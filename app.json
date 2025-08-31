@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "pickletour-app",
+    "name": "Pickletour.vn",
     "slug": "pickletour-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,14 +9,23 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pkt.pickletour",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "App dùng camera để quét mã, chụp ảnh hồ sơ.",
+        "NSPhotoLibraryUsageDescription": "App cần truy cập ảnh để bạn chọn avatar.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.pkt.pickletour",
+      "versionCode": 12
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +46,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "33bf4371-b5a6-4121-a651-99f3c2f19ba2"
+      }
+    },
+    "owner": "giangvippro"
   }
 }
