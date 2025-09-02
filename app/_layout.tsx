@@ -79,7 +79,16 @@ export default function RootLayout() {
                       />
                       <Stack.Screen
                         name="login"
-                        options={{ headerShown: false }}
+                        options={{
+                          headerTitleAlign: "center",
+                          headerBackTitle: "Quay lại",
+                          headerTintColor: "#1976d2",
+                          headerTitleStyle: {
+                            // 👈 màu title riêng
+                            color: "#000",
+                            fontWeight: "700",
+                          },
+                        }}
                       />
                       <Stack.Screen
                         name="levelpoint"
@@ -169,6 +178,32 @@ export default function RootLayout() {
                       />
                       <Stack.Screen
                         name="tournament/[id]/schedule"
+                        options={{
+                          headerTitleAlign: "center",
+                          headerBackTitle: "Quay lại",
+                          headerTintColor: "#1976d2",
+                          headerTitleStyle: {
+                            // 👈 màu title riêng
+                            color: "#000",
+                            fontWeight: "700",
+                          },
+                        }}
+                      />
+                      <Stack.Screen
+                        name="contact"
+                        options={{
+                          headerTitleAlign: "center",
+                          headerBackTitle: "Quay lại",
+                          headerTintColor: "#1976d2",
+                          headerTitleStyle: {
+                            // 👈 màu title riêng
+                            color: "#000",
+                            fontWeight: "700",
+                          },
+                        }}
+                      />
+                      <Stack.Screen
+                        name="register"
                         options={{
                           headerTitleAlign: "center",
                           headerBackTitle: "Quay lại",

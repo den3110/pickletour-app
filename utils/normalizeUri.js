@@ -6,7 +6,9 @@ export const normalizeUrl = (u) => {
   if (!u) return u;
   let s = u.trim();
   // ép https (ATS của iOS chặn http)
-  s = s.replace("http:", "https:");
+  if(!process.env.EXPO_PUBLIC_LAN_IP?.length > 0) {
+    s = s.replace("https:", "http:");
+  }
   // thay mọi backslash thành slash
   s = s.replace(/\\/g, "/");
   s = s.replace("localhost", process.env.EXPO_PUBLIC_LAN_IP)

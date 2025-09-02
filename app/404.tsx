@@ -46,7 +46,7 @@ export default function NotFound() {
       router.replace("/");
     }
   };
-  const contact = () => router.push("/(tabs)/contact"); // sửa path nếu khác
+  const contact = () => router.push("/contact"); // sửa path nếu khác
 
   return (
     <>

@@ -50,16 +50,16 @@ function SkeletonBar({ w = "100%", h = 18, r = 8, mt = 6, bg }) {
 function openURL(url) {
   if (!url) return;
   Linking.canOpenURL(url)
-    .then((ok) => (ok ? Linking.openURL(url) : Alert.alert("Lỗi", "Không mở được liên kết.")))
+    .then((ok) =>
+      ok ? Linking.openURL(url) : Alert.alert("Lỗi", "Không mở được liên kết.")
+    )
     .catch(() => Alert.alert("Lỗi", "Không mở được liên kết."));
 }
 
 function InfoRow({ icon, label, children, color, tint }) {
   return (
     <View style={styles.infoRow}>
-      <View style={styles.iconWrap}>
-        {icon}
-      </View>
+      <View style={styles.iconWrap}>{icon}</View>
       <Text style={[styles.infoText, { color }]}>{label} </Text>
       {typeof children === "string" ? (
         <Text style={[styles.linkText, { color: tint }]}>{children}</Text>
@@ -116,9 +116,18 @@ export default function ContactScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Liên hệ", headerTitleAlign: "center" }} />
-      <ScrollView contentContainerStyle={[styles.scroll, { backgroundColor: bg }]}>
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}>
+      <Stack.Screen
+        options={{ title: "Liên hệ", headerTitleAlign: "center" }}
+      />
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { backgroundColor: bg }]}
+      >
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cardBg, borderColor: border },
+          ]}
+        >
           <Text style={[styles.title, { color: textPrimary }]}>Liên hệ.</Text>
 
           {info ? (
@@ -128,9 +137,17 @@ export default function ContactScreen() {
                 color={textPrimary}
                 tint={tint}
                 label="Địa chỉ:"
-                icon={<MaterialIcons name="location-on" size={22} color={textSecondary} />}
+                icon={
+                  <MaterialIcons
+                    name="location-on"
+                    size={22}
+                    color={textSecondary}
+                  />
+                }
               >
-                <Text style={{ color: textPrimary }}>{info.address || "—"}</Text>
+                <Text style={{ color: textPrimary }}>
+                  {info.address || "—"}
+                </Text>
               </InfoRow>
 
               {/* Điện thoại */}
@@ -138,7 +155,9 @@ export default function ContactScreen() {
                 color={textPrimary}
                 tint={tint}
                 label="Điện thoại:"
-                icon={<MaterialIcons name="phone" size={20} color={textSecondary} />}
+                icon={
+                  <MaterialIcons name="phone" size={20} color={textSecondary} />
+                }
               >
                 <LinkText
                   text={info.phone}
@@ -152,7 +171,9 @@ export default function ContactScreen() {
                 color={textPrimary}
                 tint={tint}
                 label="Email:"
-                icon={<MaterialIcons name="email" size={20} color={textSecondary} />}
+                icon={
+                  <MaterialIcons name="email" size={20} color={textSecondary} />
+                }
               >
                 <LinkText
                   text={info.email}
@@ -165,7 +186,11 @@ export default function ContactScreen() {
               <View style={styles.socialRow}>
                 {info?.socials?.facebook ? (
                   <SocialButton
-                    bg={Platform.select({ ios: "#1877F2", android: "#1877F2", default: "#1877F2" })}
+                    bg={Platform.select({
+                      ios: "#1877F2",
+                      android: "#1877F2",
+                      default: "#1877F2",
+                    })}
                     onPress={() => openURL(info.socials.facebook)}
                   >
                     <AntDesign name="facebook-square" size={22} color="#fff" />
@@ -184,14 +209,20 @@ export default function ContactScreen() {
                     bg={tint}
                     onPress={() => openURL(info.socials.zalo)}
                   >
-                    <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+                    <Ionicons
+                      name="chatbubble-ellipses"
+                      size={20}
+                      color="#fff"
+                    />
                   </SocialButton>
                 ) : null}
               </View>
 
               {/* Hỗ trợ */}
               <View style={[styles.section, { borderTopColor: border }]}>
-                <Text style={[styles.sectionTitle, { color: textPrimary }]}>Hỗ trợ</Text>
+                <Text style={[styles.sectionTitle, { color: textPrimary }]}>
+                  Hỗ trợ
+                </Text>
 
                 <View style={styles.line}>
                   <Text style={[styles.labelStrong, { color: textPrimary }]}>
@@ -287,7 +318,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  title: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 10 },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 10,
+  },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -296,7 +332,10 @@ const styles = StyleSheet.create({
   },
   iconWrap: { width: 26, alignItems: "center", marginRight: 6 },
   infoText: { fontWeight: "700", fontSize: 15 },
-  linkText: { fontSize: 15, fontWeight: Platform.select({ ios: "600", android: "700" }) },
+  linkText: {
+    fontSize: 15,
+    fontWeight: Platform.select({ ios: "600", android: "700" }),
+  },
   socialRow: { flexDirection: "row", gap: 10, marginTop: 8, marginBottom: 4 },
   socialBtn: {
     width: 42,
@@ -311,6 +350,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 6 },
-  line: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginVertical: 2 },
+  line: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginVertical: 2,
+  },
   labelStrong: { fontWeight: "700" },
 });

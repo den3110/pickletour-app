@@ -1,4 +1,3 @@
-// app/register/index.jsx  (hoặc src/screens/RegisterScreen.jsx)
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -25,6 +24,7 @@ import { useRegisterMutation } from "@/slices/usersApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import CccdQrModal from "@/components/CccdQrModal";
 
 /* ---------- Constants ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -35,7 +35,69 @@ const GENDER_OPTIONS = [
   { value: "other", label: "Khác" },
 ];
 const PROVINCES = [
-  "An Giang","Bà Rịa-Vũng Tàu","Bạc Liêu","Bắc Giang","Bắc Kạn","Bắc Ninh","Bến Tre","Bình Dương","Bình Định","Bình Phước","Bình Thuận","Cà Mau","Cao Bằng","Cần Thơ","Đà Nẵng","Đắk Lắk","Đắk Nông","Điện Biên","Đồng Nai","Đồng Tháp","Gia Lai","Hà Giang","Hà Nam","Hà Nội","Hà Tĩnh","Hải Dương","Hải Phòng","Hậu Giang","Hòa Bình","Hưng Yên","Khánh Hòa","Kiên Giang","Kon Tum","Lai Châu","Lâm Đồng","Lạng Sơn","Lào Cai","Long An","Nam Định","Nghệ An","Ninh Bình","Ninh Thuận","Phú Thọ","Phú Yên","Quảng Bình","Quảng Nam","Quảng Ngãi","Quảng Ninh","Quảng Trị","Sóc Trăng","Sơn La","Tây Ninh","Thái Bình","Thái Nguyên","Thanh Hóa","Thừa Thiên Huế","Tiền Giang","TP Hồ Chí Minh","Trà Vinh","Tuyên Quang","Vĩnh Long","Vĩnh Phúc","Yên Bái",
+  "An Giang",
+  "Bà Rịa-Vũng Tàu",
+  "Bạc Liêu",
+  "Bắc Giang",
+  "Bắc Kạn",
+  "Bắc Ninh",
+  "Bến Tre",
+  "Bình Dương",
+  "Bình Định",
+  "Bình Phước",
+  "Bình Thuận",
+  "Cà Mau",
+  "Cao Bằng",
+  "Cần Thơ",
+  "Đà Nẵng",
+  "Đắk Lắk",
+  "Đắk Nông",
+  "Điện Biên",
+  "Đồng Nai",
+  "Đồng Tháp",
+  "Gia Lai",
+  "Hà Giang",
+  "Hà Nam",
+  "Hà Nội",
+  "Hà Tĩnh",
+  "Hải Dương",
+  "Hải Phòng",
+  "Hậu Giang",
+  "Hòa Bình",
+  "Hưng Yên",
+  "Khánh Hòa",
+  "Kiên Giang",
+  "Kon Tum",
+  "Lai Châu",
+  "Lâm Đồng",
+  "Lạng Sơn",
+  "Lào Cai",
+  "Long An",
+  "Nam Định",
+  "Nghệ An",
+  "Ninh Bình",
+  "Ninh Thuận",
+  "Phú Thọ",
+  "Phú Yên",
+  "Quảng Bình",
+  "Quảng Nam",
+  "Quảng Ngãi",
+  "Quảng Ninh",
+  "Quảng Trị",
+  "Sóc Trăng",
+  "Sơn La",
+  "Tây Ninh",
+  "Thái Bình",
+  "Thái Nguyên",
+  "Thanh Hóa",
+  "Thừa Thiên Huế",
+  "Tiền Giang",
+  "TP Hồ Chí Minh",
+  "Trà Vinh",
+  "Tuyên Quang",
+  "Vĩnh Long",
+  "Vĩnh Phúc",
+  "Yên Bái",
 ];
 
 /* ---------- Helpers ---------- */
@@ -67,6 +129,53 @@ function yyyyMMdd(d) {
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+// chuyển "DD/MM/YYYY" → "YYYY-MM-DD"
+function dmyToIso(s) {
+  if (!s) return "";
+  s = String(s).trim();
+
+  // Nếu đã là YYYY-MM-DD thì giữ nguyên
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const ok = (Y, M, D) =>
+    Y >= 1900 && Y <= 2099 && M >= 1 && M <= 12 && D >= 1 && D <= 31;
+
+  // Match dạng DD/MM/YYYY
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    const D = +dd, M = +mm, Y = +yyyy;
+
+    // Nếu hợp lệ → ISO
+    if (ok(Y, M, D)) return `${Y}-${pad(M)}-${pad(D)}`;
+
+    // Trường hợp đặc biệt: 94/19/1411  => YY(last)=dd, YY(first)=mm, yyyy=DDMM
+    if ((mm === "19" || mm === "20") && yyyy.length === 4) {
+      const D2 = +yyyy.slice(0, 2);
+      const M2 = +yyyy.slice(2, 4);
+      const Y2 = +(mm + dd); // "19" + "94" -> 1994
+      if (ok(Y2, M2, D2)) return `${Y2}-${pad(M2)}-${pad(D2)}`;
+    }
+  }
+
+  // Nếu đưa chuỗi số 8 ký tự kiểu 94191411 → 1994-11-14
+  const digits = s.replace(/\D/g, "");
+  if (digits.length === 8) {
+    const yyLast = digits.slice(0, 2);
+    const yyFirst = digits.slice(2, 4);
+    const D = +digits.slice(4, 6);
+    const M = +digits.slice(6, 8);
+    const Y = +(yyFirst + yyLast);
+    if ((yyFirst === "19" || yyFirst === "20") && ok(Y, M, D)) {
+      return `${Y}-${pad(M)}-${pad(D)}`;
+    }
+  }
+
+  // Không xác định được → trả nguyên
+  return s;
+}
+
 
 /* ---------- Screen ---------- */
 export default function RegisterScreen() {
@@ -84,7 +193,8 @@ export default function RegisterScreen() {
   const { userInfo } = useSelector((s) => s.auth);
 
   const [register, { isLoading }] = useRegisterMutation();
-  const [uploadAvatar, { isLoading: uploadingAvatar }] = useUploadAvatarMutation();
+  const [uploadAvatar, { isLoading: uploadingAvatar }] =
+    useUploadAvatarMutation();
 
   useEffect(() => {
     if (userInfo) router.replace("/");
@@ -103,19 +213,48 @@ export default function RegisterScreen() {
     gender: "unspecified",
   });
 
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  // highlight fields vừa được fill từ CCCD
+  const [HL, setHL] = useState({
+    name: false,
+    dob: false,
+    cccd: false,
+    gender: false,
+    province: false,
+  });
+  const flash = (keys = [], ms = 900) => {
+    if (!keys.length) return;
+    setHL((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, true])) }));
+    setTimeout(
+      () =>
+        setHL((p) => ({
+          ...p,
+          ...Object.fromEntries(keys.map((k) => [k, false])),
+        })),
+      ms
+    );
+  };
+
+  const [qrOpen, setQrOpen] = useState(false);
 
   const handleChange = (key, val) => setForm((p) => ({ ...p, [key]: val }));
 
   const errors = useMemo(() => {
     const {
-      name, nickname, phone, dob, email, password, confirmPassword, cccd, province, gender,
+      name,
+      nickname,
+      phone,
+      dob,
+      email,
+      password,
+      confirmPassword,
+      cccd,
+      province,
+      gender,
     } = form;
     const errs = [];
     if (name && name.trim().length < 1) errs.push("Họ tên không hợp lệ.");
-    if (nickname && nickname.trim().length < 1) errs.push("Biệt danh không hợp lệ.");
+    if (nickname && nickname.trim().length < 1)
+      errs.push("Biệt danh không hợp lệ.");
     if (phone && !/^0\d{9}$/.test(phone.trim()))
       errs.push("Số điện thoại phải bắt đầu bằng 0 và đủ 10 chữ số.");
     if (dob) {
@@ -125,9 +264,12 @@ export default function RegisterScreen() {
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       errs.push("Email không hợp lệ.");
-    if (password && password.length < 6) errs.push("Mật khẩu tối thiểu 6 ký tự.");
-    if (password !== confirmPassword) errs.push("Mật khẩu và xác nhận không khớp.");
-    if (cccd && !/^\d{12}$/.test(cccd.trim())) errs.push("CCCD phải gồm 12 chữ số.");
+    if (password && password.length < 6)
+      errs.push("Mật khẩu tối thiểu 6 ký tự.");
+    if (password !== confirmPassword)
+      errs.push("Mật khẩu và xác nhận không khớp.");
+    if (cccd && !/^\d{12}$/.test(cccd.trim()))
+      errs.push("CCCD phải gồm 12 chữ số.");
     if (gender && !["male", "female", "unspecified", "other"].includes(gender))
       errs.push("Giới tính không hợp lệ.");
     return errs;
@@ -152,8 +294,32 @@ export default function RegisterScreen() {
     return reqErrs.concat(errors);
   };
 
+  // Khi quét CCCD xong → fill + highlight
+  const onScanResult = (r) => {
+    console.log("r", r)
+    // r: { id, name, dob (DD/MM/YYYY), gender, address, raw }
+    const updates = {};
+    if (r?.id) updates.cccd = String(r.id);
+    if (r?.name) updates.name = r.name.trim();
+    if (r?.dob) updates.dob = dmyToIso(r.dob); // form dùng ISO
+    if (r?.gender) {
+      const g = String(r.gender).toLowerCase();
+      if (/(^m$|male|^nam$)/i.test(g)) updates.gender = "male";
+      else if (/(^f$|female|^nữ$|^nu$)/i.test(g)) updates.gender = "female";
+    }
+    if (r?.address) {
+      const match = PROVINCES.find((p) =>
+        r.address.toLowerCase().includes(p.toLowerCase())
+      );
+      if (match) updates.province = match;
+    }
+    setForm((p) => ({ ...p, ...updates }));
+    const changedKeys = Object.keys(updates);
+    console.log("[Register] Filled from CCCD:", updates);
+    if (changedKeys.length) flash(changedKeys);
+  };
+
   const onSubmit = async () => {
-    // hiển thị tất cả lỗi
     const allErrs = validateRequired();
     if (allErrs.length) {
       Alert.alert("Lỗi", allErrs.join("\n"));
@@ -164,14 +330,16 @@ export default function RegisterScreen() {
       let uploadedUrl = avatarUrl;
 
       if (avatarFile && !uploadedUrl) {
-        // slice sẽ tự wrap FormData field 'avatar'
         const up = await uploadAvatar(avatarFile).unwrap();
         uploadedUrl = up?.url || up?.data?.url || "";
         if (uploadedUrl) setAvatarUrl(uploadedUrl);
       }
 
       const cleaned = Object.fromEntries(
-        Object.entries(form).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])
+        Object.entries(form).map(([k, v]) => [
+          k,
+          typeof v === "string" ? v.trim() : v,
+        ])
       );
 
       const res = await register({ ...cleaned, avatar: uploadedUrl }).unwrap();
@@ -191,17 +359,36 @@ export default function RegisterScreen() {
     }
   };
 
+  // avatar
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+
   return (
     <>
-      <Stack.Screen options={{ title: "Đăng ký", headerTitleAlign: "center" }} />
+      <Stack.Screen
+        options={{ title: "Đăng ký", headerTitleAlign: "center" }}
+      />
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
-          <View style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
             {/* Avatar */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 8,
+              }}
+            >
               <View
                 style={[
                   styles.avatarWrap,
@@ -238,7 +425,7 @@ export default function RegisterScreen() {
                   </Text>
                 </Pressable>
 
-                {(avatarPreview || avatarUrl) ? (
+                {avatarPreview || avatarUrl ? (
                   <Pressable
                     onPress={() => {
                       setAvatarFile(null);
@@ -251,29 +438,122 @@ export default function RegisterScreen() {
                       pressed && { opacity: 0.9 },
                     ]}
                   >
-                    <Text style={[styles.btnText, { color: "#e53935" }]}>Xóa ảnh</Text>
+                    <Text style={[styles.btnText, { color: "#e53935" }]}>
+                      Xóa ảnh
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>
             </View>
 
             {/* Fields */}
-            <Field label="Họ và tên" value={form.name} onChangeText={(v) => handleChange("name", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} required />
-            <Field label="Nickname" value={form.nickname} onChangeText={(v) => handleChange("nickname", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} required />
-            <Field label="Số điện thoại" value={form.phone} onChangeText={(v) => handleChange("phone", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} keyboardType="phone-pad" required />
-            <DateField label="Ngày sinh" value={form.dob} onChange={(v) => handleChange("dob", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} tint={tint} />
-            <Field label="Email" value={form.email} onChangeText={(v) => handleChange("email", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} keyboardType="email-address" required />
-            <Field label="Mã định danh CCCD" value={form.cccd} onChangeText={(v) => handleChange("cccd", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} keyboardType="number-pad" maxLength={12} required />
-            <Field label="Mật khẩu" value={form.password} onChangeText={(v) => handleChange("password", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} secureTextEntry required />
-            <Field label="Xác nhận mật khẩu" value={form.confirmPassword} onChangeText={(v) => handleChange("confirmPassword", v)}
-              border={border} textPrimary={textPrimary} textSecondary={textSecondary} secureTextEntry required />
+            <Field
+              label="Họ và tên"
+              value={form.name}
+              onChangeText={(v) => handleChange("name", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              required
+              highlighted={HL.name}
+              tint={tint}
+            />
+
+            <Field
+              label="Nickname"
+              value={form.nickname}
+              onChangeText={(v) => handleChange("nickname", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              required
+            />
+
+            <Field
+              label="Số điện thoại"
+              value={form.phone}
+              onChangeText={(v) => handleChange("phone", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              keyboardType="phone-pad"
+              required
+            />
+
+            <DateField
+              label="Ngày sinh"
+              value={form.dob}
+              onChange={(v) => handleChange("dob", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              tint={tint}
+              highlighted={HL.dob}
+            />
+
+            <Field
+              label="Email"
+              value={form.email}
+              onChangeText={(v) => handleChange("email", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              keyboardType="email-address"
+              required
+            />
+
+            {/* CCCD + nút quét */}
+            <View style={{ gap: 8 }}>
+              <Field
+                label="Mã định danh CCCD"
+                value={form.cccd}
+                onChangeText={(v) => handleChange("cccd", v)}
+                border={border}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                keyboardType="number-pad"
+                maxLength={12}
+                required
+                highlighted={HL.cccd}
+                tint={tint}
+              />
+
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                <Pressable
+                  onPress={() => setQrOpen(true)}
+                  style={({ pressed }) => [
+                    styles.btn,
+                    { backgroundColor: tint },
+                    pressed && { opacity: 0.92 },
+                  ]}
+                >
+                  <Text style={styles.btnTextWhite}>
+                    Quét CCCD để điền nhanh thông tin ( mã QR)
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Field
+              label="Mật khẩu"
+              value={form.password}
+              onChangeText={(v) => handleChange("password", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              // secureTextEntry
+              required
+            />
+            <Field
+              label="Xác nhận mật khẩu"
+              value={form.confirmPassword}
+              onChangeText={(v) => handleChange("confirmPassword", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              secureTextEntry
+              required
+            />
 
             <SelectField
               label="Giới tính"
@@ -284,16 +564,24 @@ export default function RegisterScreen() {
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
+              highlighted={HL.gender}
+              tint={tint}
             />
+
             <SelectField
               label="Tỉnh / Thành phố"
               value={form.province}
-              options={[{ value: "", label: "-- Chọn --" }, ...PROVINCES.map((p) => ({ value: p, label: p }))]}
+              options={[
+                { value: "", label: "-- Chọn --" },
+                ...PROVINCES.map((p) => ({ value: p, label: p })),
+              ]}
               placeholder="-- Chọn --"
               onChange={(v) => handleChange("province", v)}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
+              highlighted={HL.province}
+              tint={tint}
             />
 
             {/* Submit */}
@@ -303,7 +591,8 @@ export default function RegisterScreen() {
               style={({ pressed }) => [
                 styles.btn,
                 {
-                  backgroundColor: isLoading || uploadingAvatar ? "#9aa0a6" : tint,
+                  backgroundColor:
+                    isLoading || uploadingAvatar ? "#9aa0a6" : tint,
                 },
                 pressed && { opacity: 0.95 },
               ]}
@@ -329,6 +618,16 @@ export default function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal quét CCCD */}
+      <CccdQrModal
+        visible={qrOpen}
+        onClose={() => setQrOpen(false)}
+        onResult={(r) => {
+          setQrOpen(false);
+          onScanResult(r);
+        }}
+      />
     </>
   );
 }
@@ -345,6 +644,8 @@ function Field({
   border,
   textPrimary,
   textSecondary,
+  highlighted = false,
+  tint = "#0a84ff",
 }) {
   return (
     <View style={{ marginBottom: 10 }}>
@@ -357,7 +658,16 @@ function Field({
         onChangeText={onChangeText}
         placeholder={label}
         placeholderTextColor="#9aa0a6"
-        style={[styles.input, { borderColor: border, color: textPrimary }]}
+        style={[
+          styles.input,
+          { borderColor: highlighted ? tint : border, color: textPrimary },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
+        ]}
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
         maxLength={maxLength}
@@ -375,14 +685,15 @@ function SelectField({
   border,
   textPrimary,
   textSecondary,
+  highlighted = false,
+  tint = "#0a84ff",
 }) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(value || "");
 
   useEffect(() => setTemp(value || ""), [value]);
 
-  const display =
-    options.find((o) => o.value === value)?.label || placeholder;
+  const display = options.find((o) => o.value === value)?.label || placeholder;
 
   return (
     <View style={{ marginBottom: 10 }}>
@@ -392,7 +703,13 @@ function SelectField({
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.selectBox,
-          { borderColor: border },
+          { borderColor: highlighted ? tint : border },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -401,7 +718,12 @@ function SelectField({
         </Text>
       </Pressable>
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+      <Modal
+        visible={open}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpen(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, { borderColor: border }]}>
             <View style={styles.modalHeader}>
@@ -419,9 +741,16 @@ function SelectField({
                 <Text style={styles.modalBtnText}>Xong</Text>
               </Pressable>
             </View>
-            <Picker selectedValue={temp} onValueChange={(v) => setTemp(String(v))}>
+            <Picker
+              selectedValue={temp}
+              onValueChange={(v) => setTemp(String(v))}
+            >
               {options.map((o) => (
-                <Picker.Item key={o.value ?? o.label} label={o.label} value={o.value} />
+                <Picker.Item
+                  key={o.value ?? o.label}
+                  label={o.label}
+                  value={o.value}
+                />
               ))}
             </Picker>
           </View>
@@ -439,9 +768,12 @@ function DateField({
   textPrimary,
   textSecondary,
   tint,
+  highlighted = false,
 }) {
   const [open, setOpen] = useState(false);
-  const [temp, setTemp] = useState(value ? new Date(value) : new Date(1990, 0, 1));
+  const [temp, setTemp] = useState(
+    value ? new Date(value) : new Date(1990, 0, 1)
+  );
 
   useEffect(() => {
     if (value) setTemp(new Date(value));
@@ -455,7 +787,13 @@ function DateField({
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.selectBox,
-          { borderColor: border },
+          { borderColor: highlighted ? tint : border },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -465,11 +803,19 @@ function DateField({
       </Pressable>
 
       {open && (
-        <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+        <Modal
+          visible={open}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setOpen(false)}
+        >
           <View style={styles.modalBackdrop}>
             <View style={[styles.modalCard, { borderColor: border }]}>
               <View style={styles.modalHeader}>
-                <Pressable onPress={() => setOpen(false)} style={styles.modalBtn}>
+                <Pressable
+                  onPress={() => setOpen(false)}
+                  style={styles.modalBtn}
+                >
                   <Text style={styles.modalBtnText}>Hủy</Text>
                 </Pressable>
                 <Text style={styles.modalTitle}>{label}</Text>
@@ -478,9 +824,18 @@ function DateField({
                     onChange(yyyyMMdd(temp));
                     setOpen(false);
                   }}
-                  style={[styles.modalBtn, { backgroundColor: tint, borderRadius: 8, paddingHorizontal: 10 }]}
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor: tint,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>Xong</Text>
+                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>
+                    Xong
+                  </Text>
                 </Pressable>
               </View>
 
@@ -537,7 +892,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   btnText: { fontWeight: "700" },
-  btnTextWhite: { color: "#fff", fontWeight: "700" },
+  btnTextWhite: { color: "#fff", fontWeight: "700", },
   btnOutline: { borderWidth: 1 },
   btnTextOnly: { backgroundColor: "transparent" },
   selectBox: {

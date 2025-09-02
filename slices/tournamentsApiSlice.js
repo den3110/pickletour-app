@@ -406,6 +406,26 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["ADMIN_MATCHES"],
     }),
+    // GET /me/tournaments?role=player&page&limit&status
+    listMyTournaments: builder.query({
+      query: ({
+        page = 1,
+        limit = 50,
+        status,
+        withMatches = 1,
+        matchLimit = 200,
+      } = {}) => ({
+        url: "/api/users/tournaments",
+        params: { page, limit, status, withMatches, matchLimit },
+      }),
+      providesTags: (res) =>
+        res?.items
+          ? [
+              ...res.items.map((t) => ({ type: "MyTournaments", id: t._id })),
+              { type: "MyTournaments", id: "LIST" },
+            ]
+          : [{ type: "MyTournaments", id: "LIST" }],
+    }),
   }),
 });
 
@@ -455,4 +475,5 @@ export const {
   useAdminGetBracketsQuery,
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
+  useListMyTournamentsQuery,
 } = tournamentsApiSlice;

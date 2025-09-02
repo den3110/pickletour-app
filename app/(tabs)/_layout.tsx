@@ -55,11 +55,11 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="contact"
+        name="my_tournament"
         options={{
-          title: "Liên hệ",
+          title: "Giải của tôi",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="phone.fill" color={color} />
+            <IconSymbol size={28} name="sportscourt.fill" color={color} />
           ),
         }}
       />

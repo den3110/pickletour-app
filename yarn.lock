@@ -1694,6 +1694,14 @@
   resolved "https://registry.yarnpkg.com/@rtsao/scc/-/scc-1.1.0.tgz#927dd2fae9bc3361403ac2c7a00c32ddce9ad7e8"
   integrity sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==
 
+"@shopify/react-native-skia@^2.2.8":
+  version "2.2.8"
+  resolved "https://registry.yarnpkg.com/@shopify/react-native-skia/-/react-native-skia-2.2.8.tgz#f1734a90252e153c1dc60d3516a0b5e8f8ea65c8"
+  integrity sha512-ISdx5gzp3XQGp0uem4h2j7VWqSKdRdqp+D+1XHdYy21kMtkdrYYt6UPTQafxP27ndP4D9D7fSmIE+AYDsB3ezw==
+  dependencies:
+    canvaskit-wasm "0.40.0"
+    react-reconciler "0.31.0"
+
 "@sinclair/typebox@^0.27.8":
   version "0.27.8"
   resolved "https://registry.yarnpkg.com/@sinclair/typebox/-/typebox-0.27.8.tgz#6667fac16c436b5434a387a34dedb013198f6e6e"
@@ -2072,6 +2080,11 @@
   dependencies:
     "@urql/core" "^5.1.2"
     wonka "^6.3.2"
+
+"@webgpu/types@0.1.21":
+  version "0.1.21"
+  resolved "https://registry.yarnpkg.com/@webgpu/types/-/types-0.1.21.tgz#b181202daec30d66ccd67264de23814cfd176d3a"
+  integrity sha512-pUrWq3V5PiSGFLeLxoGqReTZmiiXwY3jRkIG5sLLKjyqNxrwm/04b4nw7LSmGWJcKk59XOM/YRTUwOzo4MMlow==
 
 "@xmldom/xmldom@^0.8.8":
   version "0.8.11"
@@ -2614,6 +2627,13 @@ caniuse-lite@^1.0.30001737:
   version "1.0.30001737"
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001737.tgz#8292bb7591932ff09e9a765f12fdf5629a241ccc"
   integrity sha512-BiloLiXtQNrY5UyF0+1nSJLXUENuhka2pzy2Fx5pGxqavdrxSCW4U6Pn/PoG3Efspi2frRbHpBV2XsrPE6EDlw==
+
+canvaskit-wasm@0.40.0:
+  version "0.40.0"
+  resolved "https://registry.yarnpkg.com/canvaskit-wasm/-/canvaskit-wasm-0.40.0.tgz#61a77657259fddfc0025ad1c3f57ac8d4d5850ff"
+  integrity sha512-Od2o+ZmoEw9PBdN/yCGvzfu0WVqlufBPEWNG452wY7E9aT8RBE+ChpZF526doOlg7zumO4iCS+RAeht4P0Gbpw==
+  dependencies:
+    "@webgpu/types" "0.1.21"
 
 chalk@^2.0.1, chalk@^2.4.2:
   version "2.4.2"
@@ -3518,10 +3538,29 @@ expo-av@~15.1.7:
   resolved "https://registry.yarnpkg.com/expo-av/-/expo-av-15.1.7.tgz#a8422646eca9250c842e8a44fccccb1a4b070a05"
   integrity sha512-NC+JR+65sxXfQN1mOHp3QBaXTL2J+BzNwVO27XgUEc5s9NaoBTdHWElYXrfxvik6xwytZ+a7abrqfNNgsbQzsA==
 
+expo-barcode-scanner@^13.0.1:
+  version "13.0.1"
+  resolved "https://registry.yarnpkg.com/expo-barcode-scanner/-/expo-barcode-scanner-13.0.1.tgz#c7218c78f9e3d27086473a9826756bbcacd7f117"
+  integrity sha512-xBGLT1An2gpAMIQRTLU3oHydKohX8r8F9/ait1Fk9Vgd0GraFZbP4IiT7nHMlaw4H6E7Muucf7vXpGV6u7d4HQ==
+  dependencies:
+    expo-image-loader "~4.7.0"
+
 expo-blur@~14.1.5:
   version "14.1.5"
   resolved "https://registry.yarnpkg.com/expo-blur/-/expo-blur-14.1.5.tgz#910712389e19286ccdc136275bf569f427aa05ef"
   integrity sha512-CCLJHxN4eoAl06ESKT3CbMasJ98WsjF9ZQEJnuxtDb9ffrYbZ+g9ru84fukjNUOTtc8A8yXE5z8NgY1l0OMrmQ==
+
+expo-brightness@~13.1.4:
+  version "13.1.4"
+  resolved "https://registry.yarnpkg.com/expo-brightness/-/expo-brightness-13.1.4.tgz#f45127e120270ed0d1b6ee50293c61d440ed666d"
+  integrity sha512-we7F+CB/jsDGRcJ1WGvyACTZUcEMx/a1TlwTkDHOORPr31leOwmk6+k98G4i0GrhvdsQt91w3WXnrWyTh7IyJg==
+
+expo-camera@^16.1.11:
+  version "16.1.11"
+  resolved "https://registry.yarnpkg.com/expo-camera/-/expo-camera-16.1.11.tgz#9b63c5e6807f960f54efec31fbe5d25a6a1dac83"
+  integrity sha512-etA5ZKoC6nPBnWWqiTmlX//zoFZ6cWQCCIdmpUHTGHAKd4qZNCkhPvBWbi8o32pDe57lix1V4+TPFgEcvPwsaA==
+  dependencies:
+    invariant "^2.2.4"
 
 expo-clipboard@~7.1.5:
   version "7.1.5"
@@ -3553,6 +3592,11 @@ expo-haptics@~14.1.4:
   resolved "https://registry.yarnpkg.com/expo-haptics/-/expo-haptics-14.1.4.tgz#442f48b1bdf83484d4fcadc653445aaae6049b70"
   integrity sha512-QZdE3NMX74rTuIl82I+n12XGwpDWKb8zfs5EpwsnGi/D/n7O2Jd4tO5ivH+muEG/OCJOMq5aeaVDqqaQOhTkcA==
 
+expo-image-loader@~4.7.0:
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/expo-image-loader/-/expo-image-loader-4.7.0.tgz#d403106822de80bda12d644c82b7a3b7983c0f0b"
+  integrity sha512-cx+MxxsAMGl9AiWnQUzrkJMJH4eNOGlu7XkLGnAXSJrRoIiciGaKqzeaD326IyCTV+Z1fXvIliSgNW+DscvD8g==
+
 expo-image-loader@~5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/expo-image-loader/-/expo-image-loader-5.1.0.tgz#f7d65f9b9a9714eaaf5d50a406cb34cb25262153"
@@ -3574,6 +3618,11 @@ expo-keep-awake@~14.1.4:
   version "14.1.4"
   resolved "https://registry.yarnpkg.com/expo-keep-awake/-/expo-keep-awake-14.1.4.tgz#80197728563e0e17523e5a606fbd6fbed9639503"
   integrity sha512-wU9qOnosy4+U4z/o4h8W9PjPvcFMfZXrlUoKTMBW7F4pLqhkkP/5G4EviPZixv4XWFMjn1ExQ5rV6BX8GwJsWA==
+
+expo-linear-gradient@~14.1.5:
+  version "14.1.5"
+  resolved "https://registry.yarnpkg.com/expo-linear-gradient/-/expo-linear-gradient-14.1.5.tgz#414bf0c8145089087198d4dd5a419eb324af2a02"
+  integrity sha512-BSN3MkSGLZoHMduEnAgfhoj3xqcDWaoICgIr4cIYEx1GcHfKMhzA/O4mpZJ/WC27BP1rnAqoKfbclk1eA70ndQ==
 
 expo-linking@~7.1.7:
   version "7.1.7"
@@ -5849,6 +5898,13 @@ react-native@0.79.6:
     whatwg-fetch "^3.0.0"
     ws "^6.2.3"
     yargs "^17.6.2"
+
+react-reconciler@0.31.0:
+  version "0.31.0"
+  resolved "https://registry.yarnpkg.com/react-reconciler/-/react-reconciler-0.31.0.tgz#6b7390fe8fab59210daf523d7400943973de1458"
+  integrity sha512-7Ob7Z+URmesIsIVRjnLoDGwBEG/tVitidU0nMsqX/eeJaLY89RISO/10ERe0MqmzuKUUB1rmY+h1itMbUHg9BQ==
+  dependencies:
+    scheduler "^0.25.0"
 
 react-redux@^9.2.0:
   version "9.2.0"

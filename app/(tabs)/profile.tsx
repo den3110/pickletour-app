@@ -3,6 +3,7 @@ import { Picker } from "@react-native-picker/picker";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { router, Stack } from "expo-router";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -641,12 +642,12 @@ export default function ProfileScreen() {
             ) : (
               <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
                 <PreviewBox
-                  uri={normalizeUri(frontUrl)}
+                  uri={normalizeUrl(frontUrl)}
                   label="Mặt trước"
                   border={border}
                 />
                 <PreviewBox
-                  uri={normalizeUri(backUrl)}
+                  uri={normalizeUrl(backUrl)}
                   label="Mặt sau"
                   border={border}
                 />

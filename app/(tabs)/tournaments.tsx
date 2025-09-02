@@ -184,12 +184,12 @@ export default function TournamentDashboardScreen() {
             />
             <InfoChip label={`Địa điểm: ${t.location || "-"}`} />
             <InfoChip
-              label={`Đăng ký: ${t.registered}/${t.maxPairs} – Trận: ${
-                t.matchesCount ?? "-"
-              }`}
+              label={`Đăng ký: ${t.registered}/${t.maxPairs}`}
             />
           </View>
-
+ {/* – Trận: ${
+                t.matchesCount ?? "-"
+              } */}
           <View
             style={{
               flexDirection: "row",
