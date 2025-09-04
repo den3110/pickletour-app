@@ -30,6 +30,7 @@ import { useSocket } from "@/context/SocketContext";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 
 /* ===================== Helpers (names) ===================== */
+// (giữ nguyên các helper cũ để không ảnh hưởng nơi khác nếu còn dùng)
 export const safePairName = (pair, eventType = "double") => {
   if (!pair) return "—";
   const p1 =
@@ -59,6 +60,19 @@ export const preferNick = (p) =>
   (p?.nick && String(p.nick).trim()) ||
   "";
 
+// === NEW: luôn ưu tiên chỉ hiện nickname ===
+export const safePairNick = (pair, eventType = "double") => {
+  if (!pair) return "—";
+  const n1 = preferNick(pair.player1) || "N/A";
+  const n2 = preferNick(pair.player2) || "";
+  const isSingle = String(eventType).toLowerCase() === "single";
+  return isSingle ? n1 : n2 ? `${n1} & ${n2}` : n1;
+};
+
+export const pairLabelNickOnly = (pair, eventType = "double") =>
+  safePairNick(pair, eventType);
+
+// (giữ để backward-compat ở file khác nếu có import)
 export const nameWithNick = (p) => {
   if (!p) return "—";
   const nm = preferName(p);
@@ -66,7 +80,6 @@ export const nameWithNick = (p) => {
   if (!nk) return nm;
   return nm.toLowerCase() === nk.toLowerCase() ? nm : `${nm} (${nk})`;
 };
-
 export const pairLabelWithNick = (pair, eventType = "double") => {
   if (!pair) return "—";
   const isSingle = String(eventType).toLowerCase() === "single";
@@ -366,8 +379,8 @@ function computeGroupTablesForBracket(bracket, matches, eventType) {
     if (y.pts !== x.pts) return y.pts - x.pts;
     if (y.setDiff !== x.setDiff) return y.setDiff - x.setDiff;
     if (y.pointDiff !== x.pointDiff) return y.pointDiff - x.pointDiff;
-    const nx = safePairName(x.pair, eventType) || "";
-    const ny = safePairName(y.pair, eventType) || "";
+    const nx = safePairNick(x.pair, eventType) || "";
+    const ny = safePairNick(y.pair, eventType) || "";
     return nx.localeCompare(ny);
   };
 
@@ -830,10 +843,10 @@ const TabsBar = ({ items, value, onChange }) => (
 const MatchModal = ({ visible, match, onClose, eventType }) => {
   if (!match) return null;
   const a = match.pairA
-    ? pairLabelWithNick(match.pairA, eventType)
+    ? pairLabelNickOnly(match.pairA, eventType) // CHỈ NICK
     : depLabel(match.previousA) || seedLabel(match.seedA);
   const b = match.pairB
-    ? pairLabelWithNick(match.pairB, eventType)
+    ? pairLabelNickOnly(match.pairB, eventType) // CHỈ NICK
     : depLabel(match.previousB) || seedLabel(match.seedB);
 
   return (
@@ -1214,15 +1227,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     () => (allMatchesFetched || []).map((m) => String(m._id)).filter(Boolean),
     [allMatchesFetched]
   );
-  // seed initial live map
-  //   useEffect(() => {
-  //     const mp = new Map();
-  //     for (const m of allMatchesFetched || []) {
-  //       if (m?._id) mp.set(String(m._id), m);
-  //     }
-  //     liveMapRef.current = mp;
-  //     setLiveBump((x) => x + 1);
-  //   }, [allMatchesFetched]);
   // đặt cùng scope với các ref khác
   const initialSeededRef = useRef(false);
 
@@ -1275,19 +1279,13 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         mp.set(id, m);
         changed = true;
       } else if (vNew === vOld) {
-        // cùng version: merge nông để lấp field rỗng nhưng KHÔNG mất dữ liệu live
         const merged = { ...cur, ...m };
-        // so sánh sơ bộ để tránh bump thừa
         if (merged !== cur) {
           mp.set(id, merged);
           changed = true;
         }
       }
     }
-
-    // KHÔNG xóa phần tử “không thấy trong fetch” ở đây
-    // (xóa sẽ làm mất trận vừa tạo live). Việc xóa hãy dựa vào
-    // socket "match:deleted" hoặc "draw:refilled" (đã debounce).
 
     if (changed) {
       liveMapRef.current = mp;
@@ -1346,10 +1344,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       refetchMatchesRef.current?.();
     };
 
-    // Nếu socket đã connected tại thời điểm mount → chạy 1 lần
     if (socket.connected) onConnect();
 
-    // Đăng ký listeners
     socket.on("connect", onConnect);
     socket.on("match:update", onUpsert);
     socket.on("match:snapshot", onUpsert);
@@ -1372,7 +1368,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         rafRef.current = null;
       }
     };
-    // deps gọn: không đưa trực tiếp refetch*, không đưa object arrays
   }, [socket, queueUpsert, bracketIds.join(","), matchIds.join(",")]);
 
   const matchesMerged = useMemo(
@@ -1397,7 +1392,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const [tab, setTab] = useState(0);
   useEffect(() => {
     if (tab >= (brackets?.length || 0)) setTab(0);
-  }, [brackets?.length]); // tránh out-of-bounds
+  }, [brackets?.length]);
 
   // Modal viewer
   const [open, setOpen] = useState(false);
@@ -1422,13 +1417,13 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [byBracket, current]
   );
 
-  // resolveSideLabel
+  // resolveSideLabel → CHỈ HIỆN NICKNAME
   const resolveSideLabel = useCallback(
     (m, side) => {
       const eventType = tour?.eventType;
       if (!m) return "Chưa có đội";
       const pair = side === "A" ? m.pairA : m.pairB;
-      if (pair) return pairLabelWithNick(pair, eventType);
+      if (pair) return pairLabelNickOnly(pair, eventType); // 👈
 
       const prev = side === "A" ? m.previousA : m.previousB;
       const seed = side === "A" ? m.seedA : m.seedB;
@@ -1442,7 +1437,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           matchIndex.get(prevId) || (typeof prev === "object" ? prev : null);
         if (pm && pm.status === "finished" && pm.winner) {
           const wp = pm.winner === "A" ? pm.pairA : pm.pairB;
-          if (wp) return pairLabelWithNick(wp, eventType);
+          if (wp) return pairLabelNickOnly(wp, eventType); // 👈
         }
         return depLabel(prev);
       }
@@ -1784,7 +1779,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                 <View style={{ gap: 8 }}>
                   {gStand.rows.map((row, idx) => {
                     const name = row.pair
-                      ? safePairName(row.pair, tour?.eventType)
+                      ? safePairNick(row.pair, tour?.eventType) // 👈 CHỈ NICK
                       : row.name || "—";
                     const pts = Number(row.pts ?? 0);
                     const diff = Number.isFinite(row.pointDiff)
@@ -1893,7 +1888,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             <Text>
               Vô địch:{" "}
               <Text style={styles.bold}>
-                {pairLabelWithNick(championPair, tour?.eventType)}
+                {pairLabelNickOnly(championPair, tour?.eventType)}
               </Text>
             </Text>
           </Card>
@@ -2162,15 +2157,15 @@ const styles = StyleSheet.create({
   koMeta: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
 
   // footnote
-  note: { marginTop: 8, fontSize: 12, opacity: 0.7 }, // thêm vào nhóm bracket
+  note: { marginTop: 8, fontSize: 12, opacity: 0.7 },
   bracketCanvas: {
     position: "relative",
-    paddingTop: 4, // nhấc connectors khỏi title một chút
+    paddingTop: 4,
   },
 
   connector: {
     position: "absolute",
-    backgroundColor: "#263238", // đậm như wiki
+    backgroundColor: "#263238",
     opacity: 0.9,
     borderRadius: 1,
   },

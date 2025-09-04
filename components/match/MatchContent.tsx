@@ -15,9 +15,10 @@ import { WebView } from "react-native-webview";
 import { Video } from "expo-av";
 import * as Clipboard from "expo-clipboard";
 
-// import { depLabel, seedLabel, nameWithNick } from "../TournamentBracket";
+// import { depLabel, seedLabel } from "../TournamentBracket";
 import PublicProfileDialog from "../PublicProfileDialog";
 
+/* ===================== Name/Nick helpers (NICKNAME-ONLY) ===================== */
 export const preferName = (p) =>
   (p?.fullName && String(p.fullName).trim()) ||
   (p?.name && String(p.name).trim()) ||
@@ -30,12 +31,10 @@ export const preferNick = (p) =>
   (p?.nick && String(p.nick).trim()) ||
   "";
 
+// CHỈ TRẢ VỀ NICKNAME (fallback "N/A")
 export const nameWithNick = (p) => {
   if (!p) return "—";
-  const nm = preferName(p);
-  const nk = preferNick(p);
-  if (!nk) return nm;
-  return nm.toLowerCase() === nk.toLowerCase() ? nm : `${nm} (${nk})`;
+  return preferNick(p) || "N/A";
 };
 
 /* ----- seed label helpers ----- */
@@ -86,7 +85,7 @@ export const depLabel = (prev) => {
   return `Winner of R${r} #${idx}`;
 };
 
-/* ===================== PlayerLink (không cắt …) ===================== */
+/* ===================== PlayerLink (chỉ hiện nickname) ===================== */
 function PlayerLink({ person, onOpen, align = "left" }) {
   if (!person) return null;
   const uid =
@@ -107,7 +106,7 @@ function PlayerLink({ person, onOpen, align = "left" }) {
       onPress={handlePress}
       style={[styles.linkText, align === "right" && { textAlign: "right" }]}
     >
-      {nameWithNick(person)}
+      {nameWithNick(person) /* => nickname only */}
     </Text>
   );
 }
@@ -664,7 +663,7 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
     asStr(o?.webUrl) ||
     "";
 
-  // ---- thay cho block overlay cũ ----
+  // ---- overlay cfg ----
   const overlayCfg =
     (mm?.overlay && typeof mm.overlay === "object" ? mm.overlay : null) ||
     (mm?.meta?.overlay && typeof mm.meta.overlay === "object"
@@ -705,7 +704,7 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
       {/* Banner trạng thái */}
       <StatusBanner status={status} hasStreams={streams.length > 0} />
 
-      {/* Khu video: đúng 2 nút theo yêu cầu */}
+      {/* Khu video */}
       {activeStream && (
         <View style={{ gap: 8 }}>
           <View style={styles.rowWrap}>
@@ -878,7 +877,7 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
         </View>
       </View>
 
-      {/* Popup hồ sơ VĐV (giữ nguyên import) */}
+      {/* Popup hồ sơ VĐV */}
       <PublicProfileDialog
         open={profileOpen}
         onClose={closeProfile}
@@ -911,7 +910,6 @@ const styles = StyleSheet.create({
   linkText: {
     color: "#1976d2",
     fontWeight: "600",
-    // Hiển thị đầy đủ, cho phép xuống dòng
     flexShrink: 0,
   },
   andText: {

@@ -24,7 +24,6 @@
     "@shopify/react-native-skia": "^2.2.8",
     "expo": "~53.0.22",
     "expo-av": "~15.1.7",
-    "expo-barcode-scanner": "^13.0.1",
     "expo-blur": "~14.1.5",
     "expo-brightness": "~13.1.4",
     "expo-camera": "^16.1.11",

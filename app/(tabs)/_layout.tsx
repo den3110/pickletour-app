@@ -7,10 +7,18 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useSelector } from "react-redux";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const userInfo = useSelector((s) => s.auth?.userInfo);
+  const [authReady, setAuthReady] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setAuthReady(true), 0);
+    return () => clearTimeout(t);
+  }, [userInfo]);
 
+  if (!authReady) return null; // hoặc splash nhẹ
   return (
     <Tabs
       screenOptions={{

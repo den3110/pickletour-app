@@ -1,3 +1,4 @@
+// app/(tabs)/profile/index.jsx
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import * as FileSystem from "expo-file-system";
@@ -6,12 +7,14 @@ import { router, Stack } from "expo-router";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActionSheetIOS,
   Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,11 +30,13 @@ import {
   useUploadCccdMutation,
 } from "@/slices/uploadApiSlice";
 import {
+  useDeleteMeMutation,
   useGetProfileQuery,
   useLogoutMutation,
   useUpdateUserMutation,
 } from "@/slices/usersApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import CccdQrModal from "@/components/CccdQrModal";
 
 /* ---------- Config ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -127,16 +132,6 @@ const EMPTY = {
 };
 
 /* helpers */
-function normalizeUri(url) {
-  try {
-    if (!url) return undefined;
-    const lan = process.env.EXPO_PUBLIC_LAN_IP;
-    if (!lan) return url;
-    return url.replace(/localhost(\:\d+)?/i, `${lan}$1`);
-  } catch {
-    return url;
-  }
-}
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -165,6 +160,18 @@ function yyyyMMdd(d) {
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+// "DD/MM/YYYY" → "YYYY-MM-DD"
+function dmyToIso(s) {
+  if (!s) return "";
+  s = String(s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // đã ISO
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return s;
+}
 
 export default function ProfileScreen() {
   const scheme = useColorScheme() ?? "light";
@@ -188,19 +195,28 @@ export default function ProfileScreen() {
 
   const [updateProfile, { isLoading }] = useUpdateUserMutation();
   const [logoutApiCall] = useLogoutMutation();
+  const [deleteMe] = useDeleteMeMutation();
   const [uploadCccd, { isLoading: upLoad }] = useUploadCccdMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadAvatarMutation();
 
+
   // ===== Redirect rules =====
-  // 1) Không có userInfo -> về login ngay
+  // Đợi 1 tick cho quá trình hydrate store rồi mới quyết định redirect
+  const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
-    if (!userInfo) {
+    const t = setTimeout(() => setAuthReady(true), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  const navigatedRef = useRef(false);
+  useEffect(() => {
+    if (authReady && !userInfo && !navigatedRef.current) {
+      navigatedRef.current = true;
       router.replace("/login");
     }
-  }, [userInfo]);
+  }, [authReady, userInfo]);
 
-  // 2) API profile trả 401 -> logout + về login
   useEffect(() => {
     const status = error?.status || error?.originalStatus;
     if (status === 401) {
@@ -214,12 +230,46 @@ export default function ProfileScreen() {
   const [errors, setErrors] = useState({});
   const initialRef = useRef(EMPTY);
 
+  // highlight fields vừa autofill
+  const [HL, setHL] = useState({
+    name: false,
+    dob: false,
+    gender: false,
+    province: false,
+    cccd: false,
+  });
+  const flash = (keys = [], ms = 900) => {
+    if (!keys.length) return;
+    setHL((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, true])) }));
+    setTimeout(
+      () =>
+        setHL((p) => ({
+          ...p,
+          ...Object.fromEntries(keys.map((k) => [k, false])),
+        })),
+      ms
+    );
+  };
+
+  const [qrOpen, setQrOpen] = useState(false);
+
   const [frontImg, setFrontImg] = useState(null);
   const [backImg, setBackImg] = useState(null);
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState("");
+
+  // Pull to refresh
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Prefill
   useEffect(() => {
@@ -293,6 +343,30 @@ export default function ProfileScreen() {
     return out;
   };
 
+  // QR → fill + highlight
+  const onScanResult = (r) => {
+    // r: { id, name, dob (DD/MM/YYYY), gender, address, raw }
+    const updates = {};
+    if (r?.id) updates.cccd = String(r.id);
+    if (r?.name) updates.name = String(r.name).trim();
+    if (r?.dob) updates.dob = dmyToIso(r.dob);
+    if (r?.gender) {
+      const g = String(r.gender).toLowerCase();
+      if (/(^m$|male|^nam$)/i.test(g)) updates.gender = "male";
+      else if (/(^f$|female|^nữ$|^nu$)/i.test(g)) updates.gender = "female";
+    }
+    if (r?.address) {
+      const match = PROVINCES.find((p) =>
+        r.address.toLowerCase().includes(p.toLowerCase())
+      );
+      if (match) updates.province = match;
+    }
+    if (Object.keys(updates).length) {
+      setForm((p) => ({ ...p, ...updates }));
+      flash(Object.keys(updates));
+    }
+  };
+
   const submit = async () => {
     setTouched(Object.fromEntries(Object.keys(form).map((k) => [k, true])));
     const errs = validate(form);
@@ -336,6 +410,13 @@ export default function ProfileScreen() {
   };
 
   const sendCccd = async () => {
+    // yêu cầu đã có số CCCD hợp lệ mới cho gửi ảnh
+    if (!/^\d{12}$/.test(String(form.cccd || "").trim())) {
+      return Alert.alert(
+        "Thiếu CCCD",
+        "Vui lòng nhập hoặc quét số CCCD (12 số) trước khi gửi ảnh xác minh."
+      );
+    }
     if (!frontImg || !backImg || upLoad) return;
     try {
       await uploadCccd({ front: frontImg, back: backImg }).unwrap();
@@ -348,20 +429,84 @@ export default function ProfileScreen() {
     }
   };
 
-  const onLogout = async () => {
+  const confirmLogout = () => {
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: "Bạn chắc muốn đăng xuất?",
+          options: ["Huỷ", "Đăng xuất"],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0,
+          userInterfaceStyle: scheme === "dark" ? "dark" : "light",
+        },
+        async (idx) => {
+          if (idx === 1) await doLogout();
+        }
+      );
+    } else {
+      Alert.alert("Đăng xuất", "Bạn chắc chắn muốn đăng xuất?", [
+        { text: "Huỷ", style: "cancel" },
+        { text: "Đăng xuất", style: "destructive", onPress: doLogout },
+      ]);
+    }
+  };
+
+  const doLogout = async () => {
     try {
       await logoutApiCall().unwrap();
+    } catch {}
+    dispatch(logoutAction());
+    router.replace("/login");
+  };
+
+  const confirmDelete = () => {
+    const run = async () => {
+      try {
+        await deleteMe().unwrap();
+      } catch {}
       dispatch(logoutAction());
       router.replace("/login");
-    } catch (err) {
-      Alert.alert("Lỗi", err?.data?.message || "Đăng xuất thất bại");
+      Alert.alert("Đã xoá", "Tài khoản của bạn đã được xoá vĩnh viễn.");
+    };
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title:
+            "Xoá tài khoản sẽ xoá dữ liệu cá nhân và không thể hoàn tác. Xác nhận?",
+          options: ["Huỷ", "Xoá vĩnh viễn"],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0,
+          userInterfaceStyle: scheme === "dark" ? "dark" : "light",
+        },
+        (idx) => idx === 1 && run()
+      );
+    } else {
+      Alert.alert(
+        "Xoá tài khoản",
+        "Xoá tài khoản sẽ xoá dữ liệu cá nhân và không thể hoàn tác. Xác nhận?",
+        [
+          { text: "Huỷ", style: "cancel" },
+          { text: "Xoá vĩnh viễn", style: "destructive", onPress: run },
+        ]
+      );
     }
   };
 
   // ===== Render gate =====
-  // Không có userInfo: đã trigger replace ở effect, return null để tránh flicker
   if (!userInfo) {
-    return null;
+    return (
+      <>
+        <Stack.Screen
+          options={{ title: "Hồ sơ", headerTitleAlign: "center" }}
+        />
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text>Đang kiểm tra đăng nhập…</Text>
+        </View>
+      </>
+    );
   }
 
   if (fetching || !user) {
@@ -381,8 +526,12 @@ export default function ProfileScreen() {
 
   const status = user.cccdStatus || "unverified";
   const showUpload = status === "unverified" || status === "rejected";
-  const frontUrl = normalizeUri(user.cccdImages?.front) || "";
-  const backUrl = normalizeUri(user.cccdImages?.back) || "";
+  const frontUrl = normalizeUrl(user.cccdImages?.front) || "";
+  const backUrl = normalizeUrl(user.cccdImages?.back) || "";
+
+  // nút gửi ảnh chỉ enable khi có 2 ảnh + có CCCD hợp lệ
+  const allowSendCccd =
+    !!frontImg && !!backImg && /^\d{12}$/.test(String(form.cccd || "").trim());
 
   return (
     <>
@@ -391,7 +540,12 @@ export default function ProfileScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <View
             style={[
               styles.card,
@@ -474,6 +628,8 @@ export default function ProfileScreen() {
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
+              highlighted={HL.name}
+              tint={tint}
             />
             <Field
               label="Biệt danh"
@@ -513,6 +669,8 @@ export default function ProfileScreen() {
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
+              highlighted={HL.gender}
+              tint={tint}
             />
 
             {/* DOB */}
@@ -528,6 +686,7 @@ export default function ProfileScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               tint={tint}
+              highlighted={HL.dob}
             />
 
             {/* Tỉnh / Thành phố */}
@@ -547,21 +706,51 @@ export default function ProfileScreen() {
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
+              highlighted={HL.province}
+              tint={tint}
             />
 
-            <Field
-              label="Mã định danh CCCD"
-              value={form.cccd}
-              onChangeText={(v) => setField("cccd", v)}
-              onBlur={() => markTouched("cccd")}
-              error={showErr("cccd") ? errors.cccd : ""}
-              placeholder="12 chữ số"
-              keyboardType="number-pad"
-              maxLength={12}
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
+            {/* CCCD + nút quét */}
+            <View style={{ gap: 8 }}>
+              <Field
+                label="Mã định danh CCCD"
+                value={form.cccd}
+                onChangeText={(v) => setField("cccd", v)}
+                onBlur={() => markTouched("cccd")}
+                error={showErr("cccd") ? errors.cccd : ""}
+                placeholder="12 chữ số"
+                keyboardType="number-pad"
+                maxLength={12}
+                border={border}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                highlighted={HL.cccd}
+                tint={tint}
+              />
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginBottom: 6,
+                }}
+              >
+                <Pressable
+                  onPress={() => setQrOpen(true)}
+                  style={({ pressed }) => [
+                    styles.btn,
+                    { backgroundColor: tint },
+                    pressed && { opacity: 0.92 },
+                  ]}
+                >
+                  <Text style={styles.btnTextWhite}>
+                    Quét CCCD (QR) để điền nhanh
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
             <Field
               label="Email"
               value={form.email}
@@ -574,6 +763,7 @@ export default function ProfileScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
             />
+
             <Field
               label="Mật khẩu mới"
               value={form.password}
@@ -624,12 +814,12 @@ export default function ProfileScreen() {
                 </View>
                 <Pressable
                   onPress={sendCccd}
-                  disabled={!frontImg || !backImg || upLoad}
+                  disabled={!allowSendCccd || upLoad}
                   style={({ pressed }) => [
                     styles.btn,
                     {
                       backgroundColor:
-                        !frontImg || !backImg || upLoad ? "#9aa0a6" : tint,
+                        !allowSendCccd || upLoad ? "#9aa0a6" : tint,
                     },
                     pressed && { opacity: 0.92 },
                   ]}
@@ -638,6 +828,13 @@ export default function ProfileScreen() {
                     {upLoad ? "Đang gửi…" : "Gửi ảnh xác minh"}
                   </Text>
                 </Pressable>
+                {!/^\d{12}$/.test(String(form.cccd || "").trim()) && (
+                  <Text
+                    style={{ color: "#e11d48", fontSize: 12, marginTop: 4 }}
+                  >
+                    Bạn cần nhập/scan số CCCD (12 số) trước khi gửi ảnh.
+                  </Text>
+                )}
               </>
             ) : (
               <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
@@ -688,13 +885,13 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* Logout */}
+          {/* Logout & Delete */}
           <Pressable
-            onPress={onLogout}
+            onPress={confirmLogout}
             style={({ pressed }) => [
               styles.btn,
               styles.btnOutline,
-              { borderColor: "#e53935", marginBottom: 100 },
+              { borderColor: "#e53935", backgroundColor: "#fff" },
               pressed && { opacity: 0.9 },
             ]}
           >
@@ -702,8 +899,36 @@ export default function ProfileScreen() {
               Đăng xuất
             </Text>
           </Pressable>
+
+          <Pressable
+            onPress={confirmDelete}
+            style={({ pressed }) => [
+              styles.btn,
+              styles.btnOutline,
+              {
+                borderColor: "#b00020",
+                marginBottom: 100,
+                backgroundColor: "#fff",
+              },
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <Text style={[styles.btnText, { color: "#b00020" }]}>
+              Xoá tài khoản
+            </Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal quét CCCD */}
+      <CccdQrModal
+        visible={qrOpen}
+        onClose={() => setQrOpen(false)}
+        onResult={(r) => {
+          setQrOpen(false);
+          onScanResult(r);
+        }}
+      />
     </>
   );
 }
@@ -723,6 +948,8 @@ function Field({
   border,
   textPrimary,
   textSecondary,
+  highlighted = false,
+  tint = "#0a84ff",
 }) {
   return (
     <View style={{ marginBottom: 10 }}>
@@ -734,9 +961,18 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         onBlur={onBlur}
-        placeholder={placeholder}
+        placeholder={placeholder || label}
         placeholderTextColor="#9aa0a6"
-        style={[styles.input, { borderColor: border, color: textPrimary }]}
+        style={[
+          styles.input,
+          { borderColor: highlighted ? tint : border, color: textPrimary },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
+        ]}
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
         maxLength={maxLength}
@@ -756,24 +992,28 @@ function SelectField({
   border,
   textPrimary,
   textSecondary,
+  highlighted = false,
+  tint = "#0a84ff",
 }) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(value || "");
-
   useEffect(() => setTemp(value || ""), [value]);
-
   const display =
     options.find((o) => o.value === value)?.label || placeholder || "—";
-
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={[styles.label, { color: textSecondary }]}>{label}</Text>
-
       <Pressable
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.selectBox,
-          { borderColor: border },
+          { borderColor: highlighted ? tint : border },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -781,9 +1021,7 @@ function SelectField({
           {display}
         </Text>
       </Pressable>
-
       {!!error && <Text style={styles.errText}>{error}</Text>}
-
       <Modal
         visible={open}
         animationType="slide"
@@ -812,7 +1050,11 @@ function SelectField({
               onValueChange={(v) => setTemp(String(v))}
             >
               {options.map((o) => (
-                <Picker.Item key={o.value} label={o.label} value={o.value} />
+                <Picker.Item
+                  key={o.value ?? o.label}
+                  label={o.label}
+                  value={o.value}
+                />
               ))}
             </Picker>
           </View>
@@ -831,25 +1073,29 @@ function DateField({
   textPrimary,
   textSecondary,
   tint,
+  highlighted = false,
 }) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(
     value ? new Date(value) : new Date(1990, 0, 1)
   );
-
   useEffect(() => {
     if (value) setTemp(new Date(value));
   }, [value]);
-
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={[styles.label, { color: textSecondary }]}>{label}</Text>
-
       <Pressable
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.selectBox,
-          { borderColor: border },
+          { borderColor: highlighted ? tint : border },
+          highlighted && {
+            shadowColor: tint,
+            shadowOpacity: 0.55,
+            shadowRadius: 6,
+            elevation: 3,
+          },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -857,9 +1103,7 @@ function DateField({
           {value || "Chọn ngày sinh"}
         </Text>
       </Pressable>
-
       {!!error && <Text style={styles.errText}>{error}</Text>}
-
       {open && (
         <Modal
           visible={open}
@@ -896,7 +1140,6 @@ function DateField({
                   </Text>
                 </Pressable>
               </View>
-
               <DateTimePicker
                 value={temp}
                 mode="date"
@@ -950,7 +1193,6 @@ function PickBox({ label, file, onPick, border, muted }) {
   );
 }
 function PreviewBox({ uri, label, border }) {
-  
   return (
     <View style={[styles.pickBox, { borderColor: border }]}>
       {uri ? (

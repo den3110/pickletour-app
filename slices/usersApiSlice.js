@@ -59,6 +59,10 @@ export const userApiSlice = apiSlice.injectEndpoints({
     searchUser: builder.query({
       query: (q) => `/api/users/search?q=${encodeURIComponent(q)}`,
     }),
+    // slices/usersApiSlice.ts
+    deleteMe: builder.mutation({
+      query: () => ({ url: "/api/users/me", method: "DELETE" }),
+    }),
   }),
 });
 
@@ -73,4 +77,5 @@ export const {
   useGetProfileQuery,
   useLazyGetProfileQuery,
   useLazySearchUserQuery,
+  useDeleteMeMutation,
 } = userApiSlice;

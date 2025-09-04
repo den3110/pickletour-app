@@ -1,9 +1,11 @@
-// app/contact/index.jsx — "Giải của tôi" + sticky header cho tiêu đề/search/chips
+// app/contact/index.jsx — "Giải của tôi" + sticky header + banner dùng expo-image (cache)
+// - Thêm: guard đăng nhập, hiển thị "Hãy đăng nhập để xem Giải của tôi" nếu chưa login
+// - Skip query khi chưa đăng nhập (RTKQ skipToken)
+
 import React, { useMemo, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  ImageBackground,
   Platform,
   Pressable,
   RefreshControl,
@@ -13,11 +15,15 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image"; // 👈 dùng expo-image để cache
 import { MaterialIcons } from "@expo/vector-icons";
+import { useSelector } from "react-redux";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { useListMyTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 /* ================= Theme ================= */
 function useThemeTokens() {
@@ -245,6 +251,7 @@ function MatchRow({ m, onPress, tokens, eventType }) {
   );
 }
 
+/** ===== Banner: dùng expo-image + gradient tối (cache ảnh giải) ===== */
 function Banner({ t, tokens }) {
   const status = t.status;
   const statusText =
@@ -260,18 +267,44 @@ function Banner({ t, tokens }) {
       ? tokens.success
       : tokens.tint;
 
+  const uri = t.image || t.cover || t.bannerUrl || null;
+
   return (
     <View style={styles.bannerWrap}>
-      <ImageBackground
-        source={t.image ? { uri: t.image } : undefined}
-        resizeMode="cover"
-        style={styles.banner}
-        imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
-      >
+      <View style={styles.bannerContainer}>
+        {uri ? (
+          <Image
+            source={{ uri: normalizeUrl(uri) }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={250}
+            cachePolicy="memory-disk" // 👈 cache vào disk + memory
+            recyclingKey={String(t._id || uri)}
+            priority="high"
+          />
+        ) : (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: "#11161c" }, // fallback tối
+            ]}
+          />
+        )}
+
+        {/* Lớp tối nhẹ khắp ảnh để tăng tương phản chữ */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(0,0,0,0.22)" },
+          ]}
+        />
+        {/* Gradient tối dần ở đáy */}
         <LinearGradient
           colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.55)"]}
           style={StyleSheet.absoluteFill}
         />
+
+        {/* Nội dung */}
         <View style={styles.bannerInner}>
           <View style={{ flex: 1 }}>
             <Text
@@ -298,13 +331,14 @@ function Banner({ t, tokens }) {
               </View>
             )}
           </View>
+
           <View style={[styles.statusTag, { backgroundColor: statusColor }]}>
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
               {statusText}
             </Text>
           </View>
         </View>
-      </ImageBackground>
+      </View>
     </View>
   );
 }
@@ -478,19 +512,70 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
   );
 }
 
+/* ======= Login Prompt (hiện khi chưa đăng nhập) ======= */
+function LoginPrompt({ tokens }) {
+  const goLogin = useCallback(() => {
+    // tuỳ cấu trúc route của bạn: "/login" hoặc "/(auth)/login"
+    router.push("/login");
+  }, []);
+  return (
+    <View style={[styles.loginWrap, { backgroundColor: tokens.bg }]}>
+      <View
+        style={[
+          styles.loginCard,
+          { backgroundColor: tokens.cardBg, borderColor: tokens.border },
+        ]}
+      >
+        <View style={styles.lockIcon}>
+          <MaterialIcons name="lock" size={28} color={tokens.tint} />
+        </View>
+        <Text style={[styles.loginTitle, { color: tokens.text }]}>
+          Hãy đăng nhập để xem{" "}
+          <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
+        </Text>
+        <Text style={{ color: tokens.sub, textAlign: "center", marginTop: 6 }}>
+          Sau khi đăng nhập, bạn sẽ thấy danh sách các giải mình đã tham gia,
+          lịch thi đấu và kết quả cá nhân.
+        </Text>
+
+        <Pressable
+          onPress={goLogin}
+          style={({ pressed }) => [
+            styles.loginBtn,
+            {
+              backgroundColor: tokens.tint,
+              opacity: pressed ? 0.9 : 1,
+              shadowColor: tokens.shadow,
+            },
+          ]}
+        >
+          <MaterialIcons name="login" size={18} color="#fff" />
+          <Text style={{ color: "#fff", fontWeight: "800", marginLeft: 8 }}>
+            Đăng nhập
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 /* ================= Page ================= */
 export default function MyTournament() {
   const tokens = useThemeTokens();
   const [open, setOpen] = useState(false);
   const [matchId, setMatchId] = useState(null);
 
+  // Lấy thông tin đăng nhập từ Redux
+  const { userInfo } = useSelector((s) => s?.auth || {});
+  const isAuthed = !!(userInfo?.token || userInfo?._id || userInfo?.email);
+
+  // Skip query nếu chưa đăng nhập
+  const queryArg = isAuthed
+    ? { withMatches: 1, matchLimit: 200, page: 1, limit: 50 }
+    : skipToken;
+
   const { data, isLoading, isError, refetch, isFetching } =
-    useListMyTournamentsQuery({
-      withMatches: 1,
-      matchLimit: 200,
-      page: 1,
-      limit: 50,
-    });
+    useListMyTournamentsQuery(queryArg);
 
   // ===== Tournament search/filter state (GLOBAL) =====
   const [tourQuery, setTourQuery] = useState("");
@@ -634,7 +719,10 @@ export default function MyTournament() {
         options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
       />
 
-      {isLoading ? (
+      {/* Nếu CHƯA đăng nhập: hiển thị prompt và không gọi API */}
+      {!isAuthed ? (
+        <LoginPrompt tokens={tokens} />
+      ) : isLoading ? (
         <View
           style={{
             flex: 1,
@@ -727,8 +815,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
+
+  /* Banner */
   bannerWrap: { width: "100%" },
-  banner: { width: "100%", height: 140, backgroundColor: "#1c2430" },
+  bannerContainer: {
+    width: "100%",
+    height: 140,
+    overflow: "hidden",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    backgroundColor: "#11161c", // fallback khi không có ảnh
+  },
   bannerInner: {
     flex: 1,
     padding: 14,
@@ -807,5 +904,47 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
+  },
+
+  /* Login prompt */
+  loginWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  loginCard: {
+    width: "100%",
+    maxWidth: 520,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: "center",
+  },
+  lockIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+    backgroundColor: "rgba(10,132,255,0.10)",
+  },
+  loginTitle: {
+    fontSize: 18,
+    fontWeight: Platform.select({ ios: "800", android: "700", default: "800" }),
+    textAlign: "center",
+  },
+  loginBtn: {
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
 });

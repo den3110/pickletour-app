@@ -34,7 +34,8 @@ import {
 import PaginationRN from "@/components/PaginationRN";
 import PlayerSelector from "@/components/PlayerSelector"; // RN version
 import PublicProfileSheet from "@/components/PublicProfileDialog"; // ✅ đúng component sheet
-import { normalizeUri, normalizeUrl } from "@/utils/normalizeUri";
+import { normalizeUrl } from "@/utils/normalizeUri";
+import { Image as ExpoImage } from "expo-image";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
@@ -386,7 +387,10 @@ export default function TournamentRegistrationScreen() {
   /* ─── actions ─── */
   const submit = async () => {
     if (!isLoggedIn)
-      return Alert.alert("Thông báo", "Vui lòng đăng nhập để đăng ký.");
+      return Alert.alert(
+        "Thông báo",
+        "Vui lòng đăng nhập để đăng ký giải đấu."
+      );
     if (!p1) return Alert.alert("Thiếu thông tin", "Chọn VĐV 1");
     if (isDoubles && !p2)
       return Alert.alert("Thiếu thông tin", "Giải đôi cần 2 VĐV");
@@ -411,7 +415,7 @@ export default function TournamentRegistrationScreen() {
 
       Alert.alert(
         "Thành công",
-        isSingles ? "Đã gửi lời mời (single)" : "Đã gửi lời mời (double)"
+        isSingles ? "Đã gửi lời mời (giải đơn)" : "Đã gửi lời mời (giải đôi)"
       );
       setP1(null);
       setP2(null);
@@ -422,15 +426,31 @@ export default function TournamentRegistrationScreen() {
       ]);
       listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
     } catch (err: any) {
-      Alert.alert(
-        "Lỗi",
-        err?.data?.message || err?.error || "Gửi lời mời thất bại"
-      );
+      if (err?.status == 412) {
+        // Precondition Failed: cần xác minh CCCD
+        Alert.alert("Cần xác minh CCCD", err?.data?.message, [
+          {
+            text: "Xác minh ngay",
+            onPress: () => router.push(`/(tabs)/profile`),
+          },
+          { text: "Để sau", style: "cancel" },
+        ]);
+        return;
+      } else {
+        Alert.alert(
+          "Lỗi",
+          err?.data?.message || err?.error || "Gửi lời mời thất bại"
+        );
+      }
     }
   };
 
   const handleCancel = (r: any) => {
-    if (!isLoggedIn) return Alert.alert("Thông báo", "Vui lòng đăng nhập.");
+    if (!isLoggedIn)
+      return Alert.alert(
+        "Thông báo",
+        "Vui lòng đăng nhập để đăng ký giải đấu."
+      );
     if (!canManage && r?.payment?.status === "Paid") {
       return Alert.alert(
         "Không thể huỷ",
@@ -528,7 +548,7 @@ export default function TournamentRegistrationScreen() {
   const openPreview = (src?: string, name?: string) =>
     setImgPreview({
       open: true,
-      src: normalizeUri(src) || PLACE,
+      src: normalizeUrl(src) || PLACE,
       name: name || "",
     });
   const closePreview = () => setImgPreview({ open: false, src: "", name: "" });
@@ -572,14 +592,17 @@ export default function TournamentRegistrationScreen() {
           openPreview(player?.avatar || PLACE, displayName(player))
         }
       >
-        <Image
-          source={{ uri: normalizeUri(player?.avatar) || PLACE }}
+        <ExpoImage
+          source={{ uri: normalizeUrl(player?.avatar) || PLACE }}
           style={{
             width: 40,
             height: 40,
             borderRadius: 20,
             backgroundColor: "#eee",
           }}
+          contentFit="cover"
+          cachePolicy="memory-disk" // cache mạnh tay: RAM + disk
+          transition={0} // tắt fade để khỏi thấy “nháy”
         />
       </Pressable>
 
@@ -1029,10 +1052,12 @@ export default function TournamentRegistrationScreen() {
               { backgroundColor: "#111", borderColor: "#333" },
             ]}
           >
-            <Image
+            <ExpoImage
               source={{ uri: normalizeUrl(imgPreview.src) || PLACE }}
               style={{ width: "100%", height: 360, borderRadius: 12 }}
-              resizeMode="contain"
+              contentFit="cover"
+              cachePolicy="memory-disk" // cache mạnh tay: RAM + disk
+              transition={0} // tắt fade để khỏi thấy “nháy”
             />
             <PrimaryBtn onPress={closePreview}>Đóng</PrimaryBtn>
           </View>
