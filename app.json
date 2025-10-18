@@ -2,8 +2,8 @@
   "expo": {
     "name": "Pickletour.vn",
     "slug": "pickletour-app",
-    "version": "1.0.1",
-    "orientation": "portrait",
+    "version": "1.0.5",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "pickletourapp",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
-      "buildNumber": "3",
+      "buildNumber": "8",
       "infoPlist": {
         "NSCameraUsageDescription": "pickletour.vn uses the camera to scan the CCCD QR code and auto-fill your full name and date of birth in Profile. Example: Scan CCCD to quickly fill profile info.",
         "NSPhotoLibraryUsageDescription": "pickletour.vn lets you pick photos to upload your avatar and CCCD verification images. Example: choose front/back CCCD images to verify.",
@@ -21,11 +21,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
-          },
-          {
-            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -38,7 +36,11 @@
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
       "versionCode": 12,
-      "permissions": ["android.permission.RECORD_AUDIO"]
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -47,6 +49,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -68,7 +76,10 @@
           "photosPermission": "Pick photos to upload your avatar and CCCD images.",
           "cameraPermission": "Scan the CCCD QR to auto-fill profile information."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -76,7 +87,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "fdad596b-007d-4477-b6f5-6ac04b8422f2"
+        "projectId": "33bf4371-b5a6-4121-a651-99f3c2f19ba2"
       }
     }
   }

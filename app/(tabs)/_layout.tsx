@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router"; // ✅ usePathname
 import React from "react";
 import { Platform } from "react-native";
 
@@ -8,26 +8,48 @@ import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useSelector } from "react-redux";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+
+const makeIcon = (
+  sfName: string,
+  androidName: keyof typeof MaterialCommunityIcons.glyphMap
+) => {
+  return ({ color, size = 28 }: { color: string; size?: number }) =>
+    Platform.OS === "ios" ? (
+      <IconSymbol size={size} name={sfName} color={color} />
+    ) : (
+      <MaterialCommunityIcons name={androidName} size={size} color={color} />
+    );
+};
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const userInfo = useSelector((s) => s.auth?.userInfo);
-  const [authReady, setAuthReady] = React.useState(false);
-  React.useEffect(() => {
-    const t = setTimeout(() => setAuthReady(true), 0);
-    return () => clearTimeout(t);
-  }, [userInfo]);
+  const userInfo = useSelector((s: any) => s.auth?.userInfo);
+  const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin"); // ✅
+  const pathname = usePathname(); // ✅
 
-  if (!authReady) return null; // hoặc splash nhẹ
+  // ✅ Nếu đang ở admin mà bị mất quyền -> đẩy ra Home
+  React.useEffect(() => {
+    if (!isAdmin && pathname?.includes("/admin")) {
+      // dùng replace để không quay lại admin được bằng back
+      // import { router } from "expo-router" nếu cần điều hướng ngay tại đây
+      // nhưng trong TabLayout tránh navigate trực tiếp; trang admin tự Redirect cũng được
+    }
+  }, [isAdmin, pathname]);
+
+  // ✅ re-mount riêng khi quyền admin thay đổi
+  const tabsKey = isAdmin ? "tabs-admin-on" : "tabs-admin-off";
+
   return (
     <Tabs
+      key={tabsKey} // ✅ ép re-mount khi isAdmin đổi
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
-          ios: { position: "absolute" }, // để lộ blur background
+          ios: { position: "absolute" },
           default: {},
         }),
       }}
@@ -36,9 +58,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Trang chủ",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
-          ),
+          tabBarIcon: makeIcon("house.fill", "home"),
         }}
       />
 
@@ -46,9 +66,7 @@ export default function TabLayout() {
         name="tournaments"
         options={{
           title: "Giải đấu",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="trophy.fill" color={color} />
-          ),
+          tabBarIcon: makeIcon("trophy.fill", "trophy"),
         }}
       />
 
@@ -56,9 +74,7 @@ export default function TabLayout() {
         name="rankings"
         options={{
           title: "Xếp hạng",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="chart.bar.fill" color={color} />
-          ),
+          tabBarIcon: makeIcon("chart.bar.fill", "chart-bar"),
         }}
       />
 
@@ -66,9 +82,31 @@ export default function TabLayout() {
         name="my_tournament"
         options={{
           title: "Giải của tôi",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="sportscourt.fill" color={color} />
-          ),
+          tabBarIcon: makeIcon("sportscourt.fill", "tennis-ball"),
+        }}
+      />
+
+      {/* ✅ Luôn khai báo màn admin, nhưng ẩn khỏi tab & deep-link nếu không phải admin */}
+      <Tabs.Screen
+        name="admin"
+        options={
+          isAdmin
+            ? {
+                title: "Quản trị",
+                tabBarIcon: makeIcon("lock.shield.fill", "shield-lock"),
+              }
+            : {
+                href: null, // ẩn khỏi tab + chặn deep-link
+              }
+        }
+      />
+
+      {/* LIVE */}
+      <Tabs.Screen
+        name="live"
+        options={{
+          title: "Live",
+          tabBarIcon: makeIcon("dot.radiowaves.left.and.right", "broadcast"),
         }}
       />
 
@@ -76,13 +114,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Hồ sơ",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={28}
-              name="person.crop.circle.fill"
-              color={color}
-            />
-          ),
+          tabBarIcon: makeIcon("person.crop.circle.fill", "account-circle"),
         }}
       />
     </Tabs>

@@ -1,7 +1,8 @@
 // app/(tabs)/profile/index.jsx
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, Stack } from "expo-router";
 
@@ -22,6 +23,7 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 
 import { logout as logoutAction } from "@/slices/authSlice";
@@ -35,8 +37,13 @@ import {
   useLogoutMutation,
   useUpdateUserMutation,
 } from "@/slices/usersApiSlice";
+import * as SecureStore from "expo-secure-store";
+import { useUnregisterPushTokenMutation } from "@/slices/pushApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import CccdQrModal from "@/components/CccdQrModal";
+import { usePlatform } from "@/hooks/usePlatform";
+import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
+import apiSlice from "@/slices/apiSlice";
 
 /* ---------- Config ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -138,22 +145,59 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
     quality: 0.9,
   });
   if (res.canceled) return null;
-  const asset = res.assets[0];
-  const uri = asset.uri;
-  const info = await FileSystem.getInfoAsync(uri, { size: true });
-  if (info.size && info.size > maxBytes) {
+
+  // Asset từ ImagePicker
+  let asset = res.assets[0];
+  let uri = asset.uri;
+
+  // Dùng File API mới để đọc metadata (size, mime, name…)
+  let f = new File(asset); // constructor nhận thẳng asset từ picker
+  let size = f.size; // bytes (0 nếu không đọc được)
+  let mime = f.type; // ví dụ "image/heic", "image/jpeg", ...
+  let name = f.name || asset.fileName || "image";
+
+  // Nếu là HEIC/HEIF -> convert sang JPEG bằng ImageManipulator (API mới)
+  const isHeic = /heic|heif/i.test(mime || "") || /\.heic|\.heif$/i.test(name);
+  if (isHeic) {
+    const ctx = ImageManipulator.manipulate(uri); // tạo context
+    const ref = await ctx.renderAsync(); // load ảnh
+    const out = await ref.saveAsync({
+      // lưu ra file mới
+      format: SaveFormat.JPEG,
+      compress: 0.9,
+    });
+    uri = out.uri;
+
+    // Cập nhật lại File sau khi convert
+    f = new File(uri);
+    size = f.size;
+    mime = "image/jpeg";
+    name = (name || "image").replace(/\.(heic|heif)$/i, ".jpg");
+  }
+
+  // Giới hạn dung lượng
+  if (typeof size === "number" && size > maxBytes) {
     Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
     return null;
   }
-  const ext = (
-    asset.fileName?.split(".").pop() ||
-    uri.split(".").pop() ||
-    "jpg"
-  ).toLowerCase();
-  const name = asset.fileName || `image.${ext}`;
-  const type = asset.mimeType || (ext === "png" ? "image/png" : "image/jpeg");
-  return { uri, name, type, size: info.size };
+
+  // Chuẩn hóa trả về cho FormData
+  if (!/\.jpe?g|\.png|\.webp$/i.test(name)) {
+    // đoán đuôi theo mime
+    const ext = /png/i.test(mime) ? "png" : /webp/i.test(mime) ? "webp" : "jpg";
+    if (!name.includes(".")) name = `${name}.${ext}`;
+  }
+  const type =
+    mime ||
+    (name.endsWith(".png")
+      ? "image/png"
+      : name.endsWith(".webp")
+      ? "image/webp"
+      : "image/jpeg");
+
+  return { uri, name, type, size };
 }
+
 function yyyyMMdd(d) {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
@@ -174,6 +218,7 @@ function dmyToIso(s) {
 }
 
 export default function ProfileScreen() {
+  const { isIOS } = usePlatform();
   const scheme = useColorScheme() ?? "light";
   const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
   const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
@@ -181,6 +226,8 @@ export default function ProfileScreen() {
   const textSecondary = scheme === "dark" ? "#c9c9c9" : "#444";
   const border = scheme === "dark" ? "#2e2f33" : "#dfe3ea";
   const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
+  const placeholder = scheme === "dark" ? "#8e8e93" : "#9aa0a6";
+  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
@@ -194,12 +241,12 @@ export default function ProfileScreen() {
   } = useGetProfileQuery(undefined, { skip: !userInfo });
 
   const [updateProfile, { isLoading }] = useUpdateUserMutation();
+  const [unregisterDeviceToken] = useUnregisterPushTokenMutation();
   const [logoutApiCall] = useLogoutMutation();
   const [deleteMe] = useDeleteMeMutation();
   const [uploadCccd, { isLoading: upLoad }] = useUploadCccdMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadAvatarMutation();
-
 
   // ===== Redirect rules =====
   // Đợi 1 tick cho quá trình hydrate store rồi mới quyết định redirect
@@ -453,10 +500,27 @@ export default function ProfileScreen() {
 
   const doLogout = async () => {
     try {
+      // 1) Tắt token của thiết bị hiện tại (khi còn đăng nhập ⇒ có auth, không 403)
+      const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+      if (deviceId) {
+        try {
+          await unregisterDeviceToken({ deviceId }).unwrap();
+        } catch (e) {
+          if (__DEV__) console.log("unregister device token failed:", e);
+          // vẫn tiếp tục logout
+        }
+      }
+
+      // 2) Gọi API logout (server xoá cookie/session)
       await logoutApiCall().unwrap();
-    } catch {}
+    } catch {
+      // bỏ qua lỗi để đảm bảo luôn logout phía client
+    }
+
+    // 3) Dọn state & điều hướng
     dispatch(logoutAction());
     router.replace("/login");
+    dispatch(apiSlice.util.resetApiState());
   };
 
   const confirmDelete = () => {
@@ -543,7 +607,13 @@ export default function ProfileScreen() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={tint} // iOS spinner
+              colors={[tint]} // Android spinner
+              progressBackgroundColor={cardBg} // Android track
+            />
           }
         >
           <View
@@ -803,13 +873,16 @@ export default function ProfileScreen() {
                     onPick={async () => setFrontImg(await pickImage())}
                     border={border}
                     muted={muted}
+                    textSecondary={textSecondary}
                   />
+
                   <PickBox
                     label="Mặt sau"
                     file={backImg}
                     onPick={async () => setBackImg(await pickImage())}
                     border={border}
                     muted={muted}
+                    textSecondary={textSecondary}
                   />
                 </View>
                 <Pressable
@@ -832,7 +905,7 @@ export default function ProfileScreen() {
                   <Text
                     style={{ color: "#e11d48", fontSize: 12, marginTop: 4 }}
                   >
-                    Bạn cần nhập/scan số CCCD (12 số) trước khi gửi ảnh.
+                    Bạn cần nhập hoặc quét mã số CCCD (12 số) trước khi gửi ảnh.
                   </Text>
                 )}
               </>
@@ -842,11 +915,13 @@ export default function ProfileScreen() {
                   uri={normalizeUrl(frontUrl)}
                   label="Mặt trước"
                   border={border}
+                  muted={muted}
                 />
                 <PreviewBox
                   uri={normalizeUrl(backUrl)}
                   label="Mặt sau"
                   border={border}
+                  muted={muted}
                 />
               </View>
             )}
@@ -891,7 +966,7 @@ export default function ProfileScreen() {
             style={({ pressed }) => [
               styles.btn,
               styles.btnOutline,
-              { borderColor: "#e53935", backgroundColor: "#fff" },
+              { borderColor: "#e53935", backgroundColor: cardBg },
               pressed && { opacity: 0.9 },
             ]}
           >
@@ -905,11 +980,8 @@ export default function ProfileScreen() {
             style={({ pressed }) => [
               styles.btn,
               styles.btnOutline,
-              {
-                borderColor: "#b00020",
-                marginBottom: 100,
-                backgroundColor: "#fff",
-              },
+              { borderColor: "#b00020", backgroundColor: cardBg },
+              isIOS && { marginBottom: 80 },
               pressed && { opacity: 0.9 },
             ]}
           >
@@ -995,6 +1067,11 @@ function SelectField({
   highlighted = false,
   tint = "#0a84ff",
 }) {
+  const { isIOS } = usePlatform();
+  const scheme = useColorScheme() ?? "light";
+  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
+  const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
+  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(value || "");
   useEffect(() => setTemp(value || ""), [value]);
@@ -1017,7 +1094,9 @@ function SelectField({
           pressed && { opacity: 0.95 },
         ]}
       >
-        <Text style={{ color: value ? textPrimary : "#9aa0a6", fontSize: 16 }}>
+        <Text
+          style={{ color: value ? textPrimary : placeholder, fontSize: 16 }}
+        >
           {display}
         </Text>
       </Pressable>
@@ -1029,12 +1108,23 @@ function SelectField({
         onRequestClose={() => setOpen(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { borderColor: border }]}>
+          <View
+            style={[
+              styles.modalCard,
+              { borderColor: border, backgroundColor: cardBg },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setOpen(false)} style={styles.modalBtn}>
-                <Text style={styles.modalBtnText}>Hủy</Text>
+                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                  Hủy
+                </Text>
               </Pressable>
-              <Text style={styles.modalTitle}>{label}</Text>
+
+              <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                {label}
+              </Text>
+
               <Pressable
                 onPress={() => {
                   onChange(temp);
@@ -1042,7 +1132,9 @@ function SelectField({
                 }}
                 style={styles.modalBtn}
               >
-                <Text style={styles.modalBtnText}>Xong</Text>
+                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                  Xong
+                </Text>
               </Pressable>
             </View>
             <Picker
@@ -1075,6 +1167,12 @@ function DateField({
   tint,
   highlighted = false,
 }) {
+  const { isIOS } = usePlatform();
+  const scheme = useColorScheme() ?? "light";
+  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
+  const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
+  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
+  const placeholder = scheme === "dark" ? "#8e8e93" : "#9aa0a6";
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(
     value ? new Date(value) : new Date(1990, 0, 1)
@@ -1099,7 +1197,9 @@ function DateField({
           pressed && { opacity: 0.95 },
         ]}
       >
-        <Text style={{ color: value ? textPrimary : "#9aa0a6", fontSize: 16 }}>
+        <Text
+          style={{ color: value ? textPrimary : placeholder, fontSize: 16 }}
+        >
           {value || "Chọn ngày sinh"}
         </Text>
       </Pressable>
@@ -1112,15 +1212,26 @@ function DateField({
           onRequestClose={() => setOpen(false)}
         >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { borderColor: border }]}>
+            <View
+              style={[
+                styles.modalCard,
+                { borderColor: border, backgroundColor: cardBg },
+              ]}
+            >
               <View style={styles.modalHeader}>
                 <Pressable
                   onPress={() => setOpen(false)}
                   style={styles.modalBtn}
                 >
-                  <Text style={styles.modalBtnText}>Hủy</Text>
+                  <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                    Hủy
+                  </Text>
                 </Pressable>
-                <Text style={styles.modalTitle}>{label}</Text>
+
+                <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                  {label}
+                </Text>
+
                 <Pressable
                   onPress={() => {
                     onChange(yyyyMMdd(temp));
@@ -1144,9 +1255,7 @@ function DateField({
                 value={temp}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(_, d) => {
-                  if (d) setTemp(d);
-                }}
+                onChange={(_, d) => d && setTemp(d)}
                 maximumDate={new Date()}
               />
             </View>
@@ -1157,28 +1266,59 @@ function DateField({
   );
 }
 
-function PickBox({ label, file, onPick, border, muted }) {
+function PickBox({ label, file, onPick, border, muted, textSecondary }) {
+  const hasImg = !!file?.uri;
+
   return (
     <View
       style={[styles.pickBox, { borderColor: border, backgroundColor: muted }]}
     >
-      {file?.uri ? (
-        <Image
-          source={{ uri: file.uri }}
-          style={{ width: "100%", height: 120, borderRadius: 8 }}
-          resizeMode="cover"
-        />
-      ) : (
+      <Pressable
+        onPress={onPick}
+        android_ripple={{ color: "rgba(0,0,0,0.08)" }}
+        accessibilityRole="button"
+        accessibilityLabel={hasImg ? "Đổi ảnh" : "Chọn ảnh"}
+        accessibilityHint="Nhấn để chọn ảnh từ thư viện"
+        style={({ pressed }) => [{ opacity: pressed ? 0.96 : 1 }]}
+      >
         <View
-          style={{
-            width: "100%",
-            height: 120,
-            borderRadius: 8,
-            backgroundColor: "rgba(0,0,0,0.06)",
-          }}
-        />
-      )}
-      <Text style={{ textAlign: "center", marginTop: 6 }}>{label}</Text>
+          style={[sx.area, { borderColor: border, backgroundColor: muted }]}
+        >
+          {hasImg ? (
+            <>
+              <Image
+                source={{ uri: file.uri }}
+                style={sx.img}
+                resizeMode="cover"
+              />
+              <View style={sx.overlay}>
+                <MaterialIcons name="photo-camera" size={18} color="#fff" />
+                <Text style={sx.overlayText}>Đổi ảnh</Text>
+              </View>
+            </>
+          ) : (
+            <View style={sx.placeholder}>
+              <MaterialIcons name="image" size={28} color={textSecondary} />
+              <Text style={[sx.title, { color: textSecondary }]}>
+                Chạm để chọn ảnh
+              </Text>
+              <Text
+                style={[
+                  sx.hint,
+                  { color: textSecondary, opacity: 0.8, textAlign: "center" },
+                ]}
+              >
+                Hỗ trợ JPG/PNG, tối đa 5MB
+              </Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+
+      <Text style={{ textAlign: "center", marginTop: 6, color: textSecondary }}>
+        {label}
+      </Text>
+
       <Pressable
         onPress={onPick}
         style={({ pressed }) => [
@@ -1187,12 +1327,40 @@ function PickBox({ label, file, onPick, border, muted }) {
           pressed && { opacity: 0.9 },
         ]}
       >
-        <Text style={styles.btnText}>Chọn ảnh</Text>
+        <Text style={[styles.btnText, { color: textSecondary }]}>Chọn ảnh</Text>
       </Pressable>
     </View>
   );
 }
-function PreviewBox({ uri, label, border }) {
+
+const sx = StyleSheet.create({
+  area: {
+    width: "100%",
+    height: 120,
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    // màu sẽ override theo props ở trên
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  img: { width: "100%", height: "100%" },
+  overlay: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  overlayText: { color: "#fff", fontWeight: "600", marginLeft: 6 },
+  placeholder: { alignItems: "center", gap: 6 },
+  title: { fontSize: 14, fontWeight: "600" },
+  hint: { fontSize: 12 },
+});
+
+function PreviewBox({ uri, label, border, muted }) {
   return (
     <View style={[styles.pickBox, { borderColor: border }]}>
       {uri ? (
@@ -1207,7 +1375,7 @@ function PreviewBox({ uri, label, border }) {
             width: "100%",
             height: 120,
             borderRadius: 8,
-            backgroundColor: "rgba(0,0,0,0.06)",
+            backgroundColor: muted,
           }}
         />
       )}
@@ -1215,6 +1383,7 @@ function PreviewBox({ uri, label, border }) {
     </View>
   );
 }
+
 function StatusChip({ status }) {
   const map = {
     unverified: { label: "Chưa xác nhận", bg: "#9aa0a6" },

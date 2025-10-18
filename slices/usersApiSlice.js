@@ -37,6 +37,9 @@ export const userApiSlice = apiSlice.injectEndpoints({
     }),
     getRatingHistory: builder.query({
       query: (id) => `/api/users/${id}/ratings`,
+      providesTags: (result, error, userId) => [
+        { type: "RatingHistory", id: userId },
+      ],
     }),
     getMatchHistory: builder.query({
       query: (id) => `/api/users/${id}/matches`,
@@ -63,6 +66,54 @@ export const userApiSlice = apiSlice.injectEndpoints({
     deleteMe: builder.mutation({
       query: () => ({ url: "/api/users/me", method: "DELETE" }),
     }),
+    // ... login, register đang có
+    forgotPassword: builder.mutation({
+      query: (body) => ({
+        url: `${USERS_URL}/forgot-password`,
+        method: "POST",
+        body,
+      }),
+    }),
+    resetPassword: builder.mutation({
+      query: (body) => ({
+        url: `${USERS_URL}/reset-password`,
+        method: "POST",
+        body,
+      }),
+    }),
+    verifyResetOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/verify-reset-otp",
+        method: "POST",
+        body,
+      }),
+    }),
+    getMe: builder.query({
+      query: () => "/api/users/me",
+      providesTags: ["Me"],
+      keepUnusedDataFor: 30,
+    }),
+    getMeScore: builder.query({
+      query: () => ({ url: "/api/users/me/score", method: "GET" }),
+      providesTags: ["MeScore"],
+    }),
+    // Xoá 1 lịch sử điểm trình
+    deleteRatingHistory: builder.mutation({
+      query: ({ userId, historyId }) => ({
+        url: `/api/users/${userId}/rating-history/${historyId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (r, e, { userId }) => [
+        { type: "RatingHistory", id: userId },
+      ],
+    }),
+     getUserAchievements: builder.query({
+      query: (userId) => `/api/users/${userId}/achievements`,
+      providesTags: (res, err, id) => [
+        { type: "User", id },
+        { type: "Achievements", id },
+      ],
+    }),
   }),
 });
 
@@ -78,4 +129,12 @@ export const {
   useLazyGetProfileQuery,
   useLazySearchUserQuery,
   useDeleteMeMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useVerifyResetOtpMutation,
+  useGetMeQuery,
+  useGetMeScoreQuery,
+  useDeleteRatingHistoryMutation,
+  useGetUserAchievementsQuery,
+
 } = userApiSlice;

@@ -359,7 +359,7 @@ export default function TournamentCheckinScreen() {
       {/* ACTIONS */}
       <View style={[styles.card, styles.actionsCard]}>
         {/* Check-in theo SĐT đã đăng ký */}
-        <View style={styles.rowWrap}>
+        {/* <View style={styles.rowWrap}>
           <TextInput
             placeholder="Nhập SĐT VĐV đã đăng ký"
             value={phone}
@@ -373,7 +373,7 @@ export default function TournamentCheckinScreen() {
             onPress={handlePhone}
             disabled={busyId !== null}
           />
-        </View>
+        </View> */}
 
         <View style={styles.rowWrap}>
           <PrimaryBtn

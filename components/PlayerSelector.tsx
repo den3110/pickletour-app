@@ -11,6 +11,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { normalizeUri } from "@/utils/normalizeUri";
 
@@ -143,9 +144,12 @@ export default function PlayerSelector({
                       pressed && { backgroundColor: "#f3f4f6" },
                     ]}
                   >
-                    <Image
-                      source={{ uri: normalizeUri(item?.avatar) || AVA_PLACE }}
+                    <ExpoImage
+                      source={normalizeUri(item?.avatar) || AVA_PLACE}
                       style={styles.ava}
+                      contentFit="cover"
+                      transition={150}
+                      cachePolicy="memory-disk"
                     />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text numberOfLines={1} style={styles.optName}>
@@ -168,9 +172,12 @@ export default function PlayerSelector({
       {/* Selected preview */}
       {value && (
         <View style={styles.selectedRow}>
-          <Image
-            source={{ uri: normalizeUri(value?.avatar) || AVA_PLACE }}
+          <ExpoImage
+            source={normalizeUri(value?.avatar) || AVA_PLACE}
             style={[styles.ava, { width: 36, height: 36, borderRadius: 18 }]}
+            contentFit="cover"
+            transition={150}
+            cachePolicy="memory-disk"
           />
           <Text numberOfLines={1} style={styles.selName}>
             {value?.name || value?.fullName || value?.nickname}

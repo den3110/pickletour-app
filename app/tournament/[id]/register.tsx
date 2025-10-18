@@ -1,24 +1,34 @@
 // app/screens/TournamentRegistrationScreen.tsx
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
-  Image,
-  Linking,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
+  Linking,
+  TouchableOpacity,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
-
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { FlashList } from "@shopify/flash-list";
 import {
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
@@ -29,13 +39,15 @@ import {
   useManagerReplaceRegPlayerMutation,
   useManagerSetRegPaymentStatusMutation,
   useRespondRegInviteMutation,
+  useCreateComplaintMutation,
 } from "@/slices/tournamentsApiSlice";
-
-import PaginationRN from "@/components/PaginationRN";
-import PlayerSelector from "@/components/PlayerSelector"; // RN version
-import PublicProfileSheet from "@/components/PublicProfileDialog"; // ✅ đúng component sheet
+import { useGetMeScoreQuery } from "@/slices/usersApiSlice";
+import PlayerSelector from "@/components/PlayerSelector";
+import PublicProfileSheet from "@/components/PublicProfileDialog";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { Image as ExpoImage } from "expo-image";
+import { roundTo3 } from "@/utils/roundTo3";
+import { getFeeAmount } from "@/utils/fee";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
@@ -49,7 +61,7 @@ const normType = (t?: string) => {
 
 const displayName = (pl: any) => {
   if (!pl) return "—";
-  const fn = pl.fullName || "";
+  const fn = pl.fullName || pl.name || "";
   const nn = pl.nickName || pl.nickname || "";
   return nn ? `${fn} (${nn})` : fn || "—";
 };
@@ -71,6 +83,46 @@ const fmtRange = (a?: string, b?: string) => {
   const B = fmtDate(b);
   if (A && B) return `${A} – ${B}`;
   return A || B || "—";
+};
+
+/* cap / delta & màu tổng điểm */
+const getScoreCap = (tour: any, isSingles: boolean) =>
+  Number(
+    isSingles ? tour?.singleCap ?? tour?.scoreCap ?? 0 : tour?.scoreCap ?? 0
+  );
+
+const getMaxDelta = (tour: any) =>
+  Number(
+    tour?.scoreGap ??
+      tour?.maxDelta ??
+      tour?.scoreTolerance ??
+      tour?.tolerance ??
+      0
+  );
+
+type TotalState = "success" | "warning" | "error" | "default";
+
+/** ✅ Logic màu tổng điểm: total < cap+delta => xanh; = => vàng; > => đỏ */
+const decideTotalState = (total: number, cap: number, delta?: number) => {
+  const t = Number(total);
+  const c = Number(cap);
+  if (!Number.isFinite(t) || !(Number.isFinite(c) && c > 0)) {
+    return { state: "default" as TotalState, note: "" };
+  }
+  const d = Number.isFinite(delta) && Number(delta) > 0 ? Number(delta) : 0;
+  const threshold = c + d;
+  const EPS = 1e-6;
+  if (t > threshold + EPS) return { state: "error" as TotalState, note: "" };
+  if (Math.abs(t - threshold) <= EPS)
+    return { state: "warning" as TotalState, note: "" };
+  return { state: "success" as TotalState, note: "" };
+};
+
+const chipColorsByState: Record<TotalState, { bg: string; fg: string }> = {
+  success: { bg: "#e8f5e9", fg: "#2e7d32" },
+  warning: { bg: "#fef3c7", fg: "#92400e" },
+  error: { bg: "#fee2e2", fg: "#991b1b" },
+  default: { bg: "#eeeeee", fg: "#424242" },
 };
 
 /* -------- small atoms (RN) -------- */
@@ -130,7 +182,6 @@ function PaymentChip({ status, paidAt }: { status?: string; paidAt?: string }) {
     />
   );
 }
-
 function CheckinChip({ checkinAt }: { checkinAt?: string }) {
   const ok = !!checkinAt;
   return (
@@ -162,17 +213,130 @@ function StatItem({ label, value, hint }: any) {
   );
 }
 
-/* --------- Action cell --------- */
+/** VĐV 1 (Bạn) */
+function SelfPlayerReadonly({
+  me,
+  isSingles,
+}: {
+  me: any;
+  isSingles: boolean;
+}) {
+  if (!me?._id) return null;
+  const display = me?.nickname || me?.name || "Tôi";
+  const scoreVal = isSingles ? me?.score?.single : me?.score?.double;
+  return (
+    <View style={styles.selfCard}>
+      <Text style={{ fontWeight: "700", marginBottom: 8 }}>VĐV 1 (Bạn)</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <ExpoImage
+          source={{ uri: normalizeUrl(me?.avatar) || PLACE }}
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 23,
+            backgroundColor: "#eee",
+          }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={0}
+        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ fontWeight: "600", color: "#111" }}>
+            {display}
+          </Text>
+          <Text numberOfLines={1} style={{ color: "#6b7280", fontSize: 12 }}>
+            {me?.phone || "—"}
+          </Text>
+        </View>
+        <Chip
+          label={`Điểm ${isSingles ? "đơn" : "đôi"}: ${roundTo3(
+            Number(scoreVal ?? 0)
+          )}`}
+          bg="#fff"
+          fg="#111"
+        />
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Payment & Complaint helpers ---------- */
+const maskPhone = (phone?: string) => {
+  if (!phone) return "*******???";
+  const d = String(phone).replace(/\D/g, "");
+  const tail = d.slice(-3) || "???";
+  return "*******" + tail;
+};
+const regCodeOf = (r: any) =>
+  r?.code ||
+  r?.shortCode ||
+  String(r?._id || "")
+    .slice(-5)
+    .toUpperCase();
+
+const normalizeNoAccent = (s?: string) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getQrProviderConfig = (tour: any) => {
+  const bank =
+    tour?.bankShortName ||
+    tour?.qrBank ||
+    tour?.bankCode ||
+    tour?.bank ||
+    process.env.EXPO_PUBLIC_QR_BANK ||
+    "";
+  const acc =
+    tour?.bankAccountNumber ||
+    tour?.qrAccount ||
+    tour?.bankAccount ||
+    process.env.EXPO_PUBLIC_QR_ACC ||
+    "";
+  return { bank, acc };
+};
+const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
+  const { bank, acc } = getQrProviderConfig(tour);
+  if (!bank || !acc) return null;
+
+  const code = regCodeOf(r);
+  const ph = maskPhone(r?.player1?.phone || r?.player2?.phone || mePhone || "");
+  const des = normalizeNoAccent(
+    `Ma giai ${tour?._id || ""} Ma dang ky ${code} SDT ${ph}`
+  );
+
+  const params = new URLSearchParams({ bank, acc, des, template: "compact" });
+  try {
+    const amount = getFeeAmount?.(tour, r);
+    if (typeof amount === "number" && amount > 0)
+      params.set("amount", String(amount));
+  } catch {}
+  return `https://qr.sepay.vn/img?${params.toString()}`;
+};
+
+/* --------- Action cell (có Thanh toán & Khiếu nại) --------- */
 function ActionCell({
   r,
   canManage,
   isOwner,
   onTogglePayment,
   onCancel,
+  onOpenComplaint,
+  onOpenPayment,
   busy,
 }: any) {
   return (
-    <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        gap: 6,
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
       {canManage && (
         <OutlineBtn
           onPress={() => onTogglePayment(r)}
@@ -181,6 +345,8 @@ function ActionCell({
           {r?.payment?.status === "Paid" ? "Bỏ thanh toán" : "Xác nhận phí 💰"}
         </OutlineBtn>
       )}
+      <PrimaryBtn onPress={() => onOpenPayment(r)}>Thanh toán</PrimaryBtn>
+      <OutlineBtn onPress={() => onOpenComplaint(r)}>⚠️ Khiếu nại</OutlineBtn>
       {(canManage || isOwner) && (
         <OutlineBtn
           onPress={() => onCancel(r)}
@@ -201,7 +367,6 @@ function HtmlCols({ tour }: { tour: any }) {
 
   if (!tour?.contactHtml && !tour?.contentHtml) return null;
 
-  // bề rộng mỗi cột (ước lượng, trừ padding & gap để RenderHTML scale ảnh)
   const colContentWidth = twoCols
     ? Math.floor((width - 16 * 2 - GAP) / 2)
     : width - 16 * 2;
@@ -262,18 +427,190 @@ function HtmlCols({ tour }: { tour: any }) {
   );
 }
 
+/* ===== Hook: keyboard height (để tránh bàn phím che nội dung) ===== */
+function useKeyboardHeight() {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const onShow = (e: any) => setH(e?.endCoordinates?.height ?? 0);
+    const onHide = () => setH(0);
+    const s1 = Keyboard.addListener("keyboardWillShow", onShow);
+    const s2 = Keyboard.addListener("keyboardWillHide", onHide);
+    const s3 = Keyboard.addListener("keyboardDidShow", onShow);
+    const s4 = Keyboard.addListener("keyboardDidHide", onHide);
+    return () => {
+      s1.remove();
+      s2.remove();
+      s3.remove();
+      s4.remove();
+    };
+  }, []);
+  return h;
+}
+
+/* ===== Item đã memo để mượt hơn ===== */
+const RegItem = React.memo(
+  function RegItem({
+    r,
+    index,
+    isSingles,
+    canManage,
+    cap,
+    delta,
+    isOwner,
+    onPreview,
+    onOpenProfile,
+    onOpenReplace,
+    onTogglePayment,
+    onCancel,
+    onOpenComplaint,
+    onOpenPayment,
+    cancelingId,
+    settingPayment,
+  }: any) {
+    const total = totalScoreOf(r, isSingles);
+    const { state } = decideTotalState(total, cap, delta);
+    const { bg, fg } = chipColorsByState[state];
+    const players = [r?.player1, r?.player2].filter(Boolean);
+
+    return (
+      <View style={[styles.card, { marginHorizontal: 16, marginTop: 8 }]}>
+        <Text style={{ color: "#6b7280", fontSize: 12 }}>#{index + 1}</Text>
+
+        {players.map((pl: any, idx: number) => (
+          <View
+            key={`${pl?.phone || pl?.fullName || idx}`}
+            style={{ marginTop: 10 }}
+          >
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              <Pressable
+                onPress={() => onPreview(pl?.avatar || PLACE, displayName(pl))}
+              >
+                <ExpoImage
+                  source={{ uri: normalizeUrl(pl?.avatar) || PLACE }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: "#eee",
+                  }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={0}
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() => onOpenProfile(pl)}
+                style={{ flex: 1, minWidth: 0 }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{ fontWeight: "600", color: "#111" }}
+                >
+                  {displayName(pl)}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: "#6b7280", fontSize: 12 }}
+                >
+                  {pl?.phone || ""}
+                </Text>
+              </Pressable>
+
+              <Chip
+                label={`Điểm: ${roundTo3(pl?.score) ?? 0}`}
+                bg="#fff"
+                fg="#111"
+              />
+              {canManage && (
+                <OutlineBtn
+                  onPress={() => onOpenReplace(r, idx === 0 ? "p1" : "p2")}
+                >
+                  Thay VĐV
+                </OutlineBtn>
+              )}
+            </View>
+          </View>
+        ))}
+
+        {!isSingles && !r.player2 && canManage && (
+          <View style={{ marginTop: 8 }}>
+            <OutlineBtn onPress={() => onOpenReplace(r, "p2")}>
+              Thêm VĐV 2
+            </OutlineBtn>
+          </View>
+        )}
+
+        <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 8 }}>
+          {new Date(r.createdAt).toLocaleString()}
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <PaymentChip status={r.payment?.status} paidAt={r.payment?.paidAt} />
+          <CheckinChip checkinAt={r.checkinAt} />
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 6,
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
+          <Text style={{ fontWeight: "600" }}>Tổng điểm:</Text>
+          <Chip label={`${roundTo3(total)}`} bg={bg} fg={fg} />
+        </View>
+
+        <View style={{ marginTop: 10 }}>
+          <ActionCell
+            r={r}
+            canManage={canManage}
+            isOwner={isOwner}
+            onTogglePayment={onTogglePayment}
+            onCancel={onCancel}
+            onOpenComplaint={onOpenComplaint}
+            onOpenPayment={onOpenPayment}
+            busy={{ settingPayment, deletingId: cancelingId }}
+          />
+        </View>
+      </View>
+    );
+  },
+  (a, b) => {
+    // chỉ re-render khi những field quan trọng đổi
+    return (
+      a.r?._id === b.r?._id &&
+      a.r?.payment?.status === b.r?.payment?.status &&
+      a.r?.checkinAt === b.r?.checkinAt &&
+      a.r?.player2?._id === b.r?.player2?._id &&
+      a.isSingles === b.isSingles &&
+      a.canManage === b.canManage &&
+      a.index === b.index &&
+      a.cancelingId === b.cancelingId &&
+      a.settingPayment === b.settingPayment
+    );
+  }
+);
+
 /* ===================== Screen ===================== */
 export default function TournamentRegistrationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const listRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
+  const listRef = useRef<FlashList<any>>(null);
 
-  const me = useSelector((s: any) => s.auth?.userInfo || null);
+  const { data: me, isLoading: meLoading, error: meErr } = useGetMeScoreQuery();
   const isLoggedIn = !!me?._id;
-
-  // client pagination for registrations
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
 
   /* ─── queries ─── */
   const {
@@ -281,7 +618,6 @@ export default function TournamentRegistrationScreen() {
     isLoading: tourLoading,
     error: tourErr,
   } = useGetTournamentQuery(id);
-
   const {
     data: regs = [],
     isLoading: regsLoading,
@@ -299,16 +635,19 @@ export default function TournamentRegistrationScreen() {
   const [respondInvite, { isLoading: responding }] =
     useRespondRegInviteMutation();
   const [cancelReg] = useCancelRegistrationMutation();
-
   const [setPaymentStatus, { isLoading: settingPayment }] =
     useManagerSetRegPaymentStatusMutation();
   const [adminDeleteReg] = useManagerDeleteRegistrationMutation();
   const [replacePlayer, { isLoading: replacing }] =
     useManagerReplaceRegPlayerMutation();
+  const [createComplaint, { isLoading: sendingComplaint }] =
+    useCreateComplaintMutation();
 
   /* ─── local state ─── */
-  const [p1, setP1] = useState<any>(null);
+  // Admin chọn VĐV1/2
+  const [p1Admin, setP1Admin] = useState<any>(null);
   const [p2, setP2] = useState<any>(null);
+
   const [msg, setMsg] = useState("");
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
@@ -317,23 +656,102 @@ export default function TournamentRegistrationScreen() {
     src: "",
     name: "",
   });
-
-  // replace player modal
   const [replaceDlg, setReplaceDlg] = useState({
     open: false,
     reg: null as any,
     slot: "p1" as "p1" | "p2",
   });
   const [newPlayer, setNewPlayer] = useState<any>(null);
-
-  // profile sheet
   const [profile, setProfile] = useState({ open: false, userId: null as any });
+
+  // complaint & payment
+  const [complaintDlg, setComplaintDlg] = useState({
+    open: false,
+    reg: null as any,
+    text: "",
+  });
+  const [paymentDlg, setPaymentDlg] = useState({
+    open: false,
+    reg: null as any,
+  });
+
+  // ===== Search & infinite pagination (client-side) =====
+  const PAGE_SIZE = 15;
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [take, setTake] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // tránh che nội dung khi bàn phím mở
+  const kbHeight = useKeyboardHeight();
+
+  // auto gợi ý VĐV1 là chính admin (nếu muốn)
+  useEffect(() => {
+    if ((me as any)?._id && !p1Admin) setP1Admin(me);
+  }, [me, p1Admin]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const matchStr = (s?: string) =>
+    (s || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const filteredRegs = useMemo(() => {
+    if (!debouncedQ) return regs;
+    const qn = matchStr(debouncedQ);
+    return regs.filter((r: any) => {
+      const code = regCodeOf(r);
+      const p1 = r?.player1 || {};
+      const p2 = r?.player2 || {};
+      const text = `${displayName(p1)} ${p1?.phone || ""} ${displayName(p2)} ${
+        p2?.phone || ""
+      } ${code}`.toLowerCase();
+      return matchStr(text).includes(qn);
+    });
+  }, [regs, debouncedQ]);
+
+  useEffect(() => {
+    setTake(PAGE_SIZE);
+    listRef.current?.scrollToOffset?.({ offset: 0, animated: false });
+  }, [debouncedQ, regs]);
+
+  const canLoadMore = take < filteredRegs.length;
+  const listData = useMemo(
+    () => filteredRegs.slice(0, take),
+    [filteredRegs, take]
+  );
+
+  const loadMore = useCallback(() => {
+    if (!canLoadMore || loadingMore) return;
+    setLoadingMore(true);
+    setTimeout(() => {
+      setTake((t) => Math.min(t + PAGE_SIZE, filteredRegs.length));
+      setLoadingMore(false);
+    }, 100);
+  }, [canLoadMore, loadingMore, filteredRegs.length]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchRegs(),
+        isLoggedIn ? refetchInvites() : Promise.resolve(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchRegs, refetchInvites, isLoggedIn]);
 
   const evType = useMemo(() => normType(tour?.eventType), [tour]);
   const isSingles = evType === "single";
   const isDoubles = evType === "double";
 
-  // quyền
   const isManager = useMemo(() => {
     if (!isLoggedIn || !tour) return false;
     if (String(tour.createdBy) === String(me._id)) return true;
@@ -344,7 +762,6 @@ export default function TournamentRegistrationScreen() {
     }
     return !!tour.isManager;
   }, [isLoggedIn, me, tour]);
-
   const isAdmin = !!(
     me?.isAdmin ||
     me?.role === "admin" ||
@@ -352,7 +769,6 @@ export default function TournamentRegistrationScreen() {
   );
   const canManage = isLoggedIn && (isManager || isAdmin);
 
-  // invites của giải hiện tại
   const pendingInvitesHere = useMemo(() => {
     if (!isLoggedIn) return [];
     return (myInvites || []).filter(
@@ -360,29 +776,14 @@ export default function TournamentRegistrationScreen() {
     );
   }, [myInvites, id, isLoggedIn]);
 
-  // derived for regs
-  const regCount = regs?.length ?? 0;
+  const regTotal = regs?.length ?? 0;
   const paidCount = useMemo(
     () => regs.filter((r: any) => r?.payment?.status === "Paid").length,
     [regs]
   );
 
-  const totalPages = Math.max(1, Math.ceil(regCount / pageSize));
-  const baseIndex = (page - 1) * pageSize;
-  const paginatedRegs = useMemo(
-    () => regs.slice(baseIndex, baseIndex + pageSize),
-    [regs, baseIndex, pageSize]
-  );
-
-  // clamp trang khi dữ liệu đổi
-  useEffect(() => {
-    const total = Math.max(1, Math.ceil((regs?.length ?? 0) / pageSize));
-    if (page > total) setPage(total);
-  }, [regs, page, pageSize]);
-
-  // utils
-  const playersOfReg = (r: any) => [r?.player1, r?.player2].filter(Boolean);
-  const disableSubmit = saving || !p1 || (isDoubles && !p2);
+  const cap = useMemo(() => getScoreCap(tour, isSingles), [tour, isSingles]);
+  const delta = useMemo(() => getMaxDelta(tour), [tour]);
 
   /* ─── actions ─── */
   const submit = async () => {
@@ -391,21 +792,58 @@ export default function TournamentRegistrationScreen() {
         "Thông báo",
         "Vui lòng đăng nhập để đăng ký giải đấu."
       );
-    if (!p1) return Alert.alert("Thiếu thông tin", "Chọn VĐV 1");
+
+    // xác định VĐV1 theo role (admin chọn tự do)
+    let player1Id: string | null = null;
+    if (isAdmin) {
+      if (!p1Admin?._id) {
+        return Alert.alert("Thiếu thông tin", "Vui lòng chọn VĐV 1.");
+      }
+      player1Id = String(p1Admin._id);
+    } else {
+      if (!me?._id) {
+        return Alert.alert(
+          "Thiếu thông tin",
+          "Không xác định được VĐV 1 (bạn)."
+        );
+      }
+      player1Id = String(me._id);
+    }
+
     if (isDoubles && !p2)
       return Alert.alert("Thiếu thông tin", "Giải đôi cần 2 VĐV");
 
+    if (
+      isDoubles &&
+      isAdmin &&
+      p1Admin?._id &&
+      p2?._id &&
+      String(p1Admin._id) === String(p2._id)
+    ) {
+      return Alert.alert(
+        "Không hợp lệ",
+        "VĐV 1 và VĐV 2 không được trùng nhau."
+      );
+    }
+
     try {
-      const res = await createInvite({
+      const payload: any = {
         tourId: id,
         message: msg,
-        player1Id: p1._id,
-        ...(isDoubles ? { player2Id: p2._id } : {}),
-      }).unwrap();
+        player1Id,
+        ...(isDoubles && p2?._id ? { player2Id: p2._id } : {}),
+      };
 
-      if (res?.mode === "direct_by_admin" || res?.registration) {
-        Alert.alert("Thành công", "Đã tạo đăng ký (admin — auto approve)");
-        setP1(null);
+      const res = await createInvite(payload).unwrap();
+      const mode = res?.mode ?? (res?.registration ? "direct" : "invite");
+
+      if (
+        mode === "direct_by_admin" ||
+        mode === "direct_by_kyc" ||
+        mode === "direct"
+      ) {
+        Alert.alert("Thành công", res?.message ?? "Đã tạo đăng ký");
+        if (isAdmin) setP1Admin(null);
         setP2(null);
         setMsg("");
         await refetchRegs();
@@ -417,7 +855,7 @@ export default function TournamentRegistrationScreen() {
         "Thành công",
         isSingles ? "Đã gửi lời mời (giải đơn)" : "Đã gửi lời mời (giải đôi)"
       );
-      setP1(null);
+      if (isAdmin) setP1Admin(null);
       setP2(null);
       setMsg("");
       await Promise.all([
@@ -426,16 +864,19 @@ export default function TournamentRegistrationScreen() {
       ]);
       listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
     } catch (err: any) {
-      if (err?.status == 412) {
-        // Precondition Failed: cần xác minh CCCD
-        Alert.alert("Cần xác minh CCCD", err?.data?.message, [
+      if (parseInt(err?.status) === 412) {
+        const msg412 =
+          err?.data?.message ||
+          (isDoubles
+            ? "Đồng đội cần KYC (xác minh CCCD)."
+            : "Bạn cần KYC (xác minh CCCD).");
+        Alert.alert("Cần xác minh CCCD", msg412, [
           {
             text: "Xác minh ngay",
             onPress: () => router.push(`/(tabs)/profile`),
           },
           { text: "Để sau", style: "cancel" },
         ]);
-        return;
       } else {
         Alert.alert(
           "Lỗi",
@@ -462,12 +903,10 @@ export default function TournamentRegistrationScreen() {
       if (!isOwner)
         return Alert.alert("Không có quyền", "Bạn không thể huỷ đăng ký này.");
     }
-
     const extraWarn =
       r?.payment?.status === "Paid"
         ? "\n⚠️ Cặp này đã nộp lệ phí. Hãy đảm bảo hoàn tiền/offline theo quy trình trước khi xoá."
         : "";
-
     Alert.alert(
       "Xác nhận",
       `Bạn chắc chắn muốn huỷ cặp đăng ký này?${extraWarn}`,
@@ -560,7 +999,6 @@ export default function TournamentRegistrationScreen() {
   };
   const closeReplace = () =>
     setReplaceDlg({ open: false, reg: null as any, slot: "p1" });
-
   const submitReplace = async () => {
     if (!replaceDlg?.reg?._id) return;
     if (!newPlayer?._id) return Alert.alert("Thiếu thông tin", "Chọn VĐV mới");
@@ -584,44 +1022,43 @@ export default function TournamentRegistrationScreen() {
     else Alert.alert("Thông báo", "Không tìm thấy userId của VĐV này.");
   };
 
-  /* ---- small subcomponents ---- */
-  const PlayerCell = ({ player, canEdit, onEdit }: any) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <Pressable
-        onPress={() =>
-          openPreview(player?.avatar || PLACE, displayName(player))
-        }
-      >
-        <ExpoImage
-          source={{ uri: normalizeUrl(player?.avatar) || PLACE }}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: "#eee",
-          }}
-          contentFit="cover"
-          cachePolicy="memory-disk" // cache mạnh tay: RAM + disk
-          transition={0} // tắt fade để khỏi thấy “nháy”
-        />
-      </Pressable>
+  const openComplaint = (reg: any) =>
+    setComplaintDlg({ open: true, reg, text: "" });
+  const closeComplaint = () =>
+    setComplaintDlg({ open: false, reg: null as any, text: "" });
+  const submitComplaint = async () => {
+    const regId = complaintDlg?.reg?._id;
+    const content = complaintDlg.text?.trim();
+    if (!content)
+      return Alert.alert("Thiếu nội dung", "Vui lòng nhập nội dung khiếu nại.");
+    if (!regId)
+      return Alert.alert("Lỗi", "Không tìm thấy mã đăng ký để gửi khiếu nại.");
+    if (!isLoggedIn)
+      return Alert.alert("Thông báo", "Vui lòng đăng nhập để gửi khiếu nại.");
+    try {
+      await createComplaint({ tournamentId: id, regId, content }).unwrap();
+      Alert.alert("Thành công", "Đã gửi khiếu nại. BTC sẽ phản hồi sớm.");
+      closeComplaint();
+    } catch (e: any) {
+      Alert.alert(
+        "Lỗi",
+        e?.data?.message || e?.error || "Gửi khiếu nại thất bại"
+      );
+    }
+  };
 
-      <Pressable
-        onPress={() => openProfileByPlayer(player)}
-        style={{ flex: 1, minWidth: 0 }}
-      >
-        <Text numberOfLines={1} style={{ fontWeight: "600", color: "#111" }}>
-          {displayName(player)}
-        </Text>
-        <Text numberOfLines={1} style={{ color: "#6b7280", fontSize: 12 }}>
-          {player?.phone || ""}
-        </Text>
-      </Pressable>
+  const openPayment = (reg: any) => setPaymentDlg({ open: true, reg });
+  const closePayment = () => setPaymentDlg({ open: false, reg: null as any });
 
-      <Chip label={`Điểm: ${player?.score ?? 0}`} bg="#fff" fg="#111" />
-      {canEdit && <OutlineBtn onPress={onEdit}>Thay VĐV</OutlineBtn>}
-    </View>
-  );
+  const onGoDraw = () => {
+    // drawPath nên là route nội bộ của app, ví dụ: `/tournaments/${id}/draw`
+    router.push(`/tournament/${id}/draw`);
+  };
+
+  const onGoManage = () => {
+    // đổi sang route của app nếu bạn đang dùng cấu trúc khác
+    router.push(`/tournament/${id}/manage`);
+  };
 
   /* ───────────────── Guards ───────────────── */
   if (tourLoading) {
@@ -653,9 +1090,8 @@ export default function TournamentRegistrationScreen() {
 
   const isSinglesLabel = isSingles ? "Giải đơn" : "Giải đôi";
 
-  /* ───────────────── FlatList root ───────────────── */
-  // Header gom toàn bộ phần trên danh sách
-  const ListHeader = (
+  /* ───────────────── Header (bao gồm search) ───────────────── */
+  const HeaderBlock = (
     <View style={{ padding: 16, paddingBottom: 8 }}>
       {/* Header */}
       <View style={styles.headerRow}>
@@ -695,7 +1131,7 @@ export default function TournamentRegistrationScreen() {
           />
           <StatItem
             label={isSingles ? "Số VĐV đã đăng ký" : "Số đội đã đăng ký"}
-            value={regCount}
+            value={regTotal}
           />
           <StatItem
             label={isSingles ? "Số VĐV đã nộp lệ phí" : "Số đội đã nộp lệ phí"}
@@ -703,24 +1139,24 @@ export default function TournamentRegistrationScreen() {
           />
         </View>
 
-        {/* HTML liên hệ / nội dung */}
         <HtmlCols tour={tour} />
       </View>
 
       {/* Thông báo đăng nhập */}
-      {!isLoggedIn && (
-        <View
-          style={[
-            styles.alert,
-            { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
-          ]}
-        >
-          <Text style={{ color: "#1e3a8a" }}>
-            Bạn chưa đăng nhập. Hãy đăng nhập để xem/ phản hồi lời mời và thực
-            hiện đăng ký.
-          </Text>
-        </View>
-      )}
+      {meLoading
+        ? null
+        : !isLoggedIn && (
+            <View
+              style={[
+                styles.alert,
+                { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
+              ]}
+            >
+              <Text style={{ color: "#1e3a8a" }}>
+                Bạn chưa đăng nhập. Hãy đăng nhập để thực hiện đăng ký giải đấu.
+              </Text>
+            </View>
+          )}
 
       {/* Lời mời đang chờ */}
       {isLoggedIn && pendingInvitesHere.length > 0 && (
@@ -809,24 +1245,75 @@ export default function TournamentRegistrationScreen() {
         </View>
       )}
 
-      {/* FORM đăng ký/lời mời */}
+      {/* FORM đăng ký */}
       <View style={styles.sectionCard}>
         <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
           {isAdmin ? "Tạo đăng ký (admin)" : "Gửi lời mời đăng ký"}
         </Text>
 
-        <PlayerSelector
-          label={isSingles ? "VĐV" : "VĐV 1"}
-          eventType={tour.eventType}
-          onChange={setP1}
-        />
-        {isDoubles && (
-          <View style={{ marginTop: 12 }}>
-            <PlayerSelector
-              label="VĐV 2"
-              eventType={tour.eventType}
-              onChange={setP2}
-            />
+        {meLoading ? (
+          <View style={{ paddingVertical: 6 }}>
+            <ActivityIndicator />
+          </View>
+        ) : meErr ? (
+          <View
+            style={[
+              styles.alert,
+              { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+            ]}
+          >
+            <Text style={{ color: "#991b1b" }}>
+              {(meErr.status === 403 &&
+                "Bạn chưa đăng nhập. Không có thông tin") ||
+                (meErr as any)?.data?.message ||
+                (meErr as any)?.error ||
+                "Không tải được thông tin của bạn"}
+            </Text>
+          </View>
+        ) : isLoggedIn ? (
+          isAdmin ? (
+            <>
+              <View style={{ marginTop: 8 }}>
+                <PlayerSelector
+                  label="VĐV 1"
+                  eventType={tour.eventType}
+                  onChange={setP1Admin}
+                />
+              </View>
+              {isDoubles && (
+                <View style={{ marginTop: 12 }}>
+                  <PlayerSelector
+                    label="VĐV 2"
+                    eventType={tour.eventType}
+                    onChange={setP2}
+                  />
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <SelfPlayerReadonly me={me} isSingles={isSingles} />
+              {isDoubles && (
+                <View style={{ marginTop: 12 }}>
+                  <PlayerSelector
+                    label="VĐV 2"
+                    eventType={tour.eventType}
+                    onChange={setP2}
+                  />
+                </View>
+              )}
+            </>
+          )
+        ) : (
+          <View
+            style={[
+              styles.alert,
+              { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
+            ]}
+          >
+            <Text style={{ color: "#1e3a8a" }}>
+              Bạn chưa đăng nhập. Hãy đăng nhập để đăng ký.
+            </Text>
           </View>
         )}
 
@@ -845,12 +1332,20 @@ export default function TournamentRegistrationScreen() {
           {isAdmin
             ? "Quyền admin: tạo đăng ký và duyệt ngay, không cần xác nhận từ VĐV."
             : isSingles
-            ? "Giải đơn: nếu bạn chính là VĐV mời chính mình, đăng ký sẽ tự xác nhận."
-            : "Giải đôi: cần cả hai VĐV chấp nhận lời mời thì mới tạo đăng ký."}
+            ? "Giải đơn: VĐV 1 luôn là bạn; cần KYC (đã xác minh) để đăng ký."
+            : "Giải đôi: VĐV 1 luôn là bạn; CẢ HAI VĐV cần KYC (đã xác minh)."}
         </Text>
 
         <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-          <PrimaryBtn onPress={submit} disabled={disableSubmit}>
+          <PrimaryBtn
+            onPress={submit}
+            disabled={
+              saving ||
+              meLoading ||
+              !isLoggedIn ||
+              (isAdmin ? !p1Admin || (isDoubles && !p2) : isDoubles && !p2)
+            }
+          >
             {isAdmin
               ? saving
                 ? "Đang tạo…"
@@ -867,43 +1362,66 @@ export default function TournamentRegistrationScreen() {
           </OutlineBtn>
         </View>
       </View>
-
-      {/* Quản lý (chỉ BTC/admin) */}
       {canManage && (
-        <View style={{ marginBottom: 12 }}>
-          <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 6 }}>
-            Quản lý giải đấu
-          </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <PrimaryBtn onPress={() => router.push(`/tournament/${id}/draw`)}>
-              Bốc thăm
-            </PrimaryBtn>
-            <OutlineBtn onPress={() => router.push(`/tournament/${id}/manage`)}>
-              Quản lý giải
-            </OutlineBtn>
+        <View style={styles.container}>
+          <Text style={[styles.title, {marginBottom: 10}]}>Quản lý giải đấu</Text>
+
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary]}
+              onPress={onGoDraw}
+            >
+              <Text style={[styles.btnText, styles.btnTextPrimary]}>
+                Bốc thăm
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btn, styles.btnOutlined]}
+              onPress={onGoManage}
+            >
+              <Text style={[styles.btnText, styles.btnTextOutlined]}>
+                Quản lý giải
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* Tiêu đề danh sách */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
-          marginTop: 4,
-        }}
-      >
-        <Text style={{ fontSize: 18, fontWeight: "800" }}>
-          Danh sách đăng ký ({regCount})
-        </Text>
-        <Chip
-          label={`${regCount} ${isSingles ? "VĐV" : "đội"}`}
-          bg="#eef2ff"
-          fg="#3730a3"
-        />
+      {/* Tiêu đề + Search danh sách */}
+      <View style={{ marginTop: 4 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 18, fontWeight: "800" }}>
+            Danh sách đăng ký ({regTotal})
+          </Text>
+          <Chip
+            label={`Kết quả: ${filteredRegs.length}`}
+            bg="#eef2ff"
+            fg="#3730a3"
+          />
+        </View>
+
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
+            placeholderTextColor="#9aa0a6"
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+          {q.length > 0 && (
+            <Pressable style={styles.clearBtn} onPress={() => setQ("")}>
+              <Text style={{ fontWeight: "800", color: "#6b7280" }}>✕</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
+      {/* Thông báo lỗi / loading */}
       {regsLoading ? (
         <View style={{ paddingVertical: 16, alignItems: "center" }}>
           <ActivityIndicator />
@@ -921,120 +1439,65 @@ export default function TournamentRegistrationScreen() {
               "Lỗi tải danh sách"}
           </Text>
         </View>
-      ) : regs.length === 0 ? (
-        <Text style={{ color: "#6b7280", marginTop: 8 }}>
-          Danh sách đăng ký trống!
-        </Text>
       ) : null}
     </View>
   );
 
+  /* ===================== LIST ===================== */
   return (
-    <View style={styles.container}>
-      <FlatList
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={insets.top}
+    >
+      <FlashList
         ref={listRef}
-        data={paginatedRegs}
+        data={listData}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         keyExtractor={(item, i) => String(item?._id || i)}
         renderItem={({ item: r, index }) => {
           const isOwner =
             isLoggedIn && String(r?.createdBy) === String(me?._id);
           return (
-            <View style={[styles.card, { marginHorizontal: 16, marginTop: 8 }]}>
-              <Text style={{ color: "#6b7280", fontSize: 12 }}>
-                #{baseIndex + index + 1}
-              </Text>
-
-              {playersOfReg(r).map((pl: any, idx: number) => (
-                <View
-                  key={`${pl?.phone || pl?.fullName || idx}`}
-                  style={{ marginTop: 10 }}
-                >
-                  <PlayerCell
-                    player={pl}
-                    canEdit={canManage}
-                    onEdit={() => openReplace(r, idx === 0 ? "p1" : "p2")}
-                  />
-                </View>
-              ))}
-
-              {!isSingles && !r.player2 && canManage && (
-                <View style={{ marginTop: 8 }}>
-                  <OutlineBtn onPress={() => openReplace(r, "p2")}>
-                    Thêm VĐV 2
-                  </OutlineBtn>
-                </View>
-              )}
-
-              <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 8 }}>
-                {new Date(r.createdAt).toLocaleString()}
-              </Text>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 8,
-                  marginTop: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <PaymentChip
-                  status={r.payment?.status}
-                  paidAt={r.payment?.paidAt}
-                />
-                <CheckinChip checkinAt={r.checkinAt} />
-              </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 6,
-                  alignItems: "center",
-                  marginTop: 8,
-                }}
-              >
-                <Text style={{ fontWeight: "600" }}>Tổng điểm:</Text>
-                <Chip label={totalScoreOf(r, isSingles)} bg="#fff" fg="#111" />
-              </View>
-
-              <View style={{ marginTop: 10 }}>
-                <ActionCell
-                  r={r}
-                  canManage={canManage}
-                  isOwner={isOwner}
-                  onTogglePayment={togglePayment}
-                  onCancel={handleCancel}
-                  busy={{ settingPayment, deletingId: cancelingId }}
-                />
-              </View>
-            </View>
+            <RegItem
+              r={r}
+              index={index}
+              isSingles={isSingles}
+              canManage={canManage}
+              cap={cap}
+              delta={delta}
+              isOwner={isOwner}
+              onPreview={openPreview}
+              onOpenProfile={openProfileByPlayer}
+              onOpenReplace={openReplace}
+              onTogglePayment={togglePayment}
+              onCancel={handleCancel}
+              onOpenComplaint={openComplaint}
+              onOpenPayment={openPayment}
+              cancelingId={cancelingId}
+              settingPayment={settingPayment}
+            />
           );
         }}
-        ListHeaderComponent={ListHeader}
+        ListHeaderComponent={HeaderBlock}
         ListFooterComponent={
-          regCount > 0 ? (
-            <View
-              style={{ marginTop: 12, marginBottom: 20, paddingHorizontal: 16 }}
-            >
-              <PaginationRN
-                count={totalPages}
-                page={page}
-                onChange={(p: number) => {
-                  setPage(p);
-                  listRef.current?.scrollToOffset?.({
-                    offset: 0,
-                    animated: true,
-                  });
-                }}
-                siblingCount={1}
-                boundaryCount={1}
-                showPrevNext
-                size="md"
-              />
-            </View>
-          ) : (
-            <View style={{ height: 20 }} />
-          )
+          <View style={{ padding: 16, alignItems: "center" }}>
+            {loadingMore && <ActivityIndicator />}
+            {!loadingMore && !canLoadMore && filteredRegs.length > 0 && (
+              <Text style={{ color: "#9aa0a6", fontSize: 12 }}>
+                — Đã hết dữ liệu —
+              </Text>
+            )}
+          </View>
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        estimatedItemSize={220}
+        removeClippedSubviews
+        contentContainerStyle={{ paddingBottom: 16 + kbHeight }}
       />
 
       {/* Preview ảnh */}
@@ -1056,8 +1519,8 @@ export default function TournamentRegistrationScreen() {
               source={{ uri: normalizeUrl(imgPreview.src) || PLACE }}
               style={{ width: "100%", height: 360, borderRadius: 12 }}
               contentFit="cover"
-              cachePolicy="memory-disk" // cache mạnh tay: RAM + disk
-              transition={0} // tắt fade để khỏi thấy “nháy”
+              cachePolicy="memory-disk"
+              transition={0}
             />
             <PrimaryBtn onPress={closePreview}>Đóng</PrimaryBtn>
           </View>
@@ -1111,7 +1574,157 @@ export default function TournamentRegistrationScreen() {
         onClose={() => setProfile({ open: false, userId: null })}
         userId={profile.userId}
       />
-    </View>
+
+      {/* Modal Khiếu nại */}
+      <Modal
+        visible={complaintDlg.open}
+        transparent
+        animationType="slide"
+        onRequestClose={closeComplaint}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: "#fff", borderColor: "#e5e7eb" },
+            ]}
+          >
+            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+              Khiếu nại đăng ký
+            </Text>
+            <Text style={{ color: "#374151", marginBottom: 6 }}>
+              Vui lòng mô tả chi tiết vấn đề. BTC sẽ tiếp nhận và phản hồi.
+            </Text>
+            <TextInput
+              value={complaintDlg.text}
+              onChangeText={(t) => setComplaintDlg((s) => ({ ...s, text: t }))}
+              multiline
+              numberOfLines={5}
+              style={[styles.textarea, { minHeight: 120 }]}
+              placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
+              placeholderTextColor="#9aa0a6"
+            />
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
+              <PrimaryBtn
+                onPress={submitComplaint}
+                disabled={sendingComplaint || !complaintDlg.text.trim()}
+              >
+                {sendingComplaint ? "Đang gửi…" : "Gửi khiếu nại"}
+              </PrimaryBtn>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Thanh toán QR */}
+      <Modal
+        visible={paymentDlg.open}
+        transparent
+        animationType="slide"
+        onRequestClose={closePayment}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: "#fff", borderColor: "#e5e7eb" },
+            ]}
+          >
+            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+              Thanh toán lệ phí
+            </Text>
+            {paymentDlg.reg ? (
+              <>
+                {(() => {
+                  const code = regCodeOf(paymentDlg.reg);
+                  const ph = maskPhone(
+                    paymentDlg.reg?.player1?.phone ||
+                      paymentDlg.reg?.player2?.phone ||
+                      me?.phone ||
+                      ""
+                  );
+                  return (
+                    <Text style={{ color: "#374151", marginBottom: 8 }}>
+                      Quét QR để thanh toán cho mã đăng ký{" "}
+                      <Text style={{ fontWeight: "800" }}>{code}</Text>.{"\n"}
+                      SĐT xác nhận: {ph}.
+                    </Text>
+                  );
+                })()}
+                {(() => {
+                  const url = qrImgUrlFor(tour, paymentDlg.reg, me?.phone);
+                  if (!url) {
+                    return (
+                      <View
+                        style={[
+                          styles.alert,
+                          {
+                            borderColor: "#93c5fd",
+                            backgroundColor: "#eff6ff",
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: "#1e3a8a" }}>
+                          Chưa có QR thanh toán. Dùng mục{" "}
+                          <Text style={{ fontWeight: "800" }}>Khiếu nại</Text>{" "}
+                          để liên hệ BTC.
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return (
+                    <>
+                      <View style={{ alignItems: "center", marginVertical: 8 }}>
+                        <ExpoImage
+                          source={{ uri: url }}
+                          style={{
+                            width: 260,
+                            height: 260,
+                            borderRadius: 12,
+                            backgroundColor: "#f3f4f6",
+                          }}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          transition={0}
+                        />
+                      </View>
+                      <Text
+                        style={{
+                          color: "#6b7280",
+                          fontSize: 12,
+                          textAlign: "center",
+                        }}
+                      >
+                        Quét mã QR để thanh toán phí đăng ký giải đấu.
+                      </Text>
+                    </>
+                  );
+                })()}
+              </>
+            ) : null}
+
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              {!paymentDlg.reg ||
+              !qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
+                <OutlineBtn
+                  onPress={() =>
+                    setComplaintDlg({
+                      open: true,
+                      reg: paymentDlg.reg,
+                      text: "",
+                    })
+                  }
+                >
+                  ⚠️ Khiếu nại
+                </OutlineBtn>
+              ) : null}
+              <PrimaryBtn onPress={closePayment}>Đóng</PrimaryBtn>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1160,6 +1773,25 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
+  /* Search */
+  searchWrap: { marginTop: 10, position: "relative" },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#111",
+  },
+  clearBtn: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+
   card: {
     backgroundColor: "#fff",
     borderRadius: 14,
@@ -1190,12 +1822,7 @@ const styles = StyleSheet.create({
   btnOutline: { borderWidth: 1, backgroundColor: "transparent" },
   btnWhite: { color: "#fff", fontWeight: "700" },
 
-  alert: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
+  alert: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
 
   modalBackdrop: {
     flex: 1,
@@ -1223,5 +1850,34 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+
+  selfCard: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 10,
+  },
+  row: {
+    flexDirection: "row",
+  },
+  btnPrimary: {
+    backgroundColor: "#1976d2",
+    borderColor: "#1976d2",
+  },
+  btnOutlined: {
+    backgroundColor: "transparent",
+    borderColor: "#1976d2",
+  },
+  btnText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  btnTextPrimary: {
+    color: "#fff",
+  },
+  btnTextOutlined: {
+    color: "#1976d2",
   },
 });

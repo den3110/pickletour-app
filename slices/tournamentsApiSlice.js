@@ -1,6 +1,9 @@
 // src/slices/tournamentsApiSlice.js
 import { apiSlice } from "./apiSlice";
 
+const normalizeListResponse = (res) =>
+  Array.isArray(res) ? { items: res } : res || { items: [] };
+
 export const tournamentsApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     /* ========= DANH SÁCH GIẢI (mới) ========= */
@@ -426,6 +429,305 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
             ]
           : [{ type: "MyTournaments", id: "LIST" }],
     }),
+    createComplaint: builder.mutation({
+      // Backend A (mặc định): POST /api/tournaments/:tournamentId/registrations/:regId/complaints  { content }
+      query: ({ tournamentId, regId, content }) => ({
+        url: `/api/tournaments/${tournamentId}/registrations/${regId}/complaints`,
+        method: "POST",
+        body: { content },
+      }),
+
+      // Nếu backend của bạn là dạng B:
+      // query: ({ regId, content }) => ({
+      //   url: `/api/registrations/${regId}/complaints`,
+      //   method: 'POST',
+      //   body: { content },
+      // }),
+
+      // hoặc dạng C:
+      // query: ({ registrationId, message }) => ({
+      //   url: `/api/complaints`,
+      //   method: 'POST',
+      //   body: { registrationId, message },
+      // }),
+
+      invalidatesTags: (result, error, { regId, tournamentId }) => [
+        { type: "Registration", id: regId },
+        { type: "Tournament", id: tournamentId },
+        { type: "Complaints", id: "LIST" },
+      ],
+    }),
+    // Search server-side theo tên VĐV / SĐT / mã đăng ký
+    searchRegistrations: builder.query({
+      query: ({ id, q, limit = 500 }) => ({
+        url: `/api/registrations/${id}/registrations/search`,
+        params: { q, limit },
+      }),
+      // cache riêng theo id+q
+      serializeQueryArgs: ({ endpointName, queryArgs }) =>
+        `${endpointName}|${queryArgs.id}|${queryArgs.q}|${queryArgs.limit}`,
+    }),
+
+    // 3) referee cộng/trừ điểm (delta: +1|-1)
+    refereeIncPoint: builder.mutation({
+      query: ({ matchId, side, delta }) => ({
+        url: `/api/referee/matches/${matchId}/score`,
+        method: "PATCH",
+        body: { op: "inc", side, delta },
+      }),
+
+      // ✅ Optimistic update chi tiết trận
+      async onQueryStarted(
+        { matchId, side, delta },
+        { dispatch, queryFulfilled }
+      ) {
+        const s = (side || "A").toUpperCase(); // chuẩn hoá
+        const patch = dispatch(
+          tournamentsApiSlice.util.updateQueryData(
+            "getMatch",
+            matchId,
+            (draft) => {
+              if (!draft.gameScores || !draft.gameScores.length) {
+                draft.gameScores = [{ a: 0, b: 0 }];
+              }
+              const i = Math.max(0, draft.gameScores.length - 1);
+              if (s === "A") {
+                const next = (draft.gameScores[i].a || 0) + delta;
+                draft.gameScores[i].a = Math.max(0, next); // tránh âm
+              } else {
+                const next = (draft.gameScores[i].b || 0) + delta;
+                draft.gameScores[i].b = Math.max(0, next);
+              }
+            }
+          )
+        );
+        try {
+          await queryFulfilled; // giữ patch nếu OK
+        } catch {
+          patch.undo(); // rollback nếu lỗi
+        }
+      },
+
+      // ✅ Refetch lại getMatch(matchId) để đồng bộ với server
+      invalidatesTags: (_res, _err, { matchId }) => [
+        { type: "Match", id: matchId },
+      ],
+    }),
+
+    // (tuỳ chọn) set điểm tuyệt đối cho ván hiện tại
+    refereeSetGameScore: builder.mutation({
+      query: ({ matchId, gameIndex, a, b }) => ({
+        url: `/api/referee/matches/${matchId}/score`,
+        method: "PATCH",
+        body: { op: "setGame", gameIndex, a, b },
+      }),
+      async onQueryStarted(
+        { matchId, gameIndex, a, b },
+        { dispatch, queryFulfilled }
+      ) {
+        const patch = dispatch(
+          tournamentsApiSlice.util.updateQueryData(
+            "getMatch",
+            matchId,
+            (draft) => {
+              if (!draft.gameScores) draft.gameScores = [];
+              draft.gameScores[gameIndex] = { a, b };
+            }
+          )
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
+    }),
+
+    // 4) set status
+    refereeSetStatus: builder.mutation({
+      query: ({ matchId, status }) => ({
+        url: `/api/referee/matches/${matchId}/status`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: (_r, _e, { matchId }) => [
+        { type: "Match", id: matchId },
+      ],
+    }),
+
+    // 5) set winner (A|B|"")
+    refereeSetWinner: builder.mutation({
+      query: ({ matchId, winner }) => ({
+        url: `/api/referee/matches/${matchId}/winner`,
+        method: "PATCH",
+        body: { winner },
+      }),
+      invalidatesTags: (_r, _e, { matchId }) => [
+        { type: "Match", id: matchId },
+      ],
+    }),
+
+    refereeNextGame: builder.mutation({
+      query: ({ matchId, autoNext }) => ({
+        url: `/api/referee/matches/${matchId}/score`,
+        method: "PATCH",
+        body: { op: "nextGame", autoNext },
+      }),
+    }),
+    // GET /api/referee/matches/:matchId/courts  (cùng tournament+bracket với match)
+    getCourtsForMatch: builder.query({
+      query: ({ matchId, includeBusy = false, cluster, status } = {}) => {
+        if (!matchId) throw new Error("matchId is required");
+        const params = new URLSearchParams();
+        if (includeBusy) params.set("includeBusy", "1");
+        if (cluster) params.set("cluster", cluster);
+        if (status) params.set("status", status);
+        const q = params.toString() ? `?${params.toString()}` : "";
+        return `/api/referee/matches/${matchId}/courts${q}`;
+      },
+      transformResponse: normalizeListResponse,
+      keepUnusedDataFor: 0,
+    }),
+
+    // POST /api/referee/matches/:matchId/assign-court
+    refereeAssignCourt: builder.mutation({
+      query: ({
+        matchId,
+        courtId,
+        force = false,
+        allowReassignLive = false,
+      }) => ({
+        url: `/api/referee/matches/${matchId}/assign-court`,
+        method: "POST",
+        body: { courtId, force, allowReassignLive },
+      }),
+      invalidatesTags: (_res, _err, { matchId }) => [
+        { type: "Match", id: matchId },
+        { type: "Court", id: "LIST" },
+      ],
+    }),
+
+    // POST /api/referee/matches/:matchId/unassign-court
+    refereeUnassignCourt: builder.mutation({
+      query: ({ matchId, toStatus }) => ({
+        url: `/api/referee/matches/${matchId}/unassign-court`,
+        method: "POST",
+        body: { toStatus },
+      }),
+      invalidatesTags: (_res, _err, { matchId }) => [
+        { type: "Match", id: matchId },
+        { type: "Court", id: "LIST" },
+      ],
+    }),
+
+    getMatch: builder.query({
+      query: (matchId) => `/api/admin/matches/${matchId}`,
+      providesTags: (r, e, id) => [{ type: "Match", id }],
+    }),
+    adminSearchReferees: builder.query({
+      query: ({ tid, q = "", limit = 50 } = {}) => {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (limit) params.set("limit", String(limit));
+        if (tid) params.set("tid", String(tid));
+        return {
+          url: `/api/admin/referees/search?${params.toString()}`,
+          method: "GET",
+        };
+      },
+      // Giữ cache ngắn để search mượt
+      keepUnusedDataFor: 30,
+      // Đảm bảo cache key phụ thuộc đúng tham số
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { tid = "", q = "", limit = 50 } = queryArgs || {};
+        return `${endpointName}:${tid}:${q}:${limit}`;
+      },
+      // Response là mảng user → trả thẳng
+      transformResponse: (res) => (Array.isArray(res) ? res : res?.data || []),
+      providesTags: (result) =>
+        result
+          ? [
+              { type: "RefereeSearch", id: "LIST" },
+              ...result.map((u) => ({ type: "RefereeSearch", id: u._id })),
+            ]
+          : [{ type: "RefereeSearch", id: "LIST" }],
+    }),
+    adminAssignMatchToCourt: builder.mutation({
+      /**
+       * @param {{ tid: string, matchId: string, courtId: string }} args
+       */
+      async queryFn(args, _api, _extra, baseQuery) {
+        const { tid, matchId, courtId } = args || {};
+        if (!tid || !matchId || !courtId) {
+          return {
+            error: {
+              status: 400,
+              data: { message: "tid, matchId và courtId là bắt buộc" },
+            },
+          };
+        }
+        const result = await baseQuery({
+          url: `/api/admin/tournaments/${tid}/matches/${matchId}/court`,
+          method: "POST",
+          body: { courtId },
+        });
+        if (result.error) return { error: result.error };
+        return { data: result.data };
+      },
+      invalidatesTags: (result, error, { tid, matchId }) => {
+        const tags = [];
+        if (tid) tags.push({ type: "MatchesByTournament", id: tid });
+        if (tid) tags.push({ type: "Courts", id: tid });
+        if (matchId) tags.push({ type: "Match", id: matchId });
+        return tags;
+      },
+    }),
+
+    /* ================== BỎ GÁN SÂN CỦA TRẬN ================== */
+    adminClearMatchCourt: builder.mutation({
+      /**
+       * @param {{ tid: string, matchId: string }} args
+       */
+      async queryFn(args, _api, _extra, baseQuery) {
+        const { tid, matchId } = args || {};
+        if (!tid || !matchId) {
+          return {
+            error: {
+              status: 400,
+              data: { message: "tid và matchId là bắt buộc" },
+            },
+          };
+        }
+        const result = await baseQuery({
+          url: `/api/admin/tournaments/${tid}/matches/${matchId}/court`,
+          method: "DELETE",
+        });
+        if (result.error) return { error: result.error };
+        return { data: result.data };
+      },
+      invalidatesTags: (result, error, { tid, matchId }) => {
+        const tags = [];
+        if (tid) tags.push({ type: "MatchesByTournament", id: tid });
+        if (tid) tags.push({ type: "Courts", id: tid });
+        if (matchId) tags.push({ type: "Match", id: matchId });
+        return tags;
+      },
+    }),
+     adminGetMatchReferees: builder.query({
+      /**
+       * @param {{ tid: string, matchId: string }} args
+       */
+      query: ({ tid, matchId }) =>
+        `/api/admin/tournaments/${tid}/matches/${matchId}/referees`,
+      providesTags: (result, error, { matchId }) => [
+        { type: 'MatchReferees', id: matchId },
+      ],
+      // Optional: chuẩn hoá data
+      transformResponse: (res) => Array.isArray(res) ? res : (res?.referees || []),
+    }),
+     verifyManager: builder.query({
+      query: (tid) => `/api/tournaments/${tid}/is-manager`,
+    }),
   }),
 });
 
@@ -476,4 +778,20 @@ export const {
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
   useListMyTournamentsQuery,
+  useCreateComplaintMutation,
+  useSearchRegistrationsQuery,
+  useRefereeIncPointMutation,
+  useRefereeSetGameScoreMutation,
+  useRefereeSetStatusMutation,
+  useRefereeSetWinnerMutation,
+  useRefereeNextGameMutation,
+  useGetCourtsForMatchQuery,
+  useRefereeAssignCourtMutation,
+  useRefereeUnassignCourtMutation,
+  useGetMatchQuery,
+  useAdminSearchRefereesQuery,
+  useAdminAssignMatchToCourtMutation,
+  useAdminClearMatchCourtMutation,
+  useAdminGetMatchRefereesQuery,
+  useVerifyManagerQuery
 } = tournamentsApiSlice;

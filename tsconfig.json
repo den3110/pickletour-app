@@ -3,15 +3,16 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-, "utils/normalizeUri.js"  ]
+    "expo-env.d.ts",
+    "utils/normalizeUri.js",
+    "slices/pushApiSlice.js",
+    "types"
+  ]
 }

@@ -1,8 +1,18 @@
-// app/contact/index.jsx — "Giải của tôi" + sticky header + banner dùng expo-image (cache)
-// - Thêm: guard đăng nhập, hiển thị "Hãy đăng nhập để xem Giải của tôi" nếu chưa login
-// - Skip query khi chưa đăng nhập (RTKQ skipToken)
+// app/contact/index.jsx — Mobile "Giải của tôi" + sticky header + expo-image cache
+// - Guard đăng nhập (skipToken) + LoginPrompt
+// - Realtime socket: match rooms + bracket rooms
+// - Banner có nút Thu gọn/Mở rộng (finished mặc định thu gọn)
+// - Sắp xếp TRONG MỖI GIẢI: LIVE → UPCOMING → FINISHED (phụ theo thời gian)
+// - Điểm số ưu tiên scoreText, fallback gameScores/sets
 
-import React, { useMemo, useState, useCallback } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,13 +27,14 @@ import {
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image"; // 👈 dùng expo-image để cache
+import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useListMyTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useSocket } from "@/context/SocketContext";
 
 /* ================= Theme ================= */
 function useThemeTokens() {
@@ -44,7 +55,22 @@ function useThemeTokens() {
     warning: "#f59e0b",
     shadow: "rgba(16,24,40,0.08)",
     inputBg: isDark ? "#0f141a" : "#f5f7fb",
+    overlay: "rgba(255,255,255,0.12)",
   };
+}
+function toneColor(tone, tokens) {
+  switch (tone) {
+    case "live":
+    case "ongoing":
+      return tokens.warning;
+    case "scheduled":
+    case "upcoming":
+      return tokens.tint;
+    case "finished":
+      return tokens.success;
+    default:
+      return tokens.tint;
+  }
 }
 
 /* ================= Utils ================= */
@@ -57,21 +83,17 @@ const dateFmt = (s) => {
     minute: "2-digit",
   })}`;
 };
-
 const stripVN = (s = "") =>
   String(s)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-
 const nameWithNick = (p) => {
   if (!p) return "—";
   const nick = p.nickName || p.nickname || p.nick || p.alias;
   return nick?.trim() || p.fullName || p.name || "—";
 };
-
-/** team label: single → chỉ VĐV1; double → "VĐV1 & VĐV2" */
 const teamLabel = (team, eventType) => {
   if (!team) return "—";
   if (team.name) return team.name;
@@ -85,7 +107,6 @@ const teamLabel = (team, eventType) => {
   if (players.length === 1) return nameWithNick(players[0]);
   return `${nameWithNick(players[0])} & ${nameWithNick(players[1])}`;
 };
-
 function roundText(m) {
   if (m.roundName) return m.roundName;
   if (m.phase) return m.phase;
@@ -94,17 +115,37 @@ function roundText(m) {
   if (Number.isFinite(m.round)) return `Vòng ${m.round}`;
   return "—";
 }
+const isLive = (m) =>
+  ["live", "ongoing", "playing", "inprogress"].includes(
+    String(m?.status || "").toLowerCase()
+  );
+const isFinished = (m) =>
+  String(m?.status || "").toLowerCase() === "finished";
+const isScheduled = (m) =>
+  [
+    "scheduled",
+    "upcoming",
+    "pending",
+    "queued",
+    "assigning",
+    "assigned",
+  ].includes(String(m?.status || "").toLowerCase());
+const statusRank = (m) => (isLive(m) ? 0 : isScheduled(m) ? 1 : isFinished(m) ? 2 : 3);
+const whenOf = (m) =>
+  new Date(m?.scheduledAt || m?.startTime || m?.time || m?.createdAt || 0)
+    .getTime() || 0;
 
 /* ================= Small UI bits ================= */
-function ChipToggle({ active, label, onPress, tokens, style }) {
+function ChipToggle({ active, label, onPress, tokens, style, tone }) {
+  const c = toneColor(tone, tokens);
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.chip,
         {
-          backgroundColor: active ? tokens.tint + "1a" : tokens.chipBg,
-          borderColor: active ? tokens.tint : tokens.border,
+          backgroundColor: active ? c + "1a" : tokens.chipBg,
+          borderColor: active ? c : tokens.border,
         },
         style,
       ]}
@@ -113,7 +154,7 @@ function ChipToggle({ active, label, onPress, tokens, style }) {
         style={{
           fontSize: 12,
           fontWeight: "700",
-          color: active ? tokens.tint : tokens.sub,
+          color: active ? c : tokens.sub,
         }}
       >
         {label}
@@ -121,20 +162,15 @@ function ChipToggle({ active, label, onPress, tokens, style }) {
     </Pressable>
   );
 }
-
 function StatusChip({ status, tokens }) {
-  let bg = tokens.chipBg,
-    fg = tokens.sub;
-  if (status === "live") {
-    bg = tokens.danger + "22";
-    fg = tokens.danger;
-  } else if (status === "finished") {
-    bg = tokens.success + "22";
-    fg = tokens.success;
-  } else if (status === "scheduled") {
-    bg = tokens.tint + "1a";
-    fg = tokens.tint;
-  }
+  const c =
+    status === "live"
+      ? tokens.warning
+      : status === "finished"
+      ? tokens.success
+      : tokens.tint;
+  const bg = c + "22";
+  const fg = c;
   return (
     <View
       style={[styles.chip, { backgroundColor: bg, borderColor: "transparent" }]}
@@ -149,7 +185,6 @@ function StatusChip({ status, tokens }) {
     </View>
   );
 }
-
 function SmallMeta({ icon, text, tokens }) {
   return (
     <View style={styles.metaItem}>
@@ -164,13 +199,22 @@ function SmallMeta({ icon, text, tokens }) {
   );
 }
 
-function ScoreBadge({ sets, tokens }) {
-  const text =
-    Array.isArray(sets) && sets.length
-      ? sets
-          .map((s) => `${s.a ?? s.home ?? 0}-${s.b ?? s.away ?? 0}`)
-          .join("  |  ")
-      : "—";
+/* ====== Điểm số: ưu tiên scoreText, fallback gameScores/sets ====== */
+function formatScoreFromMatch(m) {
+  if (typeof m?.scoreText === "string" && m.scoreText.trim()) {
+    return m.scoreText.trim();
+  }
+  const arr =
+    (Array.isArray(m?.gameScores) && m.gameScores.length && m.gameScores) ||
+    (Array.isArray(m?.sets) && m.sets) ||
+    [];
+  if (!arr.length) return "—";
+  return arr
+    .map((s) => `${s.a ?? s.home ?? 0}-${s.b ?? s.away ?? 0}`)
+    .join("  |  ");
+}
+function ScoreBadgeFromMatch({ m, tokens }) {
+  const text = formatScoreFromMatch(m);
   return (
     <View
       style={[
@@ -193,7 +237,7 @@ function MatchRow({ m, onPress, tokens, eventType }) {
 
   const accent =
     status === "live"
-      ? tokens.danger
+      ? tokens.warning
       : status === "finished"
       ? tokens.success
       : tokens.tint;
@@ -229,7 +273,8 @@ function MatchRow({ m, onPress, tokens, eventType }) {
           {teamLabel(b, eventType)}
         </Text>
 
-        <ScoreBadge sets={m.sets || m.gameScores} tokens={tokens} />
+        {/* realtime score */}
+        <ScoreBadgeFromMatch m={m} tokens={tokens} />
 
         <View style={styles.metaRow}>
           <SmallMeta icon="event" text={dateFmt(when)} tokens={tokens} />
@@ -251,8 +296,8 @@ function MatchRow({ m, onPress, tokens, eventType }) {
   );
 }
 
-/** ===== Banner: dùng expo-image + gradient tối (cache ảnh giải) ===== */
-function Banner({ t, tokens }) {
+/** ===== Banner: expo-image + gradient + nút collapse/expand ===== */
+function Banner({ t, tokens, collapsed, onToggle }) {
   const status = t.status;
   const statusText =
     status === "ongoing"
@@ -278,27 +323,20 @@ function Banner({ t, tokens }) {
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={250}
-            cachePolicy="memory-disk" // 👈 cache vào disk + memory
+            cachePolicy="memory-disk"
             recyclingKey={String(t._id || uri)}
             priority="high"
           />
         ) : (
           <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: "#11161c" }, // fallback tối
-            ]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: "#11161c" }]}
           />
         )}
 
-        {/* Lớp tối nhẹ khắp ảnh để tăng tương phản chữ */}
+        {/* Lớp tối nhẹ + gradient đáy */}
         <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(0,0,0,0.22)" },
-          ]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.22)" }]}
         />
-        {/* Gradient tối dần ở đáy */}
         <LinearGradient
           colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.55)"]}
           style={StyleSheet.absoluteFill}
@@ -307,35 +345,42 @@ function Banner({ t, tokens }) {
         {/* Nội dung */}
         <View style={styles.bannerInner}>
           <View style={{ flex: 1 }}>
-            <Text
-              numberOfLines={2}
-              style={[styles.bannerTitle, { color: "#fff" }]}
-            >
+            <Text numberOfLines={2} style={[styles.bannerTitle, { color: "#fff" }]}>
               {t.name || "Giải đấu"}
             </Text>
             {!!t.location && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginTop: 6,
-                }}
-              >
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
                 <MaterialIcons name="location-pin" size={16} color="#fff" />
-                <Text
-                  numberOfLines={1}
-                  style={{ color: "#fff", marginLeft: 6, opacity: 0.9 }}
-                >
+                <Text numberOfLines={1} style={{ color: "#fff", marginLeft: 6, opacity: 0.9 }}>
                   {t.location}
                 </Text>
               </View>
             )}
           </View>
 
-          <View style={[styles.statusTag, { backgroundColor: statusColor }]}>
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
-              {statusText}
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={[styles.statusTag, { backgroundColor: statusColor }]}>
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
+                {statusText}
+              </Text>
+            </View>
+
+            {/* Nút toggle collapse */}
+            <Pressable
+              onPress={onToggle}
+              style={({ pressed }) => [
+                styles.bannerToggleBtn,
+                { backgroundColor: "rgba(255,255,255,0.14)", opacity: pressed ? 0.8 : 1 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={collapsed ? "Mở chi tiết" : "Thu gọn"}
+            >
+              <MaterialIcons
+                name={collapsed ? "expand-more" : "expand-less"}
+                size={18}
+                color="#fff"
+              />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -343,8 +388,12 @@ function Banner({ t, tokens }) {
   );
 }
 
-/* ===== TournamentCard (giữ nguyên per-item search/filter) ===== */
+/* ===== TournamentCard ===== */
 function TournamentCard({ t, onOpenMatch, tokens }) {
+  // Collapse toàn bộ nội dung dưới banner (mặc định finished → collapsed)
+  const [collapsed, setCollapsed] = useState(t.status === "finished");
+
+  // "Xem thêm" chỉ điều khiển số lượng hiển thị
   const [expanded, setExpanded] = useState(false);
   const [matchQuery, setMatchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState(
@@ -353,13 +402,13 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
 
   const matches = Array.isArray(t.matches) ? t.matches : [];
 
-  const filteredMatches = useMemo(() => {
+  // lọc + SẮP XẾP: LIVE → UPCOMING → FINISHED (phụ theo thời gian)
+  const filteredSortedMatches = useMemo(() => {
     const q = stripVN(matchQuery);
-    return matches.filter((m) => {
+    const base = matches.filter((m) => {
       const status = m.status || (m.winner ? "finished" : "scheduled");
       if (!statusFilter.has(status)) return false;
       if (!q) return true;
-
       const a = m.teamA || m.home || m.teams?.[0] || m.pairA;
       const b = m.teamB || m.away || m.teams?.[1] || m.pairB;
       const hay = [
@@ -370,20 +419,33 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
       ]
         .map(stripVN)
         .join(" | ");
-
       return hay.includes(q);
     });
+
+    // sort theo rank rồi theo thời gian tăng dần
+    return base
+      .slice()
+      .sort((a, b) => {
+        const ra = statusRank(a);
+        const rb = statusRank(b);
+        if (ra !== rb) return ra - rb;
+        const wa = whenOf(a);
+        const wb = whenOf(b);
+        return wa - wb;
+      });
   }, [matches, matchQuery, statusFilter, t.eventType]);
 
-  const shown = expanded ? filteredMatches : filteredMatches.slice(0, 5);
-  const hasMore = filteredMatches.length > shown.length;
+  const shown = expanded
+    ? filteredSortedMatches
+    : filteredSortedMatches.slice(0, 5);
+  const hasMore = filteredSortedMatches.length > shown.length;
 
   const toggleStatus = (key) =>
     setStatusFilter((prev) => {
       const n = new Set(prev);
       if (n.has(key)) n.delete(key);
       else n.add(key);
-      if (n.size === 0) n.add(key); // tránh rỗng
+      if (n.size === 0) n.add(key);
       return n;
     });
 
@@ -398,124 +460,130 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
         },
       ]}
     >
-      <Banner t={t} tokens={tokens} />
+      <Banner
+        t={t}
+        tokens={tokens}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((v) => !v)}
+      />
 
-      <View style={{ padding: 14, gap: 10 }}>
-        {/* Meta date */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <MaterialIcons name="calendar-month" size={18} color={tokens.sub} />
-          <Text style={{ color: tokens.sub, fontSize: 13 }}>
-            {(t.startDate || t.startAt) && (t.endDate || t.endAt)
-              ? `${dateFmt(t.startDate || t.startAt)}  →  ${dateFmt(
-                  t.endDate || t.endAt
-                )}`
-              : "—"}
-          </Text>
-        </View>
-
-        {/* SEARCH MATCHES + FILTERS */}
-        <View
-          style={[
-            styles.searchRow,
-            { backgroundColor: tokens.inputBg, borderColor: tokens.border },
-          ]}
-        >
-          <MaterialIcons name="search" size={18} color={tokens.sub} />
-          <TextInput
-            placeholder="Tìm trận (VĐV, vòng, sân...)"
-            placeholderTextColor={tokens.sub}
-            value={matchQuery}
-            onChangeText={setMatchQuery}
-            style={[styles.input]}
-          />
-          {matchQuery ? (
-            <Pressable onPress={() => setMatchQuery("")}>
-              <MaterialIcons name="close" size={18} color={tokens.sub} />
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-          <ChipToggle
-            label="Sắp diễn ra"
-            active={statusFilter.has("scheduled")}
-            onPress={() => toggleStatus("scheduled")}
-            tokens={tokens}
-          />
-          <ChipToggle
-            label="Đang diễn ra"
-            active={statusFilter.has("live")}
-            onPress={() => toggleStatus("live")}
-            tokens={tokens}
-          />
-          <ChipToggle
-            label="Đã kết thúc"
-            active={statusFilter.has("finished")}
-            onPress={() => toggleStatus("finished")}
-            tokens={tokens}
-          />
-          {!!matchQuery || statusFilter.size !== 3 ? (
-            <Pressable
-              onPress={() => {
-                setMatchQuery("");
-                setStatusFilter(new Set(["scheduled", "live", "finished"]));
-              }}
-            >
-              <Text
-                style={{ color: tokens.tint, fontWeight: "700", padding: 6 }}
-              >
-                Reset
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        {/* LIST MATCHES */}
-        {filteredMatches.length === 0 ? (
-          <View style={styles.emptyMatches}>
-            <Text style={{ fontSize: 28, marginBottom: 4 }}>🎾</Text>
-            <Text style={{ color: tokens.sub }}>
-              Không có trận phù hợp bộ lọc.
+      {/* Nội dung có thể thu gọn toàn bộ */}
+      {!collapsed && (
+        <View style={{ padding: 14, gap: 10 }}>
+          {/* Meta date */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <MaterialIcons name="calendar-month" size={18} color={tokens.sub} />
+            <Text style={{ color: tokens.sub, fontSize: 13 }}>
+              {(t.startDate || t.startAt) && (t.endDate || t.endAt)
+                ? `${dateFmt(t.startDate || t.startAt)}  →  ${dateFmt(
+                    t.endDate || t.endAt
+                  )}`
+                : "—"}
             </Text>
           </View>
-        ) : (
-          <View style={{ gap: 10 }}>
-            {shown.map((m) => (
-              <MatchRow
-                key={m._id}
-                m={m}
-                onPress={onOpenMatch}
-                tokens={tokens}
-                eventType={t.eventType}
-              />
-            ))}
 
-            {hasMore && (
+          {/* SEARCH MATCHES + FILTERS */}
+          <View
+            style={[
+              styles.searchRow,
+              { backgroundColor: tokens.inputBg, borderColor: tokens.border },
+            ]}
+          >
+            <MaterialIcons name="search" size={18} color={tokens.sub} />
+            <TextInput
+              placeholder="Tìm trận (VĐV, vòng, sân...)"
+              placeholderTextColor={tokens.sub}
+              value={matchQuery}
+              onChangeText={setMatchQuery}
+              style={[styles.input]}
+            />
+            {matchQuery ? (
+              <Pressable onPress={() => setMatchQuery("")}>
+                <MaterialIcons name="close" size={18} color={tokens.sub} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <ChipToggle
+              label="Sắp diễn ra"
+              active={statusFilter.has("scheduled")}
+              onPress={() => toggleStatus("scheduled")}
+              tokens={tokens}
+              tone="upcoming"
+            />
+            <ChipToggle
+              label="Đang diễn ra"
+              active={statusFilter.has("live")}
+              onPress={() => toggleStatus("live")}
+              tokens={tokens}
+              tone="ongoing"
+            />
+            <ChipToggle
+              label="Đã kết thúc"
+              active={statusFilter.has("finished")}
+              onPress={() => toggleStatus("finished")}
+              tokens={tokens}
+              tone="finished"
+            />
+            {!!matchQuery || statusFilter.size !== 3 ? (
               <Pressable
-                onPress={() => setExpanded((v) => !v)}
-                style={[
-                  styles.showMoreBtn,
-                  { borderColor: tokens.border, backgroundColor: tokens.muted },
-                ]}
+                onPress={() => {
+                  setMatchQuery("");
+                  setStatusFilter(new Set(["scheduled", "live", "finished"]));
+                }}
               >
-                <Text style={{ color: tokens.text, fontWeight: "700" }}>
-                  {expanded
-                    ? "Thu gọn"
-                    : `Xem tất cả ${filteredMatches.length} trận`}
+                <Text style={{ color: tokens.tint, fontWeight: "700", padding: 6 }}>
+                  Reset
                 </Text>
               </Pressable>
-            )}
+            ) : null}
           </View>
-        )}
-      </View>
+
+          {/* LIST MATCHES */}
+          {filteredSortedMatches.length === 0 ? (
+            <View style={styles.emptyMatches}>
+              <Text style={{ fontSize: 28, marginBottom: 4 }}>🎾</Text>
+              <Text style={{ color: tokens.sub }}>Không có trận phù hợp bộ lọc.</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {shown.map((m) => (
+                <MatchRow
+                  key={m._id}
+                  m={m}
+                  onPress={onOpenMatch}
+                  tokens={tokens}
+                  eventType={t.eventType}
+                />
+              ))}
+
+              {hasMore && (
+                <Pressable
+                  onPress={() => setExpanded((v) => !v)}
+                  style={[
+                    styles.showMoreBtn,
+                    { borderColor: tokens.border, backgroundColor: tokens.muted },
+                  ]}
+                >
+                  <Text style={{ color: tokens.text, fontWeight: "700" }}>
+                    {expanded
+                      ? "Thu gọn"
+                      : `Xem tất cả ${filteredSortedMatches.length} trận`}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
-/* ======= Login Prompt (hiện khi chưa đăng nhập) ======= */
+/* ======= Login Prompt ======= */
 function LoginPrompt({ tokens }) {
   const goLogin = useCallback(() => {
-    // tuỳ cấu trúc route của bạn: "/login" hoặc "/(auth)/login"
     router.push("/login");
   }, []);
   return (
@@ -530,8 +598,7 @@ function LoginPrompt({ tokens }) {
           <MaterialIcons name="lock" size={28} color={tokens.tint} />
         </View>
         <Text style={[styles.loginTitle, { color: tokens.text }]}>
-          Hãy đăng nhập để xem{" "}
-          <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
+          Hãy đăng nhập để xem <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
         </Text>
         <Text style={{ color: tokens.sub, textAlign: "center", marginTop: 6 }}>
           Sau khi đăng nhập, bạn sẽ thấy danh sách các giải mình đã tham gia,
@@ -562,26 +629,28 @@ function LoginPrompt({ tokens }) {
 /* ================= Page ================= */
 export default function MyTournament() {
   const tokens = useThemeTokens();
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const [matchId, setMatchId] = useState(null);
 
-  // Lấy thông tin đăng nhập từ Redux
+  const socket = useSocket();
+
   const { userInfo } = useSelector((s) => s?.auth || {});
   const isAuthed = !!(userInfo?.token || userInfo?._id || userInfo?.email);
 
-  // Skip query nếu chưa đăng nhập
   const queryArg = isAuthed
     ? { withMatches: 1, matchLimit: 200, page: 1, limit: 50 }
     : skipToken;
-
   const { data, isLoading, isError, refetch, isFetching } =
     useListMyTournamentsQuery(queryArg);
 
-  // ===== Tournament search/filter state (GLOBAL) =====
-  const [tourQuery, setTourQuery] = useState("");
-  const [tourStatus, setTourStatus] = useState(
-    new Set(["upcoming", "ongoing", "finished"])
-  );
+  /* ========= Realtime layer ========= */
+  const liveMapRef = useRef(new Map()); // id → match
+  const pendingRef = useRef(new Map());
+  const rafRef = useRef(null);
+  const [liveBump, setLiveBump] = useState(0);
+  const joinedMatchesRef = useRef(new Set()); // Set<matchId>
+  const subscribedBracketsRef = useRef(new Set()); // Set<bracketId>
 
   const tournamentsRaw = useMemo(() => {
     if (!data) return [];
@@ -590,31 +659,227 @@ export default function MyTournament() {
     return [];
   }, [data]);
 
+  const matchesKey = useMemo(() => {
+    const ids =
+      tournamentsRaw
+        .flatMap((t) => (Array.isArray(t.matches) ? t.matches : []))
+        .map((m) => String(m._id))
+        .filter(Boolean)
+        .sort() || [];
+    return ids.join(",");
+  }, [tournamentsRaw]);
+
+  const bracketsKey = useMemo(() => {
+    const ids =
+      tournamentsRaw
+        .flatMap((t) => (Array.isArray(t.matches) ? t.matches : []))
+        .map((m) => String(m?.bracket?._id || m?.bracket))
+        .filter(Boolean)
+        .sort() || [];
+    return Array.from(new Set(ids)).join(",");
+  }, [tournamentsRaw]);
+
+  const flushPending = useCallback(() => {
+    if (!pendingRef.current.size) return;
+    const mp = liveMapRef.current;
+    for (const [mid, inc] of pendingRef.current) {
+      const cur = mp.get(mid);
+      mp.set(mid, { ...(cur || {}), ...inc });
+    }
+    pendingRef.current.clear();
+    setLiveBump((x) => x + 1);
+  }, []);
+
+  const queueUpsert = useCallback(
+    (payload) => {
+      const incRaw = payload?.data ?? payload?.match ?? payload;
+      const inc = incRaw?._id ? incRaw : null;
+      if (!inc) return;
+
+      const normalizeEntity = (v) => {
+        if (v == null) return v;
+        if (typeof v === "string" || typeof v === "number") return v;
+        if (typeof v === "object") {
+          return {
+            _id: v._id ?? (typeof v.id === "string" ? v.id : undefined),
+            name:
+              (typeof v.name === "string" && v.name) ||
+              (typeof v.label === "string" && v.label) ||
+              (typeof v.title === "string" && v.title) ||
+              "",
+          };
+        }
+        return v;
+      };
+      if (inc.court) inc.court = normalizeEntity(inc.court);
+      if (inc.venue) inc.venue = normalizeEntity(inc.venue);
+      if (inc.location) inc.location = normalizeEntity(inc.location);
+
+      pendingRef.current.set(String(inc._id), inc);
+      if (rafRef.current) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        flushPending();
+      });
+    },
+    [flushPending]
+  );
+
+  // Seed từ API
+  useEffect(() => {
+    const mp = new Map();
+    for (const t of tournamentsRaw) {
+      const list = Array.isArray(t.matches) ? t.matches : [];
+      for (const m of list) if (m?._id) mp.set(String(m._id), m);
+    }
+    liveMapRef.current = mp;
+    setLiveBump((x) => x + 1);
+  }, [tournamentsRaw]);
+
+  // Socket listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const onUpsert = (payload) => queueUpsert(payload);
+    const onRemove = (payload) => {
+      const id = String(payload?.id ?? payload?._id ?? "");
+      if (!id) return;
+      if (liveMapRef.current.has(id)) {
+        liveMapRef.current.delete(id);
+        setLiveBump((x) => x + 1);
+      }
+    };
+    const onRefilled = () => {
+      refetch();
+    };
+    const onConnected = () => {
+      subscribedBracketsRef.current.forEach((bid) =>
+        socket.emit("draw:subscribe", { bracketId: bid })
+      );
+      joinedMatchesRef.current.forEach((mid) => {
+        socket.emit("match:join", { matchId: mid });
+        socket.emit("match:snapshot:request", { matchId: mid });
+      });
+    };
+
+    socket.on("connect", onConnected);
+    socket.on("match:update", onUpsert);
+    socket.on("match:patched", onUpsert);
+    socket.on("match:snapshot", onUpsert);
+    socket.on("score:updated", onUpsert);
+    socket.on("score:update", onUpsert);
+    socket.on("match:deleted", onRemove);
+    socket.on("draw:refilled", onRefilled);
+    socket.on("bracket:updated", onRefilled);
+
+    return () => {
+      socket.off("connect", onConnected);
+      socket.off("match:update", onUpsert);
+      socket.off("match:patched", onUpsert);
+      socket.off("match:snapshot", onUpsert);
+      socket.off("score:updated", onUpsert);
+      socket.off("score:update", onUpsert);
+      socket.off("match:deleted", onRemove);
+      socket.off("draw:refilled", onRefilled);
+      socket.off("bracket:updated", onRefilled);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [socket, queueUpsert, refetch]);
+
+  // Subscribe/unsubscribe brackets theo diff
+  useEffect(() => {
+    if (!socket) return;
+    const nextIds = bracketsKey ? bracketsKey.split(",") : [];
+    const cur = subscribedBracketsRef.current;
+    const nextSet = new Set(nextIds);
+
+    nextSet.forEach((bid) => {
+      if (!cur.has(bid)) socket.emit("draw:subscribe", { bracketId: bid });
+    });
+    cur.forEach((bid) => {
+      if (!nextSet.has(bid)) socket.emit("draw:unsubscribe", { bracketId: bid });
+    });
+    subscribedBracketsRef.current = nextSet;
+
+    return () => {
+      nextSet.forEach((bid) => socket.emit("draw:unsubscribe", { bracketId: bid }));
+    };
+  }, [socket, bracketsKey]);
+
+  // Join/leave match rooms theo diff
+  useEffect(() => {
+    if (!socket) return;
+
+    const nextIds =
+      tournamentsRaw
+        .flatMap((t) => (Array.isArray(t.matches) ? t.matches : []))
+        .map((m) => String(m._id))
+        .filter(Boolean) ?? [];
+
+    const curSet = joinedMatchesRef.current;
+    const nextSet = new Set(nextIds);
+
+    nextSet.forEach((mid) => {
+      if (!curSet.has(mid)) {
+        socket.emit("match:join", { matchId: mid });
+        socket.emit("match:snapshot:request", { matchId: mid });
+      }
+    });
+    curSet.forEach((mid) => {
+      if (!nextSet.has(mid)) socket.emit("match:leave", { matchId: mid });
+    });
+
+    joinedMatchesRef.current = nextSet;
+
+    return () => {
+      nextSet.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
+    };
+  }, [socket, matchesKey, tournamentsRaw]);
+
+  // Merge realtime vào từng giải
+  const liveMatchesByTid = useMemo(() => {
+    const mp = new Map();
+    const all = Array.from(liveMapRef.current.values());
+    for (const m of all) {
+      const tid = m?.tournament?._id || m?.tournament;
+      if (!tid) continue;
+      const k = String(tid);
+      if (!mp.has(k)) mp.set(k, []);
+      mp.get(k).push(m);
+    }
+    return mp;
+  }, [liveBump]);
+
+  const tournamentsMerged = useMemo(() => {
+    return tournamentsRaw.map((t) => {
+      const merged = liveMatchesByTid.get(String(t._id));
+      return merged ? { ...t, matches: merged } : t;
+    });
+  }, [tournamentsRaw, liveMatchesByTid]);
+
+  /* ========= GLOBAL filter ========= */
+  const [tourQuery, setTourQuery] = useState("");
+  const [tourStatus, setTourStatus] = useState(
+    new Set(["upcoming", "ongoing", "finished"])
+  );
   const tournaments = useMemo(() => {
     const q = stripVN(tourQuery);
-    return tournamentsRaw.filter((t) => {
+    return tournamentsMerged.filter((t) => {
       if (!tourStatus.has(t.status)) return false;
       if (!q) return true;
       const hay = [t.name, t.location].map(stripVN).join(" | ");
       return hay.includes(q);
     });
-  }, [tournamentsRaw, tourQuery, tourStatus]);
+  }, [tournamentsMerged, tourQuery, tourStatus]);
 
   const handleOpenMatch = useCallback((m) => {
     setMatchId(m?._id);
     setOpen(true);
   }, []);
 
-  const toggleTourStatus = (key) =>
-    setTourStatus((prev) => {
-      const n = new Set(prev);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      if (n.size === 0) n.add(key);
-      return n;
-    });
-
-  /* ====== STICKY HEADER CONTENT ====== */
   const StickyHeader = (
     <View
       style={[
@@ -625,7 +890,6 @@ export default function MyTournament() {
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Giải của tôi</Text>
 
-        {/* Tournament search */}
         <View
           style={[
             styles.searchRow,
@@ -647,49 +911,6 @@ export default function MyTournament() {
           {tourQuery ? (
             <Pressable onPress={() => setTourQuery("")}>
               <MaterialIcons name="close" size={18} color={tokens.sub} />
-            </Pressable>
-          ) : null}
-        </View>
-
-        {/* Chips filter giải */}
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            flexWrap: "wrap",
-            marginTop: 8,
-          }}
-        >
-          <ChipToggle
-            label="Sắp diễn ra"
-            active={tourStatus.has("upcoming")}
-            onPress={() => toggleTourStatus("upcoming")}
-            tokens={tokens}
-          />
-          <ChipToggle
-            label="Đang diễn ra"
-            active={tourStatus.has("ongoing")}
-            onPress={() => toggleTourStatus("ongoing")}
-            tokens={tokens}
-          />
-          <ChipToggle
-            label="Đã kết thúc"
-            active={tourStatus.has("finished")}
-            onPress={() => toggleTourStatus("finished")}
-            tokens={tokens}
-          />
-          {!!tourQuery || tourStatus.size !== 3 ? (
-            <Pressable
-              onPress={() => {
-                setTourQuery("");
-                setTourStatus(new Set(["upcoming", "ongoing", "finished"]));
-              }}
-            >
-              <Text
-                style={{ color: tokens.tint, fontWeight: "700", padding: 6 }}
-              >
-                Reset
-              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -719,7 +940,6 @@ export default function MyTournament() {
         options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
       />
 
-      {/* Nếu CHƯA đăng nhập: hiển thị prompt và không gọi API */}
       {!isAuthed ? (
         <LoginPrompt tokens={tokens} />
       ) : isLoading ? (
@@ -736,10 +956,13 @@ export default function MyTournament() {
       ) : (
         <FlatList
           data={tournaments}
-          keyExtractor={(t) => t._id}
+          keyExtractor={(t) => String(t._id)}
           contentContainerStyle={[
             styles.screen,
-            { backgroundColor: tokens.bg, paddingBottom: 28 },
+            {
+              backgroundColor: tokens.bg,
+              paddingBottom: (insets?.bottom ?? 0) + 28,
+            },
           ]}
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           renderItem={({ item }) => (
@@ -749,11 +972,11 @@ export default function MyTournament() {
               tokens={tokens}
             />
           )}
-          /* ======= GHIM HEADER Ở ĐỈNH ======= */
           ListHeaderComponent={StickyHeader}
           stickyHeaderIndices={[0]}
-          /* ================================== */
-
+          contentInset={{ bottom: insets?.bottom ?? 0 }}
+          scrollIndicatorInsets={{ bottom: insets?.bottom ?? 0 }}
+          removeClippedSubviews={Platform.OS === "android" ? false : undefined}
           ListEmptyComponent={EmptyState}
           refreshControl={
             <RefreshControl
@@ -761,6 +984,9 @@ export default function MyTournament() {
               onRefresh={refetch}
               tintColor={tokens.tint}
             />
+          }
+          ListFooterComponent={
+            <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
           }
         />
       )}
@@ -776,11 +1002,10 @@ export default function MyTournament() {
 
 /* ================= Styles ================= */
 const styles = StyleSheet.create({
-  screen: { padding: 16, paddingTop: 0 }, // top: 0 vì header là sticky bên trong
+  screen: { padding: 16, paddingTop: 0 },
 
-  /* Sticky header wrapper */
   stickyHeader: {
-    zIndex: 10, // Android cần zIndex + elevation để nổi lên
+    zIndex: 10,
     elevation: 3,
     borderBottomWidth: 1,
   },
@@ -824,7 +1049,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    backgroundColor: "#11161c", // fallback khi không có ảnh
+    backgroundColor: "#11161c",
   },
   bannerInner: {
     flex: 1,
@@ -833,6 +1058,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
+    justifyContent: "space-between",
   },
   bannerTitle: {
     fontSize: 18,
@@ -843,6 +1069,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     alignSelf: "flex-start",
+  },
+  bannerToggleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   chip: {

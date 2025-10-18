@@ -1,5 +1,4 @@
-// app/(auth)/login.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -13,13 +12,15 @@ import {
   Alert,
   useColorScheme,
 } from "react-native";
+import { Image } from "expo-image";
 import { router, Stack, Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { useLoginMutation } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
+import apiSlice from "@/slices/apiSlice";
 
-/* ---------- Helpers (JS thuần, không TS) ---------- */
+/* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
 const normPhone = (v) => {
   if (typeof v !== "string") return v;
@@ -35,13 +36,18 @@ const isLikelyPhone = (raw) => {
   return /^0\d{8,10}$/.test(s); // 9–11 số tuỳ mạng
 };
 
+/** Logo cục bộ: đặt file ở /assets/logo.png */
+const LOGO_SRC = require("@/assets/images/icon.png");
+
 export default function LoginScreen() {
   const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const textPrimary = scheme === "dark" ? "#fff" : "#111";
-  const textSecondary = scheme === "dark" ? "#c9c9c9" : "#444";
-  const border = scheme === "dark" ? "#2e2f33" : "#dfe3ea";
+  const isDark = scheme === "dark";
+  const tint = isDark ? "#7cc0ff" : "#0a84ff";
+  const cardBg = isDark ? "#16181c" : "#ffffff";
+  const textPrimary = isDark ? "#fff" : "#111";
+  const textSecondary = isDark ? "#c9c9c9" : "#444";
+  const border = isDark ? "#2e2f33" : "#dfe3ea";
+  const logoBg = isDark ? "#202329" : "#f3f5f9";
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
@@ -51,7 +57,7 @@ export default function LoginScreen() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
 
-  // Xác định loại input để set keyboardType & payload
+  // Loại input
   const kind = useMemo(() => {
     const v = (loginId || "").trim();
     if (v.includes("@")) return "email";
@@ -60,7 +66,12 @@ export default function LoginScreen() {
   }, [loginId]);
 
   const kbType = useMemo(
-    () => (kind === "email" ? "email-address" : kind === "phone" ? "phone-pad" : "default"),
+    () =>
+      kind === "email"
+        ? "email-address"
+        : kind === "phone"
+        ? "phone-pad"
+        : "default",
     [kind]
   );
 
@@ -84,11 +95,10 @@ export default function LoginScreen() {
       const res = await login(payload).unwrap();
       const normalized = res?.user ? { ...res.user, token: res.token } : res;
 
-      // Redux + persist vào storage (SecureStore/AsyncStorage)
       dispatch(setCredentials(normalized));
+      dispatch(apiSlice.util.resetApiState());
       await saveUserInfo(normalized);
 
-      // Điều hướng sau khi đã persist
       router.replace("/(tabs)");
     } catch (err) {
       const msg =
@@ -99,7 +109,6 @@ export default function LoginScreen() {
     }
   };
 
-  // QUYẾT ĐỊNH UI Ở CUỐI — không return sớm trước khi gọi hooks
   const shouldRedirect = !!userInfo;
 
   return shouldRedirect ? (
@@ -118,7 +127,25 @@ export default function LoginScreen() {
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
-            <Text style={[styles.title, { color: textPrimary }]}>Đăng nhập</Text>
+            {/* Logo (Expo Image) */}
+            <View
+              style={[
+                styles.logoWrap,
+                { backgroundColor: logoBg, borderColor: border },
+              ]}
+            >
+              <Image
+                source={LOGO_SRC}
+                style={styles.logo}
+                contentFit="contain"
+                transition={150}
+                cachePolicy="memory-disk"
+              />
+            </View>
+
+            <Text style={[styles.title, { color: textPrimary }]}>
+              Đăng nhập
+            </Text>
 
             <View style={styles.form}>
               <Text style={[styles.label, { color: textSecondary }]}>
@@ -135,7 +162,7 @@ export default function LoginScreen() {
                 ]}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType={kbType}
+                // keyboardType={kbType}
                 textContentType="username"
                 autoComplete="username"
                 returnKeyType="next"
@@ -161,6 +188,16 @@ export default function LoginScreen() {
                 returnKeyType="done"
                 onSubmitEditing={onSubmit}
               />
+
+              {/* Quên mật khẩu */}
+              <Pressable
+                onPress={() => router.push("/forgot-password")}
+                style={{ alignSelf: "flex-end", marginTop: 8 }}
+              >
+                <Text style={[styles.link, { color: tint }]}>
+                  Quên mật khẩu?
+                </Text>
+              </Pressable>
 
               <Pressable
                 onPress={onSubmit}
@@ -189,7 +226,6 @@ export default function LoginScreen() {
 
               <View
                 style={{
-                  display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
                   width: "100%",
@@ -221,6 +257,26 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+  },
+  /* Logo container có nền nhẹ + viền, tạo cảm giác “badge” */
+  logoWrap: {
+    alignSelf: "center",
+    width: 110,
+    height: 110,
+    borderRadius: 60,
+    marginBottom: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  logo: {
+    width: 88,
+    height: 88,
+    borderRadius: 18,
   },
   title: {
     fontSize: 22,

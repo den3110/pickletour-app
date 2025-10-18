@@ -1,11 +1,11 @@
 // app/(app)/tournaments/DashboardScreen.jsx
 import { useGetTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -18,8 +18,11 @@ import {
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { usePlatform } from "@/hooks/usePlatform";
 
-const THUMB_SIZE = 96;
+const SKELETON_COUNT = 6;
+const BANNER_RATIO = 16 / 9; // Ảnh đầu card tỉ lệ 16:9
+
 const TABS = ["upcoming", "ongoing", "finished"];
 const STATUS_LABEL = {
   upcoming: "Sắp diễn ra",
@@ -45,7 +48,107 @@ function formatDate(d) {
   }
 }
 
+/* ---------- Skeleton utilities ---------- */
+function usePulse() {
+  const v = useRef(new Animated.Value(0.6)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(v, {
+          toValue: 0.6,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return v;
+}
+
+function Skeleton({ style, bg }) {
+  const opacity = usePulse();
+  return (
+    <Animated.View
+      style={[{ backgroundColor: bg, opacity, borderRadius: 8 }, style]}
+    />
+  );
+}
+
+/** Skeleton card: Ảnh full width phía trên + các dòng text/chip/btn bên dưới */
+function SkeletonCard({ border, cardBg, skBase }) {
+  return (
+    <View
+      style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+    >
+      {/* Ảnh skeleton */}
+      <Skeleton
+        style={{
+          width: "100%",
+          aspectRatio: BANNER_RATIO,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: border,
+        }}
+        bg={skBase}
+      />
+      {/* Nội dung skeleton */}
+      <View style={{ gap: 8 }}>
+        <Skeleton style={{ height: 18, width: "85%" }} bg={skBase} />
+        <Skeleton style={{ height: 14, width: "55%" }} bg={skBase} />
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+            flexWrap: "wrap",
+            marginTop: 2,
+          }}
+        >
+          <Skeleton
+            style={{ height: 18, width: 90, borderRadius: 10 }}
+            bg={skBase}
+          />
+          <Skeleton
+            style={{ height: 18, width: 180, borderRadius: 8 }}
+            bg={skBase}
+          />
+          <Skeleton
+            style={{ height: 18, width: 140, borderRadius: 8 }}
+            bg={skBase}
+          />
+          <Skeleton
+            style={{ height: 18, width: 100, borderRadius: 8 }}
+            bg={skBase}
+          />
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          <Skeleton
+            style={{ height: 36, width: 100, borderRadius: 10 }}
+            bg={skBase}
+          />
+          <Skeleton
+            style={{ height: 36, width: 100, borderRadius: 10 }}
+            bg={skBase}
+          />
+          <Skeleton
+            style={{ height: 36, width: 100, borderRadius: 10 }}
+            bg={skBase}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function TournamentDashboardScreen() {
+  const { isIOS } = usePlatform();
+
   const scheme = useColorScheme() ?? "light";
   const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
   const bg = scheme === "dark" ? "#0b0d10" : "#f5f7fb";
@@ -53,6 +156,7 @@ export default function TournamentDashboardScreen() {
   const border = scheme === "dark" ? "#2e2f33" : "#e4e8ef";
   const text = scheme === "dark" ? "#f7f7f7" : "#111";
   const subtext = scheme === "dark" ? "#c9c9c9" : "#555";
+  const skBase = scheme === "dark" ? "#22262c" : "#e9eef5";
 
   const me = useSelector((s) => s.auth?.userInfo || null);
   const isAdmin = !!(
@@ -83,25 +187,19 @@ export default function TournamentDashboardScreen() {
   const [search, setSearch] = useState(q ? String(q).toLowerCase() : "");
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(keyword.trim().toLowerCase());
-    }, 300);
+    const t = setTimeout(() => setSearch(keyword.trim().toLowerCase()), 300);
     return () => clearTimeout(t);
   }, [keyword]);
 
   const {
     data: tournaments,
     isLoading,
-    isFetching,
+    isFetching, // hiển thị skeleton mỗi lần refetch
     error,
     refetch,
   } = useGetTournamentsQuery(
     { sportType, groupId },
-    {
-      // Tự động refetch khi quay lại app hoặc có mạng lại
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-    }
+    { refetchOnFocus: true, refetchOnReconnect: true }
   );
 
   const [refreshing, setRefreshing] = useState(false);
@@ -123,125 +221,132 @@ export default function TournamentDashboardScreen() {
       .filter((t) => (search ? t.name?.toLowerCase().includes(search) : true));
   }, [tournaments, tab, search]);
 
-  const onPressCard = (t) => {
-    router.push(`/tournament/${t._id}`);
-  };
+  const onPressCard = (t) => router.push(`/tournament/${t._id}`);
 
+  // === Card render: Ảnh full width ở trên, nội dung bên dưới ===
   const renderItem = ({ item: t }) => (
     <View
       style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
     >
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Pressable
-          onPress={() => setPreview(t.image)}
-          style={{ flexShrink: 0 }}
-        >
-          <ExpoImage
-            source={{
-              uri:
-                normalizeUrl(t.image) ||
-                "https://dummyimage.com/300x300/cccccc/ffffff&text=No+Image",
-            }}
-            style={{
-              width: THUMB_SIZE,
-              height: THUMB_SIZE,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: border,
-            }}
-            contentFit="cover"
-            cachePolicy="memory-disk" // cache mạnh tay: RAM + disk
-            transition={0} // tắt fade để khỏi thấy “nháy”
-            recyclingKey={String(t._id)} // giúp tái sử dụng view đúng item
-          />
+      {/* Ảnh trên cùng, full width */}
+      <Pressable
+        onPress={() => setPreview(t.image)}
+        style={{ marginBottom: 10 }}
+      >
+        <ExpoImage
+          source={{
+            uri:
+              normalizeUrl(t.image) ||
+              "https://dummyimage.com/1200x675/cccccc/ffffff&text=No+Image",
+          }}
+          style={{
+            width: "100%",
+            aspectRatio: BANNER_RATIO,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: border,
+          }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={120}
+          recyclingKey={String(t._id)}
+        />
+      </Pressable>
+
+      {/* Nội dung */}
+      <View style={{ gap: 6 }}>
+        <Pressable onPress={() => onPressCard(t)}>
+          <Text style={[styles.title, { color: text }]} numberOfLines={2}>
+            {t.name}
+          </Text>
         </Pressable>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Pressable onPress={() => onPressCard(t)}>
-            <Text style={[styles.title, { color: text }]} numberOfLines={2}>
-              {t.name}
-            </Text>
-          </Pressable>
+        <Text style={{ color: subtext, marginTop: 2 }}>
+          Đăng ký đến {formatDate(t.registrationDeadline)}
+        </Text>
 
-          <Text style={{ color: subtext, marginTop: 2 }}>
-            Đăng ký đến {formatDate(t.registrationDeadline)}
-          </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <StatusChip status={t.status} />
+          <InfoChip
+            label={`Thời gian: ${formatDate(t.startDate)} – ${formatDate(
+              t.endDate
+            )}`}
+          />
+          <InfoChip label={`Địa điểm: ${t.location || "-"}`} />
+          <InfoChip label={`Đăng ký: ${t.registered}/${t.maxPairs}`} />
+        </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 8,
-              flexWrap: "wrap",
-            }}
-          >
-            <StatusChip status={t.status} />
-            <InfoChip
-              label={`Thời gian: ${formatDate(t.startDate)} – ${formatDate(
-                t.endDate
-              )}`}
-            />
-            <InfoChip label={`Địa điểm: ${t.location || "-"}`} />
-            <InfoChip
-              label={`Đăng ký: ${t.registered}/${t.maxPairs}`}
-            />
-          </View>
- {/* – Trận: ${
-                t.matchesCount ?? "-"
-              } */}
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 8,
-              flexWrap: "wrap",
-              marginTop: 10,
-            }}
-          >
-            {t.status === "ongoing" ? (
-              <PrimaryBtn
-                onPress={() => router.push(`/tournament/${t._id}/schedule`)}
-              >
-                Lịch đấu
-              </PrimaryBtn>
-            ) : (
-              <PrimaryBtn
-                onPress={() => router.push(`/tournament/${t._id}/register`)}
-              >
-                Đăng ký
-              </PrimaryBtn>
-            )}
-            {t.status === "ongoing" && canManage(t) && (
-              <PrimaryBtn
-                onPress={() => router.push(`/tournament/${t._id}/register`)}
-              >
-                Đăng ký
-              </PrimaryBtn>
-            )}
-            <SuccessBtn
-              onPress={() => router.push(`/tournament/${t._id}/checkin`)}
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+            flexWrap: "wrap",
+            marginTop: 10,
+          }}
+        >
+          {t.status === "ongoing" ? (
+            <PrimaryBtn
+              onPress={() => router.push(`/tournament/${t._id}/schedule`)}
             >
-              Check-in
-            </SuccessBtn>
-            <OutlineBtn
-              onPress={() => {
-                router.push({
-                  pathname: "/tournament/[id]/bracket",
-                  params: { id: t._id },
-                });
-              }}
+              Lịch đấu
+            </PrimaryBtn>
+          ) : (
+            <PrimaryBtn
+              onPress={() => router.push(`/tournament/${t._id}/register`)}
             >
-              Sơ đồ
-            </OutlineBtn>
-          </View>
+              Đăng ký
+            </PrimaryBtn>
+          )}
+          {t.status === "ongoing" && canManage(t) && (
+            <PrimaryBtn
+              onPress={() => router.push(`/tournament/${t._id}/register`)}
+            >
+              Đăng ký
+            </PrimaryBtn>
+          )}
+          <SuccessBtn
+            onPress={() => router.push(`/tournament/${t._id}/checkin`)}
+          >
+            Check-in
+          </SuccessBtn>
+          <OutlineBtn
+            onPress={() =>
+              router.push({
+                pathname: "/tournament/[id]/bracket",
+                params: { id: t._id },
+              })
+            }
+          >
+            Sơ đồ
+          </OutlineBtn>
         </View>
       </View>
     </View>
   );
 
+  const showSkeleton = isLoading || isFetching;
+  const skeletonData = useMemo(
+    () => Array.from({ length: SKELETON_COUNT }, (_, i) => ({ id: `sk-${i}` })),
+    []
+  );
+
   return (
     <>
-      <View style={[styles.screen, { backgroundColor: bg }]}>
+      <View
+        style={[
+          styles.screen,
+          { backgroundColor: bg },
+          isIOS && { marginBottom: 70 },
+        ]}
+      >
         {/* Tabs */}
         <TabsBar
           value={tab}
@@ -263,13 +368,6 @@ export default function TournamentDashboardScreen() {
           ]}
         />
 
-        {/* Loading lần đầu */}
-        {isLoading && (
-          <View style={{ paddingVertical: 24, alignItems: "center" }}>
-            <ActivityIndicator size="large" color={tint} />
-          </View>
-        )}
-
         {/* Lỗi */}
         {!!error && (
           <View
@@ -284,33 +382,58 @@ export default function TournamentDashboardScreen() {
           </View>
         )}
 
-        {/* Danh sách (luôn là FlatList để có thể kéo refresh cả khi rỗng) */}
+        {/* Danh sách */}
         {!error && (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => String(item._id)}
-            renderItem={renderItem}
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            // Hiển thị separator, padding
-            contentContainerStyle={{ paddingBottom: 24 }}
-            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            // Empty State vẫn kéo để refresh được
-            ListEmptyComponent={
-              !isLoading ? (
-                <View
-                  style={[
-                    styles.alert,
-                    { borderColor: "#0284c7", backgroundColor: "#e0f2fe" },
-                  ]}
-                >
-                  <Text style={{ color: "#075985" }}>
-                    Không có giải nào phù hợp.
-                  </Text>
-                </View>
-              ) : null
-            }
-          />
+          <>
+            {showSkeleton ? (
+              <FlatList
+                data={skeletonData}
+                keyExtractor={(item) => item.id}
+                renderItem={() => (
+                  <SkeletonCard
+                    border={border}
+                    cardBg={cardBg}
+                    skBase={skBase}
+                  />
+                )}
+                contentContainerStyle={{ paddingBottom: 24 }}
+                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                ListFooterComponent={
+                  isFetching && !isLoading ? (
+                    <View style={{ paddingTop: 8, alignItems: "center" }}>
+                      <Text style={{ color: subtext, fontSize: 12 }}>
+                        Đang tải dữ liệu…
+                      </Text>
+                    </View>
+                  ) : null
+                }
+              />
+            ) : (
+              <FlatList
+                data={filtered}
+                keyExtractor={(item) => String(item._id)}
+                renderItem={renderItem}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                contentContainerStyle={{ paddingBottom: 24 }}
+                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+                ListEmptyComponent={
+                  <View
+                    style={[
+                      styles.alert,
+                      { borderColor: "#0284c7", backgroundColor: "#e0f2fe" },
+                    ]}
+                  >
+                    <Text style={{ color: "#075985" }}>
+                      Không có giải nào phù hợp.
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </>
         )}
 
         {/* Preview modal */}
@@ -334,14 +457,20 @@ export default function TournamentDashboardScreen() {
               >
                 <Text style={{ color: "#fff", fontWeight: "700" }}>×</Text>
               </Pressable>
-              <Image
-                source={{
-                  uri:
-                    normalizeUrl(preview) ||
-                    "https://dummyimage.com/1000x600/cccccc/ffffff&text=Preview",
+
+              <ExpoImage
+                source={
+                  normalizeUrl(preview) ||
+                  "https://dummyimage.com/1200x675/cccccc/ffffff&text=Preview"
+                }
+                contentFit="contain"
+                style={{
+                  width: "100%",
+                  aspectRatio: BANNER_RATIO,
+                  borderRadius: 12,
                 }}
-                resizeMode="contain"
-                style={{ width: "100%", height: 300, borderRadius: 12 }}
+                transition={150}
+                cachePolicy="memory-disk"
               />
             </View>
             <Pressable style={{ flex: 1 }} onPress={() => setPreview(null)} />
@@ -457,7 +586,7 @@ function OutlineBtn({ onPress, children }) {
 
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16, marginBottom: 70 },
+  screen: { flex: 1, padding: 16 },
   input: {
     borderWidth: 1,
     borderRadius: 12,
@@ -493,6 +622,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 12,
+    gap: 10, // khoảng cách giữa ảnh và nội dung
   },
   title: { fontSize: 16, fontWeight: "700" },
   btn: {

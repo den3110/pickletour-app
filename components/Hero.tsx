@@ -4,14 +4,16 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { router } from "expo-router";
 import React, { useMemo } from "react";
 import {
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    useColorScheme,
-    View,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useSelector } from "react-redux";
+import NativeTest from "./NativeTest";
 
 const FALLBACK = {
   title: "Kết nối cộng đồng & quản lý giải đấu thể thao",
@@ -143,6 +145,7 @@ export default function Hero() {
   return (
     <View style={[styles.section, { backgroundColor: cardBg }]}>
       <View style={styles.container}>
+        {/* <NativeTest /> */}
         {/* Text */}
         <View style={styles.left}>
           {heroData ? (
@@ -261,18 +264,25 @@ export default function Hero() {
           <View style={styles.imageWrap}>
             {heroData ? (
               uri ? (
-                <Image
-                  source={{ uri: normalizeUrl(uri) }}
-                  accessibilityLabel={heroData.imageAlt?.replace("localhost", "192.168.0.105")}
+                <ExpoImage
+                  source={normalizeUrl(uri)}
+                  accessibilityLabel={heroData.imageAlt?.replace(
+                    "localhost",
+                    "192.168.0.105"
+                  )}
                   style={styles.image}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={150}
+                  cachePolicy="memory-disk"
                 />
               ) : (
-                <Image
+                <ExpoImage
                   source={require("@/assets/images/hero.jpg")}
                   accessibilityLabel={heroData.imageAlt}
                   style={styles.image}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={150}
+                  cachePolicy="memory-disk"
                 />
               )
             ) : (

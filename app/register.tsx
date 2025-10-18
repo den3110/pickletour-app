@@ -13,9 +13,12 @@ import {
   TextInput,
   useColorScheme,
   View,
+  Keyboard,
+  FlatList,
+  TouchableOpacity,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Stack, router, Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -23,10 +26,86 @@ import { useRegisterMutation } from "@/slices/usersApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
-import { saveUserInfo } from "@/utils/authStorage"; // ✅ lưu storage theo helper bạn đưa
+import { saveUserInfo } from "@/utils/authStorage";
 
-/* ---------- Constants & helpers ---------- */
+/* ==================== Consts & Helpers ==================== */
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const PROVINCES = [
+  "An Giang",
+  "Bà Rịa - Vũng Tàu",
+  "Bạc Liêu",
+  "Bắc Giang",
+  "Bắc Kạn",
+  "Bắc Ninh",
+  "Bến Tre",
+  "Bình Dương",
+  "Bình Định",
+  "Bình Phước",
+  "Bình Thuận",
+  "Cà Mau",
+  "Cao Bằng",
+  "Cần Thơ",
+  "Đà Nẵng",
+  "Đắk Lắk",
+  "Đắk Nông",
+  "Điện Biên",
+  "Đồng Nai",
+  "Đồng Tháp",
+  "Gia Lai",
+  "Hà Giang",
+  "Hà Nam",
+  "Hà Nội",
+  "Hà Tĩnh",
+  "Hải Dương",
+  "Hải Phòng",
+  "Hậu Giang",
+  "Hòa Bình",
+  "Hưng Yên",
+  "Khánh Hòa",
+  "Kiên Giang",
+  "Kon Tum",
+  "Lai Châu",
+  "Lâm Đồng",
+  "Lạng Sơn",
+  "Lào Cai",
+  "Long An",
+  "Nam Định",
+  "Nghệ An",
+  "Ninh Bình",
+  "Ninh Thuận",
+  "Phú Thọ",
+  "Phú Yên",
+  "Quảng Bình",
+  "Quảng Nam",
+  "Quảng Ngãi",
+  "Quảng Ninh",
+  "Quảng Trị",
+  "Sóc Trăng",
+  "Sơn La",
+  "Tây Ninh",
+  "Thái Bình",
+  "Thái Nguyên",
+  "Thanh Hóa",
+  "Thừa Thiên Huế",
+  "Tiền Giang",
+  "TP. Hồ Chí Minh",
+  "Trà Vinh",
+  "Tuyên Quang",
+  "Vĩnh Long",
+  "Vĩnh Phúc",
+  "Yên Bái",
+];
+
+function vnNormalize(s = "") {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
 
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const res = await ImagePicker.launchImageLibraryAsync({
@@ -41,13 +120,11 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
     Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
     return null;
   }
-  const ext = (
-    asset.fileName?.split(".").pop() ||
-    uri.split(".").pop() ||
-    "jpg"
-  ).toLowerCase();
+  const ext = asset.fileName?.split(".").pop() || uri.split(".").pop() || "jpg";
   const name = asset.fileName || `avatar.${ext}`;
-  const type = asset.mimeType || (ext === "png" ? "image/png" : "image/jpeg");
+  const type =
+    asset.mimeType ||
+    (ext.toLowerCase() === "png" ? "image/png" : "image/jpeg");
   return { uri, name, type, size: info.size };
 }
 
@@ -60,7 +137,17 @@ function cleanPhone(v) {
   return s;
 }
 
-/* ---------- Component ---------- */
+// ---- Các trường optional cần nhắc (tuỳ bạn) ----
+function getMissingOptional(form, hasAvatar) {
+  const missing = [];
+  if (!(form?.email || "").trim()) missing.push("Email");
+  if (!cleanPhone(form?.phone || "")) missing.push("Số điện thoại");
+  if (!form?.province) missing.push("Tỉnh/Thành phố");
+  if (!hasAvatar) missing.push("Ảnh đại diện");
+  return missing;
+}
+
+/* ==================== Screen ==================== */
 export default function RegisterScreen() {
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
@@ -73,7 +160,6 @@ export default function RegisterScreen() {
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
 
-  // ✅ luôn gọi hooks mỗi lần render (KHÔNG return sớm trước khi gọi hết hooks)
   const [register, { isLoading }] = useRegisterMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadAvatarMutation();
@@ -82,6 +168,7 @@ export default function RegisterScreen() {
     nickname: "",
     email: "",
     phone: "",
+    province: "", // optional
     password: "",
     confirmPassword: "",
   });
@@ -126,34 +213,26 @@ export default function RegisterScreen() {
     return reqErrs.concat(errors);
   };
 
-  const onSubmit = async () => {
-    const allErrs = validateRequired();
-    if (allErrs.length) {
-      Alert.alert("Lỗi", allErrs.join("\n"));
-      return;
-    }
+  const doRegister = async () => {
     try {
-      // 1) Clean
       const cleaned = {
         nickname: (form.nickname || "").trim(),
         email: (form.email || "").trim() || undefined,
         phone: cleanPhone(form.phone || "") || undefined,
+        province: form.province || undefined, // optional
         password: form.password,
       };
 
-      // 2) Register -> set + persist
       const res = await register(cleaned).unwrap();
       dispatch(setCredentials(res));
-      await saveUserInfo(res); // ✅ đảm bảo hydrate về sau
+      await saveUserInfo(res);
 
-      // 3) Upload avatar (nếu có) sau khi có token
       if (avatarFile) {
         try {
           await uploadAvatar(avatarFile).unwrap();
         } catch {}
       }
 
-      // 4) Điều hướng
       router.replace("/(tabs)/profile");
     } catch (err) {
       const raw = err?.data?.message || err?.error || "Đăng ký thất bại";
@@ -161,9 +240,40 @@ export default function RegisterScreen() {
     }
   };
 
-  const submitDisabled = isLoading || uploadingAvatar || !accepted;
+  const onSubmit = async () => {
+    const allErrs = validateRequired(); // chỉ check trường bắt buộc
+    if (allErrs.length) {
+      Alert.alert("Lỗi", allErrs.join("\n"));
+      return;
+    }
 
-  // ✅ Không early return trước hooks; chỉ quyết định UI ở *cuối cùng*
+    // === Nhắc các trường KHÔNG bắt buộc ===
+    const hasAvatar = !!avatarFile || !!avatarPreview;
+    const missingOptional = getMissingOptional(form, hasAvatar);
+
+    if (missingOptional.length) {
+      Alert.alert(
+        "Thiếu thông tin",
+        `Bạn chưa nhập:\n• ${missingOptional.join(
+          "\n• "
+        )}\n\nBạn có thể bổ sung sau tại trang Hồ sơ.`,
+        [
+          { text: "Bổ sung", style: "default" },
+          {
+            text: "Bỏ qua & đăng ký",
+            style: "destructive",
+            onPress: () => doRegister(),
+          },
+        ]
+      );
+      return;
+    }
+
+    // Không thiếu optional → đăng ký luôn
+    doRegister();
+  };
+
+  const submitDisabled = isLoading || uploadingAvatar || !accepted;
   const shouldRedirect = !!userInfo;
 
   return shouldRedirect ? (
@@ -282,6 +392,19 @@ export default function RegisterScreen() {
               textSecondary={textSecondary}
               keyboardType="phone-pad"
             />
+
+            {/* Province (optional select) */}
+            <FieldSelect
+              label="Tỉnh/Thành phố (tuỳ chọn)"
+              value={form.province}
+              onSelect={(val) => handleChange("province", val)}
+              options={PROVINCES}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              tint={tint}
+            />
+
             <Field
               label="Mật khẩu"
               value={form.password}
@@ -303,7 +426,7 @@ export default function RegisterScreen() {
               required
             />
 
-            {/* Điều khoản */}
+            {/* Terms */}
             <View style={{ marginTop: 8, marginBottom: 8 }}>
               <Pressable
                 onPress={() => setAccepted((v) => !v)}
@@ -377,7 +500,7 @@ export default function RegisterScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modal Điều khoản */}
+      {/* Terms Modal */}
       <TermsModal
         open={termsOpen}
         onClose={() => setTermsOpen(false)}
@@ -395,7 +518,7 @@ export default function RegisterScreen() {
   );
 }
 
-/* ---------- Subcomponents ---------- */
+/* ==================== Subcomponents ==================== */
 function Field({
   label,
   value,
@@ -429,6 +552,211 @@ function Field({
   );
 }
 
+function FieldSelect({
+  label,
+  value,
+  onSelect,
+  options = [],
+  border,
+  textPrimary,
+  textSecondary,
+  tint = "#0a84ff",
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [kbHeight, setKbHeight] = useState(0);
+  const searchRef = React.useRef(null);
+
+  // --- bỏ dấu & normalize ---
+  const unaccentVN = (s = "") =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+  const norm = (s = "") =>
+    unaccentVN(s).toLowerCase().replace(/\s+/g, " ").trim();
+
+  const filtered = useMemo(() => {
+    const nq = norm(q);
+    if (!nq) return options;
+    return options.filter((name) => norm(name).includes(nq));
+  }, [q, options]);
+
+  // Bàn phím
+  React.useEffect(() => {
+    const onShow = (e) => setKbHeight(e.endCoordinates?.height ?? 0);
+    const onHide = () => setKbHeight(0);
+    const s1 =
+      Platform.OS === "ios"
+        ? Keyboard.addListener("keyboardWillShow", onShow)
+        : Keyboard.addListener("keyboardDidShow", onShow);
+    const s2 =
+      Platform.OS === "ios"
+        ? Keyboard.addListener("keyboardWillHide", onHide)
+        : Keyboard.addListener("keyboardDidHide", onHide);
+    return () => {
+      s1.remove();
+      s2.remove();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 50);
+    else setQ("");
+  }, [open]);
+
+  const handleSelect = (name) => {
+    onSelect(name);
+    setOpen(false);
+    setQ("");
+    Keyboard.dismiss();
+  };
+
+  const renderItem = ({ item: name }) => {
+    const selected = name === value;
+    return (
+      <Pressable
+        onStartShouldSetResponder={() => true}
+        onResponderGrant={() => handleSelect(name)}
+        onPress={() => handleSelect(name)}
+        style={({ pressed }) => [
+          {
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          },
+          pressed && { backgroundColor: "#f2f4f7" },
+        ]}
+      >
+        <Text style={{ color: textPrimary, fontSize: 16 }}>{name}</Text>
+        {selected ? (
+          <Text style={{ color: tint, fontWeight: "700" }}>✓</Text>
+        ) : null}
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={[styles.label, { color: textSecondary }]}>{label}</Text>
+
+      {/* Trigger */}
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [
+          styles.input,
+          { borderColor: border, flexDirection: "row", alignItems: "center" },
+          pressed && { opacity: 0.95 },
+        ]}
+      >
+        <Text
+          numberOfLines={1}
+          style={{
+            color: value ? textPrimary : "#9aa0a6",
+            flex: 1,
+            fontSize: 16,
+          }}
+        >
+          {value || "Chọn tỉnh/thành (không bắt buộc)"}
+        </Text>
+        <Text style={{ color: "#9aa0a6" }}>▼</Text>
+      </Pressable>
+
+      {/* Modal */}
+      <Modal
+        visible={open}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: "padding", android: "height" })}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+          style={styles.modalBackdrop}
+        >
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: "#fff",
+                borderColor: border,
+                paddingBottom: 0,
+                maxHeight: "85%",
+              },
+            ]}
+          >
+            {/* Header */}
+            <View
+              style={[
+                styles.modalHeader,
+                { borderBottomWidth: 1, borderColor: border },
+              ]}
+            >
+              <Pressable onPress={() => setOpen(false)} style={styles.modalBtn}>
+                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                  Đóng
+                </Text>
+              </Pressable>
+              <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                Chọn tỉnh/thành
+              </Text>
+              <View style={styles.modalBtn}>
+                <Text style={[styles.modalBtnText, { color: "transparent" }]}>
+                  .
+                </Text>
+              </View>
+            </View>
+
+            {/* Search */}
+            <View
+              style={{
+                paddingHorizontal: 14,
+                paddingTop: 10,
+                paddingBottom: 6,
+              }}
+            >
+              <TextInput
+                ref={searchRef}
+                placeholder="Tìm tỉnh/thành…"
+                placeholderTextColor="#9aa0a6"
+                value={q}
+                onChangeText={setQ}
+                autoCapitalize="none"
+                returnKeyType="search"
+                blurOnSubmit={false}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: border,
+                    color: textPrimary,
+                    paddingVertical: 10,
+                  },
+                ]}
+              />
+            </View>
+
+            {/* List */}
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item}
+              renderItem={renderItem}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              initialNumToRender={20}
+              windowSize={8}
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
 function TermsModal({
   open,
   onClose,
@@ -453,7 +781,7 @@ function TermsModal({
             { backgroundColor: cardBg, borderColor: border },
           ]}
         >
-          <View className="modalHeader" style={styles.modalHeader}>
+          <View style={styles.modalHeader}>
             <Pressable onPress={onClose} style={styles.modalBtn}>
               <Text style={[styles.modalBtnText, { color: textPrimary }]}>
                 Đóng
@@ -484,7 +812,6 @@ function TermsModal({
               Cập nhật lần cuối: 04/09/2025
             </Text>
 
-            {/* 1) Giới thiệu */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -495,7 +822,6 @@ function TermsModal({
               tạo tài khoản hoặc tiếp tục sử dụng, bạn đồng ý với tài liệu này.
             </Text>
 
-            {/* 2) Tài khoản */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -506,7 +832,6 @@ function TermsModal({
               khẩu; thông báo ngay nếu nghi ngờ truy cập trái phép.
             </Text>
 
-            {/* 3) Hành vi */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -517,7 +842,6 @@ function TermsModal({
               Can thiệp hệ thống, dò quét lỗ hổng, truy cập trái phép.
             </Text>
 
-            {/* 4) Nội dung người dùng */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -529,7 +853,6 @@ function TermsModal({
               {"\n"}• Ảnh CCCD (nếu cung cấp) chỉ dùng cho mục đích xác minh.
             </Text>
 
-            {/* 5) Quyền riêng tư (tóm tắt) */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -568,7 +891,6 @@ function TermsModal({
               có thể ẩn danh để giữ thống kê.
             </Text>
 
-            {/* 6) Camera & QR */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -579,7 +901,6 @@ function TermsModal({
               CCCD chỉ dùng xác minh; có thể yêu cầu xoá sau khi hoàn tất.
             </Text>
 
-            {/* 7) Cookie/Storage */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -590,7 +911,6 @@ function TermsModal({
               trên thiết bị.
             </Text>
 
-            {/* 8) Chấm dứt */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -601,7 +921,6 @@ function TermsModal({
               tạm ngưng/chấm dứt nếu có vi phạm hoặc rủi ro an ninh.
             </Text>
 
-            {/* 9) Miễn trừ */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -614,7 +933,6 @@ function TermsModal({
               pháp lý bắt buộc.
             </Text>
 
-            {/* 10) Thay đổi */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -625,7 +943,6 @@ function TermsModal({
               tức là bạn chấp nhận bản mới.
             </Text>
 
-            {/* 11) Luật áp dụng & Liên hệ */}
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
             >
@@ -656,7 +973,7 @@ function TermsModal({
   );
 }
 
-/* ---------- Styles ---------- */
+/* ==================== Styles ==================== */
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, padding: 16 },
   card: {
@@ -684,6 +1001,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: Platform.select({ ios: 12, android: 10 }),
     fontSize: 16,
+    backgroundColor: "transparent",
   },
   btn: {
     paddingVertical: 12,

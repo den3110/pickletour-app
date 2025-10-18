@@ -1,5 +1,4 @@
 // app/index.jsx  (Home)
-// Nếu bạn đang để Home ở file khác, dán phần ContactCard + dùng <ContactCard/> tương tự
 import React, { useMemo } from "react";
 import {
   ScrollView,
@@ -14,9 +13,11 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import Hero from "@/components/Hero";
-import { AntDesign, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { AntDesign, FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useGetContactContentQuery } from "@/slices/cmsApiSlice";
 
+/* ---------- Fallback ---------- */
 const FALLBACK = {
   address: "Abcd, abcd, abcd",
   phone: "012345678",
@@ -35,6 +36,7 @@ const FALLBACK = {
   },
 };
 
+/* ---------- Utils ---------- */
 function openURL(url) {
   if (!url) return;
   Linking.canOpenURL(url)
@@ -88,6 +90,7 @@ function SocialButton({ onPress, children, bg }) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       style={{
         width: 42,
         height: 42,
@@ -101,6 +104,13 @@ function SocialButton({ onPress, children, bg }) {
     </TouchableOpacity>
   );
 }
+
+/** Zalo logo:
+ *  - Mặc định dùng ảnh remote để chạy ngay.
+ *  - Nếu bạn có file cục bộ, đổi dòng dưới thành:
+ *
+ */
+const ZALO_SRC = require("@/assets/images/icon-zalo.png");
 
 function ContactCard() {
   const scheme = useColorScheme() ?? "light";
@@ -165,14 +175,17 @@ function ContactCard() {
           </InfoRow>
 
           <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+            {/* Facebook - FontAwesome */}
             {info?.socials?.facebook ? (
               <SocialButton
                 bg="#1877F2"
                 onPress={() => openURL(info.socials.facebook)}
               >
-                <AntDesign name="facebook-square" size={22} color="#fff" />
+                <FontAwesome name="facebook-square" size={22} color="#fff" />
               </SocialButton>
             ) : null}
+
+            {/* YouTube - AntDesign */}
             {info?.socials?.youtube ? (
               <SocialButton
                 bg="#FF0000"
@@ -181,12 +194,19 @@ function ContactCard() {
                 <AntDesign name="youtube" size={22} color="#fff" />
               </SocialButton>
             ) : null}
+
+            {/* Zalo - Expo Image */}
             {info?.socials?.zalo ? (
               <SocialButton
-                bg={tint}
+                bg="#0068FF" // brand Zalo
                 onPress={() => openURL(info.socials.zalo)}
               >
-                <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+                <Image
+                  source={ZALO_SRC}
+                  style={{ width: 20, height: 20 }}
+                  contentFit="contain"
+                  transition={120}
+                />
               </SocialButton>
             ) : null}
           </View>

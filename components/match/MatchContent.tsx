@@ -9,16 +9,77 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  TextInput,
+  Alert,
+  Switch,
 } from "react-native";
+import Constants from "expo-constants";
 import { useSelector } from "react-redux";
 import { WebView } from "react-native-webview";
 import { Video } from "expo-av";
 import * as Clipboard from "expo-clipboard";
-
-// import { depLabel, seedLabel } from "../TournamentBracket";
+import Toast from "react-native-toast-message";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useAdminPatchMatchMutation } from "@/slices/matchesApiSlice";
 import PublicProfileDialog from "../PublicProfileDialog";
+import RefereeJudgePanel from "./RefereeScorePanel.native";
+import { useVerifyManagerQuery } from "@/slices/tournamentsApiSlice";
+import { skipToken } from "@reduxjs/toolkit/query";
 
-/* ===================== Name/Nick helpers (NICKNAME-ONLY) ===================== */
+// === OVERLAY: helpers ===
+const _safeURL = (u) => {
+  try {
+    const x = new URL(u);
+    return x;
+  } catch {
+    try {
+      const x = new URL(`https://${u}`);
+      return x;
+    } catch {
+      return null;
+    }
+  }
+};
+function resolveWebBase(tour, overlayCfg) {
+  const envBase =
+    (typeof process !== "undefined" &&
+      process?.env?.EXPO_PUBLIC_WEB_BASE_URL) ||
+    Constants?.expoConfig?.extra?.WEB_BASE_URL ||
+    Constants?.expoConfig?.extra?.WEB_BASE ||
+    "";
+
+  const candidates = [
+    overlayCfg?.host,
+    overlayCfg?.base,
+    tour?.links?.web,
+    tour?.links?.public,
+    tour?.webUrl,
+    tour?.site,
+    tour?.domain && `https://${tour.domain}`,
+    envBase,
+    "https://pickletour.vn",
+  ].filter(Boolean);
+
+  for (const c of candidates) {
+    const u = _safeURL(c);
+    if (u) return u.origin;
+  }
+  return "https://pickletour.vn";
+}
+
+function buildOverlayUrl(base, matchId, { theme, size, showSets, autoNext }) {
+  if (!base || !matchId) return "";
+  const qp = new URLSearchParams({
+    matchId: String(matchId),
+    theme: theme || "dark",
+    size: size || "md",
+    showSets: showSets ? "1" : "0",
+    autoNext: autoNext ? "1" : "0",
+  });
+  return `${base}/overlay/score?${qp.toString()}`;
+}
+
+/* ---------- name helpers ---------- */
 export const preferName = (p) =>
   (p?.fullName && String(p.fullName).trim()) ||
   (p?.name && String(p.name).trim()) ||
@@ -29,15 +90,24 @@ export const preferNick = (p) =>
   (p?.nickname && String(p.nickname).trim()) ||
   (p?.nickName && String(p.nickName).trim()) ||
   (p?.nick && String(p.nick).trim()) ||
+  (p?.user?.nickname && String(p.user.nickname).trim()) ||
+  (p?.user?.nickName && String(p.user.nickName).trim()) ||
+  (p?.user?.nick && String(p.user.nick).trim()) ||
   "";
 
-// CHỈ TRẢ VỀ NICKNAME (fallback "N/A")
 export const nameWithNick = (p) => {
   if (!p) return "—";
-  return preferNick(p) || "N/A";
+  const nk = preferNick(p);
+  const nm =
+    (p?.fullName && String(p.fullName).trim()) ||
+    (p?.name && String(p.name).trim()) ||
+    (p?.user?.fullName && String(p.user.fullName).trim()) ||
+    (p?.user?.name && String(p.user.name).trim()) ||
+    "";
+  return nk || nm || "—";
 };
 
-/* ----- seed label helpers ----- */
+/* ---------- seed/dep label ---------- */
 export const seedLabel = (seed) => {
   if (!seed || !seed.type) return "Chưa có đội";
   if (seed.label) return seed.label;
@@ -78,14 +148,180 @@ export const seedLabel = (seed) => {
   }
 };
 
-export const depLabel = (prev) => {
-  if (!prev) return "TBD";
-  const r = prev.round ?? "?";
-  const idx = (prev.order ?? 0) + 1;
-  return `Winner of R${r} #${idx}`;
+// ——— Parse V/T từ mã trận hiện tại (Vx-Ty) ———
+const parseVT = (m) => {
+  const tryStrings = [
+    m?.code,
+    m?.name,
+    m?.label,
+    m?.displayCode,
+    m?.displayName,
+    m?.matchCode,
+    m?.slotCode,
+    m?.bracketCode,
+    m?.bracketLabel,
+    m?.meta?.code,
+    m?.meta?.label,
+  ];
+  let v = null,
+    t = null;
+  for (const s of tryStrings) {
+    if (typeof s === "string") {
+      const k = s.match(/\bV(\d+)-T(\d+)\b/i);
+      if (k) {
+        v = parseInt(k[1], 10);
+        t = parseInt(k[2], 10);
+        break;
+      }
+    }
+  }
+  if (v == null) {
+    const cand = [m?.v, m?.V, m?.roundV, m?.round, m?.meta?.v];
+    for (const c of cand) {
+      const n = Number(c);
+      if (Number.isFinite(n)) {
+        v = n;
+        break;
+      }
+    }
+  }
+  if (t == null) {
+    const cand = [
+      m?.t,
+      m?.T,
+      m?.order,
+      m?.matchOrder,
+      m?.meta?.t,
+      m?.meta?.order,
+    ];
+    for (const c of cand) {
+      const n = Number(c);
+      if (Number.isFinite(n)) {
+        t = n >= 1 ? n : n + 1;
+        break;
+      } // order 0-based -> +1
+    }
+  }
+  return { v, t };
 };
 
-/* ===================== PlayerLink (chỉ hiện nickname) ===================== */
+// ——— Suy ra W/L từ prevDep nếu có, mặc định W ———
+
+// ——— Tạo label prev dựa vào code hiện tại (chuẩn KO):
+// A: W-V(v-1)-T(2*t-1), B: W-V(v-1)-T(2*t) ———
+const prevLabelByCurrent = (m, side, prevDep) => {
+  const { v, t } = parseVT(m);
+  if (Number.isFinite(v) && Number.isFinite(t) && v > 1) {
+    const prevV = v - 1;
+    const prevT = side === "A" ? 2 * t - 1 : 2 * t;
+    const wl = inferWL(prevDep) || "W";
+    return `${wl}-V${prevV}-T${prevT}`;
+  }
+  // fallback: dùng prevDep nếu có, cuối cùng là TBD
+  return prevDep ? depLabel(prevDep) : "TBD";
+};
+
+// ---- NEW: depLabel theo chuẩn web: W/L-V{round}-T{order+1} ----
+const inferWL = (prev) => {
+  const t = String(
+    prev?.type || prev?.source || prev?.from || ""
+  ).toLowerCase();
+  const loser = prev?.loser === true || t.includes("loser");
+  const winner = prev?.winner === true || t.includes("winner");
+  if (loser && !winner) return "L";
+  return "W";
+};
+const _num = (v) => (Number.isFinite(Number(v)) ? Number(v) : NaN);
+const _inferWL = (prev) => {
+  const t = String(
+    prev?.type || prev?.source || prev?.from || ""
+  ).toLowerCase();
+  if (prev?.loser === true || t.includes("loser")) return "L";
+  return "W";
+};
+export const depLabel = (prev) => {
+  if (!prev) return "TBD";
+  const wl = _inferWL(prev);
+  const r =
+    _num(prev?.round) ??
+    _num(prev?.v) ??
+    _num(prev?.V) ??
+    _num(prev?.ref?.round) ??
+    "?";
+  const orderRaw =
+    _num(prev?.order) ?? _num(prev?.idx) ?? _num(prev?.ref?.order) ?? 0;
+  const t = Number.isFinite(orderRaw) ? orderRaw + 1 : 1;
+  return `${wl}-V${r}-T${t}`;
+};
+
+/* ====================== current V helpers (label fix) ====================== */
+function extractCurrentV(m) {
+  const tryStrings = [
+    m?.code,
+    m?.name,
+    m?.label,
+    m?.displayCode,
+    m?.displayName,
+    m?.matchCode,
+    m?.slotCode,
+    m?.bracketCode,
+    m?.bracketLabel,
+    m?.meta?.code,
+    m?.meta?.label,
+  ];
+  for (const s of tryStrings) {
+    if (typeof s === "string") {
+      const k = s.match(/\bV(\d+)-T(\d+)\b/i);
+      if (k) return parseInt(k[1], 10);
+    }
+  }
+  const nums = [m?.v, m?.V, m?.roundV, m?.meta?.v]
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n));
+  return nums.length ? nums[0] : null;
+}
+
+function isGroupPrev(prev) {
+  const t = String(
+    prev?.type || prev?.source || prev?.from || ""
+  ).toLowerCase();
+  return (
+    t.includes("grouprank") || !!prev?.ref?.groupCode || t.includes("group")
+  );
+}
+
+function smartDepLabel(m, prevDep) {
+  // y hệt web: lấy depLabel(prev) rồi dịch V về vòng trước của match hiện tại
+  const raw = depLabel(prevDep);
+  const currV = extractCurrentV(m);
+  return String(raw).replace(/\b([WL])-V(\d+)-T(\d+)\b/gi, (_s, wl, v, t) => {
+    const pv = parseInt(v, 10);
+    const newV =
+      currV != null
+        ? Math.max(1, currV - 1)
+        : m?.prevBracket?.type !== "group"
+        ? pv + 2
+        : pv + 1;
+    return `${wl}-V${newV}-T${t}`;
+  });
+}
+
+function formatStatus(status) {
+  switch (status) {
+    case "scheduled":
+      return "Chưa diễn ra";
+    case "live":
+      return "Đang diễn ra";
+    case "assigned":
+      return "Chuẩn bị";
+    case "finished":
+      return "Đã diễn ra";
+    default:
+      return "Chưa diễn ra";
+  }
+}
+
+/* ---------- PlayerLink ---------- */
 function PlayerLink({ person, onOpen, align = "left" }) {
   if (!person) return null;
   const uid =
@@ -96,22 +332,19 @@ function PlayerLink({ person, onOpen, align = "left" }) {
     person?.id ||
     null;
 
-  const handlePress = () => {
-    if (!uid) return;
-    onOpen?.(uid);
-  };
+  const handlePress = () => uid && onOpen?.(uid);
 
   return (
     <Text
       onPress={handlePress}
       style={[styles.linkText, align === "right" && { textAlign: "right" }]}
     >
-      {nameWithNick(person) /* => nickname only */}
+      {nameWithNick(person)}
     </Text>
   );
 }
 
-/* ===================== Hooks: chống nháy & tiện ích ===================== */
+/* ---------- Hooks: chống nháy ---------- */
 function useDelayedFlag(flag, ms = 250) {
   const [show, setShow] = useState(false);
   useEffect(() => {
@@ -122,53 +355,37 @@ function useDelayedFlag(flag, ms = 250) {
   }, [flag, ms]);
   return show;
 }
-function useThrottledStable(
-  value,
-  { interval = 280, isEqual = (a, b) => a === b } = {}
-) {
-  const [display, setDisplay] = useState(value ?? null);
-  const latestRef = useRef(value);
-  const timerRef = useRef(null);
-  const mountedRef = useRef(false);
 
+/* ---------- LOCK: chỉ cập nhật đúng match đang mở ---------- */
+/** Khóa id trận đầu tiên nhận qua prop m; về sau chỉ nhận update khi id khớp. */
+function useLockedMatch(m, { loading }) {
+  const [lockedId, setLockedId] = useState(() => (m?._id ? String(m._id) : ""));
+  const [view, setView] = useState(() => (m?._id ? m : null));
+
+  // Lần đầu có m => khóa
   useEffect(() => {
-    latestRef.current = value;
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      setDisplay(value ?? null);
-      return;
+    if (!lockedId && m?._id) {
+      setLockedId(String(m._id));
+      setView(m);
     }
-    if (isEqual(value, display)) return;
-    if (timerRef.current) return;
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      setDisplay(latestRef.current ?? null);
-    }, interval);
-  }, [value, display, interval, isEqual]);
+  }, [m?._id, lockedId, m]);
 
-  useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
-  return display;
-}
-function useShowAfterFetch(m, loading) {
-  const [display, setDisplay] = useState(null);
-  const shownIdRef = useRef(null);
-  const selectedId = m?._id ?? null;
-
+  // Nếu m cập nhật nhưng id trùng lockedId => nhận; khác id => bỏ qua
   useEffect(() => {
-    if (loading) {
-      if (selectedId !== shownIdRef.current) setDisplay(null);
-      return;
+    if (!m) return;
+    if (lockedId && String(m._id) === lockedId) {
+      setView((prev) => (isMatchEqual(prev, m) ? prev : m));
+    } else if (!lockedId && m?._id) {
+      setLockedId(String(m._id));
+      setView(m);
     }
-    setDisplay(m ?? null);
-    shownIdRef.current = selectedId;
-  }, [selectedId, loading, m]);
+  }, [m, lockedId]);
 
-  const waitingNewSelection =
-    loading || (selectedId && selectedId !== shownIdRef.current);
-  return [display, waitingNewSelection];
+  const waiting = loading && !view;
+  return { lockedId, view, setView, waiting };
 }
 
-/* ===================== Time helpers & compare ===================== */
+/* ---------- Time helpers ---------- */
 function ts(x) {
   if (!x) return 0;
   const d = typeof x === "number" ? new Date(x) : new Date(String(x));
@@ -238,7 +455,7 @@ function countGamesWon(gameScores) {
   return { A, B };
 }
 
-/* ===================== Stream detect & normalize ===================== */
+/* ---------- Streams ---------- */
 function safeURL(url) {
   try {
     return new URL(url);
@@ -421,9 +638,8 @@ function normalizeStreams(m) {
     ["Stream", m?.sources?.stream],
     ["URL", m?.sources?.url],
   ];
-  for (const [label, val] of singles) {
+  for (const [label, val] of singles)
     if (isNonEmptyString(val)) pushUrl(val, { label });
-  }
 
   const asStrArray = (arr) =>
     Array.isArray(arr) ? arr.filter(isNonEmptyString) : [];
@@ -446,14 +662,14 @@ function normalizeStreams(m) {
   return out;
 }
 
-/* ===================== AspectBox (RN) ===================== */
+/* ---------- AspectBox (RN) ---------- */
 function AspectBox({ ratio = 16 / 9, children }) {
   return (
     <View style={[styles.aspectBox, { aspectRatio: ratio }]}>{children}</View>
   );
 }
 
-/* ===================== StreamPlayer (RN) ===================== */
+/* ---------- StreamPlayer (RN) ---------- */
 function StreamPlayer({ stream }) {
   const [ratio, setRatio] = useState(
     stream?.aspect === "9:16" ? 9 / 16 : 16 / 9
@@ -504,7 +720,7 @@ function StreamPlayer({ stream }) {
   }
 }
 
-/* ===================== Banner trạng thái ===================== */
+/* ---------- Banner trạng thái ---------- */
 function StatusBanner({ status, hasStreams }) {
   const text =
     status === "live"
@@ -531,22 +747,237 @@ function StatusBanner({ status, hasStreams }) {
   );
 }
 
-/* ===================== Component chính ===================== */
-export default function MatchContent({ m, isLoading, liveLoading }) {
+/* ---------- Segmented Control: Status ---------- */
+function SegmentedStatus({ value, onChange, disabled }) {
+  const items = [
+    { key: "scheduled", label: "Scheduled" },
+    { key: "live", label: "Live" },
+    { key: "finished", label: "Finished" },
+  ];
+  return (
+    <View style={styles.segment}>
+      {items.map((it) => {
+        const active = value === it.key;
+        return (
+          <TouchableOpacity
+            key={it.key}
+            style={[
+              styles.segmentItem,
+              active && styles.segmentItemActive,
+              disabled && { opacity: 0.6 },
+            ]}
+            onPress={() => !disabled && value !== it.key && onChange?.(it.key)}
+            disabled={disabled}
+          >
+            <Text
+              style={[styles.segmentLabel, active && styles.segmentLabelActive]}
+            >
+              {it.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ---------- Nút có icon trái ---------- */
+function AdminBtn({ style, textStyle, icon, label, onPress, disabled }) {
+  return (
+    <TouchableOpacity
+      style={[styles.btn, style]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <View style={styles.btnContent}>
+        {!!icon && (
+          <MaterialIcons
+            name={icon}
+            size={18}
+            style={[styles.btnIcon, textStyle]}
+          />
+        )}
+        <Text style={[styles.btnText, textStyle]}>{label}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+/* ---------- Thanh công cụ quản trị ---------- */
+function AdminToolbar({
+  status,
+  editMode,
+  busy,
+  onEnterEdit,
+  onSave,
+  onReset,
+  onAddSet,
+  onExitEdit,
+  onSetStatus,
+  onSetWinner,
+}) {
+  const confirmWinner = (side) => {
+    Alert.alert(
+      "Xác nhận",
+      `Kết thúc trận và đặt đội ${side} thắng?`,
+      [
+        { text: "Huỷ" },
+        {
+          text: "Xác nhận",
+          style: "destructive",
+          onPress: () => onSetWinner?.(side),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  return (
+    <View style={styles.adminCard}>
+      <View style={styles.adminHeader}>
+        <Text style={styles.adminTitle}>QUẢN TRỊ TRẬN</Text>
+        <Text style={styles.adminSub}>
+          Chỉnh sửa tỉ số • Đặt đội thắng • Đổi trạng thái
+        </Text>
+      </View>
+
+      {/* Hàng 1: Segmented Status */}
+      <View style={styles.adminRow}>
+        <Text style={styles.rowLabel}>Trạng thái</Text>
+        <SegmentedStatus
+          value={status}
+          onChange={(s) => onSetStatus?.(s)}
+          disabled={busy}
+        />
+      </View>
+
+      {/* Hàng 2: Nhóm chỉnh sửa tỉ số */}
+      <View style={styles.adminRow}>
+        <Text style={styles.rowLabel}>Tỉ số</Text>
+        {!editMode ? (
+          <AdminBtn
+            icon="edit"
+            label="Chỉnh sửa tỉ số"
+            onPress={onEnterEdit}
+            disabled={busy}
+            style={styles.btnOutline}
+          />
+        ) : (
+          <View style={styles.rowWrap}>
+            <AdminBtn
+              icon="save"
+              label="Lưu tỉ số"
+              onPress={onSave}
+              disabled={busy}
+              style={styles.btnPrimary}
+              textStyle={styles.btnPrimaryText}
+            />
+            <AdminBtn
+              icon="undo"
+              label="Hoàn tác"
+              onPress={onReset}
+              disabled={busy}
+              style={styles.btnOutline}
+            />
+            <AdminBtn
+              icon="add"
+              label="Thêm set"
+              onPress={onAddSet}
+              disabled={busy}
+              style={styles.btnOutline}
+            />
+            <AdminBtn
+              icon="close"
+              label="Thoát sửa"
+              onPress={onExitEdit}
+              disabled={busy}
+              style={styles.btnGhost}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Hàng 3: Đặt đội thắng nhanh */}
+      <View style={styles.adminRow}>
+        <Text style={styles.rowLabel}>Kết quả</Text>
+        <View style={styles.rowWrap}>
+          <AdminBtn
+            icon="emoji-events"
+            label="Đặt A thắng"
+            onPress={() => confirmWinner("A")}
+            disabled={busy}
+            style={styles.btnSuccessOutline}
+            textStyle={styles.btnSuccessText}
+          />
+          <AdminBtn
+            icon="emoji-events"
+            label="Đặt B thắng"
+            onPress={() => confirmWinner("B")}
+            disabled={busy}
+            style={styles.btnSuccessOutline}
+            textStyle={styles.btnSuccessText}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function _getIdLike(x) {
+  if (!x) return null;
+  if (typeof x === "string") return x;
+  return x._id || x.id || x.userId || x.uid || x.email || null;
+}
+
+function _collectPossibleRefereeIds(m) {
+  const ids = new Set();
+  const push = (v) => {
+    const id = _getIdLike(v);
+    if (id) ids.add(String(id));
+  };
+  // Một số field có thể tồn tại tuỳ backend:
+  // liveBy: { _id?, id?, user? }
+  if (m?.liveBy) {
+    push(m.liveBy);
+    if (m.liveBy.user) push(m.liveBy.user);
+    if (m.liveBy._id || m.liveBy.id) push(m.liveBy._id || m.liveBy.id);
+  }
+  // referee / assignedReferee
+  push(m?.referee);
+  push(m?.assignedReferee);
+  // referees (array)
+  if (Array.isArray(m?.referees))
+    for (const it of m.referees) {
+      push(it);
+      if (it?.user) push(it.user);
+    }
+  // meta.{referee,referees}
+  push(m?.meta?.referee);
+  if (Array.isArray(m?.meta?.referees))
+    for (const it of m.meta.referees) {
+      push(it);
+      if (it?.user) push(it.user);
+    }
+  // permissions.refereeId?
+  push(m?.permissions?.refereeId);
+  return ids;
+}
+
+function amRefereeOfThisMatch(me, m) {
+  const my = _getIdLike(me) || _getIdLike(me?.user);
+  if (!my) return false;
+  const ids = _collectPossibleRefereeIds(m);
+  return ids.has(String(my));
+}
+
+/* ===================== Component chính (Native) ===================== */
+function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const { userInfo } = useSelector((s) => s.auth || {});
   const roleStr = String(userInfo?.role || "").toLowerCase();
   const roles = new Set(
     [...(userInfo?.roles || []), ...(userInfo?.permissions || [])]
       .filter(Boolean)
       .map((x) => String(x).toLowerCase())
-  );
-
-  const isAdmin = !!(
-    userInfo?.isAdmin ||
-    roleStr === "admin" ||
-    roles.has("admin") ||
-    roles.has("superadmin") ||
-    roles.has("tournament:admin")
   );
 
   const tour =
@@ -567,37 +998,21 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
         tour.organizer)) ||
     null;
 
-  const managerIds = new Set(
-    [
-      ...(tour?.managers || []),
-      ...(tour?.organizers || []),
-      ...(tour?.staff || []),
-      ...(tour?.moderators || []),
-    ]
-      .map((u) =>
-        typeof u === "string"
-          ? u
-          : u?._id || u?.id || u?.userId || u?.uid || u?.email
-      )
-      .filter(Boolean)
+  const { data: verifyRes, isFetching: verifyingMgr } = useVerifyManagerQuery(
+    tour?._id ? tour?._id : skipToken
+  );
+  const isManager = !!verifyRes?.isManager;
+  const isAdmin = !!(
+    userInfo?.isAdmin ||
+    roleStr === "admin" ||
+    roles.has("admin") ||
+    roles.has("superadmin") ||
+    roles.has("tournament:admin")
   );
 
-  const canManageFlag =
-    m?.permissions?.canManage ||
-    tour?.permissions?.canManage ||
-    userInfo?.permissions?.includes?.("tournament:manage");
+  const canManage = isAdmin || isManager;
 
-  const isManager = !!(
-    tour &&
-    (managerIds.has(
-      userInfo?._id || userInfo?.id || userInfo?.userId || userInfo?.uid
-    ) ||
-      ownerId ===
-        (userInfo?._id || userInfo?.id || userInfo?.userId || userInfo?.uid) ||
-      canManageFlag)
-  );
-
-  const canSeeOverlay = isAdmin || isManager;
+  const canSeeOverlay = canManage;
 
   // Popup hồ sơ
   const [profileOpen, setProfileOpen] = useState(false);
@@ -612,16 +1027,84 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
   };
   const closeProfile = () => setProfileOpen(false);
 
+  // LOCK theo match id (thay cho useShowAfterFetch/useThrottledStable)
   const loading = Boolean(isLoading || liveLoading);
-  const [baseMatch, waitingNewSelection] = useShowAfterFetch(m, loading);
-  const showSpinnerDelayed = useDelayedFlag(waitingNewSelection, 250);
-  const mm = useThrottledStable(baseMatch, {
-    interval: 280,
-    isEqual: isMatchEqual,
+  const {
+    lockedId,
+    view: mm,
+    setView,
+    waiting,
+  } = useLockedMatch(m, {
+    loading,
   });
+  const showSpinnerDelayed = useDelayedFlag(waiting, 250);
 
-  // Streams & chọn stream
-  const streams = useMemo(() => normalizeStreams(mm || {}), [mm]);
+  // ===== Local patch (scores/status/teams) =====
+  const [localPatch, setLocalPatch] = useState(null);
+  useEffect(() => {
+    setLocalPatch(null); // đổi trận -> bỏ patch
+  }, [lockedId]);
+
+  const merged = useMemo(
+    () => (localPatch ? { ...(mm || {}), ...localPatch } : mm || null),
+    [mm, localPatch]
+  );
+
+  // xác định có phải trọng tài được gán cho trận này không
+  const myIdForCheck =
+    userInfo?._id ||
+    userInfo?.id ||
+    userInfo?.userId ||
+    userInfo?.uid ||
+    userInfo?.email;
+  const isMyRef = useMemo(
+    () => amRefereeOfThisMatch({ _id: myIdForCheck }, merged || {}),
+    [
+      myIdForCheck,
+      merged?._id,
+      merged?.liveBy,
+      merged?.referee,
+      merged?.referees,
+    ]
+  );
+
+  function collectIds(x) {
+    if (!x) return [];
+    if (Array.isArray(x))
+      return x
+        .map((u) => u?._id || u?.id || u?.userId || u)
+        .filter(Boolean)
+        .map(String);
+    return [x?._id || x?.id || x?.userId || x].filter(Boolean).map(String);
+  }
+  function isUserRefereeOfMatch(userInfo, m) {
+    const uid = String(
+      userInfo?._id ||
+        userInfo?.id ||
+        userInfo?.userId ||
+        userInfo?.uid ||
+        userInfo?.email ||
+        ""
+    );
+    if (!uid || !m) return false;
+    const pool = new Set([
+      ...collectIds(m.referee),
+      ...collectIds(m.referees),
+      ...collectIds(m.judges),
+      ...collectIds(m.liveBy),
+      ...collectIds(m.meta?.referees),
+      ...collectIds(m.meta?.referee),
+    ]);
+    return pool.has(uid);
+  }
+
+  const isRefereeHere = isUserRefereeOfMatch(userInfo, merged);
+
+  const status = merged?.status || "scheduled";
+  const shownGameScores = merged?.gameScores ?? [];
+
+  // Streams
+  const streams = useMemo(() => normalizeStreams(merged || {}), [merged]);
   const pickInitialIndex = (arr) => {
     if (!arr.length) return -1;
     const primary = arr.findIndex((s) => s.primary);
@@ -632,18 +1115,16 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
   };
   const [activeIdx, setActiveIdx] = useState(pickInitialIndex(streams));
   const [showPlayer, setShowPlayer] = useState(false);
-
   useEffect(() => {
     setActiveIdx(pickInitialIndex(streams));
     setShowPlayer(false);
-  }, [mm?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lockedId]); // chỉ khi đổi trận
 
   const activeStream =
     activeIdx >= 0 && activeIdx < streams.length ? streams[activeIdx] : null;
 
-  // Status & time
-  const status = mm?.status || "scheduled";
-  const displayTime = toDateSafe(pickDisplayTime(mm));
+  // Overlay & time
+  const displayTime = toDateSafe(pickDisplayTime(merged));
   const timeLabel =
     displayTime && status !== "finished"
       ? `Giờ đấu: ${formatClock(displayTime)}`
@@ -651,35 +1132,104 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
       ? `Bắt đầu: ${formatClock(displayTime)}`
       : null;
 
-  // helper nhỏ: lấy chuỗi nếu là string & non-empty
-  const asStr = (v) => (typeof v === "string" ? v.trim() : "");
+  const overlayUrl = `https://pickletour.vn/overlay/score?matchId=${lockedId}&theme=dark&size=md&showSets=1&autoNext=1`;
 
-  // helper: thử bốc url từ object config
-  const pickUrlFromObj = (o) =>
-    asStr(o?.url) ||
-    asStr(o?.link) ||
-    asStr(o?.href) ||
-    asStr(o?.pageUrl) ||
-    asStr(o?.webUrl) ||
-    "";
+  // Ưu tiên: nếu backend đã có overlayUrl thì vẫn hiển thị (Custom);
+  // còn link chính “giống web” là builtinOverlayUrl.
 
-  // ---- overlay cfg ----
-  const overlayCfg =
-    (mm?.overlay && typeof mm.overlay === "object" ? mm.overlay : null) ||
-    (mm?.meta?.overlay && typeof mm.meta.overlay === "object"
-      ? mm.meta.overlay
-      : null);
+  // Admin edit states
+  const [editMode, setEditMode] = useState(false);
+  const enterEdit = () => setEditMode(true);
+  const exitEdit = () => setEditMode(false);
+  const [busy, setBusy] = useState(false);
+  const [editScores, setEditScores] = useState([...(shownGameScores || [])]);
 
-  // overlayUrl
-  const overlayUrl =
-    asStr(mm?.overlayUrl) ||
-    asStr(mm?.meta?.overlayUrl) ||
-    pickUrlFromObj(overlayCfg) ||
-    "";
+  useEffect(() => {
+    setEditScores([...(merged?.gameScores ?? [])]);
+  }, [lockedId, merged?.gameScores]);
+
+  const sanitizeInt = (v) => {
+    const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(n, 99);
+  };
+  const setCell = (idx, side, val) => {
+    setEditScores((old) => {
+      const arr = [...(Array.isArray(old) ? old : [])];
+      while (arr.length <= idx) arr.push({ a: 0, b: 0 });
+      const row = { ...(arr[idx] || { a: 0, b: 0 }) };
+      row[side] = sanitizeInt(val);
+      arr[idx] = row;
+      return arr;
+    });
+  };
+  const addSet = () => setEditScores((old) => [...(old || []), { a: 0, b: 0 }]);
+  const removeSet = (idx) =>
+    setEditScores((old) => (old || []).filter((_, i) => i !== idx));
+  const resetEdits = () => setEditScores([...(merged?.gameScores ?? [])]);
+
+  // RTK mutation
+  const [adminPatchMatch] = useAdminPatchMatchMutation();
+
+  const doPatch = async (body, { successMsg = "Đã cập nhật." } = {}) => {
+    if (!lockedId) return;
+    setBusy(true);
+    try {
+      await adminPatchMatch({ id: lockedId, body }).unwrap();
+      Toast.show({ type: "success", text1: successMsg });
+      onSaved?.(); // parent có refetch list cũng không làm dialog “nhảy” vì đã LOCK
+    } catch (e) {
+      const msg = e?.data?.message || e?.message || "Không cập nhật được";
+      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveScores = async () => {
+    if (!canManage || !lockedId) return;
+    try {
+      await doPatch(
+        {
+          gameScores: editScores,
+          ...(status !== "finished" ? { winner: "" } : {}),
+        },
+        { successMsg: "Đã lưu tỉ số." }
+      );
+      setLocalPatch((p) => ({ ...(p || {}), gameScores: editScores }));
+      exitEdit();
+    } catch {}
+  };
+
+  const handleSetWinner = async (side /* 'A' | 'B' */) => {
+    if (!canManage || !lockedId) return;
+    try {
+      await doPatch(
+        { winner: side, status: "finished" },
+        { successMsg: `Đã đặt đội ${side} thắng.` }
+      );
+      setLocalPatch((p) => ({ ...(p || {}), status: "finished" }));
+    } catch {}
+  };
+
+  const handleSetStatus = async (newStatus) => {
+    if (!canManage || !lockedId) return;
+    try {
+      const body =
+        newStatus === "finished"
+          ? { status: newStatus }
+          : { status: newStatus, winner: "" };
+      await doPatch(body, { successMsg: `Đã đổi trạng thái: ${newStatus}` });
+      setLocalPatch((p) => ({ ...(p || {}), status: newStatus }));
+    } catch {}
+  };
+
+  const { A: setsA, B: setsB } = countGamesWon(shownGameScores);
 
   // Render states
-  const showSpinner = waitingNewSelection && showSpinnerDelayed;
-  const showError = !waitingNewSelection && !baseMatch;
+  const showSpinner = waiting && showSpinnerDelayed;
+  const showError = !waiting && !mm;
 
   if (showSpinner) {
     return (
@@ -695,9 +1245,29 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
       </View>
     );
   }
-  if (!mm) return <View style={{ paddingVertical: 8 }} />;
+  if (!merged) return <View style={{ paddingVertical: 8 }} />;
 
-  const isSingle = String(mm?.tournament?.eventType).toLowerCase() === "single";
+  const isSingle =
+    String(merged?.tournament?.eventType || "").toLowerCase() === "single";
+
+  // Nhãn đội để truyền cho panel trọng tài
+  const teamAName = merged?.pairA
+    ? [merged?.pairA?.player1, !isSingle && merged?.pairA?.player2]
+        .filter(Boolean)
+        .map((p) => nameWithNick(p))
+        .join(" & ")
+    : merged?.previousA
+    ? smartDepLabel(merged, merged.previousA)
+    : seedLabel(merged?.seedA);
+
+  const teamBName = merged?.pairB
+    ? [merged?.pairB?.player1, !isSingle && merged?.pairB?.player2]
+        .filter(Boolean)
+        .map((p) => nameWithNick(p))
+        .join(" & ")
+    : merged?.previousB
+    ? smartDepLabel(merged, merged.previousB)
+    : seedLabel(merged?.seedB);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -713,8 +1283,10 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
                 style={[
                   styles.btn,
                   showPlayer ? styles.btnPrimary : styles.btnOutline,
+                  styles.btnFluid,
                 ]}
                 onPress={() => setShowPlayer((v) => !v)}
+                disabled={busy}
               >
                 <Text
                   style={showPlayer ? styles.btnPrimaryText : styles.btnText}
@@ -724,8 +1296,9 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.btn, styles.btnOutline]}
+              style={[styles.btn, styles.btnOutline, styles.btnFluid]}
               onPress={() => Linking.openURL(activeStream.url)}
+              disabled={busy}
             >
               <Text style={styles.btnText}>Mở link trực tiếp ↗</Text>
             </TouchableOpacity>
@@ -742,27 +1315,31 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Overlay tỉ số trực tiếp</Text>
           <View style={styles.rowWrap}>
-            <View style={[styles.overlayBox]}>
+            <View style={[styles.overlayBox, { flexGrow: 1, minWidth: 220 }]}>
               <Text style={styles.monoText}>{overlayUrl}</Text>
             </View>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnOutline]}
-                onPress={async () => {
-                  try {
-                    await Clipboard.setStringAsync(overlayUrl);
-                  } catch (e) {}
-                }}
-              >
-                <Text style={styles.btnText}>Copy link</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnPrimary]}
-                onPress={() => Linking.openURL(overlayUrl)}
-              >
-                <Text style={styles.btnPrimaryText}>Mở overlay</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnOutline, styles.btnFluid]}
+              onPress={async () => {
+                try {
+                  await Clipboard.setStringAsync(overlayUrl);
+                  Toast.show({
+                    type: "success",
+                    text1: "Đã copy link overlay",
+                  });
+                } catch {
+                  Toast.show({ type: "error", text1: "Copy thất bại" });
+                }
+              }}
+            >
+              <Text style={styles.btnText}>Copy link</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary, styles.btnFluid]}
+              onPress={() => Linking.openURL(overlayUrl)}
+            >
+              <Text style={styles.btnPrimaryText}>Mở overlay</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.caption}>
             Mẹo: dán link này vào OBS/StreamYard (Browser Source) để hiển thị tỉ
@@ -779,14 +1356,17 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
           {/* Đội A */}
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.muted}>Đội A</Text>
-            {mm?.pairA ? (
+            {merged?.pairA ? (
               <View style={styles.teamWrap}>
-                <PlayerLink person={mm.pairA?.player1} onOpen={openProfile} />
-                {!isSingle && mm.pairA?.player2 && (
+                <PlayerLink
+                  person={merged.pairA?.player1}
+                  onOpen={openProfile}
+                />
+                {!isSingle && merged.pairA?.player2 && (
                   <>
                     <Text style={styles.andText}> & </Text>
                     <PlayerLink
-                      person={mm.pairA.player2}
+                      person={merged.pairA.player2}
                       onOpen={openProfile}
                     />
                   </>
@@ -794,43 +1374,45 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
               </View>
             ) : (
               <Text style={styles.teamText}>
-                {mm?.previousA ? depLabel(mm.previousA) : seedLabel(mm?.seedA)}
+                {merged?.previousA
+                  ? smartDepLabel(merged, merged.previousA)
+                  : seedLabel(merged?.seedA)}
               </Text>
             )}
           </View>
 
           {/* Điểm hiện tại */}
           <View style={{ minWidth: 140, alignItems: "center" }}>
-            {mm?.status === "live" && (
+            {status === "live" && (
               <Text style={styles.mutedSmall}>Ván hiện tại</Text>
             )}
             <Text style={styles.bigScore}>
-              {lastGameScore(mm?.gameScores).a} –{" "}
-              {lastGameScore(mm?.gameScores).b}
+              {lastGameScore(shownGameScores).a ?? 0} –{" "}
+              {lastGameScore(shownGameScores).b ?? 0}
             </Text>
             <Text style={styles.muted}>
-              Sets: {countGamesWon(mm?.gameScores).A} –{" "}
-              {countGamesWon(mm?.gameScores).B}
+              Sets: {countGamesWon(shownGameScores).A} –{" "}
+              {countGamesWon(shownGameScores).B}
             </Text>
           </View>
 
           {/* Đội B */}
           <View style={{ flex: 1, paddingLeft: 8 }}>
             <Text style={[styles.muted, { textAlign: "right" }]}>Đội B</Text>
-            {mm?.pairB ? (
+            {merged?.pairB ? (
               <View style={styles.teamWrapRight}>
                 <PlayerLink
-                  person={mm.pairB?.player1}
+                  person={merged.pairB?.player1}
                   onOpen={openProfile}
                   align="right"
                 />
-                {!isSingle && mm.pairB?.player2 && (
+                {!isSingle && merged.pairB?.player2 && (
                   <>
                     <Text style={[styles.andText, { textAlign: "right" }]}>
                       {"  &  "}
                     </Text>
                     <PlayerLink
-                      person={mm.pairB.player2}
+                      person={merged.pairB.player2}
                       onOpen={openProfile}
                       align="right"
                     />
@@ -839,42 +1421,107 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
               </View>
             ) : (
               <Text style={[styles.teamText, { textAlign: "right" }]}>
-                {mm?.previousB ? depLabel(mm.previousB) : seedLabel(mm?.seedB)}
+                {merged?.previousB
+                  ? smartDepLabel(merged, merged.previousB)
+                  : seedLabel(merged?.seedB)}
               </Text>
             )}
           </View>
         </View>
 
         {/* Bảng set điểm */}
-        {!!mm?.gameScores?.length && (
+        {!!(editMode ? editScores?.length : shownGameScores?.length) && (
           <View style={{ marginTop: 12 }}>
             <View style={[styles.tableRow, styles.tableHeader]}>
               <Text style={[styles.tableCell, { flex: 1 }]}>Set</Text>
               <Text style={[styles.tableCell, styles.centerCell]}>A</Text>
               <Text style={[styles.tableCell, styles.centerCell]}>B</Text>
+              {canManage && editMode && (
+                <Text style={[styles.tableCell, styles.centerCell]} />
+              )}
             </View>
-            {mm.gameScores.map((g, idx) => (
+            {(editMode ? editScores : shownGameScores).map((g, idx) => (
               <View key={idx} style={styles.tableRow}>
                 <Text style={[styles.tableCell, { flex: 1 }]}>{idx + 1}</Text>
-                <Text style={[styles.tableCell, styles.centerCell]}>
-                  {g.a ?? 0}
-                </Text>
-                <Text style={[styles.tableCell, styles.centerCell]}>
-                  {g.b ?? 0}
-                </Text>
+                <View style={[styles.tableCell, styles.centerCell]}>
+                  {canManage && editMode ? (
+                    <TextInput
+                      style={styles.inputScore}
+                      keyboardType="number-pad"
+                      value={String(g?.a ?? 0)}
+                      onChangeText={(t) => setCell(idx, "a", t)}
+                      maxLength={2}
+                    />
+                  ) : (
+                    <Text>{g?.a ?? 0}</Text>
+                  )}
+                </View>
+                <View style={[styles.tableCell, styles.centerCell]}>
+                  {canManage && editMode ? (
+                    <TextInput
+                      style={styles.inputScore}
+                      keyboardType="number-pad"
+                      value={String(g?.b ?? 0)}
+                      onChangeText={(t) => setCell(idx, "b", t)}
+                      maxLength={2}
+                    />
+                  ) : (
+                    <Text>{g?.b ?? 0}</Text>
+                  )}
+                </View>
+                {canManage && editMode && (
+                  <View style={[styles.tableCell, styles.centerCell]}>
+                    <TouchableOpacity
+                      style={[styles.btnXS, styles.btnDangerOutline]}
+                      onPress={() => removeSet(idx)}
+                      disabled={busy}
+                    >
+                      <Text style={styles.btnDangerText}>Xoá</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             ))}
           </View>
         )}
 
-        {/* Chips */}
+        {/* Chips rule + trạng thái */}
         <View style={styles.chipsWrap}>
           {timeLabel && <Chip label={timeLabel} />}
-          <Chip label={`BO: ${mm.rules?.bestOf ?? 3}`} />
-          <Chip label={`Điểm thắng: ${mm.rules?.pointsToWin ?? 11}`} />
-          {mm.rules?.winByTwo && <Chip label="Phải chênh 2" />}
-          {mm.referee?.name && <Chip label={`Trọng tài: ${mm.referee.name}`} />}
+          <Chip label={`BO: ${merged?.rules?.bestOf ?? 3}`} />
+          <Chip label={`Điểm thắng: ${merged?.rules?.pointsToWin ?? 11}`} />
+          {merged?.rules?.winByTwo && <Chip label="Phải chênh 2" />}
+          {merged?.liveBy?.name && (
+            <Chip label={`Trọng tài: ${merged.liveBy.name}`} />
+          )}
+          <Chip label={`Trạng thái: ${formatStatus(status)}`} />
         </View>
+
+        {/* Panel chấm điểm dành cho TRỌNG TÀI được gán */}
+        {isRefereeHere && merged?._id && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={[styles.rowLabel, { marginBottom: 6 }]}>
+              Bàn chấm (trọng tài)
+            </Text>
+            <RefereeJudgePanel matchId={String(merged._id)} />
+          </View>
+        )}
+
+        {/* Admin toolbar */}
+        {canManage && (
+          <AdminToolbar
+            status={status}
+            editMode={editMode}
+            busy={busy}
+            onEnterEdit={enterEdit}
+            onSave={handleSaveScores}
+            onReset={resetEdits}
+            onAddSet={addSet}
+            onExitEdit={exitEdit}
+            onSetStatus={handleSetStatus}
+            onSetWinner={handleSetWinner}
+          />
+        )}
       </View>
 
       {/* Popup hồ sơ VĐV */}
@@ -887,7 +1534,7 @@ export default function MatchContent({ m, isLoading, liveLoading }) {
   );
 }
 
-/* ===================== Chip nhỏ ===================== */
+/* ---------- Chip nhỏ ---------- */
 function Chip({ label }) {
   return (
     <View style={styles.chip}>
@@ -896,10 +1543,33 @@ function Chip({ label }) {
   );
 }
 
-/* ===================== Styles ===================== */
+function makePropSignature(m) {
+  if (!m) return "";
+  const r = m.rules || {};
+  const gs = Array.isArray(m.gameScores) ? m.gameScores : [];
+  const last = gs.length ? gs[gs.length - 1] : { a: 0, b: 0 };
+  return [
+    m._id,
+    m.status,
+    r.bestOf ?? 3,
+    r.pointsToWin ?? 11,
+    r.winByTwo ? 1 : 0,
+    gs.length,
+    last?.a ?? 0,
+    last?.b ?? 0,
+  ].join("|");
+}
+
+export default React.memo(MatchContent, (prev, next) => {
+  if (prev.isLoading !== next.isLoading) return false;
+  if (prev.liveLoading !== next.liveLoading) return false;
+  return makePropSignature(prev.m) === makePropSignature(next.m);
+});
+
+/* ---------- Styles ---------- */
 const styles = StyleSheet.create({
   container: {
-    padding: 12,
+    // padding: 12,
     gap: 12,
   },
   centerBox: {
@@ -931,15 +1601,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
   },
-  bannerLive: {
-    backgroundColor: "#e3f2fd",
-  },
-  bannerInfo: {
-    backgroundColor: "#f1f5f9",
-  },
-  bannerText: {
-    color: "#0f172a",
-  },
+  bannerLive: { backgroundColor: "#e3f2fd" },
+  bannerInfo: { backgroundColor: "#f1f5f9" },
+  bannerText: { color: "#0f172a" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -948,16 +1612,11 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
-  cardTitle: {
-    fontWeight: "700",
-    fontSize: 16,
-    marginBottom: 4,
-  },
+  cardTitle: { fontWeight: "700", fontSize: 16, marginBottom: 4 },
   monoText: {
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
   },
   overlayBox: {
-    flex: 1,
     minHeight: 40,
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -965,78 +1624,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     justifyContent: "center",
     backgroundColor: "#f9fafb",
-    marginRight: 8,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  caption: { color: "#64748b", fontSize: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
   rowWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
   btn: {
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
-  btnOutline: {
+  btnFluid: {
+    minWidth: 140,
+  },
+  btnOutline: { backgroundColor: "#fff", borderColor: "#cbd5e1" },
+  btnGhost: { backgroundColor: "#fff", borderColor: "transparent" },
+  btnText: { color: "#0f172a", textAlign: "center" },
+  btnPrimary: { backgroundColor: "#1976d2", borderColor: "#1976d2" },
+  btnPrimaryText: { color: "#fff", fontWeight: "700", textAlign: "center" },
+  btnXS: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  btnDangerOutline: {
     backgroundColor: "#fff",
-    borderColor: "#cbd5e1",
+    borderColor: "#fecaca",
   },
-  btnText: {
-    color: "#0f172a",
-  },
-  btnPrimary: {
-    backgroundColor: "#1976d2",
-    borderColor: "#1976d2",
-  },
-  btnPrimaryText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  muted: {
-    color: "#64748b",
-  },
-  mutedSmall: {
-    color: "#64748b",
+  btnDangerText: {
+    color: "#b91c1c",
     fontSize: 12,
-  },
-  teamText: {
-    fontSize: 16,
     fontWeight: "700",
   },
-  bigScore: {
-    fontSize: 28,
-    fontWeight: "800",
-  },
+  muted: { color: "#64748b" },
+  mutedSmall: { color: "#64748b", fontSize: 12 },
+  teamText: { fontSize: 16, fontWeight: "700" },
+  bigScore: { fontSize: 28, fontWeight: "800" },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
+    alignItems: "center",
   },
   tableHeader: {
     backgroundColor: "#f8fafc",
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },
-  tableCell: {
-    flex: 1,
-    fontSize: 14,
-  },
-  centerCell: {
-    textAlign: "center",
-  },
-  chipsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
-  },
+  tableCell: { flex: 1, fontSize: 14 },
+  centerCell: { alignItems: "center" },
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   chip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1045,18 +1688,101 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#c7d2fe",
   },
-  chipText: {
-    fontSize: 12,
-    color: "#3730a3",
-  },
+  chipText: { fontSize: 12, color: "#3730a3" },
   aspectBox: {
     width: "100%",
     backgroundColor: "#000",
     borderRadius: 10,
     overflow: "hidden",
   },
-  errorText: {
-    color: "#b91c1c",
+  errorText: { color: "#b91c1c", fontWeight: "600" },
+  inputScore: {
+    width: 56,
+    height: 36,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    textAlign: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+
+  /* ===== Admin toolbar ===== */
+  adminCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 12,
+    gap: 12,
+    marginTop: 12,
+  },
+  adminHeader: {
+    gap: 2,
+  },
+  adminTitle: {
+    fontSize: 12,
+    letterSpacing: 1,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  adminSub: {
+    fontSize: 12,
+    color: "#64748b",
+  },
+  adminRow: {
+    gap: 8,
+  },
+  rowLabel: {
+    fontSize: 12,
+    color: "#64748b",
     fontWeight: "600",
+  },
+
+  /* segmented */
+  segment: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 999,
+    padding: 4,
+    gap: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    alignItems: "center",
+  },
+  segmentItemActive: {
+    backgroundColor: "#1976d2",
+  },
+  segmentLabel: {
+    fontSize: 13,
+    color: "#0f172a",
+    fontWeight: "600",
+  },
+  segmentLabelActive: {
+    color: "#fff",
+    fontWeight: "800",
+  },
+
+  /* buttons (kế thừa cái cũ) */
+  btnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  btnIcon: {
+    color: "#0f172a",
+  },
+  btnSuccessOutline: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#a7f3d0",
+  },
+  btnSuccessText: {
+    color: "#065f46",
+    fontWeight: "700",
   },
 });
