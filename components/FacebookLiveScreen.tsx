@@ -15,14 +15,13 @@ import {
   AppStateStatus,
 } from "react-native";
 import { requireNativeComponent, UIManager } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import { PinchGestureHandler, State } from "react-native-gesture-handler";
 
-// 🔊 SFX + Haptics
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
-// ✅ mới (ESM import)
 import torch_on from "../assets/sfx/click4.mp3";
 import torch_off from "../assets/sfx/click4.mp3";
 import mic_on from "../assets/sfx/click4.mp3";
@@ -37,22 +36,19 @@ const SFX = {
 type SfxKey = keyof typeof SFX;
 const SFX_VOLUME = 1;
 
-// GIỮ TÊN CŨ
 const COMPONENT_NAME = "RtmpPreviewView";
 (UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
-
 const _CachedRtmpPreviewView =
   (global as any).__RtmpPreviewView ||
   requireNativeComponent<{}>(COMPONENT_NAME);
 (global as any).__RtmpPreviewView = _CachedRtmpPreviewView;
-
 const RtmpPreviewView = _CachedRtmpPreviewView;
+
 const Live = (NativeModules as any).FacebookLiveModule;
 
-type Mode = "pre" | "countdown" | "live";
+type Mode = "pre" | "countdown" | "live" | "stopping" | "ended";
 const DEFAULT_FB_SERVER = "rtmps://live-api-s.facebook.com:443/rtmp/";
 
-// 🔊 Hook preload & play SFX
 function useSfx() {
   const soundsRef = useRef<Record<SfxKey, Audio.Sound | null>>({
     torchOn: null,
@@ -65,17 +61,15 @@ function useSfx() {
     let mounted = true;
     (async () => {
       try {
-        // cấu hình nhỏ để beep vẫn phát khi iOS đang silent
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
-          allowsRecordingIOS: true, // cho phép vừa thu vừa phát
+          allowsRecordingIOS: true,
           interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS, // ❗
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
           shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false, // phát qua loa ngoài
+          playThroughEarpieceAndroid: false,
           staysActiveInBackground: false,
         });
-        // preload
         for (const key of Object.keys(SFX) as SfxKey[]) {
           const { sound } = await Audio.Sound.createAsync(SFX[key], {
             volume: SFX_VOLUME,
@@ -85,9 +79,7 @@ function useSfx() {
           if (mounted) soundsRef.current[key] = sound;
           else await sound.unloadAsync();
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     })();
     return () => {
       mounted = false;
@@ -117,7 +109,6 @@ function useSfx() {
       } catch {}
     }
   }, []);
-
   return play;
 }
 
@@ -144,7 +135,60 @@ function buildUrl(
   return key.trim() ? base + key.trim() : "";
 }
 
-export default function LiveLikeFBScreenKey() {
+// ---- Dotted circular progress (no lib)
+function DottedCircleProgress({
+  progress,
+  size = 140,
+  dotSize = 8,
+  count = 30,
+  color = "#fff",
+  trackColor = "rgba(255,255,255,0.2)",
+}: {
+  progress: number;
+  size?: number;
+  dotSize?: number;
+  count?: number;
+  color?: string;
+  trackColor?: string;
+}) {
+  const N = Math.max(6, count);
+  const R = size / 2 - dotSize - 2;
+  const lit = Math.round(Math.max(0, Math.min(1, progress)) * N);
+  return (
+    <View style={{ width: size, height: size }}>
+      {Array.from({ length: N }).map((_, i) => {
+        const t = (i / N) * Math.PI * 2 - Math.PI / 2;
+        const cx = size / 2 + R * Math.cos(t) - dotSize / 2;
+        const cy = size / 2 + R * Math.sin(t) - dotSize / 2;
+        const on = i < lit;
+        return (
+          <View
+            key={i}
+            style={{
+              position: "absolute",
+              left: cx,
+              top: cy,
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: on ? color : trackColor,
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+type Props = {
+  tournamentHref?: string;
+  homeHref?: string;
+  onFinishedGoToTournament?: () => void;
+  onFinishedGoHome?: () => void;
+};
+
+export default function LiveLikeFBScreenKey(props: Props) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("pre");
   const [torchOn, setTorchOn] = useState(false);
@@ -152,29 +196,63 @@ export default function LiveLikeFBScreenKey() {
   const [elapsed, setElapsed] = useState(0);
   const [count, setCount] = useState(3);
 
-  // stream inputs
+  // Inputs
   const [useFullUrl, setUseFullUrl] = useState(true);
   const [fullUrl, setFullUrl] = useState("");
   const [server, setServer] = useState(DEFAULT_FB_SERVER);
   const [streamKey, setStreamKey] = useState("");
 
+  // Refs
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
   const shouldResumeLiveRef = useRef(false);
 
-  // 🔊 SFX player
+  // Zoom (UI & raf throttle)
+  const clampZoomUI = (z: number) => Math.min(2, Math.max(0.5, z));
+  const zoomUIRef = useRef(1); // giá trị UI thực tế
+  const [zoomUI, setZoomUI] = useState(1); // để render badge
+  const pinchBaseRef = useRef(1);
+  const rafIdRef = useRef<number | null>(null);
+  const pendingZoomRef = useRef<number | null>(null);
+  const lastSentZoomRef = useRef(1);
+  const isFrontRef = useRef(false); // toggle khi switchCamera
+
+  const sendZoomRAF = useCallback((z: number) => {
+    pendingZoomRef.current = z;
+    if (rafIdRef.current != null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const v = pendingZoomRef.current;
+      pendingZoomRef.current = null;
+      if (v != null && v !== lastSentZoomRef.current) {
+        Live.setZoom?.(v);
+        lastSentZoomRef.current = v;
+      }
+    });
+  }, []);
+
   const playSfx = useSfx();
 
-  // Timer hiển thị thời gian live
+  // iOS-only bump
+  const IOS_BUMP = 100;
+  const bottomBump =
+    Platform.OS === "ios" ? insets.bottom + IOS_BUMP : 16 + insets.bottom;
+
+  // Elapsed timer (live & stopping)
+  const shouldResetElapsedRef = useRef(false);
   useEffect(() => {
-    let t: any;
-    if (mode === "live") {
-      setElapsed(0);
+    let t: ReturnType<typeof setInterval> | null = null;
+    if (mode === "live" || mode === "stopping") {
+      if (mode === "live" && shouldResetElapsedRef.current) {
+        setElapsed(0);
+        shouldResetElapsedRef.current = false;
+      }
       t = setInterval(() => setElapsed((s) => s + 1), 1000);
     }
     return () => t && clearInterval(t);
   }, [mode]);
 
+  // Preview bootstrap
   const kickPreview = useCallback(async () => {
     if (startedPreviewRef.current) return;
     const ok = await ensurePermissions();
@@ -185,11 +263,20 @@ export default function LiveLikeFBScreenKey() {
     try {
       await Live.enableAutoRotate?.(true);
       await Live.startPreview?.();
+      // set zoom UI 1.0 khi khởi động
+      zoomUIRef.current = 1;
+      setZoomUI(1);
+      lastSentZoomRef.current = 1;
+      Live.setZoom?.(1);
       startedPreviewRef.current = true;
     } catch {
       requestAnimationFrame(() => {
         Live.startPreview?.()
           .then(() => {
+            zoomUIRef.current = 1;
+            setZoomUI(1);
+            lastSentZoomRef.current = 1;
+            Live.setZoom?.(1);
             startedPreviewRef.current = true;
           })
           .catch(() => {});
@@ -197,6 +284,7 @@ export default function LiveLikeFBScreenKey() {
     }
   }, []);
 
+  // Cleanup unmount
   useEffect(() => {
     return () => {
       (async () => {
@@ -211,15 +299,15 @@ export default function LiveLikeFBScreenKey() {
     };
   }, []);
 
+  // Focus lifecycle
   useFocusEffect(
     useCallback(() => {
       kickPreview();
       return () => {
         (async () => {
           try {
-            if (mode === "live") {
+            if (mode === "live" || mode === "stopping")
               shouldResumeLiveRef.current = true;
-            }
             if (startedPreviewRef.current) {
               await Live.stopPreview?.();
               startedPreviewRef.current = false;
@@ -230,12 +318,11 @@ export default function LiveLikeFBScreenKey() {
     }, [kickPreview, mode])
   );
 
+  // AppState lifecycle
   useEffect(() => {
     const handler = async (nextState: AppStateStatus) => {
       if (nextState === "active") {
-        if (!startedPreviewRef.current) {
-          await kickPreview();
-        }
+        if (!startedPreviewRef.current) await kickPreview();
         if (shouldResumeLiveRef.current && lastUrlRef.current) {
           try {
             await startNative(lastUrlRef.current);
@@ -244,9 +331,8 @@ export default function LiveLikeFBScreenKey() {
           shouldResumeLiveRef.current = false;
         }
       } else {
-        if (mode === "live") {
+        if (mode === "live" || mode === "stopping")
           shouldResumeLiveRef.current = true;
-        }
         try {
           if (startedPreviewRef.current) {
             await Live.stopPreview?.();
@@ -255,18 +341,20 @@ export default function LiveLikeFBScreenKey() {
         } catch {}
       }
     };
-
     const sub = AppState.addEventListener("change", handler);
     return () => sub.remove();
   }, [kickPreview, mode]);
 
+  // Clock
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
 
+  // Start native
   const startNative = useCallback(async (url: string) => {
     await Live.start(url, 3_800_000, 1280, 720, 30);
   }, []);
 
+  // Go live
   const onGoLive = useCallback(async () => {
     const url = buildUrl(useFullUrl, fullUrl, server, streamKey);
     if (!url) {
@@ -279,6 +367,7 @@ export default function LiveLikeFBScreenKey() {
     lastUrlRef.current = url;
     setMode("countdown");
     setCount(3);
+    shouldResetElapsedRef.current = true;
 
     let started = false;
     const runner = setInterval(async () => {
@@ -301,34 +390,107 @@ export default function LiveLikeFBScreenKey() {
     }, 1000);
   }, [useFullUrl, fullUrl, server, streamKey, startNative]);
 
-  const onFinish = useCallback(async () => {
+  // ===== Finish flow (5s)
+  const STOP_DURATION_MS = 5000;
+  const stopIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopDeadlineRef = useRef<number | null>(null);
+  const [stopProgress, setStopProgress] = useState(0);
+
+  const clearStopTimer = useCallback(() => {
+    if (stopIntervalRef.current) {
+      clearInterval(stopIntervalRef.current);
+      stopIntervalRef.current = null;
+    }
+    stopDeadlineRef.current = null;
+  }, []);
+
+  const resetAfterEnded = useCallback(async () => {
     try {
       await Live.stop();
     } catch {}
-    setMode("pre");
+    try {
+      await Live.stopPreview?.();
+      startedPreviewRef.current = false;
+    } catch {}
     shouldResumeLiveRef.current = false;
     lastUrlRef.current = null;
-    try {
-      await Live.startPreview?.();
-      startedPreviewRef.current = true;
-    } catch {}
+
+    // reset UI
+    setTorchOn(false);
+    setMicMuted(false);
+    setElapsed(0);
+    setCount(3);
+    setStopProgress(0);
+    zoomUIRef.current = 1;
+    setZoomUI(1);
+    lastSentZoomRef.current = 1;
   }, []);
 
+  const beginFinish = useCallback(async () => {
+    await Haptics.selectionAsync();
+    setStopProgress(0);
+    setMode("stopping");
+    stopDeadlineRef.current = Date.now() + STOP_DURATION_MS;
+
+    stopIntervalRef.current = setInterval(async () => {
+      const deadline = stopDeadlineRef.current ?? Date.now();
+      const remaining = Math.max(0, deadline - Date.now());
+      const pct = Math.min(
+        1,
+        (STOP_DURATION_MS - remaining) / STOP_DURATION_MS
+      );
+      setStopProgress(pct);
+      if (remaining <= 0) {
+        clearStopTimer();
+        await resetAfterEnded();
+        setMode("ended");
+      }
+    }, 50);
+  }, [STOP_DURATION_MS, clearStopTimer, resetAfterEnded]);
+
+  const cancelStopping = useCallback(() => {
+    clearStopTimer();
+    setStopProgress(0);
+    setMode("live");
+  }, [clearStopTimer]);
+
+  useEffect(() => () => clearStopTimer(), [clearStopTimer]);
+
+  // Navigation after ended
+  const goTournament = useCallback(() => {
+    if (props.onFinishedGoToTournament) return props.onFinishedGoToTournament();
+    router.push(props.tournamentHref ?? "/tournament");
+  }, [router, props.onFinishedGoToTournament, props.tournamentHref]);
+
+  const goHome = useCallback(() => {
+    if (props.onFinishedGoHome) return props.onFinishedGoHome();
+    router.push(props.homeHref ?? "/");
+  }, [router, props.onFinishedGoHome, props.homeHref]);
+
+  // Toggles
   const onSwitch = useCallback(async () => {
+    isFrontRef.current = !isFrontRef.current;
     await Live.switchCamera();
-    Haptics.selectionAsync();
+    // nếu chuyển sang front mà zoom < 1.0 thì clamp UI luôn
+    if (isFrontRef.current && zoomUIRef.current < 1) {
+      zoomUIRef.current = 1;
+      setZoomUI(1);
+      lastSentZoomRef.current = 1;
+      Live.setZoom?.(1);
+    } else {
+      Live.setZoom?.(zoomUIRef.current);
+    }
+    await Haptics.selectionAsync();
   }, []);
 
   const onToggleTorch = useCallback(async () => {
     const next = !torchOn;
     setTorchOn(next);
-    // 🔊 & 💥 ngay khi người dùng nhấn để phản hồi tức thì
     playSfx(next ? "torchOn" : "torchOff");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Live.toggleTorch(next);
     } catch {
-      // rollback nếu native fail (hiếm)
       setTorchOn(!next);
       playSfx(!next ? "torchOn" : "torchOff");
     }
@@ -337,7 +499,6 @@ export default function LiveLikeFBScreenKey() {
   const onToggleMic = useCallback(async () => {
     const nextMuted = !micMuted;
     setMicMuted(nextMuted);
-    // native toggleMic(on:boolean): mic ON khi không muted
     playSfx(nextMuted ? "micOff" : "micOn");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -350,6 +511,7 @@ export default function LiveLikeFBScreenKey() {
 
   const cancelCountdown = useCallback(async () => {
     setMode("pre");
+    shouldResetElapsedRef.current = false;
     try {
       await Live.stop();
     } catch {}
@@ -357,10 +519,46 @@ export default function LiveLikeFBScreenKey() {
     lastUrlRef.current = null;
     try {
       await Live.startPreview?.();
+      zoomUIRef.current = 1;
+      setZoomUI(1);
+      lastSentZoomRef.current = 1;
+      Live.setZoom?.(1);
       startedPreviewRef.current = true;
     } catch {}
   }, []);
 
+  // Pinch to zoom (iOS)
+  const onPinchEvent = useCallback(
+    (e: any) => {
+      if (Platform.OS !== "ios") return;
+      const scale = e?.nativeEvent?.scale ?? 1;
+      const desired = clampZoomUI(pinchBaseRef.current * scale);
+      const stepped = Math.round(desired * 10) / 10; // bước 0.1
+      if (stepped !== zoomUIRef.current) {
+        zoomUIRef.current = stepped;
+        setZoomUI(stepped);
+        sendZoomRAF(stepped);
+      }
+    },
+    [sendZoomRAF]
+  );
+
+  const onPinchStateChange = useCallback((e: any) => {
+    if (Platform.OS !== "ios") return;
+    const st = e?.nativeEvent?.state;
+    if (st === State.BEGAN) {
+      pinchBaseRef.current = zoomUIRef.current;
+    } else if (st === State.END || st === State.CANCELLED) {
+      // đảm bảo gửi phát cuối
+      const stepped = Math.round(zoomUIRef.current * 10) / 10;
+      zoomUIRef.current = stepped;
+      setZoomUI(stepped);
+      Live.setZoom?.(stepped);
+      lastSentZoomRef.current = stepped;
+    }
+  }, []);
+
+  // ===== UI
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
       <StatusBar
@@ -369,20 +567,25 @@ export default function LiveLikeFBScreenKey() {
         backgroundColor="transparent"
       />
 
-      <RtmpPreviewView
-        style={styles.preview as ViewStyle}
-        onLayout={kickPreview}
-      />
+      <PinchGestureHandler
+        onGestureEvent={onPinchEvent}
+        onHandlerStateChange={onPinchStateChange}
+      >
+        <View style={{ flex: 1 }}>
+          <RtmpPreviewView
+            style={styles.preview as ViewStyle}
+            onLayout={kickPreview}
+          />
+        </View>
+      </PinchGestureHandler>
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-        {/* CỤM 3 NÚT */}
+        {/* TOP ACTIONS */}
         <View style={styles.topButtonsRow} pointerEvents="box-none">
           <Pressable
             onPress={onToggleTorch}
             style={styles.roundBtn}
             hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle torch"
           >
             <Icon
               name={torchOn ? "flashlight-off" : "flashlight"}
@@ -390,24 +593,10 @@ export default function LiveLikeFBScreenKey() {
               color="#fff"
             />
           </Pressable>
-
-          <Pressable
-            onPress={onSwitch}
-            style={styles.roundBtn}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Switch camera"
-          >
+          <Pressable onPress={onSwitch} style={styles.roundBtn} hitSlop={10}>
             <Icon name="camera-switch" size={20} color="#fff" />
           </Pressable>
-
-          <Pressable
-            onPress={onToggleMic}
-            style={styles.roundBtn}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle microphone"
-          >
+          <Pressable onPress={onToggleMic} style={styles.roundBtn} hitSlop={10}>
             <Icon
               name={micMuted ? "microphone-off" : "microphone"}
               size={20}
@@ -416,7 +605,15 @@ export default function LiveLikeFBScreenKey() {
           </Pressable>
         </View>
 
-        {mode === "live" && (
+        {/* Zoom badge (LIVE & STOPPING) */}
+        {(mode === "live" || mode === "stopping") && (
+          <View style={styles.zoomBadge}>
+            <Text style={styles.zoomBadgeTxt}>{zoomUI.toFixed(1)}x</Text>
+          </View>
+        )}
+
+        {/* Clock */}
+        {(mode === "live" || mode === "stopping") && (
           <View style={styles.statusBarRow}>
             <Text style={styles.statusClock}>
               {mm}:{ss}
@@ -425,6 +622,7 @@ export default function LiveLikeFBScreenKey() {
           </View>
         )}
 
+        {/* ==== PRE MODE ==== */}
         {mode === "pre" && (
           <>
             <View style={styles.selectorRow}>
@@ -502,7 +700,7 @@ export default function LiveLikeFBScreenKey() {
               </View>
             )}
 
-            <View style={[styles.goLiveWrap, { bottom: 16 + insets.bottom }]}>
+            <View style={[styles.goLiveWrap, { bottom: bottomBump }]}>
               <Pressable
                 style={[styles.goLiveBtn, { backgroundColor: "#1877F2" }]}
                 onPress={onGoLive}
@@ -513,16 +711,25 @@ export default function LiveLikeFBScreenKey() {
           </>
         )}
 
+        {/* ==== COUNTDOWN ==== */}
         {mode === "countdown" && (
           <View style={styles.countdownWrap}>
             <Text style={styles.countNum}>{count}</Text>
-            <Text style={styles.countHint}>Starting live broadcast...</Text>
+            <Text
+              style={[
+                styles.countHint,
+                { bottom: Platform.OS === "ios" ? bottomBump + 20 : 70 },
+              ]}
+            >
+              Starting live broadcast...
+            </Text>
             <Pressable style={styles.cancelBtn} onPress={cancelCountdown}>
               <Text style={styles.cancelTxt}>✕</Text>
             </Pressable>
           </View>
         )}
 
+        {/* ==== LIVE MODE ==== */}
         {mode === "live" && (
           <>
             <View style={styles.liveTopLeft}>
@@ -530,7 +737,10 @@ export default function LiveLikeFBScreenKey() {
                 <Text style={styles.livePillTxt}>LIVE</Text>
               </View>
             </View>
-            <View style={styles.liveBottomBar}>
+
+            <View
+              style={[styles.liveBottomBar, { bottom: 14 + insets.bottom }]}
+            >
               <Pressable onPress={onSwitch}>
                 <Text style={styles.liveIcon}>🔄</Text>
               </Pressable>
@@ -540,11 +750,71 @@ export default function LiveLikeFBScreenKey() {
               <Pressable onPress={onToggleTorch}>
                 <Text style={styles.liveIcon}>{torchOn ? "⚡️" : "⚡"}</Text>
               </Pressable>
-              <Pressable style={styles.finishBtn} onPress={onFinish}>
-                <Text style={styles.finishTxt}>Finish</Text>
+
+              {Platform.OS !== "ios" && (
+                <Pressable style={styles.finishBtn} onPress={beginFinish}>
+                  <Text style={styles.finishTxt}>Finish</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {Platform.OS === "ios" && (
+              <View style={[styles.goLiveWrap, { bottom: bottomBump }]}>
+                <Pressable
+                  style={[styles.goLiveBtn, { backgroundColor: "#FF3B30" }]}
+                  onPress={beginFinish}
+                >
+                  <Text style={[styles.goLiveTxt, { fontWeight: "800" }]}>
+                    Finish
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ==== STOPPING ==== */}
+        {mode === "stopping" && (
+          <View style={styles.overlay}>
+            <Text style={styles.overlayTitle}>Đang kết thúc buổi phát</Text>
+            <DottedCircleProgress
+              progress={stopProgress}
+              size={140}
+              dotSize={8}
+            />
+            <Text style={styles.progressText}>
+              Sẽ kết thúc sau {Math.max(0, Math.ceil((1 - stopProgress) * 5))}s
+            </Text>
+            <Pressable
+              style={[styles.cancelBigBtn, { bottom: bottomBump }]}
+              onPress={cancelStopping}
+            >
+              <Text style={styles.cancelBigTxt}>Huỷ</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* ==== ENDED ==== */}
+        {mode === "ended" && (
+          <View style={styles.overlay}>
+            <Text style={styles.endedTitle}>
+              Đã kết thúc buổi phát trực tiếp
+            </Text>
+            <View style={[styles.endedBtns, { bottom: bottomBump }]}>
+              <Pressable
+                style={[styles.endedBtn, { backgroundColor: "#1877F2" }]}
+                onPress={goTournament}
+              >
+                <Text style={styles.endedBtnTxt}>Về trang giải đấu</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.endedBtn, { backgroundColor: "#444" }]}
+                onPress={goHome}
+              >
+                <Text style={styles.endedBtnTxt}>Về trang chủ</Text>
               </Pressable>
             </View>
-          </>
+          </View>
         )}
       </View>
     </View>
@@ -572,7 +842,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.35)",
   },
-  roundTxt: { color: "#fff", fontSize: 18 },
+
+  // Zoom badge
+  zoomBadge: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomBadgeTxt: { color: "#fff", fontWeight: "800", fontSize: 13 },
 
   statusBarRow: {
     position: "absolute",
@@ -624,7 +907,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
 
-  goLiveWrap: { position: "absolute", bottom: 98, left: 16, right: 16 },
+  goLiveWrap: { position: "absolute", left: 16, right: 16 },
   goLiveBtn: {
     height: 46,
     borderRadius: 10,
@@ -640,11 +923,7 @@ const styles = StyleSheet.create({
     backgroundColor: "black",
   },
   countNum: { color: "#fff", fontSize: 120, fontWeight: "800" },
-  countHint: {
-    position: "absolute",
-    bottom: 70,
-    color: "rgba(255,255,255,0.8)",
-  },
+  countHint: { position: "absolute", color: "rgba(255,255,255,0.8)" },
   cancelBtn: {
     position: "absolute",
     bottom: 22,
@@ -671,9 +950,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   livePillTxt: { color: "#fff", fontWeight: "800", fontSize: 12 },
+
   liveBottomBar: {
     position: "absolute",
-    bottom: 14,
     left: 10,
     right: 10,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -684,6 +963,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   liveIcon: { color: "#fff", fontSize: 18, marginHorizontal: 8 },
+
   finishBtn: {
     marginLeft: "auto",
     backgroundColor: "#fff",
@@ -694,4 +974,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   finishTxt: { color: "#111", fontWeight: "800" },
+
+  // overlays
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overlayTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 14,
+  },
+  progressText: { color: "#fff", marginTop: 12, fontWeight: "600" },
+
+  cancelBigBtn: {
+    position: "absolute",
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBigTxt: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  endedTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  endedBtns: { position: "absolute", left: 16, right: 16 },
+  endedBtn: {
+    height: 46,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  endedBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "800" },
 });

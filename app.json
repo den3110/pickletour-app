@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour.vn",
     "slug": "pickletour-app",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "pickletourapp",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "infoPlist": {
         "NSCameraUsageDescription": "pickletour.vn uses the camera to scan the CCCD QR code and auto-fill your full name and date of birth in Profile. Example: Scan CCCD to quickly fill profile info.",
         "NSPhotoLibraryUsageDescription": "pickletour.vn lets you pick photos to upload your avatar and CCCD verification images. Example: choose front/back CCCD images to verify.",
