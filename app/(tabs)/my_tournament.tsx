@@ -35,27 +35,53 @@ import { useListMyTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useSocket } from "@/context/SocketContext";
+import { useTheme } from "@react-navigation/native";
 
 /* ================= Theme ================= */
 function useThemeTokens() {
-  const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  // 1) Lấy theme từ React Navigation (nếu có)
+  const navTheme = useTheme?.() || {};
+  // 2) Fallback: nếu đứng ngoài ThemeProvider, dùng system scheme
+  const scheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#0b1220");
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#11161c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (isDark ? "#212a33" : "#e8edf3");
+  const bg = navTheme?.colors?.background ?? (isDark ? "#0b0f14" : "#fafbff");
+
   return {
     isDark,
-    bg: isDark ? "#0b0f14" : "#fafbff",
-    cardBg: isDark ? "#11161c" : "#ffffff",
-    border: isDark ? "#212a33" : "#e8edf3",
-    text: isDark ? "#f7f7f7" : "#0b1220",
+    // base palette
+    colors: {
+      primary,
+      text,
+      card: cardBg,
+      border,
+      background: bg,
+    },
+
+    // text phụ & nền phụ
     sub: isDark ? "#b9c1cc" : "#586174",
     muted: isDark ? "#0f141a" : "#f3f6fb",
+    inputBg: isDark ? "#0f141a" : "#f5f7fb",
+
+    // chips
     chipBg: isDark ? "#121a22" : "#eef2f7",
-    tint: isDark ? "#7cc0ff" : "#0a84ff",
+
+    // accents
+    tint: primary,
     success: "#22c55e",
     danger: "#ef4444",
     warning: "#f59e0b",
     shadow: "rgba(16,24,40,0.08)",
-    inputBg: isDark ? "#0f141a" : "#f5f7fb",
-    overlay: "rgba(255,255,255,0.12)",
+
+    // info chips (xanh nhạt)
+    chipInfoBg: isDark ? "#1f2937" : "#eef2f7",
+    chipInfoFg: isDark ? "#e5e7eb" : "#263238",
+    chipInfoBd: isDark ? "#334155" : "#e2e8f0",
   };
 }
 function toneColor(tone, tokens) {
@@ -119,8 +145,7 @@ const isLive = (m) =>
   ["live", "ongoing", "playing", "inprogress"].includes(
     String(m?.status || "").toLowerCase()
   );
-const isFinished = (m) =>
-  String(m?.status || "").toLowerCase() === "finished";
+const isFinished = (m) => String(m?.status || "").toLowerCase() === "finished";
 const isScheduled = (m) =>
   [
     "scheduled",
@@ -130,10 +155,12 @@ const isScheduled = (m) =>
     "assigning",
     "assigned",
   ].includes(String(m?.status || "").toLowerCase());
-const statusRank = (m) => (isLive(m) ? 0 : isScheduled(m) ? 1 : isFinished(m) ? 2 : 3);
+const statusRank = (m) =>
+  isLive(m) ? 0 : isScheduled(m) ? 1 : isFinished(m) ? 2 : 3;
 const whenOf = (m) =>
-  new Date(m?.scheduledAt || m?.startTime || m?.time || m?.createdAt || 0)
-    .getTime() || 0;
+  new Date(
+    m?.scheduledAt || m?.startTime || m?.time || m?.createdAt || 0
+  ).getTime() || 0;
 
 /* ================= Small UI bits ================= */
 function ChipToggle({ active, label, onPress, tokens, style, tone }) {
@@ -145,7 +172,7 @@ function ChipToggle({ active, label, onPress, tokens, style, tone }) {
         styles.chip,
         {
           backgroundColor: active ? c + "1a" : tokens.chipBg,
-          borderColor: active ? c : tokens.border,
+          borderColor: active ? c : tokens.colors.border,
         },
         style,
       ]}
@@ -219,10 +246,12 @@ function ScoreBadgeFromMatch({ m, tokens }) {
     <View
       style={[
         styles.scoreBadge,
-        { backgroundColor: tokens.muted, borderColor: tokens.border },
+        { backgroundColor: tokens.muted, borderColor: tokens.colors.border },
       ]}
     >
-      <Text style={{ fontWeight: "700", color: tokens.text }}>{text}</Text>
+      <Text style={{ fontWeight: "700", color: tokens.colors.text }}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -248,8 +277,8 @@ function MatchRow({ m, onPress, tokens, eventType }) {
       style={({ pressed }) => [
         styles.matchRow,
         {
-          borderColor: tokens.border,
-          backgroundColor: tokens.cardBg,
+          borderColor: tokens.colors.border,
+          backgroundColor: tokens.colors.card,
           opacity: pressed ? 0.9 : 1,
           shadowColor: tokens.shadow,
         },
@@ -264,12 +293,18 @@ function MatchRow({ m, onPress, tokens, eventType }) {
             justifyContent: "space-between",
           }}
         >
-          <Text numberOfLines={1} style={[styles.team, { color: tokens.text }]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.team, { color: tokens.colors.text }]}
+          >
             {teamLabel(a, eventType)}
           </Text>
           <StatusChip status={status} tokens={tokens} />
         </View>
-        <Text numberOfLines={1} style={[styles.team, { color: tokens.text }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.team, { color: tokens.colors.text }]}
+        >
           {teamLabel(b, eventType)}
         </Text>
 
@@ -335,7 +370,10 @@ function Banner({ t, tokens, collapsed, onToggle }) {
 
         {/* Lớp tối nhẹ + gradient đáy */}
         <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.22)" }]}
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(0,0,0,0.22)" },
+          ]}
         />
         <LinearGradient
           colors={["rgba(0,0,0,0.00)", "rgba(0,0,0,0.55)"]}
@@ -345,13 +383,25 @@ function Banner({ t, tokens, collapsed, onToggle }) {
         {/* Nội dung */}
         <View style={styles.bannerInner}>
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={2} style={[styles.bannerTitle, { color: "#fff" }]}>
+            <Text
+              numberOfLines={2}
+              style={[styles.bannerTitle, { color: "#fff" }]}
+            >
               {t.name || "Giải đấu"}
             </Text>
             {!!t.location && (
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 6,
+                }}
+              >
                 <MaterialIcons name="location-pin" size={16} color="#fff" />
-                <Text numberOfLines={1} style={{ color: "#fff", marginLeft: 6, opacity: 0.9 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: "#fff", marginLeft: 6, opacity: 0.9 }}
+                >
                   {t.location}
                 </Text>
               </View>
@@ -370,7 +420,10 @@ function Banner({ t, tokens, collapsed, onToggle }) {
               onPress={onToggle}
               style={({ pressed }) => [
                 styles.bannerToggleBtn,
-                { backgroundColor: "rgba(255,255,255,0.14)", opacity: pressed ? 0.8 : 1 },
+                {
+                  backgroundColor: "rgba(255,255,255,0.14)",
+                  opacity: pressed ? 0.8 : 1,
+                },
               ]}
               accessibilityRole="button"
               accessibilityLabel={collapsed ? "Mở chi tiết" : "Thu gọn"}
@@ -423,16 +476,14 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
     });
 
     // sort theo rank rồi theo thời gian tăng dần
-    return base
-      .slice()
-      .sort((a, b) => {
-        const ra = statusRank(a);
-        const rb = statusRank(b);
-        if (ra !== rb) return ra - rb;
-        const wa = whenOf(a);
-        const wb = whenOf(b);
-        return wa - wb;
-      });
+    return base.slice().sort((a, b) => {
+      const ra = statusRank(a);
+      const rb = statusRank(b);
+      if (ra !== rb) return ra - rb;
+      const wa = whenOf(a);
+      const wb = whenOf(b);
+      return wa - wb;
+    });
   }, [matches, matchQuery, statusFilter, t.eventType]);
 
   const shown = expanded
@@ -454,8 +505,8 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
       style={[
         styles.card,
         {
-          backgroundColor: tokens.cardBg,
-          borderColor: tokens.border,
+          backgroundColor: tokens.colors.card,
+          borderColor: tokens.colors.border,
           shadowColor: tokens.shadow,
         },
       ]}
@@ -486,7 +537,10 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
           <View
             style={[
               styles.searchRow,
-              { backgroundColor: tokens.inputBg, borderColor: tokens.border },
+              {
+                backgroundColor: tokens.inputBg,
+                borderColor: tokens.colors.border,
+              },
             ]}
           >
             <MaterialIcons name="search" size={18} color={tokens.sub} />
@@ -533,7 +587,9 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
                   setStatusFilter(new Set(["scheduled", "live", "finished"]));
                 }}
               >
-                <Text style={{ color: tokens.tint, fontWeight: "700", padding: 6 }}>
+                <Text
+                  style={{ color: tokens.tint, fontWeight: "700", padding: 6 }}
+                >
                   Reset
                 </Text>
               </Pressable>
@@ -542,9 +598,16 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
 
           {/* LIST MATCHES */}
           {filteredSortedMatches.length === 0 ? (
-            <View style={styles.emptyMatches}>
+            <View
+              style={[
+                styles.emptyMatches,
+                { borderColor: tokens.colors.border },
+              ]}
+            >
               <Text style={{ fontSize: 28, marginBottom: 4 }}>🎾</Text>
-              <Text style={{ color: tokens.sub }}>Không có trận phù hợp bộ lọc.</Text>
+              <Text style={{ color: tokens.sub }}>
+                Không có trận phù hợp bộ lọc.
+              </Text>
             </View>
           ) : (
             <View style={{ gap: 10 }}>
@@ -563,10 +626,15 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
                   onPress={() => setExpanded((v) => !v)}
                   style={[
                     styles.showMoreBtn,
-                    { borderColor: tokens.border, backgroundColor: tokens.muted },
+                    {
+                      borderColor: tokens.colors.border,
+                      backgroundColor: tokens.muted,
+                    },
                   ]}
                 >
-                  <Text style={{ color: tokens.text, fontWeight: "700" }}>
+                  <Text
+                    style={{ color: tokens.colors.text, fontWeight: "700" }}
+                  >
                     {expanded
                       ? "Thu gọn"
                       : `Xem tất cả ${filteredSortedMatches.length} trận`}
@@ -587,18 +655,26 @@ function LoginPrompt({ tokens }) {
     router.push("/login");
   }, []);
   return (
-    <View style={[styles.loginWrap, { backgroundColor: tokens.bg }]}>
+    <View
+      style={[styles.loginWrap, { backgroundColor: tokens.colors.background }]}
+    >
       <View
         style={[
           styles.loginCard,
-          { backgroundColor: tokens.cardBg, borderColor: tokens.border },
+          {
+            backgroundColor: tokens.colors.card,
+            borderColor: tokens.colors.border,
+          },
         ]}
       >
-        <View style={styles.lockIcon}>
+        <View
+          style={[styles.lockIcon, { backgroundColor: tokens.tint + "1A" }]}
+        >
           <MaterialIcons name="lock" size={28} color={tokens.tint} />
         </View>
-        <Text style={[styles.loginTitle, { color: tokens.text }]}>
-          Hãy đăng nhập để xem <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
+        <Text style={[styles.loginTitle, { color: tokens.colors.text }]}>
+          Hãy đăng nhập để xem{" "}
+          <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
         </Text>
         <Text style={{ color: tokens.sub, textAlign: "center", marginTop: 6 }}>
           Sau khi đăng nhập, bạn sẽ thấy danh sách các giải mình đã tham gia,
@@ -800,12 +876,15 @@ export default function MyTournament() {
       if (!cur.has(bid)) socket.emit("draw:subscribe", { bracketId: bid });
     });
     cur.forEach((bid) => {
-      if (!nextSet.has(bid)) socket.emit("draw:unsubscribe", { bracketId: bid });
+      if (!nextSet.has(bid))
+        socket.emit("draw:unsubscribe", { bracketId: bid });
     });
     subscribedBracketsRef.current = nextSet;
 
     return () => {
-      nextSet.forEach((bid) => socket.emit("draw:unsubscribe", { bracketId: bid }));
+      nextSet.forEach((bid) =>
+        socket.emit("draw:unsubscribe", { bracketId: bid })
+      );
     };
   }, [socket, bracketsKey]);
 
@@ -884,18 +963,23 @@ export default function MyTournament() {
     <View
       style={[
         styles.stickyHeader,
-        { backgroundColor: tokens.bg, borderBottomColor: tokens.border },
+        {
+          backgroundColor: tokens.colors.background,
+          borderBottomColor: tokens.colors.border,
+        },
       ]}
     >
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Giải của tôi</Text>
+        <Text style={[styles.pageTitle, { color: tokens.colors.text }]}>
+          Giải của tôi
+        </Text>
 
         <View
           style={[
             styles.searchRow,
             {
               backgroundColor: tokens.inputBg,
-              borderColor: tokens.border,
+              borderColor: tokens.colors.border,
               marginTop: 10,
             },
           ]}
@@ -916,7 +1000,9 @@ export default function MyTournament() {
         </View>
 
         {!!tournaments?.length && (
-          <Text style={styles.pageSub}>{tournaments.length} giải phù hợp</Text>
+          <Text style={[styles.pageSub, { color: tokens.sub }]}>
+            {tournaments.length} giải phù hợp
+          </Text>
         )}
       </View>
     </View>
@@ -925,7 +1011,9 @@ export default function MyTournament() {
   const EmptyState = (
     <View style={styles.emptyWrap}>
       <Text style={{ fontSize: 42, marginBottom: 6 }}>🏆</Text>
-      <Text style={{ color: tokens.text, fontWeight: "800", fontSize: 16 }}>
+      <Text
+        style={{ color: tokens.colors.text, fontWeight: "800", fontSize: 16 }}
+      >
         Chưa có giải nào
       </Text>
       <Text style={{ color: tokens.sub, marginTop: 4, textAlign: "center" }}>
@@ -946,12 +1034,12 @@ export default function MyTournament() {
         <View
           style={{
             flex: 1,
-            backgroundColor: tokens.bg,
+            backgroundColor: tokens.colors.background,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <ActivityIndicator />
+          <ActivityIndicator color={tokens.tint} />
         </View>
       ) : (
         <FlatList
@@ -960,7 +1048,7 @@ export default function MyTournament() {
           contentContainerStyle={[
             styles.screen,
             {
-              backgroundColor: tokens.bg,
+              backgroundColor: tokens.colors.background,
               paddingBottom: (insets?.bottom ?? 0) + 28,
             },
           ]}
@@ -983,6 +1071,8 @@ export default function MyTournament() {
               refreshing={isFetching}
               onRefresh={refetch}
               tintColor={tokens.tint}
+              colors={[tokens.tint]}
+              progressBackgroundColor={tokens.colors.card}
             />
           }
           ListFooterComponent={
@@ -1014,7 +1104,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: Platform.select({ ios: "800", android: "700", default: "700" }),
   },
-  pageSub: { marginTop: 6, color: "#7b8899" },
+  pageSub: { marginTop: 6 },
 
   searchRow: {
     borderWidth: 1,
@@ -1161,7 +1251,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
-    backgroundColor: "rgba(10,132,255,0.10)",
   },
   loginTitle: {
     fontSize: 18,

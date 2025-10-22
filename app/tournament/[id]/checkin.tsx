@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
   TouchableOpacity,
+  useColorScheme,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
@@ -21,6 +22,52 @@ import {
   useUserCheckinRegistrationMutation,
 } from "@/slices/tournamentsApiSlice";
 
+/* ---------- Theme helpers ---------- */
+function useThemeColors() {
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
+
+  const tint = isDark ? "#7cc0ff" : "#0a84ff";
+  const background = isDark ? "#0f1115" : "#fafafa";
+  const cardBg = isDark ? "#16181d" : "#ffffff";
+  const border = isDark ? "#2f3136" : "#e6e8ef";
+  const hairline = isDark ? "#26282d" : "#e6e8ef";
+  const inputBg = isDark ? "#1a1c21" : "#ffffff";
+  const inputBorder = isDark ? "#2a2d33" : "#e0e0e0";
+  const textPrimary = isDark ? "#ffffff" : "#111111";
+  const textMuted = isDark ? "#9aa0a6" : "#666666";
+  const btnDisabled = isDark ? "#4b5563" : "#9aa0a6";
+
+  // Soft info/danger boxes (balanced for dark)
+  const infoBoxBg = isDark ? "#0f2538" : "#e3f2fd";
+  const infoBoxBd = isDark ? "#1b3a55" : "#bbdefb";
+  const infoBoxFg = isDark ? "#a8d0ff" : "#0b5394";
+
+  const errBoxBg = isDark ? "#2a1416" : "#ffebee";
+  const errBoxBd = isDark ? "#55282c" : "#ffcdd2";
+  const errBoxFg = isDark ? "#ffb3b9" : "#b71c1c";
+
+  return {
+    scheme,
+    tint,
+    background,
+    cardBg,
+    border,
+    hairline,
+    inputBg,
+    inputBorder,
+    textPrimary,
+    textMuted,
+    btnDisabled,
+    infoBoxBg,
+    infoBoxBd,
+    infoBoxFg,
+    errBoxBg,
+    errBoxBd,
+    errBoxFg,
+  };
+}
+
 /* ---------- Utils ---------- */
 const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString() : "—");
 const fmtTime = (s?: string) => (s && s.length ? s : "—");
@@ -31,16 +78,28 @@ const normType = (t?: string) => {
   return s || "double";
 };
 
-/* ---------- Soft-color Chips ---------- */
-const CHIP = {
-  primary: { bg: "#e3f2fd", fg: "#0d47a1", bd: "#bbdefb" }, // blue
-  success: { bg: "#e8f5e9", fg: "#2e7d32", bd: "#c8e6c9" }, // green
-  info: { bg: "#e0f7fa", fg: "#006064", bd: "#b2ebf2" }, // teal
-  warning: { bg: "#fff8e1", fg: "#f57c00", bd: "#ffe0b2" }, // amber
-  danger: { bg: "#ffebee", fg: "#b71c1c", bd: "#ffcdd2" }, // red
-  neutral: { bg: "#f4f4f5", fg: "#52525b", bd: "#e4e4e7" }, // gray
-} as const;
-type ChipVariant = keyof typeof CHIP;
+/* ---------- Soft-color Chips (themed) ---------- */
+function chipPalette(scheme: "light" | "dark") {
+  if (scheme === "dark") {
+    return {
+      primary: { bg: "#0f2130", fg: "#90caf9", bd: "#1b3a55" }, // blue-ish
+      success: { bg: "#0f2312", fg: "#8fe29f", bd: "#1e3a22" }, // green-ish
+      info: { bg: "#0b2a2e", fg: "#7bd1d8", bd: "#15464c" }, // teal-ish
+      warning: { bg: "#2c1f06", fg: "#ffcc80", bd: "#4a3510" }, // amber-ish
+      danger: { bg: "#2a1416", fg: "#ffb3b9", bd: "#4c2327" }, // red-ish
+      neutral: { bg: "#1f2226", fg: "#a1a1aa", bd: "#2c2f34" }, // gray
+    } as const;
+  }
+  return {
+    primary: { bg: "#e3f2fd", fg: "#0d47a1", bd: "#bbdefb" },
+    success: { bg: "#e8f5e9", fg: "#2e7d32", bd: "#c8e6c9" },
+    info: { bg: "#e0f7fa", fg: "#006064", bd: "#b2ebf2" },
+    warning: { bg: "#fff8e1", fg: "#f57c00", bd: "#ffe0b2" },
+    danger: { bg: "#ffebee", fg: "#b71c1c", bd: "#ffcdd2" },
+    neutral: { bg: "#f4f4f5", fg: "#52525b", bd: "#e4e4e7" },
+  } as const;
+}
+type ChipVariant = keyof ReturnType<typeof chipPalette>;
 
 function ChipRN({
   label,
@@ -51,13 +110,16 @@ function ChipRN({
   variant?: ChipVariant;
   style?: any;
 }) {
-  const c = CHIP[variant] || CHIP.neutral;
+  const { scheme } = useThemeColors();
+  const P =
+    chipPalette(scheme as "light" | "dark")[variant] ??
+    chipPalette(scheme as "light" | "dark").neutral;
   return (
     <View
       style={[
         {
-          backgroundColor: c.bg,
-          borderColor: c.bd,
+          backgroundColor: P.bg,
+          borderColor: P.bd,
           borderWidth: 1,
           borderRadius: 999,
           paddingHorizontal: 10,
@@ -68,7 +130,7 @@ function ChipRN({
       ]}
     >
       <Text
-        style={{ color: c.fg, fontSize: 12, fontWeight: "600" }}
+        style={{ color: P.fg, fontSize: 12, fontWeight: "600" }}
         numberOfLines={1}
       >
         {label}
@@ -119,27 +181,31 @@ const PrimaryBtn = ({
   onPress,
   disabled,
   full,
-  color = "#1976d2",
+  color,
 }: {
   title: string;
   onPress?: () => void;
   disabled?: boolean;
   full?: boolean;
   color?: string;
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.85}
-    style={[
-      styles.btn,
-      { backgroundColor: disabled ? "#9aa0a6" : color },
-      full && { alignSelf: "stretch" },
-    ]}
-  >
-    <Text style={styles.btnText}>{title}</Text>
-  </TouchableOpacity>
-);
+}) => {
+  const { tint, btnDisabled } = useThemeColors();
+  const bg = disabled ? btnDisabled : color || tint;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+      style={[
+        styles.btn,
+        { backgroundColor: bg },
+        full && { alignSelf: "stretch" },
+      ]}
+    >
+      <Text style={styles.btnText}>{title}</Text>
+    </TouchableOpacity>
+  );
+};
 
 /* ---------- Vertical match item (avoid overflow) ---------- */
 function MatchItemV({
@@ -151,34 +217,52 @@ function MatchItemV({
   fmtSide: (s?: string) => string;
   embedded?: boolean; // true khi hiển thị bên trong thẻ registration
 }) {
+  const C = useThemeColors();
   return (
     <View
-      style={embedded ? styles.matchInner : [styles.card, styles.matchCardV]}
+      style={
+        embedded
+          ? [styles.matchInner, { borderTopColor: C.hairline }]
+          : [
+              styles.card,
+              styles.matchCardV,
+              { backgroundColor: C.cardBg, borderColor: C.border },
+            ]
+      }
     >
       {/* Header: code + status */}
       <View style={styles.rowBetween}>
-        <Text style={styles.matchCode}>{m?.code || "—"}</Text>
+        <Text style={[styles.matchCode, { color: C.textPrimary }]}>
+          {m?.code || "—"}
+        </Text>
         <ChipRN label={m?.status || "—"} variant={statusToVariant(m?.status)} />
       </View>
 
       {/* Sub info */}
-      <Text style={styles.matchSub}>
+      <Text style={[styles.matchSub, { color: C.textMuted }]}>
         {fmtDate(m?.date)} • {fmtTime(m?.time)} • {m?.field || "—"}
       </Text>
 
       {/* Teams (vertical) */}
       <View style={styles.teamsV}>
-        <Text style={styles.teamText}>{fmtSide(m?.team1)}</Text>
-        <Text style={styles.scoreBig}>
+        <Text style={[styles.teamText, { color: C.textPrimary }]}>
+          {fmtSide(m?.team1)}
+        </Text>
+        <Text style={[styles.scoreBig, { color: C.textPrimary }]}>
           {m?.score1} - {m?.score2}
         </Text>
-        <Text style={[styles.teamText, { textAlign: "right" }]}>
+        <Text
+          style={[
+            styles.teamText,
+            { textAlign: "right", color: C.textPrimary },
+          ]}
+        >
           {fmtSide(m?.team2)}
         </Text>
       </View>
 
       {!!m?.referee && (
-        <Text style={[styles.matchSub, { marginTop: 6 }]}>
+        <Text style={[styles.matchSub, { marginTop: 6, color: C.textMuted }]}>
           Trọng tài: {m?.referee}
         </Text>
       )}
@@ -187,6 +271,7 @@ function MatchItemV({
 }
 
 export default function TournamentCheckinScreen() {
+  const C = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const tourId = String(id || "");
   const router = useRouter();
@@ -319,15 +404,20 @@ export default function TournamentCheckinScreen() {
   /* ---------- guards ---------- */
   if (tourLoading && !tour) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
+      <View style={[styles.center, { backgroundColor: C.background }]}>
+        <ActivityIndicator color={C.tint} />
       </View>
     );
   }
   if (tourError) {
     return (
-      <View style={[styles.errorBox, { margin: 16 }]}>
-        <Text style={styles.errorText}>
+      <View
+        style={[
+          styles.errorBox,
+          { margin: 16, backgroundColor: C.errBoxBg, borderColor: C.errBoxBd },
+        ]}
+      >
+        <Text style={[styles.errorText, { color: C.errBoxFg }]}>
           {(tourError as any)?.data?.message ||
             (tourError as any)?.error ||
             "Lỗi tải giải đấu"}
@@ -339,12 +429,17 @@ export default function TournamentCheckinScreen() {
 
   /* ---------- RENDER ---------- */
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: C.background },
+      ]}
+    >
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>
+        <Text style={[styles.title, { color: C.textPrimary }]}>
           Chào mừng đến với giải đấu:{" "}
-          <Text style={{ color: "#1976d2", textTransform: "uppercase" }}>
+          <Text style={{ color: C.tint, textTransform: "uppercase" }}>
             {tour?.name || "—"}
           </Text>
         </Text>
@@ -357,15 +452,23 @@ export default function TournamentCheckinScreen() {
       </View>
 
       {/* ACTIONS */}
-      <View style={[styles.card, styles.actionsCard]}>
-        {/* Check-in theo SĐT đã đăng ký */}
-        {/* <View style={styles.rowWrap}>
+      <View
+        style={[
+          styles.card,
+          styles.actionsCard,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        {/* (Giữ UI cũ nếu cần: check-in bằng SĐT đã đăng ký)
+        <View style={styles.rowWrap}>
           <TextInput
             placeholder="Nhập SĐT VĐV đã đăng ký"
             value={phone}
             onChangeText={setPhone}
-            style={[styles.input, { flex: 1 }]}
+            style={[styles.input, { flex: 1, backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.textPrimary }]}
+            placeholderTextColor={C.textMuted}
             keyboardType="phone-pad"
+            selectionColor={C.tint}
             returnKeyType="done"
           />
           <PrimaryBtn
@@ -402,8 +505,15 @@ export default function TournamentCheckinScreen() {
       </View>
 
       {/* ====== Tìm & check-in theo SĐT/Nickname ====== */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Check-in theo SĐT / Nickname</Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>
+          Check-in theo SĐT / Nickname
+        </Text>
 
         <View style={styles.rowWrap}>
           <TextInput
@@ -411,29 +521,50 @@ export default function TournamentCheckinScreen() {
             value={q}
             onChangeText={setQ}
             onSubmitEditing={onSubmitSearch}
-            style={[styles.input, { flex: 1 }]}
+            style={[
+              styles.input,
+              {
+                flex: 1,
+                backgroundColor: C.inputBg,
+                borderColor: C.inputBorder,
+                color: C.textPrimary,
+              },
+            ]}
+            placeholderTextColor={C.textMuted}
+            selectionColor={C.tint}
             returnKeyType="search"
           />
           <PrimaryBtn
             title={searching ? "Đang tìm…" : "Tìm"}
             onPress={onSubmitSearch}
+            disabled={searching}
           />
         </View>
 
         {searching ? (
           <View style={{ paddingVertical: 12, alignItems: "center" }}>
-            <ActivityIndicator size="small" />
+            <ActivityIndicator size="small" color={C.tint} />
           </View>
         ) : submittedQ && results.length === 0 && !searchError ? (
-          <View style={[styles.infoBox]}>
-            <Text style={{ color: "#0b5394" }}>
+          <View
+            style={[
+              styles.infoBox,
+              { backgroundColor: C.infoBoxBg, borderColor: C.infoBoxBd },
+            ]}
+          >
+            <Text style={{ color: C.infoBoxFg }}>
               Không tìm thấy đăng ký nào khớp với{" "}
               <Text style={{ fontWeight: "700" }}>{submittedQ}</Text>.
             </Text>
           </View>
         ) : searchError ? (
-          <View style={[styles.errorBox]}>
-            <Text style={styles.errorText}>
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: C.errBoxBg, borderColor: C.errBoxBd },
+            ]}
+          >
+            <Text style={[styles.errorText, { color: C.errBoxFg }]}>
               {(searchErrObj as any)?.data?.message ||
                 (searchErrObj as any)?.error ||
                 "Lỗi tìm kiếm"}
@@ -456,11 +587,24 @@ export default function TournamentCheckinScreen() {
           return (
             <View
               key={reg?.regId || reg?._id}
-              style={[styles.card, { marginTop: 10 }]}
+              style={[
+                styles.card,
+                {
+                  marginTop: 10,
+                  backgroundColor: C.cardBg,
+                  borderColor: C.border,
+                },
+              ]}
             >
               <View style={styles.rowBetween}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700" }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "700",
+                      color: C.textPrimary,
+                    }}
+                  >
                     {teamLabel || "—"}
                   </Text>
                   <View style={[styles.rowWrap, { marginTop: 6 }]}>
@@ -487,7 +631,9 @@ export default function TournamentCheckinScreen() {
                     disabled={!canCheckin || checkingUser}
                   />
                   {!canCheckin && !!disabledReason && (
-                    <Text style={{ color: "#666", fontSize: 12, marginTop: 4 }}>
+                    <Text
+                      style={{ color: C.textMuted, fontSize: 12, marginTop: 4 }}
+                    >
                       * {disabledReason}
                     </Text>
                   )}
@@ -495,7 +641,7 @@ export default function TournamentCheckinScreen() {
               </View>
 
               {/* Matches of this registration (vertical items, embedded) */}
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: C.hairline }]} />
               {Array.isArray(reg?.matches) && reg.matches.length ? (
                 <View style={{ gap: 8 }}>
                   {reg.matches.map((m: any) => (
@@ -508,7 +654,7 @@ export default function TournamentCheckinScreen() {
                   ))}
                 </View>
               ) : (
-                <Text style={{ color: "#666" }}>
+                <Text style={{ color: C.textMuted }}>
                   Chưa có trận nào được xếp cho {isSingles ? "VĐV" : "đôi"} này.
                 </Text>
               )}
@@ -518,21 +664,41 @@ export default function TournamentCheckinScreen() {
       </View>
 
       {/* ====== (Cũ) SEARCH BOX cho danh sách TRẬN của GIẢI ====== */}
-      <View style={[styles.card]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
         <TextInput
           placeholder="Tìm: Tên VĐV/đội, mã trận, tình trạng…"
           value={searchMatches}
           onChangeText={setSearchMatches}
-          style={[styles.input, { marginBottom: 8 }]}
+          style={[
+            styles.input,
+            {
+              marginBottom: 8,
+              backgroundColor: C.inputBg,
+              borderColor: C.inputBorder,
+              color: C.textPrimary,
+            },
+          ]}
+          placeholderTextColor={C.textMuted}
+          selectionColor={C.tint}
           returnKeyType="search"
         />
 
         {/* ====== (Cũ) DANH SÁCH TRẬN CỦA GIẢI ====== */}
         {isLoading || matchesLoading ? (
-          <ActivityIndicator />
+          <ActivityIndicator color={C.tint} />
         ) : error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: C.errBoxBg, borderColor: C.errBoxBd },
+            ]}
+          >
+            <Text style={[styles.errorText, { color: C.errBoxFg }]}>
               {(error as any)?.data?.message ||
                 (error as any)?.error ||
                 "Lỗi tải danh sách"}
@@ -550,12 +716,11 @@ export default function TournamentCheckinScreen() {
   );
 }
 
-/* ---------- styles ---------- */
+/* ---------- styles (static sizes; colors injected via theme) ---------- */
 const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 12,
-    backgroundColor: "#fafafa",
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   header: {
@@ -564,10 +729,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: "700" },
   card: {
-    backgroundColor: "#fff",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e6e8ef",
     padding: 12,
   },
   actionsCard: { gap: 8 },
@@ -587,9 +750,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
   },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
 
@@ -604,24 +765,19 @@ const styles = StyleSheet.create({
   btnText: { color: "#fff", fontWeight: "700" },
 
   errorBox: {
-    backgroundColor: "#ffebee",
     borderWidth: 1,
-    borderColor: "#ffcdd2",
     padding: 10,
     borderRadius: 12,
   },
-  errorText: { color: "#b71c1c" },
+  errorText: { fontWeight: "600" },
   infoBox: {
-    backgroundColor: "#e3f2fd",
     borderWidth: 1,
-    borderColor: "#bbdefb",
     padding: 10,
     borderRadius: 12,
     marginTop: 8,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: "#e6e8ef",
     marginVertical: 10,
   },
 
@@ -630,11 +786,10 @@ const styles = StyleSheet.create({
   matchInner: {
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#e6e8ef",
   },
   matchCode: { fontWeight: "700" },
-  matchSub: { color: "#666", fontSize: 12 },
+  matchSub: { fontSize: 12 },
   teamsV: { marginTop: 8, gap: 4 },
-  teamText: { fontWeight: "600", lineHeight: 18, color: "#111" },
+  teamText: { fontWeight: "600", lineHeight: 18 },
   scoreBig: { alignSelf: "center", fontSize: 18, fontWeight: "800" },
 });

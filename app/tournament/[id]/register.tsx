@@ -22,6 +22,7 @@ import {
   View,
   Linking,
   TouchableOpacity,
+  useColorScheme,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
 import {
@@ -50,6 +51,56 @@ import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
+
+/* =============== THEME =============== */
+function useThemeColors() {
+  const scheme = useColorScheme() ?? "light";
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+  const pageBg = scheme === "dark" ? "#0e0f12" : "#f7f9fc";
+  const cardBg = scheme === "dark" ? "#111214" : "#fff";
+  const border = scheme === "dark" ? "#2f3136" : "#e5e7eb";
+  const textPrimary = scheme === "dark" ? "#fff" : "#111";
+  const muted = scheme === "dark" ? "#9aa0a6" : "#6b7280";
+  const chipBg = scheme === "dark" ? "#22252a" : "#eef2f7";
+  const chipFg = scheme === "dark" ? "#e5e7eb" : "#263238";
+  const inputBg = scheme === "dark" ? "#1a1c21" : "#fff";
+  const inputBorder = border;
+  const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
+  const ghostText = textPrimary;
+  const skeleton =
+    scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+
+  // Alerts
+  const errBg = scheme === "dark" ? "#3a1f21" : "#fee2e2";
+  const errBorder = scheme === "dark" ? "#6e2a34" : "#ef4444";
+  const errText = scheme === "dark" ? "#ffb3b8" : "#991b1b";
+  const infoBg = scheme === "dark" ? "#26324a" : "#eff6ff";
+  const infoBorder = scheme === "dark" ? "#3c4f74" : "#93c5fd";
+  const infoText = scheme === "dark" ? "#cfe3ff" : "#1e3a8a";
+
+  return {
+    scheme,
+    tint,
+    pageBg,
+    cardBg,
+    border,
+    textPrimary,
+    muted,
+    chipBg,
+    chipFg,
+    inputBg,
+    inputBorder,
+    ghostBg,
+    ghostText,
+    skeleton,
+    errBg,
+    errBorder,
+    errText,
+    infoBg,
+    infoBorder,
+    infoText,
+  };
+}
 
 /* ---------------- helpers ---------------- */
 const normType = (t?: string) => {
@@ -126,22 +177,45 @@ const chipColorsByState: Record<TotalState, { bg: string; fg: string }> = {
 };
 
 /* -------- small atoms (RN) -------- */
-const Chip = ({ label, bg = "#eef2f7", fg = "#263238" }: any) => (
-  <View style={[styles.chip, { backgroundColor: bg }]}>
-    <Text numberOfLines={1} style={[styles.chipTxt, { color: fg }]}>
-      {label}
-    </Text>
-  </View>
-);
+const Chip = ({
+  label,
+  bg,
+  fg,
+}: {
+  label: string;
+  bg?: string;
+  fg?: string;
+}) => {
+  const C = useThemeColors();
+  return (
+    <View style={[styles.chip, { backgroundColor: bg ?? C.chipBg }]}>
+      <Text
+        numberOfLines={1}
+        style={[styles.chipTxt, { color: fg ?? C.chipFg }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+};
 
-function PrimaryBtn({ onPress, children, disabled }: any) {
+function PrimaryBtn({
+  onPress,
+  children,
+  disabled,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const C = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: disabled ? "#9aa0a6" : "#0a84ff" },
+        { backgroundColor: disabled ? "#9aa0a6" : C.tint },
         pressed && !disabled && { opacity: 0.9 },
       ]}
     >
@@ -149,7 +223,16 @@ function PrimaryBtn({ onPress, children, disabled }: any) {
     </Pressable>
   );
 }
-function OutlineBtn({ onPress, children, disabled }: any) {
+function OutlineBtn({
+  onPress,
+  children,
+  disabled,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const C = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
@@ -157,13 +240,11 @@ function OutlineBtn({ onPress, children, disabled }: any) {
       style={({ pressed }) => [
         styles.btn,
         styles.btnOutline,
-        { borderColor: disabled ? "#c7c7c7" : "#0a84ff" },
+        { borderColor: disabled ? "#c7c7c7" : C.tint },
         pressed && !disabled && { opacity: 0.95 },
       ]}
     >
-      <Text
-        style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : "#0a84ff" }}
-      >
+      <Text style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : C.tint }}>
         {children}
       </Text>
     </Pressable>
@@ -177,12 +258,13 @@ function PaymentChip({ status, paidAt }: { status?: string; paidAt?: string }) {
   return (
     <Chip
       label={isPaid ? `Đã thanh toán${whenText}` : "Chưa thanh toán"}
-      bg={isPaid ? "#e8f5e9" : "#eeeeee"}
-      fg={isPaid ? "#2e7d32" : "#424242"}
+      bg={isPaid ? "#e8f5e9" : undefined}
+      fg={isPaid ? "#2e7d32" : undefined}
     />
   );
 }
 function CheckinChip({ checkinAt }: { checkinAt?: string }) {
+  const C = useThemeColors();
   const ok = !!checkinAt;
   return (
     <Chip
@@ -191,23 +273,29 @@ function CheckinChip({ checkinAt }: { checkinAt?: string }) {
           ? `Đã check-in • ${new Date(checkinAt!).toLocaleString()}`
           : "Chưa check-in"
       }
-      bg={ok ? "#e0f2fe" : "#eeeeee"}
-      fg={ok ? "#075985" : "#424242"}
+      bg={ok ? "#e0f2fe" : C.chipBg}
+      fg={ok ? "#075985" : C.chipFg}
     />
   );
 }
 
 function StatItem({ label, value, hint }: any) {
+  const C = useThemeColors();
   return (
     <View style={{ padding: 8 }}>
-      <Text style={{ color: "#6b7280", fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: C.muted, fontSize: 12 }}>{label}</Text>
       <Text
-        style={{ color: "#111", fontWeight: "800", fontSize: 18, marginTop: 2 }}
+        style={{
+          color: C.textPrimary,
+          fontWeight: "800",
+          fontSize: 18,
+          marginTop: 2,
+        }}
       >
         {String(value)}
       </Text>
       {hint ? (
-        <Text style={{ color: "#9aa0a6", fontSize: 12 }}>{hint}</Text>
+        <Text style={{ color: C.muted, fontSize: 12 }}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -221,12 +309,22 @@ function SelfPlayerReadonly({
   me: any;
   isSingles: boolean;
 }) {
+  const C = useThemeColors();
   if (!me?._id) return null;
   const display = me?.nickname || me?.name || "Tôi";
   const scoreVal = isSingles ? me?.score?.single : me?.score?.double;
   return (
-    <View style={styles.selfCard}>
-      <Text style={{ fontWeight: "700", marginBottom: 8 }}>VĐV 1 (Bạn)</Text>
+    <View
+      style={[
+        styles.selfCard,
+        { backgroundColor: C.cardBg, borderColor: C.border },
+      ]}
+    >
+      <Text
+        style={{ fontWeight: "700", marginBottom: 8, color: C.textPrimary }}
+      >
+        VĐV 1 (Bạn)
+      </Text>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <ExpoImage
           source={{ uri: normalizeUrl(me?.avatar) || PLACE }}
@@ -241,10 +339,13 @@ function SelfPlayerReadonly({
           transition={0}
         />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ fontWeight: "600", color: "#111" }}>
+          <Text
+            numberOfLines={1}
+            style={{ fontWeight: "600", color: C.textPrimary }}
+          >
             {display}
           </Text>
-          <Text numberOfLines={1} style={{ color: "#6b7280", fontSize: 12 }}>
+          <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
             {me?.phone || "—"}
           </Text>
         </View>
@@ -252,8 +353,8 @@ function SelfPlayerReadonly({
           label={`Điểm ${isSingles ? "đơn" : "đôi"}: ${roundTo3(
             Number(scoreVal ?? 0)
           )}`}
-          bg="#fff"
-          fg="#111"
+          bg={C.cardBg}
+          fg={C.textPrimary}
         />
       </View>
     </View>
@@ -362,6 +463,7 @@ function ActionCell({
 /* ---------- HTML columns (contact + content) ---------- */
 function HtmlCols({ tour }: { tour: any }) {
   const { width } = useWindowDimensions();
+  const C = useThemeColors();
   const GAP = 12;
   const twoCols = width >= 820;
 
@@ -377,14 +479,31 @@ function HtmlCols({ tour }: { tour: any }) {
     onLinkPress: (_e: any, href?: string) =>
       href && Linking.openURL(href).catch(() => {}),
     tagsStyles: {
-      a: { color: "#1976d2", textDecorationLine: "underline" },
+      a: { color: C.tint, textDecorationLine: "underline" },
       img: { borderRadius: 8 },
-      p: { marginBottom: 8, lineHeight: 20 },
+      p: { marginBottom: 8, lineHeight: 20, color: C.textPrimary },
+      li: { color: C.textPrimary },
       ul: { marginBottom: 8, paddingLeft: 18 },
       ol: { marginBottom: 8, paddingLeft: 18 },
-      h1: { fontSize: 20, fontWeight: "700", marginBottom: 6 },
-      h2: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
-      h3: { fontSize: 16, fontWeight: "700", marginBottom: 6 },
+      h1: {
+        fontSize: 20,
+        fontWeight: "700",
+        marginBottom: 6,
+        color: C.textPrimary,
+      },
+      h2: {
+        fontSize: 18,
+        fontWeight: "700",
+        marginBottom: 6,
+        color: C.textPrimary,
+      },
+      h3: {
+        fontSize: 16,
+        fontWeight: "700",
+        marginBottom: 6,
+        color: C.textPrimary,
+      },
+      strong: { color: C.textPrimary },
     },
     renderersProps: { img: { enableExperimentalPercentWidth: true } },
   } as const;
@@ -404,20 +523,44 @@ function HtmlCols({ tour }: { tour: any }) {
               marginBottom: twoCols ? 0 : 12,
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: "700", marginBottom: 8 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "700",
+                marginBottom: 8,
+                color: C.textPrimary,
+              }}
+            >
               Thông tin liên hệ
             </Text>
-            <View style={styles.htmlCard}>
+            <View
+              style={[
+                styles.htmlCard,
+                { backgroundColor: C.cardBg, borderColor: C.border },
+              ]}
+            >
               <RenderHTML source={{ html: tour.contactHtml }} {...common} />
             </View>
           </View>
         )}
         {!!tour?.contentHtml && (
           <View style={{ width: twoCols ? colContentWidth : "100%" }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", marginBottom: 8 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "700",
+                marginBottom: 8,
+                color: C.textPrimary,
+              }}
+            >
               Nội dung giải đấu
             </Text>
-            <View style={styles.htmlCard}>
+            <View
+              style={[
+                styles.htmlCard,
+                { backgroundColor: C.cardBg, borderColor: C.border },
+              ]}
+            >
               <RenderHTML source={{ html: tour.contentHtml }} {...common} />
             </View>
           </View>
@@ -467,14 +610,25 @@ const RegItem = React.memo(
     cancelingId,
     settingPayment,
   }: any) {
+    const C = useThemeColors();
     const total = totalScoreOf(r, isSingles);
     const { state } = decideTotalState(total, cap, delta);
     const { bg, fg } = chipColorsByState[state];
     const players = [r?.player1, r?.player2].filter(Boolean);
 
     return (
-      <View style={[styles.card, { marginHorizontal: 16, marginTop: 8 }]}>
-        <Text style={{ color: "#6b7280", fontSize: 12 }}>#{index + 1}</Text>
+      <View
+        style={[
+          styles.card,
+          {
+            marginHorizontal: 16,
+            marginTop: 8,
+            backgroundColor: C.cardBg,
+            borderColor: C.border,
+          },
+        ]}
+      >
+        <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
 
         {players.map((pl: any, idx: number) => (
           <View
@@ -507,13 +661,13 @@ const RegItem = React.memo(
               >
                 <Text
                   numberOfLines={1}
-                  style={{ fontWeight: "600", color: "#111" }}
+                  style={{ fontWeight: "600", color: C.textPrimary }}
                 >
                   {displayName(pl)}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  style={{ color: "#6b7280", fontSize: 12 }}
+                  style={{ color: C.muted, fontSize: 12 }}
                 >
                   {pl?.phone || ""}
                 </Text>
@@ -521,8 +675,8 @@ const RegItem = React.memo(
 
               <Chip
                 label={`Điểm: ${roundTo3(pl?.score) ?? 0}`}
-                bg="#fff"
-                fg="#111"
+                bg={C.cardBg}
+                fg={C.textPrimary}
               />
               {canManage && (
                 <OutlineBtn
@@ -543,7 +697,7 @@ const RegItem = React.memo(
           </View>
         )}
 
-        <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 8 }}>
+        <Text style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
           {new Date(r.createdAt).toLocaleString()}
         </Text>
 
@@ -567,7 +721,9 @@ const RegItem = React.memo(
             marginTop: 8,
           }}
         >
-          <Text style={{ fontWeight: "600" }}>Tổng điểm:</Text>
+          <Text style={{ fontWeight: "600", color: C.textPrimary }}>
+            Tổng điểm:
+          </Text>
           <Chip label={`${roundTo3(total)}`} bg={bg} fg={fg} />
         </View>
 
@@ -587,7 +743,6 @@ const RegItem = React.memo(
     );
   },
   (a, b) => {
-    // chỉ re-render khi những field quan trọng đổi
     return (
       a.r?._id === b.r?._id &&
       a.r?.payment?.status === b.r?.payment?.status &&
@@ -604,6 +759,7 @@ const RegItem = React.memo(
 
 /* ===================== Screen ===================== */
 export default function TournamentRegistrationScreen() {
+  const C = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -644,7 +800,6 @@ export default function TournamentRegistrationScreen() {
     useCreateComplaintMutation();
 
   /* ─── local state ─── */
-  // Admin chọn VĐV1/2
   const [p1Admin, setP1Admin] = useState<any>(null);
   const [p2, setP2] = useState<any>(null);
 
@@ -793,7 +948,6 @@ export default function TournamentRegistrationScreen() {
         "Vui lòng đăng nhập để đăng ký giải đấu."
       );
 
-    // xác định VĐV1 theo role (admin chọn tự do)
     let player1Id: string | null = null;
     if (isAdmin) {
       if (!p1Admin?._id) {
@@ -1000,7 +1154,8 @@ export default function TournamentRegistrationScreen() {
   const closeReplace = () =>
     setReplaceDlg({ open: false, reg: null as any, slot: "p1" });
   const submitReplace = async () => {
-    if (!replaceDlg?.reg?._id) return;
+    if (!replaceDlg?.reg?._id)
+      return Alert.alert("Thiếu thông tin", "Chọn cặp cần thay.");
     if (!newPlayer?._id) return Alert.alert("Thiếu thông tin", "Chọn VĐV mới");
     try {
       await replacePlayer({
@@ -1050,34 +1205,27 @@ export default function TournamentRegistrationScreen() {
   const openPayment = (reg: any) => setPaymentDlg({ open: true, reg });
   const closePayment = () => setPaymentDlg({ open: false, reg: null as any });
 
-  const onGoDraw = () => {
-    // drawPath nên là route nội bộ của app, ví dụ: `/tournaments/${id}/draw`
-    router.push(`/tournament/${id}/draw`);
-  };
-
-  const onGoManage = () => {
-    // đổi sang route của app nếu bạn đang dùng cấu trúc khác
-    router.push(`/tournament/${id}/manage`);
-  };
+  const onGoDraw = () => router.push(`/tournament/${id}/draw`);
+  const onGoManage = () => router.push(`/tournament/${id}/manage`);
 
   /* ───────────────── Guards ───────────────── */
   if (tourLoading) {
     return (
-      <SafeAreaView style={styles.center}>
+      <SafeAreaView style={[styles.center, { backgroundColor: C.pageBg }]}>
         <ActivityIndicator />
       </SafeAreaView>
     );
   }
   if (tourErr) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: C.pageBg }]}>
         <View
           style={[
             styles.alert,
-            { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+            { borderColor: C.errBorder, backgroundColor: C.errBg },
           ]}
         >
-          <Text style={{ color: "#991b1b" }}>
+          <Text style={{ color: C.errText }}>
             {(tourErr as any)?.data?.message ||
               (tourErr as any)?.error ||
               "Lỗi tải giải đấu"}
@@ -1095,21 +1243,33 @@ export default function TournamentRegistrationScreen() {
     <View style={{ padding: 16, paddingBottom: 8 }}>
       {/* Header */}
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Đăng ký giải đấu</Text>
+        <Text style={[styles.title, { color: C.textPrimary }]}>
+          Đăng ký giải đấu
+        </Text>
         <Chip
           label={isSinglesLabel}
-          bg={isSingles ? "#eeeeee" : "#dbeafe"}
-          fg={isSingles ? "#424242" : "#1e3a8a"}
+          bg={isSingles ? undefined : "#dbeafe"}
+          fg={isSingles ? undefined : "#1e3a8a"}
         />
       </View>
 
       {/* Thông tin giải */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.tourName} numberOfLines={1}>
+      <View
+        style={[
+          styles.sectionCard,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        <Text
+          style={[styles.tourName, { color: C.textPrimary }]}
+          numberOfLines={1}
+        >
           {tour.name}
         </Text>
-        <Text style={styles.muted}>{tour.location || "—"}</Text>
-        <Text style={styles.muted}>
+        <Text style={[styles.muted, { color: C.muted }]}>
+          {tour.location || "—"}
+        </Text>
+        <Text style={[styles.muted, { color: C.muted }]}>
           {fmtRange(tour.startDate, tour.endDate)}
         </Text>
 
@@ -1149,10 +1309,10 @@ export default function TournamentRegistrationScreen() {
             <View
               style={[
                 styles.alert,
-                { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
+                { borderColor: C.infoBorder, backgroundColor: C.infoBg },
               ]}
             >
-              <Text style={{ color: "#1e3a8a" }}>
+              <Text style={{ color: C.infoText }}>
                 Bạn chưa đăng nhập. Hãy đăng nhập để thực hiện đăng ký giải đấu.
               </Text>
             </View>
@@ -1160,18 +1320,25 @@ export default function TournamentRegistrationScreen() {
 
       {/* Lời mời đang chờ */}
       {isLoggedIn && pendingInvitesHere.length > 0 && (
-        <View style={styles.sectionCard}>
-          <Text style={{ fontWeight: "800", marginBottom: 8 }}>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: C.cardBg, borderColor: C.border },
+          ]}
+        >
+          <Text
+            style={{ fontWeight: "800", marginBottom: 8, color: C.textPrimary }}
+          >
             Lời mời đang chờ xác nhận
           </Text>
           {invitesErr ? (
             <View
               style={[
                 styles.alert,
-                { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+                { borderColor: C.errBorder, backgroundColor: C.errBg },
               ]}
             >
-              <Text style={{ color: "#991b1b" }}>
+              <Text style={{ color: C.errText }}>
                 {(invitesErr as any)?.data?.message ||
                   (invitesErr as any)?.error ||
                   "Không tải được lời mời"}
@@ -1188,7 +1355,7 @@ export default function TournamentRegistrationScreen() {
               ) : v === "declined" ? (
                 <Chip label="Từ chối" bg="#fee2e2" fg="#991b1b" />
               ) : (
-                <Chip label="Chờ xác nhận" bg="#eeeeee" fg="#424242" />
+                <Chip label="Chờ xác nhận" />
               );
             return (
               <View
@@ -1196,16 +1363,16 @@ export default function TournamentRegistrationScreen() {
                 style={{
                   borderWidth: 1,
                   borderStyle: "dashed",
-                  borderColor: "#e5e7eb",
+                  borderColor: C.border,
                   borderRadius: 12,
                   padding: 10,
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontWeight: "700" }}>
+                <Text style={{ fontWeight: "700", color: C.textPrimary }}>
                   {inv.tournament?.name}
                 </Text>
-                <Text style={{ color: "#6b7280", marginBottom: 8 }}>
+                <Text style={{ color: C.muted, marginBottom: 8 }}>
                   {isSingle ? "Giải đơn" : "Giải đôi"} •{" "}
                   {inv.tournament?.startDate
                     ? new Date(inv.tournament?.startDate).toLocaleDateString()
@@ -1215,11 +1382,11 @@ export default function TournamentRegistrationScreen() {
                 <View
                   style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}
                 >
-                  <Chip label="P1" bg="#fff" fg="#111" />
+                  <Chip label="P1" bg={C.cardBg} fg={C.textPrimary} />
                   {chip(confirmations?.p1)}
                   {!isSingle && (
                     <>
-                      <Chip label="P2" bg="#fff" fg="#111" />
+                      <Chip label="P2" bg={C.cardBg} fg={C.textPrimary} />
                       {chip(confirmations?.p2)}
                     </>
                   )}
@@ -1246,8 +1413,20 @@ export default function TournamentRegistrationScreen() {
       )}
 
       {/* FORM đăng ký */}
-      <View style={styles.sectionCard}>
-        <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+      <View
+        style={[
+          styles.sectionCard,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        <Text
+          style={{
+            fontWeight: "800",
+            fontSize: 16,
+            marginBottom: 8,
+            color: C.textPrimary,
+          }}
+        >
           {isAdmin ? "Tạo đăng ký (admin)" : "Gửi lời mời đăng ký"}
         </Text>
 
@@ -1259,10 +1438,10 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.alert,
-              { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+              { borderColor: C.errBorder, backgroundColor: C.errBg },
             ]}
           >
-            <Text style={{ color: "#991b1b" }}>
+            <Text style={{ color: C.errText }}>
               {(meErr.status === 403 &&
                 "Bạn chưa đăng nhập. Không có thông tin") ||
                 (meErr as any)?.data?.message ||
@@ -1308,27 +1487,34 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.alert,
-              { borderColor: "#93c5fd", backgroundColor: "#eff6ff" },
+              { borderColor: C.infoBorder, backgroundColor: C.infoBg },
             ]}
           >
-            <Text style={{ color: "#1e3a8a" }}>
+            <Text style={{ color: C.infoText }}>
               Bạn chưa đăng nhập. Hãy đăng nhập để đăng ký.
             </Text>
           </View>
         )}
 
-        <Text style={styles.label}>Lời nhắn</Text>
+        <Text style={[styles.label, { color: C.textPrimary }]}>Lời nhắn</Text>
         <TextInput
           value={msg}
           onChangeText={setMsg}
           multiline
           numberOfLines={3}
-          style={styles.textarea}
+          style={[
+            styles.textarea,
+            {
+              backgroundColor: C.inputBg,
+              borderColor: C.inputBorder,
+              color: C.textPrimary,
+            },
+          ]}
           placeholder="Ghi chú cho BTC…"
-          placeholderTextColor="#9aa0a6"
+          placeholderTextColor={C.muted}
         />
 
-        <Text style={{ color: "#6b7280", fontSize: 12 }}>
+        <Text style={{ color: C.muted, fontSize: 12 }}>
           {isAdmin
             ? "Quyền admin: tạo đăng ký và duyệt ngay, không cần xác nhận từ VĐV."
             : isSingles
@@ -1362,25 +1548,36 @@ export default function TournamentRegistrationScreen() {
           </OutlineBtn>
         </View>
       </View>
+
       {canManage && (
-        <View style={styles.container}>
-          <Text style={[styles.title, {marginBottom: 10}]}>Quản lý giải đấu</Text>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: C.cardBg, borderColor: C.border },
+          ]}
+        >
+          <Text
+            style={[styles.title, { marginBottom: 10, color: C.textPrimary }]}
+          >
+            Quản lý giải đấu
+          </Text>
 
           <View style={styles.row}>
             <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary]}
+              style={[
+                styles.btn,
+                { backgroundColor: C.tint, borderColor: C.tint },
+              ]}
               onPress={onGoDraw}
             >
-              <Text style={[styles.btnText, styles.btnTextPrimary]}>
-                Bốc thăm
-              </Text>
+              <Text style={[styles.btnText, { color: "#fff" }]}>Bốc thăm</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.btn, styles.btnOutlined]}
+              style={[styles.btn, styles.btnOutline, { borderColor: C.tint }]}
               onPress={onGoManage}
             >
-              <Text style={[styles.btnText, styles.btnTextOutlined]}>
+              <Text style={[styles.btnText, { color: C.tint }]}>
                 Quản lý giải
               </Text>
             </TouchableOpacity>
@@ -1391,7 +1588,9 @@ export default function TournamentRegistrationScreen() {
       {/* Tiêu đề + Search danh sách */}
       <View style={{ marginTop: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 18, fontWeight: "800" }}>
+          <Text
+            style={{ fontSize: 18, fontWeight: "800", color: C.textPrimary }}
+          >
             Danh sách đăng ký ({regTotal})
           </Text>
           <Chip
@@ -1406,8 +1605,15 @@ export default function TournamentRegistrationScreen() {
             value={q}
             onChangeText={setQ}
             placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
-            placeholderTextColor="#9aa0a6"
-            style={styles.searchInput}
+            placeholderTextColor={C.muted}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: C.inputBg,
+                borderColor: C.inputBorder,
+                color: C.textPrimary,
+              },
+            ]}
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
@@ -1415,7 +1621,7 @@ export default function TournamentRegistrationScreen() {
           />
           {q.length > 0 && (
             <Pressable style={styles.clearBtn} onPress={() => setQ("")}>
-              <Text style={{ fontWeight: "800", color: "#6b7280" }}>✕</Text>
+              <Text style={{ fontWeight: "800", color: C.muted }}>✕</Text>
             </Pressable>
           )}
         </View>
@@ -1430,10 +1636,10 @@ export default function TournamentRegistrationScreen() {
         <View
           style={[
             styles.alert,
-            { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+            { borderColor: C.errBorder, backgroundColor: C.errBg },
           ]}
         >
-          <Text style={{ color: "#991b1b" }}>
+          <Text style={{ color: C.errText }}>
             {(regsErr as any)?.data?.message ||
               (regsErr as any)?.error ||
               "Lỗi tải danh sách"}
@@ -1446,7 +1652,7 @@ export default function TournamentRegistrationScreen() {
   /* ===================== LIST ===================== */
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.pageBg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={insets.top}
     >
@@ -1485,7 +1691,7 @@ export default function TournamentRegistrationScreen() {
           <View style={{ padding: 16, alignItems: "center" }}>
             {loadingMore && <ActivityIndicator />}
             {!loadingMore && !canLoadMore && filteredRegs.length > 0 && (
-              <Text style={{ color: "#9aa0a6", fontSize: 12 }}>
+              <Text style={{ color: C.muted, fontSize: 12 }}>
                 — Đã hết dữ liệu —
               </Text>
             )}
@@ -1512,12 +1718,17 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: "#111", borderColor: "#333" },
+              { backgroundColor: C.cardBg, borderColor: C.border },
             ]}
           >
             <ExpoImage
               source={{ uri: normalizeUrl(imgPreview.src) || PLACE }}
-              style={{ width: "100%", height: 360, borderRadius: 12 }}
+              style={{
+                width: "100%",
+                height: 360,
+                borderRadius: 12,
+                backgroundColor: C.pageBg,
+              }}
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={0}
@@ -1539,10 +1750,17 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: "#fff", borderColor: "#e5e7eb" },
+              { backgroundColor: C.cardBg, borderColor: C.border },
             ]}
           >
-            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+            <Text
+              style={{
+                fontWeight: "800",
+                fontSize: 16,
+                marginBottom: 8,
+                color: C.textPrimary,
+              }}
+            >
               {replaceDlg.slot === "p2" ? "Thay/Thêm VĐV 2" : "Thay VĐV 1"}
             </Text>
 
@@ -1551,7 +1769,7 @@ export default function TournamentRegistrationScreen() {
               eventType={tour?.eventType}
               onChange={setNewPlayer}
             />
-            <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 6 }}>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
               Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
             </Text>
 
@@ -1586,13 +1804,20 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: "#fff", borderColor: "#e5e7eb" },
+              { backgroundColor: C.cardBg, borderColor: C.border },
             ]}
           >
-            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+            <Text
+              style={{
+                fontWeight: "800",
+                fontSize: 16,
+                marginBottom: 8,
+                color: C.textPrimary,
+              }}
+            >
               Khiếu nại đăng ký
             </Text>
-            <Text style={{ color: "#374151", marginBottom: 6 }}>
+            <Text style={{ color: C.textPrimary, marginBottom: 6 }}>
               Vui lòng mô tả chi tiết vấn đề. BTC sẽ tiếp nhận và phản hồi.
             </Text>
             <TextInput
@@ -1600,9 +1825,17 @@ export default function TournamentRegistrationScreen() {
               onChangeText={(t) => setComplaintDlg((s) => ({ ...s, text: t }))}
               multiline
               numberOfLines={5}
-              style={[styles.textarea, { minHeight: 120 }]}
+              style={[
+                styles.textarea,
+                {
+                  minHeight: 120,
+                  backgroundColor: C.inputBg,
+                  borderColor: C.inputBorder,
+                  color: C.textPrimary,
+                },
+              ]}
               placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
-              placeholderTextColor="#9aa0a6"
+              placeholderTextColor={C.muted}
             />
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
@@ -1628,10 +1861,17 @@ export default function TournamentRegistrationScreen() {
           <View
             style={[
               styles.modalCard,
-              { backgroundColor: "#fff", borderColor: "#e5e7eb" },
+              { backgroundColor: C.cardBg, borderColor: C.border },
             ]}
           >
-            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
+            <Text
+              style={{
+                fontWeight: "800",
+                fontSize: 16,
+                marginBottom: 8,
+                color: C.textPrimary,
+              }}
+            >
               Thanh toán lệ phí
             </Text>
             {paymentDlg.reg ? (
@@ -1645,7 +1885,7 @@ export default function TournamentRegistrationScreen() {
                       ""
                   );
                   return (
-                    <Text style={{ color: "#374151", marginBottom: 8 }}>
+                    <Text style={{ color: C.textPrimary, marginBottom: 8 }}>
                       Quét QR để thanh toán cho mã đăng ký{" "}
                       <Text style={{ fontWeight: "800" }}>{code}</Text>.{"\n"}
                       SĐT xác nhận: {ph}.
@@ -1660,12 +1900,12 @@ export default function TournamentRegistrationScreen() {
                         style={[
                           styles.alert,
                           {
-                            borderColor: "#93c5fd",
-                            backgroundColor: "#eff6ff",
+                            borderColor: C.infoBorder,
+                            backgroundColor: C.infoBg,
                           },
                         ]}
                       >
-                        <Text style={{ color: "#1e3a8a" }}>
+                        <Text style={{ color: C.infoText }}>
                           Chưa có QR thanh toán. Dùng mục{" "}
                           <Text style={{ fontWeight: "800" }}>Khiếu nại</Text>{" "}
                           để liên hệ BTC.
@@ -1682,7 +1922,7 @@ export default function TournamentRegistrationScreen() {
                             width: 260,
                             height: 260,
                             borderRadius: 12,
-                            backgroundColor: "#f3f4f6",
+                            backgroundColor: C.ghostBg,
                           }}
                           contentFit="cover"
                           cachePolicy="memory-disk"
@@ -1691,7 +1931,7 @@ export default function TournamentRegistrationScreen() {
                       </View>
                       <Text
                         style={{
-                          color: "#6b7280",
+                          color: C.muted,
                           fontSize: 12,
                           textAlign: "center",
                         }}
@@ -1730,7 +1970,7 @@ export default function TournamentRegistrationScreen() {
 
 /* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f9fc" },
+  container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   headerRow: {
@@ -1739,18 +1979,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  title: { fontSize: 20, fontWeight: "800", color: "#111" },
+  title: { fontSize: 20, fontWeight: "800" },
 
   sectionCard: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 16,
     padding: 12,
     marginBottom: 12,
   },
-  tourName: { fontSize: 18, fontWeight: "800", color: "#111" },
-  muted: { color: "#6b7280" },
+  tourName: { fontSize: 18, fontWeight: "800" },
+  muted: {},
 
   statsGrid: {
     flexDirection: "row",
@@ -1760,29 +1998,23 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  label: { marginTop: 12, marginBottom: 6, color: "#111", fontWeight: "700" },
+  label: { marginTop: 12, marginBottom: 6, fontWeight: "700" },
   textarea: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 72,
     textAlignVertical: "top",
-    color: "#111",
   },
 
   /* Search */
   searchWrap: { marginTop: 10, position: "relative" },
   searchInput: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#111",
   },
   clearBtn: {
     position: "absolute",
@@ -1793,11 +2025,9 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: "#fff",
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -1840,9 +2070,7 @@ const styles = StyleSheet.create({
   },
 
   htmlCard: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     padding: 10,
     shadowColor: "#000",
@@ -1854,30 +2082,8 @@ const styles = StyleSheet.create({
 
   selfCard: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 10,
   },
-  row: {
-    flexDirection: "row",
-  },
-  btnPrimary: {
-    backgroundColor: "#1976d2",
-    borderColor: "#1976d2",
-  },
-  btnOutlined: {
-    backgroundColor: "transparent",
-    borderColor: "#1976d2",
-  },
-  btnText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  btnTextPrimary: {
-    color: "#fff",
-  },
-  btnTextOutlined: {
-    color: "#1976d2",
-  },
+  row: { flexDirection: "row", gap: 8 },
 });

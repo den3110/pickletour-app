@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   useWindowDimensions,
+  useColorScheme,
   View,
   Animated,
   Easing,
@@ -142,20 +143,109 @@ function courtNameOf(m) {
 const hasAssignedCourt = (m) =>
   String(courtNameOf(m)).toLowerCase().includes("chưa phân sân") === false;
 
+/* ---------- THEME ---------- */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
+  return useMemo(
+    () => ({
+      scheme,
+      // Base
+      bg: isDark ? "#0b0d10" : "#ffffff",
+      cardBg: isDark ? "#111214" : "#ffffff",
+      softBg: isDark ? "#1c1e22" : "#f8fafc",
+      border: isDark ? "#2a2f36" : "#e2e8f0",
+      text: isDark ? "#e5e7eb" : "#0f172a",
+      textSecondary: isDark ? "#cbd5e1" : "#475569",
+      muted: isDark ? "#94a3b8" : "#64748b",
+      icon: isDark ? "#d1d5db" : "#334155",
+      tint: isDark ? "#7cc0ff" : "#0a84ff",
+      // Chip variants
+      chipDefaultBg: isDark ? "#1f2937" : "#f1f5f9",
+      chipDefaultFg: isDark ? "#e5e7eb" : "#0f172a",
+      chipDefaultBd: isDark ? "#374151" : "#e2e8f0",
+
+      chipOutlinedBg: "transparent",
+      chipOutlinedFg: isDark ? "#e5e7eb" : "#0f172a",
+      chipOutlinedBd: isDark ? "#374151" : "#e2e8f0",
+
+      chipInfoBg: isDark ? "#0b294a" : "#eff6ff",
+      chipInfoFg: isDark ? "#bfdbfe" : "#1e40af",
+      chipInfoBd: isDark ? "#1d4ed8" : "#bfdbfe",
+
+      chipWarnBg: isDark ? "#3b2613" : "#fff7ed",
+      chipWarnFg: isDark ? "#fdba74" : "#9a3412",
+      chipWarnBd: isDark ? "#ea580c" : "#fed7aa",
+
+      chipSecondaryBg: isDark ? "#1e1b4b" : "#eef2ff",
+      chipSecondaryFg: isDark ? "#c7d2fe" : "#3730a3",
+      chipSecondaryBd: isDark ? "#3730a3" : "#c7d2fe",
+
+      // Match states
+      liveLeft: "#ea580c",
+      liveBg: isDark ? "rgba(234,88,12,0.08)" : "#fff7ed",
+      matchLiveBorder: "#fdba74",
+      matchFinishedBorder: "#86efac",
+      matchUpcomingBorder: "#93c5fd",
+      queuePressedBg: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+
+      // Tabs
+      tabBg: isDark ? "#1c1e22" : "#f8fafc",
+      tabBd: isDark ? "#2a2f36" : "#e2e8f0",
+      tabActiveBg: isDark ? "rgba(124,192,255,0.15)" : "#dbeafe",
+      tabActiveBd: isDark ? "#7cc0ff" : "#93c5fd",
+      tabText: isDark ? "#d1d5db" : "#334155",
+      tabTextActive: isDark ? "#cde9ff" : "#1e3a8a",
+
+      // Alerts
+      infoBg: isDark ? "rgba(37,99,235,0.08)" : "#eff6ff",
+      infoBd: isDark ? "#1d4ed8" : "#bfdbfe",
+      infoText: isDark ? "#bfdbfe" : "#1e3a8a",
+      errBg: isDark ? "rgba(239,68,68,0.10)" : "#fee2e2",
+      errBd: isDark ? "#fca5a5" : "#fecaca",
+      errText: isDark ? "#fecaca" : "#991b1b",
+
+      // Skeleton
+      skeleton: isDark ? "rgba(255,255,255,0.08)" : "#e5e7eb",
+    }),
+    [scheme]
+  );
+}
+
+function getChipColors(type, T) {
+  switch (type) {
+    case "outlined":
+      return {
+        bg: T.chipOutlinedBg,
+        fg: T.chipOutlinedFg,
+        bd: T.chipOutlinedBd,
+      };
+    case "info":
+      return { bg: T.chipInfoBg, fg: T.chipInfoFg, bd: T.chipInfoBd };
+    case "warning":
+      return { bg: T.chipWarnBg, fg: T.chipWarnFg, bd: T.chipWarnBd };
+    case "secondary":
+      return {
+        bg: T.chipSecondaryBg,
+        fg: T.chipSecondaryFg,
+        bd: T.chipSecondaryBd,
+      };
+    case "default":
+    default:
+      return {
+        bg: T.chipDefaultBg,
+        fg: T.chipDefaultFg,
+        bd: T.chipDefaultBd,
+      };
+  }
+}
+
 /* ---------- Small UI helpers ---------- */
-function Chip({ text, type = "default", icon }) {
-  const colorMap = {
-    default: { bg: "#f1f5f9", fg: "#0f172a", bd: "#e2e8f0" },
-    success: { bg: "#ecfdf5", fg: "#065f46", bd: "#a7f3d0" },
-    secondary: { bg: "#eef2ff", fg: "#3730a3", bd: "#c7d2fe" },
-    info: { bg: "#eff6ff", fg: "#1e40af", bd: "#bfdbfe" },
-    warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" },
-    outlined: { bg: "transparent", fg: "#0f172a", bd: "#e2e8f0" },
-  };
-  const c = colorMap[type] || colorMap.default;
+function Chip({ text, type = "default", icon, theme }) {
+  const c = getChipColors(type, theme);
   return (
     <View style={[styles.chip, { backgroundColor: c.bg, borderColor: c.bd }]}>
-      {icon}
+      {!!icon && <View style={{ marginRight: 4 }}>{icon}</View>}
       <Text style={[styles.chipText, { color: c.fg }]} numberOfLines={1}>
         {text}
       </Text>
@@ -166,44 +256,47 @@ function ChipRow({ children, style }) {
   return <View style={[styles.chipRow, style]}>{children}</View>;
 }
 
-function StatusChip({ m }) {
-  if (isLive(m)) return <Chip type="warning" text="Đang diễn ra" />;
-  if (isFinished(m)) return <Chip type="success" text="Đã diễn ra" />;
-  return <Chip type="info" text="Sắp diễn ra" />;
+function StatusChip({ m, theme }) {
+  if (isLive(m))
+    return <Chip theme={theme} type="warning" text="Đang diễn ra" />;
+  if (isFinished(m))
+    return <Chip theme={theme} type="success" text="Đã diễn ra" />;
+  return <Chip theme={theme} type="info" text="Sắp diễn ra" />;
 }
-function ScoreChip({ text }) {
+function ScoreChip({ text, theme }) {
   if (!text) return null;
-  return <Chip type="outlined" text={text} />;
+  return <Chip theme={theme} type="outlined" text={text} />;
 }
-function WinnerChip({ m }) {
+function WinnerChip({ m, theme }) {
   const side = m?.winner === "A" ? "A" : m?.winner === "B" ? "B" : null;
   if (!side) return null;
   return (
     <Chip
+      theme={theme}
       type="secondary"
       text={`Winner: ${teamNameFrom(m, side)}`}
       icon={
         <MaterialIcons
           name="emoji-events"
           size={14}
-          style={{ marginRight: 4 }}
+          color={theme.chipSecondaryFg}
         />
       }
     />
   );
 }
 
-function SectionTitle({ title, right }) {
+function SectionTitle({ title, right, color }) {
   return (
     <View style={styles.sectionTitle}>
-      <Text style={styles.sectionTitleText}>{title}</Text>
+      <Text style={[styles.sectionTitleText, { color }]}>{title}</Text>
       {right}
     </View>
   );
 }
 
 /* ---------- Skeletons ---------- */
-function Pulse({ style }) {
+function Pulse({ style, theme }) {
   const opacity = React.useRef(new Animated.Value(0.6)).current;
   React.useEffect(() => {
     const loop = Animated.loop(
@@ -228,7 +321,7 @@ function Pulse({ style }) {
   return (
     <Animated.View
       style={[
-        { backgroundColor: "#e5e7eb", borderRadius: 8 },
+        { backgroundColor: theme.skeleton, borderRadius: 8 },
         style,
         { opacity },
       ]}
@@ -236,31 +329,44 @@ function Pulse({ style }) {
   );
 }
 
-function Line({ w = "100%", h = 12, style }) {
-  return <Pulse style={[{ width: w, height: h, borderRadius: 6 }, style]} />;
-}
-
-function Circle({ size = 24, style }) {
+function Line({ w = "100%", h = 12, style, theme }) {
   return (
     <Pulse
+      theme={theme}
+      style={[{ width: w, height: h, borderRadius: 6 }, style]}
+    />
+  );
+}
+
+function Circle({ size = 24, style, theme }) {
+  return (
+    <Pulse
+      theme={theme}
       style={[{ width: size, height: size, borderRadius: size / 2 }, style]}
     />
   );
 }
 
-function ChipGhost({ w = 70 }) {
-  return <Pulse style={{ width: w, height: 18, borderRadius: 999 }} />;
+function ChipGhost({ w = 70, theme }) {
+  return (
+    <Pulse theme={theme} style={{ width: w, height: 18, borderRadius: 999 }} />
+  );
 }
 
 /* card skeleton: “Các trận đấu trên sân” */
-function CourtCardSkeleton() {
+function CourtCardSkeleton({ theme }) {
   return (
-    <View style={styles.courtCard}>
+    <View
+      style={[
+        styles.courtCard,
+        { borderColor: theme.border, backgroundColor: theme.cardBg },
+      ]}
+    >
       <View style={styles.courtHead}>
-        <Line w={120} h={16} />
+        <Line theme={theme} w={120} h={16} />
         <View style={{ flexDirection: "row", gap: 6 }}>
-          <ChipGhost w={90} />
-          <ChipGhost w={70} />
+          <ChipGhost theme={theme} w={90} />
+          <ChipGhost theme={theme} w={70} />
         </View>
       </View>
 
@@ -268,18 +374,18 @@ function CourtCardSkeleton() {
       <View
         style={[
           styles.liveMatch,
-          { backgroundColor: "#f1f5f9", borderLeftColor: "#e5e7eb" },
+          { backgroundColor: theme.liveBg, borderLeftColor: theme.liveLeft },
         ]}
       >
         <View style={styles.liveRow}>
           <View style={styles.rowLeft}>
-            <Circle size={16} />
-            <Line w={50} />
+            <Circle theme={theme} size={16} />
+            <Line theme={theme} w={50} />
           </View>
-          <Line w={"55%"} />
+          <Line theme={theme} w={"55%"} />
           <View style={{ flexDirection: "row", gap: 6 }}>
-            <ChipGhost w={60} />
-            <ChipGhost w={80} />
+            <ChipGhost theme={theme} w={60} />
+            <ChipGhost theme={theme} w={80} />
           </View>
         </View>
       </View>
@@ -288,15 +394,15 @@ function CourtCardSkeleton() {
       {[...Array(2)].map((_, i) => (
         <View key={i} style={styles.queueRow}>
           <View style={styles.queueRowInner}>
-            <Circle size={16} />
+            <Circle theme={theme} size={16} />
             <View style={{ flex: 1 }}>
               <View style={styles.queuePrimary}>
-                <Line w={50} />
-                <Line w={"60%"} />
+                <Line theme={theme} w={50} />
+                <Line theme={theme} w={"60%"} />
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
-                <ChipGhost w={90} />
-                <ChipGhost w={100} />
+                <ChipGhost theme={theme} w={90} />
+                <ChipGhost theme={theme} w={100} />
               </View>
             </View>
           </View>
@@ -307,26 +413,31 @@ function CourtCardSkeleton() {
 }
 
 /* row skeleton: “Danh sách tất cả các trận” */
-function MatchRowSkeleton() {
+function MatchRowSkeleton({ theme }) {
   return (
-    <View style={[styles.matchRow, { borderColor: "#e2e8f0" }]}>
+    <View
+      style={[
+        styles.matchRow,
+        { borderColor: theme.border, backgroundColor: theme.cardBg },
+      ]}
+    >
       <View style={styles.matchRowInner}>
         <View style={styles.matchIcon}>
-          <Circle size={20} />
+          <Circle theme={theme} size={20} />
         </View>
         <View style={{ flex: 1 }}>
           <View style={styles.matchPrimary}>
-            <Line w={60} />
-            <Line w={"55%"} />
+            <Line theme={theme} w={60} />
+            <Line theme={theme} w={"55%"} />
             <View style={{ flexDirection: "row", gap: 6 }}>
-              <ChipGhost w={70} />
-              <ChipGhost w={90} />
+              <ChipGhost theme={theme} w={70} />
+              <ChipGhost theme={theme} w={90} />
             </View>
           </View>
           <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
-            <ChipGhost w={80} />
-            <ChipGhost w={100} />
-            <ChipGhost w={120} />
+            <ChipGhost theme={theme} w={80} />
+            <ChipGhost theme={theme} w={100} />
+            <ChipGhost theme={theme} w={120} />
           </View>
         </View>
       </View>
@@ -335,34 +446,44 @@ function MatchRowSkeleton() {
 }
 
 /* skeleton toàn trang: 2 card giống layout thật */
-function PageSkeleton() {
+function PageSkeleton({ theme }) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          { borderColor: theme.border, backgroundColor: theme.cardBg },
+        ]}
+      >
         <View style={styles.cardHeader}>
-          <Circle size={18} />
+          <Circle theme={theme} size={18} />
           <View style={{ marginLeft: 8 }}>
-            <Line w={160} h={16} />
-            <Line w={120} h={10} style={{ marginTop: 6 }} />
+            <Line theme={theme} w={160} h={16} />
+            <Line theme={theme} w={120} h={10} style={{ marginTop: 6 }} />
           </View>
         </View>
         <View style={{ gap: 12 }}>
           {[...Array(2)].map((_, i) => (
-            <CourtCardSkeleton key={i} />
+            <CourtCardSkeleton key={i} theme={theme} />
           ))}
         </View>
       </View>
 
-      <View style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          { borderColor: theme.border, backgroundColor: theme.cardBg },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <View>
-            <Line w={200} h={16} />
-            <Line w={150} h={10} style={{ marginTop: 6 }} />
+            <Line theme={theme} w={200} h={16} />
+            <Line theme={theme} w={150} h={10} style={{ marginTop: 6 }} />
           </View>
         </View>
         <View style={{ gap: 10 }}>
           {[...Array(6)].map((_, i) => (
-            <MatchRowSkeleton key={i} />
+            <MatchRowSkeleton key={i} theme={theme} />
           ))}
         </View>
       </View>
@@ -371,22 +492,32 @@ function PageSkeleton() {
 }
 
 /* ---------- Court Card ---------- */
-function CourtCard({ court, queueLimit = 4, onOpenMatch }) {
+function CourtCard({ court, queueLimit = 4, onOpenMatch, theme }) {
   return (
-    <View style={styles.courtCard}>
+    <View
+      style={[
+        styles.courtCard,
+        { borderColor: theme.border, backgroundColor: theme.cardBg },
+      ]}
+    >
       <View style={styles.courtHead}>
-        <Text style={styles.courtName}>{court.name}</Text>
+        <Text style={[styles.courtName, { color: theme.text }]}>
+          {court.name}
+        </Text>
         <ChipRow>
-          {court.live.length > 0 && <Chip type="warning" text="ĐANG DIỄN RA" />}
+          {court.live.length > 0 && (
+            <Chip theme={theme} type="warning" text="ĐANG DIỄN RA" />
+          )}
           {court.queue.length > 0 && (
             <Chip
+              theme={theme}
               type="warning"
               text={`${court.queue.length} trận tiếp theo`}
               icon={
                 <MaterialIcons
                   name="schedule"
                   size={14}
-                  style={{ marginRight: 4 }}
+                  color={theme.chipWarnFg}
                 />
               }
             />
@@ -401,22 +532,28 @@ function CourtCard({ court, queueLimit = 4, onOpenMatch }) {
           onPress={() => onOpenMatch?.(m._id)}
           style={({ pressed }) => [
             styles.liveMatch,
+            { backgroundColor: theme.liveBg, borderLeftColor: theme.liveLeft },
             { transform: [{ translateY: pressed ? -1 : 0 }] },
           ]}
         >
           <View style={styles.liveRow}>
             <View style={styles.rowLeft}>
-              <MaterialIcons name="play-arrow" size={16} />
-              <Text style={styles.matchCode}>{m.code || "Trận"}</Text>
+              <MaterialIcons name="play-arrow" size={16} color={theme.icon} />
+              <Text style={[styles.matchCode, { color: theme.text }]}>
+                {m.code || "Trận"}
+              </Text>
             </View>
 
-            <Text style={styles.vsText} numberOfLines={2}>
+            <Text
+              style={[styles.vsText, { color: theme.textSecondary }]}
+              numberOfLines={2}
+            >
               {teamNameFrom(m, "A")} vs {teamNameFrom(m, "B")}
             </Text>
 
             <ChipRow>
-              <ScoreChip text={scoreText(m)} />
-              <StatusChip m={m} />
+              <ScoreChip theme={theme} text={scoreText(m)} />
+              <StatusChip theme={theme} m={m} />
             </ChipRow>
           </View>
         </Pressable>
@@ -429,24 +566,35 @@ function CourtCard({ court, queueLimit = 4, onOpenMatch }) {
           onPress={() => onOpenMatch?.(m._id)}
           style={({ pressed }) => [
             styles.queueRow,
-            pressed && { backgroundColor: "#f1f5f9" },
+            pressed && { backgroundColor: theme.queuePressedBg },
           ]}
         >
           <View style={styles.queueRowInner}>
-            <MaterialIcons name="schedule" size={16} style={{ marginTop: 2 }} />
+            <MaterialIcons
+              name="schedule"
+              size={16}
+              color={theme.icon}
+              style={{ marginTop: 2 }}
+            />
             <View style={{ flex: 1 }}>
               <View style={styles.queuePrimary}>
-                <Text style={styles.matchCode}>{m.code || "Trận"}</Text>
-                <Text style={styles.vsText} numberOfLines={2}>
+                <Text style={[styles.matchCode, { color: theme.text }]}>
+                  {m.code || "Trận"}
+                </Text>
+                <Text
+                  style={[styles.vsText, { color: theme.textSecondary }]}
+                  numberOfLines={2}
+                >
                   {teamNameFrom(m, "A")} vs {teamNameFrom(m, "B")}
                 </Text>
               </View>
               <ChipRow>
                 <Chip
+                  theme={theme}
                   type="outlined"
                   text={m.bracket?.name || m.phase || "—"}
                 />
-                <Chip type="outlined" text={courtNameOf(m)} />
+                <Chip theme={theme} type="outlined" text={courtNameOf(m)} />
               </ChipRow>
             </View>
           </View>
@@ -457,9 +605,18 @@ function CourtCard({ court, queueLimit = 4, onOpenMatch }) {
 }
 
 /* ---------- Match Row ---------- */
-function MatchRow({ m, onOpenMatch }) {
-  const border = isLive(m) ? "#fdba74" : isFinished(m) ? "#86efac" : "#93c5fd";
-  const bg = isLive(m) ? "#fff7ed" : "transparent";
+function MatchRow({ m, onOpenMatch, theme }) {
+  const border = isLive(m)
+    ? theme.matchLiveBorder
+    : isFinished(m)
+    ? theme.matchFinishedBorder
+    : theme.matchUpcomingBorder;
+  const bg = isLive(m) ? theme.liveBg : "transparent";
+  const iconName = isLive(m)
+    ? "play-arrow"
+    : isFinished(m)
+    ? "emoji-events"
+    : "schedule";
   return (
     <Pressable
       onPress={() => onOpenMatch?.(m._id)}
@@ -471,31 +628,34 @@ function MatchRow({ m, onOpenMatch }) {
     >
       <View style={styles.matchRowInner}>
         <View style={styles.matchIcon}>
-          {isLive(m) ? (
-            <MaterialIcons name="play-arrow" size={16} />
-          ) : isFinished(m) ? (
-            <MaterialIcons name="emoji-events" size={16} />
-          ) : (
-            <MaterialIcons name="schedule" size={16} />
-          )}
+          <MaterialIcons name={iconName} size={16} color={theme.icon} />
         </View>
 
         <View style={{ flex: 1 }}>
           <View style={styles.matchPrimary}>
-            <Text style={styles.matchCode}>{m.code || "Trận"}</Text>
-            <Text style={styles.vsText} numberOfLines={2}>
+            <Text style={[styles.matchCode, { color: theme.text }]}>
+              {m.code || "Trận"}
+            </Text>
+            <Text
+              style={[styles.vsText, { color: theme.textSecondary }]}
+              numberOfLines={2}
+            >
               {teamNameFrom(m, "A")} vs {teamNameFrom(m, "B")}
             </Text>
             <ChipRow>
-              <ScoreChip text={scoreText(m)} />
-              <StatusChip m={m} />
+              <ScoreChip theme={theme} text={scoreText(m)} />
+              <StatusChip theme={theme} m={m} />
             </ChipRow>
           </View>
 
           <ChipRow style={{ marginTop: 6 }}>
-            <Chip type="outlined" text={m.bracket?.name || m.phase || "—"} />
-            <Chip type="outlined" text={courtNameOf(m)} />
-            {isFinished(m) && <WinnerChip m={m} />}
+            <Chip
+              theme={theme}
+              type="outlined"
+              text={m.bracket?.name || m.phase || "—"}
+            />
+            <Chip theme={theme} type="outlined" text={courtNameOf(m)} />
+            {isFinished(m) && <WinnerChip theme={theme} m={m} />}
           </ChipRow>
         </View>
       </View>
@@ -512,6 +672,8 @@ export default function TournamentScheduleNative() {
   const [status, setStatus] = useState("all"); // all | live | upcoming | finished
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState(null);
+
+  const T = useThemeTokens();
 
   const { width } = useWindowDimensions();
   const queueLimit = width >= 900 ? 6 : width >= 600 ? 4 : 3;
@@ -793,7 +955,7 @@ export default function TournamentScheduleNative() {
     });
   }, [allSorted, q, status]);
 
-  // CHANGED: “trên sân” = live + mọi trận CÓ SÂN & CHƯA KẾT THÚC (kể cả chưa bắt đầu)
+  // “trên sân” = live + mọi trận CÓ SÂN & CHƯA KẾT THÚC (kể cả chưa bắt đầu)
   const courts = useMemo(() => {
     const map = new Map();
     allSorted.forEach((m) => {
@@ -803,20 +965,18 @@ export default function TournamentScheduleNative() {
       if (isLive(m)) {
         map.get(name).live.push(m);
       } else if (!isFinished(m) && hasAssignedCourt(m)) {
-        // đã gán sân, chưa kết thúc, không live → lên hàng chờ
         map.get(name).queue.push(m);
       }
     });
 
-    // sort từng court theo orderKey
+    const byKey = (a, b) => {
+      const ak = orderKey(a);
+      const bk = orderKey(b);
+      for (let i = 0; i < ak.length; i++)
+        if (ak[i] !== bk[i]) return ak[i] - bk[i];
+      return 0;
+    };
     map.forEach((v) => {
-      const byKey = (a, b) => {
-        const ak = orderKey(a);
-        const bk = orderKey(b);
-        for (let i = 0; i < ak.length; i++)
-          if (ak[i] !== bk[i]) return ak[i] - bk[i];
-        return 0;
-      };
       v.live.sort(byKey);
       v.queue.sort(byKey);
     });
@@ -840,13 +1000,16 @@ export default function TournamentScheduleNative() {
           title: `Lịch thi đấu${
             tournament?.name ? ` – ${tournament.name}` : ""
           }`,
+          headerStyle: { backgroundColor: T.cardBg },
+          headerTitleStyle: { color: T.text },
+          headerShadowVisible: false,
           headerLeft: () => (
             <Pressable
               onPress={() => router.back()}
               hitSlop={12}
               style={{ paddingHorizontal: 6, paddingVertical: 4 }}
             >
-              <MaterialIcons name="arrow-back" size={22} color="#0f172a" />
+              <MaterialIcons name="arrow-back" size={22} color={T.text} />
             </Pressable>
           ),
           headerRight: () => {
@@ -860,9 +1023,18 @@ export default function TournamentScheduleNative() {
                         { padding: 6, opacity: pressed ? 0.6 : 1 },
                       ]}
                     >
-                      <View style={styles.headerBtn}>
-                        <MaterialIcons name="admin-panel-settings" size={16} />
-                        <Text style={styles.headerBtnText}>
+                      <View
+                        style={[
+                          styles.headerBtn,
+                          { borderColor: T.border, backgroundColor: T.softBg },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name="admin-panel-settings"
+                          size={16}
+                          color={T.text}
+                        />
+                        <Text style={[styles.headerBtnText, { color: T.text }]}>
                           {admin ? "Admin" : "Quản lý giải"}
                         </Text>
                       </View>
@@ -875,9 +1047,16 @@ export default function TournamentScheduleNative() {
                         { padding: 6, opacity: pressed ? 0.6 : 1 },
                       ]}
                     >
-                      <View style={styles.headerBtn}>
-                        <MaterialIcons name="rule" size={16} />
-                        <Text style={styles.headerBtnText}>Chấm trận</Text>
+                      <View
+                        style={[
+                          styles.headerBtn,
+                          { borderColor: T.border, backgroundColor: T.softBg },
+                        ]}
+                      >
+                        <MaterialIcons name="rule" size={16} color={T.text} />
+                        <Text style={[styles.headerBtnText, { color: T.text }]}>
+                          Chấm trận
+                        </Text>
                       </View>
                     </Pressable>
                   )}
@@ -887,117 +1066,190 @@ export default function TournamentScheduleNative() {
         }}
       />
 
-      {/* Filters */}
-      <View style={styles.filters}>
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Tìm mã trận, người chơi, sân, bracket…"
-          style={styles.searchInput}
-          placeholderTextColor="#64748b"
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
+        {/* Filters */}
+        <View
+          style={{
+            paddingHorizontal: 12,
+            paddingTop: 10,
+            paddingBottom: 8,
+            backgroundColor: T.cardBg,
+            borderBottomWidth: 1,
+            borderBottomColor: T.border,
+          }}
+        >
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Tìm mã trận, người chơi, sân, bracket…"
+            style={[
+              styles.searchInput,
+              {
+                borderColor: T.border,
+                color: T.text,
+                backgroundColor: "transparent",
+              },
+            ]}
+            placeholderTextColor={T.muted}
+          />
+          <View style={styles.statusTabs}>
+            {[
+              { key: "all", label: "Tất cả" },
+              { key: "live", label: "Đang diễn ra" },
+              { key: "upcoming", label: "Sắp diễn ra" },
+              { key: "finished", label: "Đã diễn ra" },
+            ].map((it) => {
+              const active = status === it.key;
+              return (
+                <Pressable
+                  key={it.key}
+                  onPress={() => setStatus(it.key)}
+                  style={[
+                    styles.tab,
+                    {
+                      backgroundColor: T.tabBg,
+                      borderColor: T.tabBd,
+                    },
+                    active && {
+                      backgroundColor: T.tabActiveBg,
+                      borderColor: T.tabActiveBd,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: T.tabText },
+                      active && { color: T.tabTextActive, fontWeight: "700" },
+                    ]}
+                  >
+                    {it.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Loading / Error */}
+        {loading && <PageSkeleton theme={T} />}
+
+        {!!errorMsg && !loading && (
+          <View
+            style={[
+              styles.alertError,
+              { borderColor: T.errBd, backgroundColor: T.errBg, margin: 12 },
+            ]}
+          >
+            <Text style={[styles.alertErrorText, { color: T.errText }]}>
+              {String(errorMsg)}
+            </Text>
+          </View>
+        )}
+
+        {!loading && !errorMsg && (
+          <ScrollView contentContainerStyle={styles.container}>
+            {/* LEFT: on-court */}
+            <View
+              style={[
+                styles.card,
+                { borderColor: T.border, backgroundColor: T.cardBg },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <MaterialCommunityIcons
+                  name="stadium"
+                  size={18}
+                  color={T.tint}
+                />
+                <View style={{ marginLeft: 8 }}>
+                  <Text style={[styles.cardTitle, { color: T.text }]}>
+                    Các trận đấu trên sân
+                  </Text>
+                  <Text style={[styles.cardSub, { color: T.textSecondary }]}>
+                    Đang diễn ra & hàng chờ
+                  </Text>
+                </View>
+              </View>
+
+              {courts.length === 0 ? (
+                <View
+                  style={[
+                    styles.alertInfo,
+                    { borderColor: T.infoBd, backgroundColor: T.infoBg },
+                  ]}
+                >
+                  <Text style={[styles.alertInfoText, { color: T.infoText }]}>
+                    Chưa có trận nào đang diễn ra hoặc trong hàng chờ.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 12 }}>
+                  {courts.map((c) => (
+                    <CourtCard
+                      key={c.name}
+                      court={c}
+                      queueLimit={queueLimit}
+                      onOpenMatch={openViewer}
+                      theme={T}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* RIGHT: all matches */}
+            <View
+              style={[
+                styles.card,
+                { borderColor: T.border, backgroundColor: T.cardBg },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <View>
+                  <Text style={[styles.cardTitle, { color: T.text }]}>
+                    Danh sách tất cả các trận
+                  </Text>
+                  <Text style={[styles.cardSub, { color: T.textSecondary }]}>
+                    Sắp xếp theo thứ tự trận • {filteredAll.length} trận
+                  </Text>
+                </View>
+              </View>
+
+              {filteredAll.length === 0 ? (
+                <View
+                  style={[
+                    styles.alertInfo,
+                    { borderColor: T.infoBd, backgroundColor: T.infoBg },
+                  ]}
+                >
+                  <Text style={[styles.alertInfoText, { color: T.infoText }]}>
+                    Không có trận phù hợp bộ lọc.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  {filteredAll.map((m) => (
+                    <MatchRow
+                      key={m._id}
+                      m={m}
+                      onOpenMatch={openViewer}
+                      theme={T}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Viewer (Bottom Sheet) */}
+        <ResponsiveMatchViewer
+          open={viewerOpen}
+          matchId={selectedMatchId}
+          onClose={closeViewer}
         />
-        <View style={styles.statusTabs}>
-          {[
-            { key: "all", label: "Tất cả" },
-            { key: "live", label: "Đang diễn ra" },
-            { key: "upcoming", label: "Sắp diễn ra" },
-            { key: "finished", label: "Đã diễn ra" },
-          ].map((it) => {
-            const active = status === it.key;
-            return (
-              <Pressable
-                key={it.key}
-                onPress={() => setStatus(it.key)}
-                style={[styles.tab, active && styles.tabActive]}
-              >
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                  {it.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
       </View>
-
-      {/* Loading / Error */}
-      {loading && <PageSkeleton />}
-
-      {!!errorMsg && !loading && (
-        <View style={styles.alertError}>
-          <Text style={styles.alertErrorText}>{String(errorMsg)}</Text>
-        </View>
-      )}
-
-      {!loading && !errorMsg && (
-        <ScrollView contentContainerStyle={styles.container}>
-          {/* LEFT: on-court */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <MaterialCommunityIcons
-                name="stadium"
-                size={18}
-                color="#2563eb"
-              />
-              <View style={{ marginLeft: 8 }}>
-                <Text style={styles.cardTitle}>Các trận đấu trên sân</Text>
-                <Text style={styles.cardSub}>Đang diễn ra & hàng chờ</Text>
-              </View>
-            </View>
-
-            {courts.length === 0 ? (
-              <View style={styles.alertInfo}>
-                <Text style={styles.alertInfoText}>
-                  Chưa có trận nào đang diễn ra hoặc trong hàng chờ.
-                </Text>
-              </View>
-            ) : (
-              <View style={{ gap: 12 }}>
-                {courts.map((c) => (
-                  <CourtCard
-                    key={c.name}
-                    court={c}
-                    queueLimit={queueLimit}
-                    onOpenMatch={openViewer}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* RIGHT: all matches */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={styles.cardTitle}>Danh sách tất cả các trận</Text>
-                <Text style={styles.cardSub}>
-                  Sắp xếp theo thứ tự trận • {filteredAll.length} trận
-                </Text>
-              </View>
-            </View>
-
-            {filteredAll.length === 0 ? (
-              <View style={styles.alertInfo}>
-                <Text style={styles.alertInfoText}>
-                  Không có trận phù hợp bộ lọc.
-                </Text>
-              </View>
-            ) : (
-              <View style={{ gap: 10 }}>
-                {filteredAll.map((m) => (
-                  <MatchRow key={m._id} m={m} onOpenMatch={openViewer} />
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Viewer (Bottom Sheet) */}
-      <ResponsiveMatchViewer
-        open={viewerOpen}
-        matchId={selectedMatchId}
-        onClose={closeViewer}
-      />
     </>
   );
 }
@@ -1005,22 +1257,13 @@ export default function TournamentScheduleNative() {
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
   container: { padding: 12, gap: 12 },
-  filters: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
+
   searchInput: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#0f172a",
     marginBottom: 8,
   },
   statusTabs: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
@@ -1029,12 +1272,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
   },
-  tabActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
-  tabText: { fontSize: 13, color: "#334155" },
-  tabTextActive: { color: "#1e3a8a", fontWeight: "700" },
+  tabText: { fontSize: 13 },
+
   sectionTitle: {
     paddingHorizontal: 12,
     paddingTop: 8,
@@ -1043,28 +1283,27 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  sectionTitleText: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
+  sectionTitleText: { fontSize: 20, fontWeight: "800" },
+
   headerBtn: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 999,
-    backgroundColor: "#fff",
   },
-  headerBtnText: { marginLeft: 6, fontSize: 12, color: "#0f172a" },
+  headerBtnText: { marginLeft: 6, fontSize: 12 },
+
   card: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 16,
     padding: 12,
-    backgroundColor: "#fff",
   },
   cardHeader: { flexDirection: "row", alignItems: "center", paddingBottom: 8 },
-  cardTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
-  cardSub: { fontSize: 12, color: "#475569", marginTop: 2 },
+  cardTitle: { fontSize: 16, fontWeight: "800" },
+  cardSub: { fontSize: 12, marginTop: 2 },
+
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: {
     flexDirection: "row",
@@ -1075,9 +1314,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   chipText: { fontSize: 11, fontWeight: "600" },
+
   courtCard: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 10,
   },
@@ -1088,11 +1327,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
-  courtName: { fontSize: 15, fontWeight: "800", color: "#0f172a" },
+  courtName: { fontSize: 15, fontWeight: "800" },
+
   liveMatch: {
     borderLeftWidth: 4,
-    borderLeftColor: "#ea580c", // cam (orange-600)
-    backgroundColor: "#fff7ed", // cam nhạt (orange-50)
     padding: 8,
     borderRadius: 8,
     marginBottom: 8,
@@ -1104,8 +1342,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 4 },
-  matchCode: { fontWeight: "800", color: "#0f172a" },
-  vsText: { color: "#334155", flexShrink: 1, maxWidth: "60%" },
+  matchCode: { fontWeight: "800" },
+  vsText: { flexShrink: 1, maxWidth: "60%" },
+
   queueRow: { paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8 },
   queueRowInner: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   queuePrimary: {
@@ -1115,6 +1354,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginBottom: 4,
   },
+
   matchRow: {
     borderWidth: 1,
     borderRadius: 12,
@@ -1130,21 +1370,17 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginBottom: 4,
   },
+
   alertInfo: {
     borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#eff6ff",
     padding: 10,
     borderRadius: 10,
   },
-  alertInfoText: { color: "#1e3a8a", fontSize: 13 },
+  alertInfoText: { fontSize: 13 },
   alertError: {
-    margin: 12,
     borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fee2e2",
     padding: 10,
     borderRadius: 10,
   },
-  alertErrorText: { color: "#991b1b" },
+  alertErrorText: {},
 });

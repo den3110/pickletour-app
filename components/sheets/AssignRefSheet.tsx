@@ -4,20 +4,21 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useColorScheme,
 } from "react-native";
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { MaterialIcons } from "@expo/vector-icons"; // nếu không dùng Expo: react-native-vector-icons/MaterialIcons
+import { MaterialIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 
-// ⬇️ Đổi alias theo dự án của bạn nếu khác
+// APIs
 import {
   useListTournamentRefereesQuery,
   useBatchAssignRefereeMutation,
@@ -40,124 +41,46 @@ const matchCode = (m) => {
   return `V${r}${t ? `-T${t}` : ""}`;
 };
 
-/* ============ tiny UI ============ */
 const Row = ({ children, style }) => (
   <View style={[styles.row, style]}>{children}</View>
 );
 
-const Card = ({ children, style }) => (
-  <View style={[styles.card, style]}>{children}</View>
-);
+/* ---------------- theme tokens ---------------- */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
 
-const Chip = ({
-  text,
-  icon,
-  outlined = false,
-  tone = "default",
-  onPress,
-  disabled,
-}) => {
-  const map = {
-    default: { bg: "#eef2f7", bd: "#e2e8f0", fg: "#263238" },
-    primary: { bg: "#e0f2fe", bd: "#bae6fd", fg: "#075985" },
-    warning: { bg: "#fff7ed", bd: "#fed7aa", fg: "#9a3412" },
-    success: { bg: "#dcfce7", bd: "#bbf7d0", fg: "#166534" },
-    secondary: { bg: "#ede9fe", bd: "#ddd6fe", fg: "#5b21b6" },
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e5e7eb");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f6f8fc");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+    muted: dark ? "#9aa0a6" : "#6b7280",
+
+    chipDefaultBg: dark ? "#1f2937" : "#eef2f7",
+    chipDefaultFg: dark ? "#e5e7eb" : "#263238",
+    chipDefaultBd: dark ? "#334155" : "#e2e8f0",
+
+    chipInfoBg: dark ? "#0f2536" : "#e0f2fe",
+    chipInfoFg: dark ? "#93c5fd" : "#075985",
+    chipInfoBd: dark ? "#1e3a5f" : "#bae6fd",
+
+    chipErrBg: dark ? "#3b0d0d" : "#fee2e2",
+    chipErrFg: dark ? "#fecaca" : "#991b1b",
+    chipErrBd: dark ? "#7f1d1d" : "#fecaca",
+
+    chipSecBg: dark ? "#241b4b" : "#ede9fe",
+    chipSecFg: dark ? "#c4b5fd" : "#5b21b6",
+    chipSecBd: dark ? "#4c1d95" : "#ddd6fe",
   };
-  const c = map[tone] || map.default;
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled || !onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        outlined
-          ? {
-              backgroundColor: "transparent",
-              borderWidth: 1,
-              borderColor: c.bd,
-            }
-          : { backgroundColor: c.bg, borderColor: "transparent" },
-        pressed && { opacity: 0.9 },
-      ]}
-    >
-      {icon ? (
-        <MaterialIcons
-          name={icon}
-          size={14}
-          color={c.fg}
-          style={{ marginRight: 6 }}
-        />
-      ) : null}
-      <Text style={{ color: c.fg, fontSize: 12, fontWeight: "700" }}>
-        {text}
-      </Text>
-    </Pressable>
-  );
-};
-
-const Btn = ({ children, onPress, variant = "solid", disabled, icon }) => (
-  <Pressable
-    onPress={onPress}
-    disabled={disabled}
-    style={({ pressed }) => [
-      styles.btn,
-      variant === "solid"
-        ? { backgroundColor: "#0a84ff" }
-        : {
-            borderWidth: 1,
-            borderColor: "#0a84ff",
-            backgroundColor: "transparent",
-          },
-      disabled && { opacity: 0.5 },
-      pressed && !disabled && { opacity: 0.9 },
-    ]}
-  >
-    {icon ? (
-      <MaterialIcons
-        name={icon}
-        size={16}
-        color={variant === "solid" ? "#fff" : "#0a84ff"}
-        style={{ marginRight: 6 }}
-      />
-    ) : null}
-    <Text
-      style={{
-        color: variant === "solid" ? "#fff" : "#0a84ff",
-        fontWeight: "700",
-      }}
-    >
-      {children}
-    </Text>
-  </Pressable>
-);
-
-const IconBtn = ({ name, onPress, size = 18, color = "#111" }) => (
-  <Pressable
-    onPress={onPress}
-    hitSlop={8}
-    style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
-  >
-    <MaterialIcons name={name} size={size} color={color} />
-  </Pressable>
-);
-
-const Checkbox = ({ checked }) => (
-  <MaterialIcons
-    name={checked ? "check-box" : "check-box-outline-blank"}
-    size={22}
-    color={checked ? "#0a84ff" : "#475569"}
-  />
-);
-
-const Avatar = ({ name }) => {
-  const ch = (String(name || "").trim()[0] || "U").toUpperCase();
-  return (
-    <View style={styles.avatar}>
-      <Text style={{ color: "#fff", fontWeight: "700" }}>{ch}</Text>
-    </View>
-  );
-};
+}
 
 /* ============ main sheet ============ */
 export default function AssignRefSheet({
@@ -169,6 +92,7 @@ export default function AssignRefSheet({
   onChanged,
   limit = 100,
 }) {
+  const t = useTokens();
   const sheetRef = useRef(null);
 
   // Hiển thị / ẩn sheet
@@ -189,8 +113,8 @@ export default function AssignRefSheet({
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(timer);
   }, [q]);
 
   // Danh sách TT của giải
@@ -304,6 +228,144 @@ export default function AssignRefSheet({
     }
   };
 
+  /* ---- themed atoms (dùng token) ---- */
+  const Card = ({ children, style }) => (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: t.colors.card, borderColor: t.colors.border },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+
+  const Chip = ({
+    text,
+    icon,
+    outlined = false,
+    tone = "default",
+    onPress,
+    disabled,
+  }) => {
+    const map = {
+      default: {
+        bg: t.chipDefaultBg,
+        fg: t.chipDefaultFg,
+        bd: t.chipDefaultBd,
+      },
+      primary: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
+      warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" }, // ít dùng
+      success: { bg: "#dcfce7", fg: "#166534", bd: "#bbf7d0" }, // ít dùng
+      secondary: { bg: t.chipSecBg, fg: t.chipSecFg, bd: t.chipSecBd },
+      error: { bg: t.chipErrBg, fg: t.chipErrFg, bd: t.chipErrBd },
+      info: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
+    };
+    const c = map[tone] || map.default;
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled || !onPress}
+        style={({ pressed }) => [
+          styles.chip,
+          outlined
+            ? {
+                backgroundColor: "transparent",
+                borderColor: c.bd,
+                borderWidth: 1,
+              }
+            : { backgroundColor: c.bg, borderColor: "transparent" },
+          pressed && { opacity: 0.9 },
+        ]}
+      >
+        {icon ? (
+          <MaterialIcons
+            name={icon}
+            size={14}
+            color={c.fg}
+            style={{ marginRight: 6 }}
+          />
+        ) : null}
+        <Text style={{ color: c.fg, fontSize: 12, fontWeight: "700" }}>
+          {text}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const Btn = ({ children, onPress, variant = "solid", disabled, icon }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.btn,
+        variant === "solid"
+          ? { backgroundColor: t.colors.primary }
+          : {
+              borderWidth: 1,
+              borderColor: t.colors.primary,
+              backgroundColor: "transparent",
+            },
+        disabled && { opacity: 0.5 },
+        pressed && !disabled && { opacity: 0.9 },
+      ]}
+    >
+      {icon ? (
+        <MaterialIcons
+          name={icon}
+          size={16}
+          color={variant === "solid" ? "#fff" : t.colors.primary}
+          style={{ marginRight: 6 }}
+        />
+      ) : null}
+      <Text
+        style={{
+          color: variant === "solid" ? "#fff" : t.colors.primary,
+          fontWeight: "700",
+        }}
+      >
+        {children}
+      </Text>
+    </Pressable>
+  );
+
+  const IconBtn = ({ name, onPress, size = 18, color = t.colors.text }) => (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
+    >
+      <MaterialIcons name={name} size={size} color={color} />
+    </Pressable>
+  );
+
+  const Checkbox = ({ checked }) => (
+    <MaterialIcons
+      name={checked ? "check-box" : "check-box-outline-blank"}
+      size={22}
+      color={checked ? t.colors.primary : t.muted}
+    />
+  );
+
+  const Avatar = ({ name }) => {
+    const ch = (String(name || "").trim()[0] || "U").toUpperCase();
+    return (
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: t.colors.primary,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "700" }}>{ch}</Text>
+      </View>
+    );
+  };
+
   return (
     <BottomSheetModal
       ref={sheetRef}
@@ -312,14 +374,21 @@ export default function AssignRefSheet({
       backdropComponent={(p) => (
         <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
       )}
-      handleIndicatorStyle={{ backgroundColor: "#cbd5e1" }}
+      handleIndicatorStyle={{ backgroundColor: t.colors.border }}
+      backgroundStyle={{
+        backgroundColor: t.colors.card,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+      }}
     >
       <BottomSheetScrollView contentContainerStyle={styles.container}>
         {/* Header */}
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
           <Row style={{ alignItems: "center", gap: 6 }}>
-            <MaterialIcons name="how-to-reg" size={18} color="#111" />
-            <Text style={styles.title}>Gán trọng tài — {titleSuffix}</Text>
+            <MaterialIcons name="how-to-reg" size={18} color={t.colors.text} />
+            <Text style={[styles.title, { color: t.colors.text }]}>
+              Gán trọng tài — {titleSuffix}
+            </Text>
           </Row>
           <Row style={{ alignItems: "center", gap: 6 }}>
             <IconBtn name="refresh" onPress={() => refetch?.()} />
@@ -341,11 +410,11 @@ export default function AssignRefSheet({
         {/* Thanh tìm kiếm + actions nhanh */}
         <Card>
           <Row style={{ alignItems: "center", gap: 8 }}>
-            <MaterialIcons name="person-search" size={18} color="#475569" />
+            <MaterialIcons name="person-search" size={18} color={t.muted} />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: t.colors.text }]}
               placeholder="Nhập tên/nickname/email để tìm…"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={t.muted}
               value={q}
               onChangeText={setQ}
             />
@@ -384,7 +453,9 @@ export default function AssignRefSheet({
             style={{ justifyContent: "space-between", alignItems: "center" }}
           >
             <Row style={{ alignItems: "center", gap: 8 }}>
-              <Text style={styles.subtitle}>Trọng tài trong giải</Text>
+              <Text style={[styles.subtitle, { color: t.colors.text }]}>
+                Trọng tài trong giải
+              </Text>
               <Chip text={`${referees?.length || 0} kết quả`} outlined />
             </Row>
             <Btn onPress={() => refetch?.()} variant="outline">
@@ -394,14 +465,14 @@ export default function AssignRefSheet({
 
           {isLoading ? (
             <View style={{ paddingVertical: 16, alignItems: "center" }}>
-              <ActivityIndicator />
+              <ActivityIndicator color={t.colors.primary} />
             </View>
           ) : error ? (
-            <Text style={{ color: "#b91c1c" }}>
+            <Text style={{ color: t.chipErrFg }}>
               {error?.data?.message || "Không tải được danh sách."}
             </Text>
           ) : (referees?.length || 0) === 0 ? (
-            <Text style={{ color: "#475569" }}>Không có kết quả phù hợp.</Text>
+            <Text style={{ color: t.muted }}>Không có kết quả phù hợp.</Text>
           ) : (
             <View style={{ marginTop: 8 }}>
               {referees.map((u) => {
@@ -419,10 +490,12 @@ export default function AssignRefSheet({
                     <Row style={{ alignItems: "center", gap: 10 }}>
                       <Avatar name={personNickname(u)} />
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "600", color: "#111827" }}>
+                        <Text
+                          style={{ fontWeight: "600", color: t.colors.text }}
+                        >
                           {personNickname(u)}
                         </Text>
-                        <Text style={{ color: "#64748b", fontSize: 12 }}>
+                        <Text style={{ color: t.muted, fontSize: 12 }}>
                           {u?.email || u?.phone || ""}
                         </Text>
                       </View>
@@ -436,12 +509,19 @@ export default function AssignRefSheet({
         </Card>
 
         {/* Cảnh báo */}
-        <Card style={{ backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }}>
-          <Text style={{ color: "#075985" }}>
+        <Card
+          style={{
+            backgroundColor: t.chipInfoBg,
+            borderColor: t.chipInfoBd,
+          }}
+        >
+          <Text style={{ color: t.chipInfoFg }}>
             Thao tác này sẽ{" "}
-            <Text style={{ fontWeight: "700" }}>cập nhật (thay thế)</Text> danh
-            sách trọng tài cho{" "}
-            <Text style={{ fontWeight: "700" }}>
+            <Text style={{ fontWeight: "700", color: t.colors.text }}>
+              cập nhật (thay thế)
+            </Text>{" "}
+            danh sách trọng tài cho{" "}
+            <Text style={{ fontWeight: "700", color: t.colors.text }}>
               {effectiveMatchIds.length}
             </Text>{" "}
             trận được chọn.
@@ -466,16 +546,14 @@ export default function AssignRefSheet({
   );
 }
 
-/* ============ styles ============ */
+/* ============ styles (layout only) ============ */
 const styles = StyleSheet.create({
   container: { padding: 12, gap: 12 },
   row: { flexDirection: "row" },
-  title: { fontSize: 16, fontWeight: "700", color: "#111" },
-  subtitle: { fontSize: 14, fontWeight: "700", color: "#111" },
+  title: { fontSize: 16, fontWeight: "700" },
+  subtitle: { fontSize: 14, fontWeight: "700" },
   card: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 12,
     gap: 8,
@@ -496,15 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   iconBtn: { padding: 6, borderRadius: 999 },
-  input: { flex: 1, fontSize: 15, color: "#111" },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#64748b",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  input: { flex: 1, fontSize: 15 },
   listItem: {
     paddingVertical: 10,
     paddingHorizontal: 8,

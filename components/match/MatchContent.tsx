@@ -1,5 +1,12 @@
 // app/screens/PickleBall/match/MatchContent.native.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+} from "react";
 import {
   View,
   Text,
@@ -11,7 +18,7 @@ import {
   Platform,
   TextInput,
   Alert,
-  Switch,
+  useColorScheme,
 } from "react-native";
 import Constants from "expo-constants";
 import { useSelector } from "react-redux";
@@ -25,8 +32,81 @@ import PublicProfileDialog from "../PublicProfileDialog";
 import RefereeJudgePanel from "./RefereeScorePanel.native";
 import { useVerifyManagerQuery } from "@/slices/tournamentsApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
+import {
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetBackdrop,
+} from "@gorhom/bottom-sheet";
+import { useCreateFacebookLiveForMatchMutation } from "@/slices/adminMatchLiveApiSlice";
+import { useRouter } from "expo-router";
 
-// === OVERLAY: helpers ===
+/* =====================================
+ * THEME TOKENS (giống phong cách Hero)
+ * ===================================== */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
+  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
+
+  const pageBg = scheme === "dark" ? "#0b0c0f" : "#f6f7fb";
+
+  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
+  const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
+
+  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
+  const softBg2 = scheme === "dark" ? "#17181c" : "#f8fafc";
+  const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
+
+  const banner = {
+    live: {
+      bg: scheme === "dark" ? "rgba(124,192,255,0.18)" : "#e3f2fd",
+      text: scheme === "dark" ? "#d7ebff" : "#0f172a",
+    },
+    info: {
+      bg: scheme === "dark" ? "rgba(148,163,184,0.18)" : "#f1f5f9",
+      text: scheme === "dark" ? "#e2e8f0" : "#0f172a",
+    },
+  };
+
+  const chip = {
+    bg: scheme === "dark" ? "rgba(199,210,254,0.16)" : "#eef2ff",
+    bd: scheme === "dark" ? "#6366f1" : "#c7d2fe",
+    text: scheme === "dark" ? "#e0e7ff" : "#3730a3",
+  };
+
+  const success = {
+    bgSoft: scheme === "dark" ? "rgba(16,185,129,0.18)" : "#ecfdf5",
+    bdSoft: scheme === "dark" ? "#34d399" : "#a7f3d0",
+    text: scheme === "dark" ? "#a7f3d0" : "#065f46",
+  };
+
+  const danger = {
+    bgSoft: scheme === "dark" ? "rgba(248,113,113,0.16)" : "#fff1f2",
+    bdSoft: scheme === "dark" ? "#f87171" : "#fecaca",
+    text: scheme === "dark" ? "#fecaca" : "#b91c1c",
+  };
+
+  return {
+    scheme,
+    tint,
+    textPrimary,
+    textSecondary,
+    pageBg,
+    cardBg,
+    cardBorder,
+    softBg,
+    softBg2,
+    softBorder,
+    banner,
+    chip,
+    success,
+    danger,
+  };
+}
+
+/* =============== OVERLAY helpers =============== */
 const _safeURL = (u) => {
   try {
     const x = new URL(u);
@@ -66,7 +146,6 @@ function resolveWebBase(tour, overlayCfg) {
   }
   return "https://pickletour.vn";
 }
-
 function buildOverlayUrl(base, matchId, { theme, size, showSets, autoNext }) {
   if (!base || !matchId) return "";
   const qp = new URLSearchParams({
@@ -176,7 +255,7 @@ const parseVT = (m) => {
     }
   }
   if (v == null) {
-    const cand = [m?.v, m?.V, m?.roundV, m?.round, m?.meta?.v];
+    const cand = [m?.v, m?.V, m?.roundV, m?.meta?.v];
     for (const c of cand) {
       const n = Number(c);
       if (Number.isFinite(n)) {
@@ -205,32 +284,7 @@ const parseVT = (m) => {
   return { v, t };
 };
 
-// ——— Suy ra W/L từ prevDep nếu có, mặc định W ———
-
-// ——— Tạo label prev dựa vào code hiện tại (chuẩn KO):
-// A: W-V(v-1)-T(2*t-1), B: W-V(v-1)-T(2*t) ———
-const prevLabelByCurrent = (m, side, prevDep) => {
-  const { v, t } = parseVT(m);
-  if (Number.isFinite(v) && Number.isFinite(t) && v > 1) {
-    const prevV = v - 1;
-    const prevT = side === "A" ? 2 * t - 1 : 2 * t;
-    const wl = inferWL(prevDep) || "W";
-    return `${wl}-V${prevV}-T${prevT}`;
-  }
-  // fallback: dùng prevDep nếu có, cuối cùng là TBD
-  return prevDep ? depLabel(prevDep) : "TBD";
-};
-
 // ---- NEW: depLabel theo chuẩn web: W/L-V{round}-T{order+1} ----
-const inferWL = (prev) => {
-  const t = String(
-    prev?.type || prev?.source || prev?.from || ""
-  ).toLowerCase();
-  const loser = prev?.loser === true || t.includes("loser");
-  const winner = prev?.winner === true || t.includes("winner");
-  if (loser && !winner) return "L";
-  return "W";
-};
 const _num = (v) => (Number.isFinite(Number(v)) ? Number(v) : NaN);
 const _inferWL = (prev) => {
   const t = String(
@@ -280,18 +334,7 @@ function extractCurrentV(m) {
     .filter((n) => Number.isFinite(n));
   return nums.length ? nums[0] : null;
 }
-
-function isGroupPrev(prev) {
-  const t = String(
-    prev?.type || prev?.source || prev?.from || ""
-  ).toLowerCase();
-  return (
-    t.includes("grouprank") || !!prev?.ref?.groupCode || t.includes("group")
-  );
-}
-
 function smartDepLabel(m, prevDep) {
-  // y hệt web: lấy depLabel(prev) rồi dịch V về vòng trước của match hiện tại
   const raw = depLabel(prevDep);
   const currV = extractCurrentV(m);
   return String(raw).replace(/\b([WL])-V(\d+)-T(\d+)\b/gi, (_s, wl, v, t) => {
@@ -305,7 +348,6 @@ function smartDepLabel(m, prevDep) {
     return `${wl}-V${newV}-T${t}`;
   });
 }
-
 function formatStatus(status) {
   switch (status) {
     case "scheduled":
@@ -323,6 +365,7 @@ function formatStatus(status) {
 
 /* ---------- PlayerLink ---------- */
 function PlayerLink({ person, onOpen, align = "left" }) {
+  const T = useThemeTokens();
   if (!person) return null;
   const uid =
     person?.user?._id ||
@@ -337,7 +380,11 @@ function PlayerLink({ person, onOpen, align = "left" }) {
   return (
     <Text
       onPress={handlePress}
-      style={[styles.linkText, align === "right" && { textAlign: "right" }]}
+      style={[
+        styles.linkText,
+        { color: T.tint },
+        align === "right" && { textAlign: "right" },
+      ]}
     >
       {nameWithNick(person)}
     </Text>
@@ -357,12 +404,10 @@ function useDelayedFlag(flag, ms = 250) {
 }
 
 /* ---------- LOCK: chỉ cập nhật đúng match đang mở ---------- */
-/** Khóa id trận đầu tiên nhận qua prop m; về sau chỉ nhận update khi id khớp. */
 function useLockedMatch(m, { loading }) {
   const [lockedId, setLockedId] = useState(() => (m?._id ? String(m._id) : ""));
   const [view, setView] = useState(() => (m?._id ? m : null));
 
-  // Lần đầu có m => khóa
   useEffect(() => {
     if (!lockedId && m?._id) {
       setLockedId(String(m._id));
@@ -370,7 +415,6 @@ function useLockedMatch(m, { loading }) {
     }
   }, [m?._id, lockedId, m]);
 
-  // Nếu m cập nhật nhưng id trùng lockedId => nhận; khác id => bỏ qua
   useEffect(() => {
     if (!m) return;
     if (lockedId && String(m._id) === lockedId) {
@@ -572,12 +616,12 @@ function detectEmbed(url) {
   }
 
   // HLS
-  if (/\.(m3u8)(\?|$)/i.test(u.pathname + u.search)) {
+  if (/(\.m3u8)(\?|$)/i.test(u.pathname + u.search)) {
     return { kind: "hls", canEmbed: true, embedUrl: url, aspect };
   }
 
   // MP4/WebM/OGG
-  if (/\.(mp4|webm|ogv?)(\?|$)/i.test(u.pathname)) {
+  if (/(\.mp4|webm|ogv?)(\?|$)/i.test(u.pathname)) {
     return { kind: "file", canEmbed: true, embedUrl: url, aspect };
   }
 
@@ -664,8 +708,16 @@ function normalizeStreams(m) {
 
 /* ---------- AspectBox (RN) ---------- */
 function AspectBox({ ratio = 16 / 9, children }) {
+  const T = useThemeTokens();
   return (
-    <View style={[styles.aspectBox, { aspectRatio: ratio }]}>{children}</View>
+    <View
+      style={[
+        styles.aspectBox,
+        { aspectRatio: ratio, backgroundColor: T.cardBg },
+      ]}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -722,6 +774,7 @@ function StreamPlayer({ stream }) {
 
 /* ---------- Banner trạng thái ---------- */
 function StatusBanner({ status, hasStreams }) {
+  const T = useThemeTokens();
   const text =
     status === "live"
       ? hasStreams
@@ -735,27 +788,30 @@ function StatusBanner({ status, hasStreams }) {
       ? "Trận chưa diễn ra — đã có liên kết sẵn."
       : "Trận chưa diễn ra. Chưa có liên kết video.";
 
+  const sty = status === "live" ? T.banner.live : T.banner.info;
+
   return (
-    <View
-      style={[
-        styles.banner,
-        status === "live" ? styles.bannerLive : styles.bannerInfo,
-      ]}
-    >
-      <Text style={styles.bannerText}>▶ {text}</Text>
+    <View style={[styles.banner, { backgroundColor: sty.bg }]}>
+      <Text style={[styles.bannerText, { color: sty.text }]}>▶ {text}</Text>
     </View>
   );
 }
 
 /* ---------- Segmented Control: Status ---------- */
 function SegmentedStatus({ value, onChange, disabled }) {
+  const T = useThemeTokens();
   const items = [
     { key: "scheduled", label: "Scheduled" },
     { key: "live", label: "Live" },
     { key: "finished", label: "Finished" },
   ];
   return (
-    <View style={styles.segment}>
+    <View
+      style={[
+        styles.segment,
+        { backgroundColor: T.softBg, borderColor: T.softBorder },
+      ]}
+    >
       {items.map((it) => {
         const active = value === it.key;
         return (
@@ -763,14 +819,18 @@ function SegmentedStatus({ value, onChange, disabled }) {
             key={it.key}
             style={[
               styles.segmentItem,
-              active && styles.segmentItemActive,
+              active && { backgroundColor: T.tint },
               disabled && { opacity: 0.6 },
             ]}
             onPress={() => !disabled && value !== it.key && onChange?.(it.key)}
             disabled={disabled}
           >
             <Text
-              style={[styles.segmentLabel, active && styles.segmentLabelActive]}
+              style={[
+                styles.segmentLabel,
+                { color: T.textPrimary },
+                active && styles.segmentLabelActive,
+              ]}
             >
               {it.label}
             </Text>
@@ -783,9 +843,14 @@ function SegmentedStatus({ value, onChange, disabled }) {
 
 /* ---------- Nút có icon trái ---------- */
 function AdminBtn({ style, textStyle, icon, label, onPress, disabled }) {
+  const T = useThemeTokens();
   return (
     <TouchableOpacity
-      style={[styles.btn, style]}
+      style={[
+        styles.btn,
+        { backgroundColor: T.cardBg, borderColor: T.softBorder },
+        style,
+      ]}
       onPress={onPress}
       disabled={disabled}
     >
@@ -794,14 +859,510 @@ function AdminBtn({ style, textStyle, icon, label, onPress, disabled }) {
           <MaterialIcons
             name={icon}
             size={18}
-            style={[styles.btnIcon, textStyle]}
+            style={[styles.btnIcon, { color: T.textPrimary }, textStyle]}
           />
         )}
-        <Text style={[styles.btnText, textStyle]}>{label}</Text>
+        <Text style={[styles.btnText, { color: T.textPrimary }, textStyle]}>
+          {label}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 }
+
+/* ============== LIVE UTILS (destinations + studio url) ============== */
+const encodeB64Json = (obj) => {
+  try {
+    return Buffer.from(JSON.stringify(obj), "utf8").toString("base64");
+  } catch {
+    return "";
+  }
+};
+
+// ===== Expo Router: build full params for Studio screen =====
+
+const splitRtmpUrl = (url) => {
+  if (!url || !/^rtmps?:\/\//i.test(url))
+    return { server_url: "", stream_key: "" };
+  try {
+    const idx = url.lastIndexOf("/");
+    if (idx === -1) return { server_url: url, stream_key: "" };
+    return { server_url: url.slice(0, idx), stream_key: url.slice(idx + 1) };
+  } catch {
+    return { server_url: "", stream_key: "" };
+  }
+};
+const normDest = (platform, raw = {}) => {
+  const p = (platform || raw.platform || "").toLowerCase();
+  let server_url = raw.server_url || "";
+  let stream_key = raw.stream_key || "";
+  const secure_stream_url = raw.secure_stream_url || "";
+
+  if ((!server_url || !stream_key) && secure_stream_url) {
+    const s = splitRtmpUrl(secure_stream_url);
+    server_url = server_url || s.server_url;
+    stream_key = stream_key || s.stream_key;
+  }
+
+  return {
+    platform: p,
+    id: raw.id,
+    server_url,
+    stream_key,
+    secure_stream_url,
+    permalink_url: raw.permalink_url,
+    watch_url: raw.watch_url,
+    room_url: raw.room_url,
+    extras: raw.extras,
+  };
+};
+const extractDestinations = (data, match) => {
+  const out = [];
+  if (Array.isArray(data?.destinations) && data.destinations.length) {
+    data.destinations.forEach((d) => out.push(normDest(d.platform, d)));
+  }
+  if (
+    (data?.server_url || data?.secure_stream_url || data?.stream_key) &&
+    !out.length
+  ) {
+    out.push(normDest("facebook", data));
+  }
+  const fb = match?.facebookLive || {};
+  const yt = match?.youtubeLive || {};
+  const tt = match?.tiktokLive || {};
+  const hasAnyFb =
+    fb.server_url || fb.stream_key || fb.permalink_url || fb.secure_stream_url;
+  const hasAnyYt = yt.server_url || yt.stream_key || yt.watch_url;
+  const hasAnyTt =
+    tt.server_url || tt.stream_key || tt.room_url || tt.secure_stream_url;
+  if (!out.length && (hasAnyFb || hasAnyYt || hasAnyTt)) {
+    if (hasAnyFb) out.push(normDest("facebook", fb));
+    if (hasAnyYt) out.push(normDest("youtube", yt));
+    if (hasAnyTt) out.push(normDest("tiktok", tt));
+  }
+  const seen = new Set();
+  return out.filter((d) => {
+    const k = [d.platform, d.id, d.server_url, d.stream_key].join("|");
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+};
+
+// ===== Expo Router: build full params for Studio screen =====
+const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
+  const params = {};
+  if (match?._id) params.matchId = String(match._id);
+  params.baseOrigin = baseOrigin || "https://pickletour.vn";
+  if (overlayUrl) params.overlayUrl = String(overlayUrl);
+
+  const dests = extractDestinations(data, match);
+
+  // danh sách RTMP tối giản (để prefill nhanh ở màn Studio)
+  const minimal = dests.map((d) => ({
+    platform: d.platform,
+    server_url: d.server_url || d.secure_stream_url || "",
+    stream_key: d.stream_key || "",
+    secure_stream_url: d.secure_stream_url || "",
+  }));
+  const d64 = encodeB64Json(minimal);
+  if (d64) params.d64 = d64;
+
+  // tiện-param + gói chi tiết từng nền tảng (base64 JSON)
+  const fb = dests.find((d) => d.platform === "facebook");
+  if (fb) {
+    let k = fb.stream_key;
+    if (!k && fb.secure_stream_url)
+      k = splitRtmpUrl(fb.secure_stream_url).stream_key;
+    if (k) params.key = String(k);
+    const facebook = {
+      server_url: fb.server_url || "",
+      stream_key: fb.stream_key || "",
+      secure_stream_url: fb.secure_stream_url || "",
+      permalink_url: fb.permalink_url || "",
+      pageId: fb.extras?.pageId || "",
+    };
+    params.facebook_d64 = encodeB64Json(facebook);
+  }
+
+  const yt = dests.find((d) => d.platform === "youtube");
+  if (yt && (yt.server_url || yt.stream_key || yt.secure_stream_url)) {
+    const y =
+      yt.server_url && yt.stream_key ? yt : splitRtmpUrl(yt.secure_stream_url);
+    const ysrv = yt.server_url || y.server_url || "";
+    const ykey = yt.stream_key || y.stream_key || "";
+    if (ysrv) params.yt_server = String(ysrv);
+    if (ykey) params.yt = String(ykey);
+    const youtube = {
+      server_url: ysrv,
+      stream_key: ykey,
+      secure_stream_url: yt.secure_stream_url || "",
+      watch_url: yt.watch_url || "",
+    };
+    params.youtube_d64 = encodeB64Json(youtube);
+  }
+
+  const tt = dests.find((d) => d.platform === "tiktok");
+  if (tt && (tt.server_url || tt.stream_key || tt.secure_stream_url)) {
+    const t =
+      tt.server_url && tt.stream_key ? tt : splitRtmpUrl(tt.secure_stream_url);
+    const tsrv = tt.server_url || t.server_url || "";
+    const tkey = tt.stream_key || t.stream_key || "";
+    if (tsrv) params.tt_server = String(tsrv);
+    if (tkey) params.tt = String(tkey);
+    const tiktok = {
+      server_url: tsrv,
+      stream_key: tkey,
+      secure_stream_url: tt.secure_stream_url || "",
+      room_url: tt.room_url || "",
+    };
+    params.tiktok_d64 = encodeB64Json(tiktok);
+  }
+
+  // raw để debug (tuỳ bạn dùng ở Studio)
+  params.raw_d64 = encodeB64Json({ data, extracted: dests });
+
+  // đảm bảo params là string (Expo Router query yêu cầu string)
+  Object.keys(params).forEach((k) => {
+    if (typeof params[k] !== "string") params[k] = String(params[k]);
+  });
+
+  return params;
+};
+
+const isLocalHost = (host) => {
+  if (!host) return false;
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    /^192\.168\./.test(host) ||
+    /^10\./.test(host) ||
+    /\.local$/.test(host)
+  );
+};
+function buildStudioUrlMobile(baseUrl, data, match, baseOrigin) {
+  let base = baseUrl || "/live/studio";
+  const origin = baseOrigin || "https://pickletour.vn";
+  // Nếu base là absolute → chỉ lấy path + search, giữ origin param
+  if (typeof base === "string" && /^https?:\/\//i.test(base)) {
+    try {
+      const parsed = new URL(base);
+      base = parsed.pathname + (parsed.search || "");
+    } catch {}
+  }
+  const u = new URL(base, origin);
+  if (match?._id) u.searchParams.set("matchId", String(match._id));
+  const dests = extractDestinations(data, match);
+  if (dests.length) {
+    const minimal = dests.map((d) => ({
+      platform: d.platform,
+      server_url: d.server_url || d.secure_stream_url || "",
+      stream_key: d.stream_key || "",
+      secure_stream_url: d.secure_stream_url || "",
+    }));
+    const d64 = encodeB64Json(minimal);
+    if (d64) u.searchParams.set("d64", d64);
+
+    const fb = dests.find((d) => d.platform === "facebook");
+    if (fb) {
+      let fbKey = fb.stream_key;
+      if (!fbKey && fb.secure_stream_url)
+        fbKey = splitRtmpUrl(fb.secure_stream_url).stream_key;
+      if (fbKey) u.searchParams.set("key", fbKey);
+    }
+    const yt = dests.find((d) => d.platform === "youtube");
+    if (yt && (yt.server_url || yt.stream_key || yt.secure_stream_url)) {
+      const y =
+        yt.server_url && yt.stream_key
+          ? yt
+          : splitRtmpUrl(yt.secure_stream_url);
+      const ysrv = yt.server_url || y.server_url;
+      const ykey = yt.stream_key || y.stream_key;
+      if (ysrv) u.searchParams.set("yt_server", ysrv);
+      if (ykey) u.searchParams.set("yt", ykey);
+    }
+    const tt = dests.find((d) => d.platform === "tiktok");
+    if (tt && (tt.server_url || tt.stream_key || tt.secure_stream_url)) {
+      const t =
+        tt.server_url && tt.stream_key
+          ? tt
+          : splitRtmpUrl(tt.secure_stream_url);
+      const tsrv = tt.server_url || t.server_url;
+      const tkey = tt.stream_key || t.stream_key;
+      if (tsrv) u.searchParams.set("tt_server", tsrv);
+      if (tkey) u.searchParams.set("tt", tkey);
+    }
+  }
+  return u.toString();
+}
+
+/* ---------- BottomSheet: LIVE info ---------- */
+const LineBox = ({ label, value, hidden, onCopy, onOpen }) => {
+  const T = useThemeTokens();
+  const router = useRouter();
+  if (!value) return null;
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={{ fontSize: 12, color: T.textSecondary }}>{label}</Text>
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <View
+          style={[
+            styles.overlayBox,
+            { flex: 1, backgroundColor: T.softBg2, borderColor: T.softBorder },
+          ]}
+        >
+          <Text
+            style={[styles.monoText, { color: T.textPrimary }]}
+            numberOfLines={1}
+          >
+            {hidden ? "••••••••••••" : value}
+          </Text>
+        </View>
+        {onCopy && (
+          <TouchableOpacity
+            style={[styles.btn, { borderColor: T.softBorder }]}
+            onPress={() => onCopy(value)}
+          >
+            <MaterialIcons
+              name="content-copy"
+              size={18}
+              color={T.textPrimary}
+            />
+          </TouchableOpacity>
+        )}
+        {onOpen && (
+          <TouchableOpacity
+            style={[styles.btn, { borderColor: T.softBorder }]}
+            onPress={() => onOpen(value)}
+          >
+            <MaterialIcons name="open-in-new" size={18} color={T.textPrimary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const DestinationCard = ({ d, onCopy }) => {
+  const T = useThemeTokens();
+  const openUrl = d.permalink_url || d.watch_url || d.room_url || null;
+  return (
+    <View
+      style={{
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.cardBorder,
+        gap: 8,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <MaterialIcons name="live-tv" size={18} color={T.textPrimary} />
+        <Text style={{ fontWeight: "700", color: T.textPrimary }}>
+          {(d.platform || "").toUpperCase()} {d.id ? `#${d.id}` : ""}
+        </Text>
+        <View style={{ flex: 1 }} />
+        {openUrl && (
+          <TouchableOpacity onPress={() => Linking.openURL(openUrl)}>
+            <MaterialIcons name="open-in-new" size={18} color={T.textPrimary} />
+          </TouchableOpacity>
+        )}
+      </View>
+      {d.server_url && (
+        <LineBox label="Server URL" value={d.server_url} onCopy={onCopy} />
+      )}
+      {d.stream_key && (
+        <LineBox
+          label="Stream Key"
+          value={d.stream_key}
+          onCopy={onCopy}
+          hidden
+        />
+      )}
+      {d.platform === "facebook" && d.extras?.pageId && (
+        <LineBox
+          label="Facebook Page ID"
+          value={String(d.extras.pageId)}
+          onCopy={onCopy}
+        />
+      )}
+    </View>
+  );
+};
+
+const LiveInfoSheet = forwardRef(function LiveInfoSheet(
+  { match, data, baseOrigin, onClose },
+  ref
+) {
+  const T = useThemeTokens();
+  const router = useRouter();
+  const snapPoints = useMemo(() => ["60%", "92%"], []);
+  const overlayPref = data?.overlay_url || "";
+  const studioParams = useMemo(
+    () => buildStudioParams(baseOrigin, data, match, overlayPref),
+    [baseOrigin, data, match, overlayPref]
+  );
+  const studioPath = useMemo(
+    () => data?.studio_route || data?.studio_path || "/live/studio",
+    [data]
+  );
+
+  const closeSheetsThenGoStudio = useCallback(() => {
+    // Đóng sheet hiện tại (BottomSheetModal => dùng dismiss)
+    ref?.current?.dismiss?.();
+    onClose?.();
+
+    // Điều hướng sau 1 tick để tránh giật khung hình
+    setTimeout(() => {
+      router.push({ pathname: studioPath, params: studioParams });
+    }, 0);
+  }, [router, studioPath, studioParams, onClose]);
+
+  const renderBackdrop = useCallback(
+    (props) => (
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+      />
+    ),
+    []
+  );
+
+  const copy = async (v) => {
+    try {
+      await Clipboard.setStringAsync(v || "");
+      Toast.show({ type: "success", text1: "Đã copy" });
+    } catch {}
+  };
+
+  const destinations = useMemo(
+    () => extractDestinations(data, match),
+    [data, match]
+  );
+  const studioHref = useMemo(
+    () => buildStudioUrlMobile(data?.studio_url, data, match, baseOrigin),
+    [data, match, baseOrigin]
+  );
+  const primaryLink = useMemo(
+    () => data?.permalink_url || data?.watch_url || null,
+    [data]
+  );
+
+  return (
+    <BottomSheetModal
+      ref={ref}
+      snapPoints={snapPoints}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onDismiss={onClose}
+    >
+      <BottomSheetScrollView contentContainerStyle={{ padding: 14, gap: 12 }}>
+        <Text style={{ fontWeight: "800", color: T.textPrimary }}>
+          LIVE Outputs (#{match?.code || String(match?._id || "").slice(-5)})
+        </Text>
+
+        <View style={{ gap: 10 }}>
+          {/* Primary encoder */}
+          {data?.secure_stream_url &&
+            !(data?.server_url || data?.stream_key) && (
+              <LineBox
+                label="Secure Stream URL (RTMPS)"
+                value={data.secure_stream_url}
+                onCopy={copy}
+              />
+            )}
+          {data?.server_url && (
+            <LineBox
+              label="Server URL (RTMPS)"
+              value={data.server_url}
+              onCopy={copy}
+            />
+          )}
+          {data?.stream_key && (
+            <LineBox
+              label="Stream Key"
+              value={data.stream_key}
+              onCopy={copy}
+              hidden
+            />
+          )}
+        </View>
+
+        {/* Overlay & Studio */}
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontWeight: "700", color: T.textPrimary }}>
+            Overlay & Studio
+          </Text>
+          {data?.overlay_url && (
+            <LineBox
+              label="Overlay URL (Browser Source)"
+              value={data.overlay_url}
+              onCopy={copy}
+              onOpen={(v) => Linking.openURL(v)}
+            />
+          )}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                { borderColor: T.softBorder, backgroundColor: T.cardBg },
+              ]}
+              onPress={closeSheetsThenGoStudio}
+            >
+              <Text
+                style={[
+                  styles.btnText,
+                  { color: T.textPrimary, fontWeight: "700" },
+                ]}
+              >
+                Open Studio
+              </Text>
+            </TouchableOpacity>
+            {primaryLink && (
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  { borderColor: T.softBorder, backgroundColor: T.cardBg },
+                ]}
+                onPress={() => Linking.openURL(primaryLink)}
+              >
+                <Text
+                  style={[
+                    styles.btnText,
+                    { color: T.textPrimary, fontWeight: "700" },
+                  ]}
+                >
+                  Open Live
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {!!destinations.length && (
+          <View style={{ gap: 8 }}>
+            <Text style={{ fontWeight: "700", color: T.textPrimary }}>
+              Destinations
+            </Text>
+            <View style={{ gap: 8 }}>
+              {destinations.map((d, i) => (
+                <DestinationCard
+                  key={`${d.platform}-${d.id || i}`}
+                  d={d}
+                  onCopy={copy}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: 8 }} />
+      </BottomSheetScrollView>
+    </BottomSheetModal>
+  );
+});
 
 /* ---------- Thanh công cụ quản trị ---------- */
 function AdminToolbar({
@@ -816,6 +1377,7 @@ function AdminToolbar({
   onSetStatus,
   onSetWinner,
 }) {
+  const T = useThemeTokens();
   const confirmWinner = (side) => {
     Alert.alert(
       "Xác nhận",
@@ -833,17 +1395,26 @@ function AdminToolbar({
   };
 
   return (
-    <View style={styles.adminCard}>
+    <View
+      style={[
+        styles.adminCard,
+        { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+      ]}
+    >
       <View style={styles.adminHeader}>
-        <Text style={styles.adminTitle}>QUẢN TRỊ TRẬN</Text>
-        <Text style={styles.adminSub}>
+        <Text style={[styles.adminTitle, { color: T.textPrimary }]}>
+          QUẢN TRỊ TRẬN
+        </Text>
+        <Text style={[styles.adminSub, { color: T.textSecondary }]}>
           Chỉnh sửa tỉ số • Đặt đội thắng • Đổi trạng thái
         </Text>
       </View>
 
       {/* Hàng 1: Segmented Status */}
       <View style={styles.adminRow}>
-        <Text style={styles.rowLabel}>Trạng thái</Text>
+        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
+          Trạng thái
+        </Text>
         <SegmentedStatus
           value={status}
           onChange={(s) => onSetStatus?.(s)}
@@ -853,14 +1424,13 @@ function AdminToolbar({
 
       {/* Hàng 2: Nhóm chỉnh sửa tỉ số */}
       <View style={styles.adminRow}>
-        <Text style={styles.rowLabel}>Tỉ số</Text>
+        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>Tỉ số</Text>
         {!editMode ? (
           <AdminBtn
             icon="edit"
             label="Chỉnh sửa tỉ số"
             onPress={onEnterEdit}
             disabled={busy}
-            style={styles.btnOutline}
           />
         ) : (
           <View style={styles.rowWrap}>
@@ -869,22 +1439,23 @@ function AdminToolbar({
               label="Lưu tỉ số"
               onPress={onSave}
               disabled={busy}
-              style={styles.btnPrimary}
-              textStyle={styles.btnPrimaryText}
+              style={[
+                styles.btnPrimary,
+                { backgroundColor: T.tint, borderColor: T.tint },
+              ]}
+              textStyle={[styles.btnPrimaryText]}
             />
             <AdminBtn
               icon="undo"
               label="Hoàn tác"
               onPress={onReset}
               disabled={busy}
-              style={styles.btnOutline}
             />
             <AdminBtn
               icon="add"
               label="Thêm set"
               onPress={onAddSet}
               disabled={busy}
-              style={styles.btnOutline}
             />
             <AdminBtn
               icon="close"
@@ -899,23 +1470,37 @@ function AdminToolbar({
 
       {/* Hàng 3: Đặt đội thắng nhanh */}
       <View style={styles.adminRow}>
-        <Text style={styles.rowLabel}>Kết quả</Text>
+        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
+          Kết quả
+        </Text>
         <View style={styles.rowWrap}>
           <AdminBtn
             icon="emoji-events"
             label="Đặt A thắng"
             onPress={() => confirmWinner("A")}
             disabled={busy}
-            style={styles.btnSuccessOutline}
-            textStyle={styles.btnSuccessText}
+            style={[
+              styles.btnSuccessOutline,
+              {
+                backgroundColor: T.success.bgSoft,
+                borderColor: T.success.bdSoft,
+              },
+            ]}
+            textStyle={{ color: T.success.text, fontWeight: "700" }}
           />
           <AdminBtn
             icon="emoji-events"
             label="Đặt B thắng"
             onPress={() => confirmWinner("B")}
             disabled={busy}
-            style={styles.btnSuccessOutline}
-            textStyle={styles.btnSuccessText}
+            style={[
+              styles.btnSuccessOutline,
+              {
+                backgroundColor: T.success.bgSoft,
+                borderColor: T.success.bdSoft,
+              },
+            ]}
+            textStyle={{ color: T.success.text, fontWeight: "700" }}
           />
         </View>
       </View>
@@ -928,41 +1513,33 @@ function _getIdLike(x) {
   if (typeof x === "string") return x;
   return x._id || x.id || x.userId || x.uid || x.email || null;
 }
-
 function _collectPossibleRefereeIds(m) {
   const ids = new Set();
   const push = (v) => {
     const id = _getIdLike(v);
     if (id) ids.add(String(id));
   };
-  // Một số field có thể tồn tại tuỳ backend:
-  // liveBy: { _id?, id?, user? }
   if (m?.liveBy) {
     push(m.liveBy);
     if (m.liveBy.user) push(m.liveBy.user);
     if (m.liveBy._id || m.liveBy.id) push(m.liveBy._id || m.liveBy.id);
   }
-  // referee / assignedReferee
   push(m?.referee);
   push(m?.assignedReferee);
-  // referees (array)
   if (Array.isArray(m?.referees))
     for (const it of m.referees) {
       push(it);
       if (it?.user) push(it.user);
     }
-  // meta.{referee,referees}
   push(m?.meta?.referee);
   if (Array.isArray(m?.meta?.referees))
     for (const it of m.meta.referees) {
       push(it);
       if (it?.user) push(it.user);
     }
-  // permissions.refereeId?
   push(m?.permissions?.refereeId);
   return ids;
 }
-
 function amRefereeOfThisMatch(me, m) {
   const my = _getIdLike(me) || _getIdLike(me?.user);
   if (!my) return false;
@@ -972,6 +1549,8 @@ function amRefereeOfThisMatch(me, m) {
 
 /* ===================== Component chính (Native) ===================== */
 function MatchContent({ m, isLoading, liveLoading, onSaved }) {
+  const T = useThemeTokens();
+
   const { userInfo } = useSelector((s) => s.auth || {});
   const roleStr = String(userInfo?.role || "").toLowerCase();
   const roles = new Set(
@@ -982,21 +1561,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const tour =
     m?.tournament && typeof m.tournament === "object" ? m.tournament : null;
-
-  const ownerId =
-    (tour?.owner &&
-      (tour.owner._id || tour.owner.id || tour.owner.userId || tour.owner)) ||
-    (tour?.createdBy &&
-      (tour.createdBy._id ||
-        tour.createdBy.id ||
-        tour.createdBy.userId ||
-        tour.createdBy)) ||
-    (tour?.organizer &&
-      (tour.organizer._id ||
-        tour.organizer.id ||
-        tour.organizer.userId ||
-        tour.organizer)) ||
-    null;
 
   const { data: verifyRes, isFetching: verifyingMgr } = useVerifyManagerQuery(
     tour?._id ? tour?._id : skipToken
@@ -1011,7 +1575,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   );
 
   const canManage = isAdmin || isManager;
-
   const canSeeOverlay = canManage;
 
   // Popup hồ sơ
@@ -1027,7 +1590,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   };
   const closeProfile = () => setProfileOpen(false);
 
-  // LOCK theo match id (thay cho useShowAfterFetch/useThrottledStable)
+  // LOCK theo match id
   const loading = Boolean(isLoading || liveLoading);
   const {
     lockedId,
@@ -1050,7 +1613,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     [mm, localPatch]
   );
 
-  // xác định có phải trọng tài được gán cho trận này không
+  // xác định trọng tài
   const myIdForCheck =
     userInfo?._id ||
     userInfo?.id ||
@@ -1132,10 +1695,13 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       ? `Bắt đầu: ${formatClock(displayTime)}`
       : null;
 
-  const overlayUrl = `https://pickletour.vn/overlay/score?matchId=${lockedId}&theme=dark&size=md&showSets=1&autoNext=1`;
-
-  // Ưu tiên: nếu backend đã có overlayUrl thì vẫn hiển thị (Custom);
-  // còn link chính “giống web” là builtinOverlayUrl.
+  const overlayBase = resolveWebBase(merged?.tournament, merged?.overlay);
+  const overlayUrl = buildOverlayUrl(overlayBase, lockedId, {
+    theme: T.scheme,
+    size: "md",
+    showSets: true,
+    autoNext: true,
+  });
 
   // Admin edit states
   const [editMode, setEditMode] = useState(false);
@@ -1177,7 +1743,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     try {
       await adminPatchMatch({ id: lockedId, body }).unwrap();
       Toast.show({ type: "success", text1: successMsg });
-      onSaved?.(); // parent có refetch list cũng không làm dialog “nhảy” vì đã LOCK
+      onSaved?.();
     } catch (e) {
       const msg = e?.data?.message || e?.message || "Không cập nhật được";
       Toast.show({ type: "error", text1: "Lỗi", text2: msg });
@@ -1227,29 +1793,93 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const { A: setsA, B: setsB } = countGamesWon(shownGameScores);
 
+  // ===== LIVE: create + info sheet =====
+  const [createLive, { isLoading: creatingLive }] =
+    useCreateFacebookLiveForMatchMutation();
+  const liveSheetRef = useRef(null);
+  const [liveData, setLiveData] = useState(null);
+
+  const presentLiveSheet = () => {
+    liveSheetRef.current?.present?.();
+  };
+
+  const prefillFromMatch = useCallback(() => {
+    const fb = merged?.facebookLive || {};
+    const yt = merged?.youtubeLive || {};
+    const tt = merged?.tiktokLive || {};
+    const destinations = [];
+    const hasAnyFb =
+      fb.server_url ||
+      fb.stream_key ||
+      fb.permalink_url ||
+      fb.secure_stream_url;
+    const hasAnyYt = yt.server_url || yt.stream_key || yt.watch_url;
+    const hasAnyTt =
+      tt.server_url || tt.stream_key || tt.room_url || tt.secure_stream_url;
+    if (hasAnyFb)
+      destinations.push({
+        platform: "facebook",
+        ...fb,
+        extras: { pageId: fb.pageId },
+      });
+    if (hasAnyYt) destinations.push({ platform: "youtube", ...yt });
+    if (hasAnyTt) destinations.push({ platform: "tiktok", ...tt });
+
+    setLiveData((prev) => ({
+      ...(prev || {}),
+      server_url:
+        (hasAnyFb && fb.server_url) ||
+        (hasAnyYt && yt.server_url) ||
+        prev?.server_url ||
+        "",
+      stream_key:
+        (hasAnyFb && fb.stream_key) ||
+        (hasAnyYt && yt.stream_key) ||
+        prev?.stream_key ||
+        "",
+      secure_stream_url:
+        (hasAnyFb && fb.secure_stream_url) || prev?.secure_stream_url || "",
+      permalink_url:
+        (hasAnyFb && fb.permalink_url) || prev?.permalink_url || "",
+      overlay_url: overlayUrl || prev?.overlay_url || "",
+      studio_url: prev?.studio_url || "",
+      destinations: destinations.length
+        ? destinations
+        : prev?.destinations || [],
+      note: prev?.note || "",
+    }));
+  }, [merged, overlayUrl]);
+
+  const handleCreateLive = async () => {
+    if (!lockedId) return;
+    try {
+      const res = await createLive(lockedId).unwrap();
+      const { errors, ...clean } = res || {};
+      setLiveData(clean);
+      presentLiveSheet();
+    } catch (err) {
+      // fallback: mở sheet với dữ liệu hiện có
+      Toast.show({
+        type: "error",
+        text1: "Không tạo được LIVE",
+        text2: "Mở thông tin đã có (nếu có).",
+      });
+      prefillFromMatch();
+      presentLiveSheet();
+    }
+  };
+
+  const handleOpenLiveInfo = () => {
+    prefillFromMatch();
+    presentLiveSheet();
+  };
+
   // Render states
   const showSpinner = waiting && showSpinnerDelayed;
   const showError = !waiting && !mm;
 
-  if (showSpinner) {
-    return (
-      <View style={styles.centerBox}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-  if (showError) {
-    return (
-      <View style={[styles.card, { padding: 12 }]}>
-        <Text style={styles.errorText}>Không tải được dữ liệu trận.</Text>
-      </View>
-    );
-  }
-  if (!merged) return <View style={{ paddingVertical: 8 }} />;
-
   const isSingle =
     String(merged?.tournament?.eventType || "").toLowerCase() === "single";
-
   // Nhãn đội để truyền cho panel trọng tài
   const teamAName = merged?.pairA
     ? [merged?.pairA?.player1, !isSingle && merged?.pairA?.player2]
@@ -1269,276 +1899,501 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     ? smartDepLabel(merged, merged.previousB)
     : seedLabel(merged?.seedB);
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Banner trạng thái */}
-      <StatusBanner status={status} hasStreams={streams.length > 0} />
+  if (showSpinner) {
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+  if (showError) {
+    return (
+      <View
+        style={[
+          styles.card,
+          { padding: 12, backgroundColor: T.cardBg, borderColor: T.cardBorder },
+        ]}
+      >
+        <Text
+          style={[styles.errorText, { color: T.danger?.text || "#f87171" }]}
+        >
+          Không tải được dữ liệu trận.
+        </Text>
+      </View>
+    );
+  }
+  if (!merged) return <View style={{ paddingVertical: 8 }} />;
 
-      {/* Khu video */}
-      {activeStream && (
-        <View style={{ gap: 8 }}>
-          <View style={styles.rowWrap}>
-            {activeStream.canEmbed && (
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { backgroundColor: "transparent" },
+        ]}
+      >
+        {/* Banner trạng thái */}
+        <StatusBanner status={status} hasStreams={streams.length > 0} />
+
+        {/* Khu video */}
+        {activeStream && (
+          <View style={{ gap: 8 }}>
+            <View style={styles.rowWrap}>
+              {activeStream.canEmbed && (
+                <TouchableOpacity
+                  style={[
+                    styles.btn,
+                    { borderColor: T.softBorder, backgroundColor: T.cardBg },
+                    showPlayer && {
+                      backgroundColor: T.tint,
+                      borderColor: T.tint,
+                    },
+                    styles.btnFluid,
+                  ]}
+                  onPress={() => setShowPlayer((v) => !v)}
+                  disabled={busy}
+                >
+                  <Text
+                    style={[
+                      styles.btnText,
+                      {
+                        color: showPlayer ? "#fff" : T.textPrimary,
+                        fontWeight: "700",
+                      },
+                    ]}
+                  >
+                    ▶ {showPlayer ? "Thu gọn video" : "Xem video trong nền"}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[
                   styles.btn,
-                  showPlayer ? styles.btnPrimary : styles.btnOutline,
                   styles.btnFluid,
+                  { backgroundColor: T.cardBg, borderColor: T.softBorder },
                 ]}
-                onPress={() => setShowPlayer((v) => !v)}
+                onPress={() => Linking.openURL(activeStream.url)}
                 disabled={busy}
               >
-                <Text
-                  style={showPlayer ? styles.btnPrimaryText : styles.btnText}
-                >
-                  ▶ {showPlayer ? "Thu gọn video" : "Xem video trong nền"}
+                <Text style={[styles.btnText, { color: T.textPrimary }]}>
+                  Mở link trực tiếp ↗
                 </Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.btn, styles.btnOutline, styles.btnFluid]}
-              onPress={() => Linking.openURL(activeStream.url)}
-              disabled={busy}
-            >
-              <Text style={styles.btnText}>Mở link trực tiếp ↗</Text>
-            </TouchableOpacity>
-          </View>
-
-          {showPlayer && activeStream.canEmbed && (
-            <StreamPlayer stream={activeStream} />
-          )}
-        </View>
-      )}
-
-      {/* Overlay */}
-      {overlayUrl && canSeeOverlay && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Overlay tỉ số trực tiếp</Text>
-          <View style={styles.rowWrap}>
-            <View style={[styles.overlayBox, { flexGrow: 1, minWidth: 220 }]}>
-              <Text style={styles.monoText}>{overlayUrl}</Text>
             </View>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnOutline, styles.btnFluid]}
-              onPress={async () => {
-                try {
-                  await Clipboard.setStringAsync(overlayUrl);
-                  Toast.show({
-                    type: "success",
-                    text1: "Đã copy link overlay",
-                  });
-                } catch {
-                  Toast.show({ type: "error", text1: "Copy thất bại" });
-                }
-              }}
-            >
-              <Text style={styles.btnText}>Copy link</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary, styles.btnFluid]}
-              onPress={() => Linking.openURL(overlayUrl)}
-            >
-              <Text style={styles.btnPrimaryText}>Mở overlay</Text>
-            </TouchableOpacity>
+
+            {showPlayer && activeStream.canEmbed && (
+              <StreamPlayer stream={activeStream} />
+            )}
           </View>
-          <Text style={styles.caption}>
-            Mẹo: dán link này vào OBS/StreamYard (Browser Source) để hiển thị tỉ
-            số.
+        )}
+
+        {/* Overlay */}
+        {overlayUrl && canSeeOverlay && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: T.textPrimary }]}>
+              Overlay tỉ số trực tiếp
+            </Text>
+            <View style={styles.rowWrap}>
+              <View
+                style={[
+                  styles.overlayBox,
+                  {
+                    flexGrow: 1,
+                    minWidth: 220,
+                    backgroundColor: T.softBg2,
+                    borderColor: T.softBorder,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.monoText, { color: T.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {overlayUrl}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  styles.btnFluid,
+                  { backgroundColor: T.cardBg, borderColor: T.softBorder },
+                ]}
+                onPress={async () => {
+                  try {
+                    await Clipboard.setStringAsync(overlayUrl);
+                    Toast.show({
+                      type: "success",
+                      text1: "Đã copy link overlay",
+                    });
+                  } catch {
+                    Toast.show({ type: "error", text1: "Copy thất bại" });
+                  }
+                }}
+              >
+                <Text style={[styles.btnText, { color: T.textPrimary }]}>
+                  Copy link
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  styles.btnFluid,
+                  { backgroundColor: T.tint, borderColor: T.tint },
+                ]}
+                onPress={() => Linking.openURL(overlayUrl)}
+              >
+                <Text style={styles.btnPrimaryText}>Mở overlay</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.caption, { color: T.textSecondary }]}>
+              Mẹo: dán link này vào OBS/StreamYard (Browser Source) để hiển thị
+              tỉ số.
+            </Text>
+
+            {/* NEW: LIVE buttons for Admin/Manager */}
+            {canManage && (
+              <View style={[styles.rowWrap, { marginTop: 10 }]}>
+                <AdminBtn
+                  icon="live-tv"
+                  label={creatingLive ? "Đang tạo LIVE…" : "Tạo LIVE"}
+                  onPress={handleCreateLive}
+                  disabled={creatingLive}
+                  style={{ minWidth: 140 }}
+                  textStyle={{ fontWeight: "700" }}
+                />
+                <AdminBtn
+                  icon="info-outline"
+                  label="Mở thông tin LIVE"
+                  onPress={handleOpenLiveInfo}
+                  style={{ minWidth: 160 }}
+                />
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Điểm số */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: T.textPrimary }]}>
+            Điểm số
           </Text>
-        </View>
-      )}
 
-      {/* Điểm số */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Điểm số</Text>
-
-        <View style={[styles.row, { alignItems: "flex-start" }]}>
-          {/* Đội A */}
-          <View style={{ flex: 1, paddingRight: 8 }}>
-            <Text style={styles.muted}>Đội A</Text>
-            {merged?.pairA ? (
-              <View style={styles.teamWrap}>
-                <PlayerLink
-                  person={merged.pairA?.player1}
-                  onOpen={openProfile}
-                />
-                {!isSingle && merged.pairA?.player2 && (
-                  <>
-                    <Text style={styles.andText}> & </Text>
-                    <PlayerLink
-                      person={merged.pairA.player2}
-                      onOpen={openProfile}
-                    />
-                  </>
-                )}
-              </View>
-            ) : (
-              <Text style={styles.teamText}>
-                {merged?.previousA
-                  ? smartDepLabel(merged, merged.previousA)
-                  : seedLabel(merged?.seedA)}
+          <View style={[styles.row, { alignItems: "flex-start" }]}>
+            {/* Đội A */}
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[styles.muted, { color: T.textSecondary }]}>
+                Đội A
               </Text>
-            )}
-          </View>
-
-          {/* Điểm hiện tại */}
-          <View style={{ minWidth: 140, alignItems: "center" }}>
-            {status === "live" && (
-              <Text style={styles.mutedSmall}>Ván hiện tại</Text>
-            )}
-            <Text style={styles.bigScore}>
-              {lastGameScore(shownGameScores).a ?? 0} –{" "}
-              {lastGameScore(shownGameScores).b ?? 0}
-            </Text>
-            <Text style={styles.muted}>
-              Sets: {countGamesWon(shownGameScores).A} –{" "}
-              {countGamesWon(shownGameScores).B}
-            </Text>
-          </View>
-
-          {/* Đội B */}
-          <View style={{ flex: 1, paddingLeft: 8 }}>
-            <Text style={[styles.muted, { textAlign: "right" }]}>Đội B</Text>
-            {merged?.pairB ? (
-              <View style={styles.teamWrapRight}>
-                <PlayerLink
-                  person={merged.pairB?.player1}
-                  onOpen={openProfile}
-                  align="right"
-                />
-                {!isSingle && merged.pairB?.player2 && (
-                  <>
-                    <Text style={[styles.andText, { textAlign: "right" }]}>
-                      {"  &  "}
-                    </Text>
-                    <PlayerLink
-                      person={merged.pairB.player2}
-                      onOpen={openProfile}
-                      align="right"
-                    />
-                  </>
-                )}
-              </View>
-            ) : (
-              <Text style={[styles.teamText, { textAlign: "right" }]}>
-                {merged?.previousB
-                  ? smartDepLabel(merged, merged.previousB)
-                  : seedLabel(merged?.seedB)}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Bảng set điểm */}
-        {!!(editMode ? editScores?.length : shownGameScores?.length) && (
-          <View style={{ marginTop: 12 }}>
-            <View style={[styles.tableRow, styles.tableHeader]}>
-              <Text style={[styles.tableCell, { flex: 1 }]}>Set</Text>
-              <Text style={[styles.tableCell, styles.centerCell]}>A</Text>
-              <Text style={[styles.tableCell, styles.centerCell]}>B</Text>
-              {canManage && editMode && (
-                <Text style={[styles.tableCell, styles.centerCell]} />
+              {merged?.pairA ? (
+                <View style={styles.teamWrap}>
+                  <PlayerLink
+                    person={merged.pairA?.player1}
+                    onOpen={openProfile}
+                  />
+                  {!isSingle && merged.pairA?.player2 && (
+                    <>
+                      <Text style={[styles.andText, { color: T.textPrimary }]}>
+                        {" "}
+                        &{" "}
+                      </Text>
+                      <PlayerLink
+                        person={merged.pairA.player2}
+                        onOpen={openProfile}
+                      />
+                    </>
+                  )}
+                </View>
+              ) : (
+                <Text style={[styles.teamText, { color: T.textPrimary }]}>
+                  {merged?.previousA
+                    ? smartDepLabel(merged, merged.previousA)
+                    : seedLabel(merged?.seedA)}
+                </Text>
               )}
             </View>
-            {(editMode ? editScores : shownGameScores).map((g, idx) => (
-              <View key={idx} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { flex: 1 }]}>{idx + 1}</Text>
-                <View style={[styles.tableCell, styles.centerCell]}>
-                  {canManage && editMode ? (
-                    <TextInput
-                      style={styles.inputScore}
-                      keyboardType="number-pad"
-                      value={String(g?.a ?? 0)}
-                      onChangeText={(t) => setCell(idx, "a", t)}
-                      maxLength={2}
-                    />
-                  ) : (
-                    <Text>{g?.a ?? 0}</Text>
+
+            {/* Điểm hiện tại */}
+            <View style={{ minWidth: 140, alignItems: "center" }}>
+              {status === "live" && (
+                <Text style={[styles.mutedSmall, { color: T.textSecondary }]}>
+                  Ván hiện tại
+                </Text>
+              )}
+              <Text style={[styles.bigScore, { color: T.textPrimary }]}>
+                {lastGameScore(shownGameScores).a ?? 0} –{" "}
+                {lastGameScore(shownGameScores).b ?? 0}
+              </Text>
+              <Text style={[styles.muted, { color: T.textSecondary }]}>
+                Sets: {countGamesWon(shownGameScores).A} –{" "}
+                {countGamesWon(shownGameScores).B}
+              </Text>
+            </View>
+
+            {/* Đội B */}
+            <View style={{ flex: 1, paddingLeft: 8 }}>
+              <Text
+                style={[
+                  styles.muted,
+                  { textAlign: "right", color: T.textSecondary },
+                ]}
+              >
+                Đội B
+              </Text>
+              {merged?.pairB ? (
+                <View style={styles.teamWrapRight}>
+                  <PlayerLink
+                    person={merged.pairB?.player1}
+                    onOpen={openProfile}
+                    align="right"
+                  />
+                  {!isSingle && merged.pairB?.player2 && (
+                    <>
+                      <Text
+                        style={[
+                          styles.andText,
+                          { textAlign: "right", color: T.textPrimary },
+                        ]}
+                      >
+                        {" "}
+                        &{" "}
+                      </Text>
+                      <PlayerLink
+                        person={merged.pairB.player2}
+                        onOpen={openProfile}
+                        align="right"
+                      />
+                    </>
                   )}
                 </View>
-                <View style={[styles.tableCell, styles.centerCell]}>
-                  {canManage && editMode ? (
-                    <TextInput
-                      style={styles.inputScore}
-                      keyboardType="number-pad"
-                      value={String(g?.b ?? 0)}
-                      onChangeText={(t) => setCell(idx, "b", t)}
-                      maxLength={2}
-                    />
-                  ) : (
-                    <Text>{g?.b ?? 0}</Text>
-                  )}
-                </View>
+              ) : (
+                <Text
+                  style={[
+                    styles.teamText,
+                    { textAlign: "right", color: T.textPrimary },
+                  ]}
+                >
+                  {merged?.previousB
+                    ? smartDepLabel(merged, merged.previousB)
+                    : seedLabel(merged?.seedB)}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Bảng set điểm */}
+          {!!(editMode ? editScores?.length : shownGameScores?.length) && (
+            <View style={{ marginTop: 12 }}>
+              <View
+                style={[
+                  styles.tableRow,
+                  {
+                    backgroundColor: T.softBg2,
+                    borderBottomColor: T.cardBorder,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { flex: 1, color: T.textSecondary },
+                  ]}
+                >
+                  Set
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.centerCell,
+                    { color: T.textSecondary },
+                  ]}
+                >
+                  A
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.centerCell,
+                    { color: T.textSecondary },
+                  ]}
+                >
+                  B
+                </Text>
                 {canManage && editMode && (
-                  <View style={[styles.tableCell, styles.centerCell]}>
-                    <TouchableOpacity
-                      style={[styles.btnXS, styles.btnDangerOutline]}
-                      onPress={() => removeSet(idx)}
-                      disabled={busy}
-                    >
-                      <Text style={styles.btnDangerText}>Xoá</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={[styles.tableCell, styles.centerCell]} />
                 )}
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* Chips rule + trạng thái */}
-        <View style={styles.chipsWrap}>
-          {timeLabel && <Chip label={timeLabel} />}
-          <Chip label={`BO: ${merged?.rules?.bestOf ?? 3}`} />
-          <Chip label={`Điểm thắng: ${merged?.rules?.pointsToWin ?? 11}`} />
-          {merged?.rules?.winByTwo && <Chip label="Phải chênh 2" />}
-          {merged?.liveBy?.name && (
-            <Chip label={`Trọng tài: ${merged.liveBy.name}`} />
+              {(editMode ? editScores : shownGameScores).map((g, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.tableRow, { borderBottomColor: T.cardBorder }]}
+                >
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { flex: 1, color: T.textPrimary },
+                    ]}
+                  >
+                    {idx + 1}
+                  </Text>
+                  <View style={[styles.tableCell, styles.centerCell]}>
+                    {canManage && editMode ? (
+                      <TextInput
+                        style={[
+                          styles.inputScore,
+                          {
+                            borderColor: T.softBorder,
+                            color: T.textPrimary,
+                            backgroundColor: T.cardBg,
+                          },
+                        ]}
+                        placeholderTextColor={T.textSecondary}
+                        keyboardType="number-pad"
+                        value={String(g?.a ?? 0)}
+                        onChangeText={(t) => setCell(idx, "a", t)}
+                        maxLength={2}
+                      />
+                    ) : (
+                      <Text style={{ color: T.textPrimary }}>{g?.a ?? 0}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.tableCell, styles.centerCell]}>
+                    {canManage && editMode ? (
+                      <TextInput
+                        style={[
+                          styles.inputScore,
+                          {
+                            borderColor: T.softBorder,
+                            color: T.textPrimary,
+                            backgroundColor: T.cardBg,
+                          },
+                        ]}
+                        placeholderTextColor={T.textSecondary}
+                        keyboardType="number-pad"
+                        value={String(g?.b ?? 0)}
+                        onChangeText={(t) => setCell(idx, "b", t)}
+                        maxLength={2}
+                      />
+                    ) : (
+                      <Text style={{ color: T.textPrimary }}>{g?.b ?? 0}</Text>
+                    )}
+                  </View>
+                  {canManage && editMode && (
+                    <View style={[styles.tableCell, styles.centerCell]}>
+                      <TouchableOpacity
+                        style={[
+                          styles.btnXS,
+                          {
+                            backgroundColor: T.danger.bgSoft,
+                            borderColor: T.danger.bdSoft,
+                          },
+                        ]}
+                        onPress={() => removeSet(idx)}
+                        disabled={busy}
+                      >
+                        <Text
+                          style={{
+                            color: T.danger.text,
+                            fontWeight: "700",
+                            fontSize: 12,
+                          }}
+                        >
+                          Xoá
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
           )}
-          <Chip label={`Trạng thái: ${formatStatus(status)}`} />
+
+          {/* Chips rule + trạng thái */}
+          <View style={styles.chipsWrap}>
+            {timeLabel && <Chip label={timeLabel} />}
+            <Chip label={`BO: ${merged?.rules?.bestOf ?? 3}`} />
+            <Chip label={`Điểm thắng: ${merged?.rules?.pointsToWin ?? 11}`} />
+            {merged?.rules?.winByTwo && <Chip label="Phải chênh 2" />}
+            {merged?.liveBy?.name && (
+              <Chip label={`Trọng tài: ${merged.liveBy.name}`} />
+            )}
+            <Chip label={`Trạng thái: ${formatStatus(status)}`} />
+          </View>
+
+          {/* Panel chấm điểm dành cho TRỌNG TÀI được gán */}
+          {isRefereeHere && merged?._id && (
+            <View style={{ marginTop: 12 }}>
+              <Text
+                style={[
+                  styles.rowLabel,
+                  { marginBottom: 6, color: T.textSecondary },
+                ]}
+              >
+                Bàn chấm (trọng tài)
+              </Text>
+              <RefereeJudgePanel matchId={String(merged._id)} />
+            </View>
+          )}
+
+          {/* Admin toolbar */}
+          {canManage && (
+            <AdminToolbar
+              status={status}
+              editMode={editMode}
+              busy={busy}
+              onEnterEdit={enterEdit}
+              onSave={handleSaveScores}
+              onReset={resetEdits}
+              onAddSet={addSet}
+              onExitEdit={exitEdit}
+              onSetStatus={handleSetStatus}
+              onSetWinner={handleSetWinner}
+            />
+          )}
         </View>
 
-        {/* Panel chấm điểm dành cho TRỌNG TÀI được gán */}
-        {isRefereeHere && merged?._id && (
-          <View style={{ marginTop: 12 }}>
-            <Text style={[styles.rowLabel, { marginBottom: 6 }]}>
-              Bàn chấm (trọng tài)
-            </Text>
-            <RefereeJudgePanel matchId={String(merged._id)} />
-          </View>
-        )}
+        {/* Popup hồ sơ VĐV */}
+        <PublicProfileDialog
+          open={profileOpen}
+          onClose={closeProfile}
+          userId={profileUserId}
+        />
+      </ScrollView>
 
-        {/* Admin toolbar */}
-        {canManage && (
-          <AdminToolbar
-            status={status}
-            editMode={editMode}
-            busy={busy}
-            onEnterEdit={enterEdit}
-            onSave={handleSaveScores}
-            onReset={resetEdits}
-            onAddSet={addSet}
-            onExitEdit={exitEdit}
-            onSetStatus={handleSetStatus}
-            onSetWinner={handleSetWinner}
-          />
-        )}
-      </View>
-
-      {/* Popup hồ sơ VĐV */}
-      <PublicProfileDialog
-        open={profileOpen}
-        onClose={closeProfile}
-        userId={profileUserId}
-      />
-    </ScrollView>
+      {/* BottomSheet LIVE info */}
+      {canManage && (
+        <LiveInfoSheet
+          ref={liveSheetRef}
+          match={merged}
+          data={liveData || { overlay_url: overlayUrl }}
+          baseOrigin={overlayBase}
+          onClose={() => {}}
+        />
+      )}
+    </>
   );
 }
 
-/* ---------- Chip nhỏ ---------- */
+/* ---------- Chip nhỏ (themed) ---------- */
 function Chip({ label }) {
+  const T = useThemeTokens();
   return (
-    <View style={styles.chip}>
-      <Text style={styles.chipText}>{label}</Text>
+    <View
+      style={[
+        styles.chip,
+        { backgroundColor: T.chip.bg, borderColor: T.chip.bd },
+      ]}
+    >
+      <Text style={[styles.chipText, { color: T.chip.text }]}>{label}</Text>
     </View>
   );
 }
@@ -1566,10 +2421,9 @@ export default React.memo(MatchContent, (prev, next) => {
   return makePropSignature(prev.m) === makePropSignature(next.m);
 });
 
-/* ---------- Styles ---------- */
+/* ---------- Styles (layout + base only) ---------- */
 const styles = StyleSheet.create({
   container: {
-    // padding: 12,
     gap: 12,
   },
   centerBox: {
@@ -1578,13 +2432,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   linkText: {
-    color: "#1976d2",
     fontWeight: "600",
     flexShrink: 0,
   },
   andText: {
     fontWeight: "700",
-    color: "#0f172a",
   },
   teamWrap: {
     flexDirection: "row",
@@ -1601,14 +2453,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
   },
-  bannerLive: { backgroundColor: "#e3f2fd" },
-  bannerInfo: { backgroundColor: "#f1f5f9" },
-  bannerText: { color: "#0f172a" },
+  bannerText: {},
   card: {
-    backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     padding: 12,
     gap: 8,
   },
@@ -1619,13 +2467,11 @@ const styles = StyleSheet.create({
   overlayBox: {
     minHeight: 40,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 8,
     paddingHorizontal: 10,
     justifyContent: "center",
-    backgroundColor: "#f9fafb",
   },
-  caption: { color: "#64748b", fontSize: 12 },
+  caption: { fontSize: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   rowWrap: {
     flexDirection: "row",
@@ -1641,10 +2487,8 @@ const styles = StyleSheet.create({
   btnFluid: {
     minWidth: 140,
   },
-  btnOutline: { backgroundColor: "#fff", borderColor: "#cbd5e1" },
-  btnGhost: { backgroundColor: "#fff", borderColor: "transparent" },
-  btnText: { color: "#0f172a", textAlign: "center" },
-  btnPrimary: { backgroundColor: "#1976d2", borderColor: "#1976d2" },
+  btnText: { textAlign: "center" },
+  btnPrimary: {},
   btnPrimaryText: { color: "#fff", fontWeight: "700", textAlign: "center" },
   btnXS: {
     paddingVertical: 4,
@@ -1652,30 +2496,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
   },
-  btnDangerOutline: {
-    backgroundColor: "#fff",
-    borderColor: "#fecaca",
-  },
-  btnDangerText: {
-    color: "#b91c1c",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  muted: { color: "#64748b" },
-  mutedSmall: { color: "#64748b", fontSize: 12 },
+  muted: {},
+  mutedSmall: { fontSize: 12 },
   teamText: { fontSize: 16, fontWeight: "700" },
   bigScore: { fontSize: 28, fontWeight: "800" },
   tableRow: {
     flexDirection: "row",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
     alignItems: "center",
-  },
-  tableHeader: {
-    backgroundColor: "#f8fafc",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
   },
   tableCell: { flex: 1, fontSize: 14 },
   centerCell: { alignItems: "center" },
@@ -1684,23 +2513,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#eef2ff",
     borderWidth: 1,
-    borderColor: "#c7d2fe",
   },
-  chipText: { fontSize: 12, color: "#3730a3" },
+  chipText: { fontSize: 12 },
   aspectBox: {
     width: "100%",
-    backgroundColor: "#000",
     borderRadius: 10,
     overflow: "hidden",
   },
-  errorText: { color: "#b91c1c", fontWeight: "600" },
+  errorText: { fontWeight: "600" },
   inputScore: {
     width: 56,
     height: 36,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     borderRadius: 8,
     textAlign: "center",
     paddingHorizontal: 8,
@@ -1709,10 +2534,8 @@ const styles = StyleSheet.create({
 
   /* ===== Admin toolbar ===== */
   adminCard: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     padding: 12,
     gap: 12,
     marginTop: 12,
@@ -1724,28 +2547,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
     fontWeight: "800",
-    color: "#0f172a",
   },
   adminSub: {
     fontSize: 12,
-    color: "#64748b",
   },
   adminRow: {
     gap: 8,
   },
   rowLabel: {
     fontSize: 12,
-    color: "#64748b",
     fontWeight: "600",
   },
 
   /* segmented */
   segment: {
     flexDirection: "row",
-    backgroundColor: "#f1f5f9",
     borderRadius: 999,
     padding: 4,
     gap: 4,
+    borderWidth: 1,
   },
   segmentItem: {
     flex: 1,
@@ -1754,12 +2574,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
   },
-  segmentItemActive: {
-    backgroundColor: "#1976d2",
-  },
   segmentLabel: {
     fontSize: 13,
-    color: "#0f172a",
     fontWeight: "600",
   },
   segmentLabelActive: {
@@ -1767,22 +2583,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* buttons (kế thừa cái cũ) */
+  /* buttons (icon row) */
   btnContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
-  btnIcon: {
-    color: "#0f172a",
-  },
-  btnSuccessOutline: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#a7f3d0",
-  },
-  btnSuccessText: {
-    color: "#065f46",
-    fontWeight: "700",
-  },
+  btnIcon: {},
+  btnSuccessOutline: {},
 });

@@ -1,15 +1,15 @@
 // components/PlayerSelector.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
   ViewStyle,
+  useColorScheme,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
@@ -24,6 +24,39 @@ type Props = {
   /** Nếu BE nhận object { q, eventType } thì bật cái này */
   queryAsObject?: boolean;
 };
+
+function useThemeColors() {
+  const scheme = useColorScheme() ?? "light";
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+  const cardBg = scheme === "dark" ? "#111214" : "#fff";
+  const inputBg = scheme === "dark" ? "#1a1c21" : "#fff";
+  const border = scheme === "dark" ? "#2f3136" : "#e5e7eb";
+  const hairline = scheme === "dark" ? "#26282d" : "#eee";
+  const textPrimary = scheme === "dark" ? "#ffffff" : "#111111";
+  const muted = scheme === "dark" ? "#9aa0a6" : "#6b7280";
+  const clearBg = scheme === "dark" ? "#2a2c31" : "#e5e7eb";
+  const clearText = textPrimary;
+  const rowPressed = scheme === "dark" ? "#1f2226" : "#f3f4f6";
+  const dropBg = cardBg;
+  const scoreChipBg = scheme === "dark" ? "#1f2937" : "#eef2ff";
+  const scoreChipFg = scheme === "dark" ? "#93c5fd" : "#3730a3";
+
+  return {
+    tint,
+    cardBg,
+    inputBg,
+    border,
+    hairline,
+    textPrimary,
+    muted,
+    clearBg,
+    clearText,
+    rowPressed,
+    dropBg,
+    scoreChipBg,
+    scoreChipFg,
+  };
+}
 
 function maskPhone(p?: string | number) {
   if (!p) return "";
@@ -42,6 +75,7 @@ export default function PlayerSelector({
   placeholder,
   queryAsObject = false,
 }: Props) {
+  const C = useThemeColors();
   const [input, setInput] = useState("");
   const [value, setValue] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
@@ -51,12 +85,15 @@ export default function PlayerSelector({
   // Debounce search
   useEffect(() => {
     const q = input.trim();
-    if (!q) return;
+    if (!q) {
+      setOpen(false);
+      return;
+    }
     const id = setTimeout(() => {
       if (queryAsObject) trigger({ q, eventType });
       else trigger(q);
       setOpen(true);
-    }, 350);
+    }, 300);
     return () => clearTimeout(id);
   }, [input, trigger, queryAsObject, eventType]);
 
@@ -88,11 +125,16 @@ export default function PlayerSelector({
 
   return (
     <View style={[styles.wrap, style]}>
-      <Text style={styles.label}>
-        {label} <Text style={{ color: "#6b7280" }}>(Tên / Nick / SĐT)</Text>
+      <Text style={[styles.label, { color: C.textPrimary }]}>
+        {label} <Text style={{ color: C.muted }}>(Tên / Nick / SĐT)</Text>
       </Text>
 
-      <View style={styles.inputRow}>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: C.inputBg, borderColor: C.border },
+        ]}
+      >
         <TextInput
           value={input}
           onChangeText={(t) => {
@@ -100,29 +142,39 @@ export default function PlayerSelector({
             setOpen(!!t.trim());
           }}
           placeholder={placeholder || "gõ để tìm…"}
-          placeholderTextColor="#9aa0a6"
-          style={styles.input}
+          placeholderTextColor={C.muted}
+          style={[styles.input, { color: C.textPrimary }]}
+          selectionColor={C.tint}
           onFocus={() => setOpen(!!input.trim())}
         />
         {isFetching ? (
-          <ActivityIndicator size="small" />
+          <ActivityIndicator size="small" color={C.tint} />
         ) : input ? (
-          <Pressable onPress={clearAll} hitSlop={10} style={styles.clearBtn}>
-            <Text style={styles.clearText}>×</Text>
+          <Pressable
+            onPress={clearAll}
+            hitSlop={10}
+            style={[styles.clearBtn, { backgroundColor: C.clearBg }]}
+          >
+            <Text style={[styles.clearText, { color: C.clearText }]}>×</Text>
           </Pressable>
         ) : null}
       </View>
 
-      {/* Dropdown suggestions (đặt trong flow layout cho đơn giản & ổn định) */}
+      {/* Dropdown suggestions */}
       {open && (
-        <View style={styles.dropdown}>
+        <View
+          style={[
+            styles.dropdown,
+            { backgroundColor: C.dropBg, borderColor: C.border },
+          ]}
+        >
           {isFetching && options.length === 0 ? (
             <View style={styles.ddLoading}>
-              <ActivityIndicator />
+              <ActivityIndicator color={C.tint} />
             </View>
           ) : options.length === 0 ? (
             <View style={styles.ddEmpty}>
-              <Text style={styles.ddEmptyText}>Không có kết quả</Text>
+              <Text style={{ color: C.muted }}>Không có kết quả</Text>
             </View>
           ) : (
             <FlatList
@@ -141,21 +193,28 @@ export default function PlayerSelector({
                     onPress={() => selectUser(item)}
                     style={({ pressed }) => [
                       styles.optionRow,
-                      pressed && { backgroundColor: "#f3f4f6" },
+                      { borderColor: C.hairline },
+                      pressed && { backgroundColor: C.rowPressed },
                     ]}
                   >
                     <ExpoImage
                       source={normalizeUri(item?.avatar) || AVA_PLACE}
-                      style={styles.ava}
+                      style={[styles.ava, { borderColor: C.border }]}
                       contentFit="cover"
                       transition={150}
                       cachePolicy="memory-disk"
                     />
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text numberOfLines={1} style={styles.optName}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.optName, { color: C.textPrimary }]}
+                      >
                         {name}
                       </Text>
-                      <Text numberOfLines={1} style={styles.optSub}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.optSub, { color: C.muted }]}
+                      >
                         {nick}
                         {phoneMasked}
                       </Text>
@@ -174,16 +233,27 @@ export default function PlayerSelector({
         <View style={styles.selectedRow}>
           <ExpoImage
             source={normalizeUri(value?.avatar) || AVA_PLACE}
-            style={[styles.ava, { width: 36, height: 36, borderRadius: 18 }]}
+            style={[
+              styles.ava,
+              {
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                borderColor: C.border,
+              },
+            ]}
             contentFit="cover"
             transition={150}
             cachePolicy="memory-disk"
           />
-          <Text numberOfLines={1} style={styles.selName}>
+          <Text
+            numberOfLines={1}
+            style={[styles.selName, { color: C.textPrimary }]}
+          >
             {value?.name || value?.fullName || value?.nickname}
           </Text>
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>
+          <View style={[styles.chip, { backgroundColor: C.scoreChipBg }]}>
+            <Text style={[styles.chipText, { color: C.scoreChipFg }]}>
               Điểm {eventType === "double" ? "đôi" : "đơn"}: {scoreOf(value)}
             </Text>
           </View>
@@ -195,41 +265,35 @@ export default function PlayerSelector({
 
 const styles = StyleSheet.create({
   wrap: { width: "100%" },
-  label: { fontSize: 13, fontWeight: "600", marginBottom: 6, color: "#111" },
+  label: { fontSize: 13, fontWeight: "600", marginBottom: 6 },
 
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 44,
   },
-  input: { flex: 1, fontSize: 16, color: "#111" },
+  input: { flex: 1, fontSize: 16 },
   clearBtn: {
     width: 24,
     height: 24,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#e5e7eb",
   },
-  clearText: { fontSize: 16, lineHeight: 16, color: "#111", marginTop: -1 },
+  clearText: { fontSize: 16, lineHeight: 16, marginTop: -1 },
 
   dropdown: {
     marginTop: 6,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
     borderRadius: 12,
     overflow: "hidden",
   },
   ddLoading: { padding: 12, alignItems: "center" },
   ddEmpty: { padding: 12, alignItems: "center" },
-  ddEmptyText: { color: "#6b7280" },
 
   optionRow: {
     flexDirection: "row",
@@ -238,7 +302,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#eee",
   },
   ava: {
     width: 28,
@@ -246,10 +309,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#eee",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
-  optName: { fontSize: 14, color: "#111", fontWeight: "600" },
-  optSub: { fontSize: 12, color: "#6b7280" },
+  optName: { fontSize: 14, fontWeight: "600" },
+  optSub: { fontSize: 12 },
 
   selectedRow: {
     marginTop: 10,
@@ -257,13 +319,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  selName: { flex: 1, color: "#111", fontWeight: "600" },
+  selName: { flex: 1, fontWeight: "600" },
 
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#eef2ff",
     borderRadius: 999,
   },
-  chipText: { color: "#3730a3", fontWeight: "700", fontSize: 12 },
+  chipText: { fontWeight: "700", fontSize: 12 },
 });

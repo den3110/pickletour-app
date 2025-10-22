@@ -1,21 +1,22 @@
 // app/screens/LevelPointScreen.jsx
 import {
-    useCreateAssessmentMutation,
-    useGetLatestAssessmentQuery,
+  useCreateAssessmentMutation,
+  useGetLatestAssessmentQuery,
 } from "@/slices/assessmentsApiSlice";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from "react-native";
 import { useSelector } from "react-redux";
 
@@ -27,6 +28,44 @@ const round3 = (n) => Number((Number(n) || 0).toFixed(3));
 const normalizeDupr = (n) => round3(clamp(n, DUPR_MIN, DUPR_MAX));
 const duprFromRaw = (raw0to10) =>
   round3(DUPR_MIN + clamp(raw0to10, 0, 10) * (6 / 10));
+
+/* ===== THEME TOKENS (đồng bộ với các màn trước) ===== */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+
+  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
+  const textSecondary = scheme === "dark" ? "#cbd5e1" : "#475569";
+
+  const canvasBg = scheme === "dark" ? "#0b0c10" : "#f7f9fc";
+  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
+  const border = scheme === "dark" ? "#2f3339" : "#e4e8ef";
+  const softBg = scheme === "dark" ? "#1a1c22" : "#f2f4f8";
+
+  const chipBg = scheme === "dark" ? "#1e293b" : "#eef2f7";
+  const chipFg = scheme === "dark" ? "#cbd5e1" : "#263238";
+
+  const success = scheme === "dark" ? "#22c55e" : "#16a34a";
+  const danger = "#ef4444";
+
+  const inputBg = scheme === "dark" ? "#0f1115" : "#ffffff";
+
+  return {
+    scheme,
+    tint,
+    textPrimary,
+    textSecondary,
+    canvasBg,
+    cardBg,
+    border,
+    softBg,
+    chipBg,
+    chipFg,
+    success,
+    danger,
+    inputBg,
+  };
+}
 
 /* Rubric (rút gọn text cho ngắn) */
 const RUBRIC = [
@@ -109,21 +148,8 @@ const sanitizeDecimalInput = (s) => {
   return v;
 };
 
-const COLORS = {
-  pageBg: "#f7f9fc",
-  cardBg: "#fff",
-  border: "#e4e8ef",
-  text: "#111",
-  subtext: "#555",
-  primary: "#1976d2", // Đơn
-  success: "#2e7d32", // Đôi
-  danger: "#ef4444",
-  chipBg: "#eef2f7",
-  chipFg: "#263238",
-};
-
-/* ======= Small atoms ======= */
-const Pill = ({ label, bg = COLORS.chipBg, fg = COLORS.chipFg }) => (
+/* ======= Small atoms (theme-aware) ======= */
+const Pill = ({ label, bg, fg }) => (
   <View style={[styles.pill, { backgroundColor: bg }]}>
     <Text style={[styles.pillText, { color: fg }]} numberOfLines={1}>
       {label}
@@ -131,44 +157,47 @@ const Pill = ({ label, bg = COLORS.chipBg, fg = COLORS.chipFg }) => (
   </View>
 );
 
-const Legend = React.memo(() => (
+const Legend = React.memo(({ palette }) => (
   <View style={styles.legendRow}>
-    <Pill label="Xanh lam = ĐƠN (Single)" bg={COLORS.primary} fg="#fff" />
-    <Pill label="Xanh lục = ĐÔI (Double)" bg={COLORS.success} fg="#fff" />
+    <Pill label="Xanh lam = ĐƠN (Single)" bg={palette.tint} fg="#fff" />
+    <Pill label="Xanh lục = ĐÔI (Double)" bg={palette.success} fg="#fff" />
   </View>
 ));
 
 /* Viền trái cho rubric – RN: vẽ 1–2 sọc đứng ở cạnh trái */
-function RubricItem({ r, activeSingle, activeDouble }) {
+function RubricItem({ r, activeSingle, activeDouble, palette, scheme }) {
   const anyActive = activeSingle || activeDouble;
+  const activeBg =
+    scheme === "dark" ? "rgba(124,192,255,0.12)" : "rgba(10,132,255,0.10)";
   return (
     <View
       style={[
         styles.rubricItem,
         {
-          backgroundColor: anyActive ? "rgba(25,118,210,0.06)" : "transparent",
-          borderColor: COLORS.border,
+          backgroundColor: anyActive ? activeBg : "transparent",
+          borderColor: palette.border,
         },
       ]}
     >
-      {/* stripes */}
       {activeSingle && (
         <View
-          style={[styles.stripe, { left: 0, backgroundColor: COLORS.primary }]}
+          style={[styles.stripe, { left: 0, backgroundColor: palette.tint }]}
         />
       )}
       {activeDouble && (
         <View
           style={[
             styles.stripe,
-            { left: activeSingle ? 4 : 0, backgroundColor: COLORS.success },
+            { left: activeSingle ? 4 : 0, backgroundColor: palette.success },
           ]}
         />
       )}
-      <Text style={styles.rubricTitle}>
+      <Text style={[styles.rubricTitle, { color: palette.textPrimary }]}>
         Mức {r.level} ({r.label})
       </Text>
-      <Text style={styles.rubricBullets}>{"• " + r.bullets.join("\n• ")}</Text>
+      <Text style={[styles.rubricBullets, { color: palette.textSecondary }]}>
+        {"• " + r.bullets.join("\n• ")}
+      </Text>
     </View>
   );
 }
@@ -178,11 +207,12 @@ const InputCard = React.memo(function InputCard({
   label,
   value,
   setValue,
-  color,
+  color, // "primary" | "success"
   didPrefillRef,
   initializing,
+  palette,
 }) {
-  const borderColor = color === "primary" ? COLORS.primary : COLORS.success;
+  const borderColor = color === "primary" ? palette.tint : palette.success;
   const hint =
     color === "primary"
       ? "Viền xanh lam = ĐƠN (Single)"
@@ -200,15 +230,22 @@ const InputCard = React.memo(function InputCard({
     <View
       style={[
         styles.inputCard,
-        { borderColor, backgroundColor: "rgba(0,0,0,0.01)" },
+        { borderColor, backgroundColor: palette.softBg },
       ]}
     >
-      <Text style={styles.inputLabel}>{label}</Text>
+      <Text style={[styles.inputLabel, { color: palette.textPrimary }]}>
+        {label}
+      </Text>
       <TextInput
         style={[
           styles.textInput,
-          { borderColor: valid ? COLORS.border : COLORS.danger },
+          {
+            borderColor: valid ? palette.border : palette.danger,
+            backgroundColor: palette.inputBg,
+            color: palette.textPrimary,
+          },
         ]}
+        placeholderTextColor={palette.textSecondary}
         keyboardType="decimal-pad"
         value={value}
         onChangeText={(t) => {
@@ -225,18 +262,22 @@ const InputCard = React.memo(function InputCard({
         returnKeyType="done"
         blurOnSubmit
       />
-      <Text style={styles.helperText}>
+      <Text style={[styles.helperText, { color: palette.textSecondary }]}>
         {valid
           ? `Dải hợp lệ ${DUPR_MIN.toFixed(3)}–${DUPR_MAX.toFixed(3)}`
           : `Nhập ${DUPR_MIN.toFixed(3)}–${DUPR_MAX.toFixed(3)}`}
       </Text>
-      <Text style={styles.captionText}>{hint}</Text>
+      <Text style={[styles.captionText, { color: palette.textSecondary }]}>
+        {hint}
+      </Text>
     </View>
   );
 });
 
 /* ======= Component chính ======= */
 export default function LevelPointScreen({ userId: userIdProp }) {
+  const T = useThemeTokens();
+
   const authedId = useSelector((s) => s?.auth?.userInfo?._id);
   const userId = userIdProp || authedId;
 
@@ -347,8 +388,10 @@ export default function LevelPointScreen({ userId: userIdProp }) {
 
   const isWide = Dimensions.get("window").width >= 640;
 
+  const disabledBg = T.scheme === "dark" ? "#334155" : "#9aa0a6";
+
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.pageBg }}>
+    <View style={{ flex: 1, backgroundColor: T.canvasBg }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -359,19 +402,28 @@ export default function LevelPointScreen({ userId: userIdProp }) {
         >
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.title}>Bảng tự đánh giá trình Pickleball</Text>
+            <Text style={[styles.title, { color: T.textPrimary }]}>
+              Bảng tự đánh giá trình Pickleball
+            </Text>
             {!!latestChipText && (
               <Pill
                 label={latestChipText}
-                bg={latestError ? "#fee2e2" : "#e0f2fe"}
-                fg={latestError ? "#991b1b" : "#075985"}
+                bg={latestError ? "#fee2e2" : T.chipBg}
+                fg={latestError ? "#991b1b" : T.chipFg}
               />
             )}
           </View>
 
+          {/* (tuỳ chọn) Legend
+          <Legend palette={{ tint: T.tint, success: T.success }} />
+          */}
+
           {/* Inputs */}
           <View
-            style={[styles.card, { padding: 12, borderColor: COLORS.border }]}
+            style={[
+              styles.card,
+              { padding: 12, borderColor: T.border, backgroundColor: T.cardBg },
+            ]}
           >
             <View
               style={[
@@ -386,6 +438,16 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                 color="primary"
                 didPrefillRef={didPrefillRef}
                 initializing={initializing}
+                palette={{
+                  tint: T.tint,
+                  success: T.success,
+                  border: T.border,
+                  danger: T.danger,
+                  softBg: T.softBg,
+                  inputBg: T.inputBg,
+                  textPrimary: T.textPrimary,
+                  textSecondary: T.textSecondary,
+                }}
               />
               <InputCard
                 label="Trình ĐÔI (Double)"
@@ -394,6 +456,16 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                 color="success"
                 didPrefillRef={didPrefillRef}
                 initializing={initializing}
+                palette={{
+                  tint: T.tint,
+                  success: T.success,
+                  border: T.border,
+                  danger: T.danger,
+                  softBg: T.softBg,
+                  inputBg: T.inputBg,
+                  textPrimary: T.textPrimary,
+                  textSecondary: T.textSecondary,
+                }}
               />
             </View>
 
@@ -408,10 +480,18 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                 style={[styles.inlineRow, { marginBottom: isWide ? 0 : 8 }]}
               >
                 {singleValid && (
-                  <Pill label={`Đơn: ${singleVal}`} bg="#dbeafe" fg="#1e3a8a" />
+                  <Pill
+                    label={`Đơn: ${singleVal}`}
+                    bg={T.scheme === "dark" ? "#1e3a8a33" : "#dbeafe"}
+                    fg={T.scheme === "dark" ? "#bfdbfe" : "#1e3a8a"}
+                  />
                 )}
                 {doubleValid && (
-                  <Pill label={`Đôi: ${doubleVal}`} bg="#dcfce7" fg="#166534" />
+                  <Pill
+                    label={`Đôi: ${doubleVal}`}
+                    bg={T.scheme === "dark" ? "#052e1633" : "#dcfce7"}
+                    fg={T.scheme === "dark" ? "#86efac" : "#166534"}
+                  />
                 )}
               </View>
 
@@ -421,7 +501,8 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                   disabled={saving || !userId}
                   style={[
                     styles.primaryBtn,
-                    (saving || !userId) && { backgroundColor: "#9aa0a6" },
+                    { backgroundColor: T.tint },
+                    (saving || !userId) && { backgroundColor: disabledBg },
                   ]}
                   activeOpacity={0.9}
                 >
@@ -437,15 +518,17 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                     setSingleInput("");
                     setDoubleInput("");
                   }}
-                  style={[styles.secondaryBtn]}
+                  style={[styles.secondaryBtn, { borderColor: T.tint }]}
                   activeOpacity={0.9}
                 >
-                  <Text style={styles.secondaryBtnText}>Đặt lại</Text>
+                  <Text style={[styles.secondaryBtnText, { color: T.tint }]}>
+                    Đặt lại
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <Text style={styles.captionText}>
+            <Text style={[styles.captionText, { color: T.textSecondary }]}>
               Màu sắc: <Text style={{ fontWeight: "700" }}>xanh lam</Text> = ĐƠN
               (Single), <Text style={{ fontWeight: "700" }}>xanh lục</Text> =
               ĐÔI (Double). Nhập số trong dải {DUPR_MIN.toFixed(3)}–
@@ -454,8 +537,13 @@ export default function LevelPointScreen({ userId: userIdProp }) {
           </View>
 
           {/* Rubric */}
-          <View style={[styles.card, { borderColor: COLORS.border }]}>
-            <Text style={styles.sectionTitle}>
+          <View
+            style={[
+              styles.card,
+              { borderColor: T.border, backgroundColor: T.cardBg },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
               📝 Bảng tự đánh giá trình độ Pickleball (tham khảo DUPR)
             </Text>
             <View style={{ gap: 10 }}>
@@ -465,6 +553,14 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                   r={r}
                   activeSingle={nearestSingle === r.level}
                   activeDouble={nearestDouble === r.level}
+                  palette={{
+                    tint: T.tint,
+                    success: T.success,
+                    border: T.border,
+                    textPrimary: T.textPrimary,
+                    textSecondary: T.textSecondary,
+                  }}
+                  scheme={T.scheme}
                 />
               ))}
             </View>
@@ -485,10 +581,9 @@ const styles = StyleSheet.create({
     rowGap: 8,
     marginBottom: 12,
   },
-  title: { fontSize: 20, fontWeight: "700", color: COLORS.text },
+  title: { fontSize: 20, fontWeight: "700" },
 
   card: {
-    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
@@ -507,22 +602,19 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontWeight: "700",
     marginBottom: 8,
-    color: COLORS.text,
   },
   textInput: {
     height: 44,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     fontSize: 16,
   },
   helperText: {
-    color: "#666",
     marginTop: 6,
     fontSize: 12,
   },
-  captionText: { color: "#777", marginTop: 6, fontSize: 12 },
+  captionText: { marginTop: 6, fontSize: 12 },
 
   inlineRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
 
@@ -534,7 +626,6 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
@@ -545,18 +636,16 @@ const styles = StyleSheet.create({
 
   secondaryBtn: {
     borderWidth: 1,
-    borderColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: "center",
   },
-  secondaryBtnText: { color: COLORS.primary, fontWeight: "700" },
+  secondaryBtnText: { fontWeight: "700" },
 
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.text,
     marginBottom: 8,
   },
 
@@ -594,8 +683,7 @@ const styles = StyleSheet.create({
   rubricTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.text,
     marginBottom: 4,
   },
-  rubricBullets: { color: COLORS.subtext, lineHeight: 20 },
+  rubricBullets: { lineHeight: 20 },
 });

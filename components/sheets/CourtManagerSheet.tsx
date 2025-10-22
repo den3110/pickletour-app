@@ -11,19 +11,21 @@ import {
   Alert,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useColorScheme,
+  Switch,
 } from "react-native";
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { MaterialIcons } from "@expo/vector-icons"; // nếu không dùng Expo: 'react-native-vector-icons/MaterialIcons'
+import { MaterialIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 import { useSocket } from "@/context/SocketContext";
 import {
   useUpsertCourtsMutation,
@@ -33,7 +35,6 @@ import {
 
 /* ================= helpers / formatters ================= */
 const isNum = (x) => typeof x === "number" && Number.isFinite(x);
-
 const isPO = (m) => {
   const t = String(m?.type || m?.format || "").toLowerCase();
   return t === "po" || m?.meta?.po === true;
@@ -176,16 +177,52 @@ const pairName = (pair) => {
   return names.filter(Boolean).join(" & ");
 };
 
-/* ================= small UI ================= */
+/* ================= theme tokens ================= */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e4e8ef");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f6f8fc");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+    muted: dark ? "#9aa0a6" : "#6b7280",
+
+    chipDefaultBg: dark ? "#1f2937" : "#eef2f7",
+    chipDefaultFg: dark ? "#e5e7eb" : "#263238",
+
+    chipInfoBg: dark ? "#0f2536" : "#e0f2fe",
+    chipInfoFg: dark ? "#93c5fd" : "#075985",
+    chipInfoBd: dark ? "#1e3a5f" : "#bae6fd",
+
+    chipSuccessBg: dark ? "#0f291e" : "#dcfce7",
+    chipSuccessFg: dark ? "#86efac" : "#166534",
+
+    chipWarnBg: dark ? "#2b1b0f" : "#fff7ed",
+    chipWarnFg: dark ? "#fbbf24" : "#9a3412",
+  };
+}
+
+/* ================= small UI (themed) ================= */
 const Row = ({ children, style }) => (
   <View style={[styles.row, style]}>{children}</View>
 );
-const Chip = ({ children, tone = "default" }) => {
+
+function Chip({ children, tone = "default" }) {
+  const t = useTokens();
   const map = {
-    default: { bg: "#eef2f7", fg: "#263238" },
-    info: { bg: "#e0f2fe", fg: "#075985" },
-    success: { bg: "#dcfce7", fg: "#166534" },
-    warn: { bg: "#fff7ed", fg: "#9a3412" },
+    default: { bg: t.chipDefaultBg, fg: t.chipDefaultFg },
+    info: { bg: t.chipInfoBg, fg: t.chipInfoFg },
+    success: { bg: t.chipSuccessBg, fg: t.chipSuccessFg },
+    warn: { bg: t.chipWarnBg, fg: t.chipWarnFg },
   };
   const c = map[tone] || map.default;
   return (
@@ -195,27 +232,41 @@ const Chip = ({ children, tone = "default" }) => {
       </Text>
     </View>
   );
-};
-const Divider = () => <View style={styles.hr} />;
+}
 
-const IconBtn = ({ name, onPress, color = "#111", size = 18, style }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.iconBtn,
-      style,
-      pressed && { opacity: 0.8 },
-    ]}
-    hitSlop={8}
-  >
-    <MaterialIcons name={name} size={size} color={color} />
-  </Pressable>
-);
+function Divider() {
+  const t = useTokens();
+  return <View style={[styles.hr, { backgroundColor: t.colors.border }]} />;
+}
 
-const Btn = ({ variant = "solid", onPress, children, disabled }) => {
+function IconBtn({ name, onPress, color, size = 18, style }) {
+  const t = useTokens();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconBtn,
+        style,
+        pressed && { opacity: 0.8 },
+      ]}
+      hitSlop={8}
+    >
+      <MaterialIcons name={name} size={size} color={color || t.colors.text} />
+    </Pressable>
+  );
+}
+
+function Btn({ variant = "solid", onPress, children, disabled }) {
+  const t = useTokens();
   const base = [
     styles.btn,
-    variant === "solid" ? styles.btnSolid : styles.btnOutline,
+    variant === "solid"
+      ? { backgroundColor: t.colors.primary }
+      : {
+          backgroundColor: "transparent",
+          borderColor: t.colors.primary,
+          borderWidth: 1,
+        },
     disabled && { opacity: 0.5 },
   ];
   return (
@@ -226,7 +277,7 @@ const Btn = ({ variant = "solid", onPress, children, disabled }) => {
     >
       <Text
         style={{
-          color: variant === "solid" ? "#fff" : "#0a84ff",
+          color: variant === "solid" ? "#fff" : t.colors.primary,
           fontWeight: "700",
         }}
       >
@@ -234,26 +285,24 @@ const Btn = ({ variant = "solid", onPress, children, disabled }) => {
       </Text>
     </Pressable>
   );
-};
+}
 
 /* ================= AssignSpecificSheet (sheet con) ================= */
 function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
+  const t = useTokens();
   const sheetRef = useRef(null);
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim().toLowerCase()), 250);
-    return () => clearTimeout(t);
+    const tmr = setTimeout(() => setDebouncedQ(q.trim().toLowerCase()), 250);
+    return () => clearTimeout(tmr);
   }, [q]);
 
   useEffect(() => {
-    if (open) {
-      sheetRef.current?.present();
-    } else {
-      sheetRef.current?.dismiss();
-    }
+    if (open) sheetRef.current?.present();
+    else sheetRef.current?.dismiss();
   }, [open]);
 
   useEffect(() => {
@@ -288,21 +337,29 @@ function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
       backdropComponent={(p) => (
         <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
       )}
-      handleIndicatorStyle={{ backgroundColor: "#cbd5e1" }}
+      handleIndicatorStyle={{ backgroundColor: t.colors.border }}
+      backgroundStyle={{ backgroundColor: t.colors.card }}
     >
       <BottomSheetScrollView contentContainerStyle={styles.container}>
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
           <Row style={{ alignItems: "center", gap: 8 }}>
-            <MaterialIcons name="edit-note" size={18} color="#111" />
-            <Text style={styles.title}>Gán trận vào sân</Text>
+            <MaterialIcons name="edit-note" size={18} color={t.colors.text} />
+            <Text style={[styles.title, { color: t.colors.text }]}>
+              Gán trận vào sân
+            </Text>
           </Row>
           <IconBtn name="close" onPress={onClose} />
         </Row>
 
-        <View style={styles.infoBox}>
-          <Text style={{ color: "#075985" }}>
+        <View
+          style={[
+            styles.infoBox,
+            { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
+          ]}
+        >
+          <Text style={{ color: t.chipInfoFg }}>
             Sân:{" "}
-            <Text style={{ fontWeight: "700", color: "#075985" }}>
+            <Text style={{ fontWeight: "700", color: t.chipInfoFg }}>
               {court?.name ||
                 court?.label ||
                 court?.title ||
@@ -312,12 +369,12 @@ function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
           </Text>
         </View>
 
-        <View style={styles.inputWrap}>
-          <MaterialIcons name="search" size={18} color="#64748b" />
+        <View style={[styles.inputWrap, { borderColor: t.colors.border }]}>
+          <MaterialIcons name="search" size={18} color={t.muted} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: t.colors.text }]}
             placeholder="Nhập mã hoặc tên đội..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={t.muted}
             value={q}
             onChangeText={setQ}
             autoCapitalize="none"
@@ -341,17 +398,31 @@ function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
                 onPress={() => setSelected(m)}
                 style={({ pressed }) => [
                   styles.itemRow,
-                  { borderColor: picked ? "#0a84ff" : "#e5e7eb" },
+                  {
+                    borderColor: picked ? t.colors.primary : t.colors.border,
+                    backgroundColor: t.colors.card,
+                  },
                   pressed && { opacity: 0.9 },
                 ]}
               >
-                <Text style={styles.itemName}>{label}</Text>
+                <Text style={[styles.itemName, { color: t.colors.text }]}>
+                  {label}
+                </Text>
               </Pressable>
             );
           })}
           {filtered.length === 0 && (
-            <View style={[styles.infoBox, { marginTop: 8 }]}>
-              <Text style={{ color: "#075985" }}>
+            <View
+              style={[
+                styles.infoBox,
+                {
+                  marginTop: 8,
+                  backgroundColor: t.chipInfoBg,
+                  borderColor: t.chipInfoBd,
+                },
+              ]}
+            >
+              <Text style={{ color: t.chipInfoFg }}>
                 Không có kết quả phù hợp.
               </Text>
             </View>
@@ -386,6 +457,7 @@ export default function CourtManagerSheet({
   tournamentName,
   snapPoints: snapPointsProp,
 }) {
+  const t = useTokens();
   const snapPoints = useMemo(() => snapPointsProp || ["85%"], [snapPointsProp]);
   const sheetRef = useRef(null);
   const socket = useSocket();
@@ -694,7 +766,8 @@ export default function CourtManagerSheet({
             disappearsOnIndex={-1}
           />
         )}
-        handleIndicatorStyle={{ backgroundColor: "#cbd5e1" }}
+        handleIndicatorStyle={{ backgroundColor: t.colors.border }}
+        backgroundStyle={{ backgroundColor: t.colors.card }}
       >
         <BottomSheetScrollView contentContainerStyle={styles.container}>
           {/* Header */}
@@ -702,8 +775,8 @@ export default function CourtManagerSheet({
             style={{ justifyContent: "space-between", alignItems: "center" }}
           >
             <Row style={{ alignItems: "center", gap: 8 }}>
-              <MaterialIcons name="stadium" size={18} color="#111" />
-              <Text style={styles.title}>
+              <MaterialIcons name="stadium" size={18} color={t.colors.text} />
+              <Text style={[styles.title, { color: t.colors.text }]}>
                 Quản lý sân — {bracketName || "Bracket"}
                 {tournamentName ? ` • ${tournamentName}` : ""}
               </Text>
@@ -718,8 +791,15 @@ export default function CourtManagerSheet({
           </Row>
 
           {/* Config block */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Cấu hình sân cho giai đoạn</Text>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: t.colors.card, borderColor: t.colors.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: t.colors.text }]}>
+              Cấu hình sân cho giai đoạn
+            </Text>
 
             {/* Mode toggle */}
             <Row style={{ gap: 8 }}>
@@ -727,12 +807,20 @@ export default function CourtManagerSheet({
                 onPress={() => setMode("count")}
                 style={[
                   styles.segment,
-                  mode === "count" && { backgroundColor: "#0a84ff" },
+                  {
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: t.colors.border,
+                    backgroundColor:
+                      mode === "count" ? t.colors.primary : "transparent",
+                  },
                 ]}
               >
                 <Text
                   style={{
-                    color: mode === "count" ? "#fff" : "#111",
+                    color: mode === "count" ? "#fff" : t.colors.text,
                     fontWeight: "700",
                   }}
                 >
@@ -743,12 +831,20 @@ export default function CourtManagerSheet({
                 onPress={() => setMode("names")}
                 style={[
                   styles.segment,
-                  mode === "names" && { backgroundColor: "#0a84ff" },
+                  {
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: t.colors.border,
+                    backgroundColor:
+                      mode === "names" ? t.colors.primary : "transparent",
+                  },
                 ]}
               >
                 <Text
                   style={{
-                    color: mode === "names" ? "#fff" : "#111",
+                    color: mode === "names" ? "#fff" : t.colors.text,
                     fontWeight: "700",
                   }}
                 >
@@ -759,36 +855,47 @@ export default function CourtManagerSheet({
 
             {/* Inputs */}
             {mode === "count" ? (
-              <View style={styles.inputWrap}>
+              <View
+                style={[styles.inputWrap, { borderColor: t.colors.border }]}
+              >
                 <MaterialIcons
                   name="format-list-numbered"
                   size={18}
-                  color="#64748b"
+                  color={t.muted}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: t.colors.text }]}
                   placeholder="Số lượng sân"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={t.muted}
                   keyboardType="numeric"
                   value={String(count)}
                   onChangeText={setCount}
                 />
               </View>
             ) : (
-              <View style={[styles.inputWrap, { alignItems: "flex-start" }]}>
+              <View
+                style={[
+                  styles.inputWrap,
+                  { alignItems: "flex-start", borderColor: t.colors.border },
+                ]}
+              >
                 <MaterialIcons
                   name="drive-file-rename-outline"
                   size={18}
-                  color="#64748b"
+                  color={t.muted}
                   style={{ marginTop: 2 }}
                 />
                 <TextInput
                   style={[
                     styles.input,
-                    { minHeight: 120, textAlignVertical: "top" },
+                    {
+                      minHeight: 120,
+                      textAlignVertical: "top",
+                      color: t.colors.text,
+                    },
                   ]}
                   placeholder="Tên sân (mỗi dòng 1 tên)"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={t.muted}
                   value={namesText}
                   onChangeText={setNamesText}
                   multiline
@@ -800,32 +907,32 @@ export default function CourtManagerSheet({
               style={{ alignItems: "center", justifyContent: "space-between" }}
             >
               <Row style={{ alignItems: "center", gap: 8 }}>
-                <MaterialIcons name="autorenew" size={16} color="#0a84ff" />
-                <Text style={{ color: "#111" }}>
+                <MaterialIcons
+                  name="autorenew"
+                  size={16}
+                  color={t.colors.primary}
+                />
+                <Text style={{ color: t.colors.text }}>
                   Tự động gán trận sau khi lưu
                 </Text>
               </Row>
-              <Pressable
-                onPress={() => setAutoAssign((x) => !x)}
-                style={({ pressed }) => [
-                  styles.switch,
-                  pressed && { opacity: 0.9 },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.switchTrack,
-                    { backgroundColor: autoAssign ? "#0a84ff" : "#cbd5e1" },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.switchThumb,
-                      { transform: [{ translateX: autoAssign ? 18 : 2 }] },
-                    ]}
-                  />
-                </View>
-              </Pressable>
+              <Switch
+                value={autoAssign}
+                onValueChange={setAutoAssign}
+                trackColor={{ false: t.colors.border, true: t.colors.primary }}
+                thumbColor={
+                  // Android only; iOS auto-handles thumb
+                  autoAssign
+                    ? t.dark
+                      ? "#e5e7eb"
+                      : "#fff"
+                    : t.dark
+                    ? "#cbd5e1"
+                    : "#f4f3f4"
+                }
+                ios_backgroundColor={t.colors.border}
+                accessibilityLabel="Bật tự động gán trận sau khi lưu"
+              />
             </Row>
 
             <Row style={{ gap: 8, justifyContent: "flex-start" }}>
@@ -839,9 +946,16 @@ export default function CourtManagerSheet({
           </View>
 
           {/* Queue block */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Hàng đợi vòng bảng</Text>
-            <Text style={{ color: "#6b7280", marginBottom: 8 }}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: t.colors.card, borderColor: t.colors.border },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: t.colors.text }]}>
+              Hàng đợi vòng bảng
+            </Text>
+            <Text style={{ color: t.muted, marginBottom: 8 }}>
               Thuật toán: A1, B1, C1… sau đó A2, B2… (tránh VĐV đang thi đấu/chờ
               sân).
             </Text>
@@ -854,14 +968,19 @@ export default function CourtManagerSheet({
 
           {/* Courts list */}
           <Row style={{ alignItems: "center", gap: 8 }}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, { color: t.colors.text }]}>
               Danh sách sân ({courts.length})
             </Text>
           </Row>
 
           {courts.length === 0 ? (
-            <View style={styles.infoBox}>
-              <Text style={{ color: "#075985" }}>
+            <View
+              style={[
+                styles.infoBox,
+                { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
+              ]}
+            >
+              <Text style={{ color: t.chipInfoFg }}>
                 Chưa có sân nào cho giai đoạn này.
               </Text>
             </View>
@@ -882,7 +1001,16 @@ export default function CourtManagerSheet({
                     ? "warn"
                     : "info";
                 return (
-                  <View key={c._id || c.id} style={styles.paperRow}>
+                  <View
+                    key={c._id || c.id}
+                    style={[
+                      styles.paperRow,
+                      {
+                        borderColor: t.colors.border,
+                        backgroundColor: t.colors.card,
+                      },
+                    ]}
+                  >
                     <View style={{ gap: 6 }}>
                       <Row
                         style={{
@@ -894,7 +1022,7 @@ export default function CourtManagerSheet({
                         <Chip tone={tone}>
                           {c.name || c.label || c.title || c.code || "Sân"}
                         </Chip>
-                        <Text style={{ color: "#111" }}>
+                        <Text style={{ color: t.colors.text }}>
                           {viCourtStatus(cs)}
                         </Text>
                         {hasMatch && (
@@ -922,9 +1050,16 @@ export default function CourtManagerSheet({
                         >
                           {code ? <Chip tone="default">Mã: {code}</Chip> : null}
                           {teams.A || teams.B ? (
-                            <Text style={{ color: "#374151" }}>
+                            <Text style={{ color: t.colors.text }}>
                               {teams.A || "Đội A"}{" "}
-                              <Text style={{ fontWeight: "700" }}>vs</Text>{" "}
+                              <Text
+                                style={{
+                                  fontWeight: "700",
+                                  color: t.colors.text,
+                                }}
+                              >
+                                vs
+                              </Text>{" "}
                               {teams.B || "Đội B"}
                             </Text>
                           ) : null}
@@ -956,13 +1091,6 @@ export default function CourtManagerSheet({
             </View>
           )}
 
-          {/* (optional) mini-log
-          {notifQueueRef.current.map((n,i)=>(
-            <Text key={i} style={{color:'#64748b', fontSize:12}}>
-              {new Date(n.at).toLocaleTimeString()} — {n.message}
-            </Text>
-          ))} */}
-
           <Row style={{ justifyContent: "flex-end" }}>
             <Btn variant="outline" onPress={() => sheetRef.current?.dismiss()}>
               Đóng
@@ -988,21 +1116,18 @@ const styles = StyleSheet.create({
   container: { padding: 12, gap: 12 },
   row: { flexDirection: "row", gap: 8 },
 
-  title: { fontSize: 16, fontWeight: "700", color: "#111" },
+  title: { fontSize: 16, fontWeight: "700" },
 
   card: {
     borderWidth: 1,
-    borderColor: "#e4e8ef",
     borderRadius: 14,
-    backgroundColor: "#fff",
     padding: 12,
     gap: 10,
   },
-  cardTitle: { color: "#111", fontWeight: "700" },
+  cardTitle: { fontWeight: "700" },
 
   inputWrap: {
     borderWidth: 1,
-    borderColor: "#e4e8ef",
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: Platform.select({ ios: 10, android: 8 }),
@@ -1010,16 +1135,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  input: { flex: 1, fontSize: 15, color: "#111" },
+  input: { flex: 1, fontSize: 15 },
 
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  hr: { height: 1, backgroundColor: "#e5e7eb", marginVertical: 6 },
+  hr: { height: 1, marginVertical: 6 },
 
   iconBtn: { padding: 6, borderRadius: 999 },
 
   paperRow: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     padding: 10,
     flexDirection: "row",
@@ -1030,17 +1154,9 @@ const styles = StyleSheet.create({
   },
 
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
-  btnSolid: { backgroundColor: "#0a84ff" },
-  btnOutline: {
-    backgroundColor: "transparent",
-    borderColor: "#0a84ff",
-    borderWidth: 1,
-  },
 
   infoBox: {
     borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#e0f2fe",
     borderRadius: 10,
     padding: 10,
   },
@@ -1062,10 +1178,9 @@ const styles = StyleSheet.create({
 
   itemRow: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
-  itemName: { color: "#111", fontWeight: "600" },
+  itemName: { fontWeight: "600" },
 });

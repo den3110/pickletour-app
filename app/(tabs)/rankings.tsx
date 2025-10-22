@@ -23,6 +23,7 @@ import {
   View,
   Platform,
   ScrollView,
+  useColorScheme,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
@@ -50,6 +51,56 @@ const HEX = {
 const MIN_RATING = 2;
 const MAX_RATING = 8.0;
 const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
+
+/* ================= Theme ================= */
+function useThemeColors() {
+  const scheme = useColorScheme() ?? "light";
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+  const textPrimary = scheme === "dark" ? "#fff" : "#111";
+  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#333";
+  const cardBg = scheme === "dark" ? "#111214" : "#fff";
+  const pageBg = scheme === "dark" ? "#0e0f12" : "#fafafa";
+  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
+  const softBorder = scheme === "dark" ? "#3a3b40" : "#cfd6e4";
+  const border = scheme === "dark" ? "#3a3b40" : "#e0e0e0";
+  const skeleton =
+    scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+  const muted = scheme === "dark" ? "#9aa0a6" : "#666";
+  const inputBg = scheme === "dark" ? "#1e1f23" : "#fff";
+  const inputBorder = scheme === "dark" ? "#3a3b40" : "#ddd";
+  const stickyBg = scheme === "dark" ? "#111214" : "#fafafa";
+  const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
+  const ghostText = scheme === "dark" ? "#fff" : "#111";
+  const outlineNeutral = scheme === "dark" ? "#bbb" : "#555";
+
+  // error box
+  const errBg = scheme === "dark" ? "#3a1f21" : "#ffebee";
+  const errBorder = scheme === "dark" ? "#6e2a34" : "#ffcdd2";
+  const errText = scheme === "dark" ? "#ffb3b8" : "#b71c1c";
+
+  return {
+    scheme,
+    tint,
+    textPrimary,
+    textSecondary,
+    cardBg,
+    pageBg,
+    softBg,
+    softBorder,
+    border,
+    skeleton,
+    muted,
+    inputBg,
+    inputBorder,
+    stickyBg,
+    ghostBg,
+    ghostText,
+    outlineNeutral,
+    errBg,
+    errBorder,
+    errText,
+  };
+}
 
 /* ================= Helpers ================= */
 const calcAge = (u) => {
@@ -151,11 +202,25 @@ const getVerifyChip = (status, tierColor) => {
 };
 
 /* ================= Small UI ================= */
-const Pill = ({ label, bg = "#eee", fg = "#111" }) => (
-  <View style={[styles.pill, { backgroundColor: bg }]}>
-    <Text style={[styles.pillText, { color: fg }]}>{label}</Text>
-  </View>
-);
+const Pill = ({ label, bg, fg }) => {
+  const C = useThemeColors();
+  return (
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: bg ?? C.softBg,
+          borderColor: C.border,
+          borderWidth: bg ? 0 : 0,
+        },
+      ]}
+    >
+      <Text style={[styles.pillText, { color: fg ?? C.textPrimary }]}>
+        {label}
+      </Text>
+    </View>
+  );
+};
 
 /* ================= Skeletons ================= */
 const Pulse = ({ children }) => {
@@ -180,22 +245,25 @@ const Pulse = ({ children }) => {
   }, [opacity]);
   return <Animated.View style={{ opacity }}>{children}</Animated.View>;
 };
-const SkelBlock = ({ w = "100%", h = 14, r = 8, style }) => (
-  <Pulse>
-    <View
-      style={[
-        { width: w, height: h, borderRadius: r, backgroundColor: "#e9e9e9" },
-        style,
-      ]}
-    />
-  </Pulse>
-);
+const SkelBlock = ({ w = "100%", h = 14, r = 8, style }) => {
+  const C = useThemeColors();
+  return (
+    <Pulse>
+      <View
+        style={[
+          { width: w, height: h, borderRadius: r, backgroundColor: C.skeleton },
+          style,
+        ]}
+      />
+    </Pulse>
+  );
+};
 const SkelPill = ({ w = 70 }) => (
   <SkelBlock w={w} h={20} r={999} style={{ marginRight: 6, marginTop: 6 }} />
 );
 
 const RankingCardSkeleton = () => (
-  <View style={styles.card}>
+  <View style={[styles.card, useCardSurface()]}>
     <View style={styles.rowCenter}>
       <SkelBlock w={54} h={54} r={27} />
       <View style={{ flex: 1, marginHorizontal: 12 }}>
@@ -233,6 +301,7 @@ const RankingCardSkeleton = () => (
 
 const FullListSkeleton = ({ count = 6 }) => {
   const data = useMemo(() => Array.from({ length: count }), [count]);
+  const C = useThemeColors();
   return (
     <FlatList
       data={data}
@@ -240,7 +309,9 @@ const FullListSkeleton = ({ count = 6 }) => {
       renderItem={() => <RankingCardSkeleton />}
       contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 }}
       ListHeaderComponent={
-        <View style={styles.legendStickyWrap}>
+        <View
+          style={[styles.legendStickyWrap, { backgroundColor: C.stickyBg }]}
+        >
           <View style={styles.legendRow}>
             <Pill label="Điểm vàng: Đã xác thực" bg={HEX.yellow} fg="#000" />
             <Pill label="Điểm đỏ: Tự chấm" bg={HEX.red} fg="#fff" />
@@ -248,20 +319,34 @@ const FullListSkeleton = ({ count = 6 }) => {
           </View>
         </View>
       }
-      ListHeaderComponentStyle={{ backgroundColor: "#fafafa" }}
       stickyHeaderIndices={[0]}
       removeClippedSubviews
     />
   );
 };
 
+/* helpers to reuse themed card surface */
+function useCardSurface(extra = {}) {
+  const C = useThemeColors();
+  return {
+    backgroundColor: C.cardBg,
+    borderColor: C.border,
+    ...extra,
+  };
+}
+
 /* ================= Flame Avatar (only for podium users) ================= */
 const FlameAvatar = ({ uri, medal, onPress }) => {
-  // Không có medal => avatar thường (viền xám nhạt)
+  const C = useThemeColors();
   if (!medal) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <View style={styles.avatarRingPlain}>
+        <View
+          style={[
+            styles.avatarRingPlain,
+            { borderColor: C.border, backgroundColor: C.cardBg },
+          ]}
+        >
           <ExpoImage
             source={normalizeUrl(uri)}
             style={styles.avatarImg}
@@ -337,7 +422,12 @@ const FlameAvatar = ({ uri, medal, onPress }) => {
             },
           ]}
         />
-        <View style={[styles.avatarRing, { borderColor: border }]}>
+        <View
+          style={[
+            styles.avatarRing,
+            { borderColor: border, backgroundColor: C.cardBg },
+          ]}
+        >
           <ExpoImage
             source={normalizeUrl(uri)}
             style={styles.avatarImg}
@@ -353,8 +443,9 @@ const FlameAvatar = ({ uri, medal, onPress }) => {
 
 /* ================= Flame Card (border+glow if podium) ================= */
 const FlameCard = ({ medal, children }) => {
-  
   const anim = useRef(new Animated.Value(0)).current;
+  const C = useThemeColors();
+
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -376,7 +467,6 @@ const FlameCard = ({ medal, children }) => {
 
   const { border, glow1, glow2 } = getMedalColors(medal);
 
-  // 🔽 Nhỏ bớt độ lan & nhịp thở
   const op1 = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.18, 0.35],
@@ -390,8 +480,8 @@ const FlameCard = ({ medal, children }) => {
     outputRange: [1, 1.015],
   });
 
-  if (!medal) return <View style={styles.card}>{children}</View>;
-
+  if (!medal)
+    return <View style={[styles.card, useCardSurface()]}>{children}</View>;
 
   return (
     <View style={styles.flameCardWrap}>
@@ -406,18 +496,25 @@ const FlameCard = ({ medal, children }) => {
         pointerEvents="none"
         style={[styles.cardFlameGlow, { backgroundColor: glow2, opacity: op2 }]}
       />
-      <View style={[styles.card, { borderColor: border, borderWidth: 1.5 }]}>
+      <View
+        style={[
+          styles.card,
+          useCardSurface({ borderWidth: 1.5, borderColor: border }),
+        ]}
+      >
         {children}
       </View>
     </View>
   );
 };
+
 /* ================= Main Screen ================= */
 export default function RankingListScreen() {
   const dispatch = useDispatch();
   const router = useRouter();
   const flatRef = useRef(null);
   const { isIOS } = usePlatform();
+  const C = useThemeColors();
 
   const { keyword = "", page = 0 } = useSelector((s) => s?.rankingUi || {});
   const [kw, setKw] = useState(keyword || "");
@@ -522,6 +619,7 @@ export default function RankingListScreen() {
   const closeZoom = () => setZoomOpen(false);
 
   // profile dialog
+
   const [openProfile, setOpenProfile] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const handleOpenProfile = (id) => {
@@ -673,7 +771,7 @@ export default function RankingListScreen() {
 
       return (
         <FlameCard medal={podium?.medal} key={r?._id || u?._id || index}>
-          {/* Header: Avatar (cháy nếu có giải) + Tên + Chip xác thực */}
+          {/* Header: Avatar + Tên + Chip xác thực */}
           <View style={styles.rowCenter}>
             <FlameAvatar
               uri={avatarSrc}
@@ -681,19 +779,24 @@ export default function RankingListScreen() {
               onPress={() => openZoom(avatarSrc)}
             />
             <View style={{ flex: 1, marginHorizontal: 12 }}>
-              <Text style={styles.nick}>{u?.nickname || "---"}</Text>
+              <Text style={[styles.nick, { color: C.textPrimary }]}>
+                {u?.nickname || "---"}
+              </Text>
             </View>
             <Pill label={chip.label} bg={chip.bg} fg={chip.fg} />
           </View>
 
-          {/* Chip giải – FULL nội dung, không ... , đặt dưới tên */}
+          {/* Chip giải */}
           {podium?.medal && (
             <View style={styles.medalRow}>
               <Pressable
                 onPress={() => goToTournament(podium.picked)}
                 style={[
                   styles.medalPill,
-                  { borderColor: getMedalColors(podium.medal).border },
+                  {
+                    borderColor: getMedalColors(podium.medal).border,
+                    backgroundColor: C.cardBg,
+                  },
                 ]}
               >
                 <Text
@@ -708,7 +811,7 @@ export default function RankingListScreen() {
             </View>
           )}
 
-          {/* Cụm chip Tuổi / Giới tính / Tỉnh – dời xuống dưới, KHÔNG chạm chip giải */}
+          {/* info chips */}
           <View style={styles.pillRowBelowMedal}>
             {Number.isFinite(age) && <Pill label={`${age} tuổi`} />}
             <Pill label={`Giới tính: ${genderLabel(u?.gender)}`} />
@@ -727,13 +830,13 @@ export default function RankingListScreen() {
 
           {/* Meta */}
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>
+            <Text style={[styles.metaText, { color: C.muted }]}>
               Cập nhật:{" "}
               {patched?.updatedAt
                 ? new Date(patched.updatedAt).toLocaleDateString()
                 : "--"}
             </Text>
-            <Text style={styles.metaText}>
+            <Text style={[styles.metaText, { color: C.muted }]}>
               Tham gia:{" "}
               {u?.createdAt ? new Date(u.createdAt).toLocaleDateString() : "--"}
             </Text>
@@ -742,7 +845,7 @@ export default function RankingListScreen() {
           {/* Actions */}
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.successBtn}
+              style={[styles.successBtn, { backgroundColor: HEX.green }]}
               onPress={() => handleOpenProfile(u?._id)}
             >
               <Text style={styles.successBtnText}>Hồ sơ</Text>
@@ -750,10 +853,10 @@ export default function RankingListScreen() {
 
             {allowGrade && (
               <TouchableOpacity
-                style={[styles.outlineBtn, { borderColor: "#1976d2" }]}
+                style={[styles.outlineBtn, { borderColor: C.tint }]}
                 onPress={() => openGrade(u, r)}
               >
-                <Text style={[styles.outlineBtnText, { color: "#1976d2" }]}>
+                <Text style={[styles.outlineBtnText, { color: C.tint }]}>
                   Chấm trình
                 </Text>
               </TouchableOpacity>
@@ -761,10 +864,12 @@ export default function RankingListScreen() {
 
             {allowKyc && (
               <TouchableOpacity
-                style={[styles.outlineBtn, { borderColor: "#555" }]}
+                style={[styles.outlineBtn, { borderColor: C.outlineNeutral }]}
                 onPress={() => openKyc(u)}
               >
-                <Text style={[styles.outlineBtnText, { color: "#555" }]}>
+                <Text
+                  style={[styles.outlineBtnText, { color: C.outlineNeutral }]}
+                >
                   Xem KYC
                 </Text>
               </TouchableOpacity>
@@ -784,15 +889,23 @@ export default function RankingListScreen() {
     !error && isFetching && (list?.length ?? 0) > 0;
 
   return (
-    <View style={[styles.container, isIOS && { paddingBottom: 50 }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: C.pageBg },
+        isIOS && { paddingBottom: 50 },
+      ]}
+    >
       {/* TOP BAR + SEARCH */}
-      <View style={styles.topWrap}>
+      <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Bảng xếp hạng</Text>
+          <Text style={[styles.title, { color: C.textPrimary }]}>
+            Bảng xếp hạng
+          </Text>
           {canSelfAssess && me !== null && (
             <TouchableOpacity
               onPress={() => router.push("/levelpoint")}
-              style={styles.primaryBtn}
+              style={[styles.primaryBtn, { backgroundColor: C.tint }]}
             >
               <Text style={styles.primaryBtnText}>Tự chấm trình</Text>
             </TouchableOpacity>
@@ -803,7 +916,15 @@ export default function RankingListScreen() {
           placeholder="Tìm kiếm"
           value={kw}
           onChangeText={setKw}
-          style={styles.searchInput}
+          style={[
+            styles.searchInput,
+            {
+              backgroundColor: C.inputBg,
+              borderColor: C.inputBorder,
+              color: C.textPrimary,
+            },
+          ]}
+          placeholderTextColor={C.muted}
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"
@@ -813,13 +934,21 @@ export default function RankingListScreen() {
       </View>
 
       {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>
+        <View
+          style={[
+            styles.errorBox,
+            { backgroundColor: C.errBg, borderColor: C.errBorder },
+          ]}
+        >
+          <Text style={[styles.errorText, { color: C.errText }]}>
             {error?.data?.message || error?.error || "Có lỗi xảy ra"}
           </Text>
           <TouchableOpacity
             onPress={refetch}
-            style={[styles.primaryBtn, { marginTop: 8 }]}
+            style={[
+              styles.primaryBtn,
+              { marginTop: 8, backgroundColor: C.tint },
+            ]}
           >
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </TouchableOpacity>
@@ -834,7 +963,12 @@ export default function RankingListScreen() {
           renderItem={renderItem}
           ListHeaderComponent={
             <View>
-              <View style={styles.legendStickyWrap}>
+              <View
+                style={[
+                  styles.legendStickyWrap,
+                  { backgroundColor: C.stickyBg },
+                ]}
+              >
                 <View style={styles.legendRow}>
                   <Pill
                     label="Điểm vàng: Đã xác thực"
@@ -858,7 +992,7 @@ export default function RankingListScreen() {
               ) : null}
             </View>
           }
-          ListHeaderComponentStyle={{ backgroundColor: "#fafafa" }}
+          ListHeaderComponentStyle={{ backgroundColor: C.stickyBg }}
           stickyHeaderIndices={[0]}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 }}
           keyboardShouldPersistTaps="always"
@@ -867,6 +1001,7 @@ export default function RankingListScreen() {
             <RefreshControl
               refreshing={isFetching && (list?.length ?? 0) > 0 && !error}
               onRefresh={() => refetch()}
+              tintColor={C.textSecondary}
             />
           }
           ListFooterComponent={
@@ -905,50 +1040,81 @@ export default function RankingListScreen() {
         onRequestClose={() => setGradeOpen(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.sheet, { paddingBottom: 16 }]}>
-            <Text style={styles.sheetTitle}>
+          <View
+            style={[
+              styles.sheet,
+              { backgroundColor: C.cardBg, borderColor: C.border },
+            ]}
+          >
+            <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
               Chấm trình – {gradeUser?.nickname}
             </Text>
 
             <View style={styles.inputRow}>
               <Text
-                style={styles.inputLabel}
+                style={[styles.inputLabel, { color: C.muted }]}
               >{`Điểm đơn (${MIN_RATING} – ${MAX_RATING})`}</Text>
               <TextInput
                 value={gradeSingles}
                 onChangeText={setGradeSingles}
                 keyboardType="decimal-pad"
                 placeholder="VD: 4.50"
-                style={styles.input}
+                placeholderTextColor={C.muted}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: C.inputBg,
+                    borderColor: C.inputBorder,
+                    color: C.textPrimary,
+                  },
+                ]}
               />
             </View>
 
             <View style={styles.inputRow}>
               <Text
-                style={styles.inputLabel}
+                style={[styles.inputLabel, { color: C.muted }]}
               >{`Điểm đôi (${MIN_RATING} – ${MAX_RATING})`}</Text>
               <TextInput
                 value={gradeDoubles}
                 onChangeText={setGradeDoubles}
                 keyboardType="decimal-pad"
                 placeholder="VD: 4.30"
-                style={styles.input}
+                placeholderTextColor={C.muted}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: C.inputBg,
+                    borderColor: C.inputBorder,
+                    color: C.textPrimary,
+                  },
+                ]}
               />
             </View>
 
-            {gradeMsg ? <Text style={styles.errorText}>{gradeMsg}</Text> : null}
+            {gradeMsg ? (
+              <Text style={[styles.errorText, { color: C.errText }]}>
+                {gradeMsg}
+              </Text>
+            ) : null}
 
             <View style={[styles.actionRow, { marginTop: 12 }]}>
               <TouchableOpacity
-                style={styles.ghostBtn}
+                style={[styles.ghostBtn, { backgroundColor: C.ghostBg }]}
                 onPress={() => setGradeOpen(false)}
               >
-                <Text style={styles.ghostBtnText}>Huỷ</Text>
+                <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
+                  Huỷ
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.primaryBtn,
-                  { flexGrow: 1, alignItems: "center" },
+                  {
+                    flexGrow: 1,
+                    alignItems: "center",
+                    backgroundColor: C.tint,
+                  },
                 ]}
                 onPress={submitGrade}
                 disabled={creating}
@@ -970,8 +1136,17 @@ export default function RankingListScreen() {
         onRequestClose={closeKyc}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.sheet, { maxHeight: "88%" }]}>
-            <Text style={styles.sheetTitle}>
+          <View
+            style={[
+              styles.sheet,
+              {
+                maxHeight: "88%",
+                backgroundColor: C.cardBg,
+                borderColor: C.border,
+              },
+            ]}
+          >
+            <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
               KYC – {kycUser?.name || kycUser?.nickname || "--"}
             </Text>
 
@@ -988,7 +1163,14 @@ export default function RankingListScreen() {
                 {["front", "back"].map((side) => (
                   <TouchableOpacity
                     key={side}
-                    style={[styles.kycImgWrap, { flex: 1 }]}
+                    style={[
+                      styles.kycImgWrap,
+                      {
+                        flex: 1,
+                        backgroundColor: C.stickyBg,
+                        borderColor: C.border,
+                      },
+                    ]}
                     activeOpacity={0.85}
                     onPress={() => openZoom(kycUser?.cccdImages?.[side])}
                   >
@@ -996,7 +1178,7 @@ export default function RankingListScreen() {
                       source={
                         normalizeUrl(kycUser?.cccdImages?.[side]) || PLACE
                       }
-                      style={styles.kycImg}
+                      style={[styles.kycImg, { backgroundColor: C.stickyBg }]}
                       contentFit="contain"
                       transition={150}
                       cachePolicy="memory-disk"
@@ -1022,17 +1204,21 @@ export default function RankingListScreen() {
                   <View
                     style={{
                       marginTop: 8,
-                      backgroundColor: "#f6f6f6",
+                      backgroundColor: C.softBg,
                       borderRadius: 8,
                       padding: 8,
+                      borderWidth: 1,
+                      borderColor: C.softBorder,
                     }}
                   >
                     <Text
-                      style={{ color: "#666", fontSize: 12, marginBottom: 4 }}
+                      style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}
                     >
                       Ghi chú
                     </Text>
-                    <Text style={{ fontSize: 14 }}>{kycUser?.note}</Text>
+                    <Text style={{ fontSize: 14, color: C.textPrimary }}>
+                      {kycUser?.note}
+                    </Text>
                   </View>
                 ) : null}
               </View>
@@ -1062,10 +1248,19 @@ export default function RankingListScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.ghostBtn, { marginTop: 8, alignSelf: "center" }]}
+              style={[
+                styles.ghostBtn,
+                {
+                  marginTop: 8,
+                  alignSelf: "center",
+                  backgroundColor: C.ghostBg,
+                },
+              ]}
               onPress={closeKyc}
             >
-              <Text style={styles.ghostBtnText}>Đóng</Text>
+              <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
+                Đóng
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1081,16 +1276,21 @@ export default function RankingListScreen() {
         onRequestClose={closeZoom}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { backgroundColor: C.cardBg }]}>
             <ExpoImage
               source={normalizeUrl(zoomSrc) || PLACE}
-              style={styles.zoomImg}
+              style={[styles.zoomImg, { backgroundColor: C.pageBg }]}
               contentFit="contain"
               transition={150}
               cachePolicy="memory-disk"
             />
-            <Pressable onPress={closeZoom} style={styles.modalCloseBtn}>
-              <Text style={styles.modalCloseText}>Đóng</Text>
+            <Pressable
+              onPress={closeZoom}
+              style={[styles.modalCloseBtn, { backgroundColor: C.ghostBg }]}
+            >
+              <Text style={[styles.modalCloseText, { color: C.ghostText }]}>
+                Đóng
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -1108,12 +1308,14 @@ export default function RankingListScreen() {
 
 /* ============== Local helpers ============== */
 function InfoRow({ label, value, mono }) {
+  const C = useThemeColors();
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoLabel, { color: C.muted }]}>{label}</Text>
       <Text
         style={[
           styles.infoValue,
+          { color: C.textPrimary },
           mono && { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
         ]}
       >
@@ -1129,12 +1331,11 @@ function formatViDate(d) {
 /* ============== Styles ============== */
 const { width } = Dimensions.get("window");
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fafafa", paddingTop: 20 },
+  container: { flex: 1, paddingTop: 20 },
 
   topWrap: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: "#fafafa",
   },
   headerRow: {
     flexDirection: "row",
@@ -1144,7 +1345,6 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: "700" },
   primaryBtn: {
-    backgroundColor: "#1976d2",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1154,13 +1354,10 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
 
   legendStickyWrap: {
-    backgroundColor: "#fafafa",
     paddingTop: 8,
     paddingBottom: 8,
   },
@@ -1177,15 +1374,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   card: {
-    backgroundColor: "#fff",
     borderRadius: 14,
     padding: 12,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
   },
@@ -1204,25 +1399,21 @@ const styles = StyleSheet.create({
     padding: 2,
     borderWidth: 2,
     borderRadius: 31,
-    backgroundColor: "#fff",
   },
   avatarRingPlain: {
     padding: 2,
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 31,
-    backgroundColor: "#fff",
   },
   avatarImg: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: "#eee",
   },
 
   nick: { fontSize: 16, fontWeight: "700" },
 
-  /* Medal pill (full width, no ellipsis) */
+  /* Medal pill */
   medalRow: { marginTop: 8 },
   medalPill: {
     width: "100%",
@@ -1230,11 +1421,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: "#fff",
   },
   medalPillText: { fontSize: 12, fontWeight: "800" },
 
-  /* info chips under medal */
+  /* info chips */
   pill: {
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -1257,11 +1447,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 8,
   },
-  metaText: { fontSize: 12, color: "#666" },
+  metaText: { fontSize: 12 },
+
   actionRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
 
   successBtn: {
-    backgroundColor: "#2e7d32",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1278,7 +1468,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: "#eee",
   },
   ghostBtnText: { fontWeight: "700" },
 
@@ -1294,13 +1483,11 @@ const styles = StyleSheet.create({
   /* Error box */
   errorBox: {
     margin: 16,
-    backgroundColor: "#ffebee",
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#ffcdd2",
   },
-  errorText: { color: "#b71c1c" },
+  errorText: {},
 
   /* Modal base */
   modalBackdrop: {
@@ -1311,7 +1498,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalBox: {
-    backgroundColor: "#f2f0f5",
     borderRadius: 12,
     width: width - 32,
     padding: 10,
@@ -1320,12 +1506,10 @@ const styles = StyleSheet.create({
     width: "100%",
     height: width,
     borderRadius: 10,
-    backgroundColor: "#f2f0f5",
   },
   modalCloseBtn: {
     alignSelf: "center",
     marginTop: 10,
-    backgroundColor: "#b5b5b5ff",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1336,21 +1520,19 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 560,
-    backgroundColor: "#fff",
     borderRadius: 14,
     padding: 12,
+    borderWidth: 1,
   },
   sheetTitle: { fontSize: 18, fontWeight: "800", marginBottom: 8 },
 
   /* KYC */
   kycImgWrap: {
-    backgroundColor: "#fafafa",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#eee",
     overflow: "hidden",
   },
-  kycImg: { width: "100%", height: 180, backgroundColor: "#f2f0f5" },
+  kycImg: { width: "100%", height: 180 },
   kycBadge: {
     position: "absolute",
     top: 6,
@@ -1364,18 +1546,16 @@ const styles = StyleSheet.create({
 
   /* Info rows */
   infoRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  infoLabel: { width: 110, color: "#666", fontSize: 13 },
+  infoLabel: { width: 110, fontSize: 13 },
   infoValue: { flex: 1, fontSize: 15, fontWeight: "700" },
 
   /* Inputs */
   inputRow: { marginTop: 10 },
-  inputLabel: { fontSize: 12, color: "#555", marginBottom: 4 },
+  inputLabel: { fontSize: 12 },
   input: {
     height: 40,
     borderRadius: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
 });

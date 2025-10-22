@@ -1,3 +1,8 @@
+if (__DEV__) {
+  require("../dev/reactotron");
+  require("../dev/ws-logger");
+}
+
 import {
   DarkTheme,
   DefaultTheme,
@@ -7,7 +12,13 @@ import { useFonts } from "expo-font";
 import { Stack, useRootNavigationState } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { ActivityIndicator, View, AppState, InteractionManager } from "react-native";
+import {
+  ActivityIndicator,
+  View,
+  AppState,
+  InteractionManager,
+  Platform,
+} from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
@@ -29,10 +40,38 @@ const SPLASH_FAILSAFE_MS = 1500;
 
 SplashScreen.preventAutoHideAsync().catch(() => {}); // chỉ 1 lần
 
-if (__DEV__) {
-  require("./dev/reactotron");
-  require("./dev/ws-logger");
-}
+
+
+/* ===================== THEME ONLY ===================== */
+const BRAND_LIGHT = "#1976d2";
+const BRAND_DARK = "#7cc0ff";
+
+const AppLightTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: BRAND_LIGHT,
+    background: "#ffffff",
+    card: "#ffffff",
+    text: "#0f172a",
+    border: "#e5e7eb",
+    notification: BRAND_LIGHT,
+  },
+};
+
+const AppDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: BRAND_DARK,
+    background: "#0b0c10",
+    card: "#111214",
+    text: "#e5e7eb",
+    border: "#2f3339",
+    notification: BRAND_DARK,
+  },
+};
+/* ===================================================== */
 
 function Boot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
@@ -63,7 +102,10 @@ function Boot({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const bg = isDark ? "#000" : "#fff"; // nền phù hợp hệ thống
+
+  // chọn theme theo hệ thống
+  const navTheme = isDark ? AppDarkTheme : AppLightTheme;
+  const bg = navTheme.colors.background;
 
   const [fontsLoaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -168,20 +210,24 @@ export default function RootLayout() {
             <Boot>
               <SafeAreaProvider>
                 <SafeAreaView
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, backgroundColor: bg }}
                   edges={["top", "left", "right"]}
                 >
                   <View style={{ flex: 1 }} onLayout={onLayoutRoot}>
-                    <ThemeProvider
-                      value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-                    >
-                      <Stack>
+                    <ThemeProvider value={navTheme}>
+                      <Stack
+                        screenOptions={{
+                          headerStyle: {
+                            backgroundColor: navTheme.colors.card,
+                          },
+                          headerTintColor: navTheme.colors.text,
+                          contentStyle: {
+                            backgroundColor: bg,
+                          },
+                        }}
+                      >
                         <Stack.Screen
                           name="(tabs)"
-                          options={{ headerShown: false }}
-                        />
-                        <Stack.Screen
-                          name="login"
                           options={{ headerShown: false }}
                         />
                         <Stack.Screen
@@ -189,12 +235,12 @@ export default function RootLayout() {
                           options={{
                             title: "Đăng ký",
                             headerTitleAlign: "center",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerBackVisible: true,
                             headerBackTitle: "Quay lại",
                             headerBackTitleVisible: true,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -204,12 +250,12 @@ export default function RootLayout() {
                           options={{
                             title: "Quên mật khẩu",
                             headerTitleAlign: "center",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerBackVisible: true,
                             headerBackTitle: "Quay lại",
                             headerBackTitleVisible: true,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -219,12 +265,12 @@ export default function RootLayout() {
                           options={{
                             title: "Tự chấm trình",
                             headerTitleAlign: "center",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerBackVisible: true,
                             headerBackTitle: "Quay lại",
                             headerBackTitleVisible: true,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -235,9 +281,9 @@ export default function RootLayout() {
                             title: "Đăng ký giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -248,9 +294,9 @@ export default function RootLayout() {
                             title: "Check-in giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -261,9 +307,9 @@ export default function RootLayout() {
                             title: "Bốc thăm giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -274,9 +320,9 @@ export default function RootLayout() {
                             title: "Sơ đồ giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -287,9 +333,9 @@ export default function RootLayout() {
                             title: "Tổng quan giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -299,9 +345,9 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -311,9 +357,9 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -323,9 +369,9 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -339,9 +385,9 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -351,9 +397,9 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
@@ -364,17 +410,30 @@ export default function RootLayout() {
                           options={{
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
-                            headerTintColor: "#1976d2",
+                            headerTintColor: navTheme.colors.primary,
                             headerTitleStyle: {
-                              color: "#000",
+                              color: navTheme.colors.text,
                               fontWeight: "700",
                             },
                           }}
                         />
                       </Stack>
+
+                      {/* ✅ StatusBar được cấu hình tốt hơn cho dark/light theme */}
                       <StatusBar
-                        style={isDark ? "dark" : "light"}
+                        // "light" = chữ trắng (dùng cho nền tối)
+                        // "dark" = chữ đen (dùng cho nền sáng)
+                        // "auto" = tự động theo theme hệ thống
+                        style={isDark ? "light" : "dark"}
+                        // backgroundColor chỉ hoạt động trên Android
+                        // iOS sẽ trong suốt và lấy màu từ SafeAreaView
                         backgroundColor={bg}
+                        // Thêm animated để transition mượt khi đổi theme
+                        animated={true}
+
+                        // translucent cho phép content hiển thị phía sau status bar
+                        // Nếu bạn muốn status bar trong suốt trên Android, bật option này
+                        // translucent={Platform.OS === 'android'}
                       />
                     </ThemeProvider>
                   </View>

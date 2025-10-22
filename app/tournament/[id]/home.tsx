@@ -5,10 +5,9 @@
 // - No extra UI libs; small Chip/Pill/Progress components are implemented locally
 // - Table UI is reproduced with FlatList row items
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert as RNAlert,
   FlatList,
   Modal,
   Pressable,
@@ -18,10 +17,12 @@ import {
   Linking,
   Platform,
   ScrollView,
+  useColorScheme,
 } from "react-native";
 import { useSelector } from "react-redux";
 import { router, useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 
 // ==== RTK Query hooks (adjust aliases to your project if needed) ====
 import {
@@ -59,116 +60,56 @@ const fmtDate = (d) => {
     const dt = new Date(d);
     const s = dt.toLocaleString?.() || dt.toISOString?.();
     return s?.replace("T", " ").slice(0, 19);
-  } catch (e) {
+  } catch {
     return String(d);
   }
 };
 
-/* ======================== Tiny UI atoms ======================== */
-const Card = ({ children, style }) => (
-  <View style={[styles.card, style]}>{children}</View>
-);
-const Row = ({ children, style, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    disabled={!onPress}
-    style={({ pressed }) => [
-      styles.row,
-      style,
-      pressed && onPress ? { opacity: 0.8 } : null,
-    ]}
-  >
-    {children}
-  </Pressable>
-);
-const HStack = ({ children, style }) => (
-  <View style={[styles.hstack, style]}>{children}</View>
-);
-const VStack = ({ children, style }) => (
-  <View style={[styles.vstack, style]}>{children}</View>
-);
-const Spacer = () => <View style={{ flex: 1 }} />;
+/* ======================== Theme tokens ======================== */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
 
-const Chip = ({ label, icon, outlined, style }) => (
-  <View style={[outlined ? styles.chipOutlined : styles.chip, style]}>
-    {icon}
-    <Text style={styles.chipText}>{label}</Text>
-  </View>
-);
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#1976d2");
+  const text = navTheme?.colors?.text ?? (dark ? "#f5f7fa" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2f3237" : "#e0e0e0");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f7f8fb");
 
-const StatusPill = ({ status }) => {
-  const map = {
-    scheduled: { bg: "#e0e0e0", fg: "#424242", label: "Chưa xếp" },
-    queued: { bg: "#e3f2fd", fg: "#1565c0", label: "Trong hàng chờ" },
-    assigned: { bg: "#ede7f6", fg: "#512da8", label: "Đã gán sân" },
-    live: { bg: "#fff8e1", fg: "#ef6c00", label: "Đang thi đấu" },
-    finished: { bg: "#e8f5e9", fg: "#2e7d32", label: "Đã kết thúc" },
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+    // text/muted
+    muted: dark ? "#9aa0a6" : "#616161",
+    // surfaces
+    divider: dark ? "#2a2e33" : "#eeeeee",
+    headerBg: dark ? "#101418" : "#fafafa",
+    track: dark ? "#2a2f36" : "#eeeeee",
+    // chip palettes
+    chipDefaultBg: dark ? "#1f2937" : "#eeeeee",
+    chipDefaultFg: dark ? "#e5e7eb" : "#263238",
+    chipDefaultBd: dark ? "#334155" : "#e0e0e0",
+
+    chipInfoBg: dark ? "#0f2536" : "#e3f2fd",
+    chipInfoFg: dark ? "#93c5fd" : "#1565c0",
+    chipInfoBd: dark ? "#1e3a5f" : "#bbdefb",
+
+    chipWarnBg: dark ? "#3a2308" : "#fff8e1",
+    chipWarnFg: dark ? "#ffddb0" : "#ef6c00",
+    chipWarnBd: dark ? "#6b3d0b" : "#ffe0b2",
+
+    chipSuccessBg: dark ? "#0f2d1a" : "#e8f5e9",
+    chipSuccessFg: dark ? "#8de4b5" : "#2e7d32",
+    chipSuccessBd: dark ? "#1c5a39" : "#c8e6c9",
   };
-  const v = map[String(status || "").toLowerCase()] || {
-    bg: "#eee",
-    fg: "#555",
-    label: status || "—",
-  };
-  return (
-    <View style={[styles.pill, { backgroundColor: v.bg }]}>
-      <Text style={[styles.pillText, { color: v.fg }]}>{v.label}</Text>
-    </View>
-  );
-};
-
-const ProgressBar = ({ value, height = 8 }) => (
-  <View style={[styles.progressWrap, { height }]}>
-    <View
-      style={[
-        styles.progressFill,
-        { width: `${Math.max(0, Math.min(100, value))}%` },
-      ]}
-    />
-  </View>
-);
-
-/* ======================== Modal viewer ======================== */
-const MatchViewerModal = ({ visible, match, onClose }) => {
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <HStack style={{ alignItems: "center", marginBottom: 12 }}>
-          <Text style={styles.modalTitle}>Chi tiết trận</Text>
-          <Spacer />
-          <Pressable onPress={onClose} style={styles.iconBtn}>
-            <MaterialIcons name="close" size={22} />
-          </Pressable>
-        </HStack>
-        {!match ? (
-          <ActivityIndicator />
-        ) : (
-          <VStack style={{ gap: 8 }}>
-            <Text style={styles.label}>Mã trận</Text>
-            <Text style={styles.value}>{matchCode(match)}</Text>
-            <Text style={styles.label}>Cặp A</Text>
-            <Text style={styles.value}>{pairLabel(match?.pairA)}</Text>
-            <Text style={styles.label}>Cặp B</Text>
-            <Text style={styles.value}>{pairLabel(match?.pairB)}</Text>
-            <Text style={styles.label}>Trạng thái</Text>
-            <StatusPill status={match?.status} />
-            {!!match?.video && (
-              <Pressable
-                onPress={() => Linking.openURL(String(match.video))}
-                style={[styles.btn, { alignSelf: "flex-start" }]}
-              >
-                <MaterialIcons name="open-in-new" size={16} />
-                <Text style={styles.btnText}> Mở video</Text>
-              </Pressable>
-            )}
-          </VStack>
-        )}
-      </View>
-    </Modal>
-  );
-};
+}
 
 /* ======================== Main Screen ======================== */
 export default function OverviewScreen() {
+  const t = useTokens();
   const { id } = useLocalSearchParams();
   const me = useSelector((s) => s.auth?.userInfo || null);
 
@@ -311,7 +252,7 @@ export default function OverviewScreen() {
     [allMatches]
   );
 
-  // 6) Viewer modal
+  // 6) Viewer modal (themed)
   const [viewer, setViewer] = useState({ open: false, matchId: null });
   const openMatch = (mid) => setViewer({ open: true, matchId: mid });
   const closeMatch = () => setViewer({ open: false, matchId: null });
@@ -320,11 +261,81 @@ export default function OverviewScreen() {
     [allMatches, viewer.matchId]
   );
 
+  const MatchViewerModal = ({ visible, match, onClose }) => {
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View
+          style={[styles.modalRoot, { backgroundColor: t.colors.background }]}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <Text style={[styles.modalTitle, { color: t.colors.text }]}>
+              Chi tiết trận
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={onClose} style={styles.iconBtn}>
+              <MaterialIcons name="close" size={22} color={t.colors.text} />
+            </Pressable>
+          </View>
+          {!match ? (
+            <ActivityIndicator color={t.colors.primary} />
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.label, { color: t.muted }]}>Mã trận</Text>
+              <Text style={[styles.value, { color: t.colors.text }]}>
+                {matchCode(match)}
+              </Text>
+              <Text style={[styles.label, { color: t.muted }]}>Cặp A</Text>
+              <Text style={[styles.value, { color: t.colors.text }]}>
+                {pairLabel(match?.pairA)}
+              </Text>
+              <Text style={[styles.label, { color: t.muted }]}>Cặp B</Text>
+              <Text style={[styles.value, { color: t.colors.text }]}>
+                {pairLabel(match?.pairB)}
+              </Text>
+              <Text style={[styles.label, { color: t.muted }]}>Trạng thái</Text>
+              <StatusPill status={match?.status} />
+              {!!match?.video && (
+                <Pressable
+                  onPress={() => Linking.openURL(String(match.video))}
+                  style={[
+                    styles.btn,
+                    {
+                      alignSelf: "flex-start",
+                      backgroundColor: t.colors.card,
+                      borderWidth: 1,
+                      borderColor: t.colors.border,
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="open-in-new"
+                    size={16}
+                    color={t.colors.text}
+                  />
+                  <Text style={[styles.btnText, { color: t.colors.text }]}>
+                    {" "}
+                    Mở video
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+      </Modal>
+    );
+  };
+
   /* ===== Guards ===== */
   if (tourLoading || regsLoading || brLoading || mLoading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
+      <View style={[styles.center, { backgroundColor: t.colors.background }]}>
+        <ActivityIndicator color={t.colors.primary} />
       </View>
     );
   }
@@ -336,59 +347,281 @@ export default function OverviewScreen() {
       mErr?.data?.message ||
       "Lỗi tải dữ liệu";
     return (
-      <View style={styles.page}>
-        <Card style={{ borderColor: "#ef5350" }}>
-          <Text style={{ color: "#b71c1c" }}>{String(msg)}</Text>
-        </Card>
+      <View style={[styles.page, { backgroundColor: t.colors.background }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: t.chipWarnBg, borderColor: t.chipWarnBd },
+          ]}
+        >
+          <Text style={{ color: t.chipWarnFg }}>{String(msg)}</Text>
+        </View>
       </View>
     );
   }
   if (!canManage) {
     return (
-      <View style={styles.page}>
-        <Card style={{ borderColor: "#ffb300", backgroundColor: "#fff8e1" }}>
-          <Text style={{ color: "#8d6e63", marginBottom: 8 }}>
+      <View style={[styles.page, { backgroundColor: t.colors.background }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: t.chipWarnBg, borderColor: t.chipWarnBd },
+          ]}
+        >
+          <Text style={{ color: t.chipWarnFg, marginBottom: 8 }}>
             Bạn không có quyền truy cập trang này.
           </Text>
           <Pressable
-            style={styles.btn}
+            style={[
+              styles.btn,
+              {
+                backgroundColor: t.colors.card,
+                borderWidth: 1,
+                borderColor: t.colors.border,
+              },
+            ]}
             onPress={() => router.push(`/tournament/${id}/home`)}
           >
-            <Text style={styles.btnText}>Quay lại trang giải</Text>
+            <Text style={[styles.btnText, { color: t.colors.text }]}>
+              Quay lại trang giải
+            </Text>
           </Pressable>
-        </Card>
+        </View>
       </View>
     );
   }
 
+  /* ======================== Themed atoms ======================== */
+  const Card = ({ children, style }) => (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: t.colors.card,
+          borderColor: t.colors.border,
+          shadowColor: t.dark ? "transparent" : "#000",
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+  const Row = ({ children, style, onPress }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.row,
+        style,
+        pressed && onPress ? { opacity: 0.85 } : null,
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+  const HStack = ({ children, style }) => (
+    <View style={[styles.hstack, style]}>{children}</View>
+  );
+  const VStack = ({ children, style }) => (
+    <View style={[styles.vstack, style]}>{children}</View>
+  );
+  const Spacer = () => <View style={{ flex: 1 }} />;
+
+  const Chip = ({ label, icon, outlined, style }) => (
+    <View
+      style={[
+        outlined
+          ? {
+              flexDirection: "row",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: t.colors.border,
+              borderRadius: 16,
+              paddingVertical: 3,
+              paddingHorizontal: 8,
+              backgroundColor: t.colors.card,
+            }
+          : {
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: t.chipDefaultBg,
+              borderRadius: 16,
+              paddingVertical: 3,
+              paddingHorizontal: 8,
+            },
+        style,
+      ]}
+    >
+      {icon}
+      <Text
+        style={{
+          fontSize: 12,
+          color: outlined ? t.colors.text : t.chipDefaultFg,
+          marginLeft: icon ? 4 : 0,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
+  const StatusPill = ({ status }) => {
+    const k = String(status || "").toLowerCase();
+    const map = {
+      scheduled: {
+        bg: t.chipDefaultBg,
+        fg: t.chipDefaultFg,
+        label: "Chưa xếp",
+      },
+      queued: { bg: t.chipInfoBg, fg: t.chipInfoFg, label: "Trong hàng chờ" },
+      assigned: {
+        bg: t.chipDefaultBg,
+        fg: t.chipDefaultFg,
+        label: "Đã gán sân",
+      },
+      live: { bg: t.chipWarnBg, fg: t.chipWarnFg, label: "Đang thi đấu" },
+      finished: {
+        bg: t.chipSuccessBg,
+        fg: t.chipSuccessFg,
+        label: "Đã kết thúc",
+      },
+    };
+    const v = map[k] || {
+      bg: t.chipDefaultBg,
+      fg: t.chipDefaultFg,
+      label: status || "—",
+    };
+    return (
+      <View
+        style={{
+          borderRadius: 12,
+          paddingVertical: 3,
+          paddingHorizontal: 8,
+          backgroundColor: v.bg,
+        }}
+      >
+        <Text style={{ fontSize: 12, fontWeight: "600", color: v.fg }}>
+          {v.label}
+        </Text>
+      </View>
+    );
+  };
+
+  const ProgressBar = ({ value, height = 8 }) => (
+    <View
+      style={{
+        width: "100%",
+        backgroundColor: t.track,
+        borderRadius: 6,
+        overflow: "hidden",
+        height,
+      }}
+    >
+      <View
+        style={{
+          height: "100%",
+          width: `${Math.max(0, Math.min(100, value))}%`,
+          backgroundColor: t.colors.primary,
+        }}
+      />
+    </View>
+  );
+
+  const ListHeader = ({ columns = [] }) => (
+    <Row
+      style={{
+        backgroundColor: t.headerBg,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+      }}
+    >
+      {columns.map((c, idx) => (
+        <Cell key={idx} flex={[1, 3, 3, 3, 2][idx] || 2} isHeader>
+          {c}
+        </Cell>
+      ))}
+    </Row>
+  );
+
+  const Cell = ({ children, flex = 1, align = "left", isHeader }) => (
+    <View style={{ flex, paddingVertical: 8, paddingHorizontal: 8 }}>
+      <Text
+        style={[
+          isHeader
+            ? { fontSize: 12, color: t.muted, fontWeight: "600" }
+            : { fontSize: 13, color: t.colors.text },
+          align === "right" && { textAlign: "right" },
+        ]}
+        numberOfLines={2}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+
+  const EmptyRow = ({ text }) => (
+    <View style={{ padding: 12 }}>
+      <Text style={{ color: t.muted }}>{text}</Text>
+    </View>
+  );
+
+  const IconCircle = ({ name }) => (
+    <View
+      style={[
+        styles.iconCircle,
+        { backgroundColor: t.chipDefaultBg, borderColor: t.colors.border },
+      ]}
+    >
+      <MaterialIcons name={name} size={20} color={t.colors.text} />
+    </View>
+  );
+
   /* ======================== UI ======================== */
   return (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={styles.page}>
+    <ScrollView style={{ flex: 1, backgroundColor: t.colors.background }}>
+      <View style={[styles.page, { backgroundColor: t.colors.background }]}>
         {/* Header */}
-        <Text style={[styles.title, {marginBottom: 10}]} numberOfLines={1}>
+        <Text
+          style={[styles.title, { marginBottom: 10, color: t.colors.text }]}
+          numberOfLines={1}
+        >
           Tổng quan: {tour?.name}
         </Text>
         <HStack style={{ alignItems: "center", marginBottom: 12 }}>
           <HStack style={{ gap: 8 }}>
             <Pressable
-              style={[styles.btn, styles.btnOutlined]}
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: t.colors.card,
+                  borderWidth: 1,
+                  borderColor: t.colors.border,
+                },
+              ]}
               onPress={() => router.push(`/tournament/${id}/register`)}
             >
-              <Text style={[styles.btnText, styles.btnOutlinedText]}>
+              <Text style={[styles.btnText, { color: t.colors.text }]}>
                 Đăng ký
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.btn, styles.btnOutlined]}
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: t.colors.card,
+                  borderWidth: 1,
+                  borderColor: t.colors.border,
+                },
+              ]}
               onPress={() => router.push(`/tournament/${id}/manage`)}
             >
-              <Text style={[styles.btnText, styles.btnOutlinedText]}>
+              <Text style={[styles.btnText, { color: t.colors.text }]}>
                 Quản lý giải
               </Text>
             </Pressable>
             <Pressable
-              style={styles.btnPrimary}
+              style={[styles.btnPrimary, { backgroundColor: t.colors.primary }]}
               onPress={() => router.push(`/tournament/${id}/draw`)}
             >
               <Text style={styles.btnPrimaryText}>Bốc thăm</Text>
@@ -403,20 +636,36 @@ export default function OverviewScreen() {
             <HStack style={{ alignItems: "center", gap: 12 }}>
               <IconCircle name="groups" />
               <VStack style={{ flex: 1 }}>
-                <Text style={styles.caption}>Tổng đăng ký</Text>
-                <Text style={styles.kpi}>{regTotal}</Text>
+                <Text style={[styles.caption, { color: t.muted }]}>
+                  Tổng đăng ký
+                </Text>
+                <Text style={[styles.kpi, { color: t.colors.text }]}>
+                  {regTotal}
+                </Text>
               </VStack>
             </HStack>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: t.divider }]} />
             <HStack style={{ gap: 6, flexWrap: "wrap" }}>
               <Chip
                 outlined
-                icon={<MaterialIcons name="attach-money" size={14} />}
+                icon={
+                  <MaterialIcons
+                    name="attach-money"
+                    size={14}
+                    color={t.colors.text}
+                  />
+                }
                 label={`Đã nộp: ${regPaid}`}
               />
               <Chip
                 outlined
-                icon={<MaterialIcons name="check-circle" size={14} />}
+                icon={
+                  <MaterialIcons
+                    name="check-circle"
+                    size={14}
+                    color={t.colors.text}
+                  />
+                }
                 label={`Check-in: ${regCheckin}`}
               />
             </HStack>
@@ -427,7 +676,9 @@ export default function OverviewScreen() {
             <HStack style={{ alignItems: "center", gap: 12 }}>
               <IconCircle name="sports-score" />
               <VStack style={{ flex: 1 }}>
-                <Text style={styles.caption}>Trận theo trạng thái</Text>
+                <Text style={[styles.caption, { color: t.muted }]}>
+                  Trận theo trạng thái
+                </Text>
                 <HStack style={{ flexWrap: "wrap", gap: 6 }}>
                   {Object.entries(matchStatusCount).map(([k, v]) =>
                     k === "other" || v === 0 ? null : (
@@ -437,7 +688,7 @@ export default function OverviewScreen() {
                 </HStack>
               </VStack>
             </HStack>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: t.divider }]} />
             <VStack style={{ gap: 8 }}>
               {["scheduled", "queued", "assigned", "live", "finished"].map(
                 (k) => {
@@ -446,7 +697,7 @@ export default function OverviewScreen() {
                   const pct = Math.round((val * 100) / total);
                   return (
                     <VStack key={k}>
-                      <Text style={styles.caption}>
+                      <Text style={[styles.caption, { color: t.muted }]}>
                         {k} • {val}/{allMatches.length}
                       </Text>
                       <ProgressBar value={pct} height={6} />
@@ -462,12 +713,16 @@ export default function OverviewScreen() {
             <HStack style={{ alignItems: "center", gap: 12 }}>
               <IconCircle name="movie" />
               <VStack style={{ flex: 1 }}>
-                <Text style={styles.caption}>Video gắn với trận</Text>
-                <Text style={styles.kpi}>{videoCount}</Text>
+                <Text style={[styles.caption, { color: t.muted }]}>
+                  Video gắn với trận
+                </Text>
+                <Text style={[styles.kpi, { color: t.colors.text }]}>
+                  {videoCount}
+                </Text>
               </VStack>
             </HStack>
-            <View style={styles.divider} />
-            <Text style={styles.caption}>
+            <View style={[styles.divider, { backgroundColor: t.divider }]} />
+            <Text style={[styles.caption, { color: t.muted }]}>
               Số trận đã gán URL video (live/VOD).
             </Text>
           </Card>
@@ -477,13 +732,15 @@ export default function OverviewScreen() {
             <HStack style={{ alignItems: "center", gap: 12 }}>
               <IconCircle name="done-all" />
               <VStack style={{ flex: 1 }}>
-                <Text style={styles.caption}>Tiến độ tổng</Text>
-                <Text style={styles.kpi}>
+                <Text style={[styles.caption, { color: t.muted }]}>
+                  Tiến độ tổng
+                </Text>
+                <Text style={[styles.kpi, { color: t.colors.text }]}>
                   {matchStatusCount.finished}/{allMatches.length}
                 </Text>
               </VStack>
             </HStack>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: t.divider }]} />
             <ProgressBar
               value={Math.round(
                 ((matchStatusCount.finished || 0) * 100) /
@@ -497,13 +754,20 @@ export default function OverviewScreen() {
         {/* Bracket progress */}
         <Card style={{ marginTop: 12 }}>
           <HStack style={{ alignItems: "center", marginBottom: 8 }}>
-            <Text style={styles.sectionTitle}>Tiến độ các bracket</Text>
+            <Text style={[styles.sectionTitle, { color: t.colors.text }]}>
+              Tiến độ các bracket
+            </Text>
             <Spacer />
             <Chip outlined label={`${brackets.length} bracket`} />
           </HStack>
           {bracketProgress.length === 0 ? (
-            <View style={[styles.alert, { backgroundColor: "#e3f2fd" }]}>
-              <Text style={{ color: "#1565c0" }}>Chưa có bracket nào.</Text>
+            <View
+              style={[
+                styles.alert,
+                { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
+              ]}
+            >
+              <Text style={{ color: t.chipInfoFg }}>Chưa có bracket nào.</Text>
             </View>
           ) : (
             <FlatList
@@ -514,7 +778,7 @@ export default function OverviewScreen() {
                   ((b.finished || 0) * 100) / (b.total || 1)
                 );
                 return (
-                  <Card style={{ marginBottom: 8, borderColor: "#e0e0e0" }}>
+                  <Card style={{ marginBottom: 8 }}>
                     <VStack style={{ gap: 6 }}>
                       <HStack
                         style={{
@@ -523,7 +787,10 @@ export default function OverviewScreen() {
                           flexWrap: "wrap",
                         }}
                       >
-                        <Text style={styles.subtitle} numberOfLines={1}>
+                        <Text
+                          style={[styles.subtitle, { color: t.colors.text }]}
+                          numberOfLines={1}
+                        >
                           {b.name}
                         </Text>
                         <Chip outlined label={TYPE_LABEL(b.type)} />
@@ -531,7 +798,7 @@ export default function OverviewScreen() {
                           <Chip outlined label={`Stage ${b.stage}`} />
                         )}
                       </HStack>
-                      <Text style={styles.caption}>
+                      <Text style={[styles.caption, { color: t.muted }]}>
                         {b.finished}/{b.total} trận đã xong
                       </Text>
                       <ProgressBar value={pct} height={8} />
@@ -548,8 +815,13 @@ export default function OverviewScreen() {
           {/* Upcoming */}
           <Card style={{ flexBasis: "100%", flexGrow: 1 }}>
             <HStack style={{ alignItems: "center", marginBottom: 6 }}>
-              <MaterialIcons name="schedule" size={18} />
-              <Text style={[styles.sectionTitle, { marginLeft: 6 }]}>
+              <MaterialIcons name="schedule" size={18} color={t.colors.text} />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { marginLeft: 6, color: t.colors.text },
+                ]}
+              >
                 Trận sắp diễn ra
               </Text>
               <Spacer />
@@ -575,7 +847,11 @@ export default function OverviewScreen() {
                     </Cell>
                   </Row>
                 )}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ItemSeparatorComponent={() => (
+                  <View
+                    style={[styles.separator, { backgroundColor: t.divider }]}
+                  />
+                )}
               />
             )}
           </Card>
@@ -583,8 +859,17 @@ export default function OverviewScreen() {
           {/* Recent finished */}
           <Card style={{ flexBasis: "100%", flexGrow: 1 }}>
             <HStack style={{ alignItems: "center", marginBottom: 6 }}>
-              <MaterialIcons name="play-circle" size={18} />
-              <Text style={[styles.sectionTitle, { marginLeft: 6 }]}>
+              <MaterialIcons
+                name="play-circle"
+                size={18}
+                color={t.colors.text}
+              />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { marginLeft: 6, color: t.colors.text },
+                ]}
+              >
                 Kết quả mới xong
               </Text>
               <Spacer />
@@ -609,9 +894,13 @@ export default function OverviewScreen() {
                       {m?.video ? (
                         <Pressable
                           style={styles.iconBtn}
-                          onPress={(e) => Linking.openURL(String(m.video))}
+                          onPress={() => Linking.openURL(String(m.video))}
                         >
-                          <MaterialIcons name="open-in-new" size={18} />
+                          <MaterialIcons
+                            name="open-in-new"
+                            size={18}
+                            color={t.colors.text}
+                          />
                         </Pressable>
                       ) : (
                         <Chip outlined label="—" />
@@ -619,7 +908,11 @@ export default function OverviewScreen() {
                     </Cell>
                   </Row>
                 )}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ItemSeparatorComponent={() => (
+                  <View
+                    style={[styles.separator, { backgroundColor: t.divider }]}
+                  />
+                )}
               />
             )}
           </Card>
@@ -636,154 +929,45 @@ export default function OverviewScreen() {
   );
 }
 
-/* ======================== Sub-components for list/table ======================== */
-const ListHeader = ({ columns = [] }) => (
-  <Row
-    style={{
-      backgroundColor: "#fafafa",
-      borderTopLeftRadius: 8,
-      borderTopRightRadius: 8,
-    }}
-  >
-    {columns.map((c, idx) => (
-      <Cell key={idx} flex={[1, 3, 3, 3, 2][idx] || 2} isHeader>
-        {c}
-      </Cell>
-    ))}
-  </Row>
-);
-const Cell = ({ children, flex = 1, align = "left", isHeader }) => (
-  <View style={{ flex, paddingVertical: 8, paddingHorizontal: 8 }}>
-    <Text
-      style={[
-        isHeader ? styles.th : styles.td,
-        align === "right" && { textAlign: "right" },
-      ]}
-      numberOfLines={2}
-    >
-      {children}
-    </Text>
-  </View>
-);
-const EmptyRow = ({ text }) => (
-  <View style={{ padding: 12 }}>
-    <Text style={{ color: "#757575" }}>{text}</Text>
-  </View>
-);
-
-const IconCircle = ({ name }) => (
-  <View style={styles.iconCircle}>
-    <MaterialIcons name={name} size={20} />
-  </View>
-);
-
-/* ======================== Styles ======================== */
+/* ======================== Styles (layout/spacing only) ======================== */
 const styles = StyleSheet.create({
-  page: { flex: 1, padding: 12, backgroundColor: "#fff" },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
+  page: { flex: 1, padding: 12 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
   title: { fontSize: 20, fontWeight: "600" },
   sectionTitle: { fontSize: 18, fontWeight: "600" },
   subtitle: { fontSize: 14, fontWeight: "600" },
-  caption: { fontSize: 12, color: "#616161" },
+  caption: { fontSize: 12 },
   kpi: { fontSize: 18, fontWeight: "700" },
+
   card: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  divider: { height: 1, backgroundColor: "#eee", marginVertical: 10 },
+  divider: { height: 1, marginVertical: 10 },
 
   hstack: { flexDirection: "row" },
   vstack: { flexDirection: "column" },
 
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#eeeeee",
-    borderRadius: 16,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-  },
-  chipOutlined: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 16,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    backgroundColor: "#fff",
-  },
-  chipText: { fontSize: 12 },
-
-  pill: {
-    borderRadius: 12,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    alignSelf: "flex-start",
-  },
-  pillText: { fontSize: 12, fontWeight: "600" },
-
-  progressWrap: {
-    width: "100%",
-    backgroundColor: "#eee",
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: Platform.select({
-      ios: "#1976d2",
-      android: "#1976d2",
-      default: "#1976d2",
-    }),
-  },
-
   row: { flexDirection: "row", alignItems: "center" },
-  th: { fontSize: 12, color: "#616161", fontWeight: "600" },
-  td: { fontSize: 13, color: "#212121" },
-  separator: { height: 1, backgroundColor: "#eee" },
+  separator: { height: 1 },
 
-  alert: {
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#bbdefb",
-  },
+  alert: { borderRadius: 10, padding: 12, borderWidth: 1 },
 
   btn: {
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: "#eeeeee",
     flexDirection: "row",
     alignItems: "center",
   },
   btnText: { fontWeight: "600" },
-  btnOutlined: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  btnOutlinedText: { color: "#1f1f1f" },
-  btnPrimary: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#1976d2",
-  },
+  btnPrimary: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   btnPrimaryText: { color: "#fff", fontWeight: "700" },
   iconBtn: { padding: 6, alignItems: "center", justifyContent: "center" },
 
@@ -791,13 +975,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#eeeeee",
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  modalRoot: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  modalRoot: { flex: 1, padding: 16 },
   modalTitle: { fontSize: 18, fontWeight: "700" },
-  label: { fontSize: 12, color: "#616161" },
+  label: { fontSize: 12 },
   value: { fontSize: 14, fontWeight: "600" },
 });

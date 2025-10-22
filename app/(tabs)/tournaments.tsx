@@ -19,6 +19,7 @@ import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { usePlatform } from "@/hooks/usePlatform";
+import { useTheme } from "@react-navigation/native";
 
 const SKELETON_COUNT = 6;
 const BANNER_RATIO = 16 / 9; // Ảnh đầu card tỉ lệ 16:9
@@ -28,11 +29,6 @@ const STATUS_LABEL = {
   upcoming: "Sắp diễn ra",
   ongoing: "Đang diễn ra",
   finished: "Đã diễn ra",
-};
-const STATUS_BG = {
-  upcoming: "#0288d1",
-  ongoing: "#2e7d32",
-  finished: "#9e9e9e",
 };
 
 function formatDate(d) {
@@ -46,6 +42,54 @@ function formatDate(d) {
   } catch {
     return "-";
   }
+}
+
+/* ---------- Theme tokens ---------- */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e4e8ef");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f5f7fb");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+
+    muted: dark ? "#9aa0a6" : "#6b7280",
+    subtext: dark ? "#c9c9c9" : "#555",
+    skeletonBase: dark ? "#22262c" : "#e9eef5",
+    headerBg: dark ? "#101418" : "#f1f5f9",
+    divider: dark ? "#2a2e33" : "#e5e7eb",
+
+    // Chips
+    chipInfoBg: dark ? "#1f2937" : "#eef2f7",
+    chipInfoFg: dark ? "#e5e7eb" : "#263238",
+    chipInfoBd: dark ? "#334155" : "#e2e8f0",
+
+    chipErrBg: dark ? "#3b0d0d" : "#fee2e2",
+    chipErrFg: dark ? "#fecaca" : "#991b1b",
+    chipErrBd: dark ? "#7f1d1d" : "#fecaca",
+
+    chipInfo2Bg: dark ? "#0f2536" : "#e0f2fe",
+    chipInfo2Fg: dark ? "#93c5fd" : "#075985",
+    chipInfo2Bd: dark ? "#1e3a5f" : "#bae6fd",
+
+    success: dark ? "#22c55e" : "#16a34a",
+
+    // Status chip bg
+    status: {
+      upcoming: dark ? "#0b5fad" : "#0288d1",
+      ongoing: dark ? "#1c6b2a" : "#2e7d32",
+      finished: dark ? "#5f6368" : "#9e9e9e",
+    },
+  };
 }
 
 /* ---------- Skeleton utilities ---------- */
@@ -148,15 +192,7 @@ function SkeletonCard({ border, cardBg, skBase }) {
 
 export default function TournamentDashboardScreen() {
   const { isIOS } = usePlatform();
-
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const bg = scheme === "dark" ? "#0b0d10" : "#f5f7fb";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const border = scheme === "dark" ? "#2e2f33" : "#e4e8ef";
-  const text = scheme === "dark" ? "#f7f7f7" : "#111";
-  const subtext = scheme === "dark" ? "#c9c9c9" : "#555";
-  const skBase = scheme === "dark" ? "#22262c" : "#e9eef5";
+  const t = useTokens();
 
   const me = useSelector((s) => s.auth?.userInfo || null);
   const isAdmin = !!(
@@ -164,16 +200,16 @@ export default function TournamentDashboardScreen() {
     me?.role === "admin" ||
     (Array.isArray(me?.roles) && me.roles.includes("admin"))
   );
-  const isManagerOf = (t) => {
+  const isManagerOf = (tt) => {
     if (!me?._id) return false;
-    if (String(t?.createdBy) === String(me._id)) return true;
-    if (Array.isArray(t?.managers)) {
-      return t.managers.some((m) => String(m?.user ?? m) === String(me._id));
+    if (String(tt?.createdBy) === String(me._id)) return true;
+    if (Array.isArray(tt?.managers)) {
+      return tt.managers.some((m) => String(m?.user ?? m) === String(me._id));
     }
-    if (typeof t?.isManager !== "undefined") return !!t.isManager;
+    if (typeof tt?.isManager !== "undefined") return !!tt.isManager;
     return false;
   };
-  const canManage = (t) => isAdmin || isManagerOf(t);
+  const canManage = (tt) => isAdmin || isManagerOf(tt);
 
   // /tournaments/DashboardScreen?sportType=2&groupId=0&status=ongoing&q=abc
   const { sportType = "2", groupId = "0", status, q } = useLocalSearchParams();
@@ -187,8 +223,8 @@ export default function TournamentDashboardScreen() {
   const [search, setSearch] = useState(q ? String(q).toLowerCase() : "");
 
   useEffect(() => {
-    const t = setTimeout(() => setSearch(keyword.trim().toLowerCase()), 300);
-    return () => clearTimeout(t);
+    const tt = setTimeout(() => setSearch(keyword.trim().toLowerCase()), 300);
+    return () => clearTimeout(tt);
   }, [keyword]);
 
   const {
@@ -217,26 +253,31 @@ export default function TournamentDashboardScreen() {
   const filtered = useMemo(() => {
     const list = Array.isArray(tournaments) ? tournaments : [];
     return list
-      .filter((t) => t.status === tab)
-      .filter((t) => (search ? t.name?.toLowerCase().includes(search) : true));
+      .filter((tt) => tt.status === tab)
+      .filter((tt) =>
+        search ? tt.name?.toLowerCase().includes(search) : true
+      );
   }, [tournaments, tab, search]);
 
-  const onPressCard = (t) => router.push(`/tournament/${t._id}`);
+  const onPressCard = (tt) => router.push(`/tournament/${tt._id}`);
 
   // === Card render: Ảnh full width ở trên, nội dung bên dưới ===
-  const renderItem = ({ item: t }) => (
+  const renderItem = ({ item: tt }) => (
     <View
-      style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+      style={[
+        styles.card,
+        { backgroundColor: t.colors.card, borderColor: t.colors.border },
+      ]}
     >
       {/* Ảnh trên cùng, full width */}
       <Pressable
-        onPress={() => setPreview(t.image)}
+        onPress={() => setPreview(tt.image)}
         style={{ marginBottom: 10 }}
       >
         <ExpoImage
           source={{
             uri:
-              normalizeUrl(t.image) ||
+              normalizeUrl(tt.image) ||
               "https://dummyimage.com/1200x675/cccccc/ffffff&text=No+Image",
           }}
           style={{
@@ -244,25 +285,28 @@ export default function TournamentDashboardScreen() {
             aspectRatio: BANNER_RATIO,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: border,
+            borderColor: t.colors.border,
           }}
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={120}
-          recyclingKey={String(t._id)}
+          recyclingKey={String(tt._id)}
         />
       </Pressable>
 
       {/* Nội dung */}
       <View style={{ gap: 6 }}>
-        <Pressable onPress={() => onPressCard(t)}>
-          <Text style={[styles.title, { color: text }]} numberOfLines={2}>
-            {t.name}
+        <Pressable onPress={() => onPressCard(tt)}>
+          <Text
+            style={[styles.title, { color: t.colors.text }]}
+            numberOfLines={2}
+          >
+            {tt.name}
           </Text>
         </Pressable>
 
-        <Text style={{ color: subtext, marginTop: 2 }}>
-          Đăng ký đến {formatDate(t.registrationDeadline)}
+        <Text style={{ color: t.subtext, marginTop: 2 }}>
+          Đăng ký đến {formatDate(tt.registrationDeadline)}
         </Text>
 
         <View
@@ -274,14 +318,15 @@ export default function TournamentDashboardScreen() {
             flexWrap: "wrap",
           }}
         >
-          <StatusChip status={t.status} />
+          <StatusChip status={tt.status} t={t} />
           <InfoChip
-            label={`Thời gian: ${formatDate(t.startDate)} – ${formatDate(
-              t.endDate
+            t={t}
+            label={`Thời gian: ${formatDate(tt.startDate)} – ${formatDate(
+              tt.endDate
             )}`}
           />
-          <InfoChip label={`Địa điểm: ${t.location || "-"}`} />
-          <InfoChip label={`Đăng ký: ${t.registered}/${t.maxPairs}`} />
+          <InfoChip t={t} label={`Địa điểm: ${tt.location || "-"}`} />
+          <InfoChip t={t} label={`Đăng ký: ${tt.registered}/${tt.maxPairs}`} />
         </View>
 
         <View
@@ -292,36 +337,41 @@ export default function TournamentDashboardScreen() {
             marginTop: 10,
           }}
         >
-          {t.status === "ongoing" ? (
+          {tt.status === "ongoing" ? (
             <PrimaryBtn
-              onPress={() => router.push(`/tournament/${t._id}/schedule`)}
+              t={t}
+              onPress={() => router.push(`/tournament/${tt._id}/schedule`)}
             >
               Lịch đấu
             </PrimaryBtn>
           ) : (
             <PrimaryBtn
-              onPress={() => router.push(`/tournament/${t._id}/register`)}
+              t={t}
+              onPress={() => router.push(`/tournament/${tt._id}/register`)}
             >
               Đăng ký
             </PrimaryBtn>
           )}
-          {t.status === "ongoing" && canManage(t) && (
+          {tt.status === "ongoing" && canManage(tt) && (
             <PrimaryBtn
-              onPress={() => router.push(`/tournament/${t._id}/register`)}
+              t={t}
+              onPress={() => router.push(`/tournament/${tt._id}/register`)}
             >
               Đăng ký
             </PrimaryBtn>
           )}
           <SuccessBtn
-            onPress={() => router.push(`/tournament/${t._id}/checkin`)}
+            t={t}
+            onPress={() => router.push(`/tournament/${tt._id}/checkin`)}
           >
             Check-in
           </SuccessBtn>
           <OutlineBtn
+            t={t}
             onPress={() =>
               router.push({
                 pathname: "/tournament/[id]/bracket",
-                params: { id: t._id },
+                params: { id: tt._id },
               })
             }
           >
@@ -343,28 +393,26 @@ export default function TournamentDashboardScreen() {
       <View
         style={[
           styles.screen,
-          { backgroundColor: bg },
+          { backgroundColor: t.colors.background },
           isIOS && { marginBottom: 70 },
         ]}
       >
         {/* Tabs */}
-        <TabsBar
-          value={tab}
-          onChange={setTab}
-          tint={tint}
-          text={text}
-          border={border}
-        />
+        <TabsBar value={tab} onChange={setTab} t={t} />
 
         {/* Search */}
         <TextInput
           value={keyword}
           onChangeText={setKeyword}
           placeholder="Tìm kiếm tên giải"
-          placeholderTextColor="#9aa0a6"
+          placeholderTextColor={t.muted}
           style={[
             styles.input,
-            { borderColor: border, color: text, backgroundColor: cardBg },
+            {
+              borderColor: t.colors.border,
+              color: t.colors.text,
+              backgroundColor: t.colors.card,
+            },
           ]}
         />
 
@@ -373,10 +421,10 @@ export default function TournamentDashboardScreen() {
           <View
             style={[
               styles.alert,
-              { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+              { borderColor: t.chipErrBd, backgroundColor: t.chipErrBg },
             ]}
           >
-            <Text style={{ color: "#991b1b" }}>
+            <Text style={{ color: t.chipErrFg }}>
               {error?.data?.message || error?.error || "Đã có lỗi xảy ra."}
             </Text>
           </View>
@@ -391,9 +439,9 @@ export default function TournamentDashboardScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={() => (
                   <SkeletonCard
-                    border={border}
-                    cardBg={cardBg}
-                    skBase={skBase}
+                    border={t.colors.border}
+                    cardBg={t.colors.card}
+                    skBase={t.skeletonBase}
                   />
                 )}
                 contentContainerStyle={{ paddingBottom: 24 }}
@@ -403,7 +451,7 @@ export default function TournamentDashboardScreen() {
                 ListFooterComponent={
                   isFetching && !isLoading ? (
                     <View style={{ paddingTop: 8, alignItems: "center" }}>
-                      <Text style={{ color: subtext, fontSize: 12 }}>
+                      <Text style={{ color: t.subtext, fontSize: 12 }}>
                         Đang tải dữ liệu…
                       </Text>
                     </View>
@@ -423,10 +471,13 @@ export default function TournamentDashboardScreen() {
                   <View
                     style={[
                       styles.alert,
-                      { borderColor: "#0284c7", backgroundColor: "#e0f2fe" },
+                      {
+                        borderColor: t.chipInfo2Bd,
+                        backgroundColor: t.chipInfo2Bg,
+                      },
                     ]}
                   >
-                    <Text style={{ color: "#075985" }}>
+                    <Text style={{ color: t.chipInfo2Fg }}>
                       Không có giải nào phù hợp.
                     </Text>
                   </View>
@@ -448,7 +499,10 @@ export default function TournamentDashboardScreen() {
             <View
               style={[
                 styles.modalCard,
-                { backgroundColor: cardBg, borderColor: border },
+                {
+                  backgroundColor: t.colors.card,
+                  borderColor: t.colors.border,
+                },
               ]}
             >
               <Pressable
@@ -481,10 +535,15 @@ export default function TournamentDashboardScreen() {
   );
 }
 
-/* ---------- Small UI pieces ---------- */
-function TabsBar({ value, onChange, tint, text, border }) {
+/* ---------- Small UI pieces (themed via t prop) ---------- */
+function TabsBar({ value, onChange, t }) {
   return (
-    <View style={[styles.tabs, { borderColor: border }]}>
+    <View
+      style={[
+        styles.tabs,
+        { borderColor: t.colors.border, backgroundColor: t.colors.card },
+      ]}
+    >
       {TABS.map((v) => {
         const active = v === value;
         return (
@@ -494,13 +553,18 @@ function TabsBar({ value, onChange, tint, text, border }) {
             style={({ pressed }) => [
               styles.tabItem,
               {
-                backgroundColor: active ? tint : "transparent",
-                borderColor: active ? tint : border,
+                backgroundColor: active ? t.colors.primary : "transparent",
+                borderColor: active ? t.colors.primary : t.colors.border,
               },
               pressed && { opacity: 0.95 },
             ]}
           >
-            <Text style={{ color: active ? "#fff" : text, fontWeight: "700" }}>
+            <Text
+              style={{
+                color: active ? "#fff" : t.colors.text,
+                fontWeight: "700",
+              }}
+            >
               {STATUS_LABEL[v]}
             </Text>
           </Pressable>
@@ -510,8 +574,8 @@ function TabsBar({ value, onChange, tint, text, border }) {
   );
 }
 
-function StatusChip({ status }) {
-  const bg = STATUS_BG[status] || "#9e9e9e";
+function StatusChip({ status, t }) {
+  const bg = t.status[status] || t.status.finished;
   return (
     <View
       style={{
@@ -527,27 +591,29 @@ function StatusChip({ status }) {
     </View>
   );
 }
-function InfoChip({ label }) {
+function InfoChip({ label, t }) {
   return (
     <View
       style={{
-        backgroundColor: "#eef2f7",
+        backgroundColor: t.chipInfoBg,
+        borderColor: t.chipInfoBd,
+        borderWidth: 1,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 8,
       }}
     >
-      <Text style={{ color: "#263238", fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: t.chipInfoFg, fontSize: 12 }}>{label}</Text>
     </View>
   );
 }
-function PrimaryBtn({ onPress, children }) {
+function PrimaryBtn({ onPress, children, t }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
-        styles.btnPrimary,
+        { backgroundColor: t.colors.primary },
         pressed && { opacity: 0.9 },
       ]}
     >
@@ -555,13 +621,13 @@ function PrimaryBtn({ onPress, children }) {
     </Pressable>
   );
 }
-function SuccessBtn({ onPress, children }) {
+function SuccessBtn({ onPress, children, t }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: "#16a34a" },
+        { backgroundColor: t.success },
         pressed && { opacity: 0.9 },
       ]}
     >
@@ -569,22 +635,28 @@ function SuccessBtn({ onPress, children }) {
     </Pressable>
   );
 }
-function OutlineBtn({ onPress, children }) {
+function OutlineBtn({ onPress, children, t }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
-        styles.btnOutline,
+        {
+          borderWidth: 1,
+          borderColor: t.colors.primary,
+          backgroundColor: "transparent",
+        },
         pressed && { opacity: 0.95 },
       ]}
     >
-      <Text style={{ fontWeight: "700", color: "#0a84ff" }}>{children}</Text>
+      <Text style={{ fontWeight: "700", color: t.colors.primary }}>
+        {children}
+      </Text>
     </Pressable>
   );
 }
 
-/* ---------- Styles ---------- */
+/* ---------- Styles (layout/spacing only) ---------- */
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 16 },
   input: {
@@ -625,17 +697,7 @@ const styles = StyleSheet.create({
     gap: 10, // khoảng cách giữa ảnh và nội dung
   },
   title: { fontSize: 16, fontWeight: "700" },
-  btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-  },
-  btnPrimary: { backgroundColor: "#0a84ff" },
-  btnOutline: {
-    borderWidth: 1,
-    borderColor: "#0a84ff",
-    backgroundColor: "transparent",
-  },
+  btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   btnTextWhite: { color: "#fff", fontWeight: "700" },
   modalBackdrop: {
     flex: 1,

@@ -5,7 +5,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +16,8 @@ import {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { MaterialIcons } from "@expo/vector-icons"; // nếu không dùng Expo: dùng react-native-vector-icons/MaterialIcons
+import { MaterialIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 
 import {
   useListTournamentRefereesQuery,
@@ -26,7 +26,7 @@ import {
 import { useAdminSearchRefereesQuery } from "@/slices/tournamentsApiSlice";
 
 /* ---------------- helpers ---------------- */
-const personNickname = (p) =>
+const personNickname = (p: any) =>
   p?.nickname ||
   p?.nickName ||
   p?.nick ||
@@ -35,28 +35,43 @@ const personNickname = (p) =>
   p?.name ||
   "—";
 
-const InitialAvatar = ({ name }) => {
+const InitialAvatar = ({ name }: { name?: string }) => {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const ch = (name?.trim?.()[0] || "U").toUpperCase();
   return (
-    <View style={styles.avatar}>
+    <View style={s.avatar}>
       <Text style={{ color: "#fff", fontWeight: "700" }}>{ch}</Text>
     </View>
   );
 };
 
-const Row = ({ children, style }) => (
-  <View style={[styles.row, style]}>{children}</View>
-);
+const Row = ({ children, style }: any) => {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  return <View style={[s.row, style]}>{children}</View>;
+};
 
-const Chip = ({ children, tone = "default" }) => {
+// Themed Chip
+const Chip = ({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "info";
+}) => {
+  const { colors, dark } = useTheme();
+  const s = useMemo(() => makeStyles(colors, dark), [colors, dark]);
+
   const map = {
-    default: { bg: "#eef2f7", fg: "#263238" },
-    info: { bg: "#e0f2fe", fg: "#075985" },
-  };
-  const c = map[tone] || map.default;
+    default: { bg: s.chipDefaultBg, fg: s.chipDefaultFg },
+    info: { bg: s.chipInfoBg, fg: s.chipInfoFg },
+  } as const;
+
+  const c = tone === "info" ? map.info : map.default;
   return (
-    <View style={[styles.chip, { backgroundColor: c.bg }]}>
-      <Text style={{ color: c.fg, fontSize: 12, fontWeight: "600" }}>
+    <View style={[s.chip, { backgroundColor: c.bg }]}>
+      <Text style={{ color: c.fg as string, fontSize: 12, fontWeight: "600" }}>
         {children}
       </Text>
     </View>
@@ -70,9 +85,18 @@ export default function ManageRefereesSheet({
   onClose,
   onChanged,
   snapPoints: snapPointsProp,
+}: {
+  open: boolean;
+  tournamentId?: string;
+  onClose?: () => void;
+  onChanged?: () => void;
+  snapPoints?: (string | number)[];
 }) {
+  const { colors, dark } = useTheme();
+  const s = useMemo(() => makeStyles(colors, dark), [colors, dark]);
+
   const snapPoints = useMemo(() => snapPointsProp || ["80%"], [snapPointsProp]);
-  const sheetRef = useRef(null);
+  const sheetRef = useRef<BottomSheetModal>(null);
 
   // debounce search q
   const [q, setQ] = useState("");
@@ -94,28 +118,28 @@ export default function ManageRefereesSheet({
     isLoading: loadingAssigned,
     refetch: refetchAssigned,
   } = useListTournamentRefereesQuery(
-    { tid: tournamentId, q: "" },
+    { tid: tournamentId as string, q: "" },
     { skip: !open || !tournamentId }
   );
 
   const { data: candidates = [], isLoading: loadingSearch } =
     useAdminSearchRefereesQuery(
-      { tid: tournamentId, q: debouncedQ },
+      { tid: tournamentId as string, q: debouncedQ },
       { skip: !open || !tournamentId }
     );
 
   const [upsert, { isLoading: saving }] = useUpsertTournamentRefereesMutation();
 
-  const isAssigned = (id) =>
-    (assigned || []).some((u) => String(u._id) === String(id));
+  const isAssigned = (id: string) =>
+    (assigned || []).some((u: any) => String(u._id) === String(id));
 
-  const handleAdd = async (userId) => {
+  const handleAdd = async (userId: string) => {
     try {
       await upsert({ tid: tournamentId, add: [userId] }).unwrap();
       Alert.alert("Thành công", "Đã thêm trọng tài vào giải");
       refetchAssigned?.();
       onChanged?.();
-    } catch (e) {
+    } catch (e: any) {
       Alert.alert(
         "Lỗi",
         e?.data?.message || e?.error || "Thêm trọng tài thất bại"
@@ -123,13 +147,13 @@ export default function ManageRefereesSheet({
     }
   };
 
-  const handleRemove = async (userId) => {
+  const handleRemove = async (userId: string) => {
     try {
       await upsert({ tid: tournamentId, remove: [userId] }).unwrap();
       Alert.alert("Thành công", "Đã bỏ trọng tài khỏi giải");
       refetchAssigned?.();
       onChanged?.();
-    } catch (e) {
+    } catch (e: any) {
       Alert.alert(
         "Lỗi",
         e?.data?.message || e?.error || "Bỏ trọng tài thất bại"
@@ -143,52 +167,58 @@ export default function ManageRefereesSheet({
       snapPoints={snapPoints}
       onDismiss={onClose}
       backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+        <BottomSheetBackdrop
+          {...p}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          opacity={0.5}
+        />
       )}
-      handleIndicatorStyle={{ backgroundColor: "#cbd5e1" }}
+      handleIndicatorStyle={{ backgroundColor: colors.border }}
+      backgroundStyle={{ backgroundColor: colors.card }}
     >
-      <BottomSheetScrollView contentContainerStyle={styles.container}>
+      <BottomSheetScrollView contentContainerStyle={s.container}>
         {/* Header */}
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
           <Row style={{ alignItems: "center", gap: 8 }}>
-            <MaterialIcons name="how-to-reg" size={18} color="#111" />
-            <Text style={styles.title}>Quản lý trọng tài của giải</Text>
+            <MaterialIcons name="how-to-reg" size={18} color={colors.text} />
+            <Text style={s.title}>Quản lý trọng tài của giải</Text>
           </Row>
           <Pressable
             onPress={() => sheetRef.current?.dismiss()}
             hitSlop={8}
             style={({ pressed }) => [pressed && { opacity: 0.7 }]}
           >
-            <MaterialIcons name="close" size={20} color="#111" />
+            <MaterialIcons name="close" size={20} color={colors.text} />
           </Pressable>
         </Row>
 
         {/* Assigned card */}
-        <View style={styles.card}>
+        <View style={s.card}>
           <Row
             style={{ justifyContent: "space-between", alignItems: "center" }}
           >
-            <Text style={styles.cardTitle}>Đang là trọng tài</Text>
+            <Text style={s.cardTitle}>Đang là trọng tài</Text>
             <Chip tone="info">{(assigned || []).length} người</Chip>
           </Row>
 
           {loadingAssigned ? (
-            <View style={styles.center}>
+            <View style={s.center}>
               <ActivityIndicator />
             </View>
           ) : (assigned?.length || 0) === 0 ? (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>Chưa có trọng tài nào.</Text>
+            <View style={s.infoBox}>
+              <Text style={s.infoText}>Chưa có trọng tài nào.</Text>
             </View>
           ) : (
             <View style={{ gap: 6 }}>
-              {assigned.map((u) => (
-                <Row key={u._id} style={styles.itemRow}>
+              {(assigned as any[]).map((u) => (
+                <Row key={u._id} style={s.itemRow}>
                   <Row style={{ alignItems: "center", gap: 10 }}>
                     <InitialAvatar name={personNickname(u)} />
                     <View style={{ gap: 2 }}>
-                      <Text style={styles.itemName}>{personNickname(u)}</Text>
-                      <Text style={styles.itemMeta}>
+                      <Text style={s.itemName}>{personNickname(u)}</Text>
+                      <Text style={s.itemMeta}>
                         {u?.email || u?.phone || ""}
                       </Text>
                     </View>
@@ -197,7 +227,7 @@ export default function ManageRefereesSheet({
                     onPress={() => handleRemove(u._id)}
                     disabled={saving}
                     style={({ pressed }) => [
-                      styles.iconBtn,
+                      s.iconBtn,
                       pressed && { opacity: 0.8 },
                     ]}
                   >
@@ -214,15 +244,19 @@ export default function ManageRefereesSheet({
         </View>
 
         {/* Search & add card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Tìm người để thêm trọng tài</Text>
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Tìm người để thêm trọng tài</Text>
 
-          <View style={styles.inputWrap}>
-            <MaterialIcons name="person-search" size={18} color="#64748b" />
+          <View style={s.inputWrap}>
+            <MaterialIcons
+              name="person-search"
+              size={18}
+              color={s.mutedColor}
+            />
             <TextInput
-              style={styles.input}
+              style={s.input}
               placeholder="Nhập tên/nickname/email để tìm…"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={s.placeholderColor as string}
               value={q}
               onChangeText={setQ}
               autoCapitalize="none"
@@ -233,12 +267,12 @@ export default function ManageRefereesSheet({
 
           <View style={{ marginTop: 10 }}>
             {loadingSearch ? (
-              <View style={styles.center}>
+              <View style={s.center}>
                 <ActivityIndicator />
               </View>
             ) : (candidates?.length || 0) === 0 ? (
-              <View style={styles.infoBox}>
-                <Text style={styles.infoText}>Không có kết quả phù hợp.</Text>
+              <View style={s.infoBox}>
+                <Text style={s.infoText}>Không có kết quả phù hợp.</Text>
               </View>
             ) : (
               <ScrollView
@@ -246,17 +280,15 @@ export default function ManageRefereesSheet({
                 contentContainerStyle={{ gap: 6 }}
                 keyboardShouldPersistTaps="handled"
               >
-                {candidates.map((u) => {
+                {(candidates as any[]).map((u) => {
                   const already = isAssigned(u._id);
                   return (
-                    <Row key={u._id} style={styles.itemRow}>
+                    <Row key={u._id} style={s.itemRow}>
                       <Row style={{ alignItems: "center", gap: 10 }}>
                         <InitialAvatar name={personNickname(u)} />
                         <View style={{ gap: 2 }}>
-                          <Text style={styles.itemName}>
-                            {personNickname(u)}
-                          </Text>
-                          <Text style={styles.itemMeta}>
+                          <Text style={s.itemName}>{personNickname(u)}</Text>
+                          <Text style={s.itemMeta}>
                             {u?.email || u?.phone || ""}
                           </Text>
                         </View>
@@ -265,7 +297,7 @@ export default function ManageRefereesSheet({
                         onPress={() => handleAdd(u._id)}
                         disabled={saving || already}
                         style={({ pressed }) => [
-                          styles.iconBtn,
+                          s.iconBtn,
                           already && { opacity: 0.4 },
                           pressed && { opacity: 0.8 },
                         ]}
@@ -273,7 +305,11 @@ export default function ManageRefereesSheet({
                         <MaterialIcons
                           name="add"
                           size={20}
-                          color={already ? "#94a3b8" : "#0a84ff"}
+                          color={
+                            already
+                              ? (s.disabledColor as string)
+                              : colors.primary
+                          }
                         />
                       </Pressable>
                     </Row>
@@ -289,12 +325,14 @@ export default function ManageRefereesSheet({
           <Pressable
             onPress={() => sheetRef.current?.dismiss()}
             style={({ pressed }) => [
-              styles.btn,
-              styles.btnOutline,
+              s.btn,
+              s.btnOutline,
               pressed && { opacity: 0.95 },
             ]}
           >
-            <Text style={{ color: "#0a84ff", fontWeight: "700" }}>Đóng</Text>
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>
+              Đóng
+            </Text>
           </Pressable>
         </Row>
       </BottomSheetScrollView>
@@ -302,93 +340,122 @@ export default function ManageRefereesSheet({
   );
 }
 
-/* ---------------- styles ---------------- */
-const styles = StyleSheet.create({
-  container: {
-    padding: 12,
-    gap: 12,
-  },
-  title: { fontSize: 16, fontWeight: "700", color: "#111" },
+/* ---------------- styles (THEMED) ---------------- */
+function makeStyles(colors: any, dark?: boolean) {
+  // derived tones
+  const text = colors.text;
+  const border = colors.border;
+  const card = colors.card;
+  const primary = colors.primary;
 
-  card: {
-    borderWidth: 1,
-    borderColor: "#e4e8ef",
-    borderRadius: 14,
-    backgroundColor: "#fff",
-    padding: 12,
-    gap: 10,
-  },
-  cardTitle: { fontWeight: "700", color: "#111" },
+  const muted = dark ? "#94a3b8" : "#64748b";
+  const placeholder = dark ? "#8b97a8" : "#94a3b8";
+  const disabled = dark ? "#6b7280" : "#94a3b8";
 
-  row: { flexDirection: "row", gap: 8 },
-  center: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-  },
+  // info tone (chip / infobox)
+  const infoBg = dark ? "#0f2536" : "#e0f2fe";
+  const infoBorder = dark ? "#1e3a5f" : "#bfdbfe";
+  const infoText = dark ? "#93c5fd" : "#075985";
 
-  infoBox: {
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#e0f2fe",
-    borderRadius: 10,
-    padding: 10,
-  },
-  infoText: { color: "#075985" },
+  return StyleSheet.create({
+    // base tokens we also export as fields for Chip & icons
+    mutedColor: { color: muted } as any,
+    placeholderColor: placeholder as any,
+    disabledColor: disabled as any,
+    chipDefaultBg: dark ? "#1f2937" : "#eef2f7",
+    chipDefaultFg: dark ? "#e5e7eb" : "#263238",
+    chipInfoBg: infoBg,
+    chipInfoFg: infoText,
 
-  itemRow: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#0a84ff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemName: { color: "#111", fontWeight: "600" },
-  itemMeta: { color: "#6b7280", fontSize: 12 },
+    container: {
+      padding: 12,
+      gap: 12,
+      backgroundColor: "transparent",
+    },
+    title: { fontSize: 16, fontWeight: "700", color: text },
 
-  inputWrap: {
-    borderWidth: 1,
-    borderColor: "#e4e8ef",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: Platform.select({ ios: 10, android: 8 }),
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  input: { flex: 1, fontSize: 15, color: "#111" },
+    card: {
+      borderWidth: 1,
+      borderColor: border,
+      borderRadius: 14,
+      backgroundColor: card,
+      padding: 12,
+      gap: 10,
+    },
+    cardTitle: { fontWeight: "700", color: text },
 
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
+    row: { flexDirection: "row", gap: 8 },
+    center: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 12,
+    },
 
-  iconBtn: {
-    padding: 6,
-    borderRadius: 999,
-  },
+    infoBox: {
+      borderWidth: 1,
+      borderColor: infoBorder,
+      backgroundColor: infoBg,
+      borderRadius: 10,
+      padding: 10,
+    },
+    infoText: { color: infoText },
 
-  btn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnOutline: {
-    borderWidth: 1,
-    borderColor: "#0a84ff",
-    backgroundColor: "transparent",
-  },
-});
+    itemRow: {
+      borderWidth: 1,
+      borderColor: border,
+      borderRadius: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: card,
+    },
+    avatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    itemName: { color: text, fontWeight: "600" },
+    itemMeta: { color: muted, fontSize: 12 },
+
+    inputWrap: {
+      borderWidth: 1,
+      borderColor: border,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: Platform.select({ ios: 10, android: 8 }) as number,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: card,
+    },
+    input: { flex: 1, fontSize: 15, color: text },
+
+    chip: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+
+    iconBtn: {
+      padding: 6,
+      borderRadius: 999,
+    },
+
+    btn: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    btnOutline: {
+      borderWidth: 1,
+      borderColor: primary,
+      backgroundColor: "transparent",
+    },
+  });
+}

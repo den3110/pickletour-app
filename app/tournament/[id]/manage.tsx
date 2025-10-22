@@ -17,17 +17,16 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useColorScheme,
   useWindowDimensions,
   View,
   ScrollView,
-  SafeAreaView,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
+import { useTheme } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 // ======= expo modules for export/share =======
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -144,12 +143,9 @@ const typeOrderWeight = (t) => {
   if (k === "swiss") return 3;
   if (k === "gsl") return 4;
   if (k === "double_elim" || k === "doubleelim") return 5;
-  // Round Elim đặt ngay trước Knockout:
   if (k === "roundelim" || k === "round_elim" || k === "round-elim")
     return 9_998;
-  // Knockout luôn là cuối cùng:
   if (k === "knockout" || k === "ko") return 9_999;
-  // khác
   return 7_000;
 };
 
@@ -315,28 +311,103 @@ const buildExportHTML = ({ tourName, typeLabel, sections }) => {
   </html>`;
 };
 
+/* ---------------- THEME TOKENS ---------------- */
+function getThemeTokens(colors, dark) {
+  const tint = colors.primary;
+  const muted = dark ? "#9aa0a6" : "#64748b";
+  const placeholder = dark ? "#8b97a8" : "#94a3b8";
+  const disabled = dark ? "#475569" : "#94a3b8";
+
+  // chips
+  const chipDefaultBg = dark ? "#1f2937" : "#eef2f7";
+  const chipDefaultFg = dark ? "#e5e7eb" : "#263238";
+  const chipInfoBg = dark ? "#0f2536" : "#e0f2fe";
+  const chipInfoFg = dark ? "#93c5fd" : "#075985";
+
+  // status / semantic
+  const infoBg = chipInfoBg;
+  const infoBorder = dark ? "#1e3a5f" : "#bfdbfe";
+  const infoText = chipInfoFg;
+
+  const warnBg = dark ? "#3b2f08" : "#fffbeb";
+  const warnBorder = dark ? "#a16207" : "#f59e0b";
+  const warnText = dark ? "#fde68a" : "#92400e";
+
+  const dangerBg = dark ? "#3b0d0d" : "#fee2e2";
+  const dangerBorder = dark ? "#7f1d1d" : "#ef4444";
+  const dangerText = dark ? "#fecaca" : "#991b1b";
+
+  const successBg = dark ? "#102a12" : "#dcfce7";
+  const successFg = dark ? "#86efac" : "#166534";
+
+  const courtBg = dark ? "#241b4b" : "#ede9fe";
+  const courtFg = dark ? "#c4b5fd" : "#5b21b6";
+
+  const statusTone = (s) => {
+    const k = String(s || "").toLowerCase();
+    if (k === "scheduled")
+      return {
+        bg: dark ? "#1f2937" : "#e5e7eb",
+        fg: dark ? "#e5e7eb" : "#111827",
+        label: "Chưa xếp",
+      };
+    if (k === "queued")
+      return { bg: chipInfoBg, fg: chipInfoFg, label: "Trong hàng chờ" };
+    if (k === "assigned")
+      return { bg: courtBg, fg: courtFg, label: "Đã gán sân" };
+    if (k === "live")
+      return {
+        bg: dark ? "#3b2308" : "#fff7ed",
+        fg: dark ? "#fdba74" : "#9a3412",
+        label: "Đang thi đấu",
+      };
+    if (k === "finished")
+      return { bg: successBg, fg: successFg, label: "Đã kết thúc" };
+    return { bg: chipDefaultBg, fg: chipDefaultFg, label: s || "—" };
+  };
+
+  return {
+    tint,
+    muted,
+    placeholder,
+    disabled,
+    chipDefaultBg,
+    chipDefaultFg,
+    chipInfoBg,
+    chipInfoFg,
+    infoBg,
+    infoBorder,
+    infoText,
+    warnBg,
+    warnBorder,
+    warnText,
+    dangerBg,
+    dangerBorder,
+    dangerText,
+    successBg,
+    successFg,
+    courtBg,
+    courtFg,
+    statusTone,
+  };
+}
+
 /* ---------------- main ---------------- */
 export default function ManageScreen() {
   const { id } = useLocalSearchParams();
   const tid = Array.isArray(id) ? id[0] : id;
 
-  const scheme = useColorScheme() ?? "light";
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const bg = scheme === "dark" ? "#0b0d10" : "#f6f8fc";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const border = scheme === "dark" ? "#2e2f33" : "#e4e8ef";
-  const text = scheme === "dark" ? "#f7f7f7" : "#111";
-  const subtext = scheme === "dark" ? "#c9c9c9" : "#444";
-  const headerIcon = scheme === "dark" ? "#fff" : "#111";
 
   const me = useSelector((s) => s.auth?.userInfo || null);
 
   // socket
   const socket = useSocket();
-  const liveMapRef = useRef(new Map()); // id -> match (merged)
+  const liveMapRef = useRef(new Map());
   const pendingRef = useRef(new Map());
   const rafRef = useRef(null);
   const [liveBump, setLiveBump] = useState(0);
@@ -347,7 +418,7 @@ export default function ManageScreen() {
       if (!socket || !mid) return;
       const now = Date.now();
       const last = lastSnapshotAtRef.current.get(mid) || 0;
-      if (now - last < 600) return; // throttle 0.6s/match
+      if (now - last < 600) return;
       lastSnapshotAtRef.current.set(mid, now);
       socket.emit("match:snapshot:request", { matchId: mid });
     },
@@ -856,15 +927,12 @@ export default function ManageScreen() {
       if (canShare) {
         await Sharing.shareAsync(fileUri, {
           mimeType,
-          UTI: uti, // iOS only; Android bỏ qua
+          UTI: uti,
           dialogTitle: title || "Chia sẻ tệp",
         });
         return;
       }
-    } catch (e) {
-      // ignore để thử fallback openURL
-    }
-    // Fallback: cố gắng mở trực tiếp
+    } catch (e) {}
     try {
       const ok = await Linking.openURL(fileUri);
       if (!ok) throw new Error("openURL returned false");
@@ -876,7 +944,7 @@ export default function ManageScreen() {
     }
   };
 
-  // === PDF (mobile-first): dùng expo-print tạo PDF, rồi share/preview ===
+  // === PDF
   const handleExportPDF = useCallback(async () => {
     try {
       const sections = buildExportPayload();
@@ -889,10 +957,7 @@ export default function ManageScreen() {
         typeLabel: TYPE_LABEL(tab),
         sections,
       });
-
-      // Tạo PDF
       const { uri } = await Print.printToFileAsync({ html });
-      // iOS/Android: share/preview
       await shareOrPreview(uri, {
         mimeType: "application/pdf",
         uti: "com.adobe.pdf",
@@ -903,7 +968,7 @@ export default function ManageScreen() {
     }
   }, [buildExportPayload, tab, tour?.name]);
 
-  // === Word (mobile-first): lưu HTML -> .doc kèm BOM UTF-8 để hiển thị TV chuẩn, rồi share/preview ===
+  // === Word
   const handleExportWord = useCallback(async () => {
     try {
       const sections = buildExportPayload();
@@ -916,26 +981,19 @@ export default function ManageScreen() {
         typeLabel: TYPE_LABEL(tab),
         sections,
       });
-
-      // BOM để Word mobile đọc Unicode (tiếng Việt) chính xác
       const content = `\ufeff${html}`;
       const safeName = (tour?.name || "export")
         .replace(/[^\p{L}\p{N}]+/gu, "_")
         .replace(/^_+|_+$/g, "")
         .toLowerCase();
-
       const fileName = `tournament_${safeName}_${tab}_${new Date()
         .toISOString()
         .slice(0, 19)
         .replace(/[:T]/g, "-")}.doc`;
-
       const fileUri = FileSystem.cacheDirectory + fileName;
-
       await FileSystem.writeAsStringAsync(fileUri, content, {
         encoding: FileSystem.EncodingType.UTF8,
       });
-
-      // iOS: UTI com.microsoft.word.doc; Android chỉ cần mimeType
       await shareOrPreview(fileUri, {
         mimeType: "application/msword",
         uti: "com.microsoft.word.doc",
@@ -961,13 +1019,12 @@ export default function ManageScreen() {
     bracket: null,
   });
 
-  /* ----------- small UI ----------- */
+  /* ----------- small UI (THEMED) ----------- */
   const Pill = ({ label, kind = "default" }) => {
-    const map = {
-      default: { bg: "#eef2f7", fg: "#263238" },
-      primary: { bg: "#e0f2fe", fg: "#075985" },
-    };
-    const st = map[kind] || map.default;
+    const st =
+      kind === "primary"
+        ? { bg: t.chipInfoBg, fg: t.chipInfoFg }
+        : { bg: t.chipDefaultBg, fg: t.chipDefaultFg };
     return (
       <View
         style={{
@@ -983,15 +1040,7 @@ export default function ManageScreen() {
   };
 
   const StatusPill = ({ status }) => {
-    const map = {
-      scheduled: { bg: "#e5e7eb", fg: "#111827", label: "Chưa xếp" },
-      queued: { bg: "#e0f2fe", fg: "#075985", label: "Trong hàng chờ" },
-      assigned: { bg: "#ede9fe", fg: "#5b21b6", label: "Đã gán sân" },
-      live: { bg: "#fff7ed", fg: "#9a3412", label: "Đang thi đấu" },
-      finished: { bg: "#dcfce7", fg: "#166534", label: "Đã kết thúc" },
-    };
-    const k = String(status || "").toLowerCase();
-    const v = map[k] || { bg: "#e5e7eb", fg: "#111827", label: status || "—" };
+    const v = t.statusTone(status);
     return (
       <View
         style={{
@@ -1006,7 +1055,7 @@ export default function ManageScreen() {
     );
   };
 
-  const MiniChipBtn = ({ icon, label, onPress, color = tint }) => (
+  const MiniChipBtn = ({ icon, label, onPress, color = colors.primary }) => (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
@@ -1032,7 +1081,7 @@ export default function ManageScreen() {
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
-          backgroundColor: has ? "#dcfce7" : "#eef2f7",
+          backgroundColor: has ? t.successBg : t.chipDefaultBg,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 999,
@@ -1041,9 +1090,11 @@ export default function ManageScreen() {
         <MaterialIcons
           name="videocam"
           size={14}
-          color={has ? "#166534" : "#263238"}
+          color={has ? t.successFg : t.chipDefaultFg}
         />
-        <Text style={{ color: has ? "#166534" : "#263238", fontSize: 12 }}>
+        <Text
+          style={{ color: has ? t.successFg : t.chipDefaultFg, fontSize: 12 }}
+        >
           Video
         </Text>
       </View>
@@ -1054,13 +1105,13 @@ export default function ManageScreen() {
     name ? (
       <View
         style={{
-          backgroundColor: "#ede9fe",
+          backgroundColor: t.courtBg,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 999,
         }}
       >
-        <Text style={{ color: "#5b21b6", fontSize: 12 }} numberOfLines={1}>
+        <Text style={{ color: t.courtFg, fontSize: 12 }} numberOfLines={1}>
           {name}
         </Text>
       </View>
@@ -1070,14 +1121,14 @@ export default function ManageScreen() {
     textVal ? (
       <View
         style={{
-          borderColor: "#cbd5e1",
+          borderColor: colors.border,
           borderWidth: 1,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 8,
         }}
       >
-        <Text style={{ color: "#1f2937", fontSize: 12, fontWeight: "700" }}>
+        <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
           {textVal}
         </Text>
       </View>
@@ -1107,11 +1158,102 @@ export default function ManageScreen() {
       }
     };
 
+    /* ===== EdgeFadedHScroll: Horizontal Scroll + fade hint ===== */
+    const EdgeFadedHScroll = ({
+      children,
+      contentContainerStyle,
+      style,
+      bgColor = "#fff",
+      chevronColor = "#94a3b8",
+      ...props
+    }) => {
+      const [state, setState] = React.useState({
+        canScroll: false,
+        showL: false,
+        showR: false,
+      });
+      const boxW = React.useRef(0);
+      const contentW = React.useRef(0);
+
+      const update = React.useCallback((x = 0) => {
+        const can = contentW.current > boxW.current + 2;
+        const showL = can && x > 2;
+        const maxX = Math.max(0, contentW.current - boxW.current);
+        const showR = can && x < maxX - 2;
+        setState({ canScroll: can, showL, showR });
+      }, []);
+
+      return (
+        <View
+          onLayout={(e) => {
+            boxW.current = e.nativeEvent.layout.width || 0;
+            update(0);
+          }}
+          style={[{ position: "relative" }, style]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onContentSizeChange={(w) => {
+              contentW.current = w || 0;
+              update(0);
+            }}
+            onScroll={(e) => update(e.nativeEvent.contentOffset.x || 0)}
+            scrollEventThrottle={16}
+            contentContainerStyle={contentContainerStyle}
+            {...props}
+          >
+            {children}
+          </ScrollView>
+
+          {/* LEFT hint */}
+          {state.canScroll && state.showL && (
+            <>
+              <LinearGradient
+                pointerEvents="none"
+                colors={[bgColor, "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.fadeLeft}
+              />
+              <View pointerEvents="none" style={[styles.chev, { left: 4 }]}>
+                <MaterialIcons
+                  name="chevron-left"
+                  size={16}
+                  color={chevronColor}
+                />
+              </View>
+            </>
+          )}
+
+          {/* RIGHT hint */}
+          {state.canScroll && state.showR && (
+            <>
+              <LinearGradient
+                pointerEvents="none"
+                colors={["transparent", bgColor]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.fadeRight}
+              />
+              <View pointerEvents="none" style={[styles.chev, { right: 4 }]}>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={16}
+                  color={chevronColor}
+                />
+              </View>
+            </>
+          )}
+        </View>
+      );
+    };
+
     return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <EdgeFadedHScroll
         contentContainerStyle={styles.actionsWrap}
+        bgColor={colors.card} // màu nền để fade đúng với card
+        chevronColor={t.muted} // màu mũi tên “hint”
       >
         <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
         <MiniChipBtn
@@ -1155,7 +1297,7 @@ export default function ManageScreen() {
             onPress={() => setVideoDlg({ open: true, match: m, url: "" })}
           />
         )}
-      </ScrollView>
+      </EdgeFadedHScroll>
     );
   };
 
@@ -1176,23 +1318,31 @@ export default function ManageScreen() {
         onPress={() => openMatch(m._id)}
         style={({ pressed }) => [
           styles.matchRow,
-          { borderColor: border, backgroundColor: cardBg },
+          { borderColor: colors.border, backgroundColor: colors.card },
           pressed && { opacity: 0.95 },
         ]}
       >
         <ActionButtons m={m} />
         <View style={styles.contentBlock}>
           <Text
-            style={[styles.code, { color: text }]}
+            style={[styles.code, { color: colors.text }]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
             {matchCode(m)}
           </Text>
-          <Text style={{ color: text }} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={{ color: colors.text }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {pairLabel(m?.pairA)}
           </Text>
-          <Text style={{ color: text }} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={{ color: colors.text }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {pairLabel(m?.pairB)}
           </Text>
 
@@ -1200,7 +1350,7 @@ export default function ManageScreen() {
             <StatusPill status={m?.status} />
             <CourtPill name={courtLabel} />
             <ScorePill textVal={score} />
-            <Text style={{ color: subtext, fontSize: 12 }}>
+            <Text style={{ color: t.muted, fontSize: 12 }}>
               Vòng {m?.round ?? "—"} • Thứ tự{" "}
               {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
             </Text>
@@ -1221,7 +1371,10 @@ export default function ManageScreen() {
 
     return (
       <View
-        style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
       >
         <View
           style={{
@@ -1233,7 +1386,7 @@ export default function ManageScreen() {
           }}
         >
           <Text
-            style={[styles.bracketTitle, { color: text }]}
+            style={[styles.bracketTitle, { color: colors.text }]}
             numberOfLines={1}
           >
             {b?.name || "Bracket"}
@@ -1254,8 +1407,8 @@ export default function ManageScreen() {
         </View>
 
         {list.length === 0 ? (
-          <View style={[styles.emptyBox, { borderColor: border }]}>
-            <Text style={{ color: subtext }}>Chưa có trận nào.</Text>
+          <View style={[styles.emptyBox, { borderColor: colors.border }]}>
+            <Text style={{ color: t.muted }}>Chưa có trận nào.</Text>
           </View>
         ) : (
           <FlatList
@@ -1273,7 +1426,7 @@ export default function ManageScreen() {
 
   // ===== Header-right dropdown w/ anchor =====
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState(null); // {x,y,width,height}
+  const [menuAnchor, setMenuAnchor] = useState(null);
   const hdrBtnRef = useRef(null);
 
   /* ----------- guards ----------- */
@@ -1283,8 +1436,8 @@ export default function ManageScreen() {
         <Stack.Screen
           options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
         />
-        <View style={[styles.center, { backgroundColor: bg }]}>
-          <ActivityIndicator size="large" color={tint} />
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </>
     );
@@ -1296,14 +1449,14 @@ export default function ManageScreen() {
         <Stack.Screen
           options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
         />
-        <View style={[styles.screen, { backgroundColor: bg }]}>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <View
             style={[
               styles.alert,
-              { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+              { borderColor: t.dangerBorder, backgroundColor: t.dangerBg },
             ]}
           >
-            <Text style={{ color: "#991b1b" }}>
+            <Text style={{ color: t.dangerText }}>
               {tourErr?.data?.message ||
                 brErr?.data?.message ||
                 mErr?.data?.message ||
@@ -1324,14 +1477,14 @@ export default function ManageScreen() {
             headerTitleAlign: "center",
           }}
         />
-        <View style={[styles.screen, { backgroundColor: bg }]}>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <View
             style={[
               styles.alert,
-              { borderColor: "#f59e0b", backgroundColor: "#fffbeb" },
+              { borderColor: t.warnBorder, backgroundColor: t.warnBg },
             ]}
           >
-            <Text style={{ color: "#92400e" }}>
+            <Text style={{ color: t.warnText }}>
               Bạn không có quyền truy cập trang này.
             </Text>
           </View>
@@ -1353,12 +1506,12 @@ export default function ManageScreen() {
       <MaterialIcons
         name={icon}
         size={18}
-        color={danger ? "#ef4444" : text}
+        color={danger ? "#ef4444" : colors.text}
         style={{ marginRight: 8 }}
       />
       <Text
         style={{
-          color: danger ? "#ef4444" : text,
+          color: danger ? "#ef4444" : colors.text,
           fontSize: 14,
           fontWeight: "600",
         }}
@@ -1390,26 +1543,26 @@ export default function ManageScreen() {
               ]}
               hitSlop={12}
             >
-              <MaterialIcons name="more-vert" size={22} color={headerIcon} />
+              <MaterialIcons name="more-vert" size={22} color={colors.text} />
             </Pressable>
           ),
         }}
       />
 
-      <View style={[styles.screen, { backgroundColor: bg }]}>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
         {/* Controls */}
         <View
           style={[
             styles.toolbar,
-            { borderColor: border, backgroundColor: cardBg },
+            { borderColor: colors.border, backgroundColor: colors.card },
           ]}
         >
-          <View style={[styles.inputWrap, { borderColor: border }]}>
-            <MaterialIcons name="search" size={18} color={subtext} />
+          <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+            <MaterialIcons name="search" size={18} color={t.muted} />
             <TextInput
-              style={[styles.input, { color: text }]}
+              style={[styles.input, { color: colors.text }]}
               placeholder="Tìm trận, cặp đấu, link…"
-              placeholderTextColor="#9aa0a6"
+              placeholderTextColor={t.placeholder}
               value={q}
               onChangeText={setQ}
             />
@@ -1430,11 +1583,13 @@ export default function ManageScreen() {
                 )
               }
               icon="sort"
+              colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
             />
             <PickerChip
               label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
               onPress={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
+              colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
             />
             <Pill
               label={`${bracketsOfTab.length} bracket • ${TYPE_LABEL(tab)}`}
@@ -1443,26 +1598,29 @@ export default function ManageScreen() {
         </View>
 
         {/* Tabs động */}
-        <View style={[styles.tabs, { borderColor: border }]}>
-          {typesAvailable.map((t) => {
-            const active = t.type === tab;
+        <View style={[styles.tabs, { borderColor: colors.border }]}>
+          {typesAvailable.map((tTab) => {
+            const active = tTab.type === tab;
             return (
               <Pressable
-                key={t.type}
-                onPress={() => setTab(t.type)}
+                key={tTab.type}
+                onPress={() => setTab(tTab.type)}
                 style={({ pressed }) => [
                   styles.tabItem,
                   {
-                    backgroundColor: active ? tint : "transparent",
-                    borderColor: active ? tint : border,
+                    backgroundColor: active ? colors.primary : "transparent",
+                    borderColor: active ? colors.primary : colors.border,
                   },
                   pressed && { opacity: 0.95 },
                 ]}
               >
                 <Text
-                  style={{ color: active ? "#fff" : text, fontWeight: "700" }}
+                  style={{
+                    color: active ? "#fff" : colors.text,
+                    fontWeight: "700",
+                  }}
                 >
-                  {TYPE_LABEL(t.type)}
+                  {TYPE_LABEL(tTab.type)}
                 </Text>
               </Pressable>
             );
@@ -1482,10 +1640,10 @@ export default function ManageScreen() {
             <View
               style={[
                 styles.alert,
-                { borderColor: "#0284c7", backgroundColor: "#e0f2fe" },
+                { borderColor: t.infoBorder, backgroundColor: t.infoBg },
               ]}
             >
-              <Text style={{ color: "#075985" }}>
+              <Text style={{ color: t.infoText }}>
                 Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
               </Text>
             </View>
@@ -1510,7 +1668,7 @@ export default function ManageScreen() {
             <View
               style={[
                 styles.modalCard,
-                { backgroundColor: cardBg, borderColor: border },
+                { backgroundColor: colors.card, borderColor: colors.border },
               ]}
             >
               <View
@@ -1521,7 +1679,13 @@ export default function ManageScreen() {
                   marginBottom: 8,
                 }}
               >
-                <Text style={{ color: text, fontWeight: "700", fontSize: 16 }}>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontWeight: "700",
+                    fontSize: 16,
+                  }}
+                >
                   {(videoDlg?.match &&
                     (videoDlg.match.code || matchCode(videoDlg.match))) ||
                     ""}{" "}
@@ -1529,25 +1693,25 @@ export default function ManageScreen() {
                 </Text>
                 <IconBtn
                   name="close"
-                  color={text}
+                  color={colors.text}
                   size={20}
                   onPress={closeVideoDlg}
                 />
               </View>
 
-              <View style={[styles.inputWrap, { borderColor: border }]}>
-                <MaterialIcons name="link" size={18} color={subtext} />
+              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+                <MaterialIcons name="link" size={18} color={t.muted} />
                 <TextInput
-                  style={[styles.input, { color: text }]}
+                  style={[styles.input, { color: colors.text }]}
                   placeholder="URL video (YouTube/Facebook/TikTok/M3U8…)"
-                  placeholderTextColor="#9aa0a6"
+                  placeholderTextColor={t.placeholder}
                   autoCapitalize="none"
                   autoCorrect={false}
                   value={videoDlg.url}
                   onChangeText={(v) => setVideoDlg((s) => ({ ...s, url: v }))}
                 />
               </View>
-              <Text style={{ color: subtext, fontSize: 12, marginTop: 4 }}>
+              <Text style={{ color: t.muted, fontSize: 12, marginTop: 4 }}>
                 Dán link live hoặc VOD. Để trống rồi Lưu để xoá link.
               </Text>
 
@@ -1559,8 +1723,14 @@ export default function ManageScreen() {
                   marginTop: 12,
                 }}
               >
-                <BtnOutline onPress={closeVideoDlg}>Huỷ</BtnOutline>
-                <BtnPrimary onPress={onSaveVideo} disabled={savingVideo}>
+                <BtnOutline onPress={closeVideoDlg} tint={colors.primary}>
+                  Huỷ
+                </BtnOutline>
+                <BtnPrimary
+                  onPress={onSaveVideo}
+                  disabled={savingVideo}
+                  tint={colors.primary}
+                >
                   {savingVideo
                     ? "Đang lưu…"
                     : videoDlg.url
@@ -1606,7 +1776,7 @@ export default function ManageScreen() {
               <View
                 style={[
                   styles.menuBox,
-                  { backgroundColor: cardBg, borderColor: border },
+                  { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
               >
                 <MenuItem
@@ -1690,15 +1860,16 @@ export default function ManageScreen() {
   );
 }
 
-/* ---------------- small UI ---------------- */
-function BtnPrimary({ onPress, children, disabled }) {
+/* ---------------- small UI (buttons/chips) ---------------- */
+function BtnPrimary({ onPress, children, disabled, tint }) {
+  const bg = disabled ? "#94a3b8" : tint || "#0a84ff";
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: disabled ? "#94a3b8" : "#0a84ff" },
+        { backgroundColor: bg },
         pressed && !disabled && { opacity: 0.9 },
       ]}
     >
@@ -1706,21 +1877,24 @@ function BtnPrimary({ onPress, children, disabled }) {
     </Pressable>
   );
 }
-function BtnOutline({ onPress, children }) {
+function BtnOutline({ onPress, children, tint }) {
+  const color = tint || "#0a84ff";
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
-        styles.btnOutline,
+        { borderWidth: 1, borderColor: color, backgroundColor: "transparent" },
         pressed && { opacity: 0.95 },
       ]}
     >
-      <Text style={{ color: "#0a84ff", fontWeight: "700" }}>{children}</Text>
+      <Text style={{ color, fontWeight: "700" }}>{children}</Text>
     </Pressable>
   );
 }
-function PickerChip({ label, onPress, icon }) {
+function PickerChip({ label, onPress, icon, colorsTheme }) {
+  const bg = colorsTheme?.bg ?? "#eef2f7";
+  const fg = colorsTheme?.fg ?? "#263238";
   return (
     <Pressable
       onPress={onPress}
@@ -1729,7 +1903,7 @@ function PickerChip({ label, onPress, icon }) {
           flexDirection: "row",
           alignItems: "center",
           gap: 6,
-          backgroundColor: "#eef2f7",
+          backgroundColor: bg,
           paddingHorizontal: 10,
           paddingVertical: 6,
           borderRadius: 999,
@@ -1737,8 +1911,8 @@ function PickerChip({ label, onPress, icon }) {
         pressed && { opacity: 0.9 },
       ]}
     >
-      {icon ? <MaterialIcons name={icon} size={16} color="#263238" /> : null}
-      <Text style={{ color: "#263238", fontSize: 12, fontWeight: "600" }}>
+      {icon ? <MaterialIcons name={icon} size={16} color={fg} /> : null}
+      <Text style={{ color: fg, fontSize: 12, fontWeight: "600" }}>
         {label}
       </Text>
     </Pressable>
@@ -1809,11 +1983,6 @@ const styles = StyleSheet.create({
   code: { fontWeight: "700", marginBottom: 4 },
 
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
-  btnOutline: {
-    borderWidth: 1,
-    borderColor: "#0a84ff",
-    backgroundColor: "transparent",
-  },
   miniBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1866,5 +2035,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  fadeLeft: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 18,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    zIndex: 2,
+  },
+  fadeRight: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 18,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    zIndex: 2,
+  },
+  chev: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -8,
+    padding: 2,
+    borderRadius: 999,
+    zIndex: 3,
   },
 });

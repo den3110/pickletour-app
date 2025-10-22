@@ -34,6 +34,64 @@ import {
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
 
+/* ---------------- THEME ---------------- */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+  const dark = scheme === "dark";
+  return useMemo(
+    () => ({
+      scheme,
+      // base
+      bg: dark ? "#0b0d10" : "#f6f8fc",
+      cardBg: dark ? "#111214" : "#ffffff",
+      border: dark ? "#2a2f36" : "#e4e8ef",
+      text: dark ? "#e5e7eb" : "#111111",
+      subtext: dark ? "#cbd5e1" : "#444444",
+      muted: dark ? "#94a3b8" : "#9aa0a6",
+      icon: dark ? "#d1d5db" : "#334155",
+      tint: dark ? "#7cc0ff" : "#0a84ff",
+
+      // pills / chips
+      pillDefaultBg: dark ? "#1e293b" : "#eef2f7",
+      pillDefaultFg: dark ? "#cbd5e1" : "#263238",
+      pillPrimaryBg: dark ? "rgba(124,192,255,0.18)" : "#e0f2fe",
+      pillPrimaryFg: dark ? "#cde9ff" : "#075985",
+
+      // status pills
+      stScheduledBg: dark ? "#1f2937" : "#e5e7eb",
+      stScheduledFg: dark ? "#e5e7eb" : "#111827",
+
+      stQueuedBg: dark ? "rgba(14,165,233,0.15)" : "#e0f2fe",
+      stQueuedFg: dark ? "#cde9ff" : "#075985",
+
+      stAssignedBg: dark ? "rgba(124,58,237,0.15)" : "#ede9fe",
+      stAssignedFg: dark ? "#ddd6fe" : "#5b21b6",
+
+      stLiveBg: dark ? "rgba(234,88,12,0.10)" : "#fff7ed",
+      stLiveFg: dark ? "#fdba74" : "#9a3412",
+
+      stFinishedBg: dark ? "rgba(34,197,94,0.15)" : "#dcfce7",
+      stFinishedFg: dark ? "#bbf7d0" : "#166534",
+
+      // alerts
+      infoBg: dark ? "rgba(2,132,199,0.15)" : "#e0f2fe",
+      infoBd: dark ? "#0284c7" : "#0284c7",
+      infoText: dark ? "#cde9ff" : "#075985",
+
+      errBg: dark ? "rgba(239,68,68,0.12)" : "#fee2e2",
+      errBd: dark ? "#fca5a5" : "#ef4444",
+      errText: dark ? "#fecaca" : "#991b1b",
+
+      // tabs
+      tabBd: dark ? "#2a2f36" : "#e4e8ef",
+
+      // buttons
+      btnDisabledBg: dark ? "#475569" : "#94a3b8",
+    }),
+    [scheme]
+  );
+}
+
 /* ---------------- helpers ---------------- */
 const TYPE_LABEL = (t) => {
   const key = String(t || "").toLowerCase();
@@ -72,17 +130,35 @@ const pairLabel = (pair) => {
 
 const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
 
-const StatusPill = ({ status }) => {
+/* status pill (themed) */
+function StatusPill({ status, theme }) {
+  const key = String(status || "").toLowerCase();
   const map = {
-    scheduled: { bg: "#e5e7eb", fg: "#111827", label: "Chưa xếp" },
-    queued: { bg: "#e0f2fe", fg: "#075985", label: "Trong hàng chờ" },
-    assigned: { bg: "#ede9fe", fg: "#5b21b6", label: "Đã gán sân" },
-    live: { bg: "#fff7ed", fg: "#9a3412", label: "Đang thi đấu" },
-    finished: { bg: "#dcfce7", fg: "#166534", label: "Đã kết thúc" },
+    scheduled: {
+      bg: theme.stScheduledBg,
+      fg: theme.stScheduledFg,
+      label: "Chưa xếp",
+    },
+    queued: {
+      bg: theme.stQueuedBg,
+      fg: theme.stQueuedFg,
+      label: "Trong hàng chờ",
+    },
+    assigned: {
+      bg: theme.stAssignedBg,
+      fg: theme.stAssignedFg,
+      label: "Đã gán sân",
+    },
+    live: { bg: theme.stLiveBg, fg: theme.stLiveFg, label: "Đang thi đấu" },
+    finished: {
+      bg: theme.stFinishedBg,
+      fg: theme.stFinishedFg,
+      label: "Đã kết thúc",
+    },
   };
-  const v = map[String(status || "").toLowerCase()] || {
-    bg: "#e5e7eb",
-    fg: "#111827",
+  const v = map[key] || {
+    bg: theme.pillDefaultBg,
+    fg: theme.pillDefaultFg,
     label: status || "—",
   };
   return (
@@ -97,7 +173,7 @@ const StatusPill = ({ status }) => {
       <Text style={{ color: v.fg, fontSize: 12 }}>{v.label}</Text>
     </View>
   );
-};
+}
 
 const IconBtn = ({ name, onPress, color = "#111", size = 18, style }, ref) => (
   <Pressable
@@ -141,26 +217,19 @@ const STATUS_GROUP_WEIGHT = {
   finished: 4,
 };
 const statusWeight = (s) =>
-  STATUS_GROUP_WEIGHT.hasOwnProperty(_normStatus(s))
+  Object.prototype.hasOwnProperty.call(STATUS_GROUP_WEIGHT, _normStatus(s))
     ? STATUS_GROUP_WEIGHT[_normStatus(s)]
-    : 3.5; // lỡ có trạng thái lạ => giữa scheduled & finished
+    : 3.5;
 
 /* ---------------- main (Public Referee Center) ---------------- */
 export default function RefereeCenterScreen() {
   const { id } = useLocalSearchParams();
-  const scheme = useColorScheme() ?? "light";
   const { width } = useWindowDimensions();
-
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const bg = scheme === "dark" ? "#0b0d10" : "#f6f8fc";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const border = scheme === "dark" ? "#2e2f33" : "#e4e8ef";
-  const text = scheme === "dark" ? "#f7f7f7" : "#111";
-  const subtext = scheme === "dark" ? "#c9c9c9" : "#444";
+  const T = useThemeTokens();
 
   const me = useSelector((s) => s.auth?.userInfo || null);
 
-  // ===== Header-right dropdown state & refs (PHẢI ở trước mọi early return)
+  // ===== Header-right dropdown state & refs
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null); // {x,y,width,height}
   const hdrBtnRef = useRef(null);
@@ -543,28 +612,25 @@ export default function RefereeCenterScreen() {
   const isInitialLoading = tourLoading || brLoading || mLoading;
   const hasError = tourErr || brErr || mErr;
 
-  /* ----------- small UI ----------- */
-  const Pill = ({ label, kind = "default" }) => {
-    const map = {
-      default: { bg: "#eef2f7", fg: "#263238" },
-      primary: { bg: "#e0f2fe", fg: "#075985" },
-    };
-    const st = map[kind] || map.default;
+  /* ----------- small UI (themed) ----------- */
+  function Pill({ label, kind = "default" }) {
+    const bg = kind === "primary" ? T.pillPrimaryBg : T.pillDefaultBg;
+    const fg = kind === "primary" ? T.pillPrimaryFg : T.pillDefaultFg;
     return (
       <View
         style={{
-          backgroundColor: st.bg,
+          backgroundColor: bg,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 8,
         }}
       >
-        <Text style={{ color: st.fg, fontSize: 12 }}>{label}</Text>
+        <Text style={{ color: fg, fontSize: 12 }}>{label}</Text>
       </View>
     );
-  };
+  }
 
-  const MiniChipBtn = ({ icon, label, onPress, color = tint }) => (
+  const MiniChipBtn = ({ icon, label, onPress, color = T.tint }) => (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
@@ -590,7 +656,7 @@ export default function RefereeCenterScreen() {
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
-          backgroundColor: has ? "#dcfce7" : "#eef2f7",
+          backgroundColor: has ? T.stFinishedBg : T.pillDefaultBg,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 999,
@@ -599,9 +665,14 @@ export default function RefereeCenterScreen() {
         <MaterialIcons
           name="videocam"
           size={14}
-          color={has ? "#166534" : "#263238"}
+          color={has ? T.stFinishedFg : T.pillDefaultFg}
         />
-        <Text style={{ color: has ? "#166534" : "#263238", fontSize: 12 }}>
+        <Text
+          style={{
+            color: has ? T.stFinishedFg : T.pillDefaultFg,
+            fontSize: 12,
+          }}
+        >
           Video
         </Text>
       </View>
@@ -647,7 +718,7 @@ export default function RefereeCenterScreen() {
         onPress={() => openMatch(m._id)}
         style={({ pressed }) => [
           styles.matchRow,
-          { borderColor: border, backgroundColor: cardBg },
+          { borderColor: T.border, backgroundColor: T.cardBg },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -657,22 +728,30 @@ export default function RefereeCenterScreen() {
         {/* HÀNG 2: Nội dung trận */}
         <View style={styles.contentBlock}>
           <Text
-            style={[styles.code, { color: text }]}
+            style={[styles.code, { color: T.text }]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
             {matchCode(m)}
           </Text>
-          <Text style={{ color: text }} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={{ color: T.text }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {pairLabel(m?.pairA)}
           </Text>
-          <Text style={{ color: text }} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={{ color: T.text }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {pairLabel(m?.pairB)}
           </Text>
 
           <View style={styles.metaRow}>
-            <StatusPill status={m?.status} />
-            <Text style={{ color: subtext, fontSize: 12 }}>
+            <StatusPill status={m?.status} theme={T} />
+            <Text style={{ color: T.subtext, fontSize: 12 }}>
               Vòng {m?.round ?? "—"} • Thứ tự {m?.order ?? "—"}
             </Text>
             <VideoPill has={hasVideo} />
@@ -691,7 +770,10 @@ export default function RefereeCenterScreen() {
 
     return (
       <View
-        style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+        style={[
+          styles.card,
+          { backgroundColor: T.cardBg, borderColor: T.border },
+        ]}
       >
         <View
           style={{
@@ -703,7 +785,7 @@ export default function RefereeCenterScreen() {
           }}
         >
           <Text
-            style={[styles.bracketTitle, { color: text }]}
+            style={[styles.bracketTitle, { color: T.text }]}
             numberOfLines={1}
           >
             {b?.name || "Bracket"}
@@ -716,8 +798,8 @@ export default function RefereeCenterScreen() {
         </View>
 
         {list.length === 0 ? (
-          <View style={[styles.emptyBox, { borderColor: border }]}>
-            <Text style={{ color: subtext }}>Chưa có trận nào.</Text>
+          <View style={[styles.emptyBox, { borderColor: T.border }]}>
+            <Text style={{ color: T.subtext }}>Chưa có trận nào.</Text>
           </View>
         ) : (
           <FlatList
@@ -738,10 +820,16 @@ export default function RefereeCenterScreen() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "Trọng tài", headerTitleAlign: "center" }}
+          options={{
+            title: "Trọng tài",
+            headerTitleAlign: "center",
+            headerStyle: { backgroundColor: T.cardBg },
+            headerTitleStyle: { color: T.text },
+            headerTintColor: T.text,
+          }}
         />
-        <View style={[styles.center, { backgroundColor: bg }]}>
-          <ActivityIndicator size="large" color={tint} />
+        <View style={[styles.center, { backgroundColor: T.bg }]}>
+          <ActivityIndicator size="large" color={T.tint} />
         </View>
       </>
     );
@@ -750,16 +838,22 @@ export default function RefereeCenterScreen() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "Trọng tài", headerTitleAlign: "center" }}
+          options={{
+            title: "Trọng tài",
+            headerTitleAlign: "center",
+            headerStyle: { backgroundColor: T.cardBg },
+            headerTitleStyle: { color: T.text },
+            headerTintColor: T.text,
+          }}
         />
-        <View style={[styles.screen, { backgroundColor: bg }]}>
+        <View style={[styles.screen, { backgroundColor: T.bg }]}>
           <View
             style={[
               styles.alert,
-              { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+              { borderColor: T.errBd, backgroundColor: T.errBg },
             ]}
           >
-            <Text style={{ color: "#991b1b" }}>
+            <Text style={{ color: T.errText }}>
               {tourErr?.data?.message ||
                 brErr?.data?.message ||
                 mErr?.data?.message ||
@@ -778,11 +872,14 @@ export default function RefereeCenterScreen() {
         options={{
           title: `Trọng tài: ${tour?.name || ""}`,
           headerTitleAlign: "center",
+          headerStyle: { backgroundColor: T.cardBg },
+          headerTitleStyle: { color: T.text },
+          headerTintColor: T.text,
           headerRight: () => (
             <IconBtnRef
               ref={hdrBtnRef}
               name="more-vert"
-              color={tint}
+              color={T.tint}
               size={22}
               onPress={onToggleHdrMenu}
               style={{ paddingHorizontal: 10, paddingVertical: 6 }}
@@ -791,20 +888,20 @@ export default function RefereeCenterScreen() {
         }}
       />
 
-      <View style={[styles.screen, { backgroundColor: bg }]}>
+      <View style={[styles.screen, { backgroundColor: T.bg }]}>
         {/* Controls */}
         <View
           style={[
             styles.toolbar,
-            { borderColor: border, backgroundColor: cardBg },
+            { borderColor: T.border, backgroundColor: T.cardBg },
           ]}
         >
-          <View style={[styles.inputWrap, { borderColor: border }]}>
-            <MaterialIcons name="search" size={18} color={subtext} />
+          <View style={[styles.inputWrap, { borderColor: T.border }]}>
+            <MaterialIcons name="search" size={18} color={T.subtext} />
             <TextInput
-              style={[styles.input, { color: text }]}
+              style={[styles.input, { color: T.text }]}
               placeholder="Tìm trận, cặp đấu, link…"
-              placeholderTextColor="#9aa0a6"
+              placeholderTextColor={T.muted}
               value={q}
               onChangeText={setQ}
             />
@@ -812,6 +909,7 @@ export default function RefereeCenterScreen() {
 
           <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
             <PickerChip
+              theme={T}
               label={`Sắp xếp: ${
                 sortKey === "time"
                   ? "Thời gian"
@@ -827,6 +925,7 @@ export default function RefereeCenterScreen() {
               icon="sort"
             />
             <PickerChip
+              theme={T}
               label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
               onPress={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
@@ -838,7 +937,7 @@ export default function RefereeCenterScreen() {
         </View>
 
         {/* Tabs động */}
-        <View style={[styles.tabs, { borderColor: border }]}>
+        <View style={[styles.tabs, { borderColor: T.tabBd }]}>
           {typesAvailable.map((t) => {
             const active = t.type === tab;
             return (
@@ -848,14 +947,14 @@ export default function RefereeCenterScreen() {
                 style={({ pressed }) => [
                   styles.tabItem,
                   {
-                    backgroundColor: active ? tint : "transparent",
-                    borderColor: active ? tint : border,
+                    backgroundColor: active ? T.tint : "transparent",
+                    borderColor: active ? T.tint : T.tabBd,
                   },
                   pressed && { opacity: 0.95 },
                 ]}
               >
                 <Text
-                  style={{ color: active ? "#fff" : text, fontWeight: "700" }}
+                  style={{ color: active ? "#fff" : T.text, fontWeight: "700" }}
                 >
                   {TYPE_LABEL(t.type)}
                 </Text>
@@ -880,10 +979,10 @@ export default function RefereeCenterScreen() {
             <View
               style={[
                 styles.alert,
-                { borderColor: "#0284c7", backgroundColor: "#e0f2fe" },
+                { borderColor: T.infoBd, backgroundColor: T.infoBg },
               ]}
             >
-              <Text style={{ color: "#075985" }}>
+              <Text style={{ color: T.infoText }}>
                 Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
               </Text>
             </View>
@@ -908,8 +1007,8 @@ export default function RefereeCenterScreen() {
             style={[
               styles.menuCard,
               {
-                borderColor: border,
-                backgroundColor: cardBg,
+                borderColor: T.border,
+                backgroundColor: T.cardBg,
                 top: 0,
                 right: 25,
               },
@@ -925,8 +1024,10 @@ export default function RefereeCenterScreen() {
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <MaterialIcons name="home" size={18} color={text} />
-              <Text style={{ color: text, fontWeight: "600" }}>Sơ đồ giải</Text>
+              <MaterialIcons name="home" size={18} color={T.text} />
+              <Text style={{ color: T.text, fontWeight: "600" }}>
+                Sơ đồ giải
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -936,15 +1037,15 @@ export default function RefereeCenterScreen() {
   );
 }
 
-/* ---------------- small UI ---------------- */
-function BtnPrimary({ onPress, children, disabled }) {
+/* ---------------- small UI (buttons, chips) ---------------- */
+function BtnPrimary({ onPress, children, disabled, theme }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: disabled ? "#94a3b8" : "#0a84ff" },
+        { backgroundColor: disabled ? theme.btnDisabledBg : theme.tint },
         pressed && !disabled && { opacity: 0.9 },
       ]}
     >
@@ -952,21 +1053,23 @@ function BtnPrimary({ onPress, children, disabled }) {
     </Pressable>
   );
 }
-function BtnOutline({ onPress, children }) {
+function BtnOutline({ onPress, children, theme }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
         styles.btnOutline,
+        { borderColor: theme.tint },
         pressed && { opacity: 0.95 },
       ]}
     >
-      <Text style={{ color: "#0a84ff", fontWeight: "700" }}>{children}</Text>
+      <Text style={{ color: theme.tint, fontWeight: "700" }}>{children}</Text>
     </Pressable>
   );
 }
-function PickerChip({ label, onPress, icon }) {
+function PickerChip({ label, onPress, icon, theme }) {
+  const T = theme;
   return (
     <Pressable
       onPress={onPress}
@@ -975,7 +1078,7 @@ function PickerChip({ label, onPress, icon }) {
           flexDirection: "row",
           alignItems: "center",
           gap: 6,
-          backgroundColor: "#eef2f7",
+          backgroundColor: T.pillDefaultBg,
           paddingHorizontal: 10,
           paddingVertical: 6,
           borderRadius: 999,
@@ -983,8 +1086,10 @@ function PickerChip({ label, onPress, icon }) {
         pressed && { opacity: 0.9 },
       ]}
     >
-      {icon ? <MaterialIcons name={icon} size={16} color="#263238" /> : null}
-      <Text style={{ color: "#263238", fontSize: 12, fontWeight: "600" }}>
+      {icon ? (
+        <MaterialIcons name={icon} size={16} color={T.pillDefaultFg} />
+      ) : null}
+      <Text style={{ color: T.pillDefaultFg, fontSize: 12, fontWeight: "600" }}>
         {label}
       </Text>
     </Pressable>
@@ -1057,7 +1162,6 @@ const styles = StyleSheet.create({
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   btnOutline: {
     borderWidth: 1,
-    borderColor: "#0a84ff",
     backgroundColor: "transparent",
   },
   miniBtn: {

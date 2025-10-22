@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Platform,
   useWindowDimensions,
+  useColorScheme,
 } from "react-native";
 import { useSelector } from "react-redux";
 import {
@@ -351,27 +352,84 @@ function useLockedDialogMatch({
   return { mm, loading };
 }
 
+/* =============== THEME =============== */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+
+  // màu chính + văn bản
+  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
+  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
+
+  // nền sheet + viền mềm + handle
+  const sheetBg = scheme === "dark" ? "#111214" : "#ffffff";
+  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
+  const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
+  const handle = scheme === "dark" ? "#475569" : "#94a3b8";
+  const backdrop = scheme === "dark" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.45)";
+
+  // Pills (status)
+  const pill = {
+    live:
+      scheme === "dark"
+        ? {
+            bg: "rgba(251,146,60,0.18)",
+            bd: "#fb923c",
+            color: "#fed7aa",
+          }
+        : {
+            bg: "#fff7ed",
+            bd: "#fdba74",
+            color: "#9a3412",
+          },
+    finished:
+      scheme === "dark"
+        ? {
+            bg: "rgba(16,185,129,0.18)",
+            bd: "#34d399",
+            color: "#a7f3d0",
+          }
+        : {
+            bg: "#ecfdf5",
+            bd: "#86efac",
+            color: "#065f46",
+          },
+    scheduled:
+      scheme === "dark"
+        ? {
+            bg: "rgba(148,163,184,0.18)",
+            bd: "#64748b",
+            color: "#cbd5e1",
+          }
+        : {
+            bg: "#f1f5f9",
+            bd: "#cbd5e1",
+            color: "#334155",
+          },
+  };
+
+  return {
+    scheme,
+    tint,
+    textPrimary,
+    textSecondary,
+    sheetBg,
+    softBg,
+    softBorder,
+    handle,
+    backdrop,
+    pill,
+  };
+}
+
 /* ================= UI bits ================= */
 export function StatusPill({ status }) {
+  const { pill } = useThemeTokens();
   const map = {
-    live: {
-      bg: "#fff7ed",
-      bd: "#fdba74",
-      color: "#9a3412",
-      label: "Đang diễn ra",
-    },
-    finished: {
-      bg: "#ecfdf5",
-      bd: "#86efac",
-      color: "#065f46",
-      label: "Hoàn thành",
-    },
-    default: {
-      bg: "#f1f5f9",
-      bd: "#cbd5e1",
-      color: "#334155",
-      label: "Dự kiến",
-    },
+    live: { ...pill.live, label: "Đang diễn ra" },
+    finished: { ...pill.finished, label: "Hoàn thành" },
+    scheduled: { ...pill.scheduled, label: "Dự kiến" },
+    default: { ...pill.scheduled, label: "Dự kiến" },
   };
   const sty = map[status] || map.default;
   return (
@@ -458,6 +516,9 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
     isLoadingLive,
   });
 
+  // THEME
+  const T = useThemeTokens();
+
   // tournamentId để lấy brackets (phục vụ offset V) — dựa trên match đã LOCK
   const tournamentId = useMemo(() => {
     if (!mm) return null;
@@ -500,15 +561,16 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
         appearsOnIndex={0}
         disappearsOnIndex={-1}
         pressBehavior="close"
+        opacity={1}
+        style={{ backgroundColor: T.backdrop }}
       />
     ),
-    []
+    [T.backdrop]
   );
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
       <BottomSheetModal
-        // key={`match-sheet-${open ? matchId || "x" : "closed"}`} // remount sạch khi đổi trận lúc đóng/mở nhanh
         ref={sheetRef}
         snapPoints={snapPoints}
         enablePanDownToClose
@@ -520,7 +582,6 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
           }, 50);
         }}
         onChange={(index) => {
-          // index >= 0: đang mở; -1 có thể coi là đóng (tuỳ implementation)
           if (index >= 0) {
             isDismissedRef.current = false;
           }
@@ -532,19 +593,21 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
         }}
         backdropComponent={renderBackdrop}
         topInset={topInset}
-        // bottomInset={insets.bottom}
         containerStyle={{
           marginLeft: sideInset,
           marginRight: sideInset,
         }}
-        handleIndicatorStyle={{ backgroundColor: "#94a3b8" }}
-        backgroundStyle={{ backgroundColor: "#fff" }}
+        handleIndicatorStyle={{ backgroundColor: T.handle }}
+        backgroundStyle={{ backgroundColor: T.sheetBg }}
         enableDynamicSizing={false}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderColor: T.softBorder }]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <Text
+              style={[styles.headerTitle, { color: T.textPrimary }]}
+              numberOfLines={1}
+            >
               {code ? `Trận đấu • ${code}` : "Trận đấu"}
             </Text>
             <StatusPill status={status} />
@@ -554,7 +617,7 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
             style={styles.closeBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MaterialIcons name="close" size={22} color="#0f172a" />
+            <MaterialIcons name="close" size={22} color={T.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -564,6 +627,7 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
             paddingBottom: Math.max(insets.bottom, 16),
             paddingHorizontal: 12,
             gap: 12,
+            backgroundColor: T.sheetBg,
           }}
         >
           <MatchContent
@@ -571,6 +635,12 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
             isLoading={loading}
             liveLoading={false}
             onSaved={handleSaved}
+            // (optional) nếu MatchContent hỗ trợ theme props:
+            // textPrimary={T.textPrimary}
+            // textSecondary={T.textSecondary}
+            // tint={T.tint}
+            // softBg={T.softBg}
+            // softBorder={T.softBorder}
           />
         </BottomSheetScrollView>
       </BottomSheetModal>
@@ -587,11 +657,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    borderBottomWidth: 0, // tăng lên 1 nếu muốn line
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#0f172a",
     marginBottom: 4,
   },
   closeBtn: {

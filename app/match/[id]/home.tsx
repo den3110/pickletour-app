@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  useColorScheme,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +19,24 @@ import Toast from "react-native-toast-message";
 import { useGetMatchPublicQuery } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import MatchContent from "@/components/match/MatchContent";
+
+/* ---------- theme tokens ---------- */
+function useThemeTokens() {
+  const scheme = useColorScheme() ?? "light";
+  const dark = scheme === "dark";
+  return {
+    scheme,
+    bg: dark ? "#0b0d10" : "#f6f8fc",
+    cardBg: dark ? "#111214" : "#ffffff",
+    border: dark ? "#2a2f36" : "#cbd5e1",
+    text: dark ? "#e5e7eb" : "#0f172a",
+    subtext: dark ? "#cbd5e1" : "#64748b",
+    tint: dark ? "#7cc0ff" : "#0a84ff",
+    errBg: dark ? "rgba(239,68,68,0.12)" : "#fee2e2",
+    errBd: dark ? "#fca5a5" : "#fecaca",
+    errText: dark ? "#fecaca" : "#b91c1c",
+  };
+}
 
 /* ---------- helpers: derive title ---------- */
 function pickCode(m: any): string | null {
@@ -73,6 +92,7 @@ export default function MatchHomePage() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const T = useThemeTokens();
   const matchId = id ? String(id) : "";
 
   const { data, isLoading, isFetching, refetch, error } =
@@ -140,13 +160,16 @@ export default function MatchHomePage() {
         options={{
           title,
           headerBackVisible: false,
+          headerStyle: { backgroundColor: T.cardBg },
+          headerTitleStyle: { color: T.text },
+          headerTintColor: T.text,
           headerLeft: () => (
             <Pressable
               onPress={() => router.replace("/(tabs)")}
               hitSlop={12}
               style={{ paddingHorizontal: 6, paddingVertical: 4 }}
             >
-              <MaterialIcons name="arrow-back" size={22} color="#0f172a" />
+              <MaterialIcons name="arrow-back" size={22} color={T.text} />
             </Pressable>
           ),
           headerRight: () => (
@@ -156,7 +179,7 @@ export default function MatchHomePage() {
                 hitSlop={12}
                 style={{ paddingHorizontal: 6, paddingVertical: 4 }}
               >
-                <MaterialIcons name="refresh" size={22} color="#0f172a" />
+                <MaterialIcons name="refresh" size={22} color={T.text} />
               </Pressable>
             </View>
           ),
@@ -164,45 +187,76 @@ export default function MatchHomePage() {
       />
 
       {!id ? (
-        <View style={[styles.center, { paddingTop: insets.top + 24 }]}>
-          <Text style={styles.err}>Thiếu tham số id của trận.</Text>
+        <View
+          style={[
+            styles.center,
+            { paddingTop: insets.top + 24, backgroundColor: T.bg },
+          ]}
+        >
+          <Text style={[styles.err, { color: T.errText }]}>
+            Thiếu tham số id của trận.
+          </Text>
         </View>
       ) : isLoading && !match ? (
         <ScrollView
+          style={{ backgroundColor: T.bg }}
           contentContainerStyle={[
             styles.center,
             { paddingTop: insets.top + 24 },
           ]}
           refreshControl={
-            <RefreshControl refreshing={isFetching} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={onRefresh}
+              colors={[T.tint]} // Android
+              tintColor={T.tint} // iOS
+              progressBackgroundColor={T.cardBg}
+            />
           }
         >
-          <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: "#64748b" }}>Đang tải…</Text>
+          <ActivityIndicator color={T.tint} />
+          <Text style={{ marginTop: 8, color: T.subtext }}>Đang tải…</Text>
         </ScrollView>
       ) : !match ? (
         <ScrollView
+          style={{ backgroundColor: T.bg }}
           contentContainerStyle={[
             styles.center,
             { paddingTop: insets.top + 24 },
           ]}
           refreshControl={
-            <RefreshControl refreshing={isFetching} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={onRefresh}
+              colors={[T.tint]}
+              tintColor={T.tint}
+              progressBackgroundColor={T.cardBg}
+            />
           }
         >
-          <Text style={styles.err}>Không tìm thấy dữ liệu trận.</Text>
-          <Pressable onPress={onRefresh} style={styles.retry}>
-            <MaterialIcons name="refresh" size={18} color="#0f172a" />
-            <Text style={styles.retryText}>Thử lại</Text>
+          <Text style={[styles.err, { color: T.errText }]}>
+            Không tìm thấy dữ liệu trận.
+          </Text>
+          <Pressable
+            onPress={onRefresh}
+            style={[
+              styles.retry,
+              { borderColor: T.border, backgroundColor: T.cardBg },
+            ]}
+          >
+            <MaterialIcons name="refresh" size={18} color={T.text} />
+            <Text style={[styles.retryText, { color: T.text }]}>Thử lại</Text>
           </Pressable>
         </ScrollView>
       ) : (
-        <MatchContent
-          m={match}
-          isLoading={isLoading}
-          liveLoading={isFetching}
-          onSaved={onRefresh}
-        />
+        <View style={{ flex: 1, backgroundColor: T.bg }}>
+          <MatchContent
+            m={match}
+            isLoading={isLoading}
+            liveLoading={isFetching}
+            onSaved={onRefresh}
+          />
+        </View>
       )}
     </>
   );
@@ -215,17 +269,15 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  err: { color: "#b91c1c", fontWeight: "600" },
+  err: { fontWeight: "600" },
   retry: {
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
     borderRadius: 8,
     marginTop: 6,
-    backgroundColor: "#fff",
   },
-  retryText: { color: "#0f172a", fontWeight: "600" },
+  retryText: { fontWeight: "600" },
 });
