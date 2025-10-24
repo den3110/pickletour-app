@@ -2330,7 +2330,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           </View>
 
           {/* Panel chấm điểm dành cho TRỌNG TÀI được gán */}
-          {isRefereeHere && merged?._id && (
+          {/* {isRefereeHere && merged?._id && (
             <View style={{ marginTop: 12 }}>
               <Text
                 style={[
@@ -2342,7 +2342,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               </Text>
               <RefereeJudgePanel matchId={String(merged._id)} />
             </View>
-          )}
+          )} */}
 
           {/* Admin toolbar */}
           {canManage && (

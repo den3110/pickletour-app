@@ -114,7 +114,7 @@ const NameBadge = memo(
         </Text>
 
         <View style={{ position: "relative", marginTop: 6 }}>
-          <View style={[s.badgeName, { paddingRight: 34 /* chừa chỗ icon */ }]}>
+          <View style={[s.badgeName, { paddingRight: 34 /* chừa icon */ }]}>
             {showIcon ? (
               <Ripple
                 onPress={() => onPressAvatar?.(user)}
@@ -338,8 +338,8 @@ export default function RefereeJudgePanel({ matchId }) {
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
   const gs = match?.gameScores || [];
   const curIdx = Math.max(0, gs.length - 1);
-  const curA = gs[curIdx]?.a ?? 0;
-  const curB = gs[curIdx]?.b ?? 0;
+  const curA = Number(gs[curIdx]?.a ?? 0);
+  const curB = Number(gs[curIdx]?.b ?? 0);
 
   const playersA = useMemo(
     () => playersOf(match?.pairA, eventType),
@@ -408,10 +408,13 @@ export default function RefereeJudgePanel({ matchId }) {
     [slotsNowA, slotsNowB]
   );
 
-  const serve = match?.serve || { side: "A", server: 2 };
+  // Serve state
+  const serve = match?.serve || { side: "A", server: 2, serverId: "" };
   const activeSide = serve?.side === "B" ? "B" : "A";
-  const activeServerNum = Number(serve?.server) === 1 ? 1 : 2;
-  const serverUidShow = getUidAtSlotNow(activeSide, activeServerNum) || "";
+  const activeServerNum =
+    Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
+  const serverUidShow =
+    serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum) || "";
 
   const callout =
     eventType === "single"
@@ -422,13 +425,23 @@ export default function RefereeJudgePanel({ matchId }) {
       ? `${curA}-${curB}-${activeServerNum}`
       : `${curB}-${curA}-${activeServerNum}`;
 
+  // Số game (set) đã thắng mỗi đội (chỉ đếm game đã win hợp lệ với rules.pointsToWin)
   const aWins = gs.filter(
-    (g) => isGameWin(g?.a, g?.b, rules.pointsToWin, rules.winByTwo) && g.a > g.b
+    (g) =>
+      isGameWin(g?.a, g?.b, Number(rules.pointsToWin), rules.winByTwo) &&
+      g.a > g.b
   ).length;
   const bWins = gs.filter(
-    (g) => isGameWin(g?.a, g?.b, rules.pointsToWin, rules.winByTwo) && g.b > g.a
+    (g) =>
+      isGameWin(g?.a, g?.b, Number(rules.pointsToWin), rules.winByTwo) &&
+      g.b > g.a
   ).length;
+
   const needSetWinsVal = needWins(rules.bestOf);
+  const matchDecided = aWins >= needSetWinsVal || bWins >= needSetWinsVal;
+
+  // Game đã kết thúc theo PTW hiện hành?
+  const gameLocked = isGameWin(curA, curB, ptw, rules.winByTwo);
 
   // ====== local UI state ======
   const [leftRight, setLeftRight] = useState({ left: "A", right: "B" });
@@ -440,20 +453,44 @@ export default function RefereeJudgePanel({ matchId }) {
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
 
+  // Mid-game side switch prompt
+  const [midPromptOpen, setMidPromptOpen] = useState(false);
+  const midAskedGamesRef = useRef(new Set());
+  const bestOf = Number(rules?.bestOf || 1);
+  const isDecider = bestOf > 1 && curIdx === bestOf - 1;
+
+  // Mốc đổi sân theo ptw
+  const midPoint =
+    ptw === 11
+      ? isDecider
+        ? 6
+        : null
+      : ptw === 15
+      ? 8
+      : ptw === 21
+      ? 11
+      : Math.ceil(ptw / 2);
+  const shouldAskMid =
+    (ptw === 11 && isDecider) ||
+    ptw === 15 ||
+    ptw === 21 ||
+    ![11, 15, 21].includes(ptw);
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const lastActionsRef = useRef([]);
-  const pushAction = (side) => {
-    lastActionsRef.current.push(side);
-    if (lastActionsRef.current.length > 10) lastActionsRef.current.shift();
-  };
-
   useEffect(() => {
     setPtw(basePointsToWin);
   }, [basePointsToWin]);
+
+  // ====== Undo stack (mở rộng) ======
+  const undoStack = useRef([]);
+  const pushUndo = (entry) => {
+    undoStack.current.push(entry);
+    if (undoStack.current.length > 50) undoStack.current.shift();
+  };
 
   // ====== socket auto-refetch ======
   const socketInst = socket;
@@ -504,7 +541,6 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // Kết thúc trận ngay, winner là 'A' | 'B' (nếu rỗng thì báo lỗi)
   const finishMatchNow = async (winner) => {
     if (!match) return;
     if (!winner) {
@@ -535,12 +571,10 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // Đi tới game kế tiếp
   const startNextGame = async () => {
     if (!match) return;
     try {
       await nextGame({ matchId: match._id }).unwrap();
-      // Có thể server sẽ broadcast; gọi refetch để chắc ăn
       refetch();
     } catch (e) {
       Toast.show({
@@ -554,8 +588,59 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
+  // ====== API điểm set (11 <-> 15) ======
+  const setPointsToWinOnServer = useCallback(
+    (nextVal) => {
+      if (!match?._id) return;
+      socket?.emit(
+        "rules:setPointsToWin",
+        { matchId: match._id, pointsToWin: Number(nextVal) },
+        (ack) => {
+          if (!ack?.ok) {
+            Toast.show({
+              type: "error",
+              text1: "Lỗi",
+              text2: ack?.message || "Không cập nhật điểm set",
+            });
+            return;
+          }
+          // KHÔNG pushUndo cho PTW
+          setPtw(Number(nextVal));
+          refetch();
+          Toast.show({
+            type: "success",
+            text1: "Đã cập nhật",
+            text2: `Điểm set: ${nextVal}`,
+          });
+        }
+      );
+    },
+    [match?._id, refetch, socket]
+  );
+
+  // ====== điều kiện khóa cộng điểm ======
+  const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
+
+  // Cộng điểm: chỉ đội đang giao; sau khi cộng, GIỮ nguyên serverId, đảo #1↔#2 (đổi tay giao)
   const inc = async (side) => {
-    if (!match || match.status !== "live") return;
+    if (!match) return;
+
+    if (!canScoreNow) {
+      Toast.show({
+        type: "info",
+        text1: "Đã khóa cộng điểm",
+        text2: matchDecided
+          ? "Trận đã đủ số game thắng (BO)."
+          : "Game đã kết thúc, vui lòng sang game tiếp theo.",
+      });
+      return;
+    }
+
+    if (side !== activeSide) return;
+
+    const prevServerUid = serverUidShow;
+    const nextOrder = activeServerNum === 1 ? 2 : 1;
+
     try {
       await incPoint({
         matchId: match._id,
@@ -563,13 +648,42 @@ export default function RefereeJudgePanel({ matchId }) {
         delta: +1,
         autoNext: false,
       }).unwrap();
+
       socket?.emit("score:inc", {
         matchId: match._id,
         side,
         delta: +1,
         autoNext: false,
       });
-      pushAction(side);
+
+      // đổi tay (slot 1↔2) nhưng GIỮ nguyên người giao
+      if (prevServerUid) {
+        socket?.emit(
+          "serve:set",
+          {
+            matchId: match._id,
+            side: activeSide,
+            server: nextOrder,
+            serverId: prevServerUid,
+          },
+          (ack) => {
+            if (!ack?.ok) {
+              Toast.show({
+                type: "error",
+                text1: "Lỗi",
+                text2:
+                  ack?.message || "Không cập nhật người giao sau khi cộng điểm",
+              });
+            } else {
+              refetch();
+            }
+          }
+        );
+      } else {
+        refetch();
+      }
+
+      pushUndo({ t: "POINT", side });
     } catch (e) {
       Toast.show({
         type: "error",
@@ -579,6 +693,7 @@ export default function RefereeJudgePanel({ matchId }) {
       });
     }
   };
+
   const dec = async (side) => {
     if (!match || match.status === "finished") return;
     try {
@@ -599,47 +714,118 @@ export default function RefereeJudgePanel({ matchId }) {
   };
 
   const onUndo = async () => {
-    const last = lastActionsRef.current.pop();
-    if (!last) {
+    const entry = undoStack.current.pop();
+    if (!entry) {
       Toast.show({ type: "info", text1: "Không có thao tác để hoàn tác" });
       return;
     }
-    await dec(last);
+    try {
+      if (entry.t === "POINT") {
+        await dec(entry.side);
+        socket?.emit("score:inc", {
+          matchId: match?._id,
+          side: entry.side,
+          delta: -1,
+          autoNext: false,
+        });
+        refetch();
+      } else if (entry.t === "SERVE_SET") {
+        const prev = entry.prev;
+        socket?.emit(
+          "serve:set",
+          {
+            matchId: match?._id,
+            side: prev.side,
+            server: prev.server,
+            serverId: prev.serverId || "",
+          },
+          (ack) => {
+            if (!ack?.ok) {
+              Toast.show({
+                type: "error",
+                text1: "Lỗi",
+                text2: ack?.message || "Không khôi phục giao bóng",
+              });
+            } else refetch();
+          }
+        );
+      } else if (entry.t === "SLOTS_SET") {
+        socket?.emit(
+          "slots:setBase",
+          { matchId: match?._id, base: entry.prevBase },
+          (ack) => {
+            if (!ack?.ok) {
+              Toast.show({
+                type: "error",
+                text1: "Lỗi",
+                text2: ack?.message || "Không khôi phục vị trí Ô",
+              });
+            } else refetch();
+          }
+        );
+      } else if (entry.t === "SWAP_SIDES") {
+        setLeftRight(entry.prev);
+      }
+      // KHÔNG hoàn tác PTW
+    } catch {
+      Toast.show({ type: "error", text1: "Hoàn tác thất bại" });
+    }
   };
 
-  const swapSides = () =>
-    setLeftRight(({ left, right }) => ({ left: right, right: left }));
-
+  // ĐỔI GIAO (side-out): sang đội kia, server = 1, người đang đứng ô #1 (phải) giao
   const toggleServeSide = () => {
+    if (!match?._id) return;
+    const prev = {
+      side: activeSide,
+      server: activeServerNum,
+      serverId: serverUidShow,
+    };
     const nextSide = activeSide === "A" ? "B" : "A";
-    const serverId =
+    const rightUid =
       getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
+
     socket?.emit(
       "serve:set",
-      { matchId: match?._id, side: nextSide, server: 1, serverId },
+      { matchId: match._id, side: nextSide, server: 1, serverId: rightUid },
       (ack) => {
-        if (!ack?.ok)
+        if (!ack?.ok) {
           Toast.show({
             type: "error",
             text1: "Lỗi",
             text2: ack?.message || "Không đặt được giao bóng",
           });
-        else refetch();
+        } else {
+          pushUndo({ t: "SERVE_SET", prev });
+          refetch();
+        }
       }
     );
   };
 
-  // Toggle người giao #1/#2 (KHÔNG đổi đội giao)
+  // ĐỔI TAY (trong cùng đội)
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
-    const nextNum = activeServerNum === 1 ? 2 : 1;
-    const serverId =
-      getUidAtSlotNow(activeSide, nextNum) ||
-      getUidAtSlotNow(activeSide, nextNum === 1 ? 2 : 1) ||
-      "";
+    const team = activeSide === "A" ? playersA : playersB;
+    if (!team?.length || team.length < 2) return;
+
+    const prev = {
+      side: activeSide,
+      server: activeServerNum,
+      serverId: serverUidShow,
+    };
+
+    const partnerId =
+      team.map(userIdOf).find((uid) => uid !== serverUidShow) || serverUidShow;
+    const nextOrder = activeServerNum === 1 ? 2 : 1;
+
     socket?.emit(
       "serve:set",
-      { matchId: match._id, side: activeSide, server: nextNum, serverId },
+      {
+        matchId: match._id,
+        side: activeSide,
+        server: nextOrder,
+        serverId: partnerId,
+      },
       (ack) => {
         if (!ack?.ok) {
           Toast.show({
@@ -648,13 +834,22 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đổi được người giao",
           });
         } else {
+          pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
       }
     );
-  }, [match?._id, activeSide, activeServerNum, getUidAtSlotNow, refetch]);
+  }, [
+    match?._id,
+    activeSide,
+    activeServerNum,
+    serverUidShow,
+    playersA,
+    playersB,
+    refetch,
+  ]);
 
-  // Hoán vị Ô (đổi vị trí VĐV 1↔2) — GIỮ nguyên "người giao" theo vị trí mới
+  // Đổi vị trí Ô (1↔2) — KHÔNG đụng vào serve
   const swapTeamSlots = useCallback(
     (teamKey) => {
       if (!match?._id) return;
@@ -680,16 +875,7 @@ export default function RefereeJudgePanel({ matchId }) {
         nextB[uidBottom] = cur1;
       }
 
-      const servingThisTeam = activeSide === teamKey;
-      const servingUid = serverUidShow;
-      let nextServerNum = activeServerNum;
-
-      if (servingThisTeam && servingUid) {
-        const teamScore = teamKey === "A" ? curA : curB;
-        const baseAfter = teamKey === "A" ? nextA : nextB;
-        const baseValAfter = Number(baseAfter[servingUid] || 1);
-        nextServerNum = currentSlotFromBase(baseValAfter, teamScore);
-      }
+      const prevBase = { A: baseA, B: baseB };
 
       socket?.emit(
         "slots:setBase",
@@ -703,49 +889,19 @@ export default function RefereeJudgePanel({ matchId }) {
             });
             return;
           }
-
-          if (servingThisTeam && servingUid) {
-            socket?.emit(
-              "serve:set",
-              {
-                matchId: match._id,
-                side: activeSide,
-                server: nextServerNum,
-                serverId: servingUid,
-              },
-              (ack2) => {
-                if (!ack2?.ok) {
-                  Toast.show({
-                    type: "error",
-                    text1: "Lỗi",
-                    text2: ack2?.message || "Không cập nhật người giao",
-                  });
-                } else {
-                  refetch();
-                }
-              }
-            );
-          } else {
-            refetch();
-          }
+          pushUndo({ t: "SLOTS_SET", prevBase });
+          refetch();
         }
       );
     },
-    [
-      match?._id,
-      playersA,
-      playersB,
-      baseA,
-      baseB,
-      activeSide,
-      activeServerNum,
-      serverUidShow,
-      curA,
-      curB,
-      socket,
-      refetch,
-    ]
+    [match?._id, playersA, playersB, baseA, baseB, refetch]
   );
+
+  const swapSides = () => {
+    const prev = { ...leftRight };
+    setLeftRight(({ left, right }) => ({ left: right, right: left }));
+    pushUndo({ t: "SWAP_SIDES", prev });
+  };
 
   const handleBack = useCallback(async () => {
     try {
@@ -756,21 +912,27 @@ export default function RefereeJudgePanel({ matchId }) {
     router.back();
   }, [router]);
 
-  const codeLabel =
+  // Header: CODE (HOA) | BOx | Gx
+  const baseCode = String(
     textOf(match?.displayCode) ||
-    textOf(match?.matchCode) ||
-    textOf(match?.code) ||
-    textOf(match?.slotCode) ||
-    textOf(match?.bracketCode) ||
-    "—";
+      textOf(match?.matchCode) ||
+      textOf(match?.code) ||
+      textOf(match?.slotCode) ||
+      textOf(match?.bracketCode) ||
+      "—"
+  ).toUpperCase();
+  const headerText = [
+    baseCode,
+    `BO${Number(rules?.bestOf || 1)}`,
+    `G${curIdx + 1}`,
+  ].join(" | ");
 
+  // enable/disable nút cộng điểm
   const leftServing = activeSide === leftSide;
   const rightServing = activeSide === rightSide;
+  const leftEnabled = canScoreNow && leftServing;
+  const rightEnabled = canScoreNow && rightServing;
 
-  const leftEnabled = match?.status === "live" && leftServing;
-  const rightEnabled = match?.status === "live" && rightServing;
-
-  // open CCCD modal
   const openCccd = useCallback((u) => {
     setCccdUser(u || null);
     setCccdOpen(!!u);
@@ -778,10 +940,8 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // ====== CTA động cho nút chính ======
   const cta = useMemo(() => {
-    // 1) Trận đã kết thúc → ẩn nút
     if (match?.status === "finished") return null;
 
-    // 2) Trận CHƯA bắt đầu (khác live và finished) → hiện "Bắt đầu"
     if (match?.status !== "live") {
       return {
         label: "Bắt đầu",
@@ -790,37 +950,19 @@ export default function RefereeJudgePanel({ matchId }) {
       };
     }
 
-    // 3) Đang live → áp dụng logic BO1/BO>1
-    const bestOf = Number(rules?.bestOf || 1);
-    const needSetWins = Math.floor(bestOf / 2) + 1;
+    const bestOfNum = Number(rules?.bestOf || 1);
+    const needSetWins = Math.floor(bestOfNum / 2) + 1;
+
+    const gameFinished = isGameWin(
+      curA,
+      curB,
+      Number(rules?.pointsToWin ?? 11),
+      !!rules?.winByTwo
+    );
 
     const winnerBySets =
       aWins >= needSetWins ? "A" : bWins >= needSetWins ? "B" : "";
 
-    const curLeader = curA > curB ? "A" : curB > curA ? "B" : "";
-    const setLeader = aWins > bWins ? "A" : bWins > aWins ? "B" : "";
-    const hasNextGame = (gs?.length || 0) < bestOf;
-
-    // BO1: kết thúc theo điểm hiện tại
-    if (bestOf === 1) {
-      return {
-        label: "Kết thúc trận",
-        danger: true,
-        onPress: () => {
-          if (!curLeader) {
-            Toast.show({
-              type: "error",
-              text1: "Chưa thể kết thúc",
-              text2: "Tỉ số đang hoà.",
-            });
-            return;
-          }
-          finishMatchNow(curLeader);
-        },
-      };
-    }
-
-    // BO>1: nếu đã đủ set → kết thúc
     if (winnerBySets) {
       return {
         label: "Kết thúc trận",
@@ -829,51 +971,53 @@ export default function RefereeJudgePanel({ matchId }) {
       };
     }
 
-    // Đội đang dẫn set cũng dẫn điểm → kết thúc
-    if (setLeader && curLeader && setLeader === curLeader) {
+    if (gameFinished) {
+      const finishedGames = aWins + bWins;
+      const remainingGames = bestOfNum - finishedGames;
+      if (remainingGames > 0) {
+        return {
+          label: "Bắt game tiếp",
+          danger: false,
+          onPress: startNextGame,
+        };
+      }
+      const finalWinner = aWins > bWins ? "A" : "B";
       return {
         label: "Kết thúc trận",
         danger: true,
-        onPress: () => finishMatchNow(setLeader),
+        onPress: () => finishMatchNow(finalWinner),
       };
     }
 
-    // Còn game sau → bắt game tiếp
-    if (hasNextGame) {
-      return {
-        label: "Bắt game tiếp",
-        danger: false,
-        onPress: startNextGame,
-      };
-    }
-
-    // Game cuối: nếu có đội dẫn thì cho kết thúc, còn hoà thì báo lỗi
-    return {
-      label: "Kết thúc trận",
-      danger: true,
-      onPress: () => {
-        if (!curLeader) {
-          Toast.show({
-            type: "error",
-            text1: "Chưa thể kết thúc",
-            text2: "Tỉ số đang hoà.",
-          });
-          return;
-        }
-        finishMatchNow(curLeader);
-      },
-    };
+    return null;
   }, [
     match?.status,
     rules?.bestOf,
+    rules?.pointsToWin,
+    rules?.winByTwo,
     aWins,
     bWins,
     curA,
     curB,
-    gs?.length,
     onStart,
     startNextGame,
   ]);
+
+  // Nút giữa theo thứ tự server
+  const isServer1 = activeServerNum === 1;
+  const midLabel = isServer1 ? "Đổi tay" : "Đổi giao";
+  const midIcon = isServer1 ? "swap-vert" : "swap-calls";
+  const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
+
+  // Tự nhắc đổi sân giữa game
+  useEffect(() => {
+    if (match?.status !== "live" || !shouldAskMid || midPoint == null) return;
+    if (midAskedGamesRef.current.has(curIdx)) return;
+    if (curA === midPoint || curB === midPoint) {
+      midAskedGamesRef.current.add(curIdx);
+      setMidPromptOpen(true);
+    }
+  }, [match?.status, curIdx, curA, curB, shouldAskMid, midPoint]);
 
   /* ========== render ========== */
   if (isLoading && !match)
@@ -908,10 +1052,11 @@ export default function RefereeJudgePanel({ matchId }) {
               <MaterialIcons name="arrow-back" size={20} color="#111827" />
             </Ripple>
 
+            {/* CODE | BOx | Gx */}
             <View
               style={[s.chip, { paddingVertical: 6, paddingHorizontal: 10 }]}
             >
-              <Text style={s.matchCodeText}>{codeLabel.toLowerCase()}</Text>
+              <Text style={s.matchCodeText}>{headerText}</Text>
             </View>
 
             <View style={{ flexDirection: "row", gap: 6, flexShrink: 0 }}>
@@ -998,13 +1143,13 @@ export default function RefereeJudgePanel({ matchId }) {
                 <WinTargetTuner
                   value={ptw}
                   base={basePointsToWin}
-                  onToggle={() =>
-                    setPtw((v) =>
-                      v > basePointsToWin
+                  onToggle={() => {
+                    const next =
+                      ptw > basePointsToWin
                         ? basePointsToWin
-                        : basePointsToWin + 4
-                    )
-                  }
+                        : basePointsToWin + 4; // 11 <-> 15
+                    setPointsToWinOnServer(next);
+                  }}
                 />
 
                 <Text style={s.callout}>{callout || "—"}</Text>
@@ -1084,13 +1229,14 @@ export default function RefereeJudgePanel({ matchId }) {
                 </Text>
               </Ripple>
 
+              {/* Nút giữa động: Đổi tay <-> Đổi giao */}
               <Ripple
-                onPress={toggleServeSide}
+                onPress={onMidPress}
                 rippleContainerBorderRadius={12}
                 style={s.toggleBtn}
               >
-                <MaterialIcons name="swap-calls" size={22} color="#fff" />
-                <Text style={s.toggleText}>Đổi giao</Text>
+                <MaterialIcons name={midIcon} size={22} color="#fff" />
+                <Text style={s.toggleText}>{midLabel}</Text>
               </Ripple>
 
               <Ripple
@@ -1122,14 +1268,57 @@ export default function RefereeJudgePanel({ matchId }) {
         </View>
       </View>
 
-      {/* ===== Modal CCCD (full screen) ===== */}
+      {/* ===== Modal CCCD ===== */}
       <CCCDModal
         visible={cccdOpen}
         onClose={() => setCccdOpen(false)}
         user={cccdUser}
       />
 
-      {/* ===== Menu modal full-screen ===== */}
+      {/* ===== Prompt đổi sân giữa game ===== */}
+      <Modal
+        visible={midPromptOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMidPromptOpen(false)}
+        supportedOrientations={[
+          "portrait",
+          "landscape-left",
+          "landscape-right",
+          "landscape",
+        ]}
+      >
+        <View style={s.promptMask}>
+          <View style={s.promptCard}>
+            <Text style={s.promptTitle}>Đổi sân?</Text>
+            <Text style={s.promptText}>
+              Một đội vừa chạm {midPoint ?? "—"} điểm (giữa game). Bạn có muốn
+              đổi sân ngay bây giờ không?
+            </Text>
+            <View style={s.promptRow}>
+              <Ripple
+                onPress={() => setMidPromptOpen(false)}
+                rippleContainerBorderRadius={10}
+                style={[s.btnOutline, { flex: 1 }]}
+              >
+                <Text style={s.btnOutlineText}>Để sau</Text>
+              </Ripple>
+              <Ripple
+                onPress={() => {
+                  setMidPromptOpen(false);
+                  swapSides();
+                }}
+                rippleContainerBorderRadius={10}
+                style={[s.btnPrimary, { flex: 1 }]}
+              >
+                <Text style={s.btnPrimaryText}>Đổi sân</Text>
+              </Ripple>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== Menu modal ===== */}
       <Modal
         visible={menuOpen}
         animationType="slide"
@@ -1154,9 +1343,7 @@ export default function RefereeJudgePanel({ matchId }) {
             </Ripple>
           </View>
 
-          <View style={s.fullModalBody}>
-            {/* <Text style={s.fullModalText}>Hello world</Text> */}
-          </View>
+          <View style={s.fullModalBody}>{/* Tuỳ chọn thêm */}</View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -1435,16 +1622,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  winAdjustPlus: {
-    backgroundColor: "#ef4444",
-    borderColor: "#dc2626",
-  },
-  winAdjustMinus: {
-    backgroundColor: "#dc2626",
-    borderColor: "#b91c1c",
-  },
+  winAdjustPlus: { backgroundColor: "#ef4444", borderColor: "#dc2626" },
+  winAdjustMinus: { backgroundColor: "#dc2626", borderColor: "#b91c1c" },
 
-  // Serve icon absolute bên phải của pill
+  // Serve icon absolute
   serveIconBadge: {
     position: "absolute",
     right: 4,
@@ -1477,4 +1658,30 @@ const s = StyleSheet.create({
     gap: 6,
   },
   btnUndoSmText: { color: "#92400e", fontWeight: "700" },
+
+  // prompt
+  promptMask: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  promptCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  promptTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 8,
+  },
+  promptText: { fontSize: 14, color: "#111827", marginBottom: 12 },
+  promptRow: { flexDirection: "row", gap: 8 },
 });
