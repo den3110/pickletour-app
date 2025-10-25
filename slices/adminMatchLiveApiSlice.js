@@ -1,6 +1,6 @@
 // src/slices/adminMatchLiveApiSlice.js
 
-import apiSlice from "./apiSlice";
+import { apiSlice } from "./apiSlice";
 
 export const adminMatchLiveApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({

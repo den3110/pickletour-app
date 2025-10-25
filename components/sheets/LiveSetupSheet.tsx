@@ -104,6 +104,26 @@ const mostCommonUrl = (ms = []) => {
   return Array.from(freq.entries()).sort((a, b) => b[1] - a[1])[0][0];
 };
 
+/* --- helpers cho Open Studio --- */
+const buildQuery = (obj) =>
+  Object.entries(obj)
+    .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
+    .map(
+      ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`
+    )
+    .join("&");
+
+const looksLikeRTMP = (u) => /^rtmps?:\/\//i.test(String(u || "").trim());
+
+const splitRtmpUrl = (url) => {
+  const trimmed = String(url || "")
+    .trim()
+    .replace(/\/$/, "");
+  const idx = trimmed.lastIndexOf("/");
+  if (idx < 0) return { server: trimmed, key: "" };
+  return { server: trimmed.slice(0, idx), key: trimmed.slice(idx + 1) };
+};
+
 /* ---------------- small buttons ---------------- */
 function BtnPrimary({ onPress, children, disabled, tint }) {
   const bg = disabled ? "#94a3b8" : tint || "#0a84ff";
@@ -383,16 +403,54 @@ export default function LiveSetupSheet({
 
   const openLiveStudio = useCallback(
     (court) => {
-      const url = buildCourtLiveUrl
-        ? buildCourtLiveUrl(tournamentId, bracketId, court)
-        : `/admin/streaming/${court._id}`;
+      const cId = String(court?._id || "");
+      const v = form[cId] || { enabled: false, videoUrl: "" };
+
+      // base params bắt buộc
+      const baseParams = {
+        tid: tournamentId,
+        bid: bracketId,
+        courtId: cId,
+
+        // auto flags
+        autoOnLive: "1",
+        autoCreateIfMissing: "1",
+
+        // điều hướng sau khi kết thúc
+        tournamentHref: `/tournament/${tournamentId}/manage`,
+        homeHref: "/",
+      };
+
+      // Nếu người dùng đã điền URL RTMP vào "URL LIVE mặc định", prefill cho studio
+      const guessUrl = String(v.videoUrl || "").trim();
+      if (looksLikeRTMP(guessUrl)) {
+        // Prefill theo “full url”
+        baseParams.useFullUrl = "1";
+        baseParams.fullUrl = guessUrl;
+
+        // (tuỳ thích) nếu bạn muốn đi server+key thay vì fullUrl:
+        // const { server, key } = splitRtmpUrl(guessUrl);
+        // baseParams.useFullUrl = "0";
+        // baseParams.server = server;
+        // baseParams.key = key;
+      }
+
+      const qs = buildQuery(baseParams);
+      const href = `/live/studio_court?${qs}`;
+
       try {
-        router.push(url);
+        // Nếu bạn vẫn muốn override đường dẫn từ prop buildCourtLiveUrl,
+        // có thể ưu tiên nó. Ở đây mình vẫn đẩy href chuẩn đã chứa FULL params.
+        const finalUrl = buildCourtLiveUrl
+          ? buildCourtLiveUrl(tournamentId, bracketId, court) || href
+          : href;
+        router.push(finalUrl);
+        sheetRef.current?.dismiss();
       } catch {
         RNAlert.alert("Không mở được", "Đường dẫn/route không hợp lệ.");
       }
     },
-    [buildCourtLiveUrl, tournamentId, bracketId]
+    [form, tournamentId, bracketId, buildCourtLiveUrl]
   );
 
   const loadingAny = courtsLoading || matchesLoading || brLoading;
