@@ -251,8 +251,9 @@ export const apiSlice = createApi({
     "RefereeSearch",
     "TournamentReferees",
     "MatchesByTournament",
-    "ADMIN_QUEUE", 
-    "ADMIN_COURTS"
+    "ADMIN_QUEUE",
+    "ADMIN_COURTS",
+    "LiveSession",
   ],
   endpoints: () => ({}),
 });

@@ -1,14 +1,14 @@
-import { Tabs, usePathname } from "expo-router"; // ✅ usePathname
+import { Tabs } from "expo-router";
 import React from "react";
-import { Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSelector } from "react-redux";
+import { BlurView } from "expo-blur";
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
-import { useSelector } from "react-redux";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 const makeIcon = (
   sfName: string,
@@ -25,35 +25,74 @@ const makeIcon = (
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const userInfo = useSelector((s: any) => s.auth?.userInfo);
-  const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin"); // ✅
-  const pathname = usePathname(); // ✅
 
-  // ✅ Nếu đang ở admin mà bị mất quyền -> đẩy ra Home
-  React.useEffect(() => {
-    if (!isAdmin && pathname?.includes("/admin")) {
-      // dùng replace để không quay lại admin được bằng back
-      // import { router } from "expo-router" nếu cần điều hướng ngay tại đây
-      // nhưng trong TabLayout tránh navigate trực tiếp; trang admin tự Redirect cũng được
-    }
-  }, [isAdmin, pathname]);
+  const isAdmin = React.useMemo(
+    () => !!(userInfo?.isAdmin || userInfo?.role === "admin"),
+    [userInfo?.isAdmin, userInfo?.role]
+  );
 
-  // ✅ re-mount riêng khi quyền admin thay đổi
-  const tabsKey = isAdmin ? "tabs-admin-on" : "tabs-admin-off";
+  const isDark = colorScheme === "dark";
+
+  // 🎨 Custom TabBar Background Component
+  const TabBarBackground = React.useCallback(() => {
+    return (
+      <BlurView
+        intensity={isDark ? 80 : 100}
+        tint={isDark ? "dark" : "light"}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }, [isDark]);
 
   return (
     <Tabs
-      key={tabsKey} // ✅ ép re-mount khi isAdmin đổi
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: { position: "absolute" },
-          default: {},
-        }),
+
+        // // 💎 Liquid Glass Styling
+        // tabBarStyle: Platform.select({
+        //   ios: {
+        //     position: "absolute",
+        //     backgroundColor: "transparent",
+        //     borderTopWidth: 0,
+        //     elevation: 0,
+        //     shadowOpacity: 0,
+        //     // 🎨 Thêm padding để đẹp hơn
+        //     paddingTop: 8,
+        //     height: 88,
+        //   },
+        //   android: {
+        //     position: "absolute",
+        //     backgroundColor: isDark
+        //       ? "rgba(17, 18, 20, 0.9)"
+        //       : "rgba(255, 255, 255, 0.9)",
+        //     borderTopWidth: 0,
+        //     elevation: 8,
+        //     shadowColor: isDark ? "#000" : "#000",
+        //     shadowOffset: { width: 0, height: -4 },
+        //     shadowOpacity: 0.1,
+        //     shadowRadius: 8,
+        //     paddingTop: 8,
+        //     height: 72,
+        //   },
+        // }),
+
+        // // 🎨 Label styling
+        // tabBarLabelStyle: {
+        //   fontSize: 11,
+        //   fontWeight: "600",
+        // },
+
+        // // 🎨 Icon container styling
+        // tabBarIconStyle: {
+        //   marginTop: 4,
+        // },
       }}
     >
+      {/* 🏠 Trang chủ */}
       <Tabs.Screen
         name="index"
         options={{
@@ -62,6 +101,7 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 🏆 Giải đấu */}
       <Tabs.Screen
         name="tournaments"
         options={{
@@ -70,6 +110,7 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 📊 Xếp hạng */}
       <Tabs.Screen
         name="rankings"
         options={{
@@ -78,6 +119,7 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 🎾 Giải của tôi */}
       <Tabs.Screen
         name="my_tournament"
         options={{
@@ -86,7 +128,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ✅ Luôn khai báo màn admin, nhưng ẩn khỏi tab & deep-link nếu không phải admin */}
+      {/* 🔒 Quản trị */}
       <Tabs.Screen
         name="admin"
         options={
@@ -96,12 +138,12 @@ export default function TabLayout() {
                 tabBarIcon: makeIcon("lock.shield.fill", "shield-lock"),
               }
             : {
-                href: null, // ẩn khỏi tab + chặn deep-link
+                href: null,
               }
         }
       />
 
-      {/* LIVE */}
+      {/* 📡 Live */}
       <Tabs.Screen
         name="live"
         options={{
@@ -110,6 +152,7 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 👤 Hồ sơ */}
       <Tabs.Screen
         name="profile"
         options={{

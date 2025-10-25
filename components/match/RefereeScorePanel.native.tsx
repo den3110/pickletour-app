@@ -26,6 +26,10 @@ import {
   useRefereeSetStatusMutation,
   useRefereeSetWinnerMutation,
   useRefereeNextGameMutation,
+  // ⬇️ NEW hooks for court assigning
+  useGetCourtsForMatchQuery,
+  useRefereeAssignCourtMutation,
+  useRefereeUnassignCourtMutation,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -401,6 +405,435 @@ function WinTargetTuner({ value, base, onToggle }) {
   );
 }
 
+function ColorCoinToss({ disabled, onClose }) {
+  const t = useTokens();
+  const [phase, setPhase] = useState("idle"); // idle|running|done
+  const [active, setActive] = useState("blue");
+  const [result, setResult] = useState(null);
+
+  const flipRef = useRef(null);
+  const stopRef = useRef(null);
+  const startAtRef = useRef(0);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  const clearTimers = useCallback(() => {
+    if (flipRef.current) {
+      clearTimeout(flipRef.current);
+      flipRef.current = null;
+    }
+    if (stopRef.current) {
+      clearTimeout(stopRef.current);
+      stopRef.current = null;
+    }
+  }, []);
+  useEffect(() => () => clearTimers(), [clearTimers]);
+
+  const tickFlip = useCallback(() => {
+    const elapsed = Date.now() - startAtRef.current;
+    const delay = Math.round(90 + 700 * Math.min(1, elapsed / 5000));
+    setActive((p) => (p === "blue" ? "red" : "blue"));
+    flipRef.current = setTimeout(tickFlip, delay);
+  }, []);
+
+  const start = useCallback(() => {
+    if (disabled || phase === "running") return;
+    clearTimers();
+    setResult(null);
+    setPhase("running");
+    setActive(Math.random() < 0.5 ? "blue" : "red");
+    startAtRef.current = Date.now();
+    tickFlip();
+    stopRef.current = setTimeout(() => {
+      if (flipRef.current) clearTimeout(flipRef.current);
+      const finalColor = activeRef.current;
+      setPhase("done");
+      setResult(finalColor);
+      setActive(finalColor);
+    }, 5000);
+  }, [disabled, phase, clearTimers, tickFlip]);
+
+  const reset = useCallback(() => {
+    clearTimers();
+    setPhase("idle");
+    setActive("blue");
+    setResult(null);
+  }, [clearTimers]);
+
+  const barColor =
+    phase === "idle"
+      ? t.colors.border
+      : active === "blue"
+      ? "#0a84ff"
+      : "#ef4444";
+
+  const Panel = ({ kind }) => {
+    const label = kind === "blue" ? "ĐỘI XANH" : "ĐỘI ĐỎ";
+    const isWin = phase === "done" && result === kind;
+    const borderColor = isWin
+      ? kind === "blue"
+        ? "#0a84ff"
+        : "#ef4444"
+      : t.colors.border;
+    const pulse =
+      phase === "running" && active === kind
+        ? { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8 }
+        : null;
+    return (
+      <View
+        style={[
+          s.coinPanel,
+          { borderColor, backgroundColor: t.colors.card },
+          pulse,
+        ]}
+      >
+        <Text style={[s.coinTitle, { color: t.colors.text }]}>{label}</Text>
+        <View
+          style={[
+            s.chip,
+            {
+              backgroundColor: (kind === "blue" ? "#0a84ff" : "#ef4444") + "22",
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color: kind === "blue" ? "#0a84ff" : "#ef4444",
+              fontWeight: "700",
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+        {isWin && (
+          <View
+            style={[
+              s.badge,
+              { backgroundColor: kind === "blue" ? "#0a84ff" : "#ef4444" },
+            ]}
+          >
+            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>
+              KẾT QUẢ
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View
+      style={[
+        s.card,
+        { backgroundColor: t.colors.card, borderColor: t.colors.border },
+      ]}
+    >
+      <View style={[s.rowBetween, { marginBottom: 8 }]}>
+        <View
+          style={[
+            s.topBar,
+            { backgroundColor: barColor, flex: 1, marginRight: 10 },
+          ]}
+        />
+       
+      </View>
+
+      <View style={[s.row, { justifyContent: "center", marginBottom: 8 }]}>
+        {phase === "running" && (
+          <View
+            style={[
+              s.chip,
+              {
+                backgroundColor: "#0a84ff11",
+                borderWidth: 0,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+              },
+            ]}
+          >
+            <Text style={{ color: "#0a84ff" }}>
+              Đang bốc thăm: {active === "blue" ? "Đội Xanh" : "Đội Đỏ"}
+            </Text>
+          </View>
+        )}
+        {phase === "done" && result && (
+          <View
+            style={[
+              s.chip,
+              {
+                backgroundColor:
+                  (result === "blue" ? "#0a84ff" : "#ef4444") + "22",
+                borderWidth: 0,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+              },
+            ]}
+          >
+            <Text
+              style={{
+                color: result === "blue" ? "#0a84ff" : "#ef4444",
+                fontWeight: "700",
+              }}
+            >
+              KẾT QUẢ: {result === "blue" ? "Đội Xanh" : "Đội Đỏ"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={[s.rowBetween, { marginBottom: 8 }]}>
+        <Text style={[s.h6, { color: t.colors.text }]}>Bốc thăm màu (5s)</Text>
+        <View style={s.row}>
+          <Ripple
+            onPress={start}
+            disabled={disabled || phase === "running"}
+            style={[
+              s.btnPrimary,
+              { backgroundColor: disabled ? "#9ca3af" : "#0a84ff" },
+              disabled && s.btnDisabled,
+            ]}
+          >
+            <MaterialIcons name="casino" size={16} color="#fff" />
+            <Text style={s.btnPrimaryText}>Bắt đầu</Text>
+          </Ripple>
+          <Ripple
+            onPress={reset}
+            disabled={phase === "running"}
+            style={[
+              s.btnOutline,
+              {
+                marginLeft: 8,
+                borderColor: t.colors.border,
+                backgroundColor: t.colors.card,
+              },
+            ]}
+          >
+            <MaterialIcons name="restart-alt" size={16} color={t.colors.text} />
+            <Text style={[s.btnOutlineText, { color: t.colors.text }]}>
+              Reset
+            </Text>
+          </Ripple>
+        </View>
+      </View>
+
+      <View style={[s.row, { gap: 12 }]}>
+        <Panel kind="blue" />
+        <Panel kind="red" />
+      </View>
+    </View>
+  );
+}
+
+/* ========= FULLSCREEN COURT PICKER (from original, themed) ========= */
+function CourtAssignModalFull({
+  visible,
+  onClose,
+  matchId,
+  currentCourtId,
+  onAssigned,
+}) {
+  const t = useTokens();
+  const { data, isLoading, isFetching, error, refetch } =
+    useGetCourtsForMatchQuery(
+      { matchId, includeBusy: false },
+      { skip: !visible || !matchId }
+    );
+  const [assignCourt, { isLoading: assigning }] =
+    useRefereeAssignCourtMutation();
+  const [unassignCourt, { isLoading: unassigning }] =
+    useRefereeUnassignCourtMutation();
+
+  const courts = data?.items || [];
+
+  const doAssign = async (courtId) => {
+    try {
+      await assignCourt({ matchId, courtId }).unwrap();
+      Toast.show({ type: "success", text1: "Đã gán sân" });
+      onAssigned?.({ courtId });
+      onClose?.();
+    } catch (e) {
+      const msg =
+        textOf(e?.data?.message) || textOf(e?.error) || "Không thể gán sân";
+      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+      onAssigned?.({ error: msg });
+    }
+  };
+
+  const clearAssign = async () => {
+    try {
+      await unassignCourt({ matchId }).unwrap();
+      Toast.show({ type: "success", text1: "Đã bỏ gán sân" });
+      onAssigned?.({ courtId: null });
+      onClose?.();
+    } catch (e) {
+      const msg =
+        textOf(e?.data?.message) || textOf(e?.error) || "Không thể bỏ gán sân";
+      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+      supportedOrientations={[
+        "portrait",
+        "landscape-left",
+        "landscape-right",
+        "landscape",
+      ]}
+    >
+      <SafeAreaView
+        style={[s.fullModalWrap, { backgroundColor: t.colors.background }]}
+      >
+        {/* Header */}
+        <View style={[s.rowBetween, { padding: 12 }]}>
+          <Text style={[s.h6, { color: t.colors.text }]}>Gán sân</Text>
+          <View style={[s.row, { gap: 6 }]}>
+            <Ripple
+              onPress={() => refetch()}
+              disabled={isLoading || isFetching}
+              style={[s.iconBtn, { backgroundColor: t.colors.card }]}
+              rippleContainerBorderRadius={8}
+            >
+              {isFetching ? (
+                <ActivityIndicator size="small" />
+              ) : (
+                <MaterialIcons name="refresh" size={18} color={t.colors.text} />
+              )}
+            </Ripple>
+            <Ripple
+              onPress={onClose}
+              style={[s.iconBtn, { backgroundColor: t.colors.card }]}
+              rippleContainerBorderRadius={8}
+            >
+              <MaterialIcons name="close" size={18} color={t.colors.text} />
+            </Ripple>
+          </View>
+        </View>
+
+        {/* Body */}
+        <View style={{ flex: 1, paddingHorizontal: 12 }}>
+          {isLoading ? (
+            <View style={[s.center, { flex: 1 }]}>
+              <ActivityIndicator />
+            </View>
+          ) : error ? (
+            <View
+              style={[
+                s.alertError,
+                { backgroundColor: t.chipErrBg, borderColor: t.chipErrBd },
+              ]}
+            >
+              <Text style={[s.alertText, { color: t.chipErrFg }]}>
+                {textOf(error?.data?.message) ||
+                  textOf(error?.error) ||
+                  "Lỗi tải danh sách sân"}
+              </Text>
+            </View>
+          ) : !courts.length ? (
+            <View style={[s.center, { flex: 1 }]}>
+              <Text style={{ color: t.colors.text }}>
+                Không có sân khả dụng.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ width: "100%" }}>
+              {courts.map((c, idx) => {
+                const id = c?._id || c?.id;
+                const selected = String(currentCourtId || "") === String(id);
+                return (
+                  <Ripple
+                    key={id || idx}
+                    onPress={() => !(assigning || unassigning) && doAssign(id)}
+                    style={{
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: t.colors.border,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                    rippleContainerBorderRadius={8}
+                  >
+                    <View style={[s.row, { gap: 8 }]}>
+                      <MaterialIcons
+                        name="stadium"
+                        size={18}
+                        color={t.colors.text}
+                      />
+                      <Text
+                        style={{
+                          fontWeight: "700",
+                          color: t.colors.text,
+                        }}
+                      >
+                        {textOf(c?.name)}
+                      </Text>
+                    </View>
+                    {selected ? (
+                      <MaterialIcons
+                        name="check-circle"
+                        size={18}
+                        color="#10b981"
+                      />
+                    ) : (
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={20}
+                        color={t.muted}
+                      />
+                    )}
+                  </Ripple>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Footer */}
+        <View
+          style={{
+            padding: 12,
+            borderTopWidth: 1,
+            borderTopColor: t.colors.border,
+          }}
+        >
+          <View style={[s.rowBetween]}>
+            <Ripple
+              onPress={clearAssign}
+              style={[
+                s.btnOutline,
+                {
+                  backgroundColor: t.colors.card,
+                  borderColor: t.colors.border,
+                },
+              ]}
+              rippleContainerBorderRadius={10}
+            >
+              <MaterialIcons name="block" size={16} color={t.colors.text} />
+              <Text style={[s.btnOutlineText, { color: t.colors.text }]}>
+                Bỏ gán sân
+              </Text>
+            </Ripple>
+            <Ripple
+              onPress={onClose}
+              style={[s.btnPrimary, { backgroundColor: t.colors.primary }]}
+              rippleContainerBorderRadius={10}
+            >
+              <Text style={s.btnPrimaryText}>Đóng</Text>
+            </Ripple>
+          </View>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 /* ========== main component ========== */
 export default function RefereeJudgePanel({ matchId }) {
   const t = useTokens();
@@ -420,13 +853,17 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const socket = useSocket();
 
+  // ===== NEW: court modal state =====
+  const [courtOpen, setCourtOpen] = useState(false);
+
   // ====== derive ======
   const rules = match?.rules || { bestOf: 1, pointsToWin: 11, winByTwo: true };
   const basePointsToWin = Number(rules?.pointsToWin ?? 11);
   const [ptw, setPtw] = useState(basePointsToWin);
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
   const gs = match?.gameScores || [];
-  const curIdx = Math.max(0, gs.length - 1);
+  const theCurIdx = Math.max(0, gs.length - 1);
+  const curIdx = theCurIdx; // keep naming
   const curA = Number(gs[curIdx]?.a ?? 0);
   const curB = Number(gs[curIdx]?.b ?? 0);
 
@@ -502,8 +939,17 @@ export default function RefereeJudgePanel({ matchId }) {
   const activeSide = serve?.side === "B" ? "B" : "A";
   const activeServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
+
+  // ⬇️ UI-ONLY: Đầu game (0-0-2) icon phải nằm ở Ô 1
+  const isStartOfGame = Number(curA) === 0 && Number(curB) === 0;
   const serverUidShow =
-    serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum) || "";
+    (isStartOfGame && activeServerNum === 2
+      ? // luôn ưu tiên Ô 1 cho icon ở đầu game
+        getUidAtSlotNow(activeSide, 1) ||
+        serve?.serverId ||
+        getUidAtSlotNow(activeSide, activeServerNum)
+      : // còn lại giữ nguyên như cũ
+        serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum)) || "";
 
   const callout =
     eventType === "single"
@@ -514,7 +960,6 @@ export default function RefereeJudgePanel({ matchId }) {
       ? `${curA}-${curB}-${activeServerNum}`
       : `${curB}-${curA}-${activeServerNum}`;
 
-  // Số game (set) đã thắng mỗi đội (chỉ đếm game đã win hợp lệ với rules.pointsToWin)
   const aWins = gs.filter(
     (g) =>
       isGameWin(g?.a, g?.b, Number(rules.pointsToWin), rules.winByTwo) &&
@@ -529,7 +974,6 @@ export default function RefereeJudgePanel({ matchId }) {
   const needSetWinsVal = needWins(rules.bestOf);
   const matchDecided = aWins >= needSetWinsVal || bWins >= needSetWinsVal;
 
-  // Game đã kết thúc theo PTW hiện hành?
   const gameLocked = isGameWin(curA, curB, ptw, rules.winByTwo);
 
   // ====== local UI state ======
@@ -542,28 +986,12 @@ export default function RefereeJudgePanel({ matchId }) {
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
 
-  // Mid-game side switch prompt
+  // Mid-game side switch prompt (ALWAYS at half-set; triggers on undo too)
   const [midPromptOpen, setMidPromptOpen] = useState(false);
-  const midAskedGamesRef = useRef(new Set());
-  const bestOf = Number(rules?.bestOf || 1);
-  const isDecider = bestOf > 1 && curIdx === bestOf - 1;
-
-  // Mốc đổi sân theo ptw
-  const midPoint =
-    ptw === 11
-      ? isDecider
-        ? 6
-        : null
-      : ptw === 15
-      ? 8
-      : ptw === 21
-      ? 11
-      : Math.ceil(ptw / 2);
-  const shouldAskMid =
-    (ptw === 11 && isDecider) ||
-    ptw === 15 ||
-    ptw === 21 ||
-    ![11, 15, 21].includes(ptw);
+  // nửa set: 11→6, 15→8, 21→11, mặc định ceil(ptw/2)
+  const midPoint = ptw ? Math.ceil(Number(ptw) / 2) : null;
+  // theo dõi snapshot điểm trước đó (để chỉ bật khi VỪA chạm nửa set)
+  const prevScoreRef = useRef({ idx: -1, a: null, b: null });
 
   useEffect(() => {
     const tmr = setInterval(() => setNow(new Date()), 1000);
@@ -574,7 +1002,7 @@ export default function RefereeJudgePanel({ matchId }) {
     setPtw(basePointsToWin);
   }, [basePointsToWin]);
 
-  // ====== Undo stack (mở rộng) ======
+  // ====== Undo stack ======
   const undoStack = useRef([]);
   const pushUndo = (entry) => {
     undoStack.current.push(entry);
@@ -677,7 +1105,6 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // ====== API điểm set (11 <-> 15) ======
   const setPointsToWinOnServer = useCallback(
     (nextVal) => {
       if (!match?._id) return;
@@ -706,10 +1133,8 @@ export default function RefereeJudgePanel({ matchId }) {
     [match?._id, refetch, socket]
   );
 
-  // ====== điều kiện khóa cộng điểm ======
   const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
 
-  // Cộng điểm
   const inc = async (side) => {
     if (!match) return;
 
@@ -869,6 +1294,7 @@ export default function RefereeJudgePanel({ matchId }) {
     const rightUid =
       getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
 
+    // BE giữ nguyên logic cũ: đặt server=1 khi đổi giao (không special-case đầu game)
     socket?.emit(
       "serve:set",
       { matchId: match._id, side: nextSide, server: 1, serverId: rightUid },
@@ -995,7 +1421,6 @@ export default function RefereeJudgePanel({ matchId }) {
     router.back();
   }, [router]);
 
-  // Header: CODE (HOA) | BOx | Gx
   const baseCode = String(
     textOf(match?.displayCode) ||
       textOf(match?.matchCode) ||
@@ -1010,7 +1435,6 @@ export default function RefereeJudgePanel({ matchId }) {
     `G${curIdx + 1}`,
   ].join(" | ");
 
-  // enable/disable nút cộng điểm
   const leftServing = activeSide === leftSide;
   const rightServing = activeSide === rightSide;
   const leftEnabled = canScoreNow && leftServing;
@@ -1021,7 +1445,6 @@ export default function RefereeJudgePanel({ matchId }) {
     setCccdOpen(!!u);
   }, []);
 
-  // ====== CTA động cho nút chính ======
   const cta = useMemo(() => {
     if (match?.status === "finished") return null;
 
@@ -1086,21 +1509,26 @@ export default function RefereeJudgePanel({ matchId }) {
     startNextGame,
   ]);
 
-  // Nút giữa theo thứ tự server
   const isServer1 = activeServerNum === 1;
   const midLabel = isServer1 ? "Đổi tay" : "Đổi giao";
   const midIcon = isServer1 ? "swap-vert" : "swap-calls";
   const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
 
-  // Tự nhắc đổi sân giữa game
+  // ====== Always-ask-at-half-set logic (triggers on undo too) ======
   useEffect(() => {
-    if (match?.status !== "live" || !shouldAskMid || midPoint == null) return;
-    if (midAskedGamesRef.current.has(curIdx)) return;
-    if (curA === midPoint || curB === midPoint) {
-      midAskedGamesRef.current.add(curIdx);
+    if (match?.status !== "live" || midPoint == null) return;
+
+    const prev = prevScoreRef.current;
+    const changedGame = prev.idx !== curIdx;
+    const scoreChanged = prev.a !== curA || prev.b !== curB;
+    const isAtMidNow = curA === midPoint || curB === midPoint;
+
+    if ((changedGame || scoreChanged) && isAtMidNow && !midPromptOpen) {
       setMidPromptOpen(true);
     }
-  }, [match?.status, curIdx, curA, curB, shouldAskMid, midPoint]);
+
+    prevScoreRef.current = { idx: curIdx, a: curA, b: curB };
+  }, [match?.status, curIdx, curA, curB, midPoint, midPromptOpen]);
 
   /* ========== render ========== */
   if (isLoading && !match)
@@ -1125,6 +1553,10 @@ export default function RefereeJudgePanel({ matchId }) {
       </View>
     );
   if (!match) return null;
+
+  // current court id if any
+  const currentCourtId =
+    match?.court?._id || match?.court?.id || match?.court || match?.courtId;
 
   return (
     <SafeAreaView style={[s.page, { backgroundColor: t.colors.background }]}>
@@ -1212,7 +1644,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   color={t.colors.text}
                 />
                 <Text style={[s.btnSwapSmText, { color: t.chipInfo2Fg }]}>
-                  Đổi sân
+                  Đổi bên
                 </Text>
               </Ripple>
 
@@ -1248,6 +1680,28 @@ export default function RefereeJudgePanel({ matchId }) {
             >
               <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
                 {activeServerNum}
+              </Text>
+            </Ripple>
+
+            {/* ⬇️ NEW: Gán sân (ở cuối cùng) */}
+            <Ripple
+              onPress={() => setCourtOpen(true)}
+              style={[
+                s.btnOutlineSm,
+                {
+                  backgroundColor: t.colors.card,
+                  borderColor: t.colors.border,
+                },
+              ]}
+              rippleContainerBorderRadius={10}
+            >
+              <MaterialIcons
+                name="edit-location"
+                size={16}
+                color={t.colors.text}
+              />
+              <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
+                {currentCourtId ? "Đổi sân" : "Gán sân"}
               </Text>
             </Ripple>
           </View>
@@ -1477,11 +1931,11 @@ export default function RefereeJudgePanel({ matchId }) {
             ]}
           >
             <Text style={[s.promptTitle, { color: t.colors.text }]}>
-              Đổi sân?
+              Đổi bên?
             </Text>
             <Text style={[s.promptText, { color: t.subtext }]}>
               Một đội vừa chạm {midPoint ?? "—"} điểm (giữa game). Bạn có muốn
-              đổi sân ngay bây giờ không?
+              đổi bên ngay bây giờ không?
             </Text>
             <View style={s.promptRow}>
               <Ripple
@@ -1541,9 +1995,22 @@ export default function RefereeJudgePanel({ matchId }) {
             </Ripple>
           </View>
 
-          <View style={s.fullModalBody}>{/* Tuỳ chọn thêm */}</View>
+          <View style={s.fullModalBody}>
+            <ColorCoinToss />
+          </View>
         </SafeAreaView>
       </Modal>
+
+      {/* ===== NEW: Court assign fullscreen modal ===== */}
+      <CourtAssignModalFull
+        visible={courtOpen}
+        onClose={() => setCourtOpen(false)}
+        matchId={match?._id}
+        currentCourtId={currentCourtId}
+        onAssigned={() => {
+          refetch();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1753,7 +2220,7 @@ const s = StyleSheet.create({
   matchCodeText: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
 
   fullModalWrap: { flex: 1, backgroundColor: "#fff" },
-  fullModalBody: { flex: 1, alignItems: "center", justifyContent: "center" },
+  fullModalBody: { flex: 1 },
   fullModalText: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
 
   btnPrimary: {
@@ -1882,4 +2349,24 @@ const s = StyleSheet.create({
   },
   promptText: { fontSize: 14, color: "#111827", marginBottom: 12 },
   promptRow: { flexDirection: "row", gap: 8 },
+  topBar: { height: 10, borderRadius: 8 },
+  coinPanel: {
+    flex: 1,
+    minHeight: 110,
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  coinTitle: { fontSize: 18, fontWeight: "900" },
+  badge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+  },
 });

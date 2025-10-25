@@ -11,6 +11,7 @@ import {
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useTheme } from "@react-navigation/native";
 import { normalizeUrl } from "@/utils/normalizeUri";
 // import { normalizeUrl } from "@/utils/normalizeUrl";
 
@@ -33,6 +34,27 @@ const getCccdImages = (u) => {
 };
 
 export default function CCCDModal({ visible, onClose, user }) {
+  const { colors, dark } = useTheme();
+
+  // ===== Tokens đơn giản theo theme (fallback an toàn) =====
+  const T = useMemo(
+    () => ({
+      bg: colors?.background ?? (dark ? "#0b1220" : "#ffffff"),
+      text: colors?.text ?? (dark ? "#e5e7eb" : "#0f172a"),
+      border: colors?.border ?? (dark ? "#334155" : "#e5e7eb"),
+      surface: dark ? "#111827" : "#f8fafc",
+      card: colors?.card ?? (dark ? "#0f172a" : "#ffffff"),
+      muted: colors?.notification /* thường không dùng cho text */
+        ? colors.notification
+        : dark
+        ? "#9CA3AF"
+        : "#6b7280",
+    }),
+    [colors, dark]
+  );
+
+  const s = useMemo(() => makeStyles(T), [T]);
+
   const name = textOf(user) || "Vận động viên";
   const cccd = getCccd(user);
   const imgs = useMemo(() => getCccdImages(user), [user]);
@@ -61,7 +83,7 @@ export default function CCCDModal({ visible, onClose, user }) {
             style={s.iconBtn}
             rippleContainerBorderRadius={8}
           >
-            <MaterialIcons name="close" size={22} color="#111827" />
+            <MaterialIcons name="close" size={22} color={T.text} />
           </Ripple>
         </View>
 
@@ -69,7 +91,7 @@ export default function CCCDModal({ visible, onClose, user }) {
           <Text style={s.name}>{name}</Text>
 
           <View style={[s.row, { marginTop: 8 }]}>
-            <MaterialIcons name="badge" size={18} color="#111827" />
+            <MaterialIcons name="badge" size={18} color={T.text} />
             <Text style={s.cccdText}>
               {cccd ? `Số CCCD: ${cccd}` : "Không có số CCCD"}
             </Text>
@@ -108,7 +130,7 @@ export default function CCCDModal({ visible, onClose, user }) {
               <MaterialIcons
                 name="image-not-supported"
                 size={22}
-                color="#6b7280"
+                color={T.muted}
               />
               <Text style={s.emptyText}>Không có ảnh CCCD</Text>
             </View>
@@ -119,54 +141,58 @@ export default function CCCDModal({ visible, onClose, user }) {
   );
 }
 
-const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fff" },
-  header: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  title: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
-  iconBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: "#f8fafc",
-  },
-  body: { padding: 14 },
-  name: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
-  row: { flexDirection: "row", alignItems: "center", gap: 6 },
-  cccdText: { marginLeft: 4, fontWeight: "700", color: "#0f172a" },
+function makeStyles(T) {
+  return StyleSheet.create({
+    wrap: { flex: 1, backgroundColor: T.bg },
+    header: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderBottomWidth: 1,
+      borderColor: T.border,
+      backgroundColor: T.card,
+    },
+    title: { fontSize: 18, fontWeight: "800", color: T.text },
+    iconBtn: {
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      backgroundColor: T.surface,
+    },
+    body: { padding: 14 },
+    name: { fontSize: 16, fontWeight: "800", color: T.text },
+    row: { flexDirection: "row", alignItems: "center", gap: 6 },
+    cccdText: { marginLeft: 4, fontWeight: "700", color: T.text },
 
-  imgGrid: { marginTop: 12, gap: 12 },
-  imgCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  label: { fontWeight: "700", color: "#111827", marginBottom: 6 },
-  img: {
-    width: "100%",
-    height: 260,
-    borderRadius: 8,
-    backgroundColor: "#f8fafc",
-  },
+    imgGrid: { marginTop: 12, gap: 12 },
+    imgCard: {
+      backgroundColor: T.card,
+      borderRadius: 12,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: T.border,
+    },
+    label: { fontWeight: "700", color: T.text, marginBottom: 6 },
+    img: {
+      width: "100%",
+      height: 260,
+      borderRadius: 8,
+      backgroundColor: T.surface,
+    },
 
-  empty: {
-    marginTop: 16,
-    paddingVertical: 18,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  emptyText: { color: "#6b7280", fontWeight: "700" },
-});
+    empty: {
+      marginTop: 16,
+      paddingVertical: 18,
+      borderWidth: 1,
+      borderColor: T.border,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: T.card,
+    },
+    emptyText: { color: T.muted, fontWeight: "700" },
+  });
+}
