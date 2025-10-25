@@ -14,6 +14,7 @@ import {
   Text,
   View,
   SafeAreaView,
+  useColorScheme,
 } from "react-native";
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -32,6 +33,55 @@ import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import CCCDModal from "../CCCDModal.native";
+import { useTheme } from "@react-navigation/native";
+
+/* ---------- Theme tokens (giống DashboardScreen) ---------- */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e4e8ef");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f5f7fb");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+
+    muted: dark ? "#9aa0a6" : "#6b7280",
+    subtext: dark ? "#c9c9c9" : "#555",
+    skeletonBase: dark ? "#22262c" : "#e9eef5",
+    headerBg: dark ? "#101418" : "#f1f5f9",
+    divider: dark ? "#2a2e33" : "#e5e7eb",
+
+    // Chips
+    chipInfoBg: dark ? "#1f2937" : "#eef2f7",
+    chipInfoFg: dark ? "#e5e7eb" : "#263238",
+    chipInfoBd: dark ? "#334155" : "#e2e8f0",
+
+    chipErrBg: dark ? "#3b0d0d" : "#fee2e2",
+    chipErrFg: dark ? "#fecaca" : "#991b1b",
+    chipErrBd: dark ? "#7f1d1d" : "#fecaca",
+
+    chipInfo2Bg: dark ? "#0f2536" : "#e0f2fe",
+    chipInfo2Fg: dark ? "#93c5fd" : "#075985",
+    chipInfo2Bd: dark ? "#1e3a5f" : "#bae6fd",
+
+    success: dark ? "#22c55e" : "#16a34a",
+
+    // Status chip bg (không dùng ở file này nhưng giữ cho đồng bộ)
+    status: {
+      upcoming: dark ? "#0b5fad" : "#0288d1",
+      ongoing: dark ? "#1c6b2a" : "#2e7d32",
+      finished: dark ? "#5f6368" : "#9e9e9e",
+    },
+  };
+}
 
 /* ========== helpers ========== */
 const textOf = (v) => {
@@ -92,6 +142,7 @@ const getCurrentSlotOfUser = ({
 /* ======= memo child components ======= */
 const NameBadge = memo(
   function NameBadge({ user, isServer, onPressAvatar }) {
+    const t = useTokens();
     const [imgError, setImgError] = useState(false);
 
     const fullName =
@@ -109,12 +160,24 @@ const NameBadge = memo(
 
     return (
       <View style={{ alignItems: "center", maxWidth: "100%" }}>
-        <Text style={s.fullNameText} numberOfLines={1}>
+        <Text
+          style={[s.fullNameText, { color: t.colors.text }]}
+          numberOfLines={1}
+        >
           {fullName}
         </Text>
 
         <View style={{ position: "relative", marginTop: 6 }}>
-          <View style={[s.badgeName, { paddingRight: 34 /* chừa icon */ }]}>
+          <View
+            style={[
+              s.badgeName,
+              {
+                paddingRight: 34,
+                backgroundColor: t.chipInfoBg,
+                borderColor: t.chipInfoBd,
+              },
+            ]}
+          >
             {showIcon ? (
               <Ripple
                 onPress={() => onPressAvatar?.(user)}
@@ -123,13 +186,13 @@ const NameBadge = memo(
                   width: AV_SIZE,
                   height: AV_SIZE,
                   borderRadius: AV_SIZE / 2,
-                  backgroundColor: "#e5e7eb",
+                  backgroundColor: t.colors.card,
                   alignItems: "center",
                   justifyContent: "center",
                   marginRight: 6,
                 }}
               >
-                <MaterialIcons name="person" size={20} color="#6b7280" />
+                <MaterialIcons name="person" size={20} color={t.muted} />
               </Ripple>
             ) : (
               <Ripple
@@ -152,13 +215,24 @@ const NameBadge = memo(
               </Ripple>
             )}
 
-            <Text style={s.nickText} numberOfLines={1}>
+            <Text
+              style={[s.nickText, { color: t.colors.text }]}
+              numberOfLines={1}
+            >
               {displayNick(user)}
             </Text>
           </View>
 
           {isServer ? (
-            <View style={s.serveIconBadge}>
+            <View
+              style={[
+                s.serveIconBadge,
+                {
+                  backgroundColor: t.colors.primary,
+                  borderColor: t.chipInfo2Bd,
+                },
+              ]}
+            >
               <MaterialIcons name="sports-tennis" size={18} color="#fff" />
             </View>
           ) : null}
@@ -191,6 +265,8 @@ const TeamSimple = memo(
     serverUidShow,
     onPressAvatar,
   }) {
+    const t = useTokens();
+
     const ordered = useMemo(() => {
       const withSlot = players.map((u) => ({
         u,
@@ -208,7 +284,16 @@ const TeamSimple = memo(
     const isServerP2 = teamKey === activeSide && userIdOf(p2) === serverUidShow;
 
     return (
-      <View style={[s.teamBox, isServing && s.teamBoxActive]}>
+      <View
+        style={[
+          s.teamBox,
+          { backgroundColor: t.colors.card, borderColor: t.colors.border },
+          isServing && {
+            backgroundColor: t.chipInfo2Bg,
+            borderColor: t.chipInfo2Bd,
+          },
+        ]}
+      >
         <View
           style={{ alignItems: "center", justifyContent: "center", gap: 8 }}
         >
@@ -223,10 +308,13 @@ const TeamSimple = memo(
           {ordered.length > 1 && (
             <Ripple
               onPress={onSwap}
-              style={[s.iconBtn, { alignSelf: "center" }]}
+              style={[
+                s.iconBtn,
+                { alignSelf: "center", backgroundColor: t.colors.card },
+              ]}
               rippleContainerBorderRadius={8}
             >
-              <MaterialIcons name="swap-vert" size={18} color="#111827" />
+              <MaterialIcons name="swap-vert" size={18} color={t.colors.text} />
             </Ripple>
           )}
 
@@ -315,6 +403,7 @@ function WinTargetTuner({ value, base, onToggle }) {
 
 /* ========== main component ========== */
 export default function RefereeJudgePanel({ matchId }) {
+  const t = useTokens();
   const router = useRouter();
 
   const {
@@ -477,8 +566,8 @@ export default function RefereeJudgePanel({ matchId }) {
     ![11, 15, 21].includes(ptw);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const tmr = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(tmr);
   }, []);
 
   useEffect(() => {
@@ -604,7 +693,6 @@ export default function RefereeJudgePanel({ matchId }) {
             });
             return;
           }
-          // KHÔNG pushUndo cho PTW
           setPtw(Number(nextVal));
           refetch();
           Toast.show({
@@ -621,7 +709,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // ====== điều kiện khóa cộng điểm ======
   const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
 
-  // Cộng điểm: chỉ đội đang giao; sau khi cộng, GIỮ nguyên serverId, đảo #1↔#2 (đổi tay giao)
+  // Cộng điểm
   const inc = async (side) => {
     if (!match) return;
 
@@ -656,7 +744,6 @@ export default function RefereeJudgePanel({ matchId }) {
         autoNext: false,
       });
 
-      // đổi tay (slot 1↔2) nhưng GIỮ nguyên người giao
       if (prevServerUid) {
         socket?.emit(
           "serve:set",
@@ -766,13 +853,11 @@ export default function RefereeJudgePanel({ matchId }) {
       } else if (entry.t === "SWAP_SIDES") {
         setLeftRight(entry.prev);
       }
-      // KHÔNG hoàn tác PTW
     } catch {
       Toast.show({ type: "error", text1: "Hoàn tác thất bại" });
     }
   };
 
-  // ĐỔI GIAO (side-out): sang đội kia, server = 1, người đang đứng ô #1 (phải) giao
   const toggleServeSide = () => {
     if (!match?._id) return;
     const prev = {
@@ -802,7 +887,6 @@ export default function RefereeJudgePanel({ matchId }) {
     );
   };
 
-  // ĐỔI TAY (trong cùng đội)
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
     const team = activeSide === "A" ? playersA : playersB;
@@ -849,7 +933,6 @@ export default function RefereeJudgePanel({ matchId }) {
     refetch,
   ]);
 
-  // Đổi vị trí Ô (1↔2) — KHÔNG đụng vào serve
   const swapTeamSlots = useCallback(
     (teamKey) => {
       if (!match?._id) return;
@@ -1028,8 +1111,13 @@ export default function RefereeJudgePanel({ matchId }) {
     );
   if (error)
     return (
-      <View style={s.alertError}>
-        <Text style={s.alertText}>
+      <View
+        style={[
+          s.alertError,
+          { backgroundColor: t.chipErrBg, borderColor: t.chipErrBd },
+        ]}
+      >
+        <Text style={[s.alertText, { color: t.chipErrFg }]}>
           {textOf(error?.data?.message) ||
             textOf(error?.error) ||
             "Lỗi tải trận"}
@@ -1039,31 +1127,55 @@ export default function RefereeJudgePanel({ matchId }) {
   if (!match) return null;
 
   return (
-    <SafeAreaView style={s.page}>
+    <SafeAreaView style={[s.page, { backgroundColor: t.colors.background }]}>
       <View style={{ flex: 1 }}>
         {/* ===== TOP MENU ===== */}
-        <View style={[s.card, s.topCard]}>
+        <View
+          style={[
+            s.card,
+            s.topCard,
+            { backgroundColor: t.colors.card, borderColor: t.colors.border },
+          ]}
+        >
           <View style={[s.rowStart, { gap: 8, flexWrap: "wrap" }]}>
             <Ripple
               onPress={handleBack}
-              style={s.iconBtn}
+              style={[s.iconBtn, { backgroundColor: t.colors.card }]}
               rippleContainerBorderRadius={8}
             >
-              <MaterialIcons name="arrow-back" size={20} color="#111827" />
+              <MaterialIcons
+                name="arrow-back"
+                size={20}
+                color={t.colors.text}
+              />
             </Ripple>
 
             {/* CODE | BOx | Gx */}
             <View
-              style={[s.chip, { paddingVertical: 6, paddingHorizontal: 10 }]}
+              style={[
+                s.chip,
+                {
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  backgroundColor: t.chipInfoBg,
+                  borderColor: t.chipInfoBd,
+                },
+              ]}
             >
-              <Text style={s.matchCodeText}>{headerText}</Text>
+              <Text style={[s.matchCodeText, { color: t.colors.text }]}>
+                {headerText}
+              </Text>
             </View>
 
             <View style={{ flexDirection: "row", gap: 6, flexShrink: 0 }}>
               {cta && (
                 <Ripple
                   onPress={cta.onPress}
-                  style={cta.danger ? s.btnDangerSm : s.btnSuccessSm}
+                  style={
+                    cta.danger
+                      ? s.btnDangerSm
+                      : [s.btnSuccessSm, { backgroundColor: t.success }]
+                  }
                   rippleContainerBorderRadius={10}
                 >
                   <Text
@@ -1085,19 +1197,35 @@ export default function RefereeJudgePanel({ matchId }) {
 
               <Ripple
                 onPress={swapSides}
-                style={s.btnSwapSm}
+                style={[
+                  s.btnSwapSm,
+                  {
+                    backgroundColor: t.chipInfo2Bg,
+                    borderColor: t.chipInfo2Bd,
+                  },
+                ]}
                 rippleContainerBorderRadius={10}
               >
-                <MaterialIcons name="swap-horiz" size={16} color="#111827" />
-                <Text style={s.btnSwapSmText}>Đổi sân</Text>
+                <MaterialIcons
+                  name="swap-horiz"
+                  size={16}
+                  color={t.colors.text}
+                />
+                <Text style={[s.btnSwapSmText, { color: t.chipInfo2Fg }]}>
+                  Đổi sân
+                </Text>
               </Ripple>
 
               <Ripple
                 onPress={() => setMenuOpen(true)}
-                style={[s.iconBtn, { backgroundColor: "#f2f0f5" }]}
+                style={[s.iconBtn, { backgroundColor: t.colors.card }]}
                 rippleContainerBorderRadius={8}
               >
-                <MaterialIcons name="more-vert" size={20} color="#111827" />
+                <MaterialIcons
+                  name="more-vert"
+                  size={20}
+                  color={t.colors.text}
+                />
               </Ripple>
             </View>
 
@@ -1112,18 +1240,27 @@ export default function RefereeJudgePanel({ matchId }) {
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
-                  backgroundColor: "#f2f0f5",
+                  backgroundColor: t.colors.card,
+                  borderColor: t.colors.border,
                 },
               ]}
               rippleContainerBorderRadius={10}
             >
-              <Text style={s.btnOutlineSmText}>{activeServerNum}</Text>
+              <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
+                {activeServerNum}
+              </Text>
             </Ripple>
           </View>
         </View>
 
         {/* ===== SCOREBOARD ===== */}
-        <View style={[s.card, s.scoreboardCard]}>
+        <View
+          style={[
+            s.card,
+            s.scoreboardCard,
+            { backgroundColor: t.colors.card, borderColor: t.colors.border },
+          ]}
+        >
           <View style={s.scoreboardBody}>
             <View
               style={[s.rowBetween, { alignItems: "stretch", gap: 8, flex: 1 }]}
@@ -1139,7 +1276,15 @@ export default function RefereeJudgePanel({ matchId }) {
                 onPressAvatar={openCccd}
               />
 
-              <View style={[s.centerCol]}>
+              <View
+                style={[
+                  s.centerCol,
+                  {
+                    backgroundColor: t.colors.card,
+                    borderColor: t.colors.border,
+                  },
+                ]}
+              >
                 <WinTargetTuner
                   value={ptw}
                   base={basePointsToWin}
@@ -1152,31 +1297,43 @@ export default function RefereeJudgePanel({ matchId }) {
                   }}
                 />
 
-                <Text style={s.callout}>{callout || "—"}</Text>
+                <Text style={[s.callout, { color: t.colors.text }]}>
+                  {callout || "—"}
+                </Text>
 
                 <View style={[s.rowBetween, { width: "100%", marginTop: 6 }]}>
-                  <Text style={[s.scoreNow, s.scoreNowText]}>{curA}</Text>
+                  <Text style={[s.scoreNow, { color: t.success }]}>{curA}</Text>
                   <Text
                     style={{
                       fontSize: 16,
                       fontWeight: "700",
                       opacity: 0.8,
                       textTransform: "uppercase",
+                      color: t.colors.text,
                     }}
                   >
                     Game
                   </Text>
-                  <Text style={[s.scoreNow, s.scoreNowText]}>{curB}</Text>
+                  <Text style={[s.scoreNow, { color: t.success }]}>{curB}</Text>
                 </View>
 
                 <View style={[s.rowBetween, { width: "100%", marginTop: 4 }]}>
-                  <Text style={s.setWin}>{aWins}</Text>
+                  <Text style={[s.setWin, { color: t.colors.text }]}>
+                    {aWins}
+                  </Text>
                   <Text
-                    style={{ opacity: 0.65, fontSize: 16, fontWeight: "700" }}
+                    style={{
+                      opacity: 0.65,
+                      fontSize: 16,
+                      fontWeight: "700",
+                      color: t.colors.text,
+                    }}
                   >
                     Match
                   </Text>
-                  <Text style={s.setWin}>{bWins}</Text>
+                  <Text style={[s.setWin, { color: t.colors.text }]}>
+                    {bWins}
+                  </Text>
                 </View>
               </View>
 
@@ -1195,9 +1352,17 @@ export default function RefereeJudgePanel({ matchId }) {
         </View>
 
         {/* ===== BOTTOM CONTROL CARD ===== */}
-        <View style={[s.card, s.bottomCard]}>
+        <View
+          style={[
+            s.card,
+            s.bottomCard,
+            { backgroundColor: t.colors.card, borderColor: t.colors.border },
+          ]}
+        >
           <View style={s.bottomBar}>
-            <Text style={[s.clockText, s.clockAbsolute]}>
+            <Text
+              style={[s.clockText, s.clockAbsolute, { color: t.colors.text }]}
+            >
               {now.getHours().toString().padStart(2, "0")}:
               {now.getMinutes().toString().padStart(2, "0")}:
               {now.getSeconds().toString().padStart(2, "0")}
@@ -1210,18 +1375,26 @@ export default function RefereeJudgePanel({ matchId }) {
                 rippleContainerBorderRadius={12}
                 style={[
                   s.bigActionBtn,
-                  leftServing && s.bigActionBtnActive,
+                  {
+                    backgroundColor: t.colors.card,
+                    borderColor: t.colors.border,
+                  },
+                  leftServing && {
+                    backgroundColor: t.colors.primary,
+                    borderColor: t.colors.primary,
+                  },
                   !leftEnabled && s.btnDisabled,
                 ]}
               >
                 <MaterialIcons
                   name="add"
                   size={22}
-                  color={leftServing ? "#fff" : "#111827"}
+                  color={leftServing ? "#fff" : t.colors.text}
                 />
                 <Text
                   style={[
                     s.bigActionText,
+                    { color: t.colors.text },
                     leftServing && s.bigActionTextActive,
                   ]}
                 >
@@ -1245,18 +1418,26 @@ export default function RefereeJudgePanel({ matchId }) {
                 rippleContainerBorderRadius={12}
                 style={[
                   s.bigActionBtn,
-                  rightServing && s.bigActionBtnActive,
+                  {
+                    backgroundColor: t.colors.card,
+                    borderColor: t.colors.border,
+                  },
+                  rightServing && {
+                    backgroundColor: t.colors.primary,
+                    borderColor: t.colors.primary,
+                  },
                   !rightEnabled && s.btnDisabled,
                 ]}
               >
                 <MaterialIcons
                   name="add"
                   size={22}
-                  color={rightServing ? "#fff" : "#111827"}
+                  color={rightServing ? "#fff" : t.colors.text}
                 />
                 <Text
                   style={[
                     s.bigActionText,
+                    { color: t.colors.text },
                     rightServing && s.bigActionTextActive,
                   ]}
                 >
@@ -1289,9 +1470,16 @@ export default function RefereeJudgePanel({ matchId }) {
         ]}
       >
         <View style={s.promptMask}>
-          <View style={s.promptCard}>
-            <Text style={s.promptTitle}>Đổi sân?</Text>
-            <Text style={s.promptText}>
+          <View
+            style={[
+              s.promptCard,
+              { backgroundColor: t.colors.card, borderColor: t.colors.border },
+            ]}
+          >
+            <Text style={[s.promptTitle, { color: t.colors.text }]}>
+              Đổi sân?
+            </Text>
+            <Text style={[s.promptText, { color: t.subtext }]}>
               Một đội vừa chạm {midPoint ?? "—"} điểm (giữa game). Bạn có muốn
               đổi sân ngay bây giờ không?
             </Text>
@@ -1299,9 +1487,17 @@ export default function RefereeJudgePanel({ matchId }) {
               <Ripple
                 onPress={() => setMidPromptOpen(false)}
                 rippleContainerBorderRadius={10}
-                style={[s.btnOutline, { flex: 1 }]}
+                style={[
+                  s.btnOutline,
+                  {
+                    backgroundColor: t.colors.card,
+                    borderColor: t.colors.border,
+                  },
+                ]}
               >
-                <Text style={s.btnOutlineText}>Để sau</Text>
+                <Text style={[s.btnOutlineText, { color: t.colors.text }]}>
+                  Để sau
+                </Text>
               </Ripple>
               <Ripple
                 onPress={() => {
@@ -1309,7 +1505,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   swapSides();
                 }}
                 rippleContainerBorderRadius={10}
-                style={[s.btnPrimary, { flex: 1 }]}
+                style={[s.btnPrimary, { backgroundColor: t.colors.primary }]}
               >
                 <Text style={s.btnPrimaryText}>Đổi sân</Text>
               </Ripple>
@@ -1331,15 +1527,17 @@ export default function RefereeJudgePanel({ matchId }) {
           "landscape",
         ]}
       >
-        <SafeAreaView style={s.fullModalWrap}>
+        <SafeAreaView
+          style={[s.fullModalWrap, { backgroundColor: t.colors.background }]}
+        >
           <View style={[s.rowBetween, { padding: 12 }]}>
-            <Text style={s.h6}></Text>
+            <Text style={[s.h6, { color: t.colors.text }]}></Text>
             <Ripple
               onPress={() => setMenuOpen(false)}
-              style={s.iconBtn}
+              style={[s.iconBtn, { backgroundColor: t.colors.card }]}
               rippleContainerBorderRadius={8}
             >
-              <MaterialIcons name="close" size={20} color="#111827" />
+              <MaterialIcons name="close" size={20} color={t.colors.text} />
             </Ripple>
           </View>
 
@@ -1350,7 +1548,7 @@ export default function RefereeJudgePanel({ matchId }) {
   );
 }
 
-/* ========== styles ========== */
+/* ========== styles (giữ nguyên layout; màu sẽ override bằng t) ========== */
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: "#fff" },
   fullNameText: { fontSize: 16, fontWeight: "800", color: "#0f172a" },

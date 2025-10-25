@@ -4,11 +4,10 @@ import { Platform, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { BlurView } from "expo-blur";
+import { useTheme } from "@react-navigation/native";
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
 
 const makeIcon = (
   sfName: string,
@@ -23,17 +22,17 @@ const makeIcon = (
 };
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const userInfo = useSelector((s: any) => s.auth?.userInfo);
+  const theme = useTheme();
+  const isDark = !!theme?.dark;
+  const activeTint = theme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
 
+  const userInfo = useSelector((s: any) => s.auth?.userInfo);
   const isAdmin = React.useMemo(
     () => !!(userInfo?.isAdmin || userInfo?.role === "admin"),
     [userInfo?.isAdmin, userInfo?.role]
   );
 
-  const isDark = colorScheme === "dark";
-
-  // 🎨 Custom TabBar Background Component
+  // 🎨 Custom TabBar Background Component (uses resolved theme, not system)
   const TabBarBackground = React.useCallback(() => {
     return (
       <BlurView
@@ -47,7 +46,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        // dùng màu từ ThemeProvider -> đổi ngay khi user chọn theme
+        tabBarActiveTintColor: activeTint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
@@ -71,7 +71,7 @@ export default function TabLayout() {
               : "rgba(255, 255, 255, 0.9)",
             borderTopWidth: 0,
             elevation: 8,
-            shadowColor: isDark ? "#000" : "#000",
+            shadowColor: "#000",
             shadowOffset: { width: 0, height: -4 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
@@ -137,9 +137,7 @@ export default function TabLayout() {
                 title: "Quản trị",
                 tabBarIcon: makeIcon("lock.shield.fill", "shield-lock"),
               }
-            : {
-                href: null,
-              }
+            : { href: null }
         }
       />
 
@@ -148,7 +146,10 @@ export default function TabLayout() {
         name="live"
         options={{
           title: "Live",
-          tabBarIcon: makeIcon("dot.radiowaves.left.and.right", "broadcast"),
+          tabBarIcon: makeIcon(
+            "dot.radiowaves.left.and.right",
+            "broadcast"
+          ),
         }}
       />
 

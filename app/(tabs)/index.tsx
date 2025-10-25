@@ -8,10 +8,10 @@ import {
   Platform,
   Linking,
   Alert,
-  useColorScheme,
   TouchableOpacity,
 } from "react-native";
 import { Stack } from "expo-router";
+import { useTheme } from "@react-navigation/native";
 import Hero from "@/components/Hero";
 import { AntDesign, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -105,21 +105,17 @@ function SocialButton({ onPress, children, bg }) {
   );
 }
 
-/** Zalo logo:
- *  - Mặc định dùng ảnh remote để chạy ngay.
- *  - Nếu bạn có file cục bộ, đổi dòng dưới thành:
- *
- */
+/** Zalo logo: */
 const ZALO_SRC = require("@/assets/images/icon-zalo.png");
 
 function ContactCard() {
-  const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
-  const bg = isDark ? "#14171c" : "#ffffff";
-  const border = isDark ? "#2a2e35" : "#e7eaf0";
-  const text = isDark ? "#ffffff" : "#111111";
+  const theme = useTheme();
+  const isDark = !!theme?.dark;
+  const bg = theme?.colors?.card ?? (isDark ? "#14171c" : "#ffffff");
+  const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e7eaf0");
+  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const sub = isDark ? "#c9c9c9" : "#555555";
-  const tint = isDark ? "#7cc0ff" : "#0a84ff";
+  const tint = theme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
 
   const { data, isLoading, isError } = useGetContactContentQuery();
   const info = useMemo(
@@ -198,7 +194,7 @@ function ContactCard() {
             {/* Zalo - Expo Image */}
             {info?.socials?.zalo ? (
               <SocialButton
-                bg="#0068FF" // brand Zalo
+                bg="#0068FF"
                 onPress={() => openURL(info.socials.zalo)}
               >
                 <Image
@@ -219,12 +215,18 @@ function ContactCard() {
 }
 
 export default function HomeScreen() {
+  const theme = useTheme();
+  const bg = theme?.colors?.background ?? "#ffffff";
+
   return (
     <>
       <Stack.Screen
         options={{ title: "PickleTour", headerTitleAlign: "center" }}
       />
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView
+        style={{ backgroundColor: bg }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
         <Hero />
         <View style={{ height: 8 }} />
         {/* 👇 Card Liên hệ đặt ở trang chủ */}

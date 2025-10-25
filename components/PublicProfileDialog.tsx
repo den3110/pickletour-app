@@ -35,6 +35,7 @@ import * as Clipboard from "expo-clipboard";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { skipToken } from "@reduxjs/toolkit/query";
+import { useTheme } from "@react-navigation/native";
 
 /* ---------- helpers ---------- */
 const AVA_PLACE = "https://dummyimage.com/160x160/cccccc/ffffff&text=?";
@@ -183,21 +184,39 @@ function SkelChip({ w = 80, h = 20, style, bg, opacity }: any) {
 }
 
 /* ---------- UI atoms ---------- */
-const Chip = ({ label, bg = "#eef2f7", fg = "#263238" }: any) => (
-  <View style={[styles.chip, { backgroundColor: bg }]}>
-    <Text numberOfLines={1} style={[styles.chipTxt, { color: fg }]}>
-      {label}
-    </Text>
-  </View>
-);
+const Chip = ({ label, bg, fg }: any) => {
+  const navTheme = useTheme?.() || {};
+  const sysScheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const defaultBg = isDark ? "#22262c" : "#eef2f7";
+  const defaultFg = isDark ? "#e5e7eb" : "#263238";
+  return (
+    <View style={[styles.chip, { backgroundColor: bg ?? defaultBg }]}>
+      <Text
+        numberOfLines={1}
+        style={[styles.chipTxt, { color: fg ?? defaultFg }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+};
+
 function PrimaryBtn({ onPress, children, disabled }: any) {
+  const navTheme = useTheme?.() || {};
+  const sysScheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const disabledBg = isDark ? "#374151" : "#cbd5e1";
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: disabled ? "#9aa0a6" : "#0a84ff" },
+        { backgroundColor: disabled ? disabledBg : tint },
         pressed && !disabled && { opacity: 0.9 },
       ]}
     >
@@ -206,6 +225,13 @@ function PrimaryBtn({ onPress, children, disabled }: any) {
   );
 }
 function OutlineBtn({ onPress, children, disabled }: any) {
+  const navTheme = useTheme?.() || {};
+  const sysScheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const disabledBorder = isDark ? "#4b5563" : "#c7c7c7";
+  const disabledText = isDark ? "#6b7280" : "#9aa0a6";
   return (
     <Pressable
       onPress={onPress}
@@ -213,12 +239,12 @@ function OutlineBtn({ onPress, children, disabled }: any) {
       style={({ pressed }) => [
         styles.btn,
         styles.btnOutline,
-        { borderColor: disabled ? "#c7c7c7" : "#0a84ff" },
+        { borderColor: disabled ? disabledBorder : tint },
         pressed && !disabled && { opacity: 0.95 },
       ]}
     >
       <Text
-        style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : "#0a84ff" }}
+        style={{ fontWeight: "700", color: disabled ? disabledText : tint }}
       >
         {children}
       </Text>
@@ -227,11 +253,19 @@ function OutlineBtn({ onPress, children, disabled }: any) {
 }
 
 function InfoRow({ label, value }: { label: string; value?: string }) {
+  const navTheme = useTheme(); // hook gọi trực tiếp
+  const scheme = useColorScheme() || "light";
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : scheme === "dark";
+  // Ưu tiên theme.text, fallback theo dark/light
+  const text =isDark ? "#f7f7f7" : "#111111"
+  const colorText= isDark ? "#f7f7f7" : "#111111"
+  const muted = isDark ? "#9aa0a6" : "#6b7280";
   if (!value) return null;
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={2}>
+      <Text style={[styles.infoLabel, { color: muted }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: muted }]} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -296,12 +330,22 @@ function InfoRowWithCopy({
   tint: string;
   onCopied: (msg: string) => void;
 }) {
+  const navTheme = useTheme?.() || {};
+  const sysScheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const textColor = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#111");
+  const muted = isDark ? "#9aa0a6" : "#6b7280";
+
   if (!value) return null;
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoLabel, { color: muted }]}>{label}</Text>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
-        <Text style={styles.infoValue} numberOfLines={2}>
+        <Text
+          style={[styles.infoValue, { color: muted }]}
+          numberOfLines={2}
+        >
           {value}
         </Text>
         <CopyButton
@@ -341,7 +385,7 @@ function Snack({
 }
 
 /* ---------- Skeleton blocks ---------- */
-const HeaderSkeleton = ({ cardBg, border, skelBg }: any) => {
+const HeaderSkeleton = ({ cardBg, border, skelBg, textColor }: any) => {
   const op = usePulse();
   return (
     <View
@@ -350,7 +394,9 @@ const HeaderSkeleton = ({ cardBg, border, skelBg }: any) => {
         { backgroundColor: cardBg, borderColor: border },
       ]}
     >
-      <Text style={{ fontWeight: "700", fontSize: 18 }}>Hồ sơ</Text>
+      <Text style={{ fontWeight: "700", fontSize: 18, color: textColor }}>
+        Hồ sơ
+      </Text>
       <View
         style={{
           flexDirection: "row",
@@ -647,14 +693,19 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
   const idArg = canOpen ? (userId as string) : (skipToken as any);
   const insets = useSafeAreaInsets();
   const { height: winH } = useWindowDimensions();
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const pageBg = scheme === "dark" ? "#0b0d10" : "#f7f9fc";
-  const border = scheme === "dark" ? "#2e2f33" : "#e4e8ef";
-  const text = scheme === "dark" ? "#f7f7f7" : "#111";
-  const subtext = scheme === "dark" ? "#c9c9c9" : "#555";
-  const skelBg = scheme === "dark" ? "#1f2937" : "#e5e7eb";
+  /* ===== THEME TOKENS: Ưu tiên app theme (React Navigation), fallback hệ thống ===== */
+  const navTheme = useTheme?.() || {};
+  const sysScheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#111");
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#16181c" : "#ffffff");
+  const pageBg =
+    navTheme?.colors?.background ?? (isDark ? "#0b0d10" : "#f7f9fc");
+  const border = navTheme?.colors?.border ?? (isDark ? "#2e2f33" : "#e4e8ef");
+  const subtext = isDark ? "#c9c9c9" : "#555";
+  const skelBg = isDark ? "#22262c" : "#e9eef5";
 
   const viewerIsAdmin = useSelector(
     (s: any) =>
@@ -1210,7 +1261,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
                           <MaterialIcons
                             name="delete-outline"
                             size={18}
-                            color={scheme === "dark" ? "#f87171" : "#ef4444"}
+                            color={isDark ? "#f87171" : "#ef4444"}
                           />
                         )}
                       </Pressable>
@@ -1362,10 +1413,13 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
               <View
                 style={[
                   styles.alert,
-                  { borderColor: "#9aa0a6", backgroundColor: "#f4f4f5" },
+                  {
+                    borderColor: isDark ? "#3f3f46" : "#9aa0a6",
+                    backgroundColor: isDark ? "#27272a" : "#f4f4f5",
+                  },
                 ]}
               >
-                <Text style={{ color: "#52525b" }}>Không có video</Text>
+                <Text style={{ color: subtext }}>Không có video</Text>
               </View>
             )}
           </View>
@@ -1416,7 +1470,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
                     height: 24,
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: "#ddd",
+                    borderColor: border,
                   }}
                   contentFit="cover"
                   cachePolicy="memory-disk"
@@ -1460,7 +1514,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
                     )}
                   </View>
                 ) : (
-                  <Text style={{ color: "#9aa0a6", fontSize: 12 }}>
+                  <Text style={{ color: subtext, fontSize: 12 }}>
                     Chưa có điểm
                   </Text>
                 )}
@@ -1964,7 +2018,10 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
             />
           )}
           handleStyle={{ borderTopLeftRadius: 20, borderTopRightRadius: 20 }}
-          handleIndicatorStyle={{ backgroundColor: "#b0b0b0", width: 36 }}
+          handleIndicatorStyle={{
+            backgroundColor: isDark ? "#6b7280" : "#b0b0b0",
+            width: 36,
+          }}
           backgroundStyle={{
             backgroundColor: pageBg,
             borderTopLeftRadius: 20,
@@ -2003,6 +2060,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
                   cardBg={cardBg}
                   border={border}
                   skelBg={skelBg}
+                  textColor={text}
                 />
               ) : (
                 <Header />

@@ -26,6 +26,7 @@ import LiveMatchCard from "./LiveMatchCard";
 import { useGetLiveMatchesQuery } from "@/slices/liveApiSlice";
 import FiltersBottomSheet from "./FiltersModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@react-navigation/native";
 
 const LIMIT = 12;
 const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
@@ -34,21 +35,27 @@ const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
  * THEME TOKENS (light/dark)
  * ============================ */
 function useThemeTokens() {
-  const scheme = useColorScheme() ?? "light";
+  // Ưu tiên theme từ react-navigation, fallback hệ thống
+  const navTheme = useTheme?.();
+  const sysScheme = useColorScheme?.() ?? "light";
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const scheme = isDark ? "dark" : "light";
 
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#475569";
-  const placeholder = scheme === "dark" ? "#9aa4b2" : "#94a3b8";
-
-  const pageBg = scheme === "dark" ? "#0b0c0f" : "#f6f7fb";
-
-  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const textPrimary =
+    navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a");
+  const textSecondary = isDark ? "#d1d1d1" : "#475569";
+  const placeholder = isDark ? "#9aa4b2" : "#94a3b8";
+  const pageBg =
+    navTheme?.colors?.background ?? (isDark ? "#0b0c0f" : "#f6f7fb");
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
+  const cardBorder =
+    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e5e7eb");
 
   const chip = {
-    bg: scheme === "dark" ? "rgba(199,210,254,0.16)" : "#e3f2fd",
-    text: scheme === "dark" ? "#e0e7ff" : "#1976d2",
+    bg: isDark ? "rgba(199,210,254,0.16)" : "#e3f2fd",
+    text: isDark ? "#e0e7ff" : "#1976d2",
   };
 
   return {
@@ -462,7 +469,7 @@ export default function LiveMatchesScreen() {
         </TouchableOpacity>
       </View>
     );
-  }, [page, pages]);
+  }, [page, pages, T.scheme, T.cardBg, T.cardBorder, T.tint, T.textSecondary, T.textPrimary]);
 
   const renderEmpty = useCallback(
     () => (
@@ -496,6 +503,7 @@ export default function LiveMatchesScreen() {
           renderItem={renderItem}
           ListHeaderComponent={headerEl}
           ListFooterComponent={footerEl}
+          extraData={T.scheme}
           ListEmptyComponent={!isLoading && renderEmpty}
           onRefresh={handlePullToRefresh}
           refreshing={isManualRefreshing && isFetching}

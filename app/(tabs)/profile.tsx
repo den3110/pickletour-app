@@ -1,16 +1,25 @@
 // app/(tabs)/profile/index.jsx
+// ✨ Layout kiểu "Facebook profile":
+// - Fix: avatar camera không bị che, stats có scroll ngang, tiêu đề Card theo theme tối,
+//   thêm padding dưới để không bị tab menu che nội dung.
+// - Dùng expo-image cho TẤT CẢ hình ảnh (cache memory-disk cho remote, tắt cache cho local).
+// - Avatar & Cover: chọn ảnh -> Modal preview (Huỷ / Xác nhận).
+//   Bấm "Xác nhận" => upload => update profile => refetch => hiển thị URL remote để tránh "đen xì".
+// - NEW: Nhấn vào Avatar/Cover để mở react-native-image-viewing (phóng to).
+
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { Image as ExpoImage } from "expo-image";
 import { router, Stack } from "expo-router";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,9 +31,13 @@ import {
   TextInput,
   useColorScheme,
   View,
+  Switch,
+  DeviceEventEmitter,
 } from "react-native";
+import ImageView from "react-native-image-viewing";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { logout as logoutAction } from "@/slices/authSlice";
 import {
@@ -44,9 +57,12 @@ import CccdQrModal from "@/components/CccdQrModal";
 import { usePlatform } from "@/hooks/usePlatform";
 import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
 import apiSlice from "@/slices/apiSlice";
+import { useTheme } from "@react-navigation/native";
 
 /* ---------- Config ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
+const PREF_PUSH_ENABLED = "PREF_PUSH_ENABLED"; // "1" | "0"
 
 /* ---------- Danh sách tỉnh ---------- */
 const PROVINCES = [
@@ -136,9 +152,37 @@ const EMPTY = {
   confirmPassword: "",
   gender: "",
   avatar: "",
+  cover: "",
 };
 
-/* helpers */
+/* ===== Helpers ===== */
+function isRemoteUri(uri) {
+  return /^https?:\/\//i.test(String(uri || ""));
+}
+
+// ExpoImage wrapper: auto cache cho remote, tắt cache cho local
+function XImage({
+  uri,
+  contentFit = "cover",
+  cacheRemote = "memory-disk",
+  style,
+  transition = 150,
+  recyclingKey,
+}) {
+  const isRemote = isRemoteUri(uri);
+  const safeUri = uri ? String(uri).replace(/\\/g, "/") : undefined;
+  return (
+    <ExpoImage
+      source={safeUri ? { uri: safeUri } : undefined}
+      style={style}
+      contentFit={contentFit}
+      cachePolicy={isRemote ? cacheRemote : "none"}
+      transition={isRemote ? transition : 0}
+      recyclingKey={recyclingKey || safeUri || Math.random().toString(36)}
+    />
+  );
+}
+
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -146,44 +190,34 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   });
   if (res.canceled) return null;
 
-  // Asset từ ImagePicker
   let asset = res.assets[0];
   let uri = asset.uri;
 
-  // Dùng File API mới để đọc metadata (size, mime, name…)
-  let f = new File(asset); // constructor nhận thẳng asset từ picker
-  let size = f.size; // bytes (0 nếu không đọc được)
-  let mime = f.type; // ví dụ "image/heic", "image/jpeg", ...
+  // (giữ nguyên cách lấy File theo code cũ của bạn)
+  let f = new File(asset);
+  let size = f.size;
+  let mime = f.type;
   let name = f.name || asset.fileName || "image";
 
-  // Nếu là HEIC/HEIF -> convert sang JPEG bằng ImageManipulator (API mới)
-  const isHeic = /heic|heif/i.test(mime || "") || /\.heic|\.heif$/i.test(name);
+  const isHeic =
+    /heic|heif/i.test(mime || "") || /\.heic|\.heif$/i.test(name || "");
   if (isHeic) {
-    const ctx = ImageManipulator.manipulate(uri); // tạo context
-    const ref = await ctx.renderAsync(); // load ảnh
-    const out = await ref.saveAsync({
-      // lưu ra file mới
-      format: SaveFormat.JPEG,
-      compress: 0.9,
-    });
+    const ctx = ImageManipulator.manipulate(uri);
+    const ref = await ctx.renderAsync();
+    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.9 });
     uri = out.uri;
-
-    // Cập nhật lại File sau khi convert
     f = new File(uri);
     size = f.size;
     mime = "image/jpeg";
     name = (name || "image").replace(/\.(heic|heif)$/i, ".jpg");
   }
 
-  // Giới hạn dung lượng
   if (typeof size === "number" && size > maxBytes) {
     Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
     return null;
   }
 
-  // Chuẩn hóa trả về cho FormData
-  if (!/\.jpe?g|\.png|\.webp$/i.test(name)) {
-    // đoán đuôi theo mime
+  if (!/\.jpe?g|\.png|\.webp$/i.test(name || "")) {
     const ext = /png/i.test(mime) ? "png" : /webp/i.test(mime) ? "webp" : "jpg";
     if (!name.includes(".")) name = `${name}.${ext}`;
   }
@@ -204,11 +238,10 @@ function yyyyMMdd(d) {
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-// "DD/MM/YYYY" → "YYYY-MM-DD"
 function dmyToIso(s) {
   if (!s) return "";
   s = String(s).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // đã ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m) {
     const [, dd, mm, yyyy] = m;
@@ -217,17 +250,41 @@ function dmyToIso(s) {
   return s;
 }
 
+/* ---------- Theme tokens (đồng bộ với react-navigation) ---------- */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e4e8ef");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f5f7fb");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+    muted: dark ? "#9aa0a6" : "#6b7280",
+    subtext: dark ? "#c9c9c9" : "#555",
+    skeletonBase: dark ? "#22262c" : "#e9eef5",
+  };
+}
+
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { isIOS } = usePlatform();
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const textPrimary = scheme === "dark" ? "#fff" : "#111";
-  const textSecondary = scheme === "dark" ? "#c9c9c9" : "#444";
-  const border = scheme === "dark" ? "#2e2f33" : "#dfe3ea";
-  const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
-  const placeholder = scheme === "dark" ? "#8e8e93" : "#9aa0a6";
-  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
+  const t = useTokens();
+  const scheme = t.dark ? "dark" : "light"; // cho iOS ActionSheet
+  const tint = t.colors.primary;
+  const cardBg = t.colors.card;
+  const textPrimary = t.colors.text;
+  const textSecondary = t.subtext;
+  const border = t.colors.border;
+  const muted = t.dark ? "#1b1d22" : "#f3f5f9";
+  const viewerBg = t.dark ? "#0b0b0c" : "#ffffff";
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
@@ -249,7 +306,6 @@ export default function ProfileScreen() {
     useUploadAvatarMutation();
 
   // ===== Redirect rules =====
-  // Đợi 1 tick cho quá trình hydrate store rồi mới quyết định redirect
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setAuthReady(true), 0);
@@ -302,10 +358,64 @@ export default function ProfileScreen() {
 
   const [frontImg, setFrontImg] = useState(null);
   const [backImg, setBackImg] = useState(null);
+  const allowSendCccd =
+    !!frontImg && !!backImg && /^\d{12}$/.test(String(form.cccd || "").trim());
 
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
+  // Avatar: preview modal (Huỷ / Xác nhận)
+  const [avatarTemp, setAvatarTemp] = useState(null);
+  const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState("");
+
+  // Cover: preview modal (Huỷ / Xác nhận)
+  const [coverTemp, setCoverTemp] = useState(null);
+  const [coverConfirmOpen, setCoverConfirmOpen] = useState(false);
+  const [coverSaving, setCoverSaving] = useState(false);
+
+  // ===== Universal Image Viewer state (Avatar / Cover / CCCD) =====
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerImages, setViewerImages] = useState([]);
+  const [viewerLabels, setViewerLabels] = useState([]);
+
+  const openAvatarViewer = () => {
+    const url = normalizeUrl(form.avatar);
+    if (!url) return;
+    setViewerImages([{ uri: url.replace(/\\/g, "/") }]);
+    setViewerLabels(["Ảnh đại diện"]);
+    setViewerIndex(0);
+    setViewerOpen(true);
+  };
+
+  const openCoverViewer = () => {
+    const url = normalizeUrl(form.cover);
+    if (!url) return;
+    setViewerImages([{ uri: url.replace(/\\/g, "/") }]);
+    setViewerLabels(["Ảnh bìa"]);
+    setViewerIndex(0);
+    setViewerOpen(true);
+  };
+
+  const openCccdViewer = (which) => {
+    const frontUrl = normalizeUrl(user?.cccdImages?.front) || "";
+    const backUrl = normalizeUrl(user?.cccdImages?.back) || "";
+    const arr = [];
+    const labels = [];
+    if (frontUrl) {
+      arr.push({ uri: frontUrl.replace(/\\/g, "/") });
+      labels.push("Mặt trước");
+    }
+    if (backUrl) {
+      arr.push({ uri: backUrl.replace(/\\/g, "/") });
+      labels.push("Mặt sau");
+    }
+    if (!arr.length) return;
+    const idx = which === "back" ? (frontUrl ? 1 : 0) : 0;
+    setViewerImages(arr);
+    setViewerLabels(labels);
+    setViewerIndex(idx);
+    setViewerOpen(true);
+  };
 
   // Pull to refresh
   const [refreshing, setRefreshing] = useState(false);
@@ -333,12 +443,20 @@ export default function ProfileScreen() {
       confirmPassword: "",
       gender: user.gender || "",
       avatar: user.avatar || "",
+      cover: user.cover || "",
     };
     initialRef.current = init;
     setForm(init);
-    setAvatarPreview("");
-    setAvatarFile(null);
+
+    // reset avatar & cover temp/modal states
     setUploadedAvatarUrl("");
+    setAvatarTemp(null);
+    setAvatarConfirmOpen(false);
+    setAvatarSaving(false);
+
+    setCoverTemp(null);
+    setCoverConfirmOpen(false);
+    setCoverSaving(false);
   }, [user]);
 
   // Validate
@@ -373,8 +491,8 @@ export default function ProfileScreen() {
     const changed = Object.keys(form).some(
       (k) => k !== "confirmPassword" && form[k] !== initialRef.current[k]
     );
-    return changed || !!avatarFile;
-  }, [form, avatarFile]);
+    return changed; // cover/avt cập nhật ngay qua modal, không qua "Lưu"
+  }, [form]);
   const isValid = useMemo(() => !Object.keys(errors).length, [errors]);
 
   const showErr = (f) => touched[f] && !!errors[f];
@@ -392,7 +510,6 @@ export default function ProfileScreen() {
 
   // QR → fill + highlight
   const onScanResult = (r) => {
-    // r: { id, name, dob (DD/MM/YYYY), gender, address, raw }
     const updates = {};
     if (r?.id) updates.cccd = String(r.id);
     if (r?.name) updates.name = String(r.name).trim();
@@ -424,26 +541,7 @@ export default function ProfileScreen() {
     if (!isDirty) return Alert.alert("Thông tin", "Chưa có thay đổi.");
 
     try {
-      // Upload avatar nếu có
-      let finalAvatarUrl = uploadedAvatarUrl || form.avatar || "";
-      if (avatarFile && !uploadedAvatarUrl) {
-        const up = await uploadAvatar(avatarFile).unwrap();
-        const url = up?.url || up?.data?.url || "";
-        if (url) {
-          finalAvatarUrl = url;
-          setUploadedAvatarUrl(url);
-          setForm((p) => ({ ...p, avatar: url }));
-        }
-      }
-
       const payload = diff();
-      if (finalAvatarUrl && finalAvatarUrl !== initialRef.current.avatar) {
-        payload.avatar = finalAvatarUrl;
-      }
-      if (!finalAvatarUrl && initialRef.current.avatar) {
-        payload.avatar = "";
-      }
-
       await updateProfile(payload).unwrap();
       await refetch();
       setTouched({});
@@ -457,7 +555,6 @@ export default function ProfileScreen() {
   };
 
   const sendCccd = async () => {
-    // yêu cầu đã có số CCCD hợp lệ mới cho gửi ảnh
     if (!/^\d{12}$/.test(String(form.cccd || "").trim())) {
       return Alert.alert(
         "Thiếu CCCD",
@@ -500,24 +597,16 @@ export default function ProfileScreen() {
 
   const doLogout = async () => {
     try {
-      // 1) Tắt token của thiết bị hiện tại (khi còn đăng nhập ⇒ có auth, không 403)
       const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
       if (deviceId) {
         try {
           await unregisterDeviceToken({ deviceId }).unwrap();
         } catch (e) {
           if (__DEV__) console.log("unregister device token failed:", e);
-          // vẫn tiếp tục logout
         }
       }
-
-      // 2) Gọi API logout (server xoá cookie/session)
       await logoutApiCall().unwrap();
-    } catch {
-      // bỏ qua lỗi để đảm bảo luôn logout phía client
-    }
-
-    // 3) Dọn state & điều hướng
+    } catch {}
     dispatch(logoutAction());
     router.replace("/login");
     dispatch(apiSlice.util.resetApiState());
@@ -557,12 +646,74 @@ export default function ProfileScreen() {
     }
   };
 
+  // ===== Prefs: theme + push (UI hiển thị, lưu vào SecureStore) =====
+  const [prefTheme, setPrefTheme] = useState("system");
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [themeBusy, setThemeBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const themePref =
+        (await SecureStore.getItemAsync(PREF_THEME_KEY)) || "system";
+      const p = (await SecureStore.getItemAsync(PREF_PUSH_ENABLED)) || "1";
+      setPrefTheme(themePref);
+      setPushEnabled(p === "1");
+    })();
+  }, []);
+  const applyThemePref = async (mode) => {
+    // cập nhật tức thì UI radio
+    setPrefTheme(mode);
+    setThemeBusy(true);
+    try {
+      await SecureStore.setItemAsync(PREF_THEME_KEY, mode);
+    } catch {}
+
+    // lắng nghe khi root báo áp dụng xong để tắt loading tại màn này
+    const sub = DeviceEventEmitter.addListener("theme:applied", () => {
+      setThemeBusy(false);
+      sub.remove();
+    });
+
+    // phát sự kiện cho RootLayout đổi theme ngay
+    DeviceEventEmitter.emit("theme:changed", mode);
+  };
+
+  // (tuỳ chọn) nếu theme bị đổi từ nơi khác, đồng bộ lại radio UI trong màn này
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("theme:changed", (mode) => {
+      setPrefTheme(mode);
+    });
+    return () => sub.remove();
+  }, []);
+  const togglePush = async (v) => {
+    setPushEnabled(v);
+    await SecureStore.setItemAsync(PREF_PUSH_ENABLED, v ? "1" : "0");
+    // console.log(SecureStore.getItemAsync(PREF_PUSH_ENABLED).then(data=> console.log(data)))
+    if (!v) {
+      try {
+        const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+        if (deviceId) await unregisterDeviceToken({ deviceId }).unwrap();
+      } catch {}
+    } else {
+      Alert.alert(
+        "Thông báo",
+        "Đã bật thông báo"
+      );
+    }
+  };
+
+  const status = user?.cccdStatus || "unverified";
+  const showUpload = status === "unverified" || status === "rejected";
+
+  // ===== Tabs
+  const [tab, setTab] = useState("overview"); // overview | profile | settings
+
   // ===== Render gate =====
   if (!userInfo) {
     return (
       <>
         <Stack.Screen
-          options={{ title: "Hồ sơ", headerTitleAlign: "center" }}
+          options={{ title: "Profile", headerTitleAlign: "center" }}
         />
         <View
           style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
@@ -577,7 +728,7 @@ export default function ProfileScreen() {
     return (
       <>
         <Stack.Screen
-          options={{ title: "Hồ sơ", headerTitleAlign: "center" }}
+          options={{ title: "Profile", headerTitleAlign: "center" }}
         />
         <View
           style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
@@ -588,409 +739,686 @@ export default function ProfileScreen() {
     );
   }
 
-  const status = user.cccdStatus || "unverified";
-  const showUpload = status === "unverified" || status === "rejected";
-  const frontUrl = normalizeUrl(user.cccdImages?.front) || "";
-  const backUrl = normalizeUrl(user.cccdImages?.back) || "";
-
-  // nút gửi ảnh chỉ enable khi có 2 ảnh + có CCCD hợp lệ
-  const allowSendCccd =
-    !!frontImg && !!backImg && /^\d{12}$/.test(String(form.cccd || "").trim());
+  const avatarUrl = normalizeUrl(form.avatar) || "";
+  const coverUrl = normalizeUrl(form.cover) || "";
 
   return (
     <>
-      <Stack.Screen options={{ title: "Hồ sơ", headerTitleAlign: "center" }} />
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: "padding", android: undefined })}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={tint} // iOS spinner
-              colors={[tint]} // Android spinner
-              progressBackgroundColor={cardBg} // Android track
-            />
-          }
+      <Stack.Screen
+        options={{ title: "Profile", headerTitleAlign: "center" }}
+      />
+      <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: "padding", android: undefined })}
+          style={{ flex: 1 }}
         >
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: cardBg, borderColor: border },
-            ]}
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + 20,
+              backgroundColor: t.colors.background,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={tint}
+                colors={[tint]}
+                progressBackgroundColor={cardBg}
+              />
+            }
           >
-            <Text style={[styles.h1, { color: textPrimary }]}>
-              Cập nhật hồ sơ
-            </Text>
+            {/* ===== Header: Cover + Avatar + Tên + Hành động ===== */}
+            <View
+              style={[
+                styles.headerWrap,
+                { backgroundColor: cardBg, borderColor: border },
+              ]}
+            >
+              <View style={[styles.cover, { backgroundColor: muted }]}>
+                <Pressable
+                  onPress={openCoverViewer}
+                  disabled={!coverUrl}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.97 : 1 }]}
+                >
+                  <XImage
+                    uri={
+                      coverUrl ||
+                      "https://dummyimage.com/1200x400/ced4da/ffffff&text="
+                    }
+                    contentFit="cover"
+                    style={styles.coverImg}
+                    transition={200}
+                    recyclingKey={coverUrl || "dummy-cover"}
+                  />
+                </Pressable>
 
-            {/* Avatar */}
-            <View style={[styles.row, { gap: 16 }]}>
-              <View
-                style={[
-                  styles.avatar,
-                  { backgroundColor: muted, borderColor: border },
-                ]}
-              >
-                <Image
-                  source={{
-                    uri:
-                      normalizeUrl(avatarPreview) ||
-                      normalizeUrl(form.avatar) ||
-                      "https://dummyimage.com/160x160/cccccc/ffffff&text=?",
-                  }}
-                  style={{ width: 80, height: 80, borderRadius: 40 }}
-                />
-              </View>
-              <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+                {/* Nút đổi ảnh bìa */}
                 <Pressable
                   onPress={async () => {
                     const f = await pickImage();
                     if (!f) return;
-                    setAvatarFile(f);
-                    setAvatarPreview(f.uri);
-                    setUploadedAvatarUrl("");
+                    setCoverTemp(f);
+                    setCoverConfirmOpen(true);
                   }}
                   style={({ pressed }) => [
-                    styles.btn,
-                    styles.btnOutline,
-                    { borderColor: border, backgroundColor: muted },
+                    styles.coverBtn,
+                    { backgroundColor: "rgba(0,0,0,0.45)" },
                     pressed && { opacity: 0.9 },
                   ]}
                 >
-                  <Text style={[styles.btnText, { color: textPrimary }]}>
-                    Chọn ảnh đại diện
+                  <MaterialIcons name="photo-camera" size={18} color="#fff" />
+                  <Text
+                    style={{ color: "#fff", fontWeight: "700", marginLeft: 6 }}
+                  >
+                    Đổi ảnh bìa
                   </Text>
                 </Pressable>
+              </View>
 
-                {form.avatar || avatarPreview ? (
-                  <Pressable
-                    onPress={() => {
-                      setAvatarFile(null);
-                      setAvatarPreview("");
-                      setUploadedAvatarUrl("");
-                      setForm((p) => ({ ...p, avatar: "" }));
-                    }}
-                    style={({ pressed }) => [
-                      styles.btn,
-                      styles.btnTextOnly,
-                      pressed && { opacity: 0.85 },
+              <View style={styles.headerBottom}>
+                {/* Avatar stack: button không bị che */}
+                <View style={styles.avatarStack}>
+                  <View
+                    style={[
+                      styles.avatarWrap,
+                      { borderColor: cardBg, backgroundColor: cardBg },
                     ]}
                   >
-                    <Text style={[styles.btnText, { color: "#e53935" }]}>
-                      Xóa ảnh
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-
-            {/* Thông tin */}
-            <Field
-              label="Họ và tên"
-              value={form.name}
-              onChangeText={(v) => setField("name", v)}
-              onBlur={() => markTouched("name")}
-              error={showErr("name") ? errors.name : ""}
-              required
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-              highlighted={HL.name}
-              tint={tint}
-            />
-            <Field
-              label="Biệt danh"
-              value={form.nickname}
-              onChangeText={(v) => setField("nickname", v)}
-              onBlur={() => markTouched("nickname")}
-              error={showErr("nickname") ? errors.nickname : ""}
-              required
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
-            <Field
-              label="Số điện thoại"
-              value={form.phone}
-              onChangeText={(v) => setField("phone", v)}
-              onBlur={() => markTouched("phone")}
-              error={showErr("phone") ? errors.phone : ""}
-              keyboardType="phone-pad"
-              required
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
-
-            {/* Giới tính */}
-            <SelectField
-              label="Giới tính"
-              value={form.gender}
-              placeholder="-- Chọn giới tính --"
-              options={GENDER_OPTIONS}
-              onChange={(val) => {
-                setField("gender", val);
-                markTouched("gender");
-              }}
-              error={showErr("gender") ? errors.gender : ""}
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-              highlighted={HL.gender}
-              tint={tint}
-            />
-
-            {/* DOB */}
-            <DateField
-              label="Ngày sinh"
-              value={form.dob}
-              onChange={(val) => {
-                setField("dob", val);
-                markTouched("dob");
-              }}
-              error={showErr("dob") ? errors.dob : ""}
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-              tint={tint}
-              highlighted={HL.dob}
-            />
-
-            {/* Tỉnh / Thành phố */}
-            <SelectField
-              label="Tỉnh / Thành phố"
-              value={form.province}
-              placeholder="-- Chọn --"
-              options={[
-                { value: "", label: "-- Chọn --" },
-                ...PROVINCES.map((p) => ({ value: p, label: p })),
-              ]}
-              onChange={(val) => {
-                setField("province", val);
-                markTouched("province");
-              }}
-              error={showErr("province") ? errors.province : ""}
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-              highlighted={HL.province}
-              tint={tint}
-            />
-
-            {/* CCCD + nút quét */}
-            <View style={{ gap: 8 }}>
-              <Field
-                label="Mã định danh CCCD"
-                value={form.cccd}
-                onChangeText={(v) => setField("cccd", v)}
-                onBlur={() => markTouched("cccd")}
-                error={showErr("cccd") ? errors.cccd : ""}
-                placeholder="12 chữ số"
-                keyboardType="number-pad"
-                maxLength={12}
-                border={border}
-                textPrimary={textPrimary}
-                textSecondary={textSecondary}
-                highlighted={HL.cccd}
-                tint={tint}
-              />
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginBottom: 6,
-                }}
-              >
-                <Pressable
-                  onPress={() => setQrOpen(true)}
-                  style={({ pressed }) => [
-                    styles.btn,
-                    { backgroundColor: tint },
-                    pressed && { opacity: 0.92 },
-                  ]}
-                >
-                  <Text style={styles.btnTextWhite}>
-                    Quét CCCD (QR) để điền nhanh
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <Field
-              label="Email"
-              value={form.email}
-              onChangeText={(v) => setField("email", v)}
-              onBlur={() => markTouched("email")}
-              error={showErr("email") ? errors.email : ""}
-              keyboardType="email-address"
-              required
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
-
-            <Field
-              label="Mật khẩu mới"
-              value={form.password}
-              onChangeText={(v) => setField("password", v)}
-              onBlur={() => markTouched("password")}
-              error={showErr("password") ? errors.password : ""}
-              placeholder="Để trống nếu không đổi"
-              secureTextEntry
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
-            <Field
-              label="Xác nhận mật khẩu"
-              value={form.confirmPassword}
-              onChangeText={(v) => setField("confirmPassword", v)}
-              onBlur={() => markTouched("confirmPassword")}
-              error={showErr("confirmPassword") ? errors.confirmPassword : ""}
-              secureTextEntry
-              border={border}
-              textPrimary={textPrimary}
-              textSecondary={textSecondary}
-            />
-
-            {/* CCCD */}
-            <Text style={[styles.subTitle, { color: textPrimary }]}>
-              Ảnh CCCD
-            </Text>
-            {showUpload ? (
-              <>
-                <View
-                  style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}
-                >
-                  <PickBox
-                    label="Mặt trước"
-                    file={frontImg}
-                    onPick={async () => setFrontImg(await pickImage())}
-                    border={border}
-                    muted={muted}
-                    textSecondary={textSecondary}
-                  />
-
-                  <PickBox
-                    label="Mặt sau"
-                    file={backImg}
-                    onPick={async () => setBackImg(await pickImage())}
-                    border={border}
-                    muted={muted}
-                    textSecondary={textSecondary}
-                  />
-                </View>
-                <Pressable
-                  onPress={sendCccd}
-                  disabled={!allowSendCccd || upLoad}
-                  style={({ pressed }) => [
-                    styles.btn,
-                    {
-                      backgroundColor:
-                        !allowSendCccd || upLoad ? "#9aa0a6" : tint,
-                    },
-                    pressed && { opacity: 0.92 },
-                  ]}
-                >
-                  <Text style={styles.btnTextWhite}>
-                    {upLoad ? "Đang gửi…" : "Gửi ảnh xác minh"}
-                  </Text>
-                </Pressable>
-                {!/^\d{12}$/.test(String(form.cccd || "").trim()) && (
-                  <Text
-                    style={{ color: "#e11d48", fontSize: 12, marginTop: 4 }}
+                    <Pressable
+                      onPress={openAvatarViewer}
+                      disabled={!avatarUrl}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.97 : 1 }]}
+                    >
+                      <XImage
+                        uri={
+                          avatarUrl ||
+                          "https://dummyimage.com/160x160/cccccc/ffffff&text=?"
+                        }
+                        contentFit="cover"
+                        style={styles.headerAvatar}
+                        transition={150}
+                        recyclingKey={avatarUrl || "dummy-avatar"}
+                      />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    onPress={async () => {
+                      const f = await pickImage();
+                      if (!f) return;
+                      setAvatarTemp(f);
+                      setAvatarConfirmOpen(true);
+                    }}
+                    style={({ pressed }) => [
+                      styles.avatarCam,
+                      {
+                        backgroundColor: tint,
+                        borderColor: cardBg,
+                      },
+                      pressed && { opacity: 0.92 },
+                    ]}
                   >
-                    Bạn cần nhập hoặc quét mã số CCCD (12 số) trước khi gửi ảnh.
+                    <MaterialIcons name="photo-camera" size={18} color="#fff" />
+                  </Pressable>
+                </View>
+
+                <View style={{ alignItems: "center" }}>
+                  <Text style={[styles.headerName, { color: textPrimary }]}>
+                    {user.name || "Không tên"}
                   </Text>
-                )}
-              </>
-            ) : (
-              <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
-                <PreviewBox
-                  uri={normalizeUrl(frontUrl)}
-                  label="Mặt trước"
+                  {!!user.nickname && (
+                    <Text style={{ color: textSecondary }}>
+                      @{user.nickname}
+                    </Text>
+                  )}
+
+                  {/* Chips: scroll ngang, giữ chiều cao gọn */}
+                  <View style={{ height: 32, marginTop: 8 }}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{
+                        alignItems: "center",
+                        paddingHorizontal: 16,
+                      }}
+                    >
+                      <StatusChip status={status} />
+                      <View style={{ width: 8 }} />
+                      <StatChip
+                        icon="sports-tennis"
+                        label="Giải đã tham gia"
+                        value={user.stats?.tournaments || 0}
+                        textSecondary={textSecondary}
+                        border={border}
+                      />
+                      <View style={{ width: 8 }} />
+                      <StatChip
+                        icon="videocam"
+                        label="Trận đã phát LIVE"
+                        value={user.stats?.lives || 0}
+                        textSecondary={textSecondary}
+                        border={border}
+                      />
+                    </ScrollView>
+                  </View>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 10,
+                      marginTop: 10,
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <PillButton
+                      title="Chỉnh sửa hồ sơ"
+                      onPress={() => setTab("profile")}
+                      tint={tint}
+                    />
+                    <PillButton
+                      title="Xác minh CCCD"
+                      onPress={() =>
+                        showUpload ? setTab("profile") : openCccdViewer("front")
+                      }
+                      outline
+                      tint={tint}
+                      textPrimary={textPrimary}
+                      border={border}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ===== Tabs */}
+            <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+              <TabBar
+                active={tab}
+                onChange={setTab}
+                tint={tint}
+                textPrimary={textPrimary}
+                border={border}
+                muted={muted}
+              />
+            </View>
+
+            {/* ===== Body by tab ===== */}
+            {tab === "overview" && (
+              <View style={{ padding: 16, gap: 12 }}>
+                <Card
+                  title="Tổng quan tài khoản"
+                  cardBg={cardBg}
                   border={border}
-                  muted={muted}
-                />
-                <PreviewBox
-                  uri={normalizeUrl(backUrl)}
-                  label="Mặt sau"
+                  textPrimary={textPrimary}
+                >
+                  <RowLabel
+                    label="Email"
+                    value={user.email}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <RowLabel
+                    label="Số điện thoại"
+                    value={user.phone}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <RowLabel
+                    label="Giới tính"
+                    value={mapGender(user.gender)}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <RowLabel
+                    label="Ngày sinh"
+                    value={user.dob?.slice(0, 10) || "—"}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <RowLabel
+                    label="Tỉnh/TP"
+                    value={user.province || "—"}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                </Card>
+
+                <Card
+                  title="CCCD"
+                  cardBg={cardBg}
                   border={border}
-                  muted={muted}
-                />
+                  textPrimary={textPrimary}
+                >
+                  {showUpload ? (
+                    <Text style={{ color: textSecondary }}>
+                      Chưa xác minh. Chuyển sang tab{" "}
+                      <Text style={{ color: tint, fontWeight: "700" }}>
+                        Hồ sơ
+                      </Text>{" "}
+                      để tải ảnh mặt trước/mặt sau.
+                    </Text>
+                  ) : (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 12,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <PreviewBox
+                        uri={normalizeUrl(user?.cccdImages?.front)}
+                        label="Mặt trước"
+                        border={border}
+                        muted={muted}
+                        textColor={textSecondary}
+                        onPress={() => openCccdViewer("front")}
+                      />
+                      <PreviewBox
+                        uri={normalizeUrl(user?.cccdImages?.back)}
+                        label="Mặt sau"
+                        border={border}
+                        muted={muted}
+                        textColor={textSecondary}
+                        onPress={() => openCccdViewer("back")}
+                      />
+                    </View>
+                  )}
+                </Card>
               </View>
             )}
 
-            {/* Trạng thái */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 6,
-              }}
-            >
-              <Text style={{ color: textSecondary }}>Trạng thái:</Text>
-              <StatusChip status={status} />
-            </View>
+            {tab === "profile" && (
+              <View style={{ padding: 16, gap: 12 }}>
+                <Card
+                  title="Cập nhật hồ sơ"
+                  cardBg={cardBg}
+                  border={border}
+                  textPrimary={textPrimary}
+                >
+                  {/* Thông tin */}
+                  <Field
+                    label="Họ và tên"
+                    value={form.name}
+                    onChangeText={(v) => setField("name", v)}
+                    onBlur={() => markTouched("name")}
+                    error={showErr("name") ? errors.name : ""}
+                    required
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    highlighted={HL.name}
+                    tint={tint}
+                  />
+                  <Field
+                    label="Biệt danh"
+                    value={form.nickname}
+                    onChangeText={(v) => setField("nickname", v)}
+                    onBlur={() => markTouched("nickname")}
+                    error={showErr("nickname") ? errors.nickname : ""}
+                    required
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <Field
+                    label="Số điện thoại"
+                    value={form.phone}
+                    onChangeText={(v) => setField("phone", v)}
+                    onBlur={() => markTouched("phone")}
+                    error={showErr("phone") ? errors.phone : ""}
+                    keyboardType="phone-pad"
+                    required
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
 
-            {/* Lưu */}
-            <Pressable
-              onPress={submit}
-              disabled={!isDirty || !isValid || isLoading || uploadingAvatar}
-              style={({ pressed }) => [
-                styles.btn,
-                {
-                  backgroundColor:
-                    !isDirty || !isValid || isLoading || uploadingAvatar
-                      ? "#9aa0a6"
-                      : tint,
-                },
-                pressed && { opacity: 0.92 },
-              ]}
-            >
-              <Text style={styles.btnTextWhite}>
-                {isLoading || uploadingAvatar ? "Đang lưu…" : "Lưu thay đổi"}
-              </Text>
-            </Pressable>
-          </View>
+                  {/* Giới tính */}
+                  <SelectField
+                    label="Giới tính"
+                    value={form.gender}
+                    placeholder="-- Chọn giới tính --"
+                    options={GENDER_OPTIONS}
+                    onChange={(val) => {
+                      setField("gender", val);
+                      markTouched("gender");
+                    }}
+                    error={showErr("gender") ? errors.gender : ""}
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    highlighted={HL.gender}
+                    tint={tint}
+                    cardBg={cardBg}
+                  />
 
-          {/* Logout & Delete */}
-          <Pressable
-            onPress={confirmLogout}
-            style={({ pressed }) => [
-              styles.btn,
-              styles.btnOutline,
-              { borderColor: "#e53935", backgroundColor: cardBg },
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <Text style={[styles.btnText, { color: "#e53935" }]}>
-              Đăng xuất
-            </Text>
-          </Pressable>
+                  {/* DOB */}
+                  <DateField
+                    label="Ngày sinh"
+                    value={form.dob}
+                    onChange={(val) => {
+                      setField("dob", val);
+                      markTouched("dob");
+                    }}
+                    error={showErr("dob") ? errors.dob : ""}
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    tint={tint}
+                    highlighted={HL.dob}
+                    cardBg={cardBg}
+                  />
 
-          <Pressable
-            onPress={confirmDelete}
-            style={({ pressed }) => [
-              styles.btn,
-              styles.btnOutline,
-              { borderColor: "#b00020", backgroundColor: cardBg },
-              isIOS && { marginBottom: 80 },
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <Text style={[styles.btnText, { color: "#b00020" }]}>
-              Xoá tài khoản
-            </Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
+                  {/* Tỉnh / Thành phố */}
+                  <SelectField
+                    label="Tỉnh / Thành phố"
+                    value={form.province}
+                    placeholder="-- Chọn --"
+                    options={[
+                      { value: "", label: "-- Chọn --" },
+                      ...PROVINCES.map((p) => ({ value: p, label: p })),
+                    ]}
+                    onChange={(val) => {
+                      setField("province", val);
+                      markTouched("province");
+                    }}
+                    error={showErr("province") ? errors.province : ""}
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    highlighted={HL.province}
+                    tint={tint}
+                    cardBg={cardBg}
+                  />
+
+                  {/* CCCD + QR */}
+                  <View style={{ gap: 8 }}>
+                    <Field
+                      label="Mã định danh CCCD"
+                      value={form.cccd}
+                      onChangeText={(v) => setField("cccd", v)}
+                      onBlur={() => markTouched("cccd")}
+                      error={showErr("cccd") ? errors.cccd : ""}
+                      placeholder="12 chữ số"
+                      keyboardType="number-pad"
+                      maxLength={12}
+                      border={border}
+                      textPrimary={textPrimary}
+                      textSecondary={textSecondary}
+                      highlighted={HL.cccd}
+                      tint={tint}
+                    />
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 10,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <Pressable
+                        onPress={() => setQrOpen(true)}
+                        style={({ pressed }) => [
+                          styles.btn,
+                          { backgroundColor: tint },
+                          pressed && { opacity: 0.92 },
+                        ]}
+                      >
+                        <Text style={styles.btnTextWhite}>
+                          Quét CCCD (QR) để điền nhanh
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <Field
+                    label="Email"
+                    value={form.email}
+                    onChangeText={(v) => setField("email", v)}
+                    onBlur={() => markTouched("email")}
+                    error={showErr("email") ? errors.email : ""}
+                    keyboardType="email-address"
+                    required
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+
+                  <Field
+                    label="Mật khẩu mới"
+                    value={form.password}
+                    onChangeText={(v) => setField("password", v)}
+                    onBlur={() => markTouched("password")}
+                    error={showErr("password") ? errors.password : ""}
+                    placeholder="Để trống nếu không đổi"
+                    secureTextEntry
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                  <Field
+                    label="Xác nhận mật khẩu"
+                    value={form.confirmPassword}
+                    onChangeText={(v) => setField("confirmPassword", v)}
+                    onBlur={() => markTouched("confirmPassword")}
+                    error={
+                      showErr("confirmPassword") ? errors.confirmPassword : ""
+                    }
+                    secureTextEntry
+                    border={border}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+
+                  {/* CCCD upload/preview */}
+                  <Text style={[styles.subTitle, { color: textPrimary }]}>
+                    Ảnh CCCD
+                  </Text>
+                  {showUpload ? (
+                    <>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 12,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <PickBox
+                          label="Mặt trước"
+                          file={frontImg}
+                          onPick={async () => setFrontImg(await pickImage())}
+                          border={border}
+                          muted={muted}
+                          textSecondary={textSecondary}
+                        />
+                        <PickBox
+                          label="Mặt sau"
+                          file={backImg}
+                          onPick={async () => setBackImg(await pickImage())}
+                          border={border}
+                          muted={muted}
+                          textSecondary={textSecondary}
+                        />
+                      </View>
+                      <Pressable
+                        onPress={sendCccd}
+                        disabled={!allowSendCccd || upLoad}
+                        style={({ pressed }) => [
+                          styles.btn,
+                          {
+                            backgroundColor:
+                              !allowSendCccd || upLoad ? "#9aa0a6" : tint,
+                          },
+                          pressed && { opacity: 0.92 },
+                        ]}
+                      >
+                        <Text style={styles.btnTextWhite}>
+                          {upLoad ? "Đang gửi…" : "Gửi ảnh xác minh"}
+                        </Text>
+                      </Pressable>
+                      {!/^\d{12}$/.test(String(form.cccd || "").trim()) && (
+                        <Text
+                          style={{
+                            color: "#e11d48",
+                            fontSize: 12,
+                            marginTop: 4,
+                          }}
+                        >
+                          Bạn cần nhập hoặc quét mã số CCCD (12 số) trước khi
+                          gửi ảnh.
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 12,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <PreviewBox
+                        uri={normalizeUrl(user?.cccdImages?.front)}
+                        label="Mặt trước"
+                        border={border}
+                        muted={muted}
+                        textColor={textSecondary}
+                        onPress={() => openCccdViewer("front")}
+                      />
+                      <PreviewBox
+                        uri={normalizeUrl(user?.cccdImages?.back)}
+                        label="Mặt sau"
+                        border={border}
+                        muted={muted}
+                        textColor={textSecondary}
+                        onPress={() => openCccdViewer("back")}
+                      />
+                    </View>
+                  )}
+
+                  {/* Lưu */}
+                  <Pressable
+                    onPress={submit}
+                    disabled={
+                      !isDirty || !isValid || isLoading || uploadingAvatar
+                    }
+                    style={({ pressed }) => [
+                      styles.btn,
+                      {
+                        backgroundColor:
+                          !isDirty || !isValid || isLoading || uploadingAvatar
+                            ? "#9aa0a6"
+                            : tint,
+                      },
+                      pressed && { opacity: 0.92 },
+                    ]}
+                  >
+                    <Text style={styles.btnTextWhite}>
+                      {isLoading || uploadingAvatar
+                        ? "Đang lưu…"
+                        : "Lưu thay đổi"}
+                    </Text>
+                  </Pressable>
+                </Card>
+              </View>
+            )}
+
+            {tab === "settings" && (
+              <View style={{ padding: 16, gap: 12 }}>
+                <Card
+                  title="Giao diện"
+                  cardBg={cardBg}
+                  border={border}
+                  textPrimary={textPrimary}
+                >
+                  {themeBusy && (
+                    <View style={{ paddingVertical: 8, alignItems: "center" }}>
+                      <ActivityIndicator color={tint} />
+                      <Text
+                        style={{
+                          color: textSecondary,
+                          marginTop: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        Đang áp dụng giao diện…
+                      </Text>
+                    </View>
+                  )}
+                  <RadioRow
+                    label="Theo hệ thống"
+                    selected={prefTheme === "system"}
+                    onPress={() => applyThemePref("system")}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    border={border}
+                    tint={tint}
+                  />
+                  <RadioRow
+                    label="Sáng"
+                    selected={prefTheme === "light"}
+                    onPress={() => applyThemePref("light")}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    border={border}
+                    tint={tint}
+                  />
+                  <RadioRow
+                    label="Tối"
+                    selected={prefTheme === "dark"}
+                    onPress={() => applyThemePref("dark")}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    border={border}
+                    tint={tint}
+                  />
+                </Card>
+
+                <Card
+                  title="Thông báo"
+                  cardBg={cardBg}
+                  border={border}
+                  textPrimary={textPrimary}
+                >
+                  <SwitchRow
+                    label="Nhận thông báo đẩy"
+                    value={pushEnabled}
+                    onValueChange={togglePush}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                  />
+                </Card>
+
+                <Card
+                  title="Tài khoản"
+                  cardBg={cardBg}
+                  border={border}
+                  textPrimary={textPrimary}
+                >
+                  <View
+                    style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}
+                  >
+                    <PillButton
+                      title="Đăng xuất"
+                      onPress={confirmLogout}
+                      outline
+                      tint="#e53935"
+                    />
+                    <PillButton
+                      title="Xoá tài khoản"
+                      onPress={confirmDelete}
+                      outline
+                      tint="#b00020"
+                    />
+                  </View>
+                </Card>
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
 
       {/* Modal quét CCCD */}
       <CccdQrModal
@@ -1001,11 +1429,512 @@ export default function ProfileScreen() {
           onScanResult(r);
         }}
       />
+
+      {/* ===== Avatar Preview Modal ===== */}
+      <Modal
+        visible={avatarConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !avatarSaving && setAvatarConfirmOpen(false)}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              Xác nhận ảnh đại diện
+            </Text>
+
+            {!!avatarTemp?.uri && (
+              <XImage
+                uri={avatarTemp.uri}
+                contentFit="cover"
+                style={{
+                  width: AVATAR_SIZE * 2,
+                  height: AVATAR_SIZE * 2,
+                  borderRadius: AVATAR_SIZE,
+                  alignSelf: "center",
+                }}
+                transition={100}
+                recyclingKey={avatarTemp.uri}
+              />
+            )}
+
+            <Text
+              style={{
+                marginTop: 10,
+                color: textSecondary,
+                textAlign: "center",
+                fontSize: 12,
+              }}
+            >
+              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm “Xác nhận”.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 14,
+                justifyContent: "center",
+              }}
+            >
+              <Pressable
+                disabled={avatarSaving}
+                onPress={() => {
+                  setAvatarConfirmOpen(false);
+                  setAvatarTemp(null);
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnOutline,
+                  {
+                    borderColor: border,
+                    minWidth: 100,
+                    opacity: avatarSaving ? 0.6 : pressed ? 0.95 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: textPrimary }]}>
+                  Huỷ
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={avatarSaving || !avatarTemp}
+                onPress={async () => {
+                  if (!avatarTemp) return;
+                  setAvatarSaving(true);
+                  try {
+                    // 1) Upload avatar
+                    const up = await uploadAvatar(avatarTemp).unwrap();
+                    const url = up?.url || up?.data?.url;
+                    if (!url) throw new Error("Không nhận được URL ảnh");
+
+                    // 2) Cập nhật hồ sơ
+                    await updateProfile({
+                      _id: user?._id,
+                      avatar: url,
+                    }).unwrap();
+
+                    // 3) Update UI
+                    setForm((p) => ({ ...p, avatar: url }));
+                    setUploadedAvatarUrl(url);
+
+                    setAvatarConfirmOpen(false);
+                    setAvatarTemp(null);
+
+                    await refetch();
+                    Alert.alert("Thành công", "Ảnh đại diện đã được cập nhật.");
+                  } catch (e) {
+                    Alert.alert(
+                      "Lỗi",
+                      e?.data?.message || e?.message || "Cập nhật ảnh thất bại"
+                    );
+                  } finally {
+                    setAvatarSaving(false);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor: tint,
+                    minWidth: 120,
+                    opacity: avatarSaving ? 0.7 : pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {avatarSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnTextWhite}>Xác nhận</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== Cover Preview Modal ===== */}
+      <Modal
+        visible={coverConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !coverSaving && setCoverConfirmOpen(false)}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              Xác nhận ảnh bìa
+            </Text>
+
+            {!!coverTemp?.uri && (
+              <XImage
+                uri={coverTemp.uri}
+                contentFit="cover"
+                style={{
+                  width: "100%",
+                  aspectRatio: 16 / 6,
+                  borderRadius: 10,
+                  alignSelf: "center",
+                }}
+                transition={100}
+                recyclingKey={coverTemp.uri}
+              />
+            )}
+
+            <Text
+              style={{
+                marginTop: 10,
+                color: textSecondary,
+                textAlign: "center",
+                fontSize: 12,
+              }}
+            >
+              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm “Xác nhận”.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 14,
+                justifyContent: "center",
+              }}
+            >
+              <Pressable
+                disabled={coverSaving}
+                onPress={() => {
+                  setCoverConfirmOpen(false);
+                  setCoverTemp(null);
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnOutline,
+                  {
+                    borderColor: border,
+                    minWidth: 100,
+                    opacity: coverSaving ? 0.6 : pressed ? 0.95 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: textPrimary }]}>
+                  Huỷ
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={coverSaving || !coverTemp}
+                onPress={async () => {
+                  if (!coverTemp) return;
+                  setCoverSaving(true);
+                  try {
+                    // 1) Upload cover
+                    const up = await uploadAvatar(coverTemp).unwrap();
+                    const url = up?.url || up?.data?.url;
+                    if (!url) throw new Error("Không nhận được URL ảnh");
+
+                    // 2) Cập nhật hồ sơ
+                    await updateProfile({
+                      _id: user?._id,
+                      cover: url,
+                    }).unwrap();
+
+                    // 3) Update UI
+                    setForm((p) => ({ ...p, cover: url }));
+
+                    setCoverConfirmOpen(false);
+                    setCoverTemp(null);
+
+                    await refetch();
+                    Alert.alert("Thành công", "Ảnh bìa đã được cập nhật.");
+                  } catch (e) {
+                    Alert.alert(
+                      "Lỗi",
+                      e?.data?.message ||
+                        e?.message ||
+                        "Cập nhật ảnh bìa thất bại"
+                    );
+                  } finally {
+                    setCoverSaving(false);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor: tint,
+                    minWidth: 120,
+                    opacity: coverSaving ? 0.7 : pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {coverSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnTextWhite}>Xác nhận</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== Universal Image Viewer (Avatar / Cover / CCCD) ===== */}
+      <ImageView
+        images={viewerImages}
+        imageIndex={viewerIndex}
+        visible={viewerOpen}
+        onRequestClose={() => setViewerOpen(false)}
+        onImageIndexChange={(i) => setViewerIndex(i)}
+        backgroundColor={viewerBg}
+        HeaderComponent={() => (
+          <View
+            style={{
+              paddingTop: insets.top + 12,
+              paddingHorizontal: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              style={{ color: textPrimary, fontWeight: "700", fontSize: 16 }}
+            >
+              {viewerLabels[viewerIndex] || ""}
+            </Text>
+            <Pressable
+              onPress={() => setViewerOpen(false)}
+              hitSlop={10}
+              style={{ padding: 4 }}
+            >
+              <MaterialIcons name="close" size={24} color={textPrimary} />
+            </Pressable>
+          </View>
+        )}
+        FooterComponent={() => (
+          <View
+            style={{ paddingBottom: insets.bottom + 12, alignItems: "center" }}
+          >
+            <Text style={{ color: textPrimary, opacity: 0.9 }}>
+              {viewerImages.length > 1
+                ? `${viewerIndex + 1} / ${viewerImages.length}`
+                : ""}
+            </Text>
+          </View>
+        )}
+      />
     </>
   );
 }
 
 /* ======= Subcomponents ======= */
+
+function PillButton({
+  title,
+  onPress,
+  outline = false,
+  tint = "#0a84ff",
+  textPrimary = "#111",
+  border = "#dfe3ea",
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          borderRadius: 999,
+          backgroundColor: outline ? "transparent" : tint,
+          borderWidth: outline ? 1 : 0,
+          borderColor: outline ? tint || border : "transparent",
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <Text
+        style={{
+          color: outline ? tint || textPrimary : "#fff",
+          fontWeight: "700",
+        }}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
+function TabBar({ active, onChange, tint, textPrimary, border, muted }) {
+  const items = [
+    { key: "overview", label: "Tổng quan", icon: "person" },
+    { key: "profile", label: "Hồ sơ", icon: "edit" },
+    { key: "settings", label: "Cài đặt", icon: "settings" },
+  ];
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        borderWidth: 1,
+        borderColor: border,
+        borderRadius: 12,
+        overflow: "hidden",
+      }}
+    >
+      {items.map((it) => {
+        const isAct = active === it.key;
+        return (
+          <Pressable
+            key={it.key}
+            onPress={() => onChange(it.key)}
+            style={({ pressed }) => [
+              {
+                flex: 1,
+                paddingVertical: 10,
+                alignItems: "center",
+                backgroundColor: isAct ? tint : muted,
+              },
+              pressed && { opacity: 0.95 },
+            ]}
+          >
+            <View
+              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
+            >
+              <MaterialIcons
+                name={it.icon}
+                size={16}
+                color={isAct ? "#fff" : textPrimary}
+              />
+              <Text
+                style={{
+                  color: isAct ? "#fff" : textPrimary,
+                  fontWeight: "700",
+                }}
+              >
+                {it.label}
+              </Text>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function Card({ title, children, cardBg, border, textPrimary = "#111" }) {
+  return (
+    <View
+      style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+    >
+      {!!title && (
+        <Text style={[styles.cardTitle, { color: textPrimary }]}>{title}</Text>
+      )}
+      {children}
+    </View>
+  );
+}
+
+function RowLabel({ label, value, textPrimary, textSecondary }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingVertical: 8,
+      }}
+    >
+      <Text style={{ color: textSecondary }}>{label}</Text>
+      <Text style={{ color: textPrimary, fontWeight: "600" }}>
+        {value || "—"}
+      </Text>
+    </View>
+  );
+}
+
+function StatChip({ icon = "star", label, value, textSecondary, border }) {
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: border,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <MaterialIcons name={icon} size={14} color={textSecondary} />
+      <Text style={{ color: textSecondary, fontWeight: "600", marginLeft: 6 }}>
+        {label}: {value ?? 0}
+      </Text>
+    </View>
+  );
+}
+
+function RadioRow({
+  label,
+  selected,
+  onPress,
+  textPrimary,
+  textSecondary,
+  border,
+  tint,
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingVertical: 12,
+          borderTopWidth: 1,
+          borderColor: border,
+        },
+        pressed && { opacity: 0.95 },
+      ]}
+    >
+      <Text style={{ color: textPrimary }}>{label}</Text>
+      <MaterialIcons
+        name={selected ? "radio-button-checked" : "radio-button-unchecked"}
+        size={20}
+        color={selected ? tint : textSecondary}
+      />
+    </Pressable>
+  );
+}
+
+function SwitchRow({
+  label,
+  value,
+  onValueChange,
+  textPrimary,
+  textSecondary,
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 12,
+      }}
+    >
+      <Text style={{ color: textPrimary }}>{label}</Text>
+      <Switch value={value} onValueChange={onValueChange} />
+    </View>
+  );
+}
+
 function Field({
   label,
   value,
@@ -1066,12 +1995,8 @@ function SelectField({
   textSecondary,
   highlighted = false,
   tint = "#0a84ff",
+  cardBg,
 }) {
-  const { isIOS } = usePlatform();
-  const scheme = useColorScheme() ?? "light";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
-  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(value || "");
   useEffect(() => setTemp(value || ""), [value]);
@@ -1094,9 +2019,7 @@ function SelectField({
           pressed && { opacity: 0.95 },
         ]}
       >
-        <Text
-          style={{ color: value ? textPrimary : placeholder, fontSize: 16 }}
-        >
+        <Text style={{ color: value ? textPrimary : "#9aa0a6", fontSize: 16 }}>
           {display}
         </Text>
       </Pressable>
@@ -1166,13 +2089,8 @@ function DateField({
   textSecondary,
   tint,
   highlighted = false,
+  cardBg,
 }) {
-  const { isIOS } = usePlatform();
-  const scheme = useColorScheme() ?? "light";
-  const cardBg = scheme === "dark" ? "#16181c" : "#ffffff";
-  const muted = scheme === "dark" ? "#22252a" : "#f3f5f9";
-  const iconMuted = scheme === "dark" ? "#a1a1aa" : "#60646c";
-  const placeholder = scheme === "dark" ? "#8e8e93" : "#9aa0a6";
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(
     value ? new Date(value) : new Date(1990, 0, 1)
@@ -1197,9 +2115,7 @@ function DateField({
           pressed && { opacity: 0.95 },
         ]}
       >
-        <Text
-          style={{ color: value ? textPrimary : placeholder, fontSize: 16 }}
-        >
+        <Text style={{ color: value ? textPrimary : "#9aa0a6", fontSize: 16 }}>
           {value || "Chọn ngày sinh"}
         </Text>
       </Pressable>
@@ -1268,7 +2184,6 @@ function DateField({
 
 function PickBox({ label, file, onPick, border, muted, textSecondary }) {
   const hasImg = !!file?.uri;
-
   return (
     <View
       style={[styles.pickBox, { borderColor: border, backgroundColor: muted }]}
@@ -1286,10 +2201,12 @@ function PickBox({ label, file, onPick, border, muted, textSecondary }) {
         >
           {hasImg ? (
             <>
-              <Image
-                source={{ uri: file.uri }}
+              <XImage
+                uri={file.uri}
+                contentFit="cover"
                 style={sx.img}
-                resizeMode="cover"
+                transition={100}
+                recyclingKey={file.uri}
               />
               <View style={sx.overlay}>
                 <MaterialIcons name="photo-camera" size={18} color="#fff" />
@@ -1308,7 +2225,7 @@ function PickBox({ label, file, onPick, border, muted, textSecondary }) {
                   { color: textSecondary, opacity: 0.8, textAlign: "center" },
                 ]}
               >
-                Hỗ trợ JPG/PNG, tối đa 5MB
+                Hỗ trợ JPG/PNG, tối đa 10MB
               </Text>
             </View>
           )}
@@ -1341,7 +2258,6 @@ const sx = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1.5,
     borderStyle: "dashed",
-    // màu sẽ override theo props ở trên
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1360,15 +2276,30 @@ const sx = StyleSheet.create({
   hint: { fontSize: 12 },
 });
 
-function PreviewBox({ uri, label, border, muted }) {
+function PreviewBox({
+  uri,
+  label,
+  border,
+  muted,
+  textColor = "#444",
+  onPress,
+}) {
   return (
     <View style={[styles.pickBox, { borderColor: border }]}>
       {uri ? (
-        <Image
-          source={{ uri: uri?.replace(/\\/g, "/") }}
-          style={{ width: "100%", height: 120, borderRadius: 8 }}
-          resizeMode="contain"
-        />
+        <Pressable
+          onPress={onPress}
+          disabled={!onPress}
+          style={({ pressed }) => [{ opacity: pressed ? 0.96 : 1 }]}
+        >
+          <XImage
+            uri={uri?.replace(/\\/g, "/")}
+            contentFit="contain"
+            style={{ width: "100%", height: 120, borderRadius: 8 }}
+            transition={150}
+            recyclingKey={uri}
+          />
+        </Pressable>
       ) : (
         <View
           style={{
@@ -1379,7 +2310,9 @@ function PreviewBox({ uri, label, border, muted }) {
           }}
         />
       )}
-      <Text style={{ textAlign: "center", marginTop: 6 }}>{label}</Text>
+      <Text style={{ textAlign: "center", marginTop: 6, color: textColor }}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -1406,9 +2339,81 @@ function StatusChip({ status }) {
   );
 }
 
+function mapGender(g) {
+  if (g === "male") return "Nam";
+  if (g === "female") return "Nữ";
+  if (g === "other") return "Khác";
+  return "—";
+}
+
 /* ======= Styles ======= */
+const AVATAR_SIZE = 96;
+
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 1, padding: 16, gap: 12 },
+  // header
+  headerWrap: {
+    borderBottomWidth: 1,
+  },
+  cover: {
+    width: "100%",
+    aspectRatio: 16 / 6,
+    position: "relative",
+  },
+  coverImg: { width: "100%", height: "100%" },
+  coverBtn: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerBottom: {
+    alignItems: "center",
+    paddingTop: 0,
+    paddingBottom: 12,
+  },
+
+  // avatar stack (button không bị che)
+  avatarStack: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    marginTop: -AVATAR_SIZE / 2,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarWrap: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    borderWidth: 3,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerAvatar: {
+    width: AVATAR_SIZE - 4,
+    height: AVATAR_SIZE - 4,
+    borderRadius: (AVATAR_SIZE - 4) / 2,
+  },
+  avatarCam: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    borderWidth: 2, // viền để tách khỏi avatar
+  },
+  headerName: { fontSize: 20, fontWeight: "800", marginTop: 8 },
+
+  // card
   card: {
     borderWidth: 1,
     borderRadius: 16,
@@ -1420,16 +2425,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     gap: 8,
   },
-  h1: { fontSize: 18, fontWeight: "700", marginBottom: 8, textAlign: "center" },
-  row: { flexDirection: "row", alignItems: "center" },
-  avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
+  cardTitle: { fontSize: 16, fontWeight: "800", marginBottom: 8 },
+
+  // common
   label: { fontSize: 13, marginBottom: 6 },
   input: {
     borderWidth: 1,
@@ -1458,7 +2456,6 @@ const styles = StyleSheet.create({
   btnTextOnly: { backgroundColor: "transparent" },
   btnOutline: { borderWidth: 1 },
   btnTextWhite: { color: "#fff", fontWeight: "700" },
-  /* select + modal */
   selectBox: {
     borderWidth: 1,
     borderRadius: 12,
@@ -1467,15 +2464,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errText: { color: "#e11d48", marginTop: 4, fontSize: 12 },
+
+  // modal (sheet & center)
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
   },
+  modalBackdropCenter: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
   modalCard: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
+    borderWidth: 1,
+  },
+  previewCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
   },
   modalHeader: {

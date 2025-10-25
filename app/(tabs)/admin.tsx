@@ -1,5 +1,5 @@
 // app/(tabs)/admin/index.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,9 @@ import {
   Text,
   TextInput,
   View,
+  useColorScheme,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
@@ -38,6 +40,9 @@ import {
   useDeleteUserMutation,
 } from "@/slices/adminApiSlice";
 import { setPage, setKeyword, setRole } from "@/slices/adminUiSlice";
+import { useTheme } from "@react-navigation/native";
+
+/* ================== Theme key ================== */
 
 /* ================== Consts ================== */
 const GENDER_OPTIONS = [
@@ -121,10 +126,10 @@ const KYC_LABEL = {
   rejected: "Từ chối",
 };
 const KYC_BG = {
-  unverified: "#e0e0e0",
-  pending: "#ffcc80",
-  verified: "#a5d6a7",
-  rejected: "#ef9a9a",
+  unverified: "#9aa0a6",
+  pending: "#f6a609",
+  verified: "#16a34a",
+  rejected: "#e11d48",
 };
 
 const prettyDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
@@ -143,26 +148,59 @@ const getIsFullEvaluator = (u) => {
   return normalized.length === PROVINCES.length;
 };
 
-/* ================== Small UI helpers ================== */
+/* ===== Small UI helpers ===== */
 const Row = ({ children, style }) => (
   <View style={[{ flexDirection: "row", alignItems: "center" }, style]}>
     {children}
   </View>
 );
-const Chip = ({ label, bg = "#eee", style }) => (
-  <View style={[styles.chip, { backgroundColor: bg }, style]}>
-    <Text style={styles.chipText}>{label}</Text>
-  </View>
-);
+// Tính màu chữ readable dựa trên màu nền (WCAG-ish)
+function pickTextColorForBg(bgHex, tokens) {
+  if (!bgHex) return tokens.scheme === "dark" ? "#fff" : tokens.textPrimary;
+  try {
+    const hex = bgHex.replace("#", "");
+    const full =
+      hex.length === 3
+        ? hex
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : hex;
+    const num = parseInt(full, 16);
+    const r = (num >> 16) & 255,
+      g = (num >> 8) & 255,
+      b = num & 255;
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000; // 0..255
+    return brightness > 155 ? "#111" : "#fff"; // ngưỡng dễ đọc
+  } catch {
+    return tokens.scheme === "dark" ? "#fff" : tokens.textPrimary;
+  }
+}
+
+const Chip = ({ label, bg, style, styles }) => {
+  const textColor = pickTextColorForBg(bg, styles.tokens);
+  return (
+    <View
+      style={[
+        styles.chip,
+        { backgroundColor: bg ?? styles.tokens.muted },
+        style,
+      ]}
+    >
+      <Text style={[styles.chipText, { color: textColor }]}>{label}</Text>
+    </View>
+  );
+};
+
 const IconBtn = ({
   name = "edit",
   mc = false,
-  color = "#333",
+  color,
   onPress,
   size = 20,
   style,
 }) => (
-  <Pressable onPress={onPress} style={[styles.iconBtn, style]}>
+  <Pressable onPress={onPress} style={[{ padding: 6, borderRadius: 8 }, style]}>
     {mc ? (
       <MaterialCommunityIcons name={name} size={size} color={color} />
     ) : (
@@ -171,12 +209,47 @@ const IconBtn = ({
   </Pressable>
 );
 
+/* ================== Main ================== */
 export default function AdminUsersScreen() {
-  /* ===== Guard admin ===== */
+  /* Theme từ react-navigation: tự re-render khi ThemeProvider đổi */
+  const navTheme = useTheme();
+  const themeKey = navTheme?.dark ? "dark" : "light";
+  const tokens = useMemo(
+    () => ({
+      scheme: themeKey,
+      pageBg:
+        navTheme.colors?.background ?? (navTheme.dark ? "#0f1115" : "#f6f8fc"),
+      cardBg: navTheme.colors?.card ?? (navTheme.dark ? "#16181c" : "#ffffff"),
+      textPrimary:
+        navTheme.colors?.text ?? (navTheme.dark ? "#ffffff" : "#111111"),
+      textSecondary: navTheme.dark ? "#c9c9c9" : "#444444",
+      border:
+        navTheme.colors?.border ?? (navTheme.dark ? "#2e2f33" : "#dfe3ea"),
+      muted: navTheme.dark ? "#22252a" : "#f3f5f9",
+      iconMuted: navTheme.dark ? "#a1a1aa" : "#60646c",
+      tint: navTheme.colors?.primary ?? (navTheme.dark ? "#7cc0ff" : "#0a84ff"),
+    }),
+    [navTheme, themeKey]
+  );
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
+
+  // ✅ Common modal props to avoid "white flash" on close/animate
+  const commonModalProps = useMemo(
+    () => ({
+      transparent: true,
+      statusBarTranslucent: true,
+      presentationStyle: "overFullScreen",
+      hardwareAccelerated: true,
+    }),
+    []
+  );
+
+  /* Guard admin */
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin");
+  if (!isAdmin) return <Redirect href="/(tabs)" />;
 
-  /* ===== UI state / filters ===== */
+  /* UI state / filters */
   const dispatch = useDispatch();
   const {
     page = 0,
@@ -191,7 +264,7 @@ export default function AdminUsersScreen() {
     return () => clearTimeout(t);
   }, [localSearch, dispatch]);
 
-  /* ===== Data ===== */
+  /* Data */
   const { data, isFetching, refetch } = useGetUsersQuery(
     { page: page + 1, keyword, role, cccdStatus: kycFilter },
     { refetchOnMountOrArgChange: true }
@@ -217,7 +290,7 @@ export default function AdminUsersScreen() {
   const [demoteEvaluatorMut] = useDemoteEvaluatorMutation();
   const [deleteUserMut] = useDeleteUserMutation();
 
-  /* ===== local derived ===== */
+  /* Derived */
   const users = data?.users ?? [];
   const serverTotalPages = data
     ? Math.ceil((data.total || 0) / (data.pageSize || 1))
@@ -232,7 +305,7 @@ export default function AdminUsersScreen() {
     }
   }, [users]);
 
-  /* ===== common handler with Alert ===== */
+  /* Common handler */
   const handle = async (promise, successMsg) => {
     try {
       const res = await promise;
@@ -269,14 +342,13 @@ export default function AdminUsersScreen() {
     }
   };
 
-  /* ===== Modals state ===== */
-  const [edit, setEdit] = useState(null); // user object
-  const [kyc, setKyc] = useState(null); // user object for KYC review
-  const [zoom, setZoom] = useState(null); // image url
-  const [del, setDel] = useState(null); // user object
-  const [score, setScore] = useState(null); // user object (numbers)
+  /* Modals state */
+  const [edit, setEdit] = useState(null);
+  const [kyc, setKyc] = useState(null);
+  const [del, setDel] = useState(null);
+  const [score, setScore] = useState(null);
 
-  /* ===== Header filters ===== */
+  /* Header */
   const Header = (
     <View style={styles.headerWrap}>
       <View
@@ -285,58 +357,69 @@ export default function AdminUsersScreen() {
         <MaterialIcons
           name="search"
           size={18}
-          color="#777"
+          color={tokens.iconMuted}
           style={{ marginRight: 6 }}
         />
         <TextInput
           placeholder="Tìm tên / email"
+          placeholderTextColor={tokens.iconMuted}
           value={localSearch}
           onChangeText={setLocalSearch}
-          style={{ flex: 1, paddingVertical: Platform.OS === "ios" ? 8 : 4 }}
+          style={{
+            flex: 1,
+            color: tokens.textPrimary,
+            paddingVertical: Platform.OS === "ios" ? 8 : 4,
+          }}
           returnKeyType="search"
           onSubmitEditing={() => Keyboard.dismiss()}
         />
         {!!localSearch && (
           <Pressable onPress={() => setLocalSearch("")} hitSlop={12}>
-            <MaterialIcons name="close" size={18} color="#999" />
+            <MaterialIcons name="close" size={18} color={tokens.iconMuted} />
           </Pressable>
         )}
       </View>
 
-      {/* Role filter */}
       <Row style={{ marginTop: 8 }}>
         <Text style={styles.label}>Role:</Text>
         <Pressable style={styles.select} onPress={() => setRoleSheetOpen(true)}>
           <Text style={styles.selectText}>
             {role ? roleText(role) : "Tất cả"}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={20} color="#666" />
+          <MaterialIcons
+            name="arrow-drop-down"
+            size={20}
+            color={tokens.iconMuted}
+          />
         </Pressable>
 
         <View style={{ width: 12 }} />
 
-        {/* KYC filter */}
         <Text style={styles.label}>KYC:</Text>
         <Pressable style={styles.select} onPress={() => setKycSheetOpen(true)}>
           <Text style={styles.selectText}>
             {kycFilter ? KYC_LABEL[kycFilter] || "Tất cả" : "Tất cả"}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={20} color="#666" />
+          <MaterialIcons
+            name="arrow-drop-down"
+            size={20}
+            color={tokens.iconMuted}
+          />
         </Pressable>
       </Row>
     </View>
   );
 
-  /* ===== Simple bottom sheets (role / kyc) ===== */
+  /* Simple bottom sheets (role / kyc) */
   const [roleSheetOpen, setRoleSheetOpen] = useState(false);
   const [kycSheetOpen, setKycSheetOpen] = useState(false);
 
   const OptionSheet = ({ open, onClose, title, options, value, onSelect }) => (
     <Modal
       visible={open}
-      transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
+      {...commonModalProps}
     >
       <Pressable style={styles.sheetBackdrop} onPress={onClose} />
       <View style={styles.sheet}>
@@ -349,7 +432,7 @@ export default function AdminUsersScreen() {
               key={v}
               style={[
                 styles.sheetItem,
-                selected && { backgroundColor: "#f0f0f0" },
+                selected && { backgroundColor: tokens.muted },
               ]}
               onPress={() => {
                 onSelect(opt.value);
@@ -358,7 +441,7 @@ export default function AdminUsersScreen() {
             >
               <Text style={styles.sheetItemText}>{opt.label}</Text>
               {selected && (
-                <MaterialIcons name="check" size={18} color="#2e7d32" />
+                <MaterialIcons name="check" size={18} color={tokens.tint} />
               )}
             </Pressable>
           );
@@ -367,19 +450,19 @@ export default function AdminUsersScreen() {
     </Modal>
   );
 
-  /* ===== Row item ===== */
+  /* Row item */
   const UserRow = ({ u }) => {
     const isFull = !!fullMap[u._id];
 
     return (
       <View style={styles.card}>
-        {/* Top line: name + KYC + zoom btn */}
         <Row style={{ justifyContent: "space-between" }}>
           <Text numberOfLines={1} style={styles.name} selectable>
             {u.name}
           </Text>
           <Row>
             <Chip
+              styles={styles}
               label={KYC_LABEL[u.cccdStatus || "unverified"]}
               bg={KYC_BG[u.cccdStatus || "unverified"]}
             />
@@ -389,41 +472,51 @@ export default function AdminUsersScreen() {
                 name="magnify"
                 onPress={() => setKyc(u)}
                 style={{ marginLeft: 6 }}
+                color={tokens.iconMuted}
               />
             )}
           </Row>
         </Row>
 
-        {/* Email */}
         <Text numberOfLines={1} style={styles.email}>
           {u.email}
         </Text>
 
-        {/* Chips */}
         <Row style={{ flexWrap: "wrap", marginTop: 4 }}>
-          <Chip label={`Phone: ${u.phone || "-"}`} />
-          <Chip label={`Đơn: ${u.single ?? "-"}`} style={{ marginLeft: 6 }} />
-          <Chip label={`Đôi: ${u.double ?? "-"}`} style={{ marginLeft: 6 }} />
+          <Chip styles={styles} label={`Phone: ${u.phone || "-"}`} />
+          <Chip
+            styles={styles}
+            label={`Đơn: ${u.single ?? "-"}`}
+            style={{ marginLeft: 6 }}
+          />
+          <Chip
+            styles={styles}
+            label={`Đôi: ${u.double ?? "-"}`}
+            style={{ marginLeft: 6 }}
+          />
           {!!u.cccd && (
-            <Chip label={`CCCD: ${u.cccd}`} style={{ marginLeft: 6 }} />
+            <Chip
+              styles={styles}
+              label={`CCCD: ${u.cccd}`}
+              style={{ marginLeft: 6 }}
+            />
           )}
         </Row>
 
-        {/* Role + toggle */}
         <Row style={{ marginTop: 8, justifyContent: "space-between" }}>
           <Pressable style={styles.roleSelect} onPress={() => setRoleFor(u)}>
             <Text style={styles.roleText}>Role: {roleText(u.role)}</Text>
-            <MaterialIcons name="edit" size={16} color="#555" />
+            <MaterialIcons name="edit" size={16} color={tokens.iconMuted} />
           </Pressable>
 
           <Pressable
-            style={[styles.toggle, isFull && styles.toggleOn]}
+            style={styles.toggle}
             onPress={() => toggleAdminEvaluator(u._id, !isFull)}
           >
             <MaterialIcons
               name={isFull ? "check-box" : "check-box-outline-blank"}
               size={18}
-              color={isFull ? "#2e7d32" : "#555"}
+              color={isFull ? "#2e7d32" : tokens.iconMuted}
             />
             <Text style={[styles.toggleText, isFull && { color: "#2e7d32" }]}>
               Full tỉnh
@@ -431,7 +524,6 @@ export default function AdminUsersScreen() {
           </Pressable>
         </Row>
 
-        {/* Actions */}
         <Row style={{ justifyContent: "flex-end", marginTop: 8 }}>
           <IconBtn
             mc
@@ -443,6 +535,7 @@ export default function AdminUsersScreen() {
           <IconBtn
             name="edit"
             onPress={() => setEdit({ ...u })}
+            color={tokens.iconMuted}
             style={{ marginRight: 8 }}
           />
           <IconBtn name="delete" color="#d32f2f" onPress={() => setDel(u)} />
@@ -451,7 +544,7 @@ export default function AdminUsersScreen() {
     );
   };
 
-  /* ===== helper to set role (simple sheet) ===== */
+  /* helper to set role */
   const [rolePickUser, setRolePickUser] = useState(null);
   const setRoleFor = (u) => setRolePickUser(u);
   const RolePickSheet = (
@@ -474,15 +567,13 @@ export default function AdminUsersScreen() {
     />
   );
 
-  if (!isAdmin) return <Redirect href="/(tabs)" />;
-
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.pageBg }}>
+      <View style={{ flex: 1, backgroundColor: tokens.pageBg }}>
         {/* Filters header */}
         {Header}
 
-        {/* Option sheets for filters */}
+        {/* Filter sheets */}
         <OptionSheet
           open={roleSheetOpen}
           onClose={() => setRoleSheetOpen(false)}
@@ -521,23 +612,21 @@ export default function AdminUsersScreen() {
         {RolePickSheet}
 
         {/* List */}
-        {/* List (pull-to-refresh + empty-handling) */}
         <FlatList
           data={users}
           keyExtractor={(item) => String(item._id)}
           renderItem={({ item }) => <UserRow u={item} />}
+          extraData={themeKey}
           contentContainerStyle={{
             paddingHorizontal: 12,
             paddingBottom: 12,
-            flexGrow: 1, // để empty view chiếm đầy & vẫn kéo refresh được
+            flexGrow: 1,
+            backgroundColor: tokens.pageBg,
           }}
           onScrollBeginDrag={Keyboard.dismiss}
-          // ⬇️ pull-to-refresh
           refreshing={refreshing}
           onRefresh={onRefresh}
-          // iOS: offset thanh spinner nếu muốn (tùy)
           progressViewOffset={8}
-          // Khi rỗng vẫn kéo để refresh được
           ListEmptyComponent={
             <View
               style={{
@@ -550,14 +639,16 @@ export default function AdminUsersScreen() {
               {isFetching ? (
                 <ActivityIndicator />
               ) : (
-                <Text>Không có người dùng</Text>
+                <Text style={{ color: tokens.textSecondary }}>
+                  Không có người dùng
+                </Text>
               )}
             </View>
           }
         />
 
         {/* Pagination */}
-        <View style={{ paddingVertical: 8 , marginBottom: 50}}>
+        <View style={{ paddingVertical: 8, marginBottom: 50 }}>
           <PaginationRN
             page={page + 1}
             count={serverTotalPages}
@@ -567,20 +658,23 @@ export default function AdminUsersScreen() {
 
         {/* ====== Dialogs / Modals ====== */}
 
-        {/* Zoom image */}
-
         {/* KYC review */}
         <Modal
           visible={!!kyc}
           animationType="slide"
           onRequestClose={() => setKyc(null)}
+          {...commonModalProps}
         >
           {kyc && (
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: tokens.pageBg }}>
               <View style={styles.modalWrap}>
                 <Row style={{ justifyContent: "space-between" }}>
                   <Text style={styles.modalTitle}>Kiểm tra CCCD</Text>
-                  <IconBtn name="close" onPress={() => setKyc(null)} />
+                  <IconBtn
+                    name="close"
+                    color={tokens.iconMuted}
+                    onPress={() => setKyc(null)}
+                  />
                 </Row>
 
                 <View style={{ marginTop: 8 }}>
@@ -593,9 +687,8 @@ export default function AdminUsersScreen() {
                           height: 220,
                           borderRadius: 8,
                           overflow: "hidden",
-                          backgroundColor: "#fafafa",
+                          backgroundColor: tokens.muted,
                         }}
-                        onPress={() => setZoom(kyc.cccdImages?.[side])}
                       >
                         <ExpoImage
                           source={{ uri: normalizeUrl(kyc.cccdImages?.[side]) }}
@@ -609,14 +702,32 @@ export default function AdminUsersScreen() {
                   <View style={styles.infoBox}>
                     <Row style={{ marginBottom: 6 }}>
                       <Chip
+                        styles={styles}
                         label={KYC_LABEL[kyc.cccdStatus || "unverified"]}
                         bg={KYC_BG[kyc.cccdStatus || "unverified"]}
                       />
                     </Row>
-                    <InfoRow label="Họ & tên" value={kyc.name || "—"} />
-                    <InfoRow label="Ngày sinh" value={prettyDate(kyc.dob)} />
-                    <InfoRow label="Số CCCD" value={kyc.cccd || "—"} mono />
-                    <InfoRow label="Tỉnh / Thành" value={kyc.province || "—"} />
+                    <InfoRow
+                      styles={styles}
+                      label="Họ & tên"
+                      value={kyc.name || "—"}
+                    />
+                    <InfoRow
+                      styles={styles}
+                      label="Ngày sinh"
+                      value={prettyDate(kyc.dob)}
+                    />
+                    <InfoRow
+                      styles={styles}
+                      label="Số CCCD"
+                      value={kyc.cccd || "—"}
+                      mono
+                    />
+                    <InfoRow
+                      styles={styles}
+                      label="Tỉnh / Thành"
+                      value={kyc.province || "—"}
+                    />
                     {!!kyc.note && (
                       <View style={styles.noteBox}>
                         <Text style={styles.noteLabel}>Ghi chú</Text>
@@ -668,12 +779,13 @@ export default function AdminUsersScreen() {
         <Modal
           visible={!!edit}
           animationType="slide"
-          presentationStyle="fullScreen" // ✅ full màn hình, tránh layout co
-          hardwareAccelerated
           onRequestClose={() => setEdit(null)}
+          {...commonModalProps}
         >
           {!!edit && (
             <EditUserForm
+              styles={styles}
+              tokens={tokens}
               edit={edit}
               setEdit={setEdit}
               handle={handle}
@@ -687,25 +799,32 @@ export default function AdminUsersScreen() {
         {/* Delete */}
         <Modal
           visible={!!del}
-          transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setDel(null)}
+          {...commonModalProps}
         >
           <Pressable style={styles.backdrop} onPress={() => setDel(null)} />
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>Xoá người dùng?</Text>
-            <Text style={{ textAlign: "center", marginTop: 6 }}>
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 6,
+                color: tokens.textPrimary,
+              }}
+            >
               Bạn chắc chắn xoá{" "}
               <Text style={{ fontWeight: "700" }}>{del?.name}</Text> (
-              {del?.email}
-              )?
+              {del?.email})?
             </Text>
             <Row style={{ justifyContent: "flex-end", marginTop: 12 }}>
               <Pressable
                 style={[styles.btn, styles.btnGhost]}
                 onPress={() => setDel(null)}
               >
-                <Text style={[styles.btnText, { color: "#333" }]}>Huỷ</Text>
+                <Text style={[styles.btnText, { color: tokens.textPrimary }]}>
+                  Huỷ
+                </Text>
               </Pressable>
               <View style={{ width: 8 }} />
               <Pressable
@@ -729,9 +848,12 @@ export default function AdminUsersScreen() {
           visible={!!score}
           animationType="slide"
           onRequestClose={() => setScore(null)}
+          {...commonModalProps}
         >
           {!!score && (
             <UpdateScoreForm
+              styles={styles}
+              tokens={tokens}
               score={score}
               setScore={setScore}
               handle={handle}
@@ -739,33 +861,13 @@ export default function AdminUsersScreen() {
             />
           )}
         </Modal>
-
-        {/* <Modal
-          visible={!!zoom}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setZoom(null)}
-        >
-          <SafeAreaView style={{flex: 1}}>
-            <Pressable style={styles.backdrop} onPress={() => setZoom(null)} />
-            <View style={styles.zoomBox}>
-              {!!zoom && (
-                <ExpoImage
-                  source={{ uri: normalizeUrl(zoom) }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit="contain"
-                />
-              )}
-            </View>
-          </SafeAreaView>
-        </Modal> */}
       </View>
     </SafeAreaView>
   );
 }
 
 /* ===== Sub-components ===== */
-const InfoRow = ({ label, value, mono }) => (
+const InfoRow = ({ label, value, mono, styles }) => (
   <Row style={{ marginTop: 4 }}>
     <Text style={styles.infoLabel}>{label}</Text>
     <Text
@@ -780,6 +882,8 @@ const InfoRow = ({ label, value, mono }) => (
 );
 
 function EditUserForm({
+  styles,
+  tokens,
   edit,
   setEdit,
   handle,
@@ -847,37 +951,46 @@ function EditUserForm({
     });
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: styles.tokens.pageBg }}>
       <ScrollView style={styles.modalWrap}>
         <Row style={{ justifyContent: "space-between" }}>
           <Text style={styles.modalTitle}>Sửa thông tin</Text>
-          <IconBtn name="close" onPress={() => setEdit(null)} />
+          <IconBtn
+            name="close"
+            color={tokens.iconMuted}
+            onPress={() => setEdit(null)}
+          />
         </Row>
 
         <View style={{ marginTop: 8 }}>
           <TextFieldRN
+            styles={styles}
             label="Tên"
             value={model.name}
             onChangeText={(v) => setModel((m) => ({ ...m, name: v }))}
           />
           <TextFieldRN
+            styles={styles}
             label="Nickname"
             value={model.nickname}
             onChangeText={(v) => setModel((m) => ({ ...m, nickname: v }))}
           />
           <TextFieldRN
+            styles={styles}
             label="Phone"
             value={model.phone}
             onChangeText={(v) => setModel((m) => ({ ...m, phone: v }))}
             keyboardType="phone-pad"
           />
           <TextFieldRN
+            styles={styles}
             label="Email"
             value={model.email}
             onChangeText={(v) => setModel((m) => ({ ...m, email: v }))}
             keyboardType="email-address"
           />
           <TextFieldRN
+            styles={styles}
             label="CCCD (12 số)"
             value={model.cccd}
             onChangeText={(v) =>
@@ -889,17 +1002,23 @@ function EditUserForm({
             keyboardType="number-pad"
           />
           <DOBPickerRN
+            styles={styles}
+            tokens={tokens}
             label="Ngày sinh"
-            valueISO={model.dob} // lưu dạng YYYY-MM-DD để gửi API
+            valueISO={model.dob}
             onChangeISO={(iso) => setModel((m) => ({ ...m, dob: iso }))}
           />
           <SelectRN
+            styles={styles}
+            tokens={tokens}
             label="Giới tính"
             value={model.gender}
             onSelect={(v) => setModel((m) => ({ ...m, gender: v }))}
             options={GENDER_OPTIONS}
           />
           <SelectRN
+            styles={styles}
+            tokens={tokens}
             label="Tỉnh / Thành"
             value={model.province}
             onSelect={(v) => setModel((m) => ({ ...m, province: v }))}
@@ -914,21 +1033,24 @@ function EditUserForm({
             <Row>
               <Pressable
                 onPress={() => setChangePass((s) => !s)}
-                style={styles.checkbox}
+                style={{ paddingRight: 4 }}
               >
                 <MaterialIcons
                   name={changePass ? "check-box" : "check-box-outline-blank"}
                   size={18}
-                  color="#555"
+                  color={tokens.iconMuted}
                 />
               </Pressable>
-              <Text style={{ marginLeft: 6 }}>Đổi mật khẩu</Text>
+              <Text style={{ marginLeft: 6, color: styles.tokens.textPrimary }}>
+                Đổi mật khẩu
+              </Text>
             </Row>
           </Row>
 
           {changePass && (
             <View style={{ marginTop: 8 }}>
               <TextFieldRN
+                styles={styles}
                 label="Mật khẩu mới"
                 value={newPass}
                 onChangeText={setNewPass}
@@ -938,6 +1060,7 @@ function EditUserForm({
                 errorText={passTooShort ? "Tối thiểu 6 ký tự" : ""}
               />
               <TextFieldRN
+                styles={styles}
                 label="Xác nhận mật khẩu mới"
                 value={confirmPass}
                 onChangeText={setConfirmPass}
@@ -957,7 +1080,14 @@ function EditUserForm({
                     setShowConfirm(false);
                   }}
                 >
-                  <Text style={[styles.btnText, { color: "#333" }]}>Huỷ</Text>
+                  <Text
+                    style={[
+                      styles.btnText,
+                      { color: styles.tokens.textPrimary },
+                    ]}
+                  >
+                    Huỷ
+                  </Text>
                 </Pressable>
                 <View style={{ width: 8 }} />
                 <Pressable
@@ -976,13 +1106,16 @@ function EditUserForm({
             </View>
           )}
 
-          {/* Footer actions */}
           <Row style={{ justifyContent: "flex-end", marginTop: 14 }}>
             <Pressable
               style={[styles.btn, styles.btnGhost]}
               onPress={() => setEdit(null)}
             >
-              <Text style={[styles.btnText, { color: "#333" }]}>Đóng</Text>
+              <Text
+                style={[styles.btnText, { color: styles.tokens.textPrimary }]}
+              >
+                Đóng
+              </Text>
             </Pressable>
             <View style={{ width: 8 }} />
             <Pressable
@@ -999,7 +1132,14 @@ function EditUserForm({
   );
 }
 
-function UpdateScoreForm({ score, setScore, handle, updateRanking }) {
+function UpdateScoreForm({
+  styles,
+  tokens,
+  score,
+  setScore,
+  handle,
+  updateRanking,
+}) {
   const [single, setSingle] = useState(String(score.single ?? ""));
   const [double, setDouble] = useState(String(score.double ?? ""));
 
@@ -1014,21 +1154,27 @@ function UpdateScoreForm({ score, setScore, handle, updateRanking }) {
     ).then(() => setScore(null));
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: styles.tokens.pageBg }}>
       <View style={styles.modalWrap}>
         <Row style={{ justifyContent: "space-between" }}>
           <Text style={styles.modalTitle}>Cập nhật điểm</Text>
-          <IconBtn name="close" onPress={() => setScore(null)} />
+          <IconBtn
+            name="close"
+            color={tokens.iconMuted}
+            onPress={() => setScore(null)}
+          />
         </Row>
 
         <View style={{ marginTop: 8 }}>
           <TextFieldRN
+            styles={styles}
             label="Điểm đơn"
             value={single}
             onChangeText={setSingle}
             keyboardType="numeric"
           />
           <TextFieldRN
+            styles={styles}
             label="Điểm đôi"
             value={double}
             onChangeText={setDouble}
@@ -1041,7 +1187,11 @@ function UpdateScoreForm({ score, setScore, handle, updateRanking }) {
             style={[styles.btn, styles.btnGhost]}
             onPress={() => setScore(null)}
           >
-            <Text style={[styles.btnText, { color: "#333" }]}>Huỷ</Text>
+            <Text
+              style={[styles.btnText, { color: styles.tokens.textPrimary }]}
+            >
+              Huỷ
+            </Text>
           </Pressable>
           <View style={{ width: 8 }} />
           <Pressable style={[styles.btn, styles.btnPrimary]} onPress={save}>
@@ -1064,13 +1214,15 @@ function parseISOToLocal(iso) {
   if (!iso) return null;
   const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d); // local date (tránh lệch múi giờ)
+  return new Date(y, m - 1, d);
 }
 function fmtDDMMYYYY(d) {
   return `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
 }
 
 function DOBPickerRN({
+  styles,
+  tokens,
   label = "Ngày sinh",
   valueISO,
   onChangeISO,
@@ -1108,19 +1260,29 @@ function DOBPickerRN({
       <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable style={styles.fieldInput} onPress={openPicker}>
         <Text
-          style={{ flex: 1, paddingVertical: Platform.OS === "ios" ? 8 : 6 }}
+          style={{
+            flex: 1,
+            paddingVertical: Platform.OS === "ios" ? 8 : 6,
+            color: styles.tokens.textPrimary,
+          }}
         >
           {valueISO ? fmtDDMMYYYY(current) : "-- Chọn ngày --"}
         </Text>
-        <MaterialIcons name="calendar-today" size={18} color="#666" />
+        <MaterialIcons
+          name="calendar-today"
+          size={18}
+          color={tokens.iconMuted}
+        />
       </Pressable>
 
-      {/* iOS modal với picker native */}
+      {/* iOS modal */}
       <Modal
         visible={open}
-        transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setOpen(false)}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        transparent
       >
         <Pressable
           style={styles.sheetBackdrop}
@@ -1131,7 +1293,7 @@ function DOBPickerRN({
           <DateTimePicker
             value={temp}
             mode="date"
-            display="spinner" /* iOS native selector */
+            display="spinner"
             maximumDate={maxDate}
             minimumDate={minDate}
             onChange={(_, d) => d && setTemp(d)}
@@ -1149,7 +1311,11 @@ function DOBPickerRN({
               style={[styles.btn, styles.btnGhost]}
               onPress={() => setOpen(false)}
             >
-              <Text style={[styles.btnText, { color: "#333" }]}>Huỷ</Text>
+              <Text
+                style={[styles.btnText, { color: styles.tokens.textPrimary }]}
+              >
+                Huỷ
+              </Text>
             </Pressable>
             <Pressable
               style={[styles.btn, styles.btnPrimary]}
@@ -1168,8 +1334,9 @@ function DOBPickerRN({
   );
 }
 
-/* ===== Reusable RN form inputs ===== */
+/* Reusable RN form inputs */
 function TextFieldRN({
+  styles,
   label,
   value,
   onChangeText,
@@ -1188,9 +1355,14 @@ function TextFieldRN({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
+          placeholderTextColor={styles.tokens.iconMuted}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
-          style={{ flex: 1, paddingVertical: Platform.OS === "ios" ? 8 : 6 }}
+          style={{
+            flex: 1,
+            paddingVertical: Platform.OS === "ios" ? 8 : 6,
+            color: styles.tokens.textPrimary,
+          }}
         />
         {!!rightIcon && (
           <Pressable
@@ -1198,22 +1370,29 @@ function TextFieldRN({
             hitSlop={8}
             style={{ paddingHorizontal: 4 }}
           >
-            <MaterialIcons name={rightIcon} size={18} color="#666" />
+            <MaterialIcons
+              name={rightIcon}
+              size={18}
+              color={styles.tokens.iconMuted}
+            />
           </Pressable>
         )}
       </View>
-      {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
+      {!!errorText && (
+        <Text style={[styles.errorText, { color: "#d32f2f" }]}>
+          {errorText}
+        </Text>
+      )}
     </View>
   );
 }
 
-function SelectRN({ label, value, onSelect, options }) {
+function SelectRN({ styles, tokens, label, value, onSelect, options }) {
   const [open, setOpen] = useState(false);
   const currentLabel =
     options.find((o) => String(o.value) === String(value))?.label ||
     value ||
     "";
-
   const MAX_H = Math.round(Dimensions.get("window").height * 0.6);
 
   return (
@@ -1221,24 +1400,33 @@ function SelectRN({ label, value, onSelect, options }) {
       <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable style={styles.fieldInput} onPress={() => setOpen(true)}>
         <Text
-          style={{ flex: 1, paddingVertical: Platform.OS === "ios" ? 8 : 6 }}
+          style={{
+            flex: 1,
+            paddingVertical: Platform.OS === "ios" ? 8 : 6,
+            color: styles.tokens.textPrimary,
+          }}
         >
           {currentLabel || "-- Chọn --"}
         </Text>
-        <MaterialIcons name="arrow-drop-down" size={20} color="#666" />
+        <MaterialIcons
+          name="arrow-drop-down"
+          size={20}
+          color={tokens.iconMuted}
+        />
       </Pressable>
 
       <Modal
         visible={open}
-        transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setOpen(false)}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        transparent
       >
         <Pressable
           style={styles.sheetBackdrop}
           onPress={() => setOpen(false)}
         />
-
         <SafeAreaView style={[styles.sheet, { maxHeight: MAX_H }]}>
           <Text style={styles.sheetTitle}>{label}</Text>
 
@@ -1257,12 +1445,16 @@ function SelectRN({ label, value, onSelect, options }) {
                   }}
                   style={[
                     styles.sheetItem,
-                    selected && { backgroundColor: "#f0f0f0" },
+                    selected && { backgroundColor: styles.tokens.muted },
                   ]}
                 >
                   <Text style={styles.sheetItemText}>{item.label}</Text>
                   {selected && (
-                    <MaterialIcons name="check" size={18} color="#2e7d32" />
+                    <MaterialIcons
+                      name="check"
+                      size={18}
+                      color={styles.tokens.tint}
+                    />
                   )}
                 </Pressable>
               );
@@ -1274,182 +1466,201 @@ function SelectRN({ label, value, onSelect, options }) {
   );
 }
 
-/* ================== Styles ================== */
-const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 4,
-    backgroundColor: "#fff",
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-  },
-  label: { fontSize: 13, color: "#555", marginRight: 6 },
-  select: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 120,
-  },
-  selectText: { flex: 1, fontSize: 14, color: "#333" },
+/* ================== Dynamic styles ================== */
+function makeStyles(tokens) {
+  const s = StyleSheet.create({
+    tokens, // expose for children (not used by RN)
+    headerWrap: {
+      paddingHorizontal: 12,
+      paddingTop: 8,
+      paddingBottom: 4,
+      backgroundColor: tokens.cardBg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: tokens.border,
+    },
+    input: {
+      backgroundColor: tokens.cardBg,
+      borderWidth: 1,
+      borderColor: tokens.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+    },
+    label: { fontSize: 13, color: tokens.textSecondary, marginRight: 6 },
+    select: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: tokens.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      minWidth: 120,
+    },
+    selectText: { flex: 1, fontSize: 14, color: tokens.textPrimary },
 
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  chipText: { fontSize: 12, color: "#222" },
+    chip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+    chipText: { fontSize: 12, color: "#fff", fontWeight: "700" },
 
-  card: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#eee",
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 8,
-  },
-  name: { fontSize: 16, fontWeight: "700", flexShrink: 1 },
-  email: { fontSize: 13, color: "#666", marginTop: 2 },
+    card: {
+      backgroundColor: tokens.cardBg,
+      borderWidth: 1,
+      borderColor: tokens.border,
+      borderRadius: 12,
+      padding: 10,
+      marginTop: 8,
+      shadowColor: "#000",
+      shadowOpacity: tokens.scheme === "dark" ? 0 : 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: tokens.scheme === "dark" ? 0 : 2,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: "700",
+      flexShrink: 1,
+      color: tokens.textPrimary,
+    },
+    email: { fontSize: 13, color: tokens.textSecondary, marginTop: 2 },
 
-  roleSelect: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  roleText: { fontSize: 13, color: "#333", marginRight: 6 },
+    roleSelect: {
+      borderWidth: 1,
+      borderColor: tokens.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    roleText: { fontSize: 13, color: tokens.textPrimary, marginRight: 6 },
 
-  toggle: { flexDirection: "row", alignItems: "center" },
-  toggleOn: {},
-  toggleText: { marginLeft: 6, color: "#555" },
+    toggle: { flexDirection: "row", alignItems: "center" },
+    toggleText: { marginLeft: 6, color: tokens.textSecondary },
 
-  iconBtn: { padding: 6, borderRadius: 8 },
+    backdrop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+    },
 
-  backdrop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  zoomBox: {
-    position: "absolute",
-    top: 40,
-    left: 12,
-    right: 12,
-    bottom: 40,
-    backgroundColor: "#000",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
+    modalWrap: {
+      flex: 1,
+      backgroundColor: tokens.cardBg,
+      padding: 12,
+      paddingTop: 16,
+    },
+    modalTitle: { fontSize: 18, fontWeight: "700", color: tokens.textPrimary },
 
-  modalWrap: { flex: 1, backgroundColor: "#fff", padding: 12, paddingTop: 16 },
-  modalTitle: { fontSize: 18, fontWeight: "700" },
+    infoBox: {
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: tokens.border,
+      borderRadius: 8,
+      padding: 10,
+      backgroundColor: tokens.cardBg,
+    },
+    infoLabel: { width: 120, color: tokens.textSecondary, fontSize: 13 },
+    infoValue: {
+      fontWeight: "600",
+      fontSize: 14,
+      flexShrink: 1,
+      color: tokens.textPrimary,
+    },
 
-  infoBox: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 10,
-  },
-  infoLabel: { width: 120, color: "#666", fontSize: 13 },
-  infoValue: { fontWeight: "600", fontSize: 14, flexShrink: 1 },
+    noteBox: {
+      marginTop: 8,
+      backgroundColor: tokens.muted,
+      borderRadius: 8,
+      padding: 8,
+    },
+    noteLabel: { fontSize: 12, color: tokens.textSecondary },
+    noteText: { fontSize: 14, color: tokens.textPrimary, marginTop: 2 },
 
-  noteBox: {
-    marginTop: 8,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 8,
-    padding: 8,
-  },
-  noteLabel: { fontSize: 12, color: "#666" },
-  noteText: { fontSize: 14, color: "#333", marginTop: 2 },
+    btn: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    btnText: { color: "#fff", fontWeight: "700", marginLeft: 6 },
+    btnPrimary: { backgroundColor: "#1976d2" },
+    btnSecondary: { backgroundColor: "#9c27b0" },
+    btnSuccess: { backgroundColor: "#2e7d32" },
+    btnDanger: { backgroundColor: "#d32f2f" },
+    btnGhost: { backgroundColor: tokens.muted },
 
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  btnText: { color: "#fff", fontWeight: "700", marginLeft: 6 },
-  btnPrimary: { backgroundColor: "#1976d2" },
-  btnSecondary: { backgroundColor: "#9c27b0" },
-  btnSuccess: { backgroundColor: "#2e7d32" },
-  btnDanger: { backgroundColor: "#d32f2f" },
-  btnGhost: { backgroundColor: "#eee" },
+    confirmBox: {
+      position: "absolute",
+      left: 20,
+      right: 20,
+      top: "35%",
+      backgroundColor: tokens.cardBg,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: tokens.border,
+    },
+    confirmTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      textAlign: "center",
+      color: tokens.textPrimary,
+    },
 
-  confirmBox: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: "35%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  confirmTitle: { fontSize: 16, fontWeight: "700", textAlign: "center" },
+    sheetBackdrop: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.35)",
+    },
+    sheet: {
+      position: "absolute",
+      left: 12,
+      right: 12,
+      bottom: 16,
+      backgroundColor: tokens.cardBg,
+      borderRadius: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 8,
+      borderWidth: 1,
+      borderColor: tokens.border,
+    },
+    sheetTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      paddingHorizontal: 8,
+      paddingBottom: 8,
+      color: tokens.textPrimary,
+    },
+    sheetItem: {
+      paddingHorizontal: 10,
+      paddingVertical: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: tokens.border,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    sheetItemText: { fontSize: 15, color: tokens.textPrimary },
 
-  sheetBackdrop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  sheet: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  sheetItem: {
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#eee",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sheetItemText: { fontSize: 15, color: "#333" },
-
-  fieldLabel: { fontSize: 12, color: "#666" },
-  fieldInput: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginTop: 6,
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  errorText: { color: "#d32f2f", fontSize: 12, marginTop: 2 },
-});
+    fieldLabel: { fontSize: 12, color: tokens.textSecondary },
+    fieldInput: {
+      borderWidth: 1,
+      borderColor: tokens.border,
+      backgroundColor: tokens.cardBg,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      marginTop: 6,
+      minHeight: 40,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    errorText: { fontSize: 12, marginTop: 2 },
+  });
+  return s;
+}

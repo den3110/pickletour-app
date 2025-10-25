@@ -11,23 +11,32 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image"; // 👈 expo-image (có cache)
 import InfoModal from "./InfoModal";
+import { useTheme } from "@react-navigation/native";
 
 /* ============================
  * THEME TOKENS
  * ============================ */
 function useThemeTokens() {
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#cbd5e1" : "#475569";
-  const muted = scheme === "dark" ? "#9aa4b2" : "#666";
+  // Ưu tiên theme từ react-navigation; fallback hệ thống nếu app chưa set
+  const navTheme = useTheme?.();
+  const sysScheme = useColorScheme?.() ?? "light";
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const scheme = isDark ? "dark" : "light";
 
-  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
-  const thumbBg = scheme === "dark" ? "#1e293b" : "#f0f0f0";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const textPrimary =
+    navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a");
+  const textSecondary = isDark ? "#cbd5e1" : "#475569";
+  const muted = isDark ? "#9aa4b2" : "#666";
 
-  const badgeNeutralBg = scheme === "dark" ? "#334155" : "#e0e0e0";
-  const badgeNeutralText = scheme === "dark" ? "#e2e8f0" : "#475569";
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
+  const cardBorder =
+    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e5e7eb");
+  const thumbBg = isDark ? "#1e293b" : "#f0f0f0";
+
+  const badgeNeutralBg = isDark ? "#334155" : "#e0e0e0";
+  const badgeNeutralText = isDark ? "#e2e8f0" : "#475569";
 
   return {
     scheme,

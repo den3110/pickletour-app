@@ -27,6 +27,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
+import { useTheme } from "@react-navigation/native";
 
 import { useGetRankingsQuery } from "@/slices/rankingsApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
@@ -54,32 +55,38 @@ const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
 
 /* ================= Theme ================= */
 function useThemeColors() {
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#fff" : "#111";
-  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#333";
-  const cardBg = scheme === "dark" ? "#111214" : "#fff";
-  const pageBg = scheme === "dark" ? "#0e0f12" : "#fafafa";
-  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
-  const softBorder = scheme === "dark" ? "#3a3b40" : "#cfd6e4";
-  const border = scheme === "dark" ? "#3a3b40" : "#e0e0e0";
-  const skeleton =
-    scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-  const muted = scheme === "dark" ? "#9aa0a6" : "#666";
-  const inputBg = scheme === "dark" ? "#1e1f23" : "#fff";
-  const inputBorder = scheme === "dark" ? "#3a3b40" : "#ddd";
-  const stickyBg = scheme === "dark" ? "#111214" : "#fafafa";
-  const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
-  const ghostText = scheme === "dark" ? "#fff" : "#111";
-  const outlineNeutral = scheme === "dark" ? "#bbb" : "#555";
+  const navTheme = useTheme();
+  const sysScheme = useColorScheme?.() || "light";
+  // ✅ Ưu tiên app theme; chỉ fallback hệ thống nếu app không set
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
 
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const textPrimary = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#000");
+  const textSecondary = isDark ? "#d1d1d1" : "#333";
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
+  const pageBg =
+    navTheme?.colors?.background ?? (isDark ? "#0e0f12" : "#fafafa");
+  const softBg = isDark ? "#1e1f23" : "#eef1f6";
+  const softBorder =
+    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#cfd6e4");
+  const border = navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
+  const skeleton = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+  const muted = isDark ? "#9aa0a6" : "#6b7280";
+  const inputBg = isDark ? "#1e1f23" : "#ffffff";
+  const inputBorder = isDark ? "#3a3b40" : "#ddd";
+  // dùng màu card để sticky match với header/card theo theme (như Dashboard)
+  const stickyBg = cardBg;
+  const ghostBg = isDark ? "#2a2c31" : "#eeeeee";
+  const ghostText = isDark ? "#ffffff" : "#111111";
+  const outlineNeutral = isDark ? "#bbbbbb" : "#555555";
   // error box
-  const errBg = scheme === "dark" ? "#3a1f21" : "#ffebee";
-  const errBorder = scheme === "dark" ? "#6e2a34" : "#ffcdd2";
-  const errText = scheme === "dark" ? "#ffb3b8" : "#b71c1c";
+  const errBg = isDark ? "#3a1f21" : "#ffebee";
+  const errBorder = isDark ? "#6e2a34" : "#ffcdd2";
+  const errText = isDark ? "#ffb3b8" : "#b71c1c";
 
   return {
-    scheme,
+    scheme: isDark ? "dark" : "light",
     tint,
     textPrimary,
     textSecondary,
@@ -738,7 +745,7 @@ export default function RankingListScreen() {
     },
     [dispatch, page]
   );
-
+  const themeKey = C.scheme; // "light" | "dark"  -> đổi khi theme đổi
   // render item
   const renderItem = useCallback(
     ({ item, index }) => {
@@ -878,7 +885,7 @@ export default function RankingListScreen() {
         </FlameCard>
       );
     },
-    [me, scorePatch, cccdPatch, podiumByUser]
+    [me, scorePatch, cccdPatch, podiumByUser, themeKey]
   );
 
   // skeleton flags

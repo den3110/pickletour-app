@@ -1,3 +1,4 @@
+// app/_layout.tsx
 if (__DEV__) {
   require("../dev/reactotron");
   require("../dev/ws-logger");
@@ -9,7 +10,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack, useRootNavigationState } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
@@ -18,6 +19,7 @@ import {
   AppState,
   InteractionManager,
   Platform,
+  DeviceEventEmitter,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -35,12 +37,12 @@ import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import Toast from "react-native-toast-message";
+import * as SecureStore from "expo-secure-store";
 
 const SPLASH_FAILSAFE_MS = 1500;
+const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
 
 SplashScreen.preventAutoHideAsync().catch(() => {}); // chỉ 1 lần
-
-
 
 /* ===================== THEME ONLY ===================== */
 const BRAND_LIGHT = "#1976d2";
@@ -88,7 +90,6 @@ function Boot({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // Trong lúc boot vẫn render view riêng, KHÔNG ảnh hưởng onLayout của root
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -100,12 +101,77 @@ function Boot({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  // 1) Scheme hệ thống (từ hook hiện tại của bạn)
+  const systemScheme = useColorScheme(); // "light" | "dark"
+  // 2) Pref đọc từ SecureStore
+  const [prefTheme, setPrefTheme] = React.useState<"system" | "light" | "dark">(
+    "system"
+  );
 
-  // chọn theme theo hệ thống
-  const navTheme = isDark ? AppDarkTheme : AppLightTheme;
+  // 🔄 Hiển thị overlay khi đổi theme
+  const [themeApplying, setThemeApplying] = React.useState(false);
+
+  // Đọc PREF_THEME lúc boot + khi app trở lại foreground
+  const loadPrefTheme = React.useCallback(async () => {
+    try {
+      const t = (await SecureStore.getItemAsync(PREF_THEME_KEY)) as
+        | "system"
+        | "light"
+        | "dark"
+        | null;
+      setPrefTheme(t || "system");
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    loadPrefTheme();
+  }, [loadPrefTheme]);
+
+  React.useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") loadPrefTheme();
+    });
+    return () => sub.remove();
+  }, [loadPrefTheme]);
+
+  // ✅ Lắng nghe đổi theme tức thì (runtime) + bật overlay
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "theme:changed",
+      async (mode: "system" | "light" | "dark") => {
+        setThemeApplying(true);
+        setPrefTheme(mode);
+        try {
+          await SecureStore.setItemAsync(PREF_THEME_KEY, mode);
+        } catch {}
+      }
+    );
+    return () => sub.remove();
+  }, []);
+
+  // 3) Resolve: nếu pref = system -> dùng systemScheme, ngược lại dùng pref
+  const resolvedScheme =
+    prefTheme === "system" ? systemScheme : (prefTheme as "light" | "dark");
+  const isDark = resolvedScheme === "dark";
+
+  const navTheme = React.useMemo(
+    () => (isDark ? AppDarkTheme : AppLightTheme),
+    [isDark]
+  );
   const bg = navTheme.colors.background;
+
+  // Khi theme đã re-render xong => tắt overlay + thông báo cho màn cài đặt
+  React.useEffect(() => {
+    if (themeApplying) {
+      // chờ 1 frame + 200ms để chắc chắn header/stack re-paint
+      requestAnimationFrame(() => {
+        const t = setTimeout(() => {
+          setThemeApplying(false);
+          DeviceEventEmitter.emit("theme:applied");
+        }, 200);
+        return () => clearTimeout(t);
+      });
+    }
+  }, [navTheme, themeApplying]);
 
   const [fontsLoaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -128,17 +194,14 @@ export default function RootLayout() {
     setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 400);
   }, []);
 
-  // gọi khi view root layout xong frame đầu (onLayout là đủ)
   const onLayoutRoot = React.useCallback(() => {
     if (!firstFrameDone) setFirstFrameDone(true);
-  }, []);
+  }, [firstFrameDone]);
 
-  // ✅ Ẩn splash: chỉ cần frame đầu + font sẵn sàng (fail-open)
   React.useEffect(() => {
     if (firstFrameDone && fontsReady) hideSplashSafe();
   }, [firstFrameDone, fontsReady, hideSplashSafe]);
 
-  // iOS: khi active lại mà chưa hide (hiếm), ép hide
   React.useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active" && !hiddenRef.current) hideSplashSafe();
@@ -150,25 +213,22 @@ export default function RootLayout() {
   const pendingUrlRef = React.useRef<string | null>(null);
   const lastHandledIdRef = React.useRef<string | null>(null);
 
-  // helper: rút URL từ payload
   const extractUrl = (n?: Notifications.Notification | null) => {
     const data: any = n?.request?.content?.data ?? {};
     return data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null);
   };
 
-  // chỉ điều hướng khi splash đã hide và nav đã render
   const navigateIfReady = React.useCallback(() => {
-    if (!hiddenRef.current) return; // đợi hide xong
+    if (!hiddenRef.current) return;
     const url = pendingUrlRef.current;
     if (!url) return;
     const { router } = require("expo-router");
     InteractionManager.runAfterInteractions(() => {
-      router.replace(url); // replace để tránh stack kỳ lạ lúc cold-start
+      router.replace(url);
       pendingUrlRef.current = null;
     });
   }, []);
 
-  // Đăng ký listener NGAY khi mount (không chờ navReady)
   React.useEffect(() => {
     let sub: Notifications.Subscription | null = null;
 
@@ -179,7 +239,7 @@ export default function RootLayout() {
       if (id && id !== lastHandledIdRef.current) {
         lastHandledIdRef.current = id;
         pendingUrlRef.current = extractUrl(n);
-        navigateIfReady(); // thử điều hướng nếu đã hide
+        navigateIfReady();
       }
     })();
 
@@ -197,7 +257,6 @@ export default function RootLayout() {
     };
   }, [navigateIfReady]);
 
-  // khi vừa hide xong → điều hướng nếu có pending url
   React.useEffect(() => {
     if (hiddenRef.current) navigateIfReady();
   }, [firstFrameDone, fontsReady, navigateIfReady]);
@@ -419,22 +478,34 @@ export default function RootLayout() {
                         />
                       </Stack>
 
-                      {/* ✅ StatusBar được cấu hình tốt hơn cho dark/light theme */}
+                      {/* ✅ StatusBar khớp theo theme đã resolve */}
                       <StatusBar
-                        // "light" = chữ trắng (dùng cho nền tối)
-                        // "dark" = chữ đen (dùng cho nền sáng)
-                        // "auto" = tự động theo theme hệ thống
                         style={isDark ? "light" : "dark"}
-                        // backgroundColor chỉ hoạt động trên Android
-                        // iOS sẽ trong suốt và lấy màu từ SafeAreaView
                         backgroundColor={bg}
-                        // Thêm animated để transition mượt khi đổi theme
-                        animated={true}
-
-                        // translucent cho phép content hiển thị phía sau status bar
-                        // Nếu bạn muốn status bar trong suốt trên Android, bật option này
-                        // translucent={Platform.OS === 'android'}
+                        animated
                       />
+
+                      {/* 🔄 Overlay khi đang áp dụng theme */}
+                      {themeApplying && (
+                        <View
+                          pointerEvents="auto"
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          <ActivityIndicator
+                            size="large"
+                            color={navTheme.colors.primary}
+                          />
+                        </View>
+                      )}
                     </ThemeProvider>
                   </View>
                 </SafeAreaView>

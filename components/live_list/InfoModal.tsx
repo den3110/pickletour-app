@@ -16,6 +16,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
+import { useTheme } from "@react-navigation/native";
 
 const { height } = Dimensions.get("window");
 
@@ -23,18 +24,26 @@ const { height } = Dimensions.get("window");
  * THEME TOKENS
  * ============================ */
 function useThemeTokens() {
-  const scheme = useColorScheme() ?? "light";
+  // Ưu tiên theme từ react-navigation; fallback hệ thống
+  const navTheme = useTheme?.();
+  const sysScheme = useColorScheme?.() ?? "light";
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+  const scheme = isDark ? "dark" : "light";
 
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#cbd5e1" : "#475569";
-  const muted = scheme === "dark" ? "#9aa4b2" : "#666";
+  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const textPrimary =
+    navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a");
+  const textSecondary = isDark ? "#cbd5e1" : "#475569";
+  const muted = isDark ? "#9aa4b2" : "#666";
 
-  const sheetBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const sheetBorder = scheme === "dark" ? "#3a3b40" : "#e0e0e0";
-  const handle = scheme === "dark" ? "#6b7280" : "#ddd";
+  // Dùng màu 'card' & 'border' của navigation cho sheet để đồng bộ toàn app
+  const sheetBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
+  const sheetBorder =
+    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
+  const handle = isDark ? "#6b7280" : "#ddd";
 
-  const softBg = scheme === "dark" ? "#1e1f23" : "#eef3f8";
+  const softBg = isDark ? "#1e1f23" : "#eef3f8";
 
   return {
     scheme,

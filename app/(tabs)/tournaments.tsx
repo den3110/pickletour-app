@@ -6,9 +6,9 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Modal,
   Platform,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +20,9 @@ import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { usePlatform } from "@/hooks/usePlatform";
 import { useTheme } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+/* ✅ New: preview viewer dùng react-native-image-viewing + Expo Image cache */
+import ImageView from "react-native-image-viewing";
 
 const SKELETON_COUNT = 6;
 const BANNER_RATIO = 16 / 9; // Ảnh đầu card tỉ lệ 16:9
@@ -248,7 +251,7 @@ export default function TournamentDashboardScreen() {
     }
   };
 
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null); // string | null
 
   const filtered = useMemo(() => {
     const list = Array.isArray(tournaments) ? tournaments : [];
@@ -388,8 +391,34 @@ export default function TournamentDashboardScreen() {
     []
   );
 
+  /* ✅ Viewer: dùng react-native-image-viewing + Expo Image làm ImageComponent */
+  const normalizedPreview =
+    normalizeUrl(preview) ||
+    "https://dummyimage.com/1200x675/cccccc/ffffff&text=Preview";
+
+  // Map resizeMode -> contentFit cho ExpoImage để vẫn tương thích với viewer
+  const CachedImage = (props) => {
+    const { resizeMode, ...rest } = props || {};
+    const fit =
+      resizeMode === "contain"
+        ? "contain"
+        : resizeMode === "cover"
+        ? "cover"
+        : "cover";
+    return (
+      <ExpoImage
+        {...rest}
+        contentFit={fit}
+        cachePolicy="memory-disk"
+        transition={120}
+      />
+    );
+  };
+
+  const viewerImages = [{ uri: normalizedPreview }];
+
   return (
-    <>
+    <SafeAreaView style={{ flex: 1 }}>
       <View
         style={[
           styles.screen,
@@ -486,52 +515,20 @@ export default function TournamentDashboardScreen() {
             )}
           </>
         )}
-
-        {/* Preview modal */}
-        <Modal
+        <ImageView
+          images={viewerImages}
+          imageIndex={0}
           visible={!!preview}
-          transparent
-          animationType="fade"
           onRequestClose={() => setPreview(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <Pressable style={{ flex: 1 }} onPress={() => setPreview(null)} />
-            <View
-              style={[
-                styles.modalCard,
-                {
-                  backgroundColor: t.colors.card,
-                  borderColor: t.colors.border,
-                },
-              ]}
-            >
-              <Pressable
-                onPress={() => setPreview(null)}
-                style={styles.closeBtn}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>×</Text>
-              </Pressable>
-
-              <ExpoImage
-                source={
-                  normalizeUrl(preview) ||
-                  "https://dummyimage.com/1200x675/cccccc/ffffff&text=Preview"
-                }
-                contentFit="contain"
-                style={{
-                  width: "100%",
-                  aspectRatio: BANNER_RATIO,
-                  borderRadius: 12,
-                }}
-                transition={150}
-                cachePolicy="memory-disk"
-              />
-            </View>
-            <Pressable style={{ flex: 1 }} onPress={() => setPreview(null)} />
-          </View>
-        </Modal>
+          swipeToCloseEnabled
+          doubleTapToZoomEnabled
+          backgroundColor="rgba(0,0,0,0.95)"
+          /* Dùng Expo Image để cache */
+          ImageComponent={CachedImage}
+        />
+        {/* ✅ Preview image viewer */}
       </View>
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -699,30 +696,18 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700" },
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   btnTextWhite: { color: "#fff", fontWeight: "700" },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 560,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 12,
-  },
-  closeBtn: {
+
+  /* Close ở header của viewer */
+  viewerClose: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 14,
+    right: 14,
     backgroundColor: "rgba(0,0,0,0.6)",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 2,
+    zIndex: 10,
   },
 });

@@ -1,8 +1,10 @@
+// Hero.jsx — cập nhật ImageViewing theo theme (bg & text)
+
 import { useGetLatestAssessmentQuery } from "@/slices/assessmentsApiSlice";
 import { useGetHeroContentQuery } from "@/slices/cmsApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { router } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Image,
   Pressable,
@@ -13,7 +15,9 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useSelector } from "react-redux";
-import NativeTest from "./NativeTest";
+import ImageViewing from "react-native-image-viewing";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 
 const FALLBACK = {
   title: "Kết nối cộng đồng & quản lý giải đấu thể thao",
@@ -39,7 +43,7 @@ const SkeletonBar = ({ w = "100%", h = 20, r = 8, style = {} }) => (
 function normalizeUri(url) {
   try {
     if (!url) return undefined;
-    const lan = process.env.EXPO_PUBLIC_LAN_IP; // vd: "192.168.0.105"
+    const lan = process.env.EXPO_PUBLIC_LAN_IP;
     if (!lan) return url;
     return url.replace(/localhost(\:\d+)?/i, `${lan}$1`);
   } catch {
@@ -87,13 +91,22 @@ function CTAButton({
 }
 
 export default function Hero() {
-  const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#fff" : "#111";
-  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#333";
-  const cardBg = scheme === "dark" ? "#111214" : "#f5f7fa";
-  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
-  const softBorder = scheme === "dark" ? "#3a3b40" : "#cfd6e4";
+  const theme = useTheme();
+  const isDark = !!theme?.dark;
+  const tint = theme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const textPrimary = theme?.colors?.text ?? (isDark ? "#fff" : "#111");
+  const textSecondary = isDark ? "#d1d1d1" : "#333";
+  const cardBg = theme?.colors?.card ?? (isDark ? "#111214" : "#f5f7fa");
+  const softBg = isDark ? "#1e1f23" : "#eef1f6";
+  const softBorder = isDark ? "#3a3b40" : "#cfd6e4";
+
+  // 🆕 màu cho viewer theo theme (đồng bộ với nav theme)
+  const overlayBg = isDark ? "rgba(0,0,0,0.98)" : "rgba(255,255,255,0.98)";
+  const overlayFg = isDark ? "#fff" : "#111";
+  const overlayChromeBg = isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.06)";
+  const overlayFooterBg = isDark
+    ? "rgba(0,0,0,0.35)"
+    : "rgba(255,255,255,0.72)";
 
   const { userInfo } = useSelector((s) => s.auth);
   const isLoggedIn = !!userInfo;
@@ -109,7 +122,7 @@ export default function Hero() {
   } = useGetHeroContentQuery();
 
   const heroData = useMemo(() => {
-    if (heroLoading) return null; // show skeleton
+    if (heroLoading) return null;
     const d = heroError ? {} : heroRes || {};
     return {
       title: d.title || FALLBACK.title,
@@ -130,22 +143,30 @@ export default function Hero() {
   const needKyc =
     isLoggedIn && (userInfo?.cccdStatus || "unverified") !== "verified";
 
-  // Số CTA để quyết định full-width khi chỉ có 1 nút
   let ctaCount = 0;
   if (!isLoggedIn) ctaCount = 2;
   else {
     if (needSelfAssess) ctaCount++;
     if (needKyc) ctaCount++;
-    if (!needSelfAssess && !needKyc) ctaCount++; // Khám phá giải đấu
+    if (!needSelfAssess && !needKyc) ctaCount++;
   }
   const isSingleCta = ctaCount === 1;
 
   const uri = normalizeUri(heroData?.imageUrl);
 
+  // 🆕 state cho ImageViewing
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const viewerImages = useMemo(
+    () =>
+      uri
+        ? [{ uri: normalizeUrl(uri) }]
+        : [require("@/assets/images/hero.jpg")],
+    [uri]
+  );
+
   return (
     <View style={[styles.section, { backgroundColor: cardBg }]}>
       <View style={styles.container}>
-        {/* <NativeTest /> */}
         {/* Text */}
         <View style={styles.left}>
           {heroData ? (
@@ -263,34 +284,64 @@ export default function Hero() {
         <View style={styles.right}>
           <View style={styles.imageWrap}>
             {heroData ? (
-              uri ? (
-                <ExpoImage
-                  source={normalizeUrl(uri)}
-                  accessibilityLabel={heroData.imageAlt?.replace(
-                    "localhost",
-                    "192.168.0.105"
-                  )}
-                  style={styles.image}
-                  contentFit="cover"
-                  transition={150}
-                  cachePolicy="memory-disk"
-                />
-              ) : (
-                <ExpoImage
-                  source={require("@/assets/images/hero.jpg")}
-                  accessibilityLabel={heroData.imageAlt}
-                  style={styles.image}
-                  contentFit="cover"
-                  transition={150}
-                  cachePolicy="memory-disk"
-                />
-              )
+              <Pressable
+                onPress={() => setViewerVisible(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={
+                  heroData.imageAlt?.replace("localhost", "192.168.0.105") ||
+                  "Xem ảnh"
+                }
+                style={{ flex: 1 }}
+              >
+                {uri ? (
+                  <ExpoImage
+                    source={normalizeUrl(uri)}
+                    accessibilityLabel={heroData.imageAlt?.replace(
+                      "localhost",
+                      "192.168.0.105"
+                    )}
+                    style={styles.image}
+                    contentFit="cover"
+                    transition={150}
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <ExpoImage
+                    source={require("@/assets/images/hero.jpg")}
+                    accessibilityLabel={heroData.imageAlt}
+                    style={styles.image}
+                    contentFit="cover"
+                    transition={150}
+                    cachePolicy="memory-disk"
+                  />
+                )}
+              </Pressable>
             ) : (
               <View style={styles.imageSkeleton} />
             )}
           </View>
         </View>
       </View>
+
+      {/* ImageViewing overlay theo theme */}
+      <ImageViewing
+        images={viewerImages}
+        imageIndex={0}
+        visible={viewerVisible}
+        onRequestClose={() => setViewerVisible(false)}
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
+        backgroundColor={overlayBg}
+        FooterComponent={() => (
+          <View
+            style={[styles.viewerFooter, { backgroundColor: overlayFooterBg }]}
+          >
+            <Text style={[styles.viewerCaption, { color: overlayFg }]}>
+              {heroData?.imageAlt || "Hình ảnh"}
+            </Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
@@ -316,7 +367,7 @@ const styles = StyleSheet.create({
     minWidth: 160,
     alignItems: "center",
   },
-  btnFull: { width: "100%" }, // 1 CTA -> full width
+  btnFull: { width: "100%" },
   btnTextPrimary: {
     color: "#fff",
     fontWeight: "700",
@@ -338,4 +389,30 @@ const styles = StyleSheet.create({
   },
   image: { width: "100%", height: "100%" },
   imageSkeleton: { flex: 1, backgroundColor: "rgba(0,0,0,0.08)" },
+
+  // viewer styles
+  viewerHeader: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    alignItems: "flex-end",
+  },
+  closeBtn: {
+    borderRadius: 18,
+    padding: 8,
+  },
+  viewerFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  viewerCaption: {
+    fontSize: 14,
+  },
 });

@@ -47,6 +47,7 @@ import ManageRefereesSheet from "@/components/sheets/ManageRefereesSheet";
 import AssignCourtSheet from "@/components/sheets/AssignCourtSheet";
 import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
+import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
 
 /* ---------------- helpers ---------------- */
 const TYPE_LABEL = (t) => {
@@ -1018,6 +1019,10 @@ export default function ManageScreen() {
     open: false,
     bracket: null,
   });
+  const [liveSetupSheet, setLiveSetupSheet] = useState({
+    open: false,
+    bracket: null,
+  });
 
   /* ----------- small UI (THEMED) ----------- */
   const Pill = ({ label, kind = "default" }) => {
@@ -1398,7 +1403,11 @@ export default function ManageScreen() {
             label="Quản lý sân"
             onPress={() => setCourtMgrSheet({ open: true, bracket: b })}
           />
-
+          <MiniChipBtn
+            icon="settings"
+            label="Thiết lập LIVE"
+            onPress={() => setLiveSetupSheet({ open: true, bracket: b })}
+          />
           <Pill label={TYPE_LABEL(b?.type)} />
           {typeof b?.stage === "number" ? (
             <Pill label={`Stage ${b.stage}`} />
@@ -1854,6 +1863,13 @@ export default function ManageScreen() {
           bracketId={String(courtMgrSheet.bracket?._id || "")}
           bracketName={courtMgrSheet.bracket?.name}
           tournamentName={tour?.name}
+        />
+        <LiveSetupSheet
+          open={liveSetupSheet.open}
+          onClose={() => setLiveSetupSheet({ open: false, bracket: null })}
+          tournamentId={tid}
+          bracketId={String(liveSetupSheet.bracket?._id || "")}
+          bracketName={liveSetupSheet.bracket?.name}
         />
       </View>
     </View>

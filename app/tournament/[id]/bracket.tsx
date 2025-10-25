@@ -19,7 +19,7 @@ import {
   RefreshControl,
 } from "react-native";
 import PropTypes from "prop-types";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useTheme, useColorScheme } from "@react-navigation/native";
 import WebViewComp from "react-native-webview";
 import { useSelector } from "react-redux";
 // ====== RTK Query (điều chỉnh alias cho phù hợp dự án RN của bạn) ======
@@ -41,6 +41,46 @@ import {
 } from "@gorhom/bottom-sheet";
 import Ripple from "react-native-material-ripple";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+/* ---------- Theme tokens (giống DashboardScreen) ---------- */
+function useTokens() {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (dark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (dark ? "#f7f7f7" : "#111");
+  const card = navTheme?.colors?.card ?? (dark ? "#16181c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (dark ? "#2e2f33" : "#e4e8ef");
+  const background =
+    navTheme?.colors?.background ?? (dark ? "#0b0d10" : "#f5f7fb");
+
+  return {
+    dark,
+    colors: { primary, text, card, border, background },
+
+    muted: dark ? "#9aa0a6" : "#6b7280",
+    subtext: dark ? "#c9c9c9" : "#555",
+    skeletonBase: dark ? "#22262c" : "#e9eef5",
+    headerBg: dark ? "#101418" : "#eef3f7",
+    divider: dark ? "#2a2e33" : "#e5e7eb",
+
+    chipInfoBg: dark ? "#1f2937" : "#eef2f7",
+    chipInfoFg: dark ? "#e5e7eb" : "#263238",
+    chipInfoBd: dark ? "#334155" : "#e2e8f0",
+
+    chipErrBg: dark ? "#3b0d0d" : "#fee2e2",
+    chipErrFg: dark ? "#fecaca" : "#991b1b",
+    chipErrBd: dark ? "#7f1d1d" : "#fecaca",
+
+    chipInfo2Bg: dark ? "#0f2536" : "#e0f2fe",
+    chipInfo2Fg: dark ? "#93c5fd" : "#075985",
+    chipInfo2Bd: dark ? "#1e3a5f" : "#bae6fd",
+
+    success: dark ? "#22c55e" : "#16a34a",
+  };
+}
 
 /* ===================== Helpers (names) ===================== */
 // (giữ nguyên các helper cũ để không ảnh hưởng nơi khác nếu còn dùng)
@@ -356,6 +396,7 @@ const courtName = (m) => m?.venue?.name || m?.court?.name || m?.court || "";
 const getVideoUrl = (m) =>
   m?.streamUrl || m?.videoUrl || m?.stream?.url || m?.broadcast?.url || null;
 const hasVideo = (m) => !!getVideoUrl(m);
+// trạng thái vẫn giữ màu đặc thù để phân biệt nhanh
 const statusColors = (m) => {
   const st = String(m?.status || "").toLowerCase();
   if (st === "finished") return { bg: "#2e7d32", fg: "#fff", key: "done" };
@@ -393,7 +434,7 @@ function computeRightScore(m) {
     return live ? "LIVE" : "";
   }
 
-  // 🆕 Khi tỉ số set đang/đã là 1–0 (hoặc 0–1) → ưu tiên hiện điểm game hiện tại
+  // Khi tỉ số set đang/đã là 1–0 (hoặc 0–1) → ưu tiên điểm game hiện tại
   if ((A === 1 && B === 0) || (A === 0 && B === 1)) {
     if (Number.isFinite(last?.a) && Number.isFinite(last?.b))
       return `${last.a} – ${last.b}`;
@@ -817,7 +858,7 @@ function scoreLabel(m) {
   const st = String(m.status || "").toLowerCase();
   if (st === "finished") {
     const gw = countGamesWonLocal(m.gameScores || []);
-    // 🆕 Nếu tổng set thắng đúng 1 (1–0 hoặc 0–1) → hiện điểm game (ví dụ 11–8)
+    // 🆕 Nếu tổng set thắng đúng 1 (1–0 hoặc 0–1) → hiện điểm game
     if (gw.A + gw.B === 1) {
       const g = lastGameScoreLocal(m.gameScores || []);
       if (Number.isFinite(g.a) && Number.isFinite(g.b)) return `${g.a}-${g.b}`;
@@ -1144,109 +1185,182 @@ function buildRoundsWithPlaceholders(
   return res;
 }
 
-/* ===================== Tiny UI helpers ===================== */
-const Chip = ({ label, tone = "default", style, bgColor, fgColor }) => (
-  <View
-    style={[
-      styles.chip,
-      tone === "primary" && styles.chipPrimary,
-      tone === "warn" && styles.chipWarn,
-      bgColor ? { backgroundColor: bgColor, borderColor: bgColor } : null,
-      style,
-    ]}
-  >
-    <Text style={[styles.chipText, fgColor ? { color: fgColor } : null]}>
-      {label}
-    </Text>
-  </View>
-);
+/* ===================== Tiny UI helpers (THEMED) ===================== */
+const Chip = ({ label, tone = "default", style, bgColor, fgColor, t }) => {
+  const base = {
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.card,
+  };
+  const toneStyles =
+    tone === "primary"
+      ? {
+          borderColor: t.chipInfo2Bd,
+          backgroundColor: t.chipInfo2Bg,
+          color: t.chipInfo2Fg,
+        }
+      : tone === "warn"
+      ? {
+          borderColor: t.chipErrBd,
+          backgroundColor: t.chipErrBg,
+          color: t.chipErrFg,
+        }
+      : { color: t.chipInfoFg };
+  const bg = bgColor ?? toneStyles.backgroundColor ?? base.backgroundColor;
+  const fg = fgColor ?? toneStyles.color ?? t.colors.text;
+  const bd = toneStyles.borderColor ?? base.borderColor;
 
-const Card = ({ children, style, onPress, disabled }) => {
+  return (
+    <View
+      style={[styles.chip, { borderColor: bd, backgroundColor: bg }, style]}
+    >
+      <Text style={[styles.chipText, { color: fg }]}>{label}</Text>
+    </View>
+  );
+};
+
+const Card = ({ children, style, onPress, disabled, t }) => {
+  const baseStyle = [
+    styles.card,
+    { borderColor: t.colors.border, backgroundColor: t.colors.card },
+    style,
+    disabled && { opacity: 0.6 },
+  ];
   if (onPress) {
     return (
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.85}
         onPress={disabled ? undefined : onPress}
-        style={[styles.card, style, disabled && { opacity: 0.6 }]}
+        style={baseStyle}
       >
         {children}
       </TouchableOpacity>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={baseStyle}>{children}</View>;
 };
 
-const SectionTitle = ({ children, mb = 8 }) => (
-  <Text style={[styles.sectionTitle, { marginBottom: mb }]}>{children}</Text>
+const SectionTitle = ({ children, mb = 8, t }) => (
+  <Text
+    style={[styles.sectionTitle, { marginBottom: mb, color: t.colors.text }]}
+  >
+    {children}
+  </Text>
 );
 
-/* 🆕 Checkbox item */
-const CheckItem = ({ checked, label, onToggle, disabled }) => (
+/* 🆕 Checkbox item (themed) */
+const CheckItem = ({ checked, label, onToggle, disabled, t }) => (
   <Pressable
     onPress={disabled ? undefined : onToggle}
     style={[styles.checkItem, disabled && { opacity: 0.5 }]}
     hitSlop={6}
   >
-    <View style={[styles.checkBox, checked && styles.checkBoxChecked]}>
-      {checked ? <Text style={styles.checkMark}>✓</Text> : null}
+    <View
+      style={[
+        styles.checkBox,
+        { borderColor: t.muted, backgroundColor: t.colors.card },
+        checked && {
+          backgroundColor: t.colors.primary,
+          borderColor: t.colors.primary,
+        },
+      ]}
+    >
+      {checked ? (
+        <Text style={[styles.checkMark, { color: "#fff" }]}>✓</Text>
+      ) : null}
     </View>
-    <Text style={styles.checkLabel}>{label}</Text>
+    <Text style={[styles.checkLabel, { color: t.colors.text }]}>{label}</Text>
   </Pressable>
 );
 
-/* ===================== Fullscreen FAB ===================== */
-const FullscreenFAB = ({ onPress, bottomGap = 80 }) => (
-  <View style={[styles.fullFab, { bottom: bottomGap }]}>
+/* ===================== Fullscreen FAB (themed) ===================== */
+const FullscreenFAB = ({ onPress, bottomGap = 80, t }) => (
+  <View
+    style={[
+      styles.fullFab,
+      {
+        bottom: bottomGap,
+        backgroundColor: t.colors.card,
+        borderColor: t.colors.border,
+        shadowColor: t.dark ? "#000" : "#000",
+      },
+    ]}
+  >
     <Pressable style={styles.fullFabBtn} onPress={onPress} hitSlop={10}>
-      <Text style={styles.fullFabIcon}>⛶</Text>
+      <Text style={[styles.fullFabIcon, { color: t.colors.text }]}>⛶</Text>
     </Pressable>
   </View>
 );
 
-const CloseFullscreenBtn = ({ onPress }) => (
+const CloseFullscreenBtn = ({ onPress, t }) => (
   <Pressable style={styles.fullCloseBtn} onPress={onPress} hitSlop={10}>
     <Text style={styles.fullCloseTxt}>✕</Text>
   </Pressable>
 );
 
-/* ===================== Simple Tabs ===================== */
-const TabsBar = ({ items, value, onChange }) => (
+/* ===================== Simple Tabs (themed) ===================== */
+const TabsBar = ({ items, value, onChange, t }) => (
   <ScrollView
     horizontal
     showsHorizontalScrollIndicator={false}
     contentContainerStyle={styles.tabsContainer}
   >
-    {items.map((node, i) => (
-      <Pressable
-        key={i}
-        onPress={() => onChange(i)}
-        style={[styles.tabItem, value === i && styles.tabItemActive]}
-      >
-        {typeof node === "string" ? (
-          <Text style={[styles.tabText, value === i && styles.tabTextActive]}>
-            {node}
-          </Text>
-        ) : (
-          <Text>{node}</Text>
-        )}
-      </Pressable>
-    ))}
+    {items.map((node, i) => {
+      const active = value === i;
+      return (
+        <Pressable
+          key={i}
+          onPress={() => onChange(i)}
+          style={[
+            styles.tabItem,
+            {
+              borderColor: active ? t.colors.primary : t.colors.border,
+              backgroundColor: active
+                ? t.dark
+                  ? "#0b2741"
+                  : t.chipInfo2Bg
+                : t.colors.card,
+            },
+            active && styles.tabItemActive,
+          ]}
+        >
+          {typeof node === "string" ? (
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color: active
+                    ? t.dark
+                      ? t.chipInfo2Fg
+                      : "#0d47a1"
+                    : t.colors.text,
+                },
+                active && styles.tabTextActive,
+              ]}
+            >
+              {node}
+            </Text>
+          ) : (
+            node
+          )}
+        </Pressable>
+      );
+    })}
   </ScrollView>
 );
 
-// ===================== Filter Bottom Sheet =====================
+// ===================== Filter Bottom Sheet (themed) =====================
 const FilterSheet = React.forwardRef(
   (
     {
       filterItems,
       selectedGroupKeys,
       onToggleKey,
-      // onlyMyGroups, setOnlyMyGroups, // <- không còn checkbox nên không cần hai prop này trong UI
       myRegIds,
-      onShowAll, // sẽ dùng làm "Bỏ chọn tất cả" (clear selection)
-      onSelectAll, // giữ nguyên
-      onOnlyMine, // giữ nguyên
-      onApply, // optional
+      onShowAll,
+      onSelectAll,
+      onOnlyMine,
+      onApply,
+      t,
     },
     ref
   ) => {
@@ -1266,8 +1380,8 @@ const FilterSheet = React.forwardRef(
     );
 
     const handleApply = React.useCallback(() => {
-      onApply?.(); // nếu parent muốn làm gì thêm
-      ref?.current?.dismiss?.(); // đóng sheet
+      onApply?.();
+      ref?.current?.dismiss?.();
     }, [onApply, ref]);
 
     return (
@@ -1277,8 +1391,8 @@ const FilterSheet = React.forwardRef(
         topInset={Math.max(insets.top, 12)}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        handleIndicatorStyle={{ backgroundColor: "#94a3b8" }}
-        backgroundStyle={{ backgroundColor: "#fff" }}
+        handleIndicatorStyle={{ backgroundColor: t.muted }}
+        backgroundStyle={{ backgroundColor: t.colors.card }}
         enableDynamicSizing={false}
       >
         <BottomSheetScrollView
@@ -1288,32 +1402,57 @@ const FilterSheet = React.forwardRef(
             gap: 10,
           }}
         >
-          <Text style={styles.sectionTitle}>Bộ lọc bảng</Text>
+          <Text style={[styles.sectionTitle, { color: t.colors.text }]}>
+            Bộ lọc bảng
+          </Text>
 
-          {/* Danh sách checkbox theo nhóm */}
           <View style={[styles.filterRowWrap, { marginTop: 6 }]}>
             {filterItems.map((it) => (
               <CheckItem
                 key={it.key}
                 checked={selectedGroupKeys.has(it.key)}
                 onToggle={() => onToggleKey(it.key)}
-                label={it.label} // đã là "Bảng 1 (bảng của tôi)" nếu cần
+                label={it.label}
+                t={t}
               />
             ))}
           </View>
 
-          {/* Hàng nút thao tác */}
           <View style={styles.sheetActions}>
-            <Pressable onPress={onShowAll} style={styles.filterBtn}>
-              <Text style={styles.filterBtnText}>Bỏ chọn tất cả</Text>
+            <Pressable
+              onPress={onShowAll}
+              style={[
+                styles.filterBtn,
+                {
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.card,
+                },
+              ]}
+            >
+              <Text style={[styles.filterBtnText, { color: t.colors.text }]}>
+                Bỏ chọn tất cả
+              </Text>
             </Pressable>
-            <Pressable onPress={onSelectAll} style={styles.filterBtn}>
-              <Text style={styles.filterBtnText}>Chọn tất cả</Text>
+            <Pressable
+              onPress={onSelectAll}
+              style={[
+                styles.filterBtn,
+                {
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.card,
+                },
+              ]}
+            >
+              <Text style={[styles.filterBtnText, { color: t.colors.text }]}>
+                Chọn tất cả
+              </Text>
             </Pressable>
           </View>
 
-          {/* Nút Áp dụng nằm cuối */}
-          <Pressable onPress={handleApply} style={styles.applyBtn}>
+          <Pressable
+            onPress={handleApply}
+            style={[styles.applyBtn, { backgroundColor: t.colors.primary }]}
+          >
             <Text style={styles.applyBtnText}>Áp dụng</Text>
           </Pressable>
         </BottomSheetScrollView>
@@ -1322,29 +1461,41 @@ const FilterSheet = React.forwardRef(
   }
 );
 
-/* ===================== Match Modal (thay cho ResponsiveMatchViewer) ===================== */
-const MatchModal = ({ visible, match, onClose, eventType }) => {
+/* ===================== Match Modal (themed) ===================== */
+const MatchModal = ({ visible, match, onClose, eventType, t }) => {
   if (!match) return null;
   const a = match.pairA
-    ? pairLabelNickOnly(match.pairA, eventType) // CHỈ NICK
+    ? pairLabelNickOnly(match.pairA, eventType)
     : smartDepLabel(match, match.previousA) || seedLabel(match.seedA);
   const b = match.pairB
-    ? pairLabelNickOnly(match.pairB, eventType) // CHỈ NICK
+    ? pairLabelNickOnly(match.pairB, eventType)
     : smartDepLabel(match, match.previousB) || seedLabel(match.seedB);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Chi tiết trận</Text>
-          <Text style={styles.modalLine}>
+        <View
+          style={[
+            styles.modalCard,
+            { backgroundColor: t.colors.card, borderColor: t.colors.border },
+          ]}
+        >
+          <Text style={[styles.modalTitle, { color: t.colors.text }]}>
+            Chi tiết trận
+          </Text>
+          <Text style={[styles.modalLine, { color: t.colors.text }]}>
             <Text style={styles.bold}>A:</Text> {a}
           </Text>
-          <Text style={styles.modalLine}>
+          <Text style={[styles.modalLine, { color: t.colors.text }]}>
             <Text style={styles.bold}>B:</Text> {b}
           </Text>
-          <Text style={styles.modalLine}>Trạng thái: {resultLabel(match)}</Text>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
+          <Text style={[styles.modalLine, { color: t.colors.text }]}>
+            Trạng thái: {resultLabel(match)}
+          </Text>
+          <Pressable
+            onPress={onClose}
+            style={[styles.closeBtn, { backgroundColor: t.colors.primary }]}
+          >
             <Text style={styles.closeBtnText}>Đóng</Text>
           </Pressable>
         </View>
@@ -1353,13 +1504,24 @@ const MatchModal = ({ visible, match, onClose, eventType }) => {
   );
 };
 
-const VideoModal = ({ visible, url, onClose }) => {
+const VideoModal = ({ visible, url, onClose, t }) => {
   if (!visible) return null;
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.modalCard, { height: 320 }]}>
-          <Text style={styles.modalTitle}>Xem video</Text>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              height: 320,
+              backgroundColor: t.colors.card,
+              borderColor: t.colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.modalTitle, { color: t.colors.text }]}>
+            Xem video
+          </Text>
           {WebViewComp ? (
             <WebViewComp
               source={{ uri: url }}
@@ -1373,12 +1535,18 @@ const VideoModal = ({ visible, url, onClose }) => {
                 justifyContent: "center",
               }}
             >
-              <Text>Thiếu react-native-webview.</Text>
+              <Text style={{ color: t.colors.text }}>
+                Thiếu react-native-webview.
+              </Text>
               <Pressable
                 onPress={() => Linking.openURL(url)}
                 style={[
                   styles.closeBtn,
-                  { alignSelf: "center", marginTop: 12 },
+                  {
+                    alignSelf: "center",
+                    marginTop: 12,
+                    backgroundColor: t.colors.primary,
+                  },
                 ]}
               >
                 <Text style={styles.closeBtnText}>Mở trong trình duyệt</Text>
@@ -1387,7 +1555,10 @@ const VideoModal = ({ visible, url, onClose }) => {
           )}
           <Pressable
             onPress={onClose}
-            style={[styles.closeBtn, { marginTop: 10 }]}
+            style={[
+              styles.closeBtn,
+              { marginTop: 10, backgroundColor: t.colors.primary },
+            ]}
           >
             <Text style={styles.closeBtnText}>Đóng</Text>
           </Pressable>
@@ -1398,7 +1569,6 @@ const VideoModal = ({ visible, url, onClose }) => {
 };
 
 /* ===================== Bracket columns (RN) ===================== */
-/* ===================== Bracket columns – centered grid like react-brackets ===================== */
 const BracketColumns = ({
   rounds,
   onOpenMatch,
@@ -1406,6 +1576,7 @@ const BracketColumns = ({
   focusRegId,
   setFocusRegId,
   onOpenVideo,
+  t,
 }) => {
   // ===== BYE helpers =====
   const isByeName = (s) => typeof s === "string" && /^BYE$/i.test(s.trim());
@@ -1422,8 +1593,8 @@ const BracketColumns = ({
     return null;
   };
   // đo cột/ô để vẽ connector
-  const [colRects, setColRects] = useState({}); // { [col]: {x,y,w,h} }
-  const [wrapRects, setWrapRects] = useState({}); // { [col]: { [idx]: {x,y,w,h} } }
+  const [colRects, setColRects] = useState({});
+  const [wrapRects, setWrapRects] = useState({});
 
   const setColRect = useCallback((c, r) => {
     setColRects((p) =>
@@ -1438,7 +1609,6 @@ const BracketColumns = ({
     });
   }, []);
 
-  // map matchId -> {col, idx} (để nối theo previousA/previousB)
   const locByMatchId = useMemo(() => {
     const mp = new Map();
     rounds.forEach((r, col) =>
@@ -1450,8 +1620,6 @@ const BracketColumns = ({
     return mp;
   }, [rounds]);
 
-  // ===== Tạo bản viewRounds (clone) và "đẩy" đội qua vòng nếu gặp BYE
-  // Quy ước mapping chuẩn: slot i của cột c → cột c+1, seed index = floor(i/2), side = i%2 (0→A,1→B)
   const viewRounds = useMemo(() => {
     const copy = (rounds || []).map((r) => ({
       ...r,
@@ -1483,20 +1651,17 @@ const BracketColumns = ({
     return copy;
   }, [rounds]);
 
-  // ==== grid/spacing giống wiki ====
-  const ROUND_GAP = 56; // khoảng cách ngang giữa các vòng
-  const INNER_GAP = 24; // khoảng cách dọc trong slot giữa card & mép
+  const ROUND_GAP = 56;
+  const INNER_GAP = 24;
   const EXTRA_SLOT = 6;
-  const [baseCardH, setBaseCardH] = useState(56); // đo từ ô đầu tiên
+  const [baseCardH, setBaseCardH] = useState(56);
 
-  // round 0 slotH = cardH + INNER_GAP*2, round k slotH = slotH0 * 2^k
   const slotH0 = Math.max(
     baseCardH + INNER_GAP * 2 + EXTRA_SLOT,
     72 + INNER_GAP * 2
   );
   const slotHeight = (col) => slotH0 * Math.pow(2, col);
 
-  // căn giữa toàn cột
   const tallest = useMemo(() => {
     const hs = Object.entries(colRects).map(([c, r]) => {
       const n = viewRounds[c]?.seeds?.length || 0;
@@ -1515,7 +1680,6 @@ const BracketColumns = ({
     return out;
   }, [viewRounds, tallest, slotH0]);
 
-  // helper: toạ độ tuyệt đối của slot wrapper (dùng cho connector)
   const absWrap = useCallback(
     (c, i) => {
       const col = colRects[c];
@@ -1526,12 +1690,13 @@ const BracketColumns = ({
     [colRects, wrapRects]
   );
 
-  // ===== vẽ connector 3-khúc, ưu tiên previousA/previousB =====
+  // connectors
   const connectors = useMemo(() => {
     const L = [];
     const TH = 2;
-    const OUT = 22; // từ cạnh phải nguồn ra “bus” dọc
-    const TO_DST = 16; // từ bus tới mép trái đích
+    const OUT = 22;
+    const TO_DST = 16;
+    const color = t.dark ? "#9aa0a6" : "#263238";
     const pushH = (x, y, w, k) =>
       w > 0 &&
       L.push(
@@ -1545,6 +1710,7 @@ const BracketColumns = ({
               top: Math.round(y - TH / 2),
               width: Math.round(w),
               height: TH,
+              backgroundColor: color,
             },
           ]}
         />
@@ -1562,6 +1728,7 @@ const BracketColumns = ({
               top: Math.round(y),
               width: TH,
               height: Math.round(h),
+              backgroundColor: color,
             },
           ]}
         />
@@ -1577,16 +1744,14 @@ const BracketColumns = ({
         const dst = absWrap(c + 1, j);
         if (!dst) continue;
 
-        // tìm 2 nguồn
-        const m = nextSeeds[j].__match;
         let srcIdxs = [];
+        const m = nextSeeds[j].__match;
         if (m) {
           const la = locByMatchId.get(idOf(m.previousA));
           const lb = locByMatchId.get(idOf(m.previousB));
           if (la?.col === c) srcIdxs.push(la.idx);
           if (lb?.col === c) srcIdxs.push(lb.idx);
         }
-        // fallback 2j,2j+1 — kể cả khi chỉ có 1 nguồn (trường hợp BYE) vẫn vẽ bus + nhánh còn lại
         const a = 2 * j,
           b = 2 * j + 1;
         if (!srcIdxs.includes(a) && absWrap(c, a)) srcIdxs.push(a);
@@ -1626,7 +1791,7 @@ const BracketColumns = ({
       }
     }
     return L;
-  }, [viewRounds, locByMatchId, colRects, wrapRects, absWrap, slotH0]);
+  }, [viewRounds, locByMatchId, colRects, wrapRects, absWrap, slotH0, t.dark]);
 
   return (
     <ScrollView
@@ -1636,7 +1801,6 @@ const BracketColumns = ({
       directionalLockEnabled
     >
       <View style={[styles.roundsRow, styles.bracketCanvas]}>
-        {/* overlay connectors */}
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           {connectors}
         </View>
@@ -1646,7 +1810,7 @@ const BracketColumns = ({
             key={colIdx}
             style={[
               styles.roundCol,
-              { marginRight: ROUND_GAP, marginTop: colTopOffset[colIdx] || 0 },
+              { marginRight: 56, marginTop: colTopOffset[colIdx] || 0 },
             ]}
             onLayout={(e) => {
               const { x, y, width: w, height: h } = e.nativeEvent.layout;
@@ -1654,7 +1818,14 @@ const BracketColumns = ({
             }}
           >
             <View style={styles.roundTitleWrap}>
-              <Text style={styles.roundTitle}>{r.title}</Text>
+              <Text
+                style={[
+                  styles.roundTitle,
+                  { backgroundColor: t.headerBg, color: t.colors.text },
+                ]}
+              >
+                {r.title}
+              </Text>
             </View>
 
             {(r.seeds || []).map((s, i) => {
@@ -1668,8 +1839,8 @@ const BracketColumns = ({
               const nameA = s.teams?.[0]?.name || "Chưa có đội";
               const nameB = s.teams?.[1]?.name || "Chưa có đội";
               const byeCard =
-                isByeName(nameA) ||
-                isByeName(nameB) ||
+                /^(BYE)$/i.test(nameA) ||
+                /^(BYE)$/i.test(nameB) ||
                 m?.seedA?.type === "bye" ||
                 m?.seedB?.type === "bye";
               const status = byeCard
@@ -1685,7 +1856,7 @@ const BracketColumns = ({
                   key={`${colIdx}-${i}`}
                   style={[
                     styles.seedWrap,
-                    { height: wrapH, paddingVertical: INNER_GAP },
+                    { height: wrapH, paddingVertical: 24 },
                   ]}
                   onLayout={(e) => {
                     const { x, y, width: w, height: h } = e.nativeEvent.layout;
@@ -1695,57 +1866,72 @@ const BracketColumns = ({
                   <Card
                     onPress={m ? () => onOpenMatch(m) : undefined}
                     disabled={!m}
-                    style={[styles.seedBox, isChampion && styles.seedChampion]}
+                    t={t}
+                    style={[
+                      styles.seedBox,
+                      {
+                        borderColor: t.colors.border,
+                        backgroundColor: t.colors.card,
+                        shadowColor: t.dark ? "#000" : "#000",
+                      },
+                      isChampion && styles.seedChampion,
+                    ]}
                     onLayout={(e) => {
-                      if (
-                        colIdx === 0 &&
-                        i === 0 &&
-                        !Number.isFinite(baseCardH)
-                      )
-                        return;
                       const h = e.nativeEvent.layout.height;
                       if (h && Math.abs(h - baseCardH) > 1) setBaseCardH(h);
                     }}
                   >
                     {isChampion && <Text style={styles.trophy}>🏆</Text>}
                     {m?.status === "live" && <View style={styles.liveDot} />}
-                    {/* Header: mã – giờ – sân – video */}
+                    {/* Header */}
                     {m &&
                       (() => {
                         const code = matchApiCode(m, i + 1);
-                        const t = timeShort(kickoffTime(m));
-                        const c = courtName(m);
+                        const t0 = timeShort(kickoffTime(m));
+                        const c0 = courtName(m);
                         const vid = hasVideo(m);
+
                         if (byeCard) {
-                          // Header trung tính khi BYE (không tô màu theo trạng thái)
                           return (
                             <View
                               style={[
                                 styles.seedHeader,
-                                styles.seedHeaderNeutral,
+                                {
+                                  borderBottomColor: t.divider,
+                                  backgroundColor: t.headerBg,
+                                },
                               ]}
                             >
                               <Text
-                                style={[styles.seedHeaderCode]}
+                                style={[
+                                  styles.seedHeaderCode,
+                                  { color: t.colors.text },
+                                ]}
                                 numberOfLines={1}
                               >
                                 {code}
                               </Text>
                               <View style={styles.seedHeaderMeta}>
-                                {!!t && (
+                                {!!t0 && (
                                   <Text
-                                    style={styles.seedHeaderText}
+                                    style={[
+                                      styles.seedHeaderText,
+                                      { color: t.colors.text },
+                                    ]}
                                     numberOfLines={1}
                                   >
-                                    ⏰ {t}
+                                    ⏰ {t0}
                                   </Text>
                                 )}
-                                {!!c && (
+                                {!!c0 && (
                                   <Text
-                                    style={styles.seedHeaderText}
+                                    style={[
+                                      styles.seedHeaderText,
+                                      { color: t.colors.text },
+                                    ]}
                                     numberOfLines={1}
                                   >
-                                    🏟️ {c}
+                                    🏟️ {c0}
                                   </Text>
                                 )}
                                 {!!vid && (
@@ -1753,7 +1939,12 @@ const BracketColumns = ({
                                     onPress={() => onOpenVideo?.(m)}
                                     hitSlop={8}
                                   >
-                                    <Text style={styles.seedHeaderText}>
+                                    <Text
+                                      style={[
+                                        styles.seedHeaderText,
+                                        { color: t.colors.text },
+                                      ]}
+                                    >
                                       🎥
                                     </Text>
                                   </Pressable>
@@ -1762,12 +1953,15 @@ const BracketColumns = ({
                             </View>
                           );
                         }
-                        const color = statusColors(m); // { bg, fg }
+                        const color = statusColors(m);
                         return (
                           <View
                             style={[
                               styles.seedHeader,
-                              { backgroundColor: color.bg },
+                              {
+                                backgroundColor: color.bg,
+                                borderBottomColor: t.divider,
+                              },
                             ]}
                           >
                             <Text
@@ -1780,7 +1974,7 @@ const BracketColumns = ({
                               {code}
                             </Text>
                             <View style={styles.seedHeaderMeta}>
-                              {!!t && (
+                              {!!t0 && (
                                 <Text
                                   style={[
                                     styles.seedHeaderText,
@@ -1788,10 +1982,10 @@ const BracketColumns = ({
                                   ]}
                                   numberOfLines={1}
                                 >
-                                  ⏰ {t}
+                                  ⏰ {t0}
                                 </Text>
                               )}
-                              {!!c && (
+                              {!!c0 && (
                                 <Text
                                   style={[
                                     styles.seedHeaderText,
@@ -1799,7 +1993,7 @@ const BracketColumns = ({
                                   ]}
                                   numberOfLines={1}
                                 >
-                                  🏟️ {c}
+                                  🏟️ {c0}
                                 </Text>
                               )}
                               {!!vid && (
@@ -1821,9 +2015,8 @@ const BracketColumns = ({
                           </View>
                         );
                       })()}
-                    {/* Content: trái (đội) – phải (tỉ số) */}
+                    {/* Content */}
                     <View style={styles.seedContent}>
-                      {/* Cột trái: 2 dòng đội */}
                       <View style={{ flex: 1 }}>
                         {(() => {
                           const widA = m?.winner === "A";
@@ -1857,11 +2050,19 @@ const BracketColumns = ({
                                   numberOfLines={3}
                                   style={[
                                     styles.teamText,
+                                    { color: t.colors.text },
                                     widA && styles.teamTextWin,
                                   ]}
                                 >
                                   {nameA}
-                                  <Text style={styles.sideTag}>(A)</Text>
+                                  <Text
+                                    style={[
+                                      styles.sideTag,
+                                      { color: t.subtext },
+                                    ]}
+                                  >
+                                    (A)
+                                  </Text>
                                 </Text>
                               </Pressable>
                               <Pressable
@@ -1880,11 +2081,20 @@ const BracketColumns = ({
                                   numberOfLines={3}
                                   style={[
                                     styles.teamText,
+                                    { color: t.colors.text },
                                     widB && styles.teamTextWin,
                                   ]}
                                 >
                                   {nameB}
-                                  <Text style={styles.sideTag}>(B)</Text>
+                                  <Text
+                                    style={[
+                                      styles.sideTag,
+                                      { color: t.subtext },
+                                    ]}
+                                  >
+                                    {" "}
+                                    (B)
+                                  </Text>
                                 </Text>
                               </Pressable>
                             </>
@@ -1893,12 +2103,16 @@ const BracketColumns = ({
                       </View>
 
                       <View style={styles.scoreBox}>
-                        <Text style={styles.scoreText}>
+                        <Text
+                          style={[styles.scoreText, { color: t.colors.text }]}
+                        >
                           {m && !byeCard ? computeRightScore(m) : ""}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.seedMeta}>{status}</Text>
+                    <Text style={[styles.seedMeta, { color: t.subtext }]}>
+                      {status}
+                    </Text>
                   </Card>
                 </View>
               );
@@ -1912,10 +2126,11 @@ const BracketColumns = ({
 
 /* ===================== Component chính (RN) ===================== */
 export default function TournamentBracketRN({ tourId: tourIdProp }) {
+  const t = useTokens();
   const route = useRoute();
   const socket = useSocket();
-  const userInfo = useSelector((s) => s.auth?.userInfo); // 🆕
-  const myUserId = useMemo(() => getUserIdFromUserInfo(userInfo), [userInfo]); // 🆕
+  const userInfo = useSelector((s) => s.auth?.userInfo);
+  const myUserId = useMemo(() => getUserIdFromUserInfo(userInfo), [userInfo]);
   const [focusRegId, setFocusRegId] = useState(null);
   const [videoState, setVideoState] = useState({ visible: false, url: "" });
   const openVideoFor = useCallback((m) => {
@@ -1926,7 +2141,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     () => setVideoState({ visible: false, url: "" }),
     []
   );
-  // 🆕 Lưu filter: chọn nhiều bảng & chỉ xem “Bảng của tôi”
   const [selectedGroupKeys, setSelectedGroupKeys] = useState(new Set());
   const [onlyMyGroups, setOnlyMyGroups] = useState(false);
 
@@ -1968,7 +2182,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const loading = l1 || l2 || l3;
   const error = e1 || e2 || e3;
 
-  /* ===== live layer: Map(id → match) & merge ===== */
+  /* ===== live layer ===== */
   const liveMapRef = useRef(new Map());
   const [liveBump, setLiveBump] = useState(0);
   const pendingRef = useRef(new Map());
@@ -2021,7 +2235,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     });
   }, []);
 
-  /* ===== GIỮ refetch STABLE, không đưa vào deps ===== */
   const refetchBracketsRef = useRef(refetchBrackets);
   const refetchMatchesRef = useRef(refetchMatches);
   useEffect(() => {
@@ -2031,7 +2244,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     refetchMatchesRef.current = refetchMatches;
   }, [refetchMatches]);
 
-  // Pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
     try {
@@ -2046,7 +2258,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     }
   }, [refetchTour, refetchBrackets, refetchMatches]);
 
-  /* ===== RÚT GỌN DEPS: bracketIds & matchIds ===== */
   const bracketIds = useMemo(
     () => (brackets || []).map((b) => String(b._id)),
     [brackets]
@@ -2055,10 +2266,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     () => (allMatchesFetched || []).map((m) => String(m._id)).filter(Boolean),
     [allMatchesFetched]
   );
-  // đặt cùng scope với các ref khác
   const initialSeededRef = useRef(false);
 
-  // ưu tiên liveVersion → version → updatedAt
   const versionOf = (m) => {
     const v = Number(m?.liveVersion ?? m?.version ?? NaN);
     if (!Number.isFinite(v)) {
@@ -2071,7 +2280,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   useEffect(() => {
     if (!Array.isArray(allMatchesFetched)) return;
 
-    // lần đầu: seed toàn bộ
     if (!initialSeededRef.current) {
       const mp = new Map();
       for (const m of allMatchesFetched) {
@@ -2083,7 +2291,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       return;
     }
 
-    // các lần sau: MERGE theo phiên bản, không replace map
     const mp = liveMapRef.current || new Map();
     let changed = false;
 
@@ -2102,7 +2309,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       const vNew = versionOf(m);
       const vOld = versionOf(cur);
 
-      // chỉ ghi đè khi dữ liệu fetch mới hơn (hoặc ngang → merge nông để điền field thiếu)
       if (vNew > vOld) {
         mp.set(id, m);
         changed = true;
@@ -2120,7 +2326,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       setLiveBump((x) => x + 1);
     }
   }, [allMatchesFetched]);
-  /* ===== SOCKET EFFECT (ổn định, không lặp) ===== */
+
   useEffect(() => {
     if (!socket) return;
 
@@ -2175,7 +2381,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     if (socket.connected) onConnect();
 
     socket.on("connect", onConnect);
-    // socket.on("match:update", onUpsert);
     socket.on("match:snapshot", onUpsert);
     socket.on("score:updated", onUpsert);
     socket.on("match:deleted", onRemove);
@@ -2184,7 +2389,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
     return () => {
       socket.off("connect", onConnect);
-      // socket.off("match:update", onUpsert);
       socket.off("match:snapshot", onUpsert);
       socket.off("score:updated", onUpsert);
       socket.off("match:deleted", onRemove);
@@ -2206,11 +2410,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [tourId, liveBump]
   );
 
-  // 🆕 Tập regIds của chính user trong giải
   const myRegIds = useMemo(() => {
     const set = new Set();
-
-    // 1) Nếu API có trả registrations đầy đủ
     if (Array.isArray(tour?.registrations)) {
       tour.registrations.forEach((r) => {
         if (regIncludesUser(r, myUserId)) {
@@ -2219,22 +2420,19 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         }
       });
     }
-
-    // 2) Gom từ các trận đang có (pair._id thường trùng regId ở schema của bạn)
     const pushIfMine = (pair) => {
       if (!pair) return;
       const tmpReg = { pair };
       if (regIncludesUser(tmpReg, myUserId)) {
         if (pair?._id) set.add(String(pair._id));
-        if (pair?.registrationId) set.add(String(pair.registrationId)); // phòng hờ
-        if (pair?.regId) set.add(String(pair.regId)); // phòng hờ
+        if (pair?.registrationId) set.add(String(pair.registrationId));
+        if (pair?.regId) set.add(String(pair.regId));
       }
     };
     (matchesMerged || []).forEach((m) => {
       pushIfMine(m?.pairA);
       pushIfMine(m?.pairB);
     });
-
     return set;
   }, [tour?.registrations, matchesMerged, myUserId]);
 
@@ -2253,13 +2451,11 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [brackets, byBracket]
   );
 
-  // Tabs state
   const [tab, setTab] = useState(0);
   useEffect(() => {
     if (tab >= (brackets?.length || 0)) setTab(0);
   }, [brackets?.length]);
 
-  // Modal viewer
   const [open, setOpen] = useState(false);
   const [activeMatchId, setActiveMatchId] = useState(null);
   const matchIndex = useMemo(() => {
@@ -2282,7 +2478,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [byBracket, current]
   );
 
-  // ===== Fullscreen state (KO/RE) =====
   const [isFullscreen, setIsFullscreen] = useState(false);
   const enterFullscreen = useCallback(() => setIsFullscreen(true), []);
   const exitFullscreen = useCallback(() => setIsFullscreen(false), []);
@@ -2297,15 +2492,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       } catch {}
     })();
   }, [isFullscreen]);
-
-  // Chỉ unlock khi unmount screen
   useEffect(() => {
     return () => {
       ScreenOrientation.unlockAsync().catch(() => {});
     };
   }, []);
 
-  // resolveSideLabel → CHỈ HIỆN NICKNAME
   const resolveSideLabel = useCallback(
     (m, side) => {
       const eventType = tour?.eventType;
@@ -2317,28 +2509,22 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         const st = Number(seed.ref?.stage ?? seed.ref?.stageIndex ?? 0) || 0;
         const gc = String(seed.ref?.groupCode ?? "").trim();
 
-        // Nếu bảng nguồn CHƯA hoàn tất → luôn giữ nhãn seed
         const groupReady = gc && completedGroupAliasSet.has(`${st}|${gc}`);
         if (!groupReady) {
           return seedLabel(seed);
         }
 
-        // Bảng đã xong:
-        // 1) nếu match đã có pairA/B → ưu tiên hiện tên đội
         const pair = side === "A" ? m.pairA : m.pairB;
         if (pair) return pairLabelNickOnly(pair, eventType);
 
-        // 2) chưa gán pair → suy luận từ BXH để vẫn hiện tên đội
         const inferred =
           resolvePairFromGroupRankSeed(seed, brackets, byBracket, eventType) ||
           null;
         if (inferred) return pairLabelNickOnly(inferred, eventType);
 
-        // 3) fallback cuối cùng
         return seedLabel(seed);
       }
 
-      // Không phải seed từ vòng bảng
       const pair = side === "A" ? m.pairA : m.pairB;
       if (pair) return pairLabelNickOnly(pair, eventType);
 
@@ -2363,14 +2549,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [matchIndex, tour?.eventType, completedGroupAliasSet, brackets, byBracket]
   );
 
-  // Prefill rounds
   const prefillRounds = useMemo(() => {
     if (!current?.prefill) return null;
     const r = buildRoundsFromPrefill(current.prefill, current?.ko);
     return r && r.length ? r : null;
   }, [current]);
 
-  // Group indexing
   const { byRegId: groupIndex } = useMemo(
     () => buildGroupIndex(current || {}),
     [current]
@@ -2383,7 +2567,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     return ga && gb && ga === gb ? ga : null;
   };
 
-  // Standings data
   const standingsData = useMemo(() => {
     if (!current || current.type !== "group") return null;
     return buildStandingsWithFallback(current, currentMatches, tour?.eventType);
@@ -2397,7 +2580,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     : 0;
   const minRoundsForCurrent = Math.max(uniqueRoundsCount, roundsFromScale);
 
-  // Live spotlight (simple list RN)
   const liveSpotlight = useMemo(() => {
     if (!current || current.type !== "group") return [];
     return (currentMatches || [])
@@ -2412,15 +2594,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       });
   }, [current, currentMatches]);
 
-  // ==== GROUP FILTER MEMOS (top-level, fixed order) ====
   const groupsList = useMemo(
     () => (current?.type === "group" ? current?.groups || [] : []),
     [current]
   );
   const groupMineMap = useMemo(() => {
     const mp = new Map();
-
-    // 1) Group có mình xuất hiện trong các trận (kể cả khi chưa map được regIds)
     const myGroupByMatch = new Set();
     (currentMatches || []).forEach((m) => {
       const iAmInA = regIncludesUser({ pair: m.pairA }, myUserId);
@@ -2430,42 +2609,26 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         if (key) myGroupByMatch.add(String(key));
       }
     });
-
-    // 2) Group có regIds giao với myRegIds (chuẩn nhất khi có registrations)
     groupsList.forEach((g, gi) => {
       const key = String(g.name || g.code || g._id || String(gi + 1));
       const ids = (g?.regIds || []).map(String);
-      const viaIds = ids.some((rid) => myRegIds.has(rid)); // regIds ∩ myRegIds
-      const viaMatch = myGroupByMatch.has(key); // theo trận
+      const viaIds = ids.some((rid) => myRegIds.has(rid));
+      const viaMatch = myGroupByMatch.has(key);
       mp.set(key, viaIds || viaMatch);
     });
-
     return mp;
   }, [groupsList, myRegIds, currentMatches, myUserId]);
 
   const filterItems = useMemo(
     () =>
       groupsList.map((g, gi) => {
-        const key = String(g.name || g.code || g._id || String(gi + 1)); // giữ key cũ
+        const key = String(g.name || g.code || g._id || String(gi + 1));
         const isMine = !!groupMineMap.get(key);
-        // label: Bảng 1/2/3… + (bảng của tôi) nếu có
         const label = `Bảng ${gi + 1}${isMine ? " (bảng của tôi)" : ""}`;
         return { key, label, isMine, index: gi + 1 };
       }),
     [groupsList, groupMineMap]
   );
-
-  // const visibleGroups = useMemo(
-  //   () =>
-  //     groupsList.filter((g, gi) => {
-  //       const key = String(g.name || g.code || g._id || String(gi + 1));
-  //       if (onlyMyGroups && !groupMineMap.get(key)) return false;
-  //       if (selectedGroupKeys.size > 0 && !selectedGroupKeys.has(key))
-  //         return false;
-  //       return true;
-  //     }),
-  //   [groupsList, selectedGroupKeys, onlyMyGroups, groupMineMap]
-  // );
 
   const renderLiveSpotlight = () => {
     if (!liveSpotlight.length) return null;
@@ -2524,9 +2687,10 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
     return (
       <Card
+        t={t}
         style={{
-          borderColor: "#f7c2be",
-          backgroundColor: "#fff6f6",
+          borderColor: t.chipErrBd,
+          backgroundColor: t.chipErrBg,
           marginBottom: 12,
         }}
       >
@@ -2537,37 +2701,51 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             marginBottom: 8,
           }}
         >
-          <Chip label="LIVE" tone="warn" />
-          <Text style={[styles.subTitle, { marginLeft: 8 }]}>
+          <Chip label="LIVE" tone="warn" t={t} />
+          <Text
+            style={[styles.subTitle, { marginLeft: 8, color: t.colors.text }]}
+          >
             Trận đang diễn ra (Vòng bảng)
           </Text>
         </View>
         {rows.map((r) => {
           const color = r.match
             ? statusColors(r.match)
-            : { bg: "#9e9e9e", fg: "#fff" };
-          const statusText = r.match ? resultLabel(r.match) : "Chưa diễn ra";
+            : { bg: t.muted, fg: t.colors.text };
           return (
             <Card
               key={r.id}
               onPress={() => openMatch(r.match)}
+              t={t}
               style={styles.rowCard}
             >
               <View style={styles.rowHeader}>
-                <Chip label={r.code} bgColor={color.bg} fgColor={color.fg} />
-                <Text style={[styles.bold, { fontSize: 13 }]}>
+                <Chip
+                  label={r.code}
+                  bgColor={color.bg}
+                  fgColor={color.fg}
+                  t={t}
+                />
+                <Text
+                  style={[styles.bold, { fontSize: 13, color: t.colors.text }]}
+                >
                   {r.score || "LIVE"}
                 </Text>
               </View>
-              <Text style={styles.rowMain} numberOfLines={2}>
-                {r.aName} <Text style={{ opacity: 0.6 }}>vs</Text> {r.bName}
+              <Text
+                style={[styles.rowMain, { color: t.colors.text }]}
+                numberOfLines={2}
+              >
+                {r.aName}{" "}
+                <Text style={{ opacity: 0.6, color: t.subtext }}>vs</Text>{" "}
+                {r.bName}
               </Text>
               <View style={styles.rowMetaWrap}>
-                <Chip label={r.time || "—"} />
-                {!!r.court && <Chip label={r.court} />}
+                <Chip label={r.time || "—"} t={t} />
+                {!!r.court && <Chip label={r.court} t={t} />}
                 {hasVideo(r.match) && (
                   <Pressable onPress={() => openVideoFor(r.match)}>
-                    <Chip label="Xem video 🎥" />
+                    <Chip label="Xem video 🎥" t={t} />
                   </Pressable>
                 )}
               </View>
@@ -2585,23 +2763,25 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
   if (!tourId) {
     return (
-      <View style={styles.center}>
-        <Text>Thiếu tournamentId.</Text>
+      <View style={[styles.center, { backgroundColor: t.colors.background }]}>
+        <Text style={{ color: t.colors.text }}>Thiếu tournamentId.</Text>
       </View>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: t.colors.background }]}>
         <ActivityIndicator />
       </View>
     );
   }
   if (error) {
     return (
-      <View style={styles.centerPad}>
-        <Text style={{ color: "#b00020" }}>
+      <View
+        style={[styles.centerPad, { backgroundColor: t.colors.background }]}
+      >
+        <Text style={{ color: t.chipErrFg }}>
           {error?.data?.message || error?.error || "Lỗi tải dữ liệu."}
         </Text>
       </View>
@@ -2609,14 +2789,18 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   }
   if (!brackets.length) {
     return (
-      <View style={styles.centerPad}>
-        <Text>Chưa có bracket nào cho giải này.</Text>
+      <View
+        style={[styles.centerPad, { backgroundColor: t.colors.background }]}
+      >
+        <Text style={{ color: t.colors.text }}>
+          Chưa có bracket nào cho giải này.
+        </Text>
       </View>
     );
   }
 
   const tabLabels = brackets.map((b) => {
-    const t =
+    const ty =
       b.type === "group"
         ? "Group"
         : b.type === "roundElim"
@@ -2624,13 +2808,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         : "Knockout";
     return (
       <View key={b._id} style={{ flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ fontWeight: "600" }}>{b.name}</Text>
-        <Chip label={t} style={{ marginLeft: 8 }} />
+        <Text style={{ fontWeight: "600", color: t.colors.text }}>
+          {b.name}
+        </Text>
+        <Chip label={ty} style={{ marginLeft: 8 }} t={t} />
       </View>
     );
   });
 
-  // ======= GROUP UI =======
   const renderGroupBlocks = () => {
     const groups = groupsList;
 
@@ -2641,9 +2826,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       points: { win: 3, draw: 1, loss: 0 },
     };
 
-    // toggle chọn key (không phải hook)
-
-    // 🆕 Xác định danh sách nhóm hiển thị theo filter
     const visibleGroups = groups
       .filter((g, gi) => {
         const key = String(g.name || g.code || g._id || String(gi + 1));
@@ -2659,7 +2841,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         const kb = String(b.name || b.code || b._id || String(ib + 1));
         const ma = groupMineMap.get(ka) ? 1 : 0;
         const mb = groupMineMap.get(kb) ? 1 : 0;
-        // bảng của tôi lên trước
         return mb - ma || ia - ib;
       });
 
@@ -2668,16 +2849,23 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         <View style={{ alignItems: "flex-start" }}>
           <Ripple
             onPress={openFilterSheet}
-            style={styles.sheetTriggerBtn}
+            style={[
+              styles.sheetTriggerBtn,
+              { borderColor: t.colors.border, backgroundColor: t.colors.card },
+            ]}
             hitSlop={8}
           >
-            <Text style={styles.sheetTriggerText}>🔎 Bộ lọc bảng</Text>
+            <Text style={[styles.sheetTriggerText, { color: t.colors.text }]}>
+              🔎 Bộ lọc bảng
+            </Text>
           </Ripple>
         </View>
 
         {!visibleGroups.length && (
-          <Card style={{ padding: 12 }}>
-            <Text>Không có bảng nào khớp bộ lọc.</Text>
+          <Card t={t} style={{ padding: 12 }}>
+            <Text style={{ color: t.colors.text }}>
+              Không có bảng nào khớp bộ lọc.
+            </Text>
           </Card>
         )}
         {visibleGroups.map((g) => {
@@ -2686,7 +2874,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           const labelNumeric = gi + 1;
           const size = sizeOf(g);
           const startIdx = starts.get(key) || 1;
-          const isMineGroup = groupMineMap.get(key); // 🆕
+          const isMineGroup = groupMineMap.get(key);
           const realMatches = currentMatches
             .filter((m) => matchGroupLabel(m) === key)
             .sort(
@@ -2738,26 +2926,27 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           const pointsCfg = sData.points || { win: 3, draw: 1, loss: 0 };
 
           return (
-            <Card key={key} style={isMineGroup ? styles.groupMineCard : null}>
+            <Card
+              key={key}
+              t={t}
+              style={isMineGroup ? styles.groupMineCard : null}
+            >
               <View style={styles.groupHeader}>
-                <Chip label={`Bảng ${labelNumeric}`} tone="primary" />
+                <Chip label={`Bảng ${labelNumeric}`} tone="primary" t={t} />
                 {(g.name || g.code) && (
-                  <Chip label={`Mã: ${g.name || g.code}`} />
+                  <Chip label={`Mã: ${g.name || g.code}`} t={t} />
                 )}
-                <Chip label={`Số đội: ${size || 0}`} />
-                {isMineGroup && <Chip label="⭐ Bảng của tôi" />}
+                <Chip label={`Số đội: ${size || 0}`} t={t} />
+                {isMineGroup && <Chip label="⭐ Bảng của tôi" t={t} />}
               </View>
 
-              <SectionTitle>Trận trong bảng</SectionTitle>
+              <SectionTitle t={t}>Trận trong bảng</SectionTitle>
               <View style={{ gap: 8, marginBottom: 8 }}>
                 {matchRows.length ? (
                   matchRows.map((r) => {
                     const color = r.match
                       ? statusColors(r.match)
-                      : { bg: "#9e9e9e", fg: "#fff" };
-                    const statusText = r.match
-                      ? resultLabel(r.match)
-                      : "Chưa diễn ra";
+                      : { bg: t.muted, fg: t.colors.text };
                     return (
                       <Card
                         key={r._id}
@@ -2767,6 +2956,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                             : undefined
                         }
                         disabled={!!r.isPlaceholder || !r.match}
+                        t={t}
                         style={styles.rowCard}
                       >
                         <View style={styles.rowHeader}>
@@ -2774,41 +2964,55 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                             label={r.code}
                             bgColor={color.bg}
                             fgColor={color.fg}
+                            t={t}
                           />
-                          <Text style={[styles.bold, { fontSize: 13 }]}>
+                          <Text
+                            style={[
+                              styles.bold,
+                              { fontSize: 13, color: t.colors.text },
+                            ]}
+                          >
                             {r.score || "—"}
                           </Text>
                         </View>
-                        <Text style={styles.rowMain} numberOfLines={2}>
-                          {r.aName} <Text style={{ opacity: 0.6 }}>vs</Text>
+                        <Text
+                          style={[styles.rowMain, { color: t.colors.text }]}
+                          numberOfLines={2}
+                        >
+                          {r.aName}{" "}
+                          <Text style={{ opacity: 0.6, color: t.subtext }}>
+                            vs
+                          </Text>{" "}
                           {r.bName}
                         </Text>
                         <View style={styles.rowMetaWrap}>
-                          <Chip label={r.time || "—"} />
-                          {!!r.court && <Chip label={r.court} />}
+                          <Chip label={r.time || "—"} t={t} />
+                          {!!r.court && <Chip label={r.court} t={t} />}
                         </View>
                       </Card>
                     );
                   })
                 ) : (
-                  <Card style={{ padding: 12, alignItems: "center" }}>
-                    <Text>Chưa có trận nào.</Text>
+                  <Card t={t} style={{ padding: 12, alignItems: "center" }}>
+                    <Text style={{ color: t.colors.text }}>
+                      Chưa có trận nào.
+                    </Text>
                   </Card>
                 )}
               </View>
 
-              <SectionTitle>Bảng xếp hạng</SectionTitle>
+              <SectionTitle t={t}>Bảng xếp hạng</SectionTitle>
               <View style={styles.legendWrap}>
-                <Chip label={`Thắng +${pointsCfg.win ?? 3}`} />
-                <Chip label={`Thua +${pointsCfg.loss ?? 0}`} />
-                <Chip label={`Hiệu số = Điểm ghi - Điểm thua`} />
+                <Chip label={`Thắng +${pointsCfg.win ?? 3}`} t={t} />
+                <Chip label={`Thua +${pointsCfg.loss ?? 0}`} t={t} />
+                <Chip label={`Hiệu số = Điểm ghi - Điểm thua`} t={t} />
               </View>
 
               {gStand?.rows?.length ? (
                 <View style={{ gap: 8 }}>
                   {gStand.rows.map((row, idx) => {
                     const name = row.pair
-                      ? safePairNick(row.pair, tour?.eventType) // 👈 CHỈ NICK
+                      ? safePairNick(row.pair, tour?.eventType)
                       : row.name || "—";
                     const pts = Number(row.pts ?? 0);
                     const diff = Number.isFinite(row.pointDiff)
@@ -2819,28 +3023,51 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                     return (
                       <View
                         key={row.id || `row-${idx}`}
-                        style={[styles.rankRow, isMyRow && styles.rankRowMy]} // 🆕
+                        style={[
+                          styles.rankRow,
+                          { borderBottomColor: t.divider },
+                          isMyRow && {
+                            backgroundColor: t.dark
+                              ? "rgba(124, 189, 255, 0.12)"
+                              : "rgba(25,118,210,0.08)",
+                          },
+                        ]}
                       >
-                        <View style={styles.rankBadge}>
-                          <Text style={[styles.bold, { fontSize: 12 }]}>
+                        <View
+                          style={[
+                            styles.rankBadge,
+                            { backgroundColor: t.chipInfoBg },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.bold,
+                              { fontSize: 12, color: t.colors.text },
+                            ]}
+                          >
                             {idx + 1}
                           </Text>
                         </View>
-                        <Text style={[styles.rankName]} numberOfLines={2}>
+                        <Text
+                          style={[styles.rankName, { color: t.colors.text }]}
+                          numberOfLines={2}
+                        >
                           {name}
                         </Text>
                         <View style={styles.rankChips}>
-                          <Chip label={`Điểm: ${pts}`} />
-                          <Chip label={`Hiệu số: ${diff}`} />
-                          <Chip label={`Hạng: ${rank}`} tone="primary" />
+                          <Chip label={`Điểm: ${pts}`} t={t} />
+                          <Chip label={`Hiệu số: ${diff}`} t={t} />
+                          <Chip label={`Hạng: ${rank}`} tone="primary" t={t} />
                         </View>
                       </View>
                     );
                   })}
                 </View>
               ) : (
-                <Card style={{ padding: 12, alignItems: "center" }}>
-                  <Text>Chưa có dữ liệu BXH.</Text>
+                <Card t={t} style={{ padding: 12, alignItems: "center" }}>
+                  <Text style={{ color: t.colors.text }}>
+                    Chưa có dữ liệu BXH.
+                  </Text>
                 </Card>
               )}
             </Card>
@@ -2850,7 +3077,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     );
   };
 
-  // ======= KO / RE render =======
   const renderRE = () => {
     const reRounds = buildRoundElimRounds(
       current,
@@ -2865,6 +3091,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         focusRegId={focusRegId}
         setFocusRegId={setFocusRegId}
         onOpenVideo={openVideoFor}
+        t={t}
       />
     );
   };
@@ -2873,6 +3100,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     const championGate = computeChampionGate(currentMatches);
     const finalMatchId = championGate.allowed ? championGate.matchId : null;
     const championPair = championGate.allowed ? championGate.pair : null;
+
+    const scaleForCurrent = readBracketScale(current);
+    const uniqueRoundsCount = new Set(currentMatches.map((m) => m.round ?? 1))
+      .size;
+    const roundsFromScale = scaleForCurrent
+      ? Math.ceil(Math.log2(scaleForCurrent))
+      : 0;
+    const minRoundsForCurrent = Math.max(uniqueRoundsCount, roundsFromScale);
 
     const expectedFirstRoundPairs =
       Array.isArray(current?.prefill?.seeds) && current.prefill.seeds.length
@@ -2900,29 +3135,30 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       <View>
         <View style={styles.koMeta}>
           {!!current?.ko?.startKey && (
-            <Chip label={`Bắt đầu: ${current.ko.startKey}`} />
+            <Chip label={`Bắt đầu: ${current.ko.startKey}`} t={t} />
           )}
           {!!current?.prefill?.isVirtual && (
-            <Chip label="Prefill ảo" tone="warn" />
+            <Chip label="Prefill ảo" tone="warn" t={t} />
           )}
           {!!current?.prefill?.source?.fromName && (
-            <Chip label={`Nguồn: ${current.prefill.source.fromName}`} />
+            <Chip label={`Nguồn: ${current.prefill.source.fromName}`} t={t} />
           )}
           {!!current?.prefill?.roundKey && (
-            <Chip label={`RoundKey: ${current.prefill.roundKey}`} />
+            <Chip label={`RoundKey: ${current.prefill.roundKey}`} t={t} />
           )}
         </View>
 
         {!!championPair && (
           <Card
+            t={t}
             style={{
               padding: 10,
-              borderColor: "#a5d6a7",
-              backgroundColor: "#f1fff2",
+              borderColor: t.success,
+              backgroundColor: t.dark ? "rgba(34,197,94,0.12)" : "#f1fff2",
             }}
           >
-            <Text>
-              Vô địch:
+            <Text style={{ color: t.colors.text }}>
+              Vô địch:{" "}
               <Text style={styles.bold}>
                 {pairLabelNickOnly(championPair, tour?.eventType)}
               </Text>
@@ -2937,11 +3173,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           focusRegId={focusRegId}
           setFocusRegId={setFocusRegId}
           onOpenVideo={openVideoFor}
+          t={t}
         />
         {currentMatches.length === 0 && prefillRounds && (
-          <Text style={styles.note}>
+          <Text style={[styles.note, { color: t.subtext }]}>
             * Đang hiển thị khung <Text style={styles.bold}>prefill</Text>
-            {current?.prefill?.isVirtual ? " (ảo theo seeding)" : ""} bắt đầu từ
+            {current?.prefill?.isVirtual ? " (ảo theo seeding)" : ""} bắt đầu từ{" "}
             <Text style={styles.bold}>
               {current?.ko?.startKey || current?.prefill?.roundKey || "?"}
             </Text>
@@ -2949,7 +3186,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           </Text>
         )}
         {currentMatches.length === 0 && !prefillRounds && (
-          <Text style={styles.note}>
+          <Text style={[styles.note, { color: t.subtext }]}>
             * Chưa bốc thăm / chưa lấy đội từ vòng trước — tạm hiển thị khung
             theo <Text style={styles.bold}>quy mô</Text>. Khi có trận thật,
             nhánh sẽ tự cập nhật.
@@ -2959,7 +3196,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     );
   };
 
-  // --- chỉ render phần sơ đồ (dùng cho fullscreen) ---
   const renderREBracketOnly = () => {
     const reRounds = buildRoundElimRounds(
       current,
@@ -2974,6 +3210,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         focusRegId={focusRegId}
         setFocusRegId={setFocusRegId}
         onOpenVideo={openVideoFor}
+        t={t}
       />
     );
   };
@@ -3018,142 +3255,166 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         focusRegId={focusRegId}
         setFocusRegId={setFocusRegId}
         onOpenVideo={openVideoFor}
+        t={t}
       />
     );
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={styles.screen}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        <Text style={styles.title}>Sơ đồ giải: {tour?.name}</Text>
-        <Card style={styles.metaCard}>
-          <View style={styles.metaRow}>
-            <Chip label={`Số đội: ${metaBar.totalTeams}`} />
-            <Chip label={`Check-in: ${metaBar.checkinLabel}`} />
-            <Chip label={`Địa điểm: ${metaBar.locationText}`} />
-          </View>
+    <BottomSheetModalProvider>
+      <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.screen,
+            { backgroundColor: t.colors.background },
+          ]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          <Text style={[styles.title, { color: t.colors.text }]}>
+            Sơ đồ giải: {tour?.name}
+          </Text>
+          <Card t={t} style={styles.metaCard}>
+            <View style={styles.metaRow}>
+              <Chip label={`Số đội: ${metaBar.totalTeams}`} t={t} />
+              <Chip label={`Check-in: ${metaBar.checkinLabel}`} t={t} />
+              <Chip label={`Địa điểm: ${metaBar.locationText}`} t={t} />
+            </View>
 
-          <View style={{ marginTop: 8, gap: 6 }}>
-            <Text style={styles.metaSmall}>
-              <Text style={styles.bold}>Chú thích:</Text> R/V: Vòng; T: Trận; B:
-              Bảng/Trận; W: Thắng; L: Thua; BYE: Ưu tiên
-            </Text>
+            <View style={{ marginTop: 8, gap: 6 }}>
+              <Text style={[styles.metaSmall, { color: t.subtext }]}>
+                <Text style={styles.bold}>Chú thích:</Text> R/V: Vòng; T: Trận;
+                B: Bảng/Trận; W: Thắng; L: Thua; BYE: Ưu tiên
+              </Text>
 
-            <View style={styles.colorLegendWrap}>
-              <View style={styles.colorLegendItem}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: "#2e7d32" }]}
-                />
-                <Text style={styles.metaSmall}>Xanh: hoàn thành</Text>
-              </View>
-              <View style={styles.colorLegendItem}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: "#ef6c00" }]}
-                />
-                <Text style={styles.metaSmall}>Đỏ: đang thi đấu</Text>
-              </View>
-              <View style={styles.colorLegendItem}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: "#f9a825" }]}
-                />
-                <Text style={styles.metaSmall}>Vàng: chuẩn bị</Text>
-              </View>
-              <View style={styles.colorLegendItem}>
-                <View
-                  style={[styles.colorDot, { backgroundColor: "#9e9e9e" }]}
-                />
-                <Text style={styles.metaSmall}>Ghi: dự kiến</Text>
+              <View style={styles.colorLegendWrap}>
+                <View style={styles.colorLegendItem}>
+                  <View
+                    style={[styles.colorDot, { backgroundColor: "#2e7d32" }]}
+                  />
+                  <Text style={[styles.metaSmall, { color: t.subtext }]}>
+                    Xanh: hoàn thành
+                  </Text>
+                </View>
+                <View style={styles.colorLegendItem}>
+                  <View
+                    style={[styles.colorDot, { backgroundColor: "#ef6c00" }]}
+                  />
+                  <Text style={[styles.metaSmall, { color: t.subtext }]}>
+                    Đỏ: đang thi đấu
+                  </Text>
+                </View>
+                <View style={styles.colorLegendItem}>
+                  <View
+                    style={[styles.colorDot, { backgroundColor: "#f9a825" }]}
+                  />
+                  <Text style={[styles.metaSmall, { color: t.subtext }]}>
+                    Vàng: chuẩn bị
+                  </Text>
+                </View>
+                <View style={styles.colorLegendItem}>
+                  <View
+                    style={[styles.colorDot, { backgroundColor: "#9e9e9e" }]}
+                  />
+                  <Text style={[styles.metaSmall, { color: t.subtext }]}>
+                    Ghi: dự kiến
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        </Card>
-        <TabsBar items={tabLabels} value={tab} onChange={setTab} />
+          </Card>
 
-        {current?.type === "group" ? (
-          <View style={{ gap: 12 }}>
-            <Card>
-              <Text style={styles.subTitle}>Vòng bảng: {current.name}</Text>
-              {renderLiveSpotlight()}
-              {renderGroupBlocks()}
-            </Card>
-          </View>
-        ) : current?.type === "roundElim" ? (
-          <Card>
-            <Text style={styles.subTitle}>
-              Vòng loại rút gọn (Round Elimination): {current.name}
-            </Text>
-            {renderRE()}
-            {currentMatches.length === 0 && (
-              <Text style={styles.note}>
-                * Chưa bốc cặp — đang hiển thị khung theo vòng cắt (V1..Vk).
+          <TabsBar items={tabLabels} value={tab} onChange={setTab} t={t} />
+
+          {current?.type === "group" ? (
+            <View style={{ gap: 12 }}>
+              <Card t={t}>
+                <Text style={[styles.subTitle, { color: t.colors.text }]}>
+                  Vòng bảng: {current.name}
+                </Text>
+                {renderLiveSpotlight()}
+                {renderGroupBlocks()}
+              </Card>
+            </View>
+          ) : current?.type === "roundElim" ? (
+            <Card t={t}>
+              <Text style={[styles.subTitle, { color: t.colors.text }]}>
+                Vòng loại rút gọn (Round Elimination): {current.name}
               </Text>
-            )}
-          </Card>
-        ) : (
-          <Card>
-            <Text style={styles.subTitle}>
-              Nhánh knock-out: {current?.name}
-            </Text>
-            {renderKO()}
-          </Card>
+              {renderRE()}
+              {currentMatches.length === 0 && (
+                <Text style={[styles.note, { color: t.subtext }]}>
+                  * Chưa bốc cặp — đang hiển thị khung theo vòng cắt (V1..Vk).
+                </Text>
+              )}
+            </Card>
+          ) : (
+            <Card t={t}>
+              <Text style={[styles.subTitle, { color: t.colors.text }]}>
+                Nhánh knock-out: {current?.name}
+              </Text>
+              {renderKO()}
+            </Card>
+          )}
+
+          <ResponsiveMatchViewer
+            open={open}
+            matchId={activeMatchId}
+            onClose={closeMatch}
+          />
+          <VideoModal
+            visible={videoState.visible}
+            url={videoState.url}
+            onClose={closeVideo}
+            t={t}
+          />
+        </ScrollView>
+
+        {current && current.type !== "group" && !isFullscreen && (
+          <FullscreenFAB onPress={enterFullscreen} bottomGap={80} t={t} />
         )}
 
-        <ResponsiveMatchViewer
-          open={open}
-          matchId={activeMatchId}
-          onClose={closeMatch}
-        />
-        <VideoModal
-          visible={videoState.visible}
-          url={videoState.url}
-          onClose={closeVideo}
-        />
-      </ScrollView>
-
-      {current && current.type !== "group" && !isFullscreen && (
-        <FullscreenFAB onPress={enterFullscreen} bottomGap={80} />
-      )}
-
-      {isFullscreen && current && current.type !== "group" && (
-        <View style={styles.fullOverlay}>
-          <StatusBar hidden />
-          <CloseFullscreenBtn onPress={exitFullscreen} />
-          <ScrollView
-            style={styles.fullScroll}
-            contentContainerStyle={{ padding: 8 }}
-            nestedScrollEnabled
-            directionalLockEnabled
-            showsVerticalScrollIndicator
+        {isFullscreen && current && current.type !== "group" && (
+          <View
+            style={[
+              styles.fullOverlay,
+              { backgroundColor: t.colors.background },
+            ]}
           >
-            {current.type === "roundElim"
-              ? renderREBracketOnly()
-              : renderKOBracketOnly()}
-          </ScrollView>
-        </View>
-      )}
-      <FilterSheet
-        ref={filterSheetRef}
-        filterItems={filterItems}
-        selectedGroupKeys={selectedGroupKeys}
-        onToggleKey={onToggleKey}
-        onlyMyGroups={!!onlyMyGroups}
-        setOnlyMyGroups={setOnlyMyGroups}
-        myRegIds={myRegIds}
-        onShowAll={() => setSelectedGroupKeys(new Set())}
-        onSelectAll={() =>
-          setSelectedGroupKeys(new Set(filterItems.map((f) => f.key)))
-        }
-        onOnlyMine={() => {
-          setSelectedGroupKeys(new Set());
-          setOnlyMyGroups(true);
-        }}
-      />
-    </View>
+            <StatusBar hidden />
+            <CloseFullscreenBtn onPress={exitFullscreen} t={t} />
+            <ScrollView
+              style={styles.fullScroll}
+              contentContainerStyle={{ padding: 8 }}
+              nestedScrollEnabled
+              directionalLockEnabled
+              showsVerticalScrollIndicator
+            >
+              {current.type === "roundElim"
+                ? renderREBracketOnly()
+                : renderKOBracketOnly()}
+            </ScrollView>
+          </View>
+        )}
+        <FilterSheet
+          ref={filterSheetRef}
+          filterItems={filterItems}
+          selectedGroupKeys={selectedGroupKeys}
+          onToggleKey={onToggleKey}
+          myRegIds={myRegIds}
+          onShowAll={() => setSelectedGroupKeys(new Set())}
+          onSelectAll={() =>
+            setSelectedGroupKeys(new Set(filterItems.map((f) => f.key)))
+          }
+          onOnlyMine={() => {
+            setSelectedGroupKeys(new Set());
+            setOnlyMyGroups(true);
+          }}
+          t={t}
+        />
+      </View>
+    </BottomSheetModalProvider>
   );
 }
 
@@ -3189,20 +3450,10 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: "#d0d0d0",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#fff",
     marginRight: 6,
-  },
-  chipPrimary: {
-    borderColor: "#1976d2",
-    backgroundColor: "#e3f2fd",
-  },
-  chipWarn: {
-    borderColor: "#f44336",
-    backgroundColor: "#ffebee",
   },
   chipText: {
     fontSize: 12,
@@ -3210,9 +3461,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 12,
-    backgroundColor: "#fff",
     padding: 12,
   },
   sectionTitle: {
@@ -3228,16 +3477,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fafafa",
     marginRight: 8,
   },
-  tabItemActive: {
-    borderColor: "#1976d2",
-    backgroundColor: "#e3f2fd",
-  },
+  tabItemActive: {},
   tabText: { fontWeight: "600" },
-  tabTextActive: { color: "#0d47a1" },
+  tabTextActive: {},
 
   // rows
   rowCard: { padding: 10 },
@@ -3268,30 +3512,23 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
   },
   rankBadge: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#eef2f7",
     alignItems: "center",
     justifyContent: "center",
   },
   rankName: { flex: 1, fontWeight: "600" },
   rankChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  rankRowMy: { backgroundColor: "rgba(25,118,210,0.08)" }, // 🆕 hàng BXH của tôi
+
   // bracket
   roundsRow: { flexDirection: "row", gap: 30 },
   seedBox: {
     borderWidth: 1,
-    borderColor: "#e5e5e5",
     borderRadius: 10,
     padding: 10,
-    backgroundColor: "#fff",
-    // bớt marginBottom (đã có padding từ wrapper)
-    // marginBottom: 10, // <-- bỏ dòng này nếu muốn spacing do wrapper kiểm soát
-    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
@@ -3304,13 +3541,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     paddingBottom: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eceff1",
   },
-  seedHeaderNeutral: {
-    backgroundColor: "#eef3f7",
-  },
-  seedCode: { fontWeight: "800", color: "#37474f" },
-  videoIcon: { fontSize: 16 },
   seedContent: {
     flexDirection: "row",
     alignItems: "stretch",
@@ -3348,7 +3579,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  teamText: { fontSize: 13, color: "#222" },
+  teamText: { fontSize: 13 },
   teamTextWin: { fontWeight: "800" },
   sideTag: { opacity: 0.65, fontWeight: "700" },
   seedMeta: { opacity: 0.7, fontSize: 12, marginTop: 2 },
@@ -3374,7 +3605,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     borderRadius: 12,
-    backgroundColor: "#fff",
+    borderWidth: 1,
     padding: 16,
   },
   modalTitle: { fontSize: 16, fontWeight: "800", marginBottom: 8 },
@@ -3383,7 +3614,6 @@ const styles = StyleSheet.create({
   closeBtn: {
     marginTop: 12,
     alignSelf: "flex-end",
-    backgroundColor: "#1976d2",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -3403,7 +3633,7 @@ const styles = StyleSheet.create({
   koMeta: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
 
   // footnote
-  note: { marginTop: 8, fontSize: 12, opacity: 0.7 },
+  note: { marginTop: 8, fontSize: 12 },
   bracketCanvas: {
     position: "relative",
     paddingTop: 4,
@@ -3411,8 +3641,6 @@ const styles = StyleSheet.create({
 
   connector: {
     position: "absolute",
-    backgroundColor: "#263238",
-    opacity: 0.9,
     borderRadius: 1,
   },
 
@@ -3429,8 +3657,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: "#eef3f7",
-    color: "#394a59",
   },
 
   // slot bọc card (để canh lưới)
@@ -3439,7 +3665,8 @@ const styles = StyleSheet.create({
   },
   metaCard: { padding: 12 },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  metaSmall: { fontSize: 12, opacity: 0.8 },
+  metaSmall: { fontSize: 12 },
+
   colorLegendWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -3448,14 +3675,7 @@ const styles = StyleSheet.create({
   },
   colorLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   colorDot: { width: 12, height: 12, borderRadius: 3 },
-  // seedHeader: {
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   paddingHorizontal: 8,
-  //   paddingVertical: 4,
-  //   borderRadius: 8,
-  //   marginBottom: 6,
-  // },
+
   seedHeaderCode: {
     fontWeight: "800",
   },
@@ -3469,17 +3689,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+
   /* ===== Fullscreen styles ===== */
   fullFab: {
     position: "absolute",
     right: 12,
     zIndex: 1000,
-    backgroundColor: "rgba(255,255,255,0.98)",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 999,
     padding: 6,
-    shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
@@ -3497,7 +3715,6 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#fff",
     padding: 8,
     zIndex: 2000,
   },
@@ -3519,8 +3736,6 @@ const styles = StyleSheet.create({
   /* 🆕 Filter styles */
   filterBar: {
     padding: 10,
-    backgroundColor: "#fbfdff",
-    borderColor: "#e3f2fd",
   },
 
   sheetContent: { paddingHorizontal: 12, paddingBottom: 12 },
@@ -3532,8 +3747,6 @@ const styles = StyleSheet.create({
   },
   sheetTriggerBtn: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    backgroundColor: "#fff",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -3556,15 +3769,13 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "#b0bec5",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
     marginRight: 6,
   },
-  checkBoxChecked: { backgroundColor: "#1976d2", borderColor: "#1976d2" },
-  checkMark: { color: "#fff", fontSize: 12, lineHeight: 12 },
-  checkLabel: { fontSize: 13, fontWeight: "600", color: "#263238" },
+  checkBoxChecked: {},
+  checkMark: { fontSize: 12, lineHeight: 12 },
+  checkLabel: { fontSize: 13, fontWeight: "600" },
   filterActions: {
     flexDirection: "row",
     gap: 8,
@@ -3576,8 +3787,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    backgroundColor: "#fff",
   },
   filterBtnText: { fontWeight: "700", fontSize: 12 },
 
@@ -3592,7 +3801,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1976d2",
   },
   applyBtnText: {
     color: "#fff",
