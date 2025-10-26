@@ -19,6 +19,7 @@ import {
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useGetMatchQuery,
   useRefereeIncPointMutation,
@@ -78,7 +79,6 @@ function useTokens() {
 
     success: dark ? "#22c55e" : "#16a34a",
 
-    // Status chip bg (không dùng ở file này nhưng giữ cho đồng bộ)
     status: {
       upcoming: dark ? "#0b5fad" : "#0288d1",
       ongoing: dark ? "#1c6b2a" : "#2e7d32",
@@ -537,7 +537,6 @@ function ColorCoinToss({ disabled, onClose }) {
             { backgroundColor: barColor, flex: 1, marginRight: 10 },
           ]}
         />
-       
       </View>
 
       <View style={[s.row, { justifyContent: "center", marginBottom: 8 }]}>
@@ -835,6 +834,8 @@ function CourtAssignModalFull({
 }
 
 /* ========== main component ========== */
+const UNDO_KEY = (matchId) => `PT_REF_JUDGE_UNDO_${String(matchId || "")}`;
+
 export default function RefereeJudgePanel({ matchId }) {
   const t = useTokens();
   const router = useRouter();
@@ -986,6 +987,14 @@ export default function RefereeJudgePanel({ matchId }) {
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
 
+  // Busy flags for disabling actions
+  const [incBusy, setIncBusy] = useState(false);
+  const [undoBusy, setUndoBusy] = useState(false);
+
+  // Track a pending op to release busy when score actually changes
+  const pendingOpRef = useRef(null);
+  const opTimeoutRef = useRef(null);
+
   // Mid-game side switch prompt (ALWAYS at half-set; triggers on undo too)
   const [midPromptOpen, setMidPromptOpen] = useState(false);
   // nửa set: 11→6, 15→8, 21→11, mặc định ceil(ptw/2)
@@ -1002,12 +1011,42 @@ export default function RefereeJudgePanel({ matchId }) {
     setPtw(basePointsToWin);
   }, [basePointsToWin]);
 
-  // ====== Undo stack ======
+  // ====== Undo stack (persisted) ======
   const undoStack = useRef([]);
+  const persistUndo = useCallback(async () => {
+    try {
+      if (!matchId) return;
+      await AsyncStorage.setItem(
+        UNDO_KEY(matchId),
+        JSON.stringify(undoStack.current)
+      );
+    } catch {}
+  }, [matchId]);
+  const loadUndo = useCallback(async () => {
+    try {
+      if (!matchId) return;
+      const raw = await AsyncStorage.getItem(UNDO_KEY(matchId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) undoStack.current = parsed;
+      }
+    } catch {}
+  }, [matchId]);
+
   const pushUndo = (entry) => {
-    undoStack.current.push(entry);
-    if (undoStack.current.length > 50) undoStack.current.shift();
+    // entry: {t: 'POINT'|'SERVE_SET'|'SLOTS_SET'|'SWAP_SIDES', ...}
+    undoStack.current.push({ ...entry, ts: Date.now() });
+    if (undoStack.current.length > 200) undoStack.current.shift();
+    persistUndo();
   };
+
+  // Load persisted undo on mount / match change
+  useEffect(() => {
+    loadUndo();
+    return () => {
+      // nothing
+    };
+  }, [loadUndo]);
 
   // ====== socket auto-refetch ======
   const socketInst = socket;
@@ -1032,6 +1071,32 @@ export default function RefereeJudgePanel({ matchId }) {
       socketInst.off("match:snapshot", handlePatched);
     };
   }, [socketInst, matchId, refetch]);
+
+  // Release busy when score actually changed for the pending op
+  useEffect(() => {
+    const op = pendingOpRef.current;
+    if (!op) return;
+    const changed =
+      op.type === "inc"
+        ? op.side === "A"
+          ? curA === op.prevA + 1
+          : curB === op.prevB + 1
+        : op.type === "undo"
+        ? op.side === "A"
+          ? curA === op.prevA - 1
+          : curB === op.prevB - 1
+        : false;
+
+    if (changed) {
+      if (op.type === "inc") setIncBusy(false);
+      if (op.type === "undo") setUndoBusy(false);
+      pendingOpRef.current = null;
+      if (opTimeoutRef.current) {
+        clearTimeout(opTimeoutRef.current);
+        opTimeoutRef.current = null;
+      }
+    }
+  }, [curA, curB]);
 
   // ====== actions ======
   const onStart = async () => {
@@ -1135,6 +1200,15 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
 
+  const beginOpTimeout = useCallback((kind) => {
+    if (opTimeoutRef.current) clearTimeout(opTimeoutRef.current);
+    opTimeoutRef.current = setTimeout(() => {
+      if (kind === "inc") setIncBusy(false);
+      if (kind === "undo") setUndoBusy(false);
+      pendingOpRef.current = null;
+    }, 2500); // fallback 2.5s
+  }, []);
+
   const inc = async (side) => {
     if (!match) return;
 
@@ -1153,6 +1227,17 @@ export default function RefereeJudgePanel({ matchId }) {
 
     const prevServerUid = serverUidShow;
     const nextOrder = activeServerNum === 1 ? 2 : 1;
+
+    // ⛔ Disable both inc buttons while waiting server update
+    setIncBusy(true);
+    pendingOpRef.current = {
+      type: "inc",
+      side,
+      prevA: curA,
+      prevB: curB,
+      t: Date.now(),
+    };
+    beginOpTimeout("inc");
 
     try {
       await incPoint({
@@ -1197,6 +1282,12 @@ export default function RefereeJudgePanel({ matchId }) {
 
       pushUndo({ t: "POINT", side });
     } catch (e) {
+      setIncBusy(false);
+      pendingOpRef.current = null;
+      if (opTimeoutRef.current) {
+        clearTimeout(opTimeoutRef.current);
+        opTimeoutRef.current = null;
+      }
       Toast.show({
         type: "error",
         text1: "Lỗi",
@@ -1231,8 +1322,21 @@ export default function RefereeJudgePanel({ matchId }) {
       Toast.show({ type: "info", text1: "Không có thao tác để hoàn tác" });
       return;
     }
+    await persistUndo();
+
     try {
       if (entry.t === "POINT") {
+        // ⛔ Lock undo during processing
+        setUndoBusy(true);
+        pendingOpRef.current = {
+          type: "undo",
+          side: entry.side,
+          prevA: curA,
+          prevB: curB,
+          t: Date.now(),
+        };
+        beginOpTimeout("undo");
+
         await dec(entry.side);
         socket?.emit("score:inc", {
           matchId: match?._id,
@@ -1242,6 +1346,8 @@ export default function RefereeJudgePanel({ matchId }) {
         });
         refetch();
       } else if (entry.t === "SERVE_SET") {
+        setUndoBusy(true);
+        beginOpTimeout("undo");
         const prev = entry.prev;
         socket?.emit(
           "serve:set",
@@ -1252,6 +1358,11 @@ export default function RefereeJudgePanel({ matchId }) {
             serverId: prev.serverId || "",
           },
           (ack) => {
+            setUndoBusy(false);
+            if (opTimeoutRef.current) {
+              clearTimeout(opTimeoutRef.current);
+              opTimeoutRef.current = null;
+            }
             if (!ack?.ok) {
               Toast.show({
                 type: "error",
@@ -1262,10 +1373,17 @@ export default function RefereeJudgePanel({ matchId }) {
           }
         );
       } else if (entry.t === "SLOTS_SET") {
+        setUndoBusy(true);
+        beginOpTimeout("undo");
         socket?.emit(
           "slots:setBase",
           { matchId: match?._id, base: entry.prevBase },
           (ack) => {
+            setUndoBusy(false);
+            if (opTimeoutRef.current) {
+              clearTimeout(opTimeoutRef.current);
+              opTimeoutRef.current = null;
+            }
             if (!ack?.ok) {
               Toast.show({
                 type: "error",
@@ -1276,9 +1394,12 @@ export default function RefereeJudgePanel({ matchId }) {
           }
         );
       } else if (entry.t === "SWAP_SIDES") {
+        setUndoBusy(true);
         setLeftRight(entry.prev);
+        setUndoBusy(false);
       }
     } catch {
+      setUndoBusy(false);
       Toast.show({ type: "error", text1: "Hoàn tác thất bại" });
     }
   };
@@ -1294,7 +1415,6 @@ export default function RefereeJudgePanel({ matchId }) {
     const rightUid =
       getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
 
-    // BE giữ nguyên logic cũ: đặt server=1 khi đổi giao (không special-case đầu game)
     socket?.emit(
       "serve:set",
       { matchId: match._id, side: nextSide, server: 1, serverId: rightUid },
@@ -1437,8 +1557,8 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const leftServing = activeSide === leftSide;
   const rightServing = activeSide === rightSide;
-  const leftEnabled = canScoreNow && leftServing;
-  const rightEnabled = canScoreNow && rightServing;
+  const leftEnabled = canScoreNow && leftServing && !incBusy && !undoBusy;
+  const rightEnabled = canScoreNow && rightServing && !incBusy && !undoBusy;
 
   const openCccd = useCallback((u) => {
     setCccdUser(u || null);
@@ -1620,10 +1740,18 @@ export default function RefereeJudgePanel({ matchId }) {
 
               <Ripple
                 onPress={onUndo}
-                style={s.btnUndoSm}
+                disabled={undoBusy || !undoStack.current.length}
+                style={[
+                  s.btnUndoSm,
+                  (undoBusy || !undoStack.current.length) && s.btnDisabled,
+                ]}
                 rippleContainerBorderRadius={10}
               >
-                <MaterialIcons name="undo" size={16} color="#92400e" />
+                {undoBusy ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <MaterialIcons name="undo" size={16} color="#92400e" />
+                )}
                 <Text style={s.btnUndoSmText}>Hoàn tác</Text>
               </Ripple>
 
@@ -1664,6 +1792,7 @@ export default function RefereeJudgePanel({ matchId }) {
             {/* Toggle người giao #1/#2 */}
             <Ripple
               onPress={toggleServerNum}
+              disabled={incBusy || undoBusy}
               style={[
                 s.btnOutlineSm,
                 {
@@ -1675,6 +1804,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   backgroundColor: t.colors.card,
                   borderColor: t.colors.border,
                 },
+                (incBusy || undoBusy) && s.btnDisabled,
               ]}
               rippleContainerBorderRadius={10}
             >
@@ -1840,11 +1970,15 @@ export default function RefereeJudgePanel({ matchId }) {
                   !leftEnabled && s.btnDisabled,
                 ]}
               >
-                <MaterialIcons
-                  name="add"
-                  size={22}
-                  color={leftServing ? "#fff" : t.colors.text}
-                />
+                {incBusy ? (
+                  <ActivityIndicator />
+                ) : (
+                  <MaterialIcons
+                    name="add"
+                    size={22}
+                    color={leftServing ? "#fff" : t.colors.text}
+                  />
+                )}
                 <Text
                   style={[
                     s.bigActionText,
@@ -1859,8 +1993,9 @@ export default function RefereeJudgePanel({ matchId }) {
               {/* Nút giữa động: Đổi tay <-> Đổi giao */}
               <Ripple
                 onPress={onMidPress}
+                disabled={incBusy || undoBusy}
                 rippleContainerBorderRadius={12}
-                style={s.toggleBtn}
+                style={[s.toggleBtn, (incBusy || undoBusy) && s.btnDisabled]}
               >
                 <MaterialIcons name={midIcon} size={22} color="#fff" />
                 <Text style={s.toggleText}>{midLabel}</Text>
@@ -1883,11 +2018,15 @@ export default function RefereeJudgePanel({ matchId }) {
                   !rightEnabled && s.btnDisabled,
                 ]}
               >
-                <MaterialIcons
-                  name="add"
-                  size={22}
-                  color={rightServing ? "#fff" : t.colors.text}
-                />
+                {incBusy ? (
+                  <ActivityIndicator />
+                ) : (
+                  <MaterialIcons
+                    name="add"
+                    size={22}
+                    color={rightServing ? "#fff" : t.colors.text}
+                  />
+                )}
                 <Text
                   style={[
                     s.bigActionText,
