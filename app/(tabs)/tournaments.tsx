@@ -20,7 +20,7 @@ import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { usePlatform } from "@/hooks/usePlatform";
 import { useTheme } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 /* ✅ New: preview viewer dùng react-native-image-viewing + Expo Image cache */
 import ImageView from "react-native-image-viewing";
 
@@ -418,12 +418,11 @@ export default function TournamentDashboardScreen() {
   const viewerImages = [{ uri: normalizedPreview }];
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{flex: 1}}>
       <View
         style={[
           styles.screen,
           { backgroundColor: t.colors.background },
-          isIOS && { marginBottom: 70 },
         ]}
       >
         {/* Tabs */}
@@ -515,17 +514,29 @@ export default function TournamentDashboardScreen() {
             )}
           </>
         )}
-        <ImageView
-          images={viewerImages}
-          imageIndex={0}
-          visible={!!preview}
-          onRequestClose={() => setPreview(null)}
-          swipeToCloseEnabled
-          doubleTapToZoomEnabled
-          backgroundColor="rgba(0,0,0,0.95)"
-          /* Dùng Expo Image để cache */
-          ImageComponent={CachedImage}
-        />
+          <ImageView
+            images={viewerImages}
+            imageIndex={0}
+            visible={!!preview}
+            onRequestClose={() => setPreview(null)}
+            swipeToCloseEnabled
+            doubleTapToZoomEnabled
+            backgroundColor="rgba(0,0,0,0.95)"
+            /* Dùng Expo Image để cache */
+            ImageComponent={CachedImage}
+            HeaderComponent={() => (
+              <Pressable
+                onPress={() => setPreview(null)}
+                style={styles.viewerClose}
+              >
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 20 }}
+                >
+                  ×
+                </Text>
+              </Pressable>
+            )}
+          />
         {/* ✅ Preview image viewer */}
       </View>
     </SafeAreaView>

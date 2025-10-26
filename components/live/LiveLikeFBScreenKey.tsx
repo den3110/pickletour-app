@@ -1,10 +1,6 @@
 // LiveLikeFBScreenKey.tsx (React Native / Expo)
-// AUTO-LIVE (Assigned → LIVE) — dùng liveStreamingApiSlice như bản web
-// - Poll: useGetCurrentMatchByCourtQuery(courtId)
-// - Tạo live: useCreateLiveSessionMutation({ matchId })
-// - Notify start/ended: useNotifyStreamStartedMutation / useNotifyStreamEndedMutation
-// - Fix Surface/preview: startPreviewWithRetry + collapsable={false} + cancel retry khi blur/unmount
-// - Không yêu cầu status "live" — chỉ cần currentMatch được gán vào sân
+// AUTO-LIVE (Assigned → LIVE) — poll court → tự start stream
+// Thêm HTML Overlay (giống OBS) qua URL, có retry an toàn, không chặn luồng live
 
 import React, {
   useCallback,
@@ -100,6 +96,14 @@ type Props = {
 
   autoOnLive?: boolean; // default: true (Assigned → LIVE)
 };
+
+/* ====== HTML Overlay (giống OBS) ====== */
+const OVERLAY_BASE = process.env.EXPO_PUBLIC_API_URL; // <— chỉnh host của bạn
+
+const buildOverlayUrl = (matchId?: string | null) =>
+  matchId
+    ? `${OVERLAY_BASE}/overlay/score?matchId=${matchId}&theme=dark&size=md&showSets=0`
+    : null;
 
 /* ====== Utils ====== */
 const SFX = {
@@ -355,9 +359,9 @@ export default function LiveLikeFBScreenKey({
   const [micMuted, setMicMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  /* ==== Score Overlay ==== */
+  /* ==== Overlay ==== */
   const [showScoreOverlay, setShowScoreOverlay] = useState(true);
-  const lastScoreRef = useRef<string | null>(null);
+  const overlaySupportedRef = useRef<boolean>(false);
 
   /* ==== Streaming refs ==== */
   const startedPreviewRef = useRef(false);
@@ -465,6 +469,8 @@ export default function LiveLikeFBScreenKey({
             await Live.stopPreview?.();
             startedPreviewRef.current = false;
           }
+          // Ẩn overlay khi unmount để giải phóng
+          await Live.setOverlayVisible?.(false);
         } catch {}
       })();
     };
@@ -491,7 +497,55 @@ export default function LiveLikeFBScreenKey({
     }, [kickPreview, mode])
   );
 
-  // AppState: resume preview & stream nếu cần
+  /* ==== Apply HTML Overlay an toàn (retry) ==== */
+  const applyHtmlOverlay = useCallback(
+    async (mid: string | null) => {
+      const overlayUrl = buildOverlayUrl(mid || undefined);
+      // Kiểm tra khả năng overlay mới
+      overlaySupportedRef.current =
+        !!Live?.setOverlayUrl &&
+        !!Live?.setOverlayRelWidth &&
+        !!Live?.setOverlayPosition &&
+        !!Live?.setOverlayVisible;
+
+      if (!overlayUrl || !overlaySupportedRef.current) {
+        log("overlay not supported or empty url — skip");
+        return;
+      }
+
+      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      // Thêm anchor nếu native có
+      try {
+        await Live.setOverlayAnchor?.("topLeft"); // optional
+      } catch {}
+
+      // Đợi GL/WebView ổn định một nhịp
+      await delay(500);
+
+      const MAX_TRIES = 6;
+      for (let i = 0; i < MAX_TRIES; i++) {
+        try {
+          //   await Live.setOverlayUrl(overlayUrl);
+          await Live.setOverlayRelWidth(0.2); // 20% bề rộng video
+          // Nếu gốc toạ độ top-left: (0.05, 0.08) = lệch 5% từ trái, 8% từ trên
+          // Nếu gốc bottom-left thì tuỳ native sẽ map nội bộ
+          await Live.setOverlayPosition(0.05, 0.08);
+          await Live.setOverlayFps?.(10); // 5–10fps nhẹ mà mượt
+          await Live.setOverlayVisible(!!showScoreOverlay);
+          log("overlay applied (try", i + 1, ")", overlayUrl);
+          return;
+        } catch (e) {
+          log("overlay apply failed (try", i + 1, ")", e);
+          await delay(350);
+        }
+      }
+      // Không throw — overlay fail vẫn live bình thường
+    },
+    [showScoreOverlay]
+  );
+
+  // AppState: resume preview & stream + re-apply overlay nếu cần
   useEffect(() => {
     const handler = async (nextState: AppStateStatus) => {
       if (nextState === "active") {
@@ -502,15 +556,15 @@ export default function LiveLikeFBScreenKey({
             log("resume → start", maskUrl(lastUrlRef.current));
             await startNative(lastUrlRef.current);
             setMode("live");
-            // ▼ đảm bảo overlay hiện lại khi resume
-            if (showScoreOverlay) {
+
+            // Re-apply HTML overlay (không chặn, có retry)
+            applyHtmlOverlay(currentMatchRef.current);
+
+            // Fallback overlay cũ nếu cần
+            if (!overlaySupportedRef.current && showScoreOverlay) {
               try {
                 await Live.setScoreVisible?.(true);
-                if (currentScore) await Live.updateScore?.(currentScore);
-                lastScoreRef.current = currentScore ?? lastScoreRef.current;
-              } catch (e) {
-                log("resume overlay init failed", e);
-              }
+              } catch {}
             }
           } catch (e) {
             log("resume → failed", e);
@@ -531,16 +585,25 @@ export default function LiveLikeFBScreenKey({
     };
     const sub = AppState.addEventListener("change", handler);
     return () => sub.remove();
-  }, [mode, startPreviewWithRetry, currentScore, showScoreOverlay]);
+  }, [mode, startPreviewWithRetry, applyHtmlOverlay, showScoreOverlay]);
 
   /* ==== Native start/stop ==== */
   const startNative = useCallback(async (url: string) => {
     log("Live.start", { url: maskUrl(url) });
-    await Live.start(url, 3_800_000, 1280, 720, 30); // 720p30, ~3.8Mbps
+    try {
+      await Live.start(url, 3_800_000, 1280, 720, 30); // 720p30, ~3.8Mbps
+    } catch (error) {
+      console.error("Live start error:", error);
+      Alert.alert("Lỗi", "Không thể bắt đầu live: " + error.message);
+      return;
+    }
     log("Live.start → OK");
   }, []);
   const stopNativeNow = useCallback(async () => {
     log("Live.stop → begin");
+    try {
+      await Live.setOverlayVisible?.(false); // ẩn overlay HTML nếu có
+    } catch {}
     try {
       await Live.stop();
     } catch (e) {
@@ -617,12 +680,10 @@ export default function LiveLikeFBScreenKey({
 
   const currentMatchId: string | null = courtData?.match?._id || null;
 
-  /* ==== Extract score from match data ==== */
+  /* ==== Extract score from match data (fallback overlay cũ) ==== */
   const extractScore = useCallback((match: any): string | null => {
     if (!match) return null;
 
-    // Try various possible score formats
-    // Format 1: match.homeScore / match.awayScore
     if (
       typeof match.homeScore === "number" &&
       typeof match.awayScore === "number"
@@ -630,7 +691,6 @@ export default function LiveLikeFBScreenKey({
       return `${match.homeScore} - ${match.awayScore}`;
     }
 
-    // Format 2: match.team1Score / match.team2Score
     if (
       typeof match.team1Score === "number" &&
       typeof match.team2Score === "number"
@@ -638,33 +698,29 @@ export default function LiveLikeFBScreenKey({
       return `${match.team1Score} - ${match.team2Score}`;
     }
 
-    // Format 3: match.score.home / match.score.away
     if (
-      match.score &&
+      match?.score &&
       typeof match.score.home === "number" &&
       typeof match.score.away === "number"
     ) {
       return `${match.score.home} - ${match.score.away}`;
     }
 
-    // Format 4: match.homeTeam.score / match.awayTeam.score
     if (
-      match.homeTeam?.score !== undefined &&
-      match.awayTeam?.score !== undefined
+      match?.homeTeam?.score !== undefined &&
+      match?.awayTeam?.score !== undefined
     ) {
       return `${match.homeTeam.score} - ${match.awayTeam.score}`;
     }
 
-    // Format 5: match.teams[0].score / match.teams[1].score
-    if (Array.isArray(match.teams) && match.teams.length >= 2) {
-      const score1 = match.teams[0]?.score;
-      const score2 = match.teams[1]?.score;
-      if (score1 !== undefined && score2 !== undefined) {
-        return `${score1} - ${score2}`;
+    if (Array.isArray(match?.teams) && match.teams.length >= 2) {
+      const s1 = match.teams[0]?.score;
+      const s2 = match.teams[1]?.score;
+      if (s1 !== undefined && s2 !== undefined) {
+        return `${s1} - ${s2}`;
       }
     }
 
-    // Default fallback
     return "0 - 0";
   }, []);
 
@@ -672,52 +728,50 @@ export default function LiveLikeFBScreenKey({
     return extractScore(courtData?.match);
   }, [courtData?.match, extractScore]);
 
-  /* ==== Update score overlay when score changes or when streaming ==== */
-  useEffect(() => {
-    const updateOverlay = async () => {
-      if (!showScoreOverlay) {
-        // Hide overlay if toggle is off
-        try {
-          await Live.setScoreVisible?.(false);
-        } catch (e) {
-          log("Failed to hide score overlay", e);
-        }
+  /* ==== Update overlay khi state đổi ==== */
+  // 1) Toggle show/hide overlay
+  const toggleScoreOverlay = useCallback(async () => {
+    try {
+      const next = !showScoreOverlay;
+      setShowScoreOverlay(next);
+
+      // Ưu tiên overlay HTML
+      if (overlaySupportedRef.current) {
+        await Live.setOverlayVisible?.(next);
         return;
       }
 
-      // Only update if in live mode and score is available
-      if (
-        mode === "live" &&
-        currentScore &&
-        currentScore !== lastScoreRef.current
-      ) {
+      // Fallback overlay cũ
+      await Live.setScoreVisible?.(next);
+      if (next && currentScore) {
+        await Live.updateScore?.(currentScore);
+      }
+    } catch (e) {
+      log("toggle overlay visible failed", e);
+    }
+  }, [showScoreOverlay, currentScore]);
+
+  // 2) Khi điểm đổi (chỉ dùng cho fallback overlay cũ)
+  useEffect(() => {
+    const run = async () => {
+      if (overlaySupportedRef.current) return; // dùng HTML overlay rồi
+      if (!showScoreOverlay) {
         try {
-          log("Updating score overlay:", currentScore);
+          await Live.setScoreVisible?.(false);
+        } catch {}
+        return;
+      }
+      if (mode === "live" && currentScore) {
+        try {
           await Live.updateScore?.(currentScore);
           await Live.setScoreVisible?.(true);
-          lastScoreRef.current = currentScore;
         } catch (e) {
-          log("Failed to update score overlay", e);
+          log("updateScore overlay (fallback) failed", e);
         }
       }
     };
-
-    updateOverlay();
+    run();
   }, [mode, currentScore, showScoreOverlay]);
-
-  const toggleScoreOverlay = useCallback(async () => {
-    try {
-      const newValue = !showScoreOverlay;
-      setShowScoreOverlay(newValue);
-      await Live.setScoreVisible?.(newValue);
-      if (newValue && currentScore) {
-        await Live.updateScore?.(currentScore);
-      }
-      log("Score overlay toggled:", newValue);
-    } catch (e) {
-      log("Failed to toggle score overlay", e);
-    }
-  }, [showScoreOverlay, currentScore]);
 
   /* ===================== create live session (idempotent) ===================== */
   const [createLiveSession] = useCreateLiveSessionMutation();
@@ -755,20 +809,21 @@ export default function LiveLikeFBScreenKey({
       try {
         await Haptics.selectionAsync();
         await startNative(url);
+
         lastUrlRef.current = url;
         currentMatchRef.current = mid;
         setMode("live");
         setStatusText("Đang LIVE…");
 
-        // ▼ bật overlay ngay khi bắt đầu live (kể cả khi điểm chưa đổi)
-        if (showScoreOverlay) {
+        // Áp HTML overlay (retry, không chặn)
+        applyHtmlOverlay(mid);
+
+        // Fallback overlay cũ nếu chưa hỗ trợ overlay HTML
+        if (!overlaySupportedRef.current && showScoreOverlay && currentScore) {
           try {
+            await Live.updateScore?.(currentScore);
             await Live.setScoreVisible?.(true);
-            if (currentScore) await Live.updateScore?.(currentScore);
-            lastScoreRef.current = currentScore ?? lastScoreRef.current;
-          } catch (e) {
-            log("live overlay init failed", e);
-          }
+          } catch {}
         }
 
         try {
@@ -777,6 +832,7 @@ export default function LiveLikeFBScreenKey({
             platform: "all",
           }).unwrap?.();
         } catch {}
+
         log("startForMatch → LIVE", { matchId: mid });
         return true;
       } catch (e: any) {
@@ -790,6 +846,7 @@ export default function LiveLikeFBScreenKey({
       ensureOutputsForMatch,
       startNative,
       notifyStreamStarted,
+      applyHtmlOverlay,
       showScoreOverlay,
       currentScore,
     ]
@@ -1063,6 +1120,7 @@ export default function LiveLikeFBScreenKey({
               <View style={styles.livePill}>
                 <Text style={styles.livePillTxt}>LIVE</Text>
               </View>
+              {/* Nếu muốn hiện điểm ngay trên UI (ngoài overlay) */}
               {currentScore && (
                 <View
                   style={[

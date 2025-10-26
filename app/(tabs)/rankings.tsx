@@ -900,7 +900,7 @@ export default function RankingListScreen() {
       style={[
         styles.container,
         { backgroundColor: C.pageBg },
-        isIOS && { paddingBottom: 50 },
+        // isIOS && { paddingBottom: 50 },
       ]}
     >
       {/* TOP BAR + SEARCH */}

@@ -86,6 +86,7 @@ function useTokens() {
 }
 
 /* ========== helpers ========== */
+
 const textOf = (v) => {
   if (v == null) return "";
   if (typeof v === "string" || typeof v === "number" || typeof v === "boolean")
@@ -141,7 +142,7 @@ const getCurrentSlotOfUser = ({
   return currentSlotFromBase(Number(base), ts);
 };
 
-/* ⚠️ Giữ icon người giao THEO NGƯỜI; riêng 0-0-2 thì lấy người ở ô 2 */
+/* ⚠️ Giữ icon người giao THEO NGƯỜI; riêng 0-0-2 ưu tiên người đã biết (lastServerUid), nếu chưa có thì mới lấy người ở ô 1 */
 const computeServerUid = ({
   serve,
   isStartOfGame,
@@ -150,19 +151,20 @@ const computeServerUid = ({
   getUidAtSlotNow,
   lastServerUid,
 }) => {
+  // Nếu serverId đã có → dùng luôn (nguồn sự thật từ server)
   const sId = serve?.serverId ? String(serve.serverId) : "";
   if (sId) return sId;
 
-  // ✓ Duy nhất ở 0-0-2: lấy người ở ô 2 (even) của đội đang giao
+  // 0-0-2: ƯU TIÊN NGƯỜI ĐÃ BIẾT (lastServerUid) để icon bám NGƯỜI khi đổi ô
   if (isStartOfGame && activeServerNum === 2) {
-    return (
-      getUidAtSlotNow?.(activeSide, 2) ||
+    const rightUid =
       getUidAtSlotNow?.(activeSide, 1) ||
-      lastServerUid ||
-      ""
-    );
+      getUidAtSlotNow?.(activeSide, 2) ||
+      "";
+    return lastServerUid || rightUid || "";
   }
-  // Còn lại: giữ người giao gần nhất
+
+  // Các trường hợp khác: giữ người giao gần nhất
   return lastServerUid || "";
 };
 
@@ -855,6 +857,7 @@ function CourtAssignModalFull({
 
 /* ========== main component ========== */
 const UNDO_KEY = (matchId) => `PT_REF_JUDGE_UNDO_${String(matchId || "")}`;
+const PTW_KEY = (matchId) => `PT_REF_PTWIN_BOOST_${String(matchId || "")}`;
 
 export default function RefereeJudgePanel({ matchId }) {
   const t = useTokens();
@@ -879,8 +882,10 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // ====== derive ======
   const rules = match?.rules || { bestOf: 1, pointsToWin: 11, winByTwo: true };
+  // const [ptwBoost, setPtwBoost] = useState(false); // true = +4, false = base
   const basePointsToWin = Number(rules?.pointsToWin ?? 11);
   const [ptw, setPtw] = useState(basePointsToWin);
+  const [ptwBoost, setPtwBoost] = useState(false);
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
   const gs = match?.gameScores || [];
   const theCurIdx = Math.max(0, gs.length - 1);
@@ -987,8 +992,7 @@ export default function RefereeJudgePanel({ matchId }) {
     ]
   );
 
-  // ✅ INIT serve cho 0-0-2: luôn là ô 2, persist về server (tránh chỉ hiển thị cục bộ)
-  // ✅ INIT serve cho 0-0-2: luôn là Ô 2 giao, persist về server
+  // ✅ INIT serve cho 0-0-2: luôn là Ô 1 (bên phải/chẵn), persist về server
   const initServeDoneRef = useRef({});
   useEffect(() => {
     if (!match?._id) return;
@@ -999,35 +1003,43 @@ export default function RefereeJudgePanel({ matchId }) {
 
     if (!is000 || inited) return;
 
-    const uidEven =
-      getUidAtSlotNow(activeSide, 2) || getUidAtSlotNow(activeSide, 1) || "";
+    // Ưu tiên người đang ở Ô 1 (bên phải/chẵn), nếu thiếu thì thử Ô 2
+    const uidRight =
+      getUidAtSlotNow(activeSide, 1) || getUidAtSlotNow(activeSide, 2) || "";
 
-    // Nếu đang không phải #2 hoặc thiếu serverId → ép về 0-0-2 (tay #2, người Ô2)
+    const currentOrder = Number(serve?.order ?? serve?.server ?? 1);
+    const currentServerId = serve?.serverId ? String(serve.serverId) : "";
+
+    // Cần sửa khi: order ≠ 2, hoặc chưa có serverId, hoặc serverId ≠ người ở Ô 1
     const needFix =
-      Number(serve?.order ?? serve?.server ?? 1) !== wantServerNum ||
-      !serve?.serverId;
+      currentOrder !== wantServerNum ||
+      !currentServerId ||
+      currentServerId !== String(uidRight);
 
     if (needFix) {
+      // ⏩ Set sớm để UI bám NGƯỜI ngay cả khi socket chưa ack
+      lastServerUidRef.current = uidRight;
+
       socket?.emit(
         "serve:set",
         {
           matchId: match._id,
           side: activeSide,
-          server: wantServerNum, // 2
-          serverId: uidEven,
+          server: wantServerNum, // 2 (0-0-2)
+          serverId: uidRight, // người ở Ô 1
         },
         (ack) => {
           if (ack?.ok) {
             initServeDoneRef.current[curIdx] = true;
-            lastServerUidRef.current = uidEven;
+            lastServerUidRef.current = uidRight;
             refetch();
           }
         }
       );
     } else {
-      // Đúng 0-0-2 rồi thì ghi nhớ người giao
+      // Đã đúng 0-0-2 và đúng người ở Ô 1
       initServeDoneRef.current[curIdx] = true;
-      lastServerUidRef.current = String(serve.serverId);
+      lastServerUidRef.current = currentServerId;
     }
   }, [
     match?._id,
@@ -1127,11 +1139,40 @@ export default function RefereeJudgePanel({ matchId }) {
     } catch {}
   }, [matchId]);
 
+  // ✅ Lưu/đọc cờ đã boost +4
+  const persistPtwBoost = useCallback(
+    async (val) => {
+      try {
+        if (!matchId) return;
+        await AsyncStorage.setItem(PTW_KEY(matchId), val ? "1" : "0");
+      } catch {}
+    },
+    [matchId]
+  );
+
+  const loadPtwBoost = useCallback(async () => {
+    try {
+      if (!matchId) return;
+      const raw = await AsyncStorage.getItem(PTW_KEY(matchId));
+      setPtwBoost(raw === "1");
+    } catch {
+      setPtwBoost(false);
+    }
+  }, [matchId]);
+
   const pushUndo = (entry) => {
     undoStack.current.push({ ...entry, ts: Date.now() });
     if (undoStack.current.length > 200) undoStack.current.shift();
     persistUndo();
   };
+
+  // ✅ sau khi có match/rules → đọc cờ boost đã lưu, không ép theo server
+  useEffect(() => {
+    if (!match?._id) return;
+    // ptw lấy theo server; cờ hiển thị +/- lấy theo AsyncStorage để “nhớ hành động”
+    setPtw(Number(match?.rules?.pointsToWin ?? basePointsToWin));
+    loadPtwBoost();
+  }, [match?._id, match?.rules?.pointsToWin, basePointsToWin, loadPtwBoost]);
 
   useEffect(() => {
     loadUndo();
@@ -1290,6 +1331,46 @@ export default function RefereeJudgePanel({ matchId }) {
       );
     },
     [match?._id, refetch, socket]
+  );
+
+  // ✅ gửi delta: +4 hoặc -4; cập nhật UI + lưu cờ
+  const setPointsToWinDelta = useCallback(
+    (deltaInt) => {
+      if (!match?._id) return;
+      const signStr = deltaInt >= 0 ? `+${deltaInt}` : `${deltaInt}`;
+      socket?.emit(
+        "rules:setPointsToWin",
+        { matchId: match._id, pointsToWin: signStr },
+        (ack) => {
+          if (!ack?.ok) {
+            Toast.show({
+              type: "error",
+              text1: "Lỗi",
+              text2: ack?.message || "Không cập nhật điểm set",
+            });
+            return;
+          }
+          // ưu tiên ack.pointsToWin nếu server trả; fallback cộng/trừ local
+          const nextVal =
+            typeof ack.pointsToWin === "number"
+              ? ack.pointsToWin
+              : Number(ptw) + Number(deltaInt);
+          setPtw(nextVal);
+
+          const nextBoost = deltaInt > 0; // +4 → true, -4 → false
+          setPtwBoost(nextBoost);
+          persistPtwBoost(nextBoost);
+          refetch();
+
+          Toast.show({
+            type: "success",
+            text1: "Đã cập nhật",
+            text2: `Điểm set: ${nextVal}`,
+          });
+        }
+      );
+    },
+    [match?._id, socket, ptw, persistPtwBoost, refetch]
   );
 
   const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
@@ -1487,7 +1568,7 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // --- ĐỔI GIAO: nếu chưa bắt đầu & 0-0 => đội kia 0-0-2; ngược lại => tay 1
+  // --- ĐỔI GIAO: ở đầu BẤT KỲ GAME nào (điểm 0-0) -> 0-0-2, ngược lại -> tay 1
   const toggleServeSide = () => {
     if (!match?._id) return;
 
@@ -1496,17 +1577,19 @@ export default function RefereeJudgePanel({ matchId }) {
       server: activeServerNum,
       serverId: serverUidShow,
     };
+
     const nextSide = activeSide === "A" ? "B" : "A";
 
-    const notStarted = match?.status !== "live" && match?.status !== "finished";
+    // Đầu trận/đầu game (0-0) => order = 2, còn lại => order = 1
     const isZeroZero = Number(curA) === 0 && Number(curB) === 0;
+    const nextOrder = isZeroZero ? 2 : 1;
 
-    // ✅ Chưa bắt đầu & 0-0 -> phải là 0-0-2
-    const nextOrder = notStarted && isZeroZero ? 2 : 1;
+    // Lấy người ở Ô 1 của đội sắp giao (fallback Ô 2 nếu trống)
+    const uidRight =
+      getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
 
-    // luôn chọn người đang ở Ô 2 (even) của đội nhận giao
-    const uidEven =
-      getUidAtSlotNow(nextSide, 2) || getUidAtSlotNow(nextSide, 1) || "";
+    // ⏩ Set sớm để icon bám NGƯỜI ngay lập tức
+    lastServerUidRef.current = uidRight;
 
     socket?.emit(
       "serve:set",
@@ -1514,7 +1597,7 @@ export default function RefereeJudgePanel({ matchId }) {
         matchId: match._id,
         side: nextSide,
         server: nextOrder,
-        serverId: uidEven,
+        serverId: uidRight,
       },
       (ack) => {
         if (!ack?.ok) {
@@ -1524,14 +1607,12 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đặt được giao bóng",
           });
         } else {
-          lastServerUidRef.current = uidEven;
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
       }
     );
   };
-  // --- ĐỔI TAY trong cùng đội: đổi sang đồng đội (không theo ô)
   // --- ĐỔI TAY trong cùng đội: đổi sang đồng đội (không theo ô)
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
@@ -1546,6 +1627,9 @@ export default function RefereeJudgePanel({ matchId }) {
     const partnerId =
       team.map(userIdOf).find((uid) => uid !== serverUidShow) || serverUidShow;
     const nextOrder = activeServerNum === 1 ? 2 : 1;
+
+    // ⏩ Set sớm để icon bám NGƯỜI ngay khi bấm
+    lastServerUidRef.current = partnerId;
 
     socket?.emit(
       "serve:set",
@@ -1563,7 +1647,6 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đổi được người giao",
           });
         } else {
-          lastServerUidRef.current = partnerId;
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
@@ -1998,14 +2081,11 @@ export default function RefereeJudgePanel({ matchId }) {
                 ]}
               >
                 <WinTargetTuner
-                  value={ptw}
-                  base={basePointsToWin}
+                  value={ptw} // hiển thị số hiện tại từ server
+                  base={ptwBoost ? ptw - 4 : ptw} // chỉ để winDigit vẽ trạng thái +/-
                   onToggle={() => {
-                    const next =
-                      ptw > basePointsToWin
-                        ? basePointsToWin
-                        : basePointsToWin + 4; // 11 <-> 15
-                    setPointsToWinOnServer(next);
+                    // nếu đã +4 → lần sau hiện “-” và gửi -4; nếu chưa → gửi +4
+                    setPointsToWinDelta(ptwBoost ? -4 : +4);
                   }}
                 />
 
