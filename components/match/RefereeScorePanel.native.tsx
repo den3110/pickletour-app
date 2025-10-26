@@ -1487,7 +1487,7 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // --- ĐỔI GIAO: sang đội kia, tay = 1, lấy người ở Ô 2 (even) hiện tại
+  // --- ĐỔI GIAO: nếu chưa bắt đầu & 0-0 => đội kia 0-0-2; ngược lại => tay 1
   const toggleServeSide = () => {
     if (!match?._id) return;
 
@@ -1497,12 +1497,25 @@ export default function RefereeJudgePanel({ matchId }) {
       serverId: serverUidShow,
     };
     const nextSide = activeSide === "A" ? "B" : "A";
-    const rightEvenUid =
+
+    const notStarted = match?.status !== "live" && match?.status !== "finished";
+    const isZeroZero = Number(curA) === 0 && Number(curB) === 0;
+
+    // ✅ Chưa bắt đầu & 0-0 -> phải là 0-0-2
+    const nextOrder = notStarted && isZeroZero ? 2 : 1;
+
+    // luôn chọn người đang ở Ô 2 (even) của đội nhận giao
+    const uidEven =
       getUidAtSlotNow(nextSide, 2) || getUidAtSlotNow(nextSide, 1) || "";
 
     socket?.emit(
       "serve:set",
-      { matchId: match._id, side: nextSide, server: 1, serverId: rightEvenUid }, // tay 1
+      {
+        matchId: match._id,
+        side: nextSide,
+        server: nextOrder,
+        serverId: uidEven,
+      },
       (ack) => {
         if (!ack?.ok) {
           Toast.show({
@@ -1511,7 +1524,7 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đặt được giao bóng",
           });
         } else {
-          lastServerUidRef.current = rightEvenUid;
+          lastServerUidRef.current = uidEven;
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
