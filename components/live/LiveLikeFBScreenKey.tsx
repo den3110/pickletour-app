@@ -355,6 +355,10 @@ export default function LiveLikeFBScreenKey({
   const [micMuted, setMicMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
+  /* ==== Score Overlay ==== */
+  const [showScoreOverlay, setShowScoreOverlay] = useState(true);
+  const lastScoreRef = useRef<string | null>(null);
+
   /* ==== Streaming refs ==== */
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
@@ -498,6 +502,16 @@ export default function LiveLikeFBScreenKey({
             log("resume → start", maskUrl(lastUrlRef.current));
             await startNative(lastUrlRef.current);
             setMode("live");
+            // ▼ đảm bảo overlay hiện lại khi resume
+            if (showScoreOverlay) {
+              try {
+                await Live.setScoreVisible?.(true);
+                if (currentScore) await Live.updateScore?.(currentScore);
+                lastScoreRef.current = currentScore ?? lastScoreRef.current;
+              } catch (e) {
+                log("resume overlay init failed", e);
+              }
+            }
           } catch (e) {
             log("resume → failed", e);
           }
@@ -517,7 +531,7 @@ export default function LiveLikeFBScreenKey({
     };
     const sub = AppState.addEventListener("change", handler);
     return () => sub.remove();
-  }, [mode, startPreviewWithRetry]);
+  }, [mode, startPreviewWithRetry, currentScore, showScoreOverlay]);
 
   /* ==== Native start/stop ==== */
   const startNative = useCallback(async (url: string) => {
@@ -603,6 +617,108 @@ export default function LiveLikeFBScreenKey({
 
   const currentMatchId: string | null = courtData?.match?._id || null;
 
+  /* ==== Extract score from match data ==== */
+  const extractScore = useCallback((match: any): string | null => {
+    if (!match) return null;
+
+    // Try various possible score formats
+    // Format 1: match.homeScore / match.awayScore
+    if (
+      typeof match.homeScore === "number" &&
+      typeof match.awayScore === "number"
+    ) {
+      return `${match.homeScore} - ${match.awayScore}`;
+    }
+
+    // Format 2: match.team1Score / match.team2Score
+    if (
+      typeof match.team1Score === "number" &&
+      typeof match.team2Score === "number"
+    ) {
+      return `${match.team1Score} - ${match.team2Score}`;
+    }
+
+    // Format 3: match.score.home / match.score.away
+    if (
+      match.score &&
+      typeof match.score.home === "number" &&
+      typeof match.score.away === "number"
+    ) {
+      return `${match.score.home} - ${match.score.away}`;
+    }
+
+    // Format 4: match.homeTeam.score / match.awayTeam.score
+    if (
+      match.homeTeam?.score !== undefined &&
+      match.awayTeam?.score !== undefined
+    ) {
+      return `${match.homeTeam.score} - ${match.awayTeam.score}`;
+    }
+
+    // Format 5: match.teams[0].score / match.teams[1].score
+    if (Array.isArray(match.teams) && match.teams.length >= 2) {
+      const score1 = match.teams[0]?.score;
+      const score2 = match.teams[1]?.score;
+      if (score1 !== undefined && score2 !== undefined) {
+        return `${score1} - ${score2}`;
+      }
+    }
+
+    // Default fallback
+    return "0 - 0";
+  }, []);
+
+  const currentScore = useMemo(() => {
+    return extractScore(courtData?.match);
+  }, [courtData?.match, extractScore]);
+
+  /* ==== Update score overlay when score changes or when streaming ==== */
+  useEffect(() => {
+    const updateOverlay = async () => {
+      if (!showScoreOverlay) {
+        // Hide overlay if toggle is off
+        try {
+          await Live.setScoreVisible?.(false);
+        } catch (e) {
+          log("Failed to hide score overlay", e);
+        }
+        return;
+      }
+
+      // Only update if in live mode and score is available
+      if (
+        mode === "live" &&
+        currentScore &&
+        currentScore !== lastScoreRef.current
+      ) {
+        try {
+          log("Updating score overlay:", currentScore);
+          await Live.updateScore?.(currentScore);
+          await Live.setScoreVisible?.(true);
+          lastScoreRef.current = currentScore;
+        } catch (e) {
+          log("Failed to update score overlay", e);
+        }
+      }
+    };
+
+    updateOverlay();
+  }, [mode, currentScore, showScoreOverlay]);
+
+  const toggleScoreOverlay = useCallback(async () => {
+    try {
+      const newValue = !showScoreOverlay;
+      setShowScoreOverlay(newValue);
+      await Live.setScoreVisible?.(newValue);
+      if (newValue && currentScore) {
+        await Live.updateScore?.(currentScore);
+      }
+      log("Score overlay toggled:", newValue);
+    } catch (e) {
+      log("Failed to toggle score overlay", e);
+    }
+  }, [showScoreOverlay, currentScore]);
+
   /* ===================== create live session (idempotent) ===================== */
   const [createLiveSession] = useCreateLiveSessionMutation();
   const [notifyStreamStarted] = useNotifyStreamStartedMutation();
@@ -643,6 +759,18 @@ export default function LiveLikeFBScreenKey({
         currentMatchRef.current = mid;
         setMode("live");
         setStatusText("Đang LIVE…");
+
+        // ▼ bật overlay ngay khi bắt đầu live (kể cả khi điểm chưa đổi)
+        if (showScoreOverlay) {
+          try {
+            await Live.setScoreVisible?.(true);
+            if (currentScore) await Live.updateScore?.(currentScore);
+            lastScoreRef.current = currentScore ?? lastScoreRef.current;
+          } catch (e) {
+            log("live overlay init failed", e);
+          }
+        }
+
         try {
           await (notifyStreamStarted as any)({
             matchId: mid,
@@ -658,7 +786,13 @@ export default function LiveLikeFBScreenKey({
         return false;
       }
     },
-    [ensureOutputsForMatch, startNative, notifyStreamStarted]
+    [
+      ensureOutputsForMatch,
+      startNative,
+      notifyStreamStarted,
+      showScoreOverlay,
+      currentScore,
+    ]
   );
 
   // Auto: chỉ cần có currentMatch → phát (switch nếu khác)
@@ -877,6 +1011,11 @@ export default function LiveLikeFBScreenKey({
               color="#fff"
             />
           </Pressable>
+          <Pressable onPress={toggleScoreOverlay}>
+            <Text style={styles.liveIcon}>
+              {showScoreOverlay ? "📊" : "📊🚫"}
+            </Text>
+          </Pressable>
           <Pressable onPress={onSwitch} style={styles.roundBtn} hitSlop={10}>
             <Icon name="camera-switch" size={20} color="#fff" />
           </Pressable>
@@ -924,6 +1063,16 @@ export default function LiveLikeFBScreenKey({
               <View style={styles.livePill}>
                 <Text style={styles.livePillTxt}>LIVE</Text>
               </View>
+              {currentScore && (
+                <View
+                  style={[
+                    styles.livePill,
+                    { marginLeft: 8, backgroundColor: "rgba(0,0,0,0.7)" },
+                  ]}
+                >
+                  <Text style={styles.livePillTxt}>{currentScore}</Text>
+                </View>
+              )}
             </View>
             <View
               style={[styles.liveBottomBar, { bottom: 14 + insets.bottom }]}

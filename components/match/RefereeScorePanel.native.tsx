@@ -141,6 +141,31 @@ const getCurrentSlotOfUser = ({
   return currentSlotFromBase(Number(base), ts);
 };
 
+/* ⚠️ Giữ icon người giao THEO NGƯỜI; riêng 0-0-2 thì lấy người ở ô 2 */
+const computeServerUid = ({
+  serve,
+  isStartOfGame,
+  activeServerNum,
+  activeSide,
+  getUidAtSlotNow,
+  lastServerUid,
+}) => {
+  const sId = serve?.serverId ? String(serve.serverId) : "";
+  if (sId) return sId;
+
+  // ✓ Duy nhất ở 0-0-2: lấy người ở ô 2 (even) của đội đang giao
+  if (isStartOfGame && activeServerNum === 2) {
+    return (
+      getUidAtSlotNow?.(activeSide, 2) ||
+      getUidAtSlotNow?.(activeSide, 1) ||
+      lastServerUid ||
+      ""
+    );
+  }
+  // Còn lại: giữ người giao gần nhất
+  return lastServerUid || "";
+};
+
 /* ======= memo child components ======= */
 const NameBadge = memo(
   function NameBadge({ user, isServer, onPressAvatar }) {
@@ -642,7 +667,7 @@ function CourtAssignModalFull({
   const [unassignCourt, { isLoading: unassigning }] =
     useRefereeUnassignCourtMutation();
 
-  const courts = data?.items || [];
+  const courts = (data?.items || []).filter(Boolean);
 
   const doAssign = async (courtId) => {
     try {
@@ -930,20 +955,98 @@ export default function RefereeJudgePanel({ matchId }) {
     [slotsNowA, slotsNowB]
   );
 
-  // Serve state
+  // ==== Serve state
   const serve = match?.serve || { side: "A", server: 2, serverId: "" };
   const activeSide = serve?.side === "B" ? "B" : "A";
   const activeServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
 
-  // Đầu game (0-0-2) icon phải nằm ở Ô 1
+  // Nhớ người giao gần nhất để icon không “nhảy theo ô”
+  const lastServerUidRef = useRef("");
+
+  // Đầu game (0-0-2) icon phải nằm ở ô phải/even
   const isStartOfGame = Number(curA) === 0 && Number(curB) === 0;
-  const serverUidShow =
-    (isStartOfGame && activeServerNum === 2
-      ? getUidAtSlotNow(activeSide, 1) ||
-        serve?.serverId ||
-        getUidAtSlotNow(activeSide, activeServerNum)
-      : serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum)) || "";
+
+  // ✅ TÍNH NGƯỜI GIAO “THEO NGƯỜI” (không theo ô)
+  const serverUidShow = useMemo(
+    () =>
+      computeServerUid({
+        serve,
+        isStartOfGame,
+        activeServerNum,
+        activeSide,
+        getUidAtSlotNow,
+        lastServerUid: lastServerUidRef.current,
+      }),
+    [
+      serve?.serverId,
+      isStartOfGame,
+      activeServerNum,
+      activeSide,
+      getUidAtSlotNow,
+    ]
+  );
+
+  // ✅ INIT serve cho 0-0-2: luôn là ô 2, persist về server (tránh chỉ hiển thị cục bộ)
+  // ✅ INIT serve cho 0-0-2: luôn là Ô 2 giao, persist về server
+  const initServeDoneRef = useRef({});
+  useEffect(() => {
+    if (!match?._id) return;
+
+    const inited = !!initServeDoneRef.current[curIdx];
+    const wantServerNum = 2;
+    const is000 = Number(curA) === 0 && Number(curB) === 0;
+
+    if (!is000 || inited) return;
+
+    const uidEven =
+      getUidAtSlotNow(activeSide, 2) || getUidAtSlotNow(activeSide, 1) || "";
+
+    // Nếu đang không phải #2 hoặc thiếu serverId → ép về 0-0-2 (tay #2, người Ô2)
+    const needFix =
+      Number(serve?.order ?? serve?.server ?? 1) !== wantServerNum ||
+      !serve?.serverId;
+
+    if (needFix) {
+      socket?.emit(
+        "serve:set",
+        {
+          matchId: match._id,
+          side: activeSide,
+          server: wantServerNum, // 2
+          serverId: uidEven,
+        },
+        (ack) => {
+          if (ack?.ok) {
+            initServeDoneRef.current[curIdx] = true;
+            lastServerUidRef.current = uidEven;
+            refetch();
+          }
+        }
+      );
+    } else {
+      // Đúng 0-0-2 rồi thì ghi nhớ người giao
+      initServeDoneRef.current[curIdx] = true;
+      lastServerUidRef.current = String(serve.serverId);
+    }
+  }, [
+    match?._id,
+    curIdx,
+    curA,
+    curB,
+    activeSide,
+    getUidAtSlotNow,
+    serve?.serverId,
+    serve?.order,
+    serve?.server,
+    socket,
+    refetch,
+  ]);
+
+  // Luôn ghi nhớ người giao hiện tại
+  useEffect(() => {
+    if (serverUidShow) lastServerUidRef.current = serverUidShow;
+  }, [serverUidShow]);
 
   const callout =
     eventType === "single"
@@ -980,15 +1083,15 @@ export default function RefereeJudgePanel({ matchId }) {
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
 
-  // Busy flags for disabling actions
+  // Busy flags
   const [incBusy, setIncBusy] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
 
-  // Track a pending op to release busy when score actually changes
+  // Track pending op
   const pendingOpRef = useRef(null);
   const opTimeoutRef = useRef(null);
 
-  // Mid-game side switch prompt — ask only once per game
+  // Mid-game side switch prompt
   const [midPromptOpen, setMidPromptOpen] = useState(false);
   const midPoint = ptw ? Math.ceil(Number(ptw) / 2) : null;
   const midAskedRef = useRef({}); // { [gameIndex]: true }
@@ -1163,21 +1266,26 @@ export default function RefereeJudgePanel({ matchId }) {
         "rules:setPointsToWin",
         { matchId: match._id, pointsToWin: Number(nextVal) },
         (ack) => {
-          if (!ack?.ok) {
+          try {
+            if (!ack?.ok) {
+              console.log(ack?.message);
+              Toast.show({
+                type: "error",
+                text1: "Lỗi",
+                text2: ack?.message || "Không cập nhật điểm set",
+              });
+              return;
+            }
+            setPtw(Number(nextVal));
+            refetch();
             Toast.show({
-              type: "error",
-              text1: "Lỗi",
-              text2: ack?.message || "Không cập nhật điểm set",
+              type: "success",
+              text1: "Đã cập nhật",
+              text2: `Điểm set: ${nextVal}`,
             });
-            return;
+          } catch (error) {
+            console.log(error);
           }
-          setPtw(Number(nextVal));
-          refetch();
-          Toast.show({
-            type: "success",
-            text1: "Đã cập nhật",
-            text2: `Điểm set: ${nextVal}`,
-          });
         }
       );
     },
@@ -1211,7 +1319,8 @@ export default function RefereeJudgePanel({ matchId }) {
 
     if (side !== activeSide) return;
 
-    const prevServerUid = serverUidShow;
+    // lấy người giao hiện hành theo ref (không fallback theo ô)
+    const prevServerUid = lastServerUidRef.current;
 
     // ⛔ Disable both inc buttons while waiting server update
     setIncBusy(true);
@@ -1239,8 +1348,8 @@ export default function RefereeJudgePanel({ matchId }) {
         autoNext: false,
       });
 
-      // ❗ KHÔNG tự đổi order khi đội giao ăn điểm — giữ nguyên server/order
-      // Nếu serverId đang rỗng (đầu game), set một lần để cố định icon
+      // ❗ Không đổi người giao khi đội giao ghi điểm
+      // Nếu serverId đang rỗng (độ trễ socket), gán lại đúng UID vừa giao
       if (!serve?.serverId && prevServerUid) {
         socket?.emit(
           "serve:set",
@@ -1301,7 +1410,6 @@ export default function RefereeJudgePanel({ matchId }) {
 
     try {
       if (entry.t === "POINT") {
-        // ⛔ Lock undo during processing
         setUndoBusy(true);
         pendingOpRef.current = {
           type: "undo",
@@ -1379,20 +1487,22 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
+  // --- ĐỔI GIAO: sang đội kia, tay = 1, lấy người ở Ô 2 (even) hiện tại
   const toggleServeSide = () => {
     if (!match?._id) return;
+
     const prev = {
       side: activeSide,
       server: activeServerNum,
       serverId: serverUidShow,
     };
     const nextSide = activeSide === "A" ? "B" : "A";
-    const rightUid =
-      getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
+    const rightEvenUid =
+      getUidAtSlotNow(nextSide, 2) || getUidAtSlotNow(nextSide, 1) || "";
 
     socket?.emit(
       "serve:set",
-      { matchId: match._id, side: nextSide, server: 1, serverId: rightUid },
+      { matchId: match._id, side: nextSide, server: 1, serverId: rightEvenUid }, // tay 1
       (ack) => {
         if (!ack?.ok) {
           Toast.show({
@@ -1401,13 +1511,15 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đặt được giao bóng",
           });
         } else {
+          lastServerUidRef.current = rightEvenUid;
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
       }
     );
   };
-
+  // --- ĐỔI TAY trong cùng đội: đổi sang đồng đội (không theo ô)
+  // --- ĐỔI TAY trong cùng đội: đổi sang đồng đội (không theo ô)
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
     const team = activeSide === "A" ? playersA : playersB;
@@ -1418,7 +1530,6 @@ export default function RefereeJudgePanel({ matchId }) {
       server: activeServerNum,
       serverId: serverUidShow,
     };
-
     const partnerId =
       team.map(userIdOf).find((uid) => uid !== serverUidShow) || serverUidShow;
     const nextOrder = activeServerNum === 1 ? 2 : 1;
@@ -1439,6 +1550,7 @@ export default function RefereeJudgePanel({ matchId }) {
             text2: ack?.message || "Không đổi được người giao",
           });
         } else {
+          lastServerUidRef.current = partnerId;
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
@@ -2507,14 +2619,6 @@ const s = StyleSheet.create({
     position: "relative",
   },
   coinTitle: { fontSize: 18, fontWeight: "900" },
-  badge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 999,
-  },
   btnCourtNameSm: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -2523,7 +2627,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    maxWidth: 180, // tránh quá dài phá layout
+    maxWidth: 180,
   },
   btnCourtNameSmText: {
     fontWeight: "700",
