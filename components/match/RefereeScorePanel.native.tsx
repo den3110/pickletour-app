@@ -27,7 +27,6 @@ import {
   useRefereeSetStatusMutation,
   useRefereeSetWinnerMutation,
   useRefereeNextGameMutation,
-  // ⬇️ NEW hooks for court assigning
   useGetCourtsForMatchQuery,
   useRefereeAssignCourtMutation,
   useRefereeUnassignCourtMutation,
@@ -40,7 +39,7 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import CCCDModal from "../CCCDModal.native";
 import { useTheme } from "@react-navigation/native";
 
-/* ---------- Theme tokens (giống DashboardScreen) ---------- */
+/* ---------- Theme tokens ---------- */
 function useTokens() {
   const navTheme = useTheme?.() || {};
   const scheme = useColorScheme?.() || "light";
@@ -64,7 +63,6 @@ function useTokens() {
     headerBg: dark ? "#101418" : "#f1f5f9",
     divider: dark ? "#2a2e33" : "#e5e7eb",
 
-    // Chips
     chipInfoBg: dark ? "#1f2937" : "#eef2f7",
     chipInfoFg: dark ? "#e5e7eb" : "#263238",
     chipInfoBd: dark ? "#334155" : "#e2e8f0",
@@ -625,7 +623,7 @@ function ColorCoinToss({ disabled, onClose }) {
   );
 }
 
-/* ========= FULLSCREEN COURT PICKER (from original, themed) ========= */
+/* ========= FULLSCREEN COURT PICKER ========= */
 function CourtAssignModalFull({
   visible,
   onClose,
@@ -689,7 +687,6 @@ function CourtAssignModalFull({
       <SafeAreaView
         style={[s.fullModalWrap, { backgroundColor: t.colors.background }]}
       >
-        {/* Header */}
         <View style={[s.rowBetween, { padding: 12 }]}>
           <Text style={[s.h6, { color: t.colors.text }]}>Gán sân</Text>
           <View style={[s.row, { gap: 6 }]}>
@@ -715,7 +712,6 @@ function CourtAssignModalFull({
           </View>
         </View>
 
-        {/* Body */}
         <View style={{ flex: 1, paddingHorizontal: 12 }}>
           {isLoading ? (
             <View style={[s.center, { flex: 1 }]}>
@@ -794,7 +790,6 @@ function CourtAssignModalFull({
           )}
         </View>
 
-        {/* Footer */}
         <View
           style={{
             padding: 12,
@@ -864,7 +859,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
   const gs = match?.gameScores || [];
   const theCurIdx = Math.max(0, gs.length - 1);
-  const curIdx = theCurIdx; // keep naming
+  const curIdx = theCurIdx;
   const curA = Number(gs[curIdx]?.a ?? 0);
   const curB = Number(gs[curIdx]?.b ?? 0);
 
@@ -941,16 +936,14 @@ export default function RefereeJudgePanel({ matchId }) {
   const activeServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
 
-  // ⬇️ UI-ONLY: Đầu game (0-0-2) icon phải nằm ở Ô 1
+  // Đầu game (0-0-2) icon phải nằm ở Ô 1
   const isStartOfGame = Number(curA) === 0 && Number(curB) === 0;
   const serverUidShow =
     (isStartOfGame && activeServerNum === 2
-      ? // luôn ưu tiên Ô 1 cho icon ở đầu game
-        getUidAtSlotNow(activeSide, 1) ||
+      ? getUidAtSlotNow(activeSide, 1) ||
         serve?.serverId ||
         getUidAtSlotNow(activeSide, activeServerNum)
-      : // còn lại giữ nguyên như cũ
-        serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum)) || "";
+      : serve?.serverId || getUidAtSlotNow(activeSide, activeServerNum)) || "";
 
   const callout =
     eventType === "single"
@@ -995,12 +988,10 @@ export default function RefereeJudgePanel({ matchId }) {
   const pendingOpRef = useRef(null);
   const opTimeoutRef = useRef(null);
 
-  // Mid-game side switch prompt (ALWAYS at half-set; triggers on undo too)
+  // Mid-game side switch prompt — ask only once per game
   const [midPromptOpen, setMidPromptOpen] = useState(false);
-  // nửa set: 11→6, 15→8, 21→11, mặc định ceil(ptw/2)
   const midPoint = ptw ? Math.ceil(Number(ptw) / 2) : null;
-  // theo dõi snapshot điểm trước đó (để chỉ bật khi VỪA chạm nửa set)
-  const prevScoreRef = useRef({ idx: -1, a: null, b: null });
+  const midAskedRef = useRef({}); // { [gameIndex]: true }
 
   useEffect(() => {
     const tmr = setInterval(() => setNow(new Date()), 1000);
@@ -1034,18 +1025,13 @@ export default function RefereeJudgePanel({ matchId }) {
   }, [matchId]);
 
   const pushUndo = (entry) => {
-    // entry: {t: 'POINT'|'SERVE_SET'|'SLOTS_SET'|'SWAP_SIDES', ...}
     undoStack.current.push({ ...entry, ts: Date.now() });
     if (undoStack.current.length > 200) undoStack.current.shift();
     persistUndo();
   };
 
-  // Load persisted undo on mount / match change
   useEffect(() => {
     loadUndo();
-    return () => {
-      // nothing
-    };
   }, [loadUndo]);
 
   // ====== socket auto-refetch ======
@@ -1206,7 +1192,7 @@ export default function RefereeJudgePanel({ matchId }) {
       if (kind === "inc") setIncBusy(false);
       if (kind === "undo") setUndoBusy(false);
       pendingOpRef.current = null;
-    }, 2500); // fallback 2.5s
+    }, 2500);
   }, []);
 
   const inc = async (side) => {
@@ -1226,7 +1212,6 @@ export default function RefereeJudgePanel({ matchId }) {
     if (side !== activeSide) return;
 
     const prevServerUid = serverUidShow;
-    const nextOrder = activeServerNum === 1 ? 2 : 1;
 
     // ⛔ Disable both inc buttons while waiting server update
     setIncBusy(true);
@@ -1254,32 +1239,22 @@ export default function RefereeJudgePanel({ matchId }) {
         autoNext: false,
       });
 
-      if (prevServerUid) {
+      // ❗ KHÔNG tự đổi order khi đội giao ăn điểm — giữ nguyên server/order
+      // Nếu serverId đang rỗng (đầu game), set một lần để cố định icon
+      if (!serve?.serverId && prevServerUid) {
         socket?.emit(
           "serve:set",
           {
             matchId: match._id,
             side: activeSide,
-            server: nextOrder,
+            server: activeServerNum,
             serverId: prevServerUid,
           },
-          (ack) => {
-            if (!ack?.ok) {
-              Toast.show({
-                type: "error",
-                text1: "Lỗi",
-                text2:
-                  ack?.message || "Không cập nhật người giao sau khi cộng điểm",
-              });
-            } else {
-              refetch();
-            }
-          }
+          () => {}
         );
-      } else {
-        refetch();
       }
 
+      refetch();
       pushUndo({ t: "POINT", side });
     } catch (e) {
       setIncBusy(false);
@@ -1634,21 +1609,16 @@ export default function RefereeJudgePanel({ matchId }) {
   const midIcon = isServer1 ? "swap-vert" : "swap-calls";
   const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
 
-  // ====== Always-ask-at-half-set logic (triggers on undo too) ======
+  // ====== Ask-once-at-half-set per game ======
   useEffect(() => {
     if (match?.status !== "live" || midPoint == null) return;
-
-    const prev = prevScoreRef.current;
-    const changedGame = prev.idx !== curIdx;
-    const scoreChanged = prev.a !== curA || prev.b !== curB;
+    const asked = !!midAskedRef.current[curIdx];
     const isAtMidNow = curA === midPoint || curB === midPoint;
-
-    if ((changedGame || scoreChanged) && isAtMidNow && !midPromptOpen) {
+    if (!asked && isAtMidNow) {
       setMidPromptOpen(true);
+      midAskedRef.current[curIdx] = true; // mark asked for this game
     }
-
-    prevScoreRef.current = { idx: curIdx, a: curA, b: curB };
-  }, [match?.status, curIdx, curA, curB, midPoint, midPromptOpen]);
+  }, [match?.status, curIdx, curA, curB, midPoint]);
 
   /* ========== render ========== */
   if (isLoading && !match)
@@ -1677,6 +1647,22 @@ export default function RefereeJudgePanel({ matchId }) {
   // current court id if any
   const currentCourtId =
     match?.court?._id || match?.court?.id || match?.court || match?.courtId;
+
+  // Lấy tên sân nếu có (tránh hiện ID nếu court là string)
+  const currentCourtName =
+    typeof match?.court === "object"
+      ? textOf(
+          match?.court?.name ||
+            match?.court?.label ||
+            match?.court?.title ||
+            match?.court
+        )
+      : textOf(match?.courtName || match?.meta?.courtName || "");
+  // ✅ Map điểm/sets theo bên trái/phải hiện tại
+  const leftGameScore = leftSide === "A" ? curA : curB;
+  const rightGameScore = rightSide === "A" ? curA : curB;
+  const leftSetWins = leftSide === "A" ? aWins : bWins;
+  const rightSetWins = rightSide === "A" ? aWins : bWins;
 
   return (
     <SafeAreaView style={[s.page, { backgroundColor: t.colors.background }]}>
@@ -1813,7 +1799,7 @@ export default function RefereeJudgePanel({ matchId }) {
               </Text>
             </Ripple>
 
-            {/* ⬇️ NEW: Gán sân (ở cuối cùng) */}
+            {/* Gán/Đổi sân (court) */}
             <Ripple
               onPress={() => setCourtOpen(true)}
               style={[
@@ -1836,6 +1822,23 @@ export default function RefereeJudgePanel({ matchId }) {
             </Ripple>
           </View>
         </View>
+        {/* Nút text hiển thị TÊN SÂN — chỉ hiện khi đã gán sân và có tên */}
+        {currentCourtId && !!currentCourtName ? (
+          <View
+            style={[
+              s.btnCourtNameSm,
+              { backgroundColor: t.colors.card, borderColor: t.colors.border },
+            ]}
+          >
+            <Text
+              style={[s.btnCourtNameSmText, { color: t.colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {currentCourtName}
+            </Text>
+          </View>
+        ) : null}
 
         {/* ===== SCOREBOARD ===== */}
         <View
@@ -1886,7 +1889,9 @@ export default function RefereeJudgePanel({ matchId }) {
                 </Text>
 
                 <View style={[s.rowBetween, { width: "100%", marginTop: 6 }]}>
-                  <Text style={[s.scoreNow, { color: t.success }]}>{curA}</Text>
+                  <Text style={[s.scoreNow, { color: t.success }]}>
+                    {leftGameScore}
+                  </Text>
                   <Text
                     style={{
                       fontSize: 16,
@@ -1898,12 +1903,14 @@ export default function RefereeJudgePanel({ matchId }) {
                   >
                     Game
                   </Text>
-                  <Text style={[s.scoreNow, { color: t.success }]}>{curB}</Text>
+                  <Text style={[s.scoreNow, { color: t.success }]}>
+                    {rightGameScore}
+                  </Text>
                 </View>
 
                 <View style={[s.rowBetween, { width: "100%", marginTop: 4 }]}>
                   <Text style={[s.setWin, { color: t.colors.text }]}>
-                    {aWins}
+                    {leftSetWins}
                   </Text>
                   <Text
                     style={{
@@ -1916,7 +1923,7 @@ export default function RefereeJudgePanel({ matchId }) {
                     Match
                   </Text>
                   <Text style={[s.setWin, { color: t.colors.text }]}>
-                    {bWins}
+                    {rightSetWins}
                   </Text>
                 </View>
               </View>
@@ -2049,7 +2056,7 @@ export default function RefereeJudgePanel({ matchId }) {
         user={cccdUser}
       />
 
-      {/* ===== Prompt đổi sân giữa game ===== */}
+      {/* ===== Prompt đổi bên giữa game ===== */}
       <Modal
         visible={midPromptOpen}
         transparent
@@ -2100,7 +2107,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 rippleContainerBorderRadius={10}
                 style={[s.btnPrimary, { backgroundColor: t.colors.primary }]}
               >
-                <Text style={s.btnPrimaryText}>Đổi sân</Text>
+                <Text style={s.btnPrimaryText}>Đổi bên</Text>
               </Ripple>
             </View>
           </View>
@@ -2140,7 +2147,7 @@ export default function RefereeJudgePanel({ matchId }) {
         </SafeAreaView>
       </Modal>
 
-      {/* ===== NEW: Court assign fullscreen modal ===== */}
+      {/* ===== Court assign fullscreen modal ===== */}
       <CourtAssignModalFull
         visible={courtOpen}
         onClose={() => setCourtOpen(false)}
@@ -2154,7 +2161,7 @@ export default function RefereeJudgePanel({ matchId }) {
   );
 }
 
-/* ========== styles (giữ nguyên layout; màu sẽ override bằng t) ========== */
+/* ========== styles ========== */
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: "#fff" },
   fullNameText: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
@@ -2507,5 +2514,19 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 999,
+  },
+  btnCourtNameSm: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    maxWidth: 180, // tránh quá dài phá layout
+  },
+  btnCourtNameSmText: {
+    fontWeight: "700",
+    fontSize: 14,
   },
 });

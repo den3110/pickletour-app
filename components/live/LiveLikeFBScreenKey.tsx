@@ -857,8 +857,8 @@ export default function LiveLikeFBScreenKey({
         <View style={{ flex: 1 }}>
           <RtmpPreviewView
             style={styles.preview as ViewStyle}
-            collapsable={false}           
-            onLayout={kickPreview}      
+            collapsable={false}
+            onLayout={kickPreview}
           />
         </View>
       </PinchGestureHandler>
