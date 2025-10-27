@@ -526,7 +526,7 @@ export default function LiveLikeFBScreenKey({
       const MAX_TRIES = 6;
       for (let i = 0; i < MAX_TRIES; i++) {
         try {
-          //   await Live.setOverlayUrl(overlayUrl);
+            await Live.setOverlayUrl(overlayUrl);
           await Live.setOverlayRelWidth(0.2); // 20% bề rộng video
           // Nếu gốc toạ độ top-left: (0.05, 0.08) = lệch 5% từ trái, 8% từ trên
           // Nếu gốc bottom-left thì tuỳ native sẽ map nội bộ

@@ -1569,6 +1569,7 @@ export default function RefereeJudgePanel({ matchId }) {
   };
 
   // --- ĐỔI GIAO: ở đầu BẤT KỲ GAME nào (điểm 0-0) -> 0-0-2, ngược lại -> tay 1
+  // --- ĐỔI GIAO: 0-0 -> 0-0-2; mid-game -> server #1; LUÔN giữ nguyên điểm
   const toggleServeSide = () => {
     if (!match?._id) return;
 
@@ -1578,13 +1579,16 @@ export default function RefereeJudgePanel({ matchId }) {
       serverId: serverUidShow,
     };
 
-    const nextSide = activeSide === "A" ? "B" : "A";
+    // Snapshot điểm/game hiện tại để guard chống reset
+    const prevA = curA;
+    const prevB = curB;
+    const prevIdx = curIdx;
 
-    // Đầu trận/đầu game (0-0) => order = 2, còn lại => order = 1
-    const isZeroZero = Number(curA) === 0 && Number(curB) === 0;
+    const nextSide = activeSide === "A" ? "B" : "A";
+    const isZeroZero = Number(prevA) === 0 && Number(prevB) === 0;
     const nextOrder = isZeroZero ? 2 : 1;
 
-    // Lấy người ở Ô 1 của đội sắp giao (fallback Ô 2 nếu trống)
+    // Ưu tiên người ở Ô 1 của đội sắp giao (fallback Ô 2 nếu trống)
     const uidRight =
       getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
 
@@ -1599,16 +1603,51 @@ export default function RefereeJudgePanel({ matchId }) {
         server: nextOrder,
         serverId: uidRight,
       },
-      (ack) => {
+      async (ack) => {
         if (!ack?.ok) {
           Toast.show({
             type: "error",
             text1: "Lỗi",
             text2: ack?.message || "Không đặt được giao bóng",
           });
-        } else {
-          pushUndo({ t: "SERVE_SET", prev });
-          refetch();
+          return;
+        }
+
+        pushUndo({ t: "SERVE_SET", prev });
+
+        try {
+          // Refetch để kiểm tra xem backend có lỡ reset 0-0 không
+          const res = await refetch();
+          const m = res?.data || match;
+          const g = m?.gameScores?.[prevIdx];
+
+          // Nếu không phải đầu game, mà điểm vừa bị về 0-0 ⇒ khôi phục ngay
+          if (
+            !isZeroZero &&
+            g &&
+            g.a === 0 &&
+            g.b === 0 &&
+            (prevA !== 0 || prevB !== 0)
+          ) {
+            await setGame({
+              matchId: match._id,
+              gameIndex: prevIdx,
+              a: prevA,
+              b: prevB,
+              autoNext: false,
+            }).unwrap();
+
+            Toast.show({
+              type: "info",
+              text1: "Đã giữ nguyên điểm",
+              text2: "Đổi giao không làm reset điểm.",
+            });
+
+            // Lấy lại snapshot sau khi khôi phục
+            await refetch();
+          }
+        } catch {
+          // bỏ qua
         }
       }
     );
