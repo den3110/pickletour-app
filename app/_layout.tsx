@@ -18,7 +18,6 @@ import {
   View,
   AppState,
   InteractionManager,
-  Platform,
   DeviceEventEmitter,
 } from "react-native";
 import "react-native-reanimated";
@@ -39,10 +38,19 @@ import ForceUpdateModal from "@/components/ForceUpdateModal";
 import Toast from "react-native-toast-message";
 import * as SecureStore from "expo-secure-store";
 
-const SPLASH_FAILSAFE_MS = 1500;
+const SPLASH_FONT_FAILSAFE_MS = 1500;
+const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
 
-SplashScreen.preventAutoHideAsync().catch(() => {}); // chỉ 1 lần
+// 🔒 Guard: tránh gọi preventAutoHideAsync nhiều lần khi HMR/Fast Refresh
+declare global {
+  // eslint-disable-next-line no-var
+  var __SPLASH_LOCKED__: boolean;
+}
+if (!global.__SPLASH_LOCKED__) {
+  global.__SPLASH_LOCKED__ = true;
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
 
 /* ===================== THEME ONLY ===================== */
 const BRAND_LIGHT = "#1976d2";
@@ -80,14 +88,23 @@ function Boot({ children }: { children: React.ReactNode }) {
   useExpoPushToken();
 
   React.useEffect(() => {
+    let done = false;
+    const guard = setTimeout(() => {
+      if (!done) setReady(true);
+    }, 2000);
+
     (async () => {
       try {
         const cached = await loadUserInfo();
         if (cached) store.dispatch(setCredentials(cached));
       } finally {
+        done = true;
+        clearTimeout(guard);
         setReady(true);
       }
     })();
+
+    return () => clearTimeout(guard);
   }, []);
 
   if (!ready) {
@@ -101,17 +118,18 @@ function Boot({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  // 1) Scheme hệ thống (từ hook hiện tại của bạn)
+  // 1) Scheme hệ thống
   const systemScheme = useColorScheme(); // "light" | "dark"
   // 2) Pref đọc từ SecureStore
   const [prefTheme, setPrefTheme] = React.useState<"system" | "light" | "dark">(
     "system"
   );
 
-  // 🔄 Hiển thị overlay khi đổi theme
+  // 🔄 Overlay khi đổi theme
   const [themeApplying, setThemeApplying] = React.useState(false);
+  const themeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Đọc PREF_THEME lúc boot + khi app trở lại foreground
+  // Đọc PREF_THEME lúc boot + khi app active
   const loadPrefTheme = React.useCallback(async () => {
     try {
       const t = (await SecureStore.getItemAsync(PREF_THEME_KEY)) as
@@ -133,7 +151,7 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [loadPrefTheme]);
 
-  // ✅ Lắng nghe đổi theme tức thì (runtime) + bật overlay
+  // Lắng nghe đổi theme runtime
   React.useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
       "theme:changed",
@@ -148,7 +166,7 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  // 3) Resolve: nếu pref = system -> dùng systemScheme, ngược lại dùng pref
+  // 3) Resolve theme
   const resolvedScheme =
     prefTheme === "system" ? systemScheme : (prefTheme as "light" | "dark");
   const isDark = resolvedScheme === "dark";
@@ -159,39 +177,56 @@ export default function RootLayout() {
   );
   const bg = navTheme.colors.background;
 
-  // Khi theme đã re-render xong => tắt overlay + thông báo cho màn cài đặt
+  // Tắt overlay sau khi theme áp dụng
   React.useEffect(() => {
-    if (themeApplying) {
-      // chờ 1 frame + 200ms để chắc chắn header/stack re-paint
-      requestAnimationFrame(() => {
-        const t = setTimeout(() => {
-          setThemeApplying(false);
-          DeviceEventEmitter.emit("theme:applied");
-        }, 200);
-        return () => clearTimeout(t);
-      });
+    if (!themeApplying) return;
+    if (themeTimerRef.current) {
+      clearTimeout(themeTimerRef.current);
+      themeTimerRef.current = null;
     }
+    const raf = requestAnimationFrame(() => {
+      themeTimerRef.current = setTimeout(() => {
+        setThemeApplying(false);
+        DeviceEventEmitter.emit("theme:applied");
+        themeTimerRef.current = null;
+      }, 200);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (themeTimerRef.current) {
+        clearTimeout(themeTimerRef.current);
+        themeTimerRef.current = null;
+      }
+    };
   }, [navTheme, themeApplying]);
 
+  // Fonts + failsafe
   const [fontsLoaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
   const [fontTimeout, setFontTimeout] = React.useState(false);
   React.useEffect(() => {
-    const t = setTimeout(() => setFontTimeout(true), SPLASH_FAILSAFE_MS);
+    const t = setTimeout(() => setFontTimeout(true), SPLASH_FONT_FAILSAFE_MS);
     return () => clearTimeout(t);
   }, []);
   const fontsReady = fontsLoaded || fontTimeout;
 
-  // ✅ KHÔNG phụ thuộc navReady nữa để hide splash
+  // Splash hide control
   const hiddenRef = React.useRef(false);
   const [firstFrameDone, setFirstFrameDone] = React.useState(false);
 
   const hideSplashSafe = React.useCallback(() => {
     if (hiddenRef.current) return;
-    hiddenRef.current = true;
-    SplashScreen.hideAsync().catch(() => {});
-    setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 400);
+    (async () => {
+      try {
+        await SplashScreen.hideAsync();
+      } catch {}
+      finally {
+        hiddenRef.current = true; // chỉ chốt sau khi gọi hide
+        // double-tap an toàn
+        setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 300);
+      }
+    })();
   }, []);
 
   const onLayoutRoot = React.useCallback(() => {
@@ -202,6 +237,15 @@ export default function RootLayout() {
     if (firstFrameDone && fontsReady) hideSplashSafe();
   }, [firstFrameDone, fontsReady, hideSplashSafe]);
 
+  // Failsafe hide toàn cục
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      if (!hiddenRef.current) hideSplashSafe();
+    }, SPLASH_GLOBAL_FAILSAFE_MS);
+    return () => clearTimeout(t);
+  }, [hideSplashSafe]);
+
+  // Ensure hide khi app trở lại foreground
   React.useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active" && !hiddenRef.current) hideSplashSafe();
@@ -272,7 +316,12 @@ export default function RootLayout() {
                   style={{ flex: 1, backgroundColor: bg }}
                   edges={["top", "left", "right"]}
                 >
-                  <View style={{ flex: 1 }} onLayout={onLayoutRoot}>
+                  {/* ⚠️ onLayout cần collapsable={false} để chắc chắn fire trên Android */}
+                  <View
+                    style={{ flex: 1 }}
+                    onLayout={onLayoutRoot}
+                    collapsable={false}
+                  >
                     <ThemeProvider value={navTheme}>
                       <Stack
                         screenOptions={{

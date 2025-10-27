@@ -1,14 +1,12 @@
-// LiveLikeFBScreenKey.tsx (React Native / Expo)
-// AUTO-LIVE (Assigned → LIVE) — poll court → tự start stream
-// Thêm HTML Overlay (giống OBS) qua URL, có retry an toàn, không chặn luồng live
+// LiveLikeFBScreenKey.tsx
+// AUTO-LIVE theo sân (Assigned → LIVE), mỗi trận = 1 video riêng:
+// - Có match → tạo liveSession → pick RTMP → start stream + overlay
+// - Hết match → stop stream ngay, KHÔNG đóng app; chờ 10 phút, rồi cảnh báo 10s (Huỷ để tiếp tục chờ)
+// - Có match mới trong lúc chờ → start stream mới
+// - Adaptive chất lượng/FPS theo máy (native hint nếu có; fallback an toàn)
+// - Tối ưu nhiệt/ram: thermalProtect(optional), dọn overlay/view khi stop, release(optional)
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -37,7 +35,7 @@ import torch_off from "@/assets/sfx/click4.mp3";
 import mic_on from "@/assets/sfx/click4.mp3";
 import mic_off from "@/assets/sfx/click4.mp3";
 
-/* ====== RTK Query: giống web ====== */
+/* ====== RTK Query ====== */
 import {
   useGetCurrentMatchByCourtQuery,
   useCreateLiveSessionMutation,
@@ -55,10 +53,55 @@ const _CachedRtmpPreviewView =
 const RtmpPreviewView = _CachedRtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-// ==== DEBUG helpers ====
+/* ====== Overlay URL builder ====== */
+const overlayUrlForMatch = (mid?: string | null) =>
+  mid
+    ? process.env.EXPO_PUBLIC_BASE_URL + `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5`
+    : null;
+
+/* ====== DEBUG ====== */
 const LOG = true;
 const log = (...args: any[]) =>
   LOG && console.log("[LiveLikeFB]", new Date().toISOString(), ...args);
+
+/* ====== Types ====== */
+type Mode = "idle" | "live" | "stopping" | "ended";
+type Dest = {
+  platform?: string;
+  server_url?: string;
+  stream_key?: string;
+  secure_stream_url?: string;
+};
+type Props = {
+  tournamentHref?: string;
+  homeHref?: string;
+  onFinishedGoToTournament?: () => void;
+  onFinishedGoHome?: () => void;
+  tid: string;
+  bid: string;
+  courtId: string;
+  autoOnLive?: boolean; // default: true
+};
+type StreamProfile = {
+  bitrate: number;
+  width: number;
+  height: number;
+  fps: number;
+};
+
+/* ====== Gap timers (giữa trận) ====== */
+const GAP_WAIT_MS = 10 * 60 * 1000; // 10 phút chờ match mới
+const GAP_WARN_MS = 10 * 1000; // 10s cảnh báo tự tắt
+
+/* ====== Utils ====== */
+const SFX = {
+  torchOn: torch_on,
+  torchOff: torch_off,
+  micOn: mic_on,
+  micOff: mic_off,
+} as const;
+type SfxKey = keyof typeof SFX;
+const SFX_VOLUME = 1;
 
 const maskUrl = (u?: string | null) => {
   if (!u) return u;
@@ -74,46 +117,6 @@ const maskUrl = (u?: string | null) => {
     return u;
   }
 };
-
-/* ====== Types ====== */
-type Mode = "idle" | "live" | "stopping" | "ended";
-type Dest = {
-  platform?: string;
-  server_url?: string;
-  stream_key?: string;
-  secure_stream_url?: string;
-};
-
-type Props = {
-  tournamentHref?: string;
-  homeHref?: string;
-  onFinishedGoToTournament?: () => void;
-  onFinishedGoHome?: () => void;
-
-  tid: string; // giữ cho navigate nếu cần
-  bid: string; // giữ cho navigate nếu cần
-  courtId: string;
-
-  autoOnLive?: boolean; // default: true (Assigned → LIVE)
-};
-
-/* ====== HTML Overlay (giống OBS) ====== */
-const OVERLAY_BASE = process.env.EXPO_PUBLIC_API_URL; // <— chỉnh host của bạn
-
-const buildOverlayUrl = (matchId?: string | null) =>
-  matchId
-    ? `${OVERLAY_BASE}/overlay/score?matchId=${matchId}&theme=dark&size=md&showSets=0`
-    : null;
-
-/* ====== Utils ====== */
-const SFX = {
-  torchOn: torch_on,
-  torchOff: torch_off,
-  micOn: mic_on,
-  micOff: mic_off,
-} as const;
-type SfxKey = keyof typeof SFX;
-const SFX_VOLUME = 1;
 
 function useSfx() {
   const soundsRef = useRef<Record<SfxKey, Audio.Sound | null>>({
@@ -186,60 +189,26 @@ async function ensurePermissions() {
   );
 }
 
-/** Rút destinations giống web: từ liveData.platforms/primary/destinations */
+/** Chuẩn hoá RTMP outputs từ liveData */
 const normalizeDestinationsFromLiveData = (liveData: any): Dest[] => {
   const outs: Dest[] = [];
   try {
     const p = liveData?.platforms || {};
     const primary = liveData?.primary || {};
-
-    // Facebook
-    if (p?.facebook?.live?.server_url || p?.facebook?.live?.stream_key) {
-      outs.push({
-        platform: "facebook",
-        server_url: p.facebook.live.server_url,
-        stream_key: p.facebook.live.stream_key,
-        secure_stream_url: p.facebook.live.secure_stream_url,
-      });
-    }
-    if (primary?.platform === "facebook") {
-      outs.push({
-        platform: "facebook",
-        server_url: primary.server_url,
-        stream_key: primary.stream_key,
-        secure_stream_url: primary.secure_stream_url,
-      });
-    }
-
-    // YouTube
-    if (p?.youtube?.live?.server_url || p?.youtube?.live?.stream_key) {
-      outs.push({
-        platform: "youtube",
-        server_url: p.youtube.live.server_url,
-        stream_key: p.youtube.live.stream_key,
-        secure_stream_url: p.youtube.live.secure_stream_url,
-      });
-    }
-    if (primary?.platform === "youtube") {
-      outs.push({
-        platform: "youtube",
-        server_url: primary.server_url,
-        stream_key: primary.stream_key,
-        secure_stream_url: primary.secure_stream_url,
-      });
-    }
-
-    // TikTok
-    if (p?.tiktok?.live?.server_url || p?.tiktok?.live?.stream_key) {
-      outs.push({
-        platform: "tiktok",
-        server_url: p.tiktok.live.server_url,
-        stream_key: p.tiktok.live.stream_key,
-        secure_stream_url: p.tiktok.live.secure_stream_url,
-      });
-    }
-
-    // Fallback: destinations[]
+    const push = (platform?: string, node?: any) => {
+      if (!node) return;
+      const server_url = node.server_url;
+      const stream_key = node.stream_key;
+      const secure_stream_url = node.secure_stream_url;
+      if (server_url || stream_key || secure_stream_url) {
+        outs.push({ platform, server_url, stream_key, secure_stream_url });
+      }
+    };
+    push("facebook", p?.facebook?.live);
+    if (primary?.platform === "facebook") push("facebook", primary);
+    push("youtube", p?.youtube?.live);
+    if (primary?.platform === "youtube") push("youtube", primary);
+    push("tiktok", p?.tiktok?.live);
     if (Array.isArray(liveData?.destinations)) {
       for (const d of liveData.destinations) {
         outs.push({
@@ -254,7 +223,6 @@ const normalizeDestinationsFromLiveData = (liveData: any): Dest[] => {
     console.warn("normalizeDestinationsFromLiveData error", e);
   }
 
-  // Chuẩn hoá secure_stream_url → (server_url, stream_key)
   return outs
     .map((d) => {
       let {
@@ -289,7 +257,7 @@ const pickStreamUrl = (dests: Dest[]): string | null => {
   return `${base}/${chosen.stream_key!}`;
 };
 
-/* ====== Small UI piece ====== */
+/* ====== UI piece ====== */
 function DottedCircleProgress({
   progress,
   size = 140,
@@ -359,10 +327,6 @@ export default function LiveLikeFBScreenKey({
   const [micMuted, setMicMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  /* ==== Overlay ==== */
-  const [showScoreOverlay, setShowScoreOverlay] = useState(true);
-  const overlaySupportedRef = useRef<boolean>(false);
-
   /* ==== Streaming refs ==== */
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
@@ -370,6 +334,15 @@ export default function LiveLikeFBScreenKey({
   const shouldResumeLiveRef = useRef(false);
   const switchingRef = useRef(false);
   const previewRetryRef = useRef<{ cancel: boolean }>({ cancel: false });
+  const chosenProfileRef = useRef<StreamProfile | null>(null);
+
+  /* ==== Gap wait / warn ==== */
+  const [gapWarnVisible, setGapWarnVisible] = useState(false);
+  const [gapWarnProgress, setGapWarnProgress] = useState(0);
+  const gapWaitingRef = useRef(false);
+  const gapTenMinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gapWarnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gapWarnDeadlineRef = useRef<number | null>(null);
 
   /* ==== Zoom (UI & throttle) ==== */
   const clampZoomUI = (z: number) => Math.min(2, Math.max(0.5, z));
@@ -402,15 +375,13 @@ export default function LiveLikeFBScreenKey({
 
   useEffect(() => {
     let t: ReturnType<typeof setInterval> | null = null;
-    if (mode === "live" || mode === "stopping") {
+    if (mode === "live" || mode === "stopping")
       t = setInterval(() => setElapsed((s) => s + 1), 1000);
-    } else {
-      setElapsed(0);
-    }
+    else setElapsed(0);
     return () => t && clearInterval(t);
   }, [mode]);
 
-  /* ==== Preview bootstrap (FIX surface invalid) ==== */
+  /* ==== Preview bootstrap ==== */
   const startPreviewWithRetry = useCallback(async () => {
     if (startedPreviewRef.current) return true;
     const okPerm = await ensurePermissions();
@@ -418,9 +389,8 @@ export default function LiveLikeFBScreenKey({
       Alert.alert("Thiếu quyền", "Cần cấp quyền Camera & Micro để livestream.");
       return false;
     }
-
     let attempts = 0;
-    const maxAttempts = 20; // ~3s với delay 150ms
+    const maxAttempts = 20;
     const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
     previewRetryRef.current.cancel = false;
 
@@ -441,11 +411,7 @@ export default function LiveLikeFBScreenKey({
         return true;
       } catch (e: any) {
         const msg = String(e?.message || e);
-        if (/surface/i.test(msg) || /invalid|illegalargument/i.test(msg)) {
-          await delay(150);
-        } else {
-          await delay(120);
-        }
+        await delay(/surface|invalid|illegalargument/i.test(msg) ? 150 : 120);
       }
       attempts += 1;
     }
@@ -458,25 +424,39 @@ export default function LiveLikeFBScreenKey({
     await startPreviewWithRetry();
   }, [startPreviewWithRetry]);
 
-  // Unmount cleanup
+  // App unmount cleanup + thermal protect
   useEffect(() => {
+    Live.enableThermalProtect?.(true);
     return () => {
       previewRetryRef.current.cancel = true;
+      try {
+        clearTimeout(gapTenMinTimerRef.current!);
+      } catch {}
+      try {
+        clearInterval(gapWarnTimerRef.current!);
+      } catch {}
       (async () => {
         try {
           await Live.enableAutoRotate?.(false);
-          if (startedPreviewRef.current) {
-            await Live.stopPreview?.();
-            startedPreviewRef.current = false;
-          }
-          // Ẩn overlay khi unmount để giải phóng
-          await Live.setOverlayVisible?.(false);
+        } catch {}
+        try {
+          await Live.overlayRemove?.();
+        } catch {}
+        try {
+          await Live.stopPreview?.();
+          startedPreviewRef.current = false;
+        } catch {}
+        try {
+          await Live.stop?.();
+        } catch {}
+        try {
+          await Live.release?.();
         } catch {}
       })();
     };
   }, []);
 
-  // Focus/blur → giữ camera ổn định khi back/forward
+  // Focus/blur giữ preview ổn định
   useFocusEffect(
     useCallback(() => {
       previewRetryRef.current.cancel = false;
@@ -497,78 +477,15 @@ export default function LiveLikeFBScreenKey({
     }, [kickPreview, mode])
   );
 
-  /* ==== Apply HTML Overlay an toàn (retry) ==== */
-  const applyHtmlOverlay = useCallback(
-    async (mid: string | null) => {
-      const overlayUrl = buildOverlayUrl(mid || undefined);
-      // Kiểm tra khả năng overlay mới
-      overlaySupportedRef.current =
-        !!Live?.setOverlayUrl &&
-        !!Live?.setOverlayRelWidth &&
-        !!Live?.setOverlayPosition &&
-        !!Live?.setOverlayVisible;
-
-      if (!overlayUrl || !overlaySupportedRef.current) {
-        log("overlay not supported or empty url — skip");
-        return;
-      }
-
-      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-      // Thêm anchor nếu native có
-      try {
-        await Live.setOverlayAnchor?.("topLeft"); // optional
-      } catch {}
-
-      // Đợi GL/WebView ổn định một nhịp
-      await delay(500);
-
-      const MAX_TRIES = 6;
-      for (let i = 0; i < MAX_TRIES; i++) {
-        try {
-            await Live.setOverlayUrl(overlayUrl);
-          await Live.setOverlayRelWidth(0.2); // 20% bề rộng video
-          // Nếu gốc toạ độ top-left: (0.05, 0.08) = lệch 5% từ trái, 8% từ trên
-          // Nếu gốc bottom-left thì tuỳ native sẽ map nội bộ
-          await Live.setOverlayPosition(0.05, 0.08);
-          await Live.setOverlayFps?.(10); // 5–10fps nhẹ mà mượt
-          await Live.setOverlayVisible(!!showScoreOverlay);
-          log("overlay applied (try", i + 1, ")", overlayUrl);
-          return;
-        } catch (e) {
-          log("overlay apply failed (try", i + 1, ")", e);
-          await delay(350);
-        }
-      }
-      // Không throw — overlay fail vẫn live bình thường
-    },
-    [showScoreOverlay]
-  );
-
-  // AppState: resume preview & stream + re-apply overlay nếu cần
+  // AppState: resume preview & stream nếu cần
   useEffect(() => {
     const handler = async (nextState: AppStateStatus) => {
       if (nextState === "active") {
         previewRetryRef.current.cancel = false;
         if (!startedPreviewRef.current) await startPreviewWithRetry();
         if (shouldResumeLiveRef.current && lastUrlRef.current) {
-          try {
-            log("resume → start", maskUrl(lastUrlRef.current));
-            await startNative(lastUrlRef.current);
-            setMode("live");
-
-            // Re-apply HTML overlay (không chặn, có retry)
-            applyHtmlOverlay(currentMatchRef.current);
-
-            // Fallback overlay cũ nếu cần
-            if (!overlaySupportedRef.current && showScoreOverlay) {
-              try {
-                await Live.setScoreVisible?.(true);
-              } catch {}
-            }
-          } catch (e) {
-            log("resume → failed", e);
-          }
+          // KHÔNG auto resume stream ở đây vì mỗi trận là video riêng.
+          // Chỉ dành cho trường hợp app background khi đang live (giữ nguyên).
           shouldResumeLiveRef.current = false;
         }
       } else {
@@ -585,48 +502,80 @@ export default function LiveLikeFBScreenKey({
     };
     const sub = AppState.addEventListener("change", handler);
     return () => sub.remove();
-  }, [mode, startPreviewWithRetry, applyHtmlOverlay, showScoreOverlay]);
+  }, [mode, startPreviewWithRetry]);
+
+  /* ==== Adaptive profile ==== */
+  const pickAdaptiveProfile = useCallback(async (): Promise<StreamProfile> => {
+    // 1) hỏi native (nếu có)
+    try {
+      const p = await Live.suggestProfile?.(); // {bitrate,width,height,fps}
+      if (p && p.width && p.height && p.fps && p.bitrate) {
+        log("suggestProfile(native)", p);
+        return p as StreamProfile;
+      }
+    } catch {}
+
+    // 2) heuristics đơn giản
+    let can1080 = false,
+      can720p60 = false,
+      perfScore = 50;
+    try {
+      can1080 = !!(await Live.canDo1080p?.());
+    } catch {}
+    try {
+      can720p60 = !!(await Live.canDo720p60?.());
+    } catch {}
+    try {
+      const s = await Live.getPerfScore?.();
+      if (typeof s === "number") perfScore = s;
+    } catch {}
+
+    if (can1080 || perfScore >= 80)
+      return { width: 1920, height: 1080, fps: 30, bitrate: 4_500_000 };
+    if (can720p60 || perfScore >= 65)
+      return { width: 1280, height: 720, fps: 30, bitrate: 3_800_000 };
+    if (perfScore >= 55)
+      return { width: 1280, height: 720, fps: 24, bitrate: 3_000_000 };
+    return { width: 1280, height: 720, fps: 24, bitrate: 2_800_000 }; // an toàn
+  }, []);
 
   /* ==== Native start/stop ==== */
-  const startNative = useCallback(async (url: string) => {
-    log("Live.start", { url: maskUrl(url) });
-    try {
-      await Live.start(url, 3_800_000, 1280, 720, 30); // 720p30, ~3.8Mbps
-    } catch (error) {
-      console.error("Live start error:", error);
-      Alert.alert("Lỗi", "Không thể bắt đầu live: " + error.message);
-      return;
-    }
-    log("Live.start → OK");
-  }, []);
+  const startNative = useCallback(
+    async (url: string, profile: StreamProfile) => {
+      log("Live.start", { url: maskUrl(url), profile });
+      await Live.start(
+        url,
+        profile.bitrate,
+        profile.width,
+        profile.height,
+        profile.fps
+      );
+      log("Live.start → OK");
+    },
+    []
+  );
+
   const stopNativeNow = useCallback(async () => {
     log("Live.stop → begin");
     try {
-      await Live.setOverlayVisible?.(false); // ẩn overlay HTML nếu có
-    } catch {}
+      await Live.overlayRemove?.();
+    } catch (e) {
+      log("overlayRemove error", e);
+    }
     try {
-      await Live.stop();
+      await Live.stop?.();
     } catch (e) {
       log("Live.stop error", e);
     }
-    try {
-      await Live.stopPreview?.();
-      startedPreviewRef.current = false;
-    } catch (e) {
-      log("Live.stopPreview error", e);
-    }
+    // giữ preview để người dùng vẫn canh máy trong thời gian chờ (tùy chọn)
     setTorchOn(false);
     setMicMuted(false);
     setElapsed(0);
-    setStatusText("Đang chờ trận được gán (assigned) vào sân…");
-    zoomUIRef.current = 1;
-    setZoomUI(1);
-    lastSentZoomRef.current = 1;
     lastUrlRef.current = null;
     log("Live.stop → done");
   }, []);
 
-  /* ===================== RTK Query: poll court by courtId ===================== */
+  /* ===================== Poll court ===================== */
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
@@ -657,7 +606,6 @@ export default function LiveLikeFBScreenKey({
   useEffect(() => {
     log("poll-config", { shouldPoll, courtId });
   }, [shouldPoll, courtId]);
-
   useEffect(() => {
     if (!shouldPoll) return;
     if (courtsError) {
@@ -669,109 +617,12 @@ export default function LiveLikeFBScreenKey({
       return;
     }
     if (courtsFetching) log("court fetching…");
-
     const court = courtData?.court;
     const cm = courtData?.match || null;
-    log("court ok", {
-      court: court?.name,
-      currentMatchId: cm?._id || null,
-    });
+    log("court ok", { court: court?.name, currentMatchId: cm?._id || null });
   }, [courtData, courtsFetching, courtsLoading, courtsError, shouldPoll]);
 
   const currentMatchId: string | null = courtData?.match?._id || null;
-
-  /* ==== Extract score from match data (fallback overlay cũ) ==== */
-  const extractScore = useCallback((match: any): string | null => {
-    if (!match) return null;
-
-    if (
-      typeof match.homeScore === "number" &&
-      typeof match.awayScore === "number"
-    ) {
-      return `${match.homeScore} - ${match.awayScore}`;
-    }
-
-    if (
-      typeof match.team1Score === "number" &&
-      typeof match.team2Score === "number"
-    ) {
-      return `${match.team1Score} - ${match.team2Score}`;
-    }
-
-    if (
-      match?.score &&
-      typeof match.score.home === "number" &&
-      typeof match.score.away === "number"
-    ) {
-      return `${match.score.home} - ${match.score.away}`;
-    }
-
-    if (
-      match?.homeTeam?.score !== undefined &&
-      match?.awayTeam?.score !== undefined
-    ) {
-      return `${match.homeTeam.score} - ${match.awayTeam.score}`;
-    }
-
-    if (Array.isArray(match?.teams) && match.teams.length >= 2) {
-      const s1 = match.teams[0]?.score;
-      const s2 = match.teams[1]?.score;
-      if (s1 !== undefined && s2 !== undefined) {
-        return `${s1} - ${s2}`;
-      }
-    }
-
-    return "0 - 0";
-  }, []);
-
-  const currentScore = useMemo(() => {
-    return extractScore(courtData?.match);
-  }, [courtData?.match, extractScore]);
-
-  /* ==== Update overlay khi state đổi ==== */
-  // 1) Toggle show/hide overlay
-  const toggleScoreOverlay = useCallback(async () => {
-    try {
-      const next = !showScoreOverlay;
-      setShowScoreOverlay(next);
-
-      // Ưu tiên overlay HTML
-      if (overlaySupportedRef.current) {
-        await Live.setOverlayVisible?.(next);
-        return;
-      }
-
-      // Fallback overlay cũ
-      await Live.setScoreVisible?.(next);
-      if (next && currentScore) {
-        await Live.updateScore?.(currentScore);
-      }
-    } catch (e) {
-      log("toggle overlay visible failed", e);
-    }
-  }, [showScoreOverlay, currentScore]);
-
-  // 2) Khi điểm đổi (chỉ dùng cho fallback overlay cũ)
-  useEffect(() => {
-    const run = async () => {
-      if (overlaySupportedRef.current) return; // dùng HTML overlay rồi
-      if (!showScoreOverlay) {
-        try {
-          await Live.setScoreVisible?.(false);
-        } catch {}
-        return;
-      }
-      if (mode === "live" && currentScore) {
-        try {
-          await Live.updateScore?.(currentScore);
-          await Live.setScoreVisible?.(true);
-        } catch (e) {
-          log("updateScore overlay (fallback) failed", e);
-        }
-      }
-    };
-    run();
-  }, [mode, currentScore, showScoreOverlay]);
 
   /* ===================== create live session (idempotent) ===================== */
   const [createLiveSession] = useCreateLiveSessionMutation();
@@ -797,9 +648,74 @@ export default function LiveLikeFBScreenKey({
     [createLiveSession]
   );
 
+  /* ===================== Gap wait helpers ===================== */
+  const clearGapTimers = useCallback(() => {
+    gapWaitingRef.current = false;
+    try {
+      if (gapTenMinTimerRef.current) clearTimeout(gapTenMinTimerRef.current);
+    } catch {}
+    try {
+      if (gapWarnTimerRef.current) clearInterval(gapWarnTimerRef.current);
+    } catch {}
+    gapTenMinTimerRef.current = null;
+    gapWarnTimerRef.current = null;
+    gapWarnDeadlineRef.current = null;
+    setGapWarnVisible(false);
+    setGapWarnProgress(0);
+  }, []);
+
+  const beginGapWait = useCallback(() => {
+    clearGapTimers();
+    gapWaitingRef.current = true;
+    setStatusText("Không còn trận — đang chờ trận mới… (tối đa 10 phút)");
+    gapTenMinTimerRef.current = setTimeout(() => {
+      // Hiện cảnh báo 10s
+      setGapWarnVisible(true);
+      setGapWarnProgress(0);
+      gapWarnDeadlineRef.current = Date.now() + GAP_WARN_MS;
+      gapWarnTimerRef.current = setInterval(() => {
+        const deadline = gapWarnDeadlineRef.current ?? Date.now();
+        const remaining = Math.max(0, deadline - Date.now());
+        const pct = Math.min(1, (GAP_WARN_MS - remaining) / GAP_WARN_MS);
+        setGapWarnProgress(pct);
+        if (remaining <= 0) {
+          // auto stop hẳn
+          try {
+            clearInterval(gapWarnTimerRef.current!);
+          } catch {}
+          gapWarnTimerRef.current = null;
+          (async () => {
+            try {
+              await (notifyStreamEnded as any)({
+                matchId: currentMatchRef.current,
+                platform: "all",
+              }).unwrap?.();
+            } catch {}
+            await stopNativeNow();
+            setMode("ended");
+            setStatusText("Đã kết thúc buổi phát.");
+            clearGapTimers();
+          })();
+        }
+      }, 50);
+    }, GAP_WAIT_MS);
+  }, [clearGapTimers, notifyStreamEnded, stopNativeNow]);
+
+  const cancelAutoStop = useCallback(() => {
+    // Huỷ countdown 10s và tiếp tục chờ thêm 10 phút nữa
+    try {
+      clearInterval(gapWarnTimerRef.current!);
+    } catch {}
+    gapWarnTimerRef.current = null;
+    setGapWarnVisible(false);
+    setGapWarnProgress(0);
+    beginGapWait();
+  }, [beginGapWait]);
+
+  /* ===================== Start/Stop per match ===================== */
   const startForMatch = useCallback(
     async (mid: string) => {
-      setStatusText("Sân đã có trận (assigned) — chuẩn bị phát…");
+      setStatusText("Sân đã có trận — chuẩn bị phát…");
       const url = await ensureOutputsForMatch(mid);
       if (!url) {
         setStatusText("❌ Backend chưa trả outputs cho trận này.");
@@ -808,32 +724,33 @@ export default function LiveLikeFBScreenKey({
       }
       try {
         await Haptics.selectionAsync();
-        await startNative(url);
+        const profile = await pickAdaptiveProfile();
+        chosenProfileRef.current = profile;
+        await startNative(url, profile);
+
+        // Overlay theo match
+        const oUrl = overlayUrlForMatch(mid);
+        if (oUrl) {
+          try {
+            await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
+            await Live.overlaySetVisible?.(true);
+            log("overlay → loaded (full)", oUrl);
+          } catch (e) {
+            log("overlay → failed", e);
+          }
+        }
 
         lastUrlRef.current = url;
         currentMatchRef.current = mid;
         setMode("live");
         setStatusText("Đang LIVE…");
-
-        // Áp HTML overlay (retry, không chặn)
-        applyHtmlOverlay(mid);
-
-        // Fallback overlay cũ nếu chưa hỗ trợ overlay HTML
-        if (!overlaySupportedRef.current && showScoreOverlay && currentScore) {
-          try {
-            await Live.updateScore?.(currentScore);
-            await Live.setScoreVisible?.(true);
-          } catch {}
-        }
-
         try {
           await (notifyStreamStarted as any)({
             matchId: mid,
             platform: "all",
           }).unwrap?.();
         } catch {}
-
-        log("startForMatch → LIVE", { matchId: mid });
+        log("startForMatch → LIVE", { matchId: mid, profile });
         return true;
       } catch (e: any) {
         setStatusText("❌ Không thể bắt đầu phát");
@@ -844,52 +761,30 @@ export default function LiveLikeFBScreenKey({
     },
     [
       ensureOutputsForMatch,
+      pickAdaptiveProfile,
       startNative,
       notifyStreamStarted,
-      applyHtmlOverlay,
-      showScoreOverlay,
-      currentScore,
     ]
   );
 
-  // Auto: chỉ cần có currentMatch → phát (switch nếu khác)
+  // Auto điều khiển theo currentMatchId (mỗi trận 1 video riêng)
   const lastAutoStartedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!autoOnLive || !courtId) return;
 
-    // 1) Không còn trận assigned → dừng nếu đang phát
-    if (!currentMatchId) {
-      if (mode === "live" || mode === "stopping") {
-        (async () => {
-          setStatusText("🔔 Không còn trận được gán — dừng phát…");
-          try {
-            await (notifyStreamEnded as any)({
-              matchId: currentMatchRef.current,
-              platform: "all",
-            }).unwrap?.();
-          } catch {}
-          await stopNativeNow();
-          setMode("ended");
-        })();
-      } else {
-        setStatusText("Đang chờ trận được gán (assigned) vào sân…");
-      }
-      currentMatchRef.current = null;
-      lastAutoStartedForRef.current = null;
-      return;
-    }
-
-    // 2) Có trận mới được assign → chuyển/khởi động
-    if (
-      lastAutoStartedForRef.current !== currentMatchId &&
-      !switchingRef.current
-    ) {
-      switchingRef.current = true;
-      (async () => {
-        try {
-          if (mode === "live" || mode === "stopping") {
-            log("auto(assign): switching match → stop current then start", {
-              prev: lastAutoStartedForRef.current,
+    // Có match mới
+    if (currentMatchId) {
+      // Nếu đang countdown auto-stop hoặc gap-wait, huỷ hết để start mới
+      clearGapTimers();
+      if (
+        currentMatchRef.current &&
+        currentMatchRef.current !== currentMatchId
+      ) {
+        // Đang live trận A → chuyển sang trận B: stop A rồi start B
+        if (mode === "live" || mode === "stopping") {
+          (async () => {
+            log("switch match: stop current then start", {
+              prev: currentMatchRef.current,
               next: currentMatchId,
             });
             try {
@@ -898,19 +793,53 @@ export default function LiveLikeFBScreenKey({
                 platform: "all",
               }).unwrap?.();
             } catch {}
-            await stopNativeNow();
+            await stopNativeNow(); // stop RTMP ngay
             setMode("idle");
-          } else {
-            log("auto(assign): start new match", { next: currentMatchId });
-          }
+            const ok = await startForMatch(currentMatchId);
+            if (ok) lastAutoStartedForRef.current = currentMatchId;
+          })();
+        } else {
+          (async () => {
+            const ok = await startForMatch(currentMatchId);
+            if (ok) lastAutoStartedForRef.current = currentMatchId;
+          })();
+        }
+      } else if (!currentMatchRef.current) {
+        // Chưa live, có match → start
+        (async () => {
           const ok = await startForMatch(currentMatchId);
           if (ok) lastAutoStartedForRef.current = currentMatchId;
-        } finally {
-          switchingRef.current = false;
-        }
-      })();
-    } else {
-      if (mode === "live") setStatusText("Đang LIVE…");
+        })();
+      } else {
+        // Đang live đúng match → giữ nguyên
+        if (mode === "live") setStatusText("Đang LIVE…");
+      }
+      return;
+    }
+
+    // Không còn match (kết thúc trận hiện tại)
+    if (!currentMatchId) {
+      if (mode === "live" || mode === "stopping") {
+        (async () => {
+          setStatusText("🔔 Trận đã kết thúc — dừng phát và chờ trận mới…");
+          try {
+            await (notifyStreamEnded as any)({
+              matchId: currentMatchRef.current,
+              platform: "all",
+            }).unwrap?.();
+          } catch {}
+          await stopNativeNow(); // dừng RTMP NGAY để tách video
+          setMode("idle");
+          beginGapWait(); // chờ 10 phút rồi cảnh báo 10s
+        })();
+      } else {
+        // Đang idle mà vẫn chưa có match → đảm bảo đang chờ
+        if (!gapWaitingRef.current && !gapWarnVisible) beginGapWait();
+        setStatusText("Đang chờ trận được gán (assigned) vào sân…");
+      }
+      currentMatchRef.current = null;
+      lastAutoStartedForRef.current = null;
+      return;
     }
   }, [
     autoOnLive,
@@ -920,9 +849,12 @@ export default function LiveLikeFBScreenKey({
     startForMatch,
     stopNativeNow,
     notifyStreamEnded,
+    beginGapWait,
+    clearGapTimers,
+    gapWarnVisible,
   ]);
 
-  /* ====== Finish flow (manual stop) ====== */
+  /* ====== Manual finish flow ====== */
   const STOP_DURATION_MS = 5000;
   const stopIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopDeadlineRef = useRef<number | null>(null);
@@ -1068,11 +1000,6 @@ export default function LiveLikeFBScreenKey({
               color="#fff"
             />
           </Pressable>
-          <Pressable onPress={toggleScoreOverlay}>
-            <Text style={styles.liveIcon}>
-              {showScoreOverlay ? "📊" : "📊🚫"}
-            </Text>
-          </Pressable>
           <Pressable onPress={onSwitch} style={styles.roundBtn} hitSlop={10}>
             <Icon name="camera-switch" size={20} color="#fff" />
           </Pressable>
@@ -1100,7 +1027,7 @@ export default function LiveLikeFBScreenKey({
           </>
         )}
 
-        {/* IDLE */}
+        {/* IDLE (đang chờ trận) */}
         {mode === "idle" && (
           <View style={styles.centerOverlay}>
             <ActivityIndicator size="large" color="#fff" />
@@ -1120,17 +1047,6 @@ export default function LiveLikeFBScreenKey({
               <View style={styles.livePill}>
                 <Text style={styles.livePillTxt}>LIVE</Text>
               </View>
-              {/* Nếu muốn hiện điểm ngay trên UI (ngoài overlay) */}
-              {currentScore && (
-                <View
-                  style={[
-                    styles.livePill,
-                    { marginLeft: 8, backgroundColor: "rgba(0,0,0,0.7)" },
-                  ]}
-                >
-                  <Text style={styles.livePillTxt}>{currentScore}</Text>
-                </View>
-              )}
             </View>
             <View
               style={[styles.liveBottomBar, { bottom: 14 + insets.bottom }]}
@@ -1151,7 +1067,17 @@ export default function LiveLikeFBScreenKey({
               )}
             </View>
             {Platform.OS === "ios" && (
-              <View style={[styles.goLiveWrap, { bottom: bottomBump }]}>
+              <View
+                style={[
+                  styles.goLiveWrap,
+                  {
+                    bottom:
+                      Platform.OS === "ios"
+                        ? insets.bottom + 100
+                        : 16 + insets.bottom,
+                  },
+                ]}
+              >
                 <Pressable
                   style={[styles.goLiveBtn, { backgroundColor: "#FF3B30" }]}
                   onPress={beginFinish}
@@ -1165,7 +1091,7 @@ export default function LiveLikeFBScreenKey({
           </>
         )}
 
-        {/* STOPPING */}
+        {/* STOPPING (manual) */}
         {mode === "stopping" && (
           <View style={styles.overlay}>
             <Text style={styles.overlayTitle}>Đang kết thúc buổi phát</Text>
@@ -1178,10 +1104,35 @@ export default function LiveLikeFBScreenKey({
               Sẽ kết thúc sau {Math.max(0, Math.ceil((1 - stopProgress) * 5))}s
             </Text>
             <Pressable
-              style={[styles.cancelBigBtn, { bottom: bottomBump }]}
+              style={[styles.cancelBigBtn, { bottom: 16 + insets.bottom }]}
               onPress={cancelStopping}
             >
               <Text style={styles.cancelBigTxt}>Huỷ</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* GAP WARNING (sau 10 phút không có trận) */}
+        {gapWarnVisible && (
+          <View style={styles.overlay}>
+            <Text style={styles.overlayTitle}>
+              Không có trận mới — sẽ tự dừng sau ít giây
+            </Text>
+            <DottedCircleProgress
+              progress={gapWarnProgress}
+              size={140}
+              dotSize={8}
+            />
+            <Text style={styles.progressText}>
+              Sẽ dừng sau {Math.max(0, Math.ceil((1 - gapWarnProgress) * 10))}s
+            </Text>
+            <Pressable
+              style={[styles.cancelBigBtn, { bottom: 16 + insets.bottom }]}
+              onPress={cancelAutoStop}
+            >
+              <Text style={styles.cancelBigTxt}>
+                Huỷ (tiếp tục chờ 10 phút)
+              </Text>
             </Pressable>
           </View>
         )}
@@ -1192,7 +1143,7 @@ export default function LiveLikeFBScreenKey({
             <Text style={styles.endedTitle}>
               Đã kết thúc buổi phát trực tiếp
             </Text>
-            <View style={[styles.endedBtns, { bottom: bottomBump }]}>
+            <View style={[styles.endedBtns, { bottom: 16 + insets.bottom }]}>
               <Pressable
                 style={[styles.endedBtn, { backgroundColor: "#1877F2" }]}
                 onPress={() => {
