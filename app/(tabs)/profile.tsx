@@ -49,6 +49,7 @@ import {
   useGetProfileQuery,
   useLogoutMutation,
   useUpdateUserMutation,
+  useIssueOsAuthTokenMutation,
 } from "@/slices/usersApiSlice";
 import * as SecureStore from "expo-secure-store";
 import { useUnregisterPushTokenMutation } from "@/slices/pushApiSlice";
@@ -58,7 +59,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
 import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
-
+import * as LocalAuthentication from "expo-local-authentication";
 /* ---------- Config ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
@@ -301,6 +302,7 @@ export default function ProfileScreen() {
   const [unregisterDeviceToken] = useUnregisterPushTokenMutation();
   const [logoutApiCall] = useLogoutMutation();
   const [deleteMe] = useDeleteMeMutation();
+  const [issueOsAuthToken] = useIssueOsAuthTokenMutation();
   const [uploadCccd, { isLoading: upLoad }] = useUploadCccdMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadAvatarMutation();
@@ -612,37 +614,89 @@ export default function ProfileScreen() {
     dispatch(apiSlice.util.resetApiState());
   };
 
-  const confirmDelete = () => {
-    const run = async () => {
-      try {
-        await deleteMe().unwrap();
-      } catch {}
+  // Thực sự gọi API xoá: body = { password } | { osAuthToken }
+  const runDelete = async (body) => {
+    setDelBusy(true);
+    try {
+      // Backend nên nhận body trong DELETE: { password }
+      // Nếu slice của bạn chưa cho body trong DELETE, xem ghi chú bên dưới.
+      await deleteMe(body ?? {}).unwrap();
       dispatch(logoutAction());
       router.replace("/login");
+      dispatch(apiSlice.util.resetApiState());
       Alert.alert("Đã xoá", "Tài khoản của bạn đã được xoá vĩnh viễn.");
-    };
+    } catch (e) {
+      Alert.alert(
+        "Lỗi",
+        e?.data?.message || e?.error || "Xoá tài khoản thất bại"
+      );
+    } finally {
+      setDelBusy(false);
+      setDelPw("");
+      setDelPwModalOpen(false);
+    }
+  };
 
+  // Gọi xác thực hệ điều hành trước. Nếu không khả dụng → fallback nhập mật khẩu.
+  const attemptOsAuthThenDelete = async () => {
+    try {
+      // Luôn để disableDeviceFallback=false để iOS có Passcode, Android có Device PIN/PATTERN.
+      const res = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Xác thực để xoá tài khoản",
+        cancelLabel: "Huỷ",
+        fallbackLabel: "Dùng mật mã",
+        disableDeviceFallback: false,
+        requireConfirmation: false, // Android: không cần nhấn thêm nút xác nhận
+      });
+      if (res.success) {
+        // Đã xác thực bằng FaceID/TouchID/PIN của máy → xoá ngay (không yêu cầu mật khẩu).
+        // Đã xác thực OS → xin osAuthToken rồi xoá bằng token
+        try {
+          const data = await issueOsAuthToken().unwrap();
+          const osAuthToken = data?.osAuthToken || data?.token;
+          if (!osAuthToken) throw new Error("Không nhận được osAuthToken");
+          await runDelete({ osAuthToken });
+        } catch (_) {
+          // Nếu xin token lỗi → fallback bắt nhập password
+          setDelPwModalOpen(true);
+        }
+      } else {
+        // Các trường hợp không có/không enrol/lockout/thất bại → bắt người dùng nhập mật khẩu tài khoản.
+        const needPw =
+          res.error === "not_available" ||
+          res.error === "not_enrolled" ||
+          res.error === "lockout" ||
+          res.error === "lockout_permanent" ||
+          res.error === "unknown";
+        if (needPw) setDelPwModalOpen(true);
+        // user_cancel / system_cancel: không làm gì.
+      }
+    } catch {
+      // Lỗi bất ngờ khi gọi OS auth → fallback mật khẩu
+      setDelPwModalOpen(true);
+    }
+  };
+
+  const confirmDelete = () => {
+    const onConfirm = () => attemptOsAuthThenDelete();
+    const title =
+      "Xoá tài khoản sẽ xoá dữ liệu cá nhân và không thể hoàn tác. Xác nhận?";
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          title:
-            "Xoá tài khoản sẽ xoá dữ liệu cá nhân và không thể hoàn tác. Xác nhận?",
+          title,
           options: ["Huỷ", "Xoá vĩnh viễn"],
           destructiveButtonIndex: 1,
           cancelButtonIndex: 0,
           userInterfaceStyle: scheme === "dark" ? "dark" : "light",
         },
-        (idx) => idx === 1 && run()
+        (idx) => idx === 1 && onConfirm()
       );
     } else {
-      Alert.alert(
-        "Xoá tài khoản",
-        "Xoá tài khoản sẽ xoá dữ liệu cá nhân và không thể hoàn tác. Xác nhận?",
-        [
-          { text: "Huỷ", style: "cancel" },
-          { text: "Xoá vĩnh viễn", style: "destructive", onPress: run },
-        ]
-      );
+      Alert.alert("Xoá tài khoản", title, [
+        { text: "Huỷ", style: "cancel" },
+        { text: "Xoá vĩnh viễn", style: "destructive", onPress: onConfirm },
+      ]);
     }
   };
 
@@ -695,10 +749,7 @@ export default function ProfileScreen() {
         if (deviceId) await unregisterDeviceToken({ deviceId }).unwrap();
       } catch {}
     } else {
-      Alert.alert(
-        "Thông báo",
-        "Đã bật thông báo"
-      );
+      Alert.alert("Thông báo", "Đã bật thông báo");
     }
   };
 
@@ -707,7 +758,10 @@ export default function ProfileScreen() {
 
   // ===== Tabs
   const [tab, setTab] = useState("overview"); // overview | profile | settings
-
+  // ===== Delete-account states (fallback password) =====
+  const [delPwModalOpen, setDelPwModalOpen] = useState(false);
+  const [delPw, setDelPw] = useState("");
+  const [delBusy, setDelBusy] = useState(false);
   // ===== Render gate =====
   if (!userInfo) {
     return (
@@ -1731,6 +1785,96 @@ export default function ProfileScreen() {
           </View>
         )}
       />
+
+      {/* ===== Fallback Password Modal (khi máy không hỗ trợ sinh trắc/PIN) ===== */}
+      <Modal
+        visible={delPwModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => (!delBusy ? setDelPwModalOpen(false) : null)}
+        supportedOrientations={[
+          "landscape",
+          "landscape-left",
+          "landscape-right",
+          "portrait",
+          "portrait-upside-down",
+        ]}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              Nhập mật khẩu để xác nhận xoá
+            </Text>
+            <Text style={{ color: textSecondary, marginTop: 6, fontSize: 12 }}>
+              Thiết bị này không hỗ trợ/không bật sinh trắc học. Vui lòng nhập
+              mật khẩu tài khoản để tiếp tục.
+            </Text>
+            <TextInput
+              value={delPw}
+              onChangeText={setDelPw}
+              secureTextEntry
+              placeholder="Mật khẩu"
+              placeholderTextColor="#9aa0a6"
+              style={[
+                styles.input,
+                { marginTop: 12, borderColor: border, color: textPrimary },
+              ]}
+              autoCapitalize="none"
+              textContentType="password"
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 14,
+                justifyContent: "center",
+              }}
+            >
+              <Pressable
+                disabled={delBusy}
+                onPress={() => setDelPwModalOpen(false)}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnOutline,
+                  {
+                    borderColor: border,
+                    minWidth: 100,
+                    opacity: delBusy ? 0.6 : pressed ? 0.95 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: textPrimary }]}>
+                  Huỷ
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={delBusy || !delPw.trim()}
+                onPress={() => runDelete({ password: delPw.trim() })}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor:
+                      delBusy || !delPw.trim() ? "#9aa0a6" : tint,
+                    minWidth: 140,
+                    opacity: delBusy ? 0.7 : pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {delBusy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnTextWhite}>Xoá vĩnh viễn</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }

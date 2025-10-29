@@ -5,6 +5,7 @@
 // - Có match mới trong lúc chờ → start stream mới
 // - Adaptive chất lượng/FPS theo máy (native hint nếu có; fallback an toàn)
 // - Tối ưu nhiệt/ram: thermalProtect(optional), dọn overlay/view khi stop, release(optional)
+// - NEW: Gate chọn orientation Dọc/Ngang trước khi bắt đầu phát
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -28,6 +29,7 @@ import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 import { PinchGestureHandler, State } from "react-native-gesture-handler";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
+import * as ScreenOrientation from "expo-screen-orientation";
 
 /* ====== SFX ====== */
 import torch_on from "@/assets/sfx/click4.mp3";
@@ -56,7 +58,8 @@ const Live = (NativeModules as any).FacebookLiveModule;
 /* ====== Overlay URL builder ====== */
 const overlayUrlForMatch = (mid?: string | null) =>
   mid
-    ? process.env.EXPO_PUBLIC_BASE_URL + `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5`
+    ? process.env.EXPO_PUBLIC_BASE_URL +
+      `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5`
     : null;
 
 /* ====== DEBUG ====== */
@@ -88,6 +91,7 @@ type StreamProfile = {
   height: number;
   fps: number;
 };
+type Orient = "portrait" | "landscape";
 
 /* ====== Gap timers (giữa trận) ====== */
 const GAP_WAIT_MS = 10 * 60 * 1000; // 10 phút chờ match mới
@@ -257,51 +261,6 @@ const pickStreamUrl = (dests: Dest[]): string | null => {
   return `${base}/${chosen.stream_key!}`;
 };
 
-/* ====== UI piece ====== */
-function DottedCircleProgress({
-  progress,
-  size = 140,
-  dotSize = 8,
-  count = 30,
-  color = "#fff",
-  trackColor = "rgba(255,255,255,0.2)",
-}: {
-  progress: number;
-  size?: number;
-  dotSize?: number;
-  count?: number;
-  color?: string;
-  trackColor?: string;
-}) {
-  const N = Math.max(6, count);
-  const R = size / 2 - dotSize - 2;
-  const lit = Math.round(Math.max(0, Math.min(1, progress)) * N);
-  return (
-    <View style={{ width: size, height: size }}>
-      {Array.from({ length: N }).map((_, i) => {
-        const t = (i / N) * Math.PI * 2 - Math.PI / 2;
-        const cx = size / 2 + R * Math.cos(t) - dotSize / 2;
-        const cy = size / 2 + R * Math.sin(t) - dotSize / 2;
-        const on = i < lit;
-        return (
-          <View
-            key={i}
-            style={{
-              position: "absolute",
-              left: cx,
-              top: cy,
-              width: dotSize,
-              height: dotSize,
-              borderRadius: dotSize / 2,
-              backgroundColor: on ? color : trackColor,
-            }}
-          />
-        );
-      })}
-    </View>
-  );
-}
-
 /* ================================================================================== */
 
 export default function LiveLikeFBScreenKey({
@@ -327,12 +286,48 @@ export default function LiveLikeFBScreenKey({
   const [micMuted, setMicMuted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
+  /* ==== Orientation gate (NEW) ==== */
+  const [orientation, setOrientation] = useState<Orient | null>(null);
+  const [locking, setLocking] = useState(false);
+  const orientationChosen = orientation !== null;
+
+  const applyOrientationChoice = useCallback(
+    async (choice: Orient) => {
+      setLocking(true);
+      try {
+        await Haptics.selectionAsync();
+        // Khoá xoay OS (ưu tiên expo)
+        await ScreenOrientation.lockAsync(
+          choice === "portrait"
+            ? ScreenOrientation.OrientationLock.PORTRAIT
+            : ScreenOrientation.OrientationLock.LANDSCAPE
+        );
+      } catch {}
+      try {
+        // Nếu native có hỗ trợ khoá riêng (optional)
+        await Live.enableAutoRotate?.(false);
+        await Live.lockOrientation?.(choice.toUpperCase());
+      } catch {}
+      setOrientation(choice);
+      setLocking(false);
+    },
+    []
+  );
+
+  const unlockOrientation = useCallback(async () => {
+    try {
+      await ScreenOrientation.unlockAsync();
+    } catch {}
+    try {
+      await Live.enableAutoRotate?.(true);
+    } catch {}
+  }, []);
+
   /* ==== Streaming refs ==== */
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
   const currentMatchRef = useRef<string | null>(null);
   const shouldResumeLiveRef = useRef(false);
-  const switchingRef = useRef(false);
   const previewRetryRef = useRef<{ cancel: boolean }>({ cancel: false });
   const chosenProfileRef = useRef<StreamProfile | null>(null);
 
@@ -400,6 +395,7 @@ export default function LiveLikeFBScreenKey({
       attempts < maxAttempts
     ) {
       try {
+        // Cho phép xoay lúc preview để người dùng dễ chọn
         await Live.enableAutoRotate?.(true);
         await Live.startPreview?.();
         zoomUIRef.current = 1;
@@ -437,7 +433,7 @@ export default function LiveLikeFBScreenKey({
       } catch {}
       (async () => {
         try {
-          await Live.enableAutoRotate?.(false);
+          await Live.enableAutoRotate?.(true);
         } catch {}
         try {
           await Live.overlayRemove?.();
@@ -452,9 +448,10 @@ export default function LiveLikeFBScreenKey({
         try {
           await Live.release?.();
         } catch {}
+        await unlockOrientation();
       })();
     };
-  }, []);
+  }, [unlockOrientation]);
 
   // Focus/blur giữ preview ổn định
   useFocusEffect(
@@ -484,8 +481,6 @@ export default function LiveLikeFBScreenKey({
         previewRetryRef.current.cancel = false;
         if (!startedPreviewRef.current) await startPreviewWithRetry();
         if (shouldResumeLiveRef.current && lastUrlRef.current) {
-          // KHÔNG auto resume stream ở đây vì mỗi trận là video riêng.
-          // Chỉ dành cho trường hợp app background khi đang live (giữ nguyên).
           shouldResumeLiveRef.current = false;
         }
       } else {
@@ -504,40 +499,52 @@ export default function LiveLikeFBScreenKey({
     return () => sub.remove();
   }, [mode, startPreviewWithRetry]);
 
-  /* ==== Adaptive profile ==== */
-  const pickAdaptiveProfile = useCallback(async (): Promise<StreamProfile> => {
-    // 1) hỏi native (nếu có)
-    try {
-      const p = await Live.suggestProfile?.(); // {bitrate,width,height,fps}
-      if (p && p.width && p.height && p.fps && p.bitrate) {
-        log("suggestProfile(native)", p);
-        return p as StreamProfile;
+  /* ==== Adaptive profile (orientation-aware) ==== */
+  const pickAdaptiveProfile = useCallback(
+    async (orient: Orient): Promise<StreamProfile> => {
+      // 1) hỏi native (nếu có)
+      try {
+        const p = await Live.suggestProfile?.(); // {bitrate,width,height,fps}
+        if (p && p.width && p.height && p.fps && p.bitrate) {
+          log("suggestProfile(native)", p);
+          const base: StreamProfile = p;
+          return orient === "portrait"
+            ? { ...base, width: Math.min(base.width, base.height), height: Math.max(base.width, base.height) }
+            : { ...base, width: Math.max(base.width, base.height), height: Math.min(base.width, base.height) };
+        }
+      } catch {}
+
+      // 2) heuristics đơn giản (landscape là chuẩn; portrait thì swap)
+      let can1080 = false,
+        can720p60 = false,
+        perfScore = 50;
+      try {
+        can1080 = !!(await Live.canDo1080p?.());
+      } catch {}
+      try {
+        can720p60 = !!(await Live.canDo720p60?.());
+      } catch {}
+      try {
+        const s = await Live.getPerfScore?.();
+        if (typeof s === "number") perfScore = s;
+      } catch {}
+
+      let base: StreamProfile;
+      if (can1080 || perfScore >= 80)
+        base = { width: 1920, height: 1080, fps: 30, bitrate: 4_500_000 };
+      else if (can720p60 || perfScore >= 65)
+        base = { width: 1280, height: 720, fps: 30, bitrate: 3_800_000 };
+      else if (perfScore >= 55)
+        base = { width: 1280, height: 720, fps: 24, bitrate: 3_000_000 };
+      else base = { width: 1280, height: 720, fps: 24, bitrate: 2_800_000 };
+
+      if (orient === "portrait") {
+        return { ...base, width: Math.min(base.width, base.height), height: Math.max(base.width, base.height) };
       }
-    } catch {}
-
-    // 2) heuristics đơn giản
-    let can1080 = false,
-      can720p60 = false,
-      perfScore = 50;
-    try {
-      can1080 = !!(await Live.canDo1080p?.());
-    } catch {}
-    try {
-      can720p60 = !!(await Live.canDo720p60?.());
-    } catch {}
-    try {
-      const s = await Live.getPerfScore?.();
-      if (typeof s === "number") perfScore = s;
-    } catch {}
-
-    if (can1080 || perfScore >= 80)
-      return { width: 1920, height: 1080, fps: 30, bitrate: 4_500_000 };
-    if (can720p60 || perfScore >= 65)
-      return { width: 1280, height: 720, fps: 30, bitrate: 3_800_000 };
-    if (perfScore >= 55)
-      return { width: 1280, height: 720, fps: 24, bitrate: 3_000_000 };
-    return { width: 1280, height: 720, fps: 24, bitrate: 2_800_000 }; // an toàn
-  }, []);
+      return base;
+    },
+    []
+  );
 
   /* ==== Native start/stop ==== */
   const startNative = useCallback(
@@ -567,7 +574,6 @@ export default function LiveLikeFBScreenKey({
     } catch (e) {
       log("Live.stop error", e);
     }
-    // giữ preview để người dùng vẫn canh máy trong thời gian chờ (tùy chọn)
     setTorchOn(false);
     setMicMuted(false);
     setElapsed(0);
@@ -679,7 +685,6 @@ export default function LiveLikeFBScreenKey({
         const pct = Math.min(1, (GAP_WARN_MS - remaining) / GAP_WARN_MS);
         setGapWarnProgress(pct);
         if (remaining <= 0) {
-          // auto stop hẳn
           try {
             clearInterval(gapWarnTimerRef.current!);
           } catch {}
@@ -715,6 +720,10 @@ export default function LiveLikeFBScreenKey({
   /* ===================== Start/Stop per match ===================== */
   const startForMatch = useCallback(
     async (mid: string) => {
+      if (!orientationChosen) {
+        setStatusText("Vui lòng chọn Dọc hoặc Ngang để bắt đầu phát.");
+        return false;
+      }
       setStatusText("Sân đã có trận — chuẩn bị phát…");
       const url = await ensureOutputsForMatch(mid);
       if (!url) {
@@ -724,7 +733,17 @@ export default function LiveLikeFBScreenKey({
       }
       try {
         await Haptics.selectionAsync();
-        const profile = await pickAdaptiveProfile();
+        // Khoá orientation ngay trước khi start để không bị xoay khi live
+        try {
+          await ScreenOrientation.lockAsync(
+            orientation === "portrait"
+              ? ScreenOrientation.OrientationLock.PORTRAIT
+              : ScreenOrientation.OrientationLock.LANDSCAPE
+          );
+          await Live.enableAutoRotate?.(false);
+          await Live.lockOrientation?.(orientation!.toUpperCase());
+        } catch {}
+        const profile = await pickAdaptiveProfile(orientation!);
         chosenProfileRef.current = profile;
         await startNative(url, profile);
 
@@ -761,9 +780,11 @@ export default function LiveLikeFBScreenKey({
     },
     [
       ensureOutputsForMatch,
+      notifyStreamStarted,
+      orientation,
+      orientationChosen,
       pickAdaptiveProfile,
       startNative,
-      notifyStreamStarted,
     ]
   );
 
@@ -772,15 +793,27 @@ export default function LiveLikeFBScreenKey({
   useEffect(() => {
     if (!autoOnLive || !courtId) return;
 
+    // Nếu chưa chọn orientation, không start — nhắc chọn
+    if (!orientationChosen) {
+      if (currentMatchId) {
+        setStatusText(
+          "Sân đã có trận. Chọn chế độ Dọc hoặc Ngang để bắt đầu phát."
+        );
+      } else {
+        setStatusText("Chọn Dọc/Ngang và chờ trận được gán vào sân…");
+      }
+      return;
+    }
+
     // Có match mới
     if (currentMatchId) {
-      // Nếu đang countdown auto-stop hoặc gap-wait, huỷ hết để start mới
+      // Huỷ timers nếu có
       clearGapTimers();
       if (
         currentMatchRef.current &&
         currentMatchRef.current !== currentMatchId
       ) {
-        // Đang live trận A → chuyển sang trận B: stop A rồi start B
+        // Đang live trận A → chuyển sang trận B
         if (mode === "live" || mode === "stopping") {
           (async () => {
             log("switch match: stop current then start", {
@@ -833,7 +866,6 @@ export default function LiveLikeFBScreenKey({
           beginGapWait(); // chờ 10 phút rồi cảnh báo 10s
         })();
       } else {
-        // Đang idle mà vẫn chưa có match → đảm bảo đang chờ
         if (!gapWaitingRef.current && !gapWarnVisible) beginGapWait();
         setStatusText("Đang chờ trận được gán (assigned) vào sân…");
       }
@@ -852,6 +884,7 @@ export default function LiveLikeFBScreenKey({
     beginGapWait,
     clearGapTimers,
     gapWarnVisible,
+    orientationChosen,
   ]);
 
   /* ====== Manual finish flow ====== */
@@ -1095,11 +1128,7 @@ export default function LiveLikeFBScreenKey({
         {mode === "stopping" && (
           <View style={styles.overlay}>
             <Text style={styles.overlayTitle}>Đang kết thúc buổi phát</Text>
-            <DottedCircleProgress
-              progress={stopProgress}
-              size={140}
-              dotSize={8}
-            />
+            <DottedCircleProgress progress={stopProgress} size={140} dotSize={8} />
             <Text style={styles.progressText}>
               Sẽ kết thúc sau {Math.max(0, Math.ceil((1 - stopProgress) * 5))}s
             </Text>
@@ -1118,11 +1147,7 @@ export default function LiveLikeFBScreenKey({
             <Text style={styles.overlayTitle}>
               Không có trận mới — sẽ tự dừng sau ít giây
             </Text>
-            <DottedCircleProgress
-              progress={gapWarnProgress}
-              size={140}
-              dotSize={8}
-            />
+            <DottedCircleProgress progress={gapWarnProgress} size={140} dotSize={8} />
             <Text style={styles.progressText}>
               Sẽ dừng sau {Math.max(0, Math.ceil((1 - gapWarnProgress) * 10))}s
             </Text>
@@ -1140,9 +1165,7 @@ export default function LiveLikeFBScreenKey({
         {/* ENDED */}
         {mode === "ended" && (
           <View style={styles.overlay}>
-            <Text style={styles.endedTitle}>
-              Đã kết thúc buổi phát trực tiếp
-            </Text>
+            <Text style={styles.endedTitle}>Đã kết thúc buổi phát trực tiếp</Text>
             <View style={[styles.endedBtns, { bottom: 16 + insets.bottom }]}>
               <Pressable
                 style={[styles.endedBtn, { backgroundColor: "#1877F2" }]}
@@ -1166,7 +1189,103 @@ export default function LiveLikeFBScreenKey({
             </View>
           </View>
         )}
+
+        {/* ORIENTATION GATE (NEW) — hiển thị NGAY khi vào màn hình cho đến khi chọn */}
+        {!orientationChosen && (
+          <View style={styles.gateWrap} pointerEvents="auto">
+            <View style={styles.gateCard}>
+              <Text style={styles.gateTitle}>Chọn chế độ phát trực tiếp</Text>
+              <Text style={styles.gateSub}>Bạn muốn live Dọc hay Ngang?</Text>
+
+              <View style={styles.gateRow}>
+                <Pressable
+                  disabled={locking}
+                  onPress={() => applyOrientationChoice("portrait")}
+                  style={({ pressed }) => [
+                    styles.gateBtn,
+                    styles.gateBtnPortrait,
+                    pressed && styles.gateBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.gateEmoji}>📱↕️</Text>
+                  <Text style={styles.gateBtnText}>Dọc</Text>
+                </Pressable>
+
+                <Pressable
+                  disabled={locking}
+                  onPress={() => applyOrientationChoice("landscape")}
+                  style={({ pressed }) => [
+                    styles.gateBtn,
+                    styles.gateBtnLandscape,
+                    pressed && styles.gateBtnPressed,
+                  ]}
+                >
+                  <Text style={styles.gateEmoji}>📱↔️</Text>
+                  <Text style={styles.gateBtnText}>Ngang</Text>
+                </Pressable>
+              </View>
+
+              {locking && (
+                <View style={{ marginTop: 10, alignItems: "center" }}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.gateHint}>Đang khoá xoay…</Text>
+                </View>
+              )}
+
+              {!!currentMatchId && (
+                <Text style={styles.gateHint2}>
+                  Sân đã có trận • Sau khi chọn, hệ thống sẽ tự bắt đầu phát.
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
       </View>
+    </View>
+  );
+}
+
+/* ====== Small UI piece ====== */
+function DottedCircleProgress({
+  progress,
+  size = 140,
+  dotSize = 8,
+  count = 30,
+  color = "#fff",
+  trackColor = "rgba(255,255,255,0.2)",
+}: {
+  progress: number;
+  size?: number;
+  dotSize?: number;
+  count?: number;
+  color?: string;
+  trackColor?: string;
+}) {
+  const N = Math.max(6, count);
+  const R = size / 2 - dotSize - 2;
+  const lit = Math.round(Math.max(0, Math.min(1, progress)) * N);
+  return (
+    <View style={{ width: size, height: size }}>
+      {Array.from({ length: N }).map((_, i) => {
+        const t = (i / N) * Math.PI * 2 - Math.PI / 2;
+        const cx = size / 2 + R * Math.cos(t) - dotSize / 2;
+        const cy = size / 2 + R * Math.sin(t) - dotSize / 2;
+        const on = i < lit;
+        return (
+          <View
+            key={i}
+            style={{
+              position: "absolute",
+              left: cx,
+              top: cy,
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: on ? color : trackColor,
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -1334,4 +1453,69 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   endedBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "800" },
+
+  /* Orientation Gate */
+  gateWrap: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  gateCard: {
+    width: "92%",
+    maxWidth: 420,
+    borderRadius: 16,
+    backgroundColor: "rgba(30,30,30,0.95)",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  gateTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  gateSub: {
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  gateRow: {
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "center",
+  },
+  gateBtn: {
+    flex: 1,
+    minHeight: 90,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  gateBtnPortrait: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  gateBtnLandscape: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  gateBtnPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.99 }],
+  },
+  gateEmoji: { fontSize: 26, marginBottom: 8 },
+  gateBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  gateHint: { color: "#fff", marginTop: 8, fontSize: 12 },
+  gateHint2: {
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 12,
+    fontSize: 12,
+    textAlign: "center",
+  },
 });

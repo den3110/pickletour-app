@@ -64,7 +64,17 @@ export const userApiSlice = apiSlice.injectEndpoints({
     }),
     // slices/usersApiSlice.ts
     deleteMe: builder.mutation({
-      query: () => ({ url: "/api/users/me", method: "DELETE" }),
+      query: (body) => ({
+        url: "/api/users/me",
+        method: "DELETE",
+        body: body ?? {},
+      }),
+    }),
+    issueOsAuthToken: builder.mutation({
+      query: () => ({
+        url: "/api/users/auth/os-auth-token",
+        method: "POST",
+      }),
     }),
     // ... login, register đang có
     forgotPassword: builder.mutation({
@@ -107,7 +117,7 @@ export const userApiSlice = apiSlice.injectEndpoints({
         { type: "RatingHistory", id: userId },
       ],
     }),
-     getUserAchievements: builder.query({
+    getUserAchievements: builder.query({
       query: (userId) => `/api/users/${userId}/achievements`,
       providesTags: (res, err, id) => [
         { type: "User", id },
@@ -136,5 +146,5 @@ export const {
   useGetMeScoreQuery,
   useDeleteRatingHistoryMutation,
   useGetUserAchievementsQuery,
-
+  useIssueOsAuthTokenMutation,
 } = userApiSlice;

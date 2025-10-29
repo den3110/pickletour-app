@@ -524,18 +524,7 @@ export default function TournamentDashboardScreen() {
             backgroundColor="rgba(0,0,0,0.95)"
             /* Dùng Expo Image để cache */
             ImageComponent={CachedImage}
-            HeaderComponent={() => (
-              <Pressable
-                onPress={() => setPreview(null)}
-                style={styles.viewerClose}
-              >
-                <Text
-                  style={{ color: "#fff", fontWeight: "700", fontSize: 20 }}
-                >
-                  ×
-                </Text>
-              </Pressable>
-            )}
+           
           />
         {/* ✅ Preview image viewer */}
       </View>

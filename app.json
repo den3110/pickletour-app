@@ -16,15 +16,14 @@
         "NSCameraUsageDescription": "pickletour.vn uses the camera to scan the CCCD QR code, auto-fill profile info, and livestream matches.",
         "NSMicrophoneUsageDescription": "pickletour.vn uses the microphone to capture audio for livestreams and video recordings.",
         "NSPhotoLibraryUsageDescription": "pickletour.vn lets you pick photos to upload your avatar and CCCD verification images. Example: choose front/back CCCD images to verify.",
+        "NSFaceIDUsageDescription": "pickletour.vn dùng Face ID/Touch ID/Passcode để xác thực các hành động nhạy cảm như xoá tài khoản.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": [
-              "CA92.1"
-            ]
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
           }
         ]
       }
@@ -50,6 +49,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ],
       [
         "expo-notifications",
         {
