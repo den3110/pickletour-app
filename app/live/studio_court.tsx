@@ -130,7 +130,7 @@ export default function StudioCourtPage() {
     <>
       <Stack.Screen
         options={{
-          headerShown: true,
+          headerShown: false,
           title: `Live Studio — Court ${courtId ? courtId.slice(-4) : ""}`,
         }}
       />

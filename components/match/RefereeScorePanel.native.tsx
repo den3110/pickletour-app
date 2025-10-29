@@ -15,6 +15,7 @@ import {
   View,
   SafeAreaView,
   useColorScheme,
+  Alert,
 } from "react-native";
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -151,11 +152,8 @@ const computeServerUid = ({
   getUidAtSlotNow,
   lastServerUid,
 }) => {
-  // Nếu serverId đã có → dùng luôn (nguồn sự thật từ server)
   const sId = serve?.serverId ? String(serve.serverId) : "";
   if (sId) return sId;
-
-  // 0-0-2: ƯU TIÊN NGƯỜI ĐÃ BIẾT (lastServerUid) để icon bám NGƯỜI khi đổi ô
   if (isStartOfGame && activeServerNum === 2) {
     const rightUid =
       getUidAtSlotNow?.(activeSide, 1) ||
@@ -163,8 +161,6 @@ const computeServerUid = ({
       "";
     return lastServerUid || rightUid || "";
   }
-
-  // Các trường hợp khác: giữ người giao gần nhất
   return lastServerUid || "";
 };
 
@@ -674,13 +670,20 @@ function CourtAssignModalFull({
   const doAssign = async (courtId) => {
     try {
       await assignCourt({ matchId, courtId }).unwrap();
-      Toast.show({ type: "success", text1: "Đã gán sân" });
+      const courtName =
+        textOf(
+          (courts.find((x) => (x?._id || x?.id) === courtId) || {}).name
+        ) || "";
+      Alert.alert(
+        "Đã gán sân",
+        courtName ? `Sân: ${courtName}` : "Gán sân thành công"
+      );
       onAssigned?.({ courtId });
       onClose?.();
     } catch (e) {
       const msg =
         textOf(e?.data?.message) || textOf(e?.error) || "Không thể gán sân";
-      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+      Alert.alert("Lỗi", msg);
       onAssigned?.({ error: msg });
     }
   };
@@ -688,13 +691,13 @@ function CourtAssignModalFull({
   const clearAssign = async () => {
     try {
       await unassignCourt({ matchId }).unwrap();
-      Toast.show({ type: "success", text1: "Đã bỏ gán sân" });
+      Alert.alert("Đã bỏ gán sân", "Trận đã được bỏ gán sân.");
       onAssigned?.({ courtId: null });
       onClose?.();
     } catch (e) {
       const msg =
         textOf(e?.data?.message) || textOf(e?.error) || "Không thể bỏ gán sân";
-      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+      Alert.alert("Lỗi", msg);
     }
   };
 
@@ -880,9 +883,11 @@ export default function RefereeJudgePanel({ matchId }) {
   // ===== NEW: court modal state =====
   const [courtOpen, setCourtOpen] = useState(false);
 
+  // ===== NEW: “chờ bấm Bắt đầu” sau khi bấm BẮT GAME TIẾP =====
+  const [waitingStart, setWaitingStart] = useState(false);
+
   // ====== derive ======
   const rules = match?.rules || { bestOf: 1, pointsToWin: 11, winByTwo: true };
-  // const [ptwBoost, setPtwBoost] = useState(false); // true = +4, false = base
   const basePointsToWin = Number(rules?.pointsToWin ?? 11);
   const [ptw, setPtw] = useState(basePointsToWin);
   const [ptwBoost, setPtwBoost] = useState(false);
@@ -1010,7 +1015,6 @@ export default function RefereeJudgePanel({ matchId }) {
     const currentOrder = Number(serve?.order ?? serve?.server ?? 1);
     const currentServerId = serve?.serverId ? String(serve.serverId) : "";
 
-    // Cần sửa khi: order ≠ 2, hoặc chưa có serverId, hoặc serverId ≠ người ở Ô 1
     const needFix =
       currentOrder !== wantServerNum ||
       !currentServerId ||
@@ -1037,7 +1041,6 @@ export default function RefereeJudgePanel({ matchId }) {
         }
       );
     } else {
-      // Đã đúng 0-0-2 và đúng người ở Ô 1
       initServeDoneRef.current[curIdx] = true;
       lastServerUidRef.current = currentServerId;
     }
@@ -1166,10 +1169,9 @@ export default function RefereeJudgePanel({ matchId }) {
     persistUndo();
   };
 
-  // ✅ sau khi có match/rules → đọc cờ boost đã lưu, không ép theo server
+  // ✅ sau khi có match/rules → đọc cờ boost đã lưu
   useEffect(() => {
     if (!match?._id) return;
-    // ptw lấy theo server; cờ hiển thị +/- lấy theo AsyncStorage để “nhớ hành động”
     setPtw(Number(match?.rules?.pointsToWin ?? basePointsToWin));
     loadPtwBoost();
   }, [match?._id, match?.rules?.pointsToWin, basePointsToWin, loadPtwBoost]);
@@ -1233,6 +1235,7 @@ export default function RefereeJudgePanel({ matchId }) {
     if (!match) return;
     try {
       await setStatus({ matchId: match._id, status: "live" }).unwrap();
+      setWaitingStart(false); // ✅ cho phép cộng điểm
       socket?.emit("status:updated", { matchId: match._id, status: "live" });
       if (gs.length === 0) {
         await setGame({
@@ -1287,6 +1290,7 @@ export default function RefereeJudgePanel({ matchId }) {
     if (!match) return;
     try {
       await nextGame({ matchId: match._id }).unwrap();
+      setWaitingStart(true); // ✅ chuyển sang trạng thái "chờ Bắt đầu"
       refetch();
     } catch (e) {
       Toast.show({
@@ -1309,7 +1313,6 @@ export default function RefereeJudgePanel({ matchId }) {
         (ack) => {
           try {
             if (!ack?.ok) {
-              console.log(ack?.message);
               Toast.show({
                 type: "error",
                 text1: "Lỗi",
@@ -1324,9 +1327,7 @@ export default function RefereeJudgePanel({ matchId }) {
               text1: "Đã cập nhật",
               text2: `Điểm set: ${nextVal}`,
             });
-          } catch (error) {
-            console.log(error);
-          }
+          } catch {}
         }
       );
     },
@@ -1350,7 +1351,6 @@ export default function RefereeJudgePanel({ matchId }) {
             });
             return;
           }
-          // ưu tiên ack.pointsToWin nếu server trả; fallback cộng/trừ local
           const nextVal =
             typeof ack.pointsToWin === "number"
               ? ack.pointsToWin
@@ -1373,7 +1373,9 @@ export default function RefereeJudgePanel({ matchId }) {
     [match?._id, socket, ptw, persistPtwBoost, refetch]
   );
 
-  const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
+  // ✅ chỉ cho cộng điểm khi đang live VÀ không ở trạng thái chờ bắt đầu
+  const canScoreNow =
+    match?.status === "live" && !waitingStart && !matchDecided && !gameLocked;
 
   const beginOpTimeout = useCallback((kind) => {
     if (opTimeoutRef.current) clearTimeout(opTimeoutRef.current);
@@ -1391,19 +1393,19 @@ export default function RefereeJudgePanel({ matchId }) {
       Toast.show({
         type: "info",
         text1: "Đã khóa cộng điểm",
-        text2: matchDecided
+        text2: waitingStart
+          ? "Hãy bấm 'Bắt đầu' để bắt game."
+          : matchDecided
           ? "Trận đã đủ số game thắng (BO)."
           : "Game đã kết thúc, vui lòng sang game tiếp theo.",
       });
       return;
     }
 
-    if (side !== activeSide) return;
+    if (side !== (serve?.side || "A")) return;
 
-    // lấy người giao hiện hành theo ref (không fallback theo ô)
     const prevServerUid = lastServerUidRef.current;
 
-    // ⛔ Disable both inc buttons while waiting server update
     setIncBusy(true);
     pendingOpRef.current = {
       type: "inc",
@@ -1429,14 +1431,12 @@ export default function RefereeJudgePanel({ matchId }) {
         autoNext: false,
       });
 
-      // ❗ Không đổi người giao khi đội giao ghi điểm
-      // Nếu serverId đang rỗng (độ trễ socket), gán lại đúng UID vừa giao
       if (!serve?.serverId && prevServerUid) {
         socket?.emit(
           "serve:set",
           {
             matchId: match._id,
-            side: activeSide,
+            side: serve?.side || "A",
             server: activeServerNum,
             serverId: prevServerUid,
           },
@@ -1568,8 +1568,7 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // --- ĐỔI GIAO: ở đầu BẤT KỲ GAME nào (điểm 0-0) -> 0-0-2, ngược lại -> tay 1
-  // --- ĐỔI GIAO: 0-0 -> 0-0-2; mid-game -> server #1; LUÔN giữ nguyên điểm
+  // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU (status !== live HOẶC waitingStart) → 0-0-2; nếu đang live → tay 1
   const toggleServeSide = () => {
     if (!match?._id) return;
 
@@ -1579,20 +1578,14 @@ export default function RefereeJudgePanel({ matchId }) {
       serverId: serverUidShow,
     };
 
-    // Snapshot điểm/game hiện tại để guard chống reset
-    const prevA = curA;
-    const prevB = curB;
-    const prevIdx = curIdx;
-
     const nextSide = activeSide === "A" ? "B" : "A";
-    const isZeroZero = Number(prevA) === 0 && Number(prevB) === 0;
-    const nextOrder = isZeroZero ? 2 : 1;
 
-    // Ưu tiên người ở Ô 1 của đội sắp giao (fallback Ô 2 nếu trống)
+    const preStart = waitingStart || match?.status !== "live";
+    const wantOrder = preStart ? 2 : 1; // ✅ yêu cầu mới
+
     const uidRight =
       getUidAtSlotNow(nextSide, 1) || getUidAtSlotNow(nextSide, 2) || "";
 
-    // ⏩ Set sớm để icon bám NGƯỜI ngay lập tức
     lastServerUidRef.current = uidRight;
 
     socket?.emit(
@@ -1600,7 +1593,7 @@ export default function RefereeJudgePanel({ matchId }) {
       {
         matchId: match._id,
         side: nextSide,
-        server: nextOrder,
+        server: wantOrder,
         serverId: uidRight,
       },
       async (ack) => {
@@ -1615,44 +1608,33 @@ export default function RefereeJudgePanel({ matchId }) {
 
         pushUndo({ t: "SERVE_SET", prev });
 
+        // 🛡️ Guard: nếu backend lỡ reset 0-0 khi đang mid-game → khôi phục điểm
         try {
-          // Refetch để kiểm tra xem backend có lỡ reset 0-0 không
           const res = await refetch();
           const m = res?.data || match;
-          const g = m?.gameScores?.[prevIdx];
-
-          // Nếu không phải đầu game, mà điểm vừa bị về 0-0 ⇒ khôi phục ngay
+          const g = m?.gameScores?.[curIdx];
           if (
-            !isZeroZero &&
+            !preStart &&
             g &&
             g.a === 0 &&
             g.b === 0 &&
-            (prevA !== 0 || prevB !== 0)
+            (curA !== 0 || curB !== 0)
           ) {
             await setGame({
               matchId: match._id,
-              gameIndex: prevIdx,
-              a: prevA,
-              b: prevB,
+              gameIndex: curIdx,
+              a: curA,
+              b: curB,
               autoNext: false,
             }).unwrap();
-
-            Toast.show({
-              type: "info",
-              text1: "Đã giữ nguyên điểm",
-              text2: "Đổi giao không làm reset điểm.",
-            });
-
-            // Lấy lại snapshot sau khi khôi phục
             await refetch();
           }
-        } catch {
-          // bỏ qua
-        }
+        } catch {}
       }
     );
   };
-  // --- ĐỔI TAY trong cùng đội: đổi sang đồng đội (không theo ô)
+
+  // --- ĐỔI TAY trong cùng đội
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
     const team = activeSide === "A" ? playersA : playersB;
@@ -1667,7 +1649,6 @@ export default function RefereeJudgePanel({ matchId }) {
       team.map(userIdOf).find((uid) => uid !== serverUidShow) || serverUidShow;
     const nextOrder = activeServerNum === 1 ? 2 : 1;
 
-    // ⏩ Set sớm để icon bám NGƯỜI ngay khi bấm
     lastServerUidRef.current = partnerId;
 
     socket?.emit(
@@ -1708,25 +1689,30 @@ export default function RefereeJudgePanel({ matchId }) {
       const list = teamKey === "A" ? playersA : playersB;
       if (!list?.[0] || !list?.[1]) return;
 
+      // ===== tính next base sau khi hoán đổi trong đội =====
       const uidTop = userIdOf(list[0]);
-      const uidBottom = userIdOf(list[1]);
+      const uidBot = userIdOf(list[1]);
 
       const nextA = { ...baseA };
       const nextB = { ...baseB };
 
       if (teamKey === "A") {
         const cur1 = Number(nextA[uidTop] || 1);
-        const cur2 = Number(nextA[uidBottom] || 2);
+        const cur2 = Number(nextA[uidBot] || 2);
         nextA[uidTop] = cur2;
-        nextA[uidBottom] = cur1;
+        nextA[uidBot] = cur1;
       } else {
         const cur1 = Number(nextB[uidTop] || 1);
-        const cur2 = Number(nextB[uidBottom] || 2);
+        const cur2 = Number(nextB[uidBot] || 2);
         nextB[uidTop] = cur2;
-        nextB[uidBottom] = cur1;
+        nextB[uidBot] = cur1;
       }
 
       const prevBase = { A: baseA, B: baseB };
+
+      // Điều kiện "chưa bắt đầu trận hoặc game"
+      const preOrZero =
+        match?.status !== "live" || (Number(curA) === 0 && Number(curB) === 0);
 
       socket?.emit(
         "slots:setBase",
@@ -1740,12 +1726,66 @@ export default function RefereeJudgePanel({ matchId }) {
             });
             return;
           }
+
           pushUndo({ t: "SLOTS_SET", prevBase });
+
+          // ⛳ Theo yêu cầu: nếu chưa bắt đầu trận/game thì KHÔNG đổi giao.
+          // Nhưng nếu hoán đổi ngay tại đội đang giao, cần đảm bảo 0-0-2
+          // và người giao là người đang ở ô phải (slot 1) sau hoán đổi.
+          if (preOrZero && teamKey === activeSide) {
+            // Tính UID ở ô phải (slot 1) theo base "mới"
+            const mapAfter = teamKey === "A" ? nextA : nextB; // base mới của đội đang giao
+            const uidRightNew =
+              Object.entries(mapAfter).find(
+                ([, slot]) => Number(slot) === 1
+              )?.[0] ||
+              Object.keys(mapAfter)[0] ||
+              "";
+
+            if (uidRightNew) {
+              lastServerUidRef.current = uidRightNew; // bám NGƯỜI ngay lập tức
+
+              socket?.emit(
+                "serve:set",
+                {
+                  matchId: match._id,
+                  side: activeSide, // giữ nguyên đội đang giao
+                  server: 2, // luôn 0-0-2 ở đầu game/chưa bắt đầu
+                  serverId: uidRightNew,
+                },
+                (ack2) => {
+                  if (!ack2?.ok) {
+                    Toast.show({
+                      type: "error",
+                      text1: "Lỗi",
+                      text2: ack2?.message || "Không cập nhật lại người giao",
+                    });
+                  }
+                  // Dù sao cũng refetch để UI khớp trạng thái mới
+                  refetch();
+                }
+              );
+              return; // đã refetch trong callback
+            }
+          }
+
+          // Trường hợp thường: chỉ refetch sau khi đổi ô
           refetch();
         }
       );
     },
-    [match?._id, playersA, playersB, baseA, baseB, refetch]
+    [
+      match?._id,
+      match?.status,
+      curA,
+      curB,
+      playersA,
+      playersB,
+      baseA,
+      baseB,
+      activeSide,
+      refetch,
+    ]
   );
 
   const swapSides = () => {
@@ -1790,14 +1830,6 @@ export default function RefereeJudgePanel({ matchId }) {
   const cta = useMemo(() => {
     if (match?.status === "finished") return null;
 
-    if (match?.status !== "live") {
-      return {
-        label: "Bắt đầu",
-        danger: false,
-        onPress: onStart,
-      };
-    }
-
     const bestOfNum = Number(rules?.bestOf || 1);
     const needSetWins = Math.floor(bestOfNum / 2) + 1;
 
@@ -1819,6 +1851,15 @@ export default function RefereeJudgePanel({ matchId }) {
       };
     }
 
+    // ✅ nếu đang chờ bắt đầu (waitingStart) HOẶC status !== live → cho bấm “Bắt đầu”
+    if (waitingStart || match?.status !== "live") {
+      return {
+        label: "Bắt đầu",
+        danger: false,
+        onPress: onStart,
+      };
+    }
+
     if (gameFinished) {
       const finishedGames = aWins + bWins;
       const remainingGames = bestOfNum - finishedGames;
@@ -1826,7 +1867,7 @@ export default function RefereeJudgePanel({ matchId }) {
         return {
           label: "Bắt game tiếp",
           danger: false,
-          onPress: startNextGame,
+          onPress: startNextGame, // ✅ chỉ chuyển game, KHÔNG start
         };
       }
       const finalWinner = aWins > bWins ? "A" : "B";
@@ -1840,6 +1881,7 @@ export default function RefereeJudgePanel({ matchId }) {
     return null;
   }, [
     match?.status,
+    waitingStart,
     rules?.bestOf,
     rules?.pointsToWin,
     rules?.winByTwo,
@@ -1858,14 +1900,14 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // ====== Ask-once-at-half-set per game ======
   useEffect(() => {
-    if (match?.status !== "live" || midPoint == null) return;
+    if (match?.status !== "live" || waitingStart || midPoint == null) return;
     const asked = !!midAskedRef.current[curIdx];
     const isAtMidNow = curA === midPoint || curB === midPoint;
     if (!asked && isAtMidNow) {
       setMidPromptOpen(true);
       midAskedRef.current[curIdx] = true; // mark asked for this game
     }
-  }, [match?.status, curIdx, curA, curB, midPoint]);
+  }, [match?.status, waitingStart, curIdx, curA, curB, midPoint]);
 
   /* ========== render ========== */
   if (isLoading && !match)
@@ -1895,7 +1937,6 @@ export default function RefereeJudgePanel({ matchId }) {
   const currentCourtId =
     match?.court?._id || match?.court?.id || match?.court || match?.courtId;
 
-  // Lấy tên sân nếu có (tránh hiện ID nếu court là string)
   const currentCourtName =
     typeof match?.court === "object"
       ? textOf(
@@ -1905,7 +1946,7 @@ export default function RefereeJudgePanel({ matchId }) {
             match?.court
         )
       : textOf(match?.courtName || match?.meta?.courtName || "");
-  // ✅ Map điểm/sets theo bên trái/phải hiện tại
+
   const leftGameScore = leftSide === "A" ? curA : curB;
   const rightGameScore = rightSide === "A" ? curA : curB;
   const leftSetWins = leftSide === "A" ? aWins : bWins;
@@ -2120,10 +2161,9 @@ export default function RefereeJudgePanel({ matchId }) {
                 ]}
               >
                 <WinTargetTuner
-                  value={ptw} // hiển thị số hiện tại từ server
-                  base={ptwBoost ? ptw - 4 : ptw} // chỉ để winDigit vẽ trạng thái +/-
+                  value={ptw}
+                  base={ptwBoost ? ptw - 4 : ptw}
                   onToggle={() => {
-                    // nếu đã +4 → lần sau hiện “-” và gửi -4; nếu chưa → gửi +4
                     setPointsToWinDelta(ptwBoost ? -4 : +4);
                   }}
                 />
@@ -2214,7 +2254,7 @@ export default function RefereeJudgePanel({ matchId }) {
                     backgroundColor: t.colors.card,
                     borderColor: t.colors.border,
                   },
-                  leftServing && {
+                  activeSide === leftSide && {
                     backgroundColor: t.colors.primary,
                     borderColor: t.colors.primary,
                   },
@@ -2227,14 +2267,14 @@ export default function RefereeJudgePanel({ matchId }) {
                   <MaterialIcons
                     name="add"
                     size={22}
-                    color={leftServing ? "#fff" : t.colors.text}
+                    color={activeSide === leftSide ? "#fff" : t.colors.text}
                   />
                 )}
                 <Text
                   style={[
                     s.bigActionText,
                     { color: t.colors.text },
-                    leftServing && s.bigActionTextActive,
+                    activeSide === leftSide && s.bigActionTextActive,
                   ]}
                 >
                   Đội bên trái
@@ -2262,7 +2302,7 @@ export default function RefereeJudgePanel({ matchId }) {
                     backgroundColor: t.colors.card,
                     borderColor: t.colors.border,
                   },
-                  rightServing && {
+                  activeSide === rightSide && {
                     backgroundColor: t.colors.primary,
                     borderColor: t.colors.primary,
                   },
@@ -2275,14 +2315,14 @@ export default function RefereeJudgePanel({ matchId }) {
                   <MaterialIcons
                     name="add"
                     size={22}
-                    color={rightServing ? "#fff" : t.colors.text}
+                    color={activeSide === rightSide ? "#fff" : t.colors.text}
                   />
                 )}
                 <Text
                   style={[
                     s.bigActionText,
                     { color: t.colors.text },
-                    rightServing && s.bigActionTextActive,
+                    activeSide === rightSide && s.bigActionTextActive,
                   ]}
                 >
                   Đội bên phải
