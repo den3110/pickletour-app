@@ -379,7 +379,7 @@ export default function ProfileScreen() {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerImages, setViewerImages] = useState([]);
   const [viewerLabels, setViewerLabels] = useState([]);
-
+  const canNativePicker = Platform.OS === "ios" || Platform.OS === "android";
   const openAvatarViewer = () => {
     const url = normalizeUrl(form.avatar);
     if (!url) return;
@@ -2143,6 +2143,7 @@ function SelectField({
 }) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(value || "");
+  const canNativePicker = Platform.OS === "ios" || Platform.OS === "android";
   useEffect(() => setTemp(value || ""), [value]);
   const display =
     options.find((o) => o.value === value)?.label || placeholder || "—";
@@ -2168,57 +2169,62 @@ function SelectField({
         </Text>
       </Pressable>
       {!!error && <Text style={styles.errText}>{error}</Text>}
-      <Modal
-        visible={open}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setOpen(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { borderColor: border, backgroundColor: cardBg },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setOpen(false)} style={styles.modalBtn}>
-                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
-                  Hủy
-                </Text>
-              </Pressable>
-
-              <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                {label}
-              </Text>
-
-              <Pressable
-                onPress={() => {
-                  onChange(temp);
-                  setOpen(false);
-                }}
-                style={styles.modalBtn}
-              >
-                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
-                  Xong
-                </Text>
-              </Pressable>
-            </View>
-            <Picker
-              selectedValue={temp}
-              onValueChange={(v) => setTemp(String(v))}
+      {open && canNativePicker ? (
+        <Modal
+          visible={open}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.modalCard,
+                { borderColor: border, backgroundColor: cardBg },
+              ]}
             >
-              {options.map((o) => (
-                <Picker.Item
-                  key={o.value ?? o.label}
-                  label={o.label}
-                  value={o.value}
-                />
-              ))}
-            </Picker>
+              <View style={styles.modalHeader}>
+                <Pressable
+                  onPress={() => setOpen(false)}
+                  style={styles.modalBtn}
+                >
+                  <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                    Hủy
+                  </Text>
+                </Pressable>
+
+                <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                  {label}
+                </Text>
+
+                <Pressable
+                  onPress={() => {
+                    onChange(temp);
+                    setOpen(false);
+                  }}
+                  style={styles.modalBtn}
+                >
+                  <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                    Xong
+                  </Text>
+                </Pressable>
+              </View>
+              <Picker
+                selectedValue={temp}
+                onValueChange={(v) => setTemp(String(v))}
+              >
+                {options.map((o) => (
+                  <Picker.Item
+                    key={o.value ?? o.label}
+                    label={o.label}
+                    value={o.value}
+                  />
+                ))}
+              </Picker>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -2239,6 +2245,7 @@ function DateField({
   const [temp, setTemp] = useState(
     value ? new Date(value) : new Date(1990, 0, 1)
   );
+  const canNativePicker = Platform.OS === "ios" || Platform.OS === "android";
   useEffect(() => {
     if (value) setTemp(new Date(value));
   }, [value]);
@@ -2264,7 +2271,7 @@ function DateField({
         </Text>
       </Pressable>
       {!!error && <Text style={styles.errText}>{error}</Text>}
-      {open && (
+      {open && canNativePicker && (
         <Modal
           visible={open}
           animationType="slide"
