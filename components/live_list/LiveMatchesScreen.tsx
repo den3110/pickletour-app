@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  StatusBar,
   Platform,
   Keyboard,
   ActivityIndicator,
@@ -35,7 +34,6 @@ const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
  * THEME TOKENS (light/dark)
  * ============================ */
 function useThemeTokens() {
-  // Ưu tiên theme từ react-navigation, fallback hệ thống
   const navTheme = useTheme?.();
   const sysScheme = useColorScheme?.() ?? "light";
   const isDark =
@@ -259,7 +257,7 @@ export default function LiveMatchesScreen() {
   const [statuses, setStatuses] = useState([...STATUS_OPTIONS]);
   const [excludeFinished, setExcludeFinished] = useState(true);
   const [windowHours, setWindowHours] = useState(8);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1); // vẫn giữ nhưng BE trả 1 trang
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshSec, setRefreshSec] = useState(15);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -269,7 +267,8 @@ export default function LiveMatchesScreen() {
   const submitSearchTick = useRef(0);
   const bumpSubmitTick = () => (submitSearchTick.current += 1);
 
-  // Query args
+  // Query args — BE hiện tại chỉ dùng windowMs + maybe excludeFinished,
+  // các field khác BE sẽ bỏ qua cũng không sao.
   const qArgs = useMemo(() => {
     const filteredStatuses = excludeFinished
       ? statuses.filter((s) => s !== "finished")
@@ -279,7 +278,7 @@ export default function LiveMatchesScreen() {
       keyword: debouncedKeyword,
       page: page - 1,
       limit: LIMIT,
-      statuses: filteredStatuses.join(","),
+      statuses: filteredStatuses.join(","), // BE hiện chưa dùng nhưng để đó
       windowMs: windowHours * 3600 * 1000,
       _submitTick: submitSearchTick.current,
     };
@@ -295,18 +294,18 @@ export default function LiveMatchesScreen() {
     }
   );
 
-  // Auto-refresh — TẮT khi đang focus ô search
-  useEffect(() => {
-    if (!autoRefresh || searchFocused) return;
-    const id = setInterval(() => {
-      refetch();
-    }, Math.max(5, refreshSec) * 1000);
-    return () => clearInterval(id);
-  }, [autoRefresh, refreshSec, refetch, searchFocused]);
+  // chuẩn hoá items theo BE mới
+  const items = useMemo(() => {
+    const raw = Array.isArray(data?.items) ? data.items : [];
+    return raw.map((m) => ({
+      ...m,
+      matchId: m.matchId || m._id, // để RN keyExtractor dùng được
+    }));
+  }, [data]);
 
-  const items = data?.items || [];
-  const total = data?.rawCount ?? 0;
-  const pages = data?.pages || 1;
+  const total = data?.count ?? items.length;
+  // BE không trả pages nên ép =1
+  const pages = 1;
 
   // updatedAgo
   const tick = useTickingAgo();
@@ -327,6 +326,15 @@ export default function LiveMatchesScreen() {
     (excludeFinished ? 0 : 1) +
     (windowHours !== 8 ? 1 : 0) +
     (!autoRefresh || refreshSec !== 15 ? 1 : 0);
+
+  // Auto-refresh — TẮT khi đang focus ô search
+  useEffect(() => {
+    if (!autoRefresh || searchFocused) return;
+    const id = setInterval(() => {
+      refetch();
+    }, Math.max(5, refreshSec) * 1000);
+    return () => clearInterval(id);
+  }, [autoRefresh, refreshSec, refetch, searchFocused]);
 
   const handleOpenFilters = useCallback(() => {
     Keyboard.dismiss();
@@ -404,75 +412,11 @@ export default function LiveMatchesScreen() {
     ]
   );
 
-  const footerEl = useMemo(() => {
-    if (pages <= 1) return null;
+  // vì BE luôn trả 1 mảng nên footer phân trang ẩn đi
+  const footerEl = null;
+
+  const renderEmpty = useCallback(() => {
     return (
-      <View style={styles.pagination}>
-        <TouchableOpacity
-          style={[
-            styles.pageBtn,
-            { backgroundColor: T.cardBg, borderColor: T.cardBorder },
-            page <= 1 && styles.pageBtnDisabled,
-          ]}
-          onPress={() => {
-            Keyboard.dismiss();
-            setPage((p) => Math.max(1, p - 1));
-          }}
-          disabled={page <= 1}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.pageBtnText,
-              { color: T.tint },
-              page <= 1 && { color: T.textSecondary },
-            ]}
-          >
-            ← Trước
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.pageInfo}>
-          <Text style={[styles.pageText, { color: T.textPrimary }]}>
-            {page}
-          </Text>
-          <Text style={[styles.pageTextSeparator, { color: T.textSecondary }]}>
-            /
-          </Text>
-          <Text style={[styles.pageTextTotal, { color: T.textSecondary }]}>
-            {pages}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.pageBtn,
-            { backgroundColor: T.cardBg, borderColor: T.cardBorder },
-            page >= pages && styles.pageBtnDisabled,
-          ]}
-          onPress={() => {
-            Keyboard.dismiss();
-            setPage((p) => Math.min(pages, p + 1));
-          }}
-          disabled={page >= pages}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.pageBtnText,
-              { color: T.tint },
-              page >= pages && { color: T.textSecondary },
-            ]}
-          >
-            Sau →
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }, [page, pages, T.scheme, T.cardBg, T.cardBorder, T.tint, T.textSecondary, T.textPrimary]);
-
-  const renderEmpty = useCallback(
-    () => (
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyIcon, { color: T.textSecondary }]}>🔍</Text>
         <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>
@@ -482,16 +426,11 @@ export default function LiveMatchesScreen() {
           Thử điều chỉnh bộ lọc hoặc tìm kiếm khác
         </Text>
       </View>
-    ),
-    [T.textPrimary, T.textSecondary]
-  );
+    );
+  }, [T.textPrimary, T.textSecondary]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: T.pageBg }]}>
-      {/* <StatusBar
-        barStyle={T.scheme === "dark" ? "light-content" : "dark-content"}
-        backgroundColor={T.pageBg}
-      /> */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -499,7 +438,7 @@ export default function LiveMatchesScreen() {
       >
         <FlatList
           data={items}
-          keyExtractor={(item) => item.matchId}
+          keyExtractor={(item) => item.matchId || item._id}
           renderItem={renderItem}
           ListHeaderComponent={headerEl}
           ListFooterComponent={footerEl}
@@ -621,38 +560,6 @@ const styles = StyleSheet.create({
     maxWidth: 220,
   },
   chipText: { fontSize: 12, fontWeight: "500" },
-
-  /* pagination */
-  pagination: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
-    marginBottom: 8,
-    paddingHorizontal: 8,
-  },
-  pageBtn: {
-    borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    minWidth: 90,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  pageInfo: { flexDirection: "row", alignItems: "baseline" },
-  pageText: { fontSize: 18, fontWeight: "700" },
-  pageTextSeparator: { fontSize: 14, marginHorizontal: 4 },
-  pageTextTotal: { fontSize: 14, fontWeight: "500" },
 
   /* empty */
   emptyContainer: { paddingVertical: 80, alignItems: "center" },

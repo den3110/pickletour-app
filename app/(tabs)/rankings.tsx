@@ -49,7 +49,7 @@ const HEX = {
   green: "#2e7d32",
   blue: "#1976d2",
 };
-const MIN_RATING = 2;
+const MIN_RATING = 1.6;
 const MAX_RATING = 8.0;
 const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
 
@@ -663,14 +663,21 @@ export default function RankingListScreen() {
     setGradeMsg("");
     setGradeOpen(true);
   };
-
+  const normalizeDecimalInput = (v) =>
+    typeof v === "string" ? v.replace(/,/g, ".").trim() : v;
   const submitGrade = async () => {
+    // 🟣 chuẩn hoá input từ bàn phím số: "2,2" -> "2.2"
+    const singlesStr = normalizeDecimalInput(gradeSingles);
+    const doublesStr = normalizeDecimalInput(gradeDoubles);
+
     const singles =
-      gradeSingles === "" ? undefined : Number.parseFloat(gradeSingles);
+      singlesStr === "" ? undefined : Number.parseFloat(singlesStr);
     const doubles =
-      gradeDoubles === "" ? undefined : Number.parseFloat(gradeDoubles);
+      doublesStr === "" ? undefined : Number.parseFloat(doublesStr);
+
     const inRange = (v) =>
       v === undefined || (v >= MIN_RATING && v <= MAX_RATING);
+
     if (!inRange(singles) || !inRange(doubles)) {
       setGradeMsg(`Điểm phải trong khoảng ${MIN_RATING} - ${MAX_RATING}`);
       return;
@@ -679,6 +686,7 @@ export default function RankingListScreen() {
       setGradeMsg("Thiếu thông tin người được chấm.");
       return;
     }
+
     try {
       const resp = await createEvaluation({
         targetUser: gradeUser.id,
@@ -687,12 +695,14 @@ export default function RankingListScreen() {
         overall: { singles, doubles },
         notes: undefined,
       }).unwrap();
+
       const newSingle =
         resp?.ranking?.single ?? (singles !== undefined ? singles : undefined);
       const newDouble =
         resp?.ranking?.double ?? (doubles !== undefined ? doubles : undefined);
       const newUpdatedAt =
         resp?.ranking?.lastUpdated ?? new Date().toISOString();
+
       setScorePatch((m) => ({
         ...m,
         [gradeUser.id]: {
@@ -710,7 +720,6 @@ export default function RankingListScreen() {
       );
     }
   };
-
   // KYC modal
   const [kycOpen, setKycOpen] = useState(false);
   const [kycUser, setKycUser] = useState(null);

@@ -33,6 +33,7 @@ import {
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
+import { useIsFocused } from "@react-navigation/native";
 
 /* ---------------- THEME ---------------- */
 function useThemeTokens() {
@@ -105,17 +106,18 @@ const TYPE_LABEL = (t) => {
   return t || "Khác";
 };
 
-// Knockout luôn cuối; Round Elim xếp sau Knockout
-const typeOrderWeight = (t) => {
-  const k = String(t || "").toLowerCase();
-  if (k === "group") return 1;
-  if (k === "po" || k === "playoff") return 2;
-  if (k === "swiss") return 3;
-  if (k === "gsl") return 4;
-  if (k === "double_elim" || k === "doubleelim") return 5;
-  if (k === "knockout" || k === "ko") return 9; // luôn cuối
-  if (k === "roundelim" || k === "round_elim") return 10; // sau knockout
-  return 6;
+/**
+ * LẤY NHÃN SÂN ĐÃ GÁN
+ * ưu tiên: match.courtLabel -> match.court.name -> match.court.label -> match.court
+ */
+const courtLabelOf = (m) => {
+  if (!m) return "";
+  if (m.courtLabel) return m.courtLabel;
+  if (m.court && typeof m.court === "object") {
+    return m.court.name || m.court.label || m.court.code || "";
+  }
+  if (typeof m.court === "string") return m.court;
+  return "";
 };
 
 const playerName = (p) =>
@@ -129,6 +131,61 @@ const pairLabel = (pair) => {
 };
 
 const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
+
+/**
+ * CHUẨN HOÁ TỈ SỐ SET
+ * trả về mảng [{a,b}, ...]
+ */
+const extractGameSets = (m) => {
+  const raw = m?.gameScores || m?.scores;
+  if (!Array.isArray(raw)) return [];
+
+  const out = [];
+  for (const g of raw) {
+    if (!g) continue;
+
+    // "11-7" / "11:7"
+    if (typeof g === "string") {
+      const parts = g.split(/[-:x]/i).map((x) => parseInt(x, 10));
+      if (
+        parts.length >= 2 &&
+        Number.isFinite(parts[0]) &&
+        Number.isFinite(parts[1])
+      ) {
+        out.push({ a: parts[0], b: parts[1] });
+      }
+      continue;
+    }
+
+    // [11,7]
+    if (Array.isArray(g) && g.length >= 2) {
+      const a = Number(g[0]);
+      const b = Number(g[1]);
+      if (Number.isFinite(a) && Number.isFinite(b)) out.push({ a, b });
+      continue;
+    }
+
+    // {a:11,b:7} / {scoreA:11, scoreB:7}
+    if (typeof g === "object") {
+      const a =
+        g.a ??
+        g.A ??
+        g.scoreA ??
+        g.left ??
+        (Array.isArray(g) ? g[0] : undefined);
+      const b =
+        g.b ??
+        g.B ??
+        g.scoreB ??
+        g.right ??
+        (Array.isArray(g) ? g[1] : undefined);
+      if (Number.isFinite(Number(a)) && Number.isFinite(Number(b))) {
+        out.push({ a: Number(a), b: Number(b) });
+      }
+    }
+  }
+  return out;
+};
 
 /* status pill (themed) */
 function StatusPill({ status, theme }) {
@@ -223,6 +280,7 @@ const statusWeight = (s) =>
 
 /* ---------------- main (Public Referee Center) ---------------- */
 export default function RefereeCenterScreen() {
+  const isFocused = useIsFocused();
   const { id } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const T = useThemeTokens();
@@ -495,22 +553,35 @@ export default function RefereeCenterScreen() {
     );
   }, [id, liveBump]);
 
-  // Tabs động theo type
+  // Tabs động THEO THỨ TỰ BRACKET (order từ BE)
   const typesAvailable = useMemo(() => {
-    const uniq = new Map();
-    (bracketsData || []).forEach((b) => {
-      const t = (b?.type || "").toString().toLowerCase();
+    const list = Array.isArray(bracketsData) ? bracketsData : [];
+    if (!list.length)
+      return [{ type: "group", label: "Vòng bảng", order: 0, idx: 0 }];
+
+    const map = new Map();
+    list.forEach((b, idx) => {
+      const t = String(b?.type || "").toLowerCase();
       if (!t) return;
-      if (!uniq.has(t))
-        uniq.set(t, {
+      const ord =
+        typeof b?.order === "number" && !Number.isNaN(b.order) ? b.order : idx;
+      const prev = map.get(t);
+      if (!prev || ord < prev.order) {
+        map.set(t, {
           type: t,
           label: TYPE_LABEL(t),
-          weight: typeOrderWeight(t),
+          order: ord,
+          idx,
         });
+      }
     });
-    if (uniq.size === 0)
-      uniq.set("group", { type: "group", label: "Vòng bảng", weight: 1 });
-    return Array.from(uniq.values()).sort((a, b) => a.weight - b.weight);
+
+    const arr = Array.from(map.values());
+    arr.sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.idx - b.idx;
+    });
+    return arr;
   }, [bracketsData]);
 
   const [tab, setTab] = useState(typesAvailable[0]?.type || "group");
@@ -565,13 +636,20 @@ export default function RefereeCenterScreen() {
     (list) => {
       const kw = q.trim().toLowerCase();
       const filtered = list.filter((m) => {
+        // ✅ 1) chỉ hiện trận mà mình là trọng tài
+        if (!isUserRefereeOfMatch(m, me)) return false;
+
+        // ✅ 2) nếu không search thì pass luôn
         if (!kw) return true;
+
+        // ✅ 3) search theo code/cặp/trạng thái/link/sân
         const text = [
           matchCode(m),
           pairLabel(m?.pairA),
           pairLabel(m?.pairB),
           m?.status,
           m?.video,
+          courtLabelOf(m),
         ]
           .join(" ")
           .toLowerCase();
@@ -589,7 +667,7 @@ export default function RefereeCenterScreen() {
 
       return sorted;
     },
-    [q, compareWithinGroup]
+    [q, compareWithinGroup, me]
   );
 
   // Viewer
@@ -607,6 +685,15 @@ export default function RefereeCenterScreen() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (isFocused) {
+      // fetch lại toàn bộ khi quay lại màn
+      refetchTour();
+      refetchBrackets();
+      refetchMatches();
+    }
+  }, [isFocused, refetchTour, refetchBrackets, refetchMatches]);
 
   // Guards
   const isInitialLoading = tourLoading || brLoading || mLoading;
@@ -713,6 +800,9 @@ export default function RefereeCenterScreen() {
   /* ----------- row render ----------- */
   const renderMatchRow = ({ item: m }) => {
     const hasVideo = !!m?.video;
+    const courtLabel = courtLabelOf(m);
+    const sets = extractGameSets(m);
+
     return (
       <Pressable
         onPress={() => openMatch(m._id)}
@@ -749,11 +839,81 @@ export default function RefereeCenterScreen() {
             {pairLabel(m?.pairB)}
           </Text>
 
+          {/* HIỆN TỈ SỐ SET */}
+          {sets.length > 0 ? (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 0,
+                marginTop: 2,
+              }}
+            >
+              {sets.map((s, idx) => {
+                const aWin = Number(s.a) > Number(s.b);
+                const bWin = Number(s.b) > Number(s.a);
+                return (
+                  <Text
+                    key={idx}
+                    style={{ color: T.subtext, fontSize: 12, lineHeight: 16 }}
+                  >
+                    {/* label G1: */}
+                    <Text style={{ color: T.subtext, fontWeight: "600" }}>
+                      {`G${idx + 1}: `}
+                    </Text>
+                    {/* điểm A */}
+                    <Text
+                      style={{
+                        color: aWin ? "#22c55e" : T.subtext,
+                        fontWeight: aWin ? "700" : "400",
+                      }}
+                    >
+                      {s.a}
+                    </Text>
+                    {"-"}
+                    {/* điểm B */}
+                    <Text
+                      style={{
+                        color: bWin ? "#22c55e" : T.subtext,
+                        fontWeight: bWin ? "700" : "400",
+                      }}
+                    >
+                      {s.b}
+                    </Text>
+                    {idx < sets.length - 1 ? ", " : ""}
+                  </Text>
+                );
+              })}
+            </View>
+          ) : null}
+
           <View style={styles.metaRow}>
             <StatusPill status={m?.status} theme={T} />
             <Text style={{ color: T.subtext, fontSize: 12 }}>
               Vòng {m?.round ?? "—"} • Thứ tự {m?.order ?? "—"}
             </Text>
+            {courtLabel ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: T.pillDefaultBg,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 999,
+                }}
+              >
+                <MaterialIcons
+                  name="sports-tennis"
+                  size={14}
+                  color={T.pillDefaultFg}
+                />
+                <Text style={{ color: T.pillDefaultFg, fontSize: 12 }}>
+                  {courtLabel}
+                </Text>
+              </View>
+            ) : null}
             <VideoPill has={hasVideo} />
           </View>
         </View>
@@ -965,10 +1125,24 @@ export default function RefereeCenterScreen() {
 
         {/* List brackets */}
         <FlatList
-          data={(bracketsData || []).filter(
-            (b) =>
-              String(b?.type || "").toLowerCase() === String(tab).toLowerCase()
-          )}
+          data={(bracketsData || [])
+            .filter(
+              (b) =>
+                String(b?.type || "").toLowerCase() ===
+                String(tab).toLowerCase()
+            )
+            // sort THEO BRACKET để hiển thị đúng thứ tự BE
+            .sort((a, b) => {
+              const oa =
+                typeof a?.order === "number" && !Number.isNaN(a.order)
+                  ? a.order
+                  : 9999;
+              const ob =
+                typeof b?.order === "number" && !Number.isNaN(b.order)
+                  ? b.order
+                  : 9999;
+              return oa - ob;
+            })}
           keyExtractor={(b) => String(b._id)}
           renderItem={renderBracket}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}

@@ -31,6 +31,9 @@ import {
   useGetCourtsForMatchQuery,
   useRefereeAssignCourtMutation,
   useRefereeUnassignCourtMutation,
+  useRefereeSetBreakMutation,
+
+  // useRefereeNextGameMutation,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -877,7 +880,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const [setStatus] = useRefereeSetStatusMutation();
   const [setWinner] = useRefereeSetWinnerMutation();
   const [nextGame] = useRefereeNextGameMutation();
-
+  const [setBreak] = useRefereeSetBreakMutation(); // 👈 thêm
   const socket = useSocket();
 
   // ===== NEW: court modal state =====
@@ -1234,9 +1237,20 @@ export default function RefereeJudgePanel({ matchId }) {
   const onStart = async () => {
     if (!match) return;
     try {
+      // 1) đặt trạng thái live
       await setStatus({ matchId: match._id, status: "live" }).unwrap();
-      setWaitingStart(false); // ✅ cho phép cộng điểm
-      socket?.emit("status:updated", { matchId: match._id, status: "live" });
+
+      // 2) tắt nghỉ
+      await setBreak({
+        matchId: match._id,
+        active: false,
+        note: "",
+      }).unwrap();
+
+      // 3) cho phép cộng điểm
+      setWaitingStart(false);
+
+      // 4) nếu chưa có game thì tạo game 0
       if (gs.length === 0) {
         await setGame({
           matchId: match._id,
@@ -1246,6 +1260,8 @@ export default function RefereeJudgePanel({ matchId }) {
           autoNext: false,
         }).unwrap();
       }
+
+      refetch();
     } catch (e) {
       Toast.show({
         type: "error",
@@ -1289,8 +1305,22 @@ export default function RefereeJudgePanel({ matchId }) {
   const startNextGame = async () => {
     if (!match) return;
     try {
+      // 1) bật nghỉ để overlay biết đang nghỉ sau game vừa xong
+      await setBreak({
+        matchId: match._id,
+        active: true,
+        // nghỉ sau game hiện tại
+        afterGame: curIdx,
+        note: "",
+      }).unwrap();
+
+      // 2) chuyển sang game tiếp theo
       await nextGame({ matchId: match._id }).unwrap();
-      setWaitingStart(true); // ✅ chuyển sang trạng thái "chờ Bắt đầu"
+
+      // 3) FE chuyển sang trạng thái chờ bấm "Bắt đầu"
+      setWaitingStart(true);
+
+      // 4) refetch lại match
       refetch();
     } catch (e) {
       Toast.show({
@@ -1303,7 +1333,6 @@ export default function RefereeJudgePanel({ matchId }) {
       });
     }
   };
-
   const setPointsToWinOnServer = useCallback(
     (nextVal) => {
       if (!match?._id) return;

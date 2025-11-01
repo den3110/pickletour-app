@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,17 @@ import {
   Alert,
   Clipboard,
   useColorScheme,
+  Platform,
 } from "react-native";
-import { Image as ExpoImage } from "expo-image"; // 👈 expo-image (có cache)
+import { Image as ExpoImage } from "expo-image";
 import InfoModal from "./InfoModal";
 import { useTheme } from "@react-navigation/native";
+import { WebView } from "react-native-webview";
 
 /* ============================
  * THEME TOKENS
  * ============================ */
 function useThemeTokens() {
-  // Ưu tiên theme từ react-navigation; fallback hệ thống nếu app chưa set
   const navTheme = useTheme?.();
   const sysScheme = useColorScheme?.() ?? "light";
   const isDark =
@@ -52,16 +53,18 @@ function useThemeTokens() {
   };
 }
 
-// ---- helpers ----
+/* ============================
+ * HELPERS
+ * ============================ */
 function useImageFallback(candidates = []) {
-  const list = React.useMemo(
+  const list = useMemo(
     () => (Array.isArray(candidates) ? candidates.filter(Boolean) : []),
     [candidates]
   );
-  const [idx, setIdx] = React.useState(0);
+  const [idx, setIdx] = useState(0);
   const src = list[idx] || null;
   const onError = () => setIdx((i) => i + 1);
-  return { src, onError, hasMore: idx < list.length - 1, list };
+  return { src, onError, list, hasMore: idx < list.length - 1 };
 }
 
 function timeAgo(date) {
@@ -78,16 +81,13 @@ function timeAgo(date) {
   return `${day}d trước`;
 }
 
-const providerMeta = (p) =>
-  p === "youtube"
-    ? { label: "YouTube", icon: "▶️", color: "#ff0000" }
-    : p === "facebook"
-    ? { label: "Facebook", icon: "👥", color: "#1877f2" }
-    : { label: p || "Stream", icon: "📺", color: "#666" };
-
-const byPriority = (a, b) =>
-  (({ youtube: 1, facebook: 2 }[a.provider] || 99) -
-  ({ youtube: 1, facebook: 2 }[b.provider] || 99));
+const providerMeta = {
+  facebook: {
+    label: "Facebook",
+    icon: "👥",
+    color: "#1877f2",
+  },
+};
 
 function parseVT(code) {
   if (!code) return { v: null, b: null, t: null };
@@ -114,32 +114,6 @@ const viStatus = (s) =>
       : VI_STATUS_LABELS[String(s).toLowerCase()] || s
     : "-";
 
-function parseYouTubeId(url = "") {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      return u.pathname.split("/").filter(Boolean)[0] || null;
-    }
-    if (u.searchParams.get("v")) return u.searchParams.get("v");
-    const parts = u.pathname.split("/").filter(Boolean);
-    if (parts[0] === "embed" && parts[1]) return parts[1];
-    if (parts[0] === "shorts" && parts[1]) return parts[1];
-    return null;
-  } catch {
-    return null;
-  }
-}
-function ytThumbCandidates(videoId) {
-  if (!videoId) return [];
-  return [
-    `https://i.ytimg.com/vi/${videoId}/maxresdefault_live.jpg`,
-    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-    `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
-    `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-  ];
-}
-
-// 👇 cacheKey ổn định (tránh signed URL/query)
 function makeCacheKey(uri, hint = "") {
   try {
     const u = new URL(uri);
@@ -150,28 +124,141 @@ function makeCacheKey(uri, hint = "") {
   }
 }
 
-// Blurhash placeholder nhẹ nhàng (có thể thay bằng của bạn)
 const BLURHASH =
-  "|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXo"; // sample
+  "|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXo";
 
-export default function LiveMatchCard({ item }) {
+/* fallback HTML */
+function wrapFbEmbed(htmlRaw = "", tick = 0) {
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+        <style>
+          html,body {
+            margin:0;
+            padding:0;
+            background:#000;
+            height:100%;
+            overflow:hidden;
+          }
+          .wrap {
+            position:relative;
+            width:100%;
+            height:100%;
+            overflow:hidden;
+          }
+          iframe {
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            border:0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          ${htmlRaw}
+        </div>
+        <!-- tick: ${tick} -->
+      </body>
+    </html>
+  `;
+}
+
+/* build plugin url từ watch url */
+function buildFbPluginUrl(watchUrl) {
+  if (!watchUrl) return null;
+  const base = "https://www.facebook.com/plugins/video.php";
+  const qs = `href=${encodeURIComponent(
+    watchUrl
+  )}&show_text=0&width=560&autoplay=1&mute=0&adapt_container_width=true`;
+  return `${base}?${qs}`;
+}
+
+function isFbLoginUrl(url = "") {
+  const u = url.toLowerCase();
+  return (
+    u.includes("facebook.com/login") ||
+    u.includes("m.facebook.com/login") ||
+    u.includes("facebook.com/checkpoint") ||
+    u.includes("facebook.com/confirm")
+  );
+}
+
+/* ============================
+ * COMPONENT
+ * ============================ */
+export default function LiveMatchCard({
+  item = {},
+  autoEmbedRefreshMs = 60000,
+}) {
   const T = useThemeTokens();
-
   const [infoVisible, setInfoVisible] = useState(false);
-  const [showAllSessions, setShowAllSessions] = useState(false);
 
-  const m = item?.match || {};
-  const sessionsAll = Array.isArray(item?.sessions) ? item.sessions : [];
-  const sessions = sessionsAll
-    .filter((s) => s.platformVerified && s.watchUrl)
-    .sort(byPriority);
+  const m = item || {};
+  const fb = m.facebookLive || {};
 
-  const primary = sessions[0] || null;
-  const secondary = sessions.slice(1);
+  // lấy ra URL gốc (watch/permalink)
+  const baseWatchUrl =
+    fb.video_permalink_url ||
+    fb.permalink_url ||
+    fb.watch_url ||
+    fb.embed_url ||
+    (fb.videoId
+      ? `https://www.facebook.com/watch/?v=${fb.videoId}`
+      : fb.id
+      ? `https://www.facebook.com/watch/?v=${fb.id}`
+      : "");
+
+  // plugin URL (ưu tiên)
+  const pluginUrl = buildFbPluginUrl(baseWatchUrl);
+
+  // HTML embed BE bắn về
+  const rawEmbedHtml =
+    m.embed_html || m.embedHtml || fb.embed_html || fb.embedHtml || null;
+
+  // thumbnail
+  const fbThumb =
+    m.embed_thumbnail ||
+    fb.embed_thumbnail ||
+    fb.thumbnail_url ||
+    fb.picture ||
+    (fb.id ? `https://graph.facebook.com/${fb.id}/picture?type=large` : null);
+
+  const heroCandidates = [fbThumb].filter(Boolean);
+  const {
+    src: heroSrc,
+    onError: heroErr,
+    list: heroList,
+  } = useImageFallback(heroCandidates);
+
+  useEffect(() => {
+    if (heroList.length > 0) {
+      ExpoImage.prefetch(heroList, { cachePolicy: "memory-disk" });
+    }
+  }, [heroList.join("|")]);
+
+  const cacheKey = makeCacheKey(
+    heroSrc || baseWatchUrl || m.code || m._id || "match",
+    "fb"
+  );
+
+  const primary = baseWatchUrl
+    ? {
+        provider: "facebook",
+        watchUrl: baseWatchUrl,
+        embedHtml: rawEmbedHtml,
+        thumbnails: fbThumb ? [fbThumb] : [],
+      }
+    : null;
+  const sessions = primary ? [primary] : [];
 
   const isLive =
-    String(m?.status || "").toLowerCase() === "live" || sessions.length > 0;
-  const hasAny = sessionsAll.length > 0;
+    String(m.status || "").toLowerCase() === "live" || !!primary || false;
+  const hasAny = !!primary;
 
   const copyToClipboard = async (text, message = "Đã copy!") => {
     try {
@@ -183,6 +270,10 @@ export default function LiveMatchCard({ item }) {
   };
 
   const openUrl = async (url) => {
+    if (!url) {
+      Alert.alert("Lỗi", "Không có link phát.");
+      return;
+    }
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
@@ -197,38 +288,53 @@ export default function LiveMatchCard({ item }) {
 
   const vt = parseVT(m.code);
 
-  // ---- thumbnail candidates (provided -> auto youtube) ----
-  const providedThumbs = Array.isArray(primary?.thumbnails)
-    ? primary.thumbnails
-    : [];
-  let autoThumbs = [];
-  if (primary?.provider === "youtube") {
-    const yid =
-      primary.platformLiveId || parseYouTubeId(primary.watchUrl || "");
-    if (yid) autoThumbs = ytThumbCandidates(yid);
-  }
-  const heroCandidates = [...providedThumbs, ...autoThumbs];
+  // webview state
+  const [embedTick, setEmbedTick] = useState(0);
+  const [webOk, setWebOk] = useState(true);
+  const webRef = useRef(null);
 
-  const {
-    src: heroSrc,
-    onError: heroErr,
-    list: heroList,
-  } = useImageFallback(heroCandidates);
+  const hasEmbed = !!(pluginUrl || rawEmbedHtml);
 
-  // ---- Prefetch & cache to disk/memory (ấm cache cho list) ----
+  // auto reload
   useEffect(() => {
-    if (heroList.length > 0) {
-      ExpoImage.prefetch(heroList, { cachePolicy: "memory-disk" });
-    }
-  }, [heroList.join("|")]);
+    if (!hasEmbed) return;
+    if (!autoEmbedRefreshMs || autoEmbedRefreshMs < 5000) return;
 
-  const cacheKey =
-    primary?.provider === "youtube"
-      ? makeCacheKey(
-          heroSrc || "",
-          `yt:${parseYouTubeId(primary?.watchUrl || "") || "unknown"}`
-        )
-      : makeCacheKey(heroSrc || "", "img");
+    const id = setInterval(() => {
+      if (!webOk) return;
+      if (Platform.OS === "android" && webRef.current?.reload) {
+        webRef.current.reload();
+      } else {
+        setEmbedTick((t) => t + 1);
+      }
+    }, autoEmbedRefreshMs);
+
+    return () => clearInterval(id);
+  }, [hasEmbed, autoEmbedRefreshMs, webOk]);
+
+  // BE đổi embed -> thử lại
+  useEffect(() => {
+    if (pluginUrl || rawEmbedHtml) {
+      setEmbedTick((t) => t + 1);
+      setWebOk(true);
+    }
+  }, [pluginUrl, rawEmbedHtml]);
+
+  const handleManualReload = () => {
+    if (!hasEmbed) return;
+    setWebOk(true);
+    if (Platform.OS === "android" && webRef.current?.reload) {
+      webRef.current.reload();
+    } else {
+      setEmbedTick((t) => t + 1);
+    }
+  };
+
+  // user agent giả mobile
+  const fbUA =
+    Platform.OS === "ios"
+      ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+      : "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36";
 
   return (
     <>
@@ -238,38 +344,82 @@ export default function LiveMatchCard({ item }) {
           { backgroundColor: T.cardBg, borderColor: T.cardBorder },
         ]}
       >
-        {/* Thumbnail (expo-image + cache) */}
-        <View
-          style={[styles.thumbnailContainer, { backgroundColor: T.thumbBg }]}
-        >
-          {heroSrc && (
-            <ExpoImage
-              source={{ uri: heroSrc, cacheKey }} // 👈 cacheKey tuỳ biến
-              style={styles.thumbnail}
-              onError={heroErr}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              recyclingKey={cacheKey}
-              placeholder={{ blurhash: BLURHASH }}
-              transition={120}
-              priority="high"
-            />
-          )}
-
-          {primary?.provider && (
-            <View
-              style={[
-                styles.providerBadge,
-                { backgroundColor: providerMeta(primary.provider).color },
-              ]}
+        {/* EMBED */}
+        {hasEmbed && webOk ? (
+          <View style={styles.embedContainer}>
+            <TouchableOpacity
+              onPress={handleManualReload}
+              style={styles.reloadBtn}
+              activeOpacity={0.7}
             >
-              <Text style={styles.providerBadgeText}>
-                {providerMeta(primary.provider).icon}{" "}
-                {providerMeta(primary.provider).label}
-              </Text>
-            </View>
-          )}
-        </View>
+              <Text style={styles.reloadBtnText}>↻</Text>
+            </TouchableOpacity>
+
+            <WebView
+              key={`fb-embed-${m._id || m.code || "x"}-${embedTick}`}
+              ref={webRef}
+              originWhitelist={["*"]}
+              source={
+                pluginUrl
+                  ? { uri: pluginUrl }
+                  : { html: wrapFbEmbed(rawEmbedHtml, embedTick) }
+              }
+              style={styles.webview}
+              scrollEnabled={false}
+              javaScriptEnabled
+              domStorageEnabled
+              sharedCookiesEnabled
+              thirdPartyCookiesEnabled
+              setSupportMultipleWindows={false}
+              allowsFullscreenVideo
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              userAgent={fbUA}
+              onNavigationStateChange={(nav) => {
+                if (isFbLoginUrl(nav.url)) {
+                  // FB bắt login -> thôi bỏ WebView, show fallback
+                  setWebOk(false);
+                }
+              }}
+              onError={() => setWebOk(false)}
+              onHttpError={() => setWebOk(false)}
+            />
+          </View>
+        ) : (
+          // FALLBACK
+          <View
+            style={[styles.thumbnailContainer, { backgroundColor: T.thumbBg }]}
+          >
+            {heroSrc ? (
+              <ExpoImage
+                source={{ uri: heroSrc, cacheKey }}
+                style={styles.thumbnail}
+                onError={heroErr}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={cacheKey}
+                placeholder={{ blurhash: BLURHASH }}
+                transition={120}
+                priority="high"
+              />
+            ) : (
+              <View style={styles.thumbFallback}>
+                <Text style={{ color: T.muted, fontSize: 12 }}>
+                  Không load được embed FB
+                </Text>
+              </View>
+            )}
+
+            {baseWatchUrl ? (
+              <TouchableOpacity
+                style={styles.openFbBtn}
+                onPress={() => openUrl(baseWatchUrl)}
+              >
+                <Text style={styles.openFbBtnText}>👥 Mở Facebook</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
 
         {/* Content */}
         <View style={styles.content}>
@@ -342,60 +492,23 @@ export default function LiveMatchCard({ item }) {
             {m.updatedAt && ` • ${timeAgo(m.updatedAt)}`}
           </Text>
 
-          {/* Primary */}
+          {/* Primary FB btn */}
           {primary ? (
             <TouchableOpacity
               style={[
                 styles.primaryBtn,
-                { backgroundColor: providerMeta(primary.provider).color },
+                { backgroundColor: providerMeta.facebook.color },
               ]}
               onPress={() => openUrl(primary.watchUrl)}
             >
               <Text style={styles.primaryBtnText}>
-                {providerMeta(primary.provider).icon} Xem trên{" "}
-                {providerMeta(primary.provider).label}
+                {providerMeta.facebook.icon} Xem trên Facebook
               </Text>
             </TouchableOpacity>
           ) : (
             <Text style={[styles.noSession, { color: T.muted }]}>
               Chưa có phiên live đã xác minh.
             </Text>
-          )}
-
-          {/* Secondary */}
-          {secondary.length > 0 && (
-            <View style={styles.secondaryRow}>
-              {(showAllSessions ? secondary : secondary.slice(0, 2)).map(
-                (s, i) => {
-                  const meta = providerMeta(s.provider);
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={[styles.secondaryBtn, { borderColor: T.tint }]}
-                      onPress={() => openUrl(s.watchUrl)}
-                    >
-                      <Text
-                        style={[styles.secondaryBtnText, { color: T.tint }]}
-                      >
-                        {meta.icon} {meta.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }
-              )}
-              {secondary.length > 2 && !showAllSessions && (
-                <TouchableOpacity
-                  style={[styles.moreBtn, { borderColor: T.cardBorder }]}
-                  onPress={() => setShowAllSessions(true)}
-                >
-                  <Text
-                    style={[styles.moreBtnText, { color: T.textSecondary }]}
-                  >
-                    +{secondary.length - 2}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
           )}
 
           {/* Actions */}
@@ -454,21 +567,57 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
   },
+  embedContainer: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  reloadBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    zIndex: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reloadBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
   thumbnailContainer: {
     width: "100%",
     aspectRatio: 16 / 9,
   },
   thumbnail: { width: "100%", height: "100%" },
-  providerBadge: {
-    position: "absolute",
-    right: 8,
-    bottom: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  thumbFallback: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  providerBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
-
+  openFbBtn: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(24,119,242,0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  openFbBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
+  },
   content: { padding: 12 },
   cardHeader: { marginBottom: 8 },
   titleRow: {
@@ -483,8 +632,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-
-  /* badges */
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   liveBadge: { backgroundColor: "#f44336" },
   liveBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
@@ -492,7 +639,6 @@ const styles = StyleSheet.create({
   readyBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   normalBadgeText: { fontSize: 11, fontWeight: "600" },
 
-  /* VT chips */
   vtChips: { flexDirection: "row", gap: 4 },
   vtChip: {
     borderWidth: 1,
@@ -504,7 +650,6 @@ const styles = StyleSheet.create({
 
   metaText: { fontSize: 12, marginBottom: 12 },
 
-  /* primary & secondary buttons */
   primaryBtn: {
     paddingVertical: 12,
     borderRadius: 8,
@@ -514,28 +659,6 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   noSession: { fontSize: 13, textAlign: "center", paddingVertical: 12 },
 
-  secondaryRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginBottom: 8,
-  },
-  secondaryBtn: {
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  secondaryBtnText: { fontSize: 12, fontWeight: "600" },
-  moreBtn: {
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  moreBtnText: { fontSize: 12, fontWeight: "600" },
-
-  /* actions */
   actions: { flexDirection: "row", gap: 8 },
   actionBtn: {
     flex: 1,
@@ -546,3 +669,4 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { fontSize: 12, fontWeight: "600" },
 });
+

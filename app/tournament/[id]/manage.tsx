@@ -74,6 +74,22 @@ const pairLabel = (pair) => {
 };
 const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
 
+// lấy id cặp cho map bận
+const pairIdOf = (p) => {
+  if (!p) return "";
+  if (typeof p === "string") return p;
+  if (typeof p === "number") return String(p);
+  return (
+    p._id ||
+    p.id ||
+    p.pairId ||
+    // fallback tạm: phòng trường hợp pair được embed thành {player1, player2}
+    (p.player1?._id && p.player2?._id
+      ? `${p.player1._id}__${p.player2._id}`
+      : "")
+  );
+};
+
 const hasVal = (v) =>
   v === 0 ||
   typeof v === "number" ||
@@ -754,6 +770,27 @@ export default function ManageScreen() {
     );
   }, [tid, liveBump]);
 
+  // ✅ map cặp nào đang thi đấu ở TRẬN KHÁC
+  // cấu trúc: pairId -> [{ matchId, court }]
+  const liveBusyByPairId = useMemo(() => {
+    const mp = new Map();
+    for (const m of mergedAllMatches) {
+      if (!isLive(m)) continue;
+      const mid = String(m._id);
+      const court = courtNameOf(m);
+      const push = (p) => {
+        const pid = pairIdOf(p);
+        if (!pid) return;
+        const arr = mp.get(pid) || [];
+        arr.push({ matchId: mid, court });
+        mp.set(pid, arr);
+      };
+      push(m.pairA);
+      push(m.pairB);
+    }
+    return mp;
+  }, [mergedAllMatches]);
+
   // ======== Sắp xếp ========
   const bucketWeight = (m) =>
     isLive(m)
@@ -1060,6 +1097,27 @@ export default function ManageScreen() {
     );
   };
 
+  const BusyChip = ({ court }) => {
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          backgroundColor: "#fef3c7",
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 999,
+        }}
+      >
+        <MaterialIcons name="warning" size={12} color="#b45309" />
+        <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
+          Đang thi đấu{court ? ` (${court})` : ""}
+        </Text>
+      </View>
+    );
+  };
+
   const MiniChipBtn = ({ icon, label, onPress, color = colors.primary }) => (
     <Pressable
       onPress={onPress}
@@ -1257,8 +1315,8 @@ export default function ManageScreen() {
     return (
       <EdgeFadedHScroll
         contentContainerStyle={styles.actionsWrap}
-        bgColor={colors.card} // màu nền để fade đúng với card
-        chevronColor={t.muted} // màu mũi tên “hint”
+        bgColor={colors.card}
+        chevronColor={t.muted}
       >
         <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
         <MiniChipBtn
@@ -1318,6 +1376,32 @@ export default function ManageScreen() {
         ? parseInt(String(m?.order), 10)
         : null;
 
+    const isThisMatchLive = isLive(m);
+    const isThisMatchFinished = isFinished(m);
+
+    const pAId = pairIdOf(m?.pairA);
+    const pBId = pairIdOf(m?.pairB);
+
+    // 🔥 chỉ hiện chip nếu:
+    // - trận này CHƯA kết thúc
+    // - và bản thân trận này KHÔNG phải đang live
+    // - và cặp đó đang live ở TRẬN KHÁC
+    const busyInfoA =
+      !isThisMatchFinished &&
+      !isThisMatchLive &&
+      pAId &&
+      liveBusyByPairId.has(pAId)
+        ? // lọc bỏ chính match này nếu lỡ cùng id
+          liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
+        : null;
+    const busyInfoB =
+      !isThisMatchFinished &&
+      !isThisMatchLive &&
+      pBId &&
+      liveBusyByPairId.has(pBId)
+        ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
+        : null;
+
     return (
       <Pressable
         onPress={() => openMatch(m._id)}
@@ -1336,20 +1420,30 @@ export default function ManageScreen() {
           >
             {matchCode(m)}
           </Text>
-          <Text
-            style={{ color: colors.text }}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {pairLabel(m?.pairA)}
-          </Text>
-          <Text
-            style={{ color: colors.text }}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {pairLabel(m?.pairB)}
-          </Text>
+
+          {/* Pair A */}
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+            <Text
+              style={{ color: colors.text }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {pairLabel(m?.pairA)}
+            </Text>
+            {busyInfoA ? <BusyChip court={busyInfoA.court} /> : null}
+          </View>
+
+          {/* Pair B */}
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+            <Text
+              style={{ color: colors.text }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {pairLabel(m?.pairB)}
+            </Text>
+            {busyInfoB ? <BusyChip court={busyInfoB.court} /> : null}
+          </View>
 
           <View style={styles.metaRow}>
             <StatusPill status={m?.status} />

@@ -21,13 +21,15 @@ import {
 import { useSelector } from "react-redux";
 
 /* ===== DUPR helpers ===== */
-const DUPR_MIN = 2.0;
+// ✅ hạ sàn xuống 1.6
+const DUPR_MIN = 1.6;
 const DUPR_MAX = 8.0;
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
 const round3 = (n) => Number((Number(n) || 0).toFixed(3));
 const normalizeDupr = (n) => round3(clamp(n, DUPR_MIN, DUPR_MAX));
+// từ raw 0–10 → ra điểm trong dải 1.6–8.0 (dải rộng 6.4)
 const duprFromRaw = (raw0to10) =>
-  round3(DUPR_MIN + clamp(raw0to10, 0, 10) * (6 / 10));
+  round3(DUPR_MIN + clamp(raw0to10, 0, 10) * ((DUPR_MAX - DUPR_MIN) / 10));
 
 /* ===== THEME TOKENS (đồng bộ với các màn trước) ===== */
 function useThemeTokens() {
@@ -67,15 +69,24 @@ function useThemeTokens() {
   };
 }
 
-/* Rubric (rút gọn text cho ngắn) */
+/* Rubric (đã hạ mốc đầu xuống 1.6 cho khớp sàn) */
 const RUBRIC = [
+  {
+    level: 1.6,
+    label: "New / Recreational",
+    bullets: [
+      "Mới chơi, thao tác còn chậm",
+      "Giao bóng chưa ổn định",
+      "Đứng vị trí còn lúng túng",
+    ],
+  },
   {
     level: 2.0,
     label: "Beginner",
     bullets: [
-      "Giao bóng chưa ổn định",
-      "Chỉ đánh bóng dễ",
-      "Chưa kiểm soát vị trí",
+      "Giao bóng bắt đầu đều",
+      "Đánh bóng dễ/giữa sân",
+      "Chưa kiểm soát được tempo",
     ],
   },
   {
@@ -305,6 +316,7 @@ export default function LevelPointScreen({ userId: userIdProp }) {
     const bothEmpty = singleInput === "" && doubleInput === "";
     if (!bothEmpty) return;
 
+    // nếu BE đã lưu đúng thang DUPR thì normalize và set thẳng
     if (
       typeof latest?.singleLevel === "number" &&
       typeof latest?.doubleLevel === "number"
@@ -314,6 +326,7 @@ export default function LevelPointScreen({ userId: userIdProp }) {
       didPrefillRef.current = true;
       return;
     }
+    // nếu BE vẫn trả kiểu 0–10 thì map sang dải 1.6–8.0
     if (
       typeof latest?.singleScore === "number" &&
       typeof latest?.doubleScore === "number"
@@ -365,7 +378,9 @@ export default function LevelPointScreen({ userId: userIdProp }) {
     if (!singleValid || !doubleValid) {
       Alert.alert(
         "Thiếu/không hợp lệ",
-        "Vui lòng nhập Đơn & Đôi trong dải 2.000–8.000."
+        `Vui lòng nhập Đơn & Đôi trong dải ${DUPR_MIN.toFixed(
+          3
+        )}–${DUPR_MAX.toFixed(3)}.`
       );
       return;
     }
@@ -414,9 +429,8 @@ export default function LevelPointScreen({ userId: userIdProp }) {
             )}
           </View>
 
-          {/* (tuỳ chọn) Legend
-          <Legend palette={{ tint: T.tint, success: T.success }} />
-          */}
+          {/* (tuỳ chọn) Legend */}
+          {/* <Legend palette={{ tint: T.tint, success: T.success }} /> */}
 
           {/* Inputs */}
           <View
@@ -481,14 +495,14 @@ export default function LevelPointScreen({ userId: userIdProp }) {
               >
                 {singleValid && (
                   <Pill
-                    label={`Đơn: ${singleVal}`}
+                    label={`Đơn: ${singleVal?.toFixed(3)}`}
                     bg={T.scheme === "dark" ? "#1e3a8a33" : "#dbeafe"}
                     fg={T.scheme === "dark" ? "#bfdbfe" : "#1e3a8a"}
                   />
                 )}
                 {doubleValid && (
                   <Pill
-                    label={`Đôi: ${doubleVal}`}
+                    label={`Đôi: ${doubleVal?.toFixed(3)}`}
                     bg={T.scheme === "dark" ? "#052e1633" : "#dcfce7"}
                     fg={T.scheme === "dark" ? "#86efac" : "#166534"}
                   />
@@ -517,6 +531,7 @@ export default function LevelPointScreen({ userId: userIdProp }) {
                   onPress={() => {
                     setSingleInput("");
                     setDoubleInput("");
+                    didPrefillRef.current = false;
                   }}
                   style={[styles.secondaryBtn, { borderColor: T.tint }]}
                   activeOpacity={0.9}

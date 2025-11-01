@@ -932,7 +932,8 @@ export default function TournamentScheduleNative() {
 
   const filteredAll = useMemo(() => {
     const qnorm = q.trim().toLowerCase();
-    return allSorted.filter((m) => {
+    // 1) lọc theo status + search như cũ
+    let res = allSorted.filter((m) => {
       if (status === "live" && !isLive(m)) return false;
       if (
         status === "upcoming" &&
@@ -953,6 +954,16 @@ export default function TournamentScheduleNative() {
         .toLowerCase();
       return hay.includes(qnorm);
     });
+
+    // 2) riêng tab "Tất cả" → đẩy trận đã kết thúc xuống cuối
+    if (status === "all") {
+      const notFinished = res.filter((m) => !isFinished(m));
+      const finished = res.filter((m) => isFinished(m));
+      // vẫn giữ thứ tự cũ bên trong mỗi nhóm
+      res = [...notFinished, ...finished];
+    }
+
+    return res;
   }, [allSorted, q, status]);
 
   // “trên sân” = live + mọi trận CÓ SÂN & CHƯA KẾT THÚC (kể cả chưa bắt đầu)
@@ -960,7 +971,7 @@ export default function TournamentScheduleNative() {
     const map = new Map();
     allSorted.forEach((m) => {
       const name = courtNameOf(m);
-      if (!map.has(name)) map.set(name, { live: [], queue: [] });
+      if (!map.has(name)) map.set(name, { name, live: [], queue: [] });
 
       if (isLive(m)) {
         map.get(name).live.push(m);
@@ -976,12 +987,24 @@ export default function TournamentScheduleNative() {
         if (ak[i] !== bk[i]) return ak[i] - bk[i];
       return 0;
     };
+
+    // sort live + queue trong từng sân
     map.forEach((v) => {
       v.live.sort(byKey);
       v.queue.sort(byKey);
     });
 
-    return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
+    // ✅ luôn cho "Chưa phân sân" xuống cuối cùng
+    const list = Array.from(map.values());
+    list.sort((a, b) => {
+      const aUn = a.name && a.name.toLowerCase().includes("chưa phân sân");
+      const bUn = b.name && b.name.toLowerCase().includes("chưa phân sân");
+      if (aUn && !bUn) return 1; // a xuống dưới
+      if (!aUn && bUn) return -1; // b xuống dưới
+      return 0; // giữ nguyên thứ tự còn lại
+    });
+
+    return list;
   }, [allSorted]);
 
   const openViewer = useCallback((mid) => {

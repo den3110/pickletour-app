@@ -123,7 +123,7 @@ export default function AssignRefSheet({
     isLoading,
     isFetching,
     error,
-    refetch,
+    refetch, // 👈 cần cái này
   } = useListTournamentRefereesQuery(
     { tid: tournamentId, q: debouncedQ, limit },
     { skip: !open || !tournamentId }
@@ -134,10 +134,22 @@ export default function AssignRefSheet({
     data: assignedForSingle = [],
     isLoading: assignedLoading,
     isFetching: assignedFetching,
+    refetch: refetchAssigned, // 👈 lấy refetch luôn
   } = useAdminGetMatchRefereesQuery(
     { tid: tournamentId, matchId: singleMatchId || "" },
     { skip: !open || !tournamentId || !singleMatchId }
   );
+
+  // 👉 mỗi lần sheet mở thì refetch lại 2 cái trên
+  useEffect(() => {
+    if (!open) return;
+    // gọi lại danh sách trọng tài của giải
+    refetch?.();
+    // nếu đang gán 1 trận thì gọi lại DS đã gán
+    if (singleMatchId) {
+      refetchAssigned?.();
+    }
+  }, [open, refetch, refetchAssigned, singleMatchId]);
 
   // State chọn
   const [selected, setSelected] = useState([]);
@@ -220,6 +232,9 @@ export default function AssignRefSheet({
 
       onChanged?.();
       // giữ sheet mở để thao tác tiếp
+      // 👉 sau khi lưu xong cũng có thể refetch lại nếu muốn:
+      // refetch?.();
+      // if (singleMatchId) refetchAssigned?.();
     } catch (e) {
       Alert.alert(
         "Lỗi",
@@ -256,8 +271,8 @@ export default function AssignRefSheet({
         bd: t.chipDefaultBd,
       },
       primary: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
-      warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" }, // ít dùng
-      success: { bg: "#dcfce7", fg: "#166534", bd: "#bbf7d0" }, // ít dùng
+      warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" },
+      success: { bg: "#dcfce7", fg: "#166534", bd: "#bbf7d0" },
       secondary: { bg: t.chipSecBg, fg: t.chipSecFg, bd: t.chipSecBd },
       error: { bg: t.chipErrBg, fg: t.chipErrFg, bd: t.chipErrBd },
       info: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
@@ -391,7 +406,13 @@ export default function AssignRefSheet({
             </Text>
           </Row>
           <Row style={{ alignItems: "center", gap: 6 }}>
-            <IconBtn name="refresh" onPress={() => refetch?.()} />
+            <IconBtn
+              name="refresh"
+              onPress={() => {
+                refetch?.();
+                if (singleMatchId) refetchAssigned?.();
+              }}
+            />
             <IconBtn name="close" onPress={() => sheetRef.current?.dismiss()} />
           </Row>
         </Row>
@@ -458,7 +479,13 @@ export default function AssignRefSheet({
               </Text>
               <Chip text={`${referees?.length || 0} kết quả`} outlined />
             </Row>
-            <Btn onPress={() => refetch?.()} variant="outline">
+            <Btn
+              onPress={() => {
+                refetch?.();
+                if (singleMatchId) refetchAssigned?.();
+              }}
+              variant="outline"
+            >
               Refresh
             </Btn>
           </Row>

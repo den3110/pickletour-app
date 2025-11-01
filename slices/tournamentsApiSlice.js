@@ -713,20 +713,29 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
         return tags;
       },
     }),
-     adminGetMatchReferees: builder.query({
+    adminGetMatchReferees: builder.query({
       /**
        * @param {{ tid: string, matchId: string }} args
        */
       query: ({ tid, matchId }) =>
         `/api/admin/tournaments/${tid}/matches/${matchId}/referees`,
       providesTags: (result, error, { matchId }) => [
-        { type: 'MatchReferees', id: matchId },
+        { type: "MatchReferees", id: matchId },
       ],
       // Optional: chuẩn hoá data
-      transformResponse: (res) => Array.isArray(res) ? res : (res?.referees || []),
+      transformResponse: (res) =>
+        Array.isArray(res) ? res : res?.referees || [],
     }),
-     verifyManager: builder.query({
+    verifyManager: builder.query({
       query: (tid) => `/api/tournaments/${tid}/is-manager`,
+    }),
+    refereeSetBreak: builder.mutation({
+      query: ({ matchId, ...body }) => ({
+        url: `/api/referee/matches/${matchId}/break`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (r, e, { matchId }) => [{ type: "Match", id: matchId }],
     }),
   }),
 });
@@ -793,5 +802,6 @@ export const {
   useAdminAssignMatchToCourtMutation,
   useAdminClearMatchCourtMutation,
   useAdminGetMatchRefereesQuery,
-  useVerifyManagerQuery
+  useVerifyManagerQuery,
+  useRefereeSetBreakMutation,
 } = tournamentsApiSlice;

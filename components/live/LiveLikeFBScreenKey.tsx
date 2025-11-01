@@ -1,11 +1,12 @@
 // LiveLikeFBScreenKey.tsx
-// AUTO-LIVE theo sân (Assigned → LIVE), mỗi trận = 1 video riêng:
-// - Có match → tạo liveSession → pick RTMP → start stream + overlay
+// AUTO-LIVE theo sân (Assigned → LIVE), mỗi trận = 1 video riêng
+// - Có match → gọi createLiveSession (BE mới: chỉ tạo Facebook Live, giữ page bận) → lấy RTMPS → start stream + overlay
 // - Hết match → stop stream ngay, KHÔNG đóng app; chờ 10 phút, rồi cảnh báo 10s (Huỷ để tiếp tục chờ)
 // - Có match mới trong lúc chờ → start stream mới
 // - Adaptive chất lượng/FPS theo máy (native hint nếu có; fallback an toàn)
 // - Tối ưu nhiệt/ram: thermalProtect(optional), dọn overlay/view khi stop, release(optional)
 // - NEW: Gate chọn orientation Dọc/Ngang trước khi bắt đầu phát
+// - NEW: Chỉ phát live khi match.status === "live"
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -55,11 +56,11 @@ const _CachedRtmpPreviewView =
 const RtmpPreviewView = _CachedRtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-/* ====== Overlay URL builder ====== */
+/* ====== Overlay URL builder (fallback) ====== */
 const overlayUrlForMatch = (mid?: string | null) =>
   mid
     ? process.env.EXPO_PUBLIC_BASE_URL +
-      `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5`
+      `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5&isactivebreak=1`
     : null;
 
 /* ====== DEBUG ====== */
@@ -69,12 +70,6 @@ const log = (...args: any[]) =>
 
 /* ====== Types ====== */
 type Mode = "idle" | "live" | "stopping" | "ended";
-type Dest = {
-  platform?: string;
-  server_url?: string;
-  stream_key?: string;
-  secure_stream_url?: string;
-};
 type Props = {
   tournamentHref?: string;
   homeHref?: string;
@@ -193,72 +188,31 @@ async function ensurePermissions() {
   );
 }
 
-/** Chuẩn hoá RTMP outputs từ liveData */
-const normalizeDestinationsFromLiveData = (liveData: any): Dest[] => {
-  const outs: Dest[] = [];
-  try {
-    const p = liveData?.platforms || {};
-    const primary = liveData?.primary || {};
-    const push = (platform?: string, node?: any) => {
-      if (!node) return;
-      const server_url = node.server_url;
-      const stream_key = node.stream_key;
-      const secure_stream_url = node.secure_stream_url;
-      if (server_url || stream_key || secure_stream_url) {
-        outs.push({ platform, server_url, stream_key, secure_stream_url });
-      }
-    };
-    push("facebook", p?.facebook?.live);
-    if (primary?.platform === "facebook") push("facebook", primary);
-    push("youtube", p?.youtube?.live);
-    if (primary?.platform === "youtube") push("youtube", primary);
-    push("tiktok", p?.tiktok?.live);
-    if (Array.isArray(liveData?.destinations)) {
-      for (const d of liveData.destinations) {
-        outs.push({
-          platform: String(d?.platform || "").toLowerCase() || undefined,
-          server_url: d?.server_url,
-          stream_key: d?.stream_key,
-          secure_stream_url: d?.secure_stream_url,
-        });
-      }
-    }
-  } catch (e) {
-    console.warn("normalizeDestinationsFromLiveData error", e);
+/* ====== BE mới: chỉ FB, trả về facebook + overlay_url + studio_url ====== */
+const extractFacebookLiveFromResponse = (liveData: any) => {
+  if (!liveData || typeof liveData !== "object") return null;
+
+  const fb = liveData.facebook || null;
+
+  let rtmpUrl: string | null = null;
+  if (fb?.secure_stream_url) {
+    rtmpUrl = fb.secure_stream_url;
+  } else if (fb?.server_url && fb?.stream_key) {
+    const base = fb.server_url.endsWith("/")
+      ? fb.server_url.slice(0, -1)
+      : fb.server_url;
+    rtmpUrl = `${base}/${fb.stream_key}`;
   }
 
-  return outs
-    .map((d) => {
-      let {
-        platform,
-        server_url = "",
-        stream_key = "",
-        secure_stream_url = "",
-      } = d || {};
-      if ((!server_url || !stream_key) && secure_stream_url) {
-        const trimmed = secure_stream_url.replace(/\/$/, "");
-        const idx = trimmed.lastIndexOf("/");
-        if (idx >= 0) {
-          server_url ||= trimmed.slice(0, idx);
-          stream_key ||= trimmed.slice(idx + 1);
-        }
-      }
-      return { platform, server_url, stream_key, secure_stream_url };
-    })
-    .filter((x) => x.server_url && x.stream_key);
-};
+  const overlayUrl = liveData.overlay_url || null;
+  const studioUrl = liveData.studio_url || null;
 
-const pickStreamUrl = (dests: Dest[]): string | null => {
-  if (!dests?.length) return null;
-  const order = ["facebook", "youtube", "tiktok"];
-  const chosen =
-    dests.find((d) => order.includes(String(d.platform))) || dests[0];
-  if (!chosen) return null;
-  if (chosen.secure_stream_url) return chosen.secure_stream_url;
-  const base = chosen.server_url!.endsWith("/")
-    ? chosen.server_url!.slice(0, -1)
-    : chosen.server_url!;
-  return `${base}/${chosen.stream_key!}`;
+  return {
+    rtmpUrl,
+    overlayUrl,
+    studioUrl,
+    facebook: fb,
+  };
 };
 
 /* ================================================================================== */
@@ -291,28 +245,23 @@ export default function LiveLikeFBScreenKey({
   const [locking, setLocking] = useState(false);
   const orientationChosen = orientation !== null;
 
-  const applyOrientationChoice = useCallback(
-    async (choice: Orient) => {
-      setLocking(true);
-      try {
-        await Haptics.selectionAsync();
-        // Khoá xoay OS (ưu tiên expo)
-        await ScreenOrientation.lockAsync(
-          choice === "portrait"
-            ? ScreenOrientation.OrientationLock.PORTRAIT
-            : ScreenOrientation.OrientationLock.LANDSCAPE
-        );
-      } catch {}
-      try {
-        // Nếu native có hỗ trợ khoá riêng (optional)
-        await Live.enableAutoRotate?.(false);
-        await Live.lockOrientation?.(choice.toUpperCase());
-      } catch {}
-      setOrientation(choice);
-      setLocking(false);
-    },
-    []
-  );
+  const applyOrientationChoice = useCallback(async (choice: Orient) => {
+    setLocking(true);
+    try {
+      await Haptics.selectionAsync();
+      await ScreenOrientation.lockAsync(
+        choice === "portrait"
+          ? ScreenOrientation.OrientationLock.PORTRAIT
+          : ScreenOrientation.OrientationLock.LANDSCAPE
+      );
+    } catch {}
+    try {
+      await Live.enableAutoRotate?.(false);
+      await Live.lockOrientation?.(choice.toUpperCase());
+    } catch {}
+    setOrientation(choice);
+    setLocking(false);
+  }, []);
 
   const unlockOrientation = useCallback(async () => {
     try {
@@ -395,7 +344,6 @@ export default function LiveLikeFBScreenKey({
       attempts < maxAttempts
     ) {
       try {
-        // Cho phép xoay lúc preview để người dùng dễ chọn
         await Live.enableAutoRotate?.(true);
         await Live.startPreview?.();
         zoomUIRef.current = 1;
@@ -502,19 +450,25 @@ export default function LiveLikeFBScreenKey({
   /* ==== Adaptive profile (orientation-aware) ==== */
   const pickAdaptiveProfile = useCallback(
     async (orient: Orient): Promise<StreamProfile> => {
-      // 1) hỏi native (nếu có)
       try {
-        const p = await Live.suggestProfile?.(); // {bitrate,width,height,fps}
+        const p = await Live.suggestProfile?.();
         if (p && p.width && p.height && p.fps && p.bitrate) {
           log("suggestProfile(native)", p);
           const base: StreamProfile = p;
           return orient === "portrait"
-            ? { ...base, width: Math.min(base.width, base.height), height: Math.max(base.width, base.height) }
-            : { ...base, width: Math.max(base.width, base.height), height: Math.min(base.width, base.height) };
+            ? {
+                ...base,
+                width: Math.min(base.width, base.height),
+                height: Math.max(base.width, base.height),
+              }
+            : {
+                ...base,
+                width: Math.max(base.width, base.height),
+                height: Math.min(base.width, base.height),
+              };
         }
       } catch {}
 
-      // 2) heuristics đơn giản (landscape là chuẩn; portrait thì swap)
       let can1080 = false,
         can720p60 = false,
         perfScore = 50;
@@ -539,7 +493,11 @@ export default function LiveLikeFBScreenKey({
       else base = { width: 1280, height: 720, fps: 24, bitrate: 2_800_000 };
 
       if (orient === "portrait") {
-        return { ...base, width: Math.min(base.width, base.height), height: Math.max(base.width, base.height) };
+        return {
+          ...base,
+          width: Math.min(base.width, base.height),
+          height: Math.max(base.width, base.height),
+        };
       }
       return base;
     },
@@ -625,27 +583,55 @@ export default function LiveLikeFBScreenKey({
     if (courtsFetching) log("court fetching…");
     const court = courtData?.court;
     const cm = courtData?.match || null;
-    log("court ok", { court: court?.name, currentMatchId: cm?._id || null });
+    log("court ok", {
+      court: court?.name,
+      currentMatchId: cm?._id || null,
+      statusMatch: cm?.status || null,
+      isBreak: cm?.isBreak || null
+    });
   }, [courtData, courtsFetching, courtsLoading, courtsError, shouldPoll]);
 
-  const currentMatchId: string | null = courtData?.match?._id || null;
-
-  /* ===================== create live session (idempotent) ===================== */
+  const matchObj = courtData?.match ?? null;
+  const currentMatchId: string | null = matchObj?._id ?? null;
+  const currentMatchStatus: string | null = matchObj?.status ?? null;
+  /* ===================== create live session (BE mới: FB-only) ===================== */
   const [createLiveSession] = useCreateLiveSessionMutation();
   const [notifyStreamStarted] = useNotifyStreamStartedMutation();
   const [notifyStreamEnded] = useNotifyStreamEndedMutation();
 
   const ensureOutputsForMatch = useCallback(
-    async (mid: string): Promise<string | null> => {
+    async (
+      mid: string
+    ): Promise<{
+      rtmpUrl: string;
+      overlayUrl: string | null;
+      studioUrl: string | null;
+      facebook: any;
+    } | null> => {
       setStatusText("⚙️ Đang tạo live session…");
       try {
         const res =
           (await (createLiveSession as any)({ matchId: mid }).unwrap?.()) ??
           (await (createLiveSession as any)({ matchId: mid }).unwrap());
-        const dests = normalizeDestinationsFromLiveData(res);
-        const url = pickStreamUrl(dests);
-        log("ensureOutputsForMatch → url", { matchId: mid, url: maskUrl(url) });
-        return url;
+
+        const parsed = extractFacebookLiveFromResponse(res);
+        if (!parsed || !parsed.rtmpUrl) {
+          log("ensureOutputsForMatch → no RTMP from BE", res);
+          return null;
+        }
+
+        log("ensureOutputsForMatch → url", {
+          matchId: mid,
+          url: maskUrl(parsed.rtmpUrl),
+          page: parsed.facebook?.pageName || parsed.facebook?.pageId,
+        });
+
+        return {
+          rtmpUrl: parsed.rtmpUrl,
+          overlayUrl: parsed.overlayUrl,
+          studioUrl: parsed.studioUrl,
+          facebook: parsed.facebook,
+        };
       } catch (e) {
         log("createLiveSession → FAILED", e);
         return null;
@@ -675,7 +661,6 @@ export default function LiveLikeFBScreenKey({
     gapWaitingRef.current = true;
     setStatusText("Không còn trận — đang chờ trận mới… (tối đa 10 phút)");
     gapTenMinTimerRef.current = setTimeout(() => {
-      // Hiện cảnh báo 10s
       setGapWarnVisible(true);
       setGapWarnProgress(0);
       gapWarnDeadlineRef.current = Date.now() + GAP_WARN_MS;
@@ -707,7 +692,6 @@ export default function LiveLikeFBScreenKey({
   }, [clearGapTimers, notifyStreamEnded, stopNativeNow]);
 
   const cancelAutoStop = useCallback(() => {
-    // Huỷ countdown 10s và tiếp tục chờ thêm 10 phút nữa
     try {
       clearInterval(gapWarnTimerRef.current!);
     } catch {}
@@ -725,15 +709,18 @@ export default function LiveLikeFBScreenKey({
         return false;
       }
       setStatusText("Sân đã có trận — chuẩn bị phát…");
-      const url = await ensureOutputsForMatch(mid);
-      if (!url) {
-        setStatusText("❌ Backend chưa trả outputs cho trận này.");
+
+      const liveInfo = await ensureOutputsForMatch(mid);
+      if (!liveInfo) {
+        setStatusText("❌ Backend chưa trả RTMP cho trận này.");
         Alert.alert("Không thể phát", "Chưa có RTMPS URL từ server.");
         return false;
       }
+
+      const { rtmpUrl, overlayUrl: beOverlayUrl } = liveInfo;
+
       try {
         await Haptics.selectionAsync();
-        // Khoá orientation ngay trước khi start để không bị xoay khi live
         try {
           await ScreenOrientation.lockAsync(
             orientation === "portrait"
@@ -743,12 +730,12 @@ export default function LiveLikeFBScreenKey({
           await Live.enableAutoRotate?.(false);
           await Live.lockOrientation?.(orientation!.toUpperCase());
         } catch {}
+
         const profile = await pickAdaptiveProfile(orientation!);
         chosenProfileRef.current = profile;
-        await startNative(url, profile);
+        await startNative(rtmpUrl, profile);
 
-        // Overlay theo match
-        const oUrl = overlayUrlForMatch(mid);
+        const oUrl = beOverlayUrl || overlayUrlForMatch(mid);
         if (oUrl) {
           try {
             await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
@@ -759,7 +746,7 @@ export default function LiveLikeFBScreenKey({
           }
         }
 
-        lastUrlRef.current = url;
+        lastUrlRef.current = rtmpUrl;
         currentMatchRef.current = mid;
         setMode("live");
         setStatusText("Đang LIVE…");
@@ -788,12 +775,12 @@ export default function LiveLikeFBScreenKey({
     ]
   );
 
-  // Auto điều khiển theo currentMatchId (mỗi trận 1 video riêng)
+  // Auto điều khiển theo match của sân (có điều kiện status === 'live')
   const lastAutoStartedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!autoOnLive || !courtId) return;
 
-    // Nếu chưa chọn orientation, không start — nhắc chọn
+    // chưa chọn dọc/ngang thì thôi
     if (!orientationChosen) {
       if (currentMatchId) {
         setStatusText(
@@ -805,15 +792,46 @@ export default function LiveLikeFBScreenKey({
       return;
     }
 
-    // Có match mới
-    if (currentMatchId) {
-      // Huỷ timers nếu có
+    // ❗ nếu sân có match nhưng BE chưa bật live (status != 'live') → không phát
+    if (currentMatchId && currentMatchStatus !== "live") {
+      // nếu mình đang phát cho match này hoặc một match trước đó → dừng
+      if (mode === "live" || mode === "stopping") {
+        (async () => {
+          setStatusText(
+            "Trận đã gán nhưng chưa ở trạng thái LIVE — dừng phát và chờ…"
+          );
+          try {
+            await (notifyStreamEnded as any)({
+              matchId: currentMatchRef.current,
+              platform: "all",
+            }).unwrap?.();
+          } catch {}
+          await stopNativeNow();
+          setMode("idle");
+          if (!gapWaitingRef.current && !gapWarnVisible) {
+            beginGapWait();
+          }
+        })();
+      } else {
+        setStatusText(
+          "Trận đã gán nhưng chưa ở trạng thái LIVE — đang chờ BE chuyển sang live…"
+        );
+        if (!gapWaitingRef.current && !gapWarnVisible) {
+          beginGapWait();
+        }
+      }
+      return;
+    }
+
+    // ===== CASE: có match & status === 'live' =====
+    if (currentMatchId && currentMatchStatus === "live") {
       clearGapTimers();
+
+      // đang live match A → chuyển sang match B
       if (
         currentMatchRef.current &&
         currentMatchRef.current !== currentMatchId
       ) {
-        // Đang live trận A → chuyển sang trận B
         if (mode === "live" || mode === "stopping") {
           (async () => {
             log("switch match: stop current then start", {
@@ -826,7 +844,7 @@ export default function LiveLikeFBScreenKey({
                 platform: "all",
               }).unwrap?.();
             } catch {}
-            await stopNativeNow(); // stop RTMP ngay
+            await stopNativeNow();
             setMode("idle");
             const ok = await startForMatch(currentMatchId);
             if (ok) lastAutoStartedForRef.current = currentMatchId;
@@ -837,20 +855,26 @@ export default function LiveLikeFBScreenKey({
             if (ok) lastAutoStartedForRef.current = currentMatchId;
           })();
         }
-      } else if (!currentMatchRef.current) {
-        // Chưa live, có match → start
+        return;
+      }
+
+      // chưa live, giờ có match live → start
+      if (!currentMatchRef.current) {
         (async () => {
           const ok = await startForMatch(currentMatchId);
           if (ok) lastAutoStartedForRef.current = currentMatchId;
         })();
-      } else {
-        // Đang live đúng match → giữ nguyên
-        if (mode === "live") setStatusText("Đang LIVE…");
+        return;
+      }
+
+      // đang live đúng match → giữ
+      if (mode === "live") {
+        setStatusText("Đang LIVE…");
       }
       return;
     }
 
-    // Không còn match (kết thúc trận hiện tại)
+    // ===== CASE: không còn match =====
     if (!currentMatchId) {
       if (mode === "live" || mode === "stopping") {
         (async () => {
@@ -861,9 +885,9 @@ export default function LiveLikeFBScreenKey({
               platform: "all",
             }).unwrap?.();
           } catch {}
-          await stopNativeNow(); // dừng RTMP NGAY để tách video
+          await stopNativeNow();
           setMode("idle");
-          beginGapWait(); // chờ 10 phút rồi cảnh báo 10s
+          beginGapWait();
         })();
       } else {
         if (!gapWaitingRef.current && !gapWarnVisible) beginGapWait();
@@ -877,6 +901,7 @@ export default function LiveLikeFBScreenKey({
     autoOnLive,
     courtId,
     currentMatchId,
+    currentMatchStatus,
     mode,
     startForMatch,
     stopNativeNow,
@@ -1060,7 +1085,7 @@ export default function LiveLikeFBScreenKey({
           </>
         )}
 
-        {/* IDLE (đang chờ trận) */}
+        {/* IDLE */}
         {mode === "idle" && (
           <View style={styles.centerOverlay}>
             <ActivityIndicator size="large" color="#fff" />
@@ -1124,11 +1149,15 @@ export default function LiveLikeFBScreenKey({
           </>
         )}
 
-        {/* STOPPING (manual) */}
+        {/* STOPPING */}
         {mode === "stopping" && (
           <View style={styles.overlay}>
             <Text style={styles.overlayTitle}>Đang kết thúc buổi phát</Text>
-            <DottedCircleProgress progress={stopProgress} size={140} dotSize={8} />
+            <DottedCircleProgress
+              progress={stopProgress}
+              size={140}
+              dotSize={8}
+            />
             <Text style={styles.progressText}>
               Sẽ kết thúc sau {Math.max(0, Math.ceil((1 - stopProgress) * 5))}s
             </Text>
@@ -1141,13 +1170,17 @@ export default function LiveLikeFBScreenKey({
           </View>
         )}
 
-        {/* GAP WARNING (sau 10 phút không có trận) */}
+        {/* GAP WARNING */}
         {gapWarnVisible && (
           <View style={styles.overlay}>
             <Text style={styles.overlayTitle}>
               Không có trận mới — sẽ tự dừng sau ít giây
             </Text>
-            <DottedCircleProgress progress={gapWarnProgress} size={140} dotSize={8} />
+            <DottedCircleProgress
+              progress={gapWarnProgress}
+              size={140}
+              dotSize={8}
+            />
             <Text style={styles.progressText}>
               Sẽ dừng sau {Math.max(0, Math.ceil((1 - gapWarnProgress) * 10))}s
             </Text>
@@ -1165,7 +1198,9 @@ export default function LiveLikeFBScreenKey({
         {/* ENDED */}
         {mode === "ended" && (
           <View style={styles.overlay}>
-            <Text style={styles.endedTitle}>Đã kết thúc buổi phát trực tiếp</Text>
+            <Text style={styles.endedTitle}>
+              Đã kết thúc buổi phát trực tiếp
+            </Text>
             <View style={[styles.endedBtns, { bottom: 16 + insets.bottom }]}>
               <Pressable
                 style={[styles.endedBtn, { backgroundColor: "#1877F2" }]}
@@ -1190,7 +1225,7 @@ export default function LiveLikeFBScreenKey({
           </View>
         )}
 
-        {/* ORIENTATION GATE (NEW) — hiển thị NGAY khi vào màn hình cho đến khi chọn */}
+        {/* ORIENTATION GATE */}
         {!orientationChosen && (
           <View style={styles.gateWrap} pointerEvents="auto">
             <View style={styles.gateCard}>

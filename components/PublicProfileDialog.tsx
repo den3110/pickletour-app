@@ -109,7 +109,7 @@ function getNameNick(u: any) {
   return { name, nick };
 }
 
-/** ✅ Lấy điểm SportConnect từ base.spc */
+/** Lấy điểm SportConnect */
 function getSPC(base: any) {
   const s = base?.spc;
   if (!s || typeof s !== "object") return null;
@@ -253,13 +253,10 @@ function OutlineBtn({ onPress, children, disabled }: any) {
 }
 
 function InfoRow({ label, value }: { label: string; value?: string }) {
-  const navTheme = useTheme(); // hook gọi trực tiếp
+  const navTheme = useTheme();
   const scheme = useColorScheme() || "light";
   const isDark =
     typeof navTheme?.dark === "boolean" ? navTheme.dark : scheme === "dark";
-  // Ưu tiên theme.text, fallback theo dark/light
-  const text =isDark ? "#f7f7f7" : "#111111"
-  const colorText= isDark ? "#f7f7f7" : "#111111"
   const muted = isDark ? "#9aa0a6" : "#6b7280";
   if (!value) return null;
   return (
@@ -334,7 +331,6 @@ function InfoRowWithCopy({
   const sysScheme = useColorScheme?.() || "light";
   const isDark =
     typeof navTheme.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
-  const textColor = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#111");
   const muted = isDark ? "#9aa0a6" : "#6b7280";
 
   if (!value) return null;
@@ -342,10 +338,7 @@ function InfoRowWithCopy({
     <View style={styles.infoRow}>
       <Text style={[styles.infoLabel, { color: muted }]}>{label}</Text>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
-        <Text
-          style={[styles.infoValue, { color: muted }]}
-          numberOfLines={2}
-        >
+        <Text style={[styles.infoValue, { color: muted }]} numberOfLines={2}>
           {value}
         </Text>
         <CopyButton
@@ -689,11 +682,11 @@ type Props = { open: boolean; onClose: () => void; userId?: string };
 export default function PublicProfileSheet({ open, onClose, userId }: Props) {
   // Chỉ mở sheet khi thật sự có userId & prop open = true
   const canOpen = !!(open && userId);
-  // Tham số cho RTK Query: nếu chưa sẵn sàng thì skip hẳn
   const idArg = canOpen ? (userId as string) : (skipToken as any);
   const insets = useSafeAreaInsets();
   const { height: winH } = useWindowDimensions();
-  /* ===== THEME TOKENS: Ưu tiên app theme (React Navigation), fallback hệ thống ===== */
+
+  /* THEME */
   const navTheme = useTheme?.() || {};
   const sysScheme = useColorScheme?.() || "light";
   const isDark =
@@ -715,13 +708,21 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
   const [sheetIndex, setSheetIndex] = useState(0);
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
 
+  // ✅ cờ để tránh setState sau khi sheet đã đóng / unmount
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
   const expandThen = async (action: () => Promise<void>) => {
     if (sheetIndex !== 1) {
-      // 1 = snap max theo snapPoints anh/chị đang set
       pendingActionRef.current = action;
-      sheetRef.current?.snapToIndex(1); // expand trước
+      sheetRef.current?.snapToIndex(1);
     } else {
-      await action(); // đã max thì chạy luôn
+      await action();
     }
   };
 
@@ -729,7 +730,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     useDeleteRatingHistoryMutation();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // BottomSheet — snapPoints theo pixel
+  // snapPoints
   const topSafeGap = insets.top + 8;
   const maxPx = Math.min(winH * 0.92, winH - topSafeGap);
   const midPx = Math.max(winH * 0.6, Math.round(maxPx * 0.75));
@@ -740,11 +741,11 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
 
   const sheetRef = useRef<BottomSheetModal>(null);
 
-  // Chặn double present/dismiss khi spam mở/đóng
+  // chặn double present/dismiss
   const presentingRef = useRef(false);
   const presentedRef = useRef(false);
 
-  // Điều khiển theo canOpen cho an toàn
+  // điều khiển mở/đóng theo canOpen
   useEffect(() => {
     let mounted = true;
     if (canOpen) {
@@ -768,7 +769,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     };
   }, [canOpen]);
 
-  // Cleanup khi component unmount (ví dụ sau logout)
+  // cleanup khi unmount
   useEffect(() => {
     return () => {
       try {
@@ -779,22 +780,18 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     };
   }, []);
 
-  const handleDismiss = () => {
-    presentedRef.current = false;
-    setZoom({ open: false, src: "" }); // đóng zoom nếu còn mở
-    setDetailOpen(false); // đóng modal chi tiết trận
-    onClose?.();
-  };
-
-  // snack state
   const [snack, setSnack] = useState<{ open: boolean; message: string }>({
     open: false,
     message: "",
   });
-  const openSnack = (m: string) => setSnack({ open: true, message: m });
+  const openSnack = (m: string) =>
+    setSnack({
+      open: true,
+      message: m,
+    });
   const closeSnack = () => setSnack((s) => ({ ...s, open: false }));
 
-  // Queries (hoist ALL để có pull-to-refresh đồng bộ)
+  // Queries
   const baseQ = useGetPublicProfileQuery(idArg);
   const rateQ = useGetRatingHistoryQuery(idArg);
   const matchQ = useGetMatchHistoryQuery(idArg);
@@ -802,7 +799,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
 
   const base: any = baseQ.data || {};
 
-  // Tabs (+ “Thành tích”)
+  // Tabs
   const [tab, setTab] = useState(0);
   useEffect(() => {
     if (canOpen) setTab(0);
@@ -813,6 +810,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     ? rateQ.data.history
     : rateQ.data?.items || [];
   const ratingTotal = rateQ.data?.total ?? ratingRaw.length;
+
   const matchRaw = Array.isArray(matchQ.data)
     ? matchQ.data
     : matchQ.data?.items || [];
@@ -822,10 +820,10 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
   const ratingPerPage = 10;
   const [matchPage, setMatchPage] = useState(1);
   const matchPerPage = 10;
+
   useEffect(() => {
     if (canOpen) setRatingPage(1);
   }, [canOpen, ratingTotal]);
-
   useEffect(() => {
     if (canOpen) setMatchPage(1);
   }, [canOpen, matchTotal]);
@@ -851,6 +849,13 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
   const openDetail = (row: any) => {
     setDetail(row);
     setDetailOpen(true);
+  };
+
+  const handleDismiss = () => {
+    presentedRef.current = false;
+    setZoom({ open: false, src: "" });
+    setDetailOpen(false);
+    onClose?.();
   };
 
   /* ---------- Header / Tabs ---------- */
@@ -1013,6 +1018,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
               Thông tin cơ bản
             </Text>
             <InfoRow label="Tên hiển thị" value={safe(base?.name)} />
+
             {safe(base?.nickname) !== TEXT_PLACE ||
             safe(base?.nickName) !== TEXT_PLACE ? (
               <InfoRowWithCopy
@@ -1027,6 +1033,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
             ) : (
               <InfoRow label="Nickname" value={TEXT_PLACE} />
             )}
+
             <InfoRow label="Giới tính" value={safe(base?.gender, "Không rõ")} />
             <InfoRow label="Tỉnh/TP" value={safe(base?.province, "Không rõ")} />
             <InfoRow label="Tham gia" value={fmtDate(base?.joinedAt)} />
@@ -1108,8 +1115,8 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     );
   };
 
-  /* ---------- Rating Section ---------- */
-  const handleDeleteHistory = async (h: any) => {
+  /* ---------- Rating Section (có fix) ---------- */
+  const handleDeleteHistory = (h: any) => {
     if (!viewerIsAdmin) return;
     const historyId = h?._id ?? h?.id;
     const uid = h?.user?._id || userId;
@@ -1126,25 +1133,44 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
         {
           text: "Xoá",
           style: "destructive",
-          onPress: async () => {
-            try {
-              setDeletingId(historyId);
-              await deleteHistory({
-                userId: String(uid),
-                historyId: String(historyId),
-              }).unwrap();
-              openSnack("Đã xoá một mục lịch sử điểm trình.");
-              rateQ.refetch?.();
-            } catch (e: any) {
-              openSnack(
-                e?.data?.message ||
-                  e?.error ||
-                  e?.message ||
-                  "Xoá thất bại. Vui lòng thử lại."
-              );
-            } finally {
-              setDeletingId(null);
-            }
+          onPress: () => {
+            // ✅ chạy sau animation để tránh giật
+            InteractionManager.runAfterInteractions(async () => {
+              try {
+                if (!aliveRef.current) return;
+                setDeletingId(historyId);
+
+                await deleteHistory({
+                  userId: String(uid),
+                  historyId: String(historyId),
+                }).unwrap();
+
+                // ✅ quan trọng: về trang 1 để tránh page > count sau khi xoá
+                if (aliveRef.current) {
+                  setRatingPage(1);
+                }
+
+                // ✅ refetch lại list
+                await rateQ.refetch?.();
+
+                if (aliveRef.current) {
+                  openSnack("Đã xoá một mục lịch sử điểm trình.");
+                }
+              } catch (e: any) {
+                if (aliveRef.current) {
+                  openSnack(
+                    e?.data?.message ||
+                      e?.error ||
+                      e?.message ||
+                      "Xoá thất bại. Vui lòng thử lại."
+                  );
+                }
+              } finally {
+                if (aliveRef.current) {
+                  setDeletingId(null);
+                }
+              }
+            });
           },
         },
       ]
@@ -1968,7 +1994,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     );
   };
 
-  /* ---------- Pull-to-refresh (refetch all) ---------- */
+  /* ---------- Pull-to-refresh ---------- */
   const refetchAll = async () => {
     await Promise.all([
       baseQ.refetch?.(),
@@ -2035,7 +2061,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
           enableOverDrag={false}
           enableDynamicSizing={false}
           android_keyboardInputMode="adjustResize"
-          detached // (nếu UI cho phép; giúp tách sheet khỏi parent view)
+          detached
         >
           <BottomSheetScrollView
             style={{ paddingHorizontal: 12 }}
@@ -2103,6 +2129,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
           </BottomSheetScrollView>
         </BottomSheetModal>
       )}
+
       {/* Zoom image modal */}
       <Modal
         visible={zoom.open}
@@ -2277,7 +2304,6 @@ const styles = StyleSheet.create({
   },
   snackTxt: { color: "#fff", fontWeight: "700" },
 
-  /* KPI grid: 2 cột */
   kpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2291,7 +2317,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 
-  /* Row card cho bảng perT/perB */
   rowCard: {
     borderWidth: 1,
     borderRadius: 12,
@@ -2312,3 +2337,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
