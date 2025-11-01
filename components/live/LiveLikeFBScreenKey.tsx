@@ -57,12 +57,23 @@ const RtmpPreviewView = _CachedRtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
 /* ====== Overlay URL builder (fallback) ====== */
-const overlayUrlForMatch = (mid?: string | null) =>
-  mid
-    ? process.env.EXPO_PUBLIC_BASE_URL +
-      `/overlay/score?matchId=${mid}&theme=dark&size=md&showSets=1&autoNext=1&overlay=1&scale-score=.5&isactivebreak=1`
-    : null;
-
+const overlayUrlForMatch = (mid?: string | null): string | null => {
+  if (!mid || !process.env.EXPO_PUBLIC_BASE_URL) return null;
+  
+  const baseUrl = process.env.EXPO_PUBLIC_BASE_URL;
+  const params = new URLSearchParams({
+    matchId: mid,
+    theme: 'dark',
+    size: 'md',
+    showSets: '1',
+    autoNext: '1',
+    overlay: '1',
+    'scale-score': '.5',
+    isactivebreak: '1'
+  });
+  
+  return `${baseUrl}/overlay/score?${params}`;
+};
 /* ====== DEBUG ====== */
 const LOG = true;
 const log = (...args: any[]) =>
@@ -735,7 +746,7 @@ export default function LiveLikeFBScreenKey({
         chosenProfileRef.current = profile;
         await startNative(rtmpUrl, profile);
 
-        const oUrl = beOverlayUrl || overlayUrlForMatch(mid);
+        const oUrl = overlayUrlForMatch(mid);
         if (oUrl) {
           try {
             await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
