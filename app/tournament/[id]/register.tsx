@@ -616,6 +616,9 @@ const RegItem = React.memo(
     const { bg, fg } = chipColorsByState[state];
     const players = [r?.player1, r?.player2].filter(Boolean);
 
+    // ✅ Lấy mã đăng ký để hiển thị
+    const code = regCodeOf(r);
+
     return (
       <View
         style={[
@@ -628,8 +631,13 @@ const RegItem = React.memo(
           },
         ]}
       >
-        <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
+        {/* ✅ Hàng đầu: Mã đăng ký + STT */}
+        <View style={styles.cardTopRow}>
+          <Chip label={`Mã đăng ký: ${code}`} />
+          <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
+        </View>
 
+        {/* (giữ nguyên phần còn lại) */}
         {players.map((pl: any, idx: number) => (
           <View
             key={`${pl?.phone || pl?.fullName || idx}`}
@@ -1972,7 +1980,12 @@ export default function TournamentRegistrationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",

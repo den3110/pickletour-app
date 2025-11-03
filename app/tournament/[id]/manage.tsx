@@ -12,14 +12,13 @@ import {
   FlatList,
   Linking,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   ScrollView,
+  Animated,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
@@ -27,7 +26,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-// ======= expo modules for export/share =======
+// Export/Share
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
@@ -37,17 +36,24 @@ import {
   useAdminGetBracketsQuery,
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
+  useAdminBatchSetMatchLiveUrlMutation, // ⬅️ NEW (batch video)
 } from "@/slices/tournamentsApiSlice";
+
+import {
+  useBatchAssignRefereeMutation, // ⬅️ NEW (batch referee)
+  useListTournamentRefereesQuery, // ⬅️ NEW (referee options)
+} from "@/slices/refereeScopeApiSlice";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
 
-/** ==== import 4 sheets (gorhom) ==== */
+// Sheets có sẵn
 import ManageRefereesSheet from "@/components/sheets/ManageRefereesSheet";
 import AssignCourtSheet from "@/components/sheets/AssignCourtSheet";
 import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
 import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
+import { Platform } from "react-native";
 
 /* ---------------- helpers ---------------- */
 const TYPE_LABEL = (t) => {
@@ -74,7 +80,6 @@ const pairLabel = (pair) => {
 };
 const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
 
-// lấy id cặp cho map bận
 const pairIdOf = (p) => {
   if (!p) return "";
   if (typeof p === "string") return p;
@@ -83,17 +88,12 @@ const pairIdOf = (p) => {
     p._id ||
     p.id ||
     p.pairId ||
-    // fallback tạm: phòng trường hợp pair được embed thành {player1, player2}
     (p.player1?._id && p.player2?._id
       ? `${p.player1._id}__${p.player2._id}`
       : "")
   );
 };
 
-const hasVal = (v) =>
-  v === 0 ||
-  typeof v === "number" ||
-  (typeof v === "string" && v.trim() !== "");
 const scoreText = (m) => {
   if (typeof m?.scoreText === "string" && m.scoreText.trim())
     return m.scoreText;
@@ -113,7 +113,6 @@ const courtNameOf = (m) =>
   (typeof m?.courtName === "string" && m.courtName) ||
   "";
 
-// Chuẩn hoá status
 const normStatus = (s) => {
   const k = String(s || "").toLowerCase();
   if (
@@ -134,8 +133,6 @@ const normStatus = (s) => {
   if (["scheduled", "created", "pending"].includes(k)) return "scheduled";
   return k;
 };
-
-// status helpers
 const isLive = (m) => normStatus(m?.status) === "live";
 const isFinished = (m) => normStatus(m?.status) === "finished";
 const isAssigned = (m) => !!courtNameOf(m);
@@ -152,7 +149,7 @@ const isPendingNotAssigned = (m) =>
     "assigned",
   ].includes(String(m?.status || "").toLowerCase());
 
-// ——— special ordering: KO always last, RoundElim just before KO
+// KO luôn sau cùng, RoundElim ngay trước KO
 const typeOrderWeight = (t) => {
   const k = String(t || "").toLowerCase();
   if (k === "group") return 1;
@@ -161,9 +158,9 @@ const typeOrderWeight = (t) => {
   if (k === "gsl") return 4;
   if (k === "double_elim" || k === "doubleelim") return 5;
   if (k === "roundelim" || k === "round_elim" || k === "round-elim")
-    return 9_998;
-  if (k === "knockout" || k === "ko") return 9_999;
-  return 7_000;
+    return 9998;
+  if (k === "knockout" || k === "ko") return 9999;
+  return 7000;
 };
 
 const IconBtn = ({ name, onPress, color = "#111", size = 18, style }) => (
@@ -175,7 +172,7 @@ const IconBtn = ({ name, onPress, color = "#111", size = 18, style }) => (
   </Pressable>
 );
 
-// Trọng tài của trận
+// Trọng tài
 const _extractRefereeIds = (m) => {
   if (!m) return [];
   const raw = m.referees ?? m.referee ?? m.judges ?? [];
@@ -200,10 +197,9 @@ const refereeNames = (m) => {
   return r1 ? personNickname(r1) : "";
 };
 
-// Đường dẫn “trang bắt trận”
 const refereeRouteOf = (m) => `/match/${m._id}/referee`;
 
-/* ====== HTML builders (PDF/Word & Biên bản TT) ====== */
+/* ====== HTML builders ====== */
 const buildRefReportHTML = ({
   tourName,
   code,
@@ -219,8 +215,6 @@ const buildRefReportHTML = ({
     td,th{border:1px solid #000;padding:6px;font-size:12px}
     .no-border td,.no-border th{border:none}
     .title{font-size:22px;font-weight:700;text-align:left}
-    .section-title{font-weight:700}
-    .small{font-size:11px}
   `;
   const pointRow = () => `
     <tr>
@@ -236,17 +230,12 @@ const buildRefReportHTML = ({
       <td style="border:1px solid black"></td>
       <td style="border:1px solid black"></td>
     </tr>`;
-  return `<!DOCTYPE html>
-  <html><head><meta charset="utf-8" />
-    <title>Biên bản trọng tài - ${code}</title>
-    <style>${css}</style>
-  </head>
-  <body>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>${css}</style></head><body>
     <table class="no-border" style="width:100%">
       <tr class="no-border">
         <td class="no-border" style="width:96px"><img style="width:96px" src="${
           logoUrl || ""
-        }" alt="logo" /></td>
+        }" alt="logo"/></td>
         <td class="no-border" colspan="3"><div class="title">${
           tourName || ""
         }</div></td>
@@ -269,15 +258,7 @@ const buildRefReportHTML = ({
       ${pointRow()}${pointRow()}${pointRow()}
     </table>
     <br/>
-    <div style="height:90px;">
-      <table class="no-border" style="width:100%">
-        <tr class="no-border">
-          <td class="no-border" style="text-align:center;width:300px"><b>Đội thắng</b></td>
-          <td class="no-border" style="text-align:center;width:300px"><b>Trọng tài</b></td>
-          <td class="no-border" style="text-align:center;width:300px"><b>Đội thua</b></td>
-        </tr>
-      </table>
-    </div>
+    <div style="height:90px;"></div>
     <table>
       <tr><td>ĐỘI 2</td><td colspan="26"><b>${team2 || ""}</b></td></tr>
       <tr><td>SERVER</td><td colspan="22">ĐIỂM</td><td colspan="2">TIMEOUT</td><td>TW/TF</td></tr>
@@ -315,8 +296,7 @@ const buildExportHTML = ({ tourName, typeLabel, sections }) => {
             )
             .join("")}
         </tbody>
-      </table>
-    `
+      </table>`
     )
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"/><style>${css}</style></head>
@@ -324,8 +304,7 @@ const buildExportHTML = ({ tourName, typeLabel, sections }) => {
     <h1>Quản lý giải: ${tourName || ""}</h1>
     <div class="sub">Loại: ${typeLabel} • Xuất lúc: ${now}</div>
     ${blocks}
-  </body>
-  </html>`;
+  </body></html>`;
 };
 
 /* ---------------- THEME TOKENS ---------------- */
@@ -335,13 +314,11 @@ function getThemeTokens(colors, dark) {
   const placeholder = dark ? "#8b97a8" : "#94a3b8";
   const disabled = dark ? "#475569" : "#94a3b8";
 
-  // chips
   const chipDefaultBg = dark ? "#1f2937" : "#eef2f7";
   const chipDefaultFg = dark ? "#e5e7eb" : "#263238";
   const chipInfoBg = dark ? "#0f2536" : "#e0f2fe";
   const chipInfoFg = dark ? "#93c5fd" : "#075985";
 
-  // status / semantic
   const infoBg = chipInfoBg;
   const infoBorder = dark ? "#1e3a5f" : "#bfdbfe";
   const infoText = chipInfoFg;
@@ -409,6 +386,83 @@ function getThemeTokens(colors, dark) {
   };
 }
 
+/* ---------- small local UI comps ---------- */
+const BtnOutline = ({ onPress, children }) => {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <Text style={{ color: colors.text, fontWeight: "700" }}>{children}</Text>
+    </Pressable>
+  );
+};
+
+const PickerChip = ({ label, onPress, icon, colorsTheme }) => {
+  const { colors, dark } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: colorsTheme?.bg,
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      {icon ? (
+        <MaterialIcons name={icon} size={14} color={colorsTheme?.fg} />
+      ) : null}
+      <Text style={{ color: colorsTheme?.fg, fontSize: 12, fontWeight: "700" }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
+
+const MenuItem = ({ icon, label, onPress, danger }) => {
+  const { colors, dark } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.9 }]}
+    >
+      <MaterialIcons
+        name={icon}
+        size={18}
+        color={danger ? "#ef4444" : colors.text}
+        style={{ marginRight: 8 }}
+      />
+      <Text
+        style={{
+          color: danger ? "#ef4444" : colors.text,
+          fontSize: 14,
+          fontWeight: "600",
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
+
 /* ---------------- main ---------------- */
 export default function ManageScreen() {
   const { id } = useLocalSearchParams();
@@ -417,9 +471,7 @@ export default function ManageScreen() {
   const { colors, dark } = useTheme();
   const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
 
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-
   const me = useSelector((s) => s.auth?.userInfo || null);
 
   // socket
@@ -441,59 +493,6 @@ export default function ManageScreen() {
     },
     [socket]
   );
-
-  // Refs callback
-  const queueUpsertRef = useRef(null);
-  const requestSnapshotRef = useRef(null);
-  useEffect(() => {
-    queueUpsertRef.current = (payload) => {
-      const incRaw = payload?.data ?? payload?.match ?? payload;
-      const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
-      if (!id) return;
-      const inc = { ...(incRaw || {}), _id: String(id) };
-
-      if (Array.isArray(inc.scores) && !inc.gameScores)
-        inc.gameScores = inc.scores;
-      if (typeof inc.score_text === "string" && !inc.scoreText)
-        inc.scoreText = inc.score_text;
-
-      const normalizeEntity = (v) => {
-        if (v == null) return v;
-        if (typeof v === "string" || typeof v === "number") return v;
-        if (typeof v === "object") {
-          return {
-            _id: v._id ?? (typeof v.id === "string" ? v.id : undefined),
-            name:
-              (typeof v.name === "string" && v.name) ||
-              (typeof v.label === "string" && v.label) ||
-              (typeof v.title === "string" && v.title) ||
-              "",
-          };
-        }
-        return v;
-      };
-      if (inc.court) inc.court = normalizeEntity(inc.court);
-
-      pendingRef.current.set(String(inc._id), inc);
-      if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
-        if (!pendingRef.current.size) return;
-        const mp = liveMapRef.current;
-        for (const [mid, inc2] of pendingRef.current) {
-          const cur = mp.get(mid);
-          const vNew = Number(inc2?.liveVersion ?? inc2?.version ?? 0);
-          const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
-          const merged =
-            !cur || vNew >= vOld ? { ...(cur || {}), ...inc2 } : cur;
-          mp.set(mid, merged);
-        }
-        pendingRef.current.clear();
-        setLiveBump((x) => x + 1);
-      });
-    };
-    requestSnapshotRef.current = requestSnapshot;
-  }, [requestSnapshot]);
 
   // Queries
   const {
@@ -529,9 +528,20 @@ export default function ManageScreen() {
     { refetchOnFocus: true, refetchOnReconnect: true }
   );
 
-  const [setLiveUrl, { isLoading: savingVideo }] =
-    useAdminSetMatchLiveUrlMutation();
+  const [setLiveUrl] = useAdminSetMatchLiveUrlMutation();
+  const [batchSetLiveUrl, { isLoading: batchingVideo }] =
+    useAdminBatchSetMatchLiveUrlMutation(); // NEW
 
+  // Batch referee APIs
+  const {
+    data: refData,
+    isLoading: refsLoading,
+    error: refsErr,
+  } = useListTournamentRefereesQuery({ tid }, { skip: false }); // NEW
+  const [batchAssign, { isLoading: batchingRefs }] =
+    useBatchAssignRefereeMutation(); // NEW
+
+  // Keep refs to refetchers
   const refetchMatchesRef = useRef(refetchMatches);
   const refetchBracketsRef = useRef(refetchBrackets);
   useEffect(() => {
@@ -550,14 +560,13 @@ export default function ManageScreen() {
   const isManager = useMemo(() => {
     if (!me?._id || !tour) return false;
     if (String(tour.createdBy) === String(me._id)) return true;
-    if (Array.isArray(tour.managers)) {
+    if (Array.isArray(tour.managers))
       return tour.managers.some((m) => String(m?.user ?? m) === String(me._id));
-    }
     return !!tour?.isManager;
   }, [tour, me]);
   const canManage = isAdmin || isManager;
 
-  // Tabs động (KO cuối cùng, Round Elim ngay trước KO)
+  // Tabs
   const typesAvailable = useMemo(() => {
     const uniq = new Map();
     (bracketsData || []).forEach((b) => {
@@ -572,22 +581,17 @@ export default function ManageScreen() {
     });
     if (uniq.size === 0)
       uniq.set("group", { type: "group", label: "Vòng bảng", weight: 1 });
-
-    const arr = Array.from(uniq.values());
-    arr.sort((a, b) => a.weight - b.weight);
-    return arr;
+    return Array.from(uniq.values()).sort((a, b) => a.weight - b.weight);
   }, [bracketsData]);
 
   const [tab, setTab] = useState(typesAvailable[0]?.type || "group");
   useEffect(() => {
-    const existed = typesAvailable.some((t) => t.type === tab);
-    const fallback = typesAvailable[0]?.type || "group";
-    if (!existed && fallback && fallback !== tab) {
-      setTab(fallback);
+    if (!typesAvailable.some((t) => t.type === tab)) {
+      setTab(typesAvailable[0]?.type || "group");
     }
   }, [typesAvailable, tab]);
 
-  // Lọc/sort controls
+  // Lọc/sort
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState("time"); // "round" | "order" | "time"
   const [sortDir, setSortDir] = useState("asc");
@@ -598,7 +602,7 @@ export default function ManageScreen() {
     [matchPage?.list]
   );
 
-  /* ======== Realtime: seed map từ API & listen socket ======== */
+  /* ======== Realtime: seed & listen ======== */
   const seededFingerprintRef = useRef("");
   useEffect(() => {
     if (!allMatches.length) return;
@@ -619,51 +623,20 @@ export default function ManageScreen() {
     setLiveBump((x) => x + 1);
   }, [allMatches]);
 
-  // listeners
   useEffect(() => {
     if (!socket) return;
 
-    const onConnected = () => {
-      joinedMatchesRef.current.forEach((mid) => {
-        socket.emit("match:join", { matchId: mid });
-        requestSnapshotRef.current?.(mid);
-      });
-    };
-    const onUpsert = (payload) => queueUpsertRef.current?.(payload);
-    const onRemove = (payload) => {
-      const id = String(payload?.id ?? payload?._id ?? "");
-      if (!id) return;
-      if (liveMapRef.current.has(id)) {
-        liveMapRef.current.delete(id);
-        setLiveBump((x) => x + 1);
-      }
-    };
-
-    const lastRefillAtRef = { current: 0 };
-    const onRefilled = () => {
-      const now = Date.now();
-      if (now - lastRefillAtRef.current < 800) return;
-      lastRefillAtRef.current = now;
-      refetchMatchesRef.current?.();
-      refetchBracketsRef.current?.();
-    };
-
-    const applyDirectMerge = (raw) => {
-      const mp = liveMapRef.current;
-      const incRaw = raw?.data ?? raw?.match ?? raw;
+    const queueUpsert = (payload) => {
+      const incRaw = payload?.data ?? payload?.match ?? payload;
       const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
       if (!id) return;
-      const _id = String(id);
-      const cur = mp.get(_id);
+      const inc = { ...(incRaw || {}), _id: String(id) };
 
-      const inc = { ...(incRaw || {}), _id };
       if (Array.isArray(inc.scores) && !inc.gameScores)
         inc.gameScores = inc.scores;
-      if (inc.score_text && !inc.scoreText) inc.scoreText = inc.score_text;
-      if (inc.state && !inc.status) inc.status = inc.state;
-      if (inc.match_status && !inc.status) inc.status = inc.match_status;
-      if (inc.updated_at && !inc.updatedAt) inc.updatedAt = inc.updated_at;
-      if (inc.status) inc.status = normStatus(inc.status);
+      if (typeof inc.score_text === "string" && !inc.scoreText)
+        inc.scoreText = inc.score_text;
+
       if (inc.court && typeof inc.court === "object") {
         inc.court = {
           _id:
@@ -673,55 +646,62 @@ export default function ManageScreen() {
         };
       }
 
-      const curStatus = normStatus(cur?.status);
-      const newStatus = normStatus(inc?.status);
-      const tNew = Date.parse(inc?.updatedAt ?? inc?.liveAt ?? 0);
-      const tOld = Date.parse(cur?.updatedAt ?? cur?.liveAt ?? 0);
-      const vNew = Number(inc?.liveVersion ?? inc?.version ?? NaN);
-      const vOld = Number(cur?.liveVersion ?? cur?.version ?? NaN);
-
-      let accept = !cur;
-      if (!accept) {
-        if (Number.isFinite(tNew) && Number.isFinite(tOld))
-          accept = tNew >= tOld;
-        else if (Number.isFinite(vNew) && Number.isFinite(vOld))
-          accept = vNew >= vOld;
-        if (!accept && (newStatus === "finished" || inc?.winner)) accept = true;
-        if (!accept && newStatus && newStatus !== curStatus) accept = true;
-      }
-
-      if (!accept) return;
-      const next = { ...(cur || {}), ...inc };
-      mp.set(_id, next);
-      setLiveBump((x) => x + 1);
+      pendingRef.current.set(String(inc._id), inc);
+      if (rafRef.current) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (!pendingRef.current.size) return;
+        const mp = liveMapRef.current;
+        for (const [mid, inc2] of pendingRef.current) {
+          const cur = mp.get(mid);
+          const vNew = Number(inc2?.liveVersion ?? inc2?.version ?? 0);
+          const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
+          const merged =
+            !cur || vNew >= vOld ? { ...(cur || {}), ...inc2 } : cur;
+          mp.set(mid, merged);
+        }
+        pendingRef.current.clear();
+        setLiveBump((x) => x + 1);
+      });
     };
 
-    const onScoreUpdated = (payload) => {
-      const mid = String(payload?.matchId ?? payload?.id ?? payload?._id ?? "");
-      if (
-        !payload?.data &&
-        !payload?.match &&
-        Object.keys(payload || {}).length <= 2
-      ) {
-        if (mid) requestSnapshotRef.current?.(mid);
-        return;
+    const onConnected = () => {
+      joinedMatchesRef.current.forEach((mid) => {
+        socket.emit("match:join", { matchId: mid });
+        requestSnapshot(mid);
+      });
+    };
+    const onRemove = (payload) => {
+      const id = String(payload?.id ?? payload?._id ?? "");
+      if (!id) return;
+      if (liveMapRef.current.has(id)) {
+        liveMapRef.current.delete(id);
+        setLiveBump((x) => x + 1);
       }
-      applyDirectMerge(payload);
+    };
+
+    let lastRefill = 0;
+    const onRefilled = () => {
+      const now = Date.now();
+      if (now - lastRefill < 800) return;
+      lastRefill = now;
+      refetchMatchesRef.current?.();
+      refetchBracketsRef.current?.();
     };
 
     socket.on("connect", onConnected);
-    socket.on("match:update", onUpsert);
-    socket.on("match:snapshot", onUpsert);
-    socket.on("score:updated", onScoreUpdated);
+    socket.on("match:update", queueUpsert);
+    socket.on("match:snapshot", queueUpsert);
+    socket.on("score:updated", queueUpsert);
     socket.on("match:deleted", onRemove);
     socket.on("draw:refilled", onRefilled);
     socket.on("bracket:updated", onRefilled);
 
     return () => {
       socket.off("connect", onConnected);
-      socket.off("match:update", onUpsert);
-      socket.off("match:snapshot", onUpsert);
-      socket.off("score:updated", onScoreUpdated);
+      socket.off("match:update", queueUpsert);
+      socket.off("match:snapshot", queueUpsert);
+      socket.off("score:updated", queueUpsert);
       socket.off("match:deleted", onRemove);
       socket.off("draw:refilled", onRefilled);
       socket.off("bracket:updated", onRefilled);
@@ -730,9 +710,9 @@ export default function ManageScreen() {
         rafRef.current = null;
       }
     };
-  }, [socket]);
+  }, [socket, requestSnapshot]);
 
-  // join ALL matches
+  // join ALL matches for room updates
   const allMatchIds = useMemo(() => {
     if (!allMatches.length) return [];
     return allMatches.map((m) => String(m?._id)).filter(Boolean);
@@ -762,7 +742,7 @@ export default function ManageScreen() {
     };
   }, [socket, allMatchIds, requestSnapshot]);
 
-  // matches đã merge realtime (chỉ của giải hiện tại)
+  // merged matches chỉ của giải hiện tại
   const mergedAllMatches = useMemo(() => {
     const vals = Array.from(liveMapRef.current.values());
     return vals.filter(
@@ -770,8 +750,7 @@ export default function ManageScreen() {
     );
   }, [tid, liveBump]);
 
-  // ✅ map cặp nào đang thi đấu ở TRẬN KHÁC
-  // cấu trúc: pairId -> [{ matchId, court }]
+  // Busy map cho cặp
   const liveBusyByPairId = useMemo(() => {
     const mp = new Map();
     for (const m of mergedAllMatches) {
@@ -791,7 +770,7 @@ export default function ManageScreen() {
     return mp;
   }, [mergedAllMatches]);
 
-  // ======== Sắp xếp ========
+  // Sort helpers
   const bucketWeight = (m) =>
     isLive(m)
       ? 0
@@ -822,7 +801,7 @@ export default function ManageScreen() {
         return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
       return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
     }
-    // default: round
+    // default round
     if ((a?.round ?? 0) !== (b?.round ?? 0))
       return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
     if ((a?.order ?? 0) !== (b?.order ?? 0))
@@ -866,7 +845,7 @@ export default function ManageScreen() {
   const openMatch = (mid) => setViewer({ open: true, matchId: mid });
   const closeMatch = () => setViewer({ open: false, matchId: null });
 
-  // Video dialog
+  // Single video dialog
   const [videoDlg, setVideoDlg] = useState({
     open: false,
     match: null,
@@ -908,10 +887,6 @@ export default function ManageScreen() {
     }
   };
 
-  // Guards
-  const isInitialLoading = tourLoading || brLoading || mLoading;
-  const hasError = tourErr || brErr || mErr;
-
   // Brackets theo tab
   const bracketsOfTab = useMemo(() => {
     const list = (bracketsData || []).filter(
@@ -926,123 +901,105 @@ export default function ManageScreen() {
     });
   }, [bracketsData, tab]);
 
-  /* ----------- EXPORT ----------- */
-  const buildRowsForBracket = useCallback((matches) => {
-    return matches.map((m) => {
-      const code = matchCode(m);
-      const a = pairLabel(m?.pairA);
-      const b = pairLabel(m?.pairB);
-      const court = courtNameOf(m) || "—";
-      const order =
-        Number.isFinite(m?.order) || typeof m?.order === "number"
-          ? `T${Number(m.order) + 1}`
-          : "—";
-      const score = scoreText(m) || "—";
-      return [code, a, b, court, order, score];
+  // ======= NEW: Selection like Web =======
+  const [selectedMatchIds, setSelectedMatchIds] = useState(() => new Set());
+  const [selBump, setSelBump] = useState(0);
+  const toggleSelectMatch = useCallback((mid) => {
+    setSelectedMatchIds((prev) => {
+      const next = new Set(prev);
+      const key = String(mid);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
+    setSelBump((x) => x + 1);
+  }, []);
+  const clearSelection = useCallback(() => {
+    setSelectedMatchIds(new Set());
+    setSelBump((x) => x + 1);
+  }, []);
+  const isAllSelectedIn = useCallback(
+    (arr) =>
+      arr.length > 0 && arr.every((m) => selectedMatchIds.has(String(m._id))),
+    [selectedMatchIds]
+  );
+  const toggleSelectAllIn = useCallback((arr, checked) => {
+    setSelectedMatchIds((prev) => {
+      const next = new Set(prev);
+      arr.forEach((m) => {
+        const key = String(m._id);
+        if (checked) next.add(key);
+        else next.delete(key);
+      });
+      return next;
+    });
+    setSelBump((x) => x + 1);
   }, []);
 
-  const buildExportPayload = useCallback(() => {
-    const payload = [];
-    for (const b of bracketsOfTab) {
-      const bid = String(b?._id);
-      const matches = mergedAllMatches.filter(
-        (m) => String(m?.bracket?._id || m?.bracket) === bid
-      );
-      const list = filterSortMatches(matches);
-      payload.push({
-        title: `${b?.name || "Bracket"} — ${TYPE_LABEL(b?.type)}`,
-        rows: buildRowsForBracket(list),
-      });
-    }
-    return payload;
-  }, [bracketsOfTab, mergedAllMatches, filterSortMatches, buildRowsForBracket]);
+  // ======= NEW: Batch dialogs state =======
+  const [batchRefDlg, setBatchRefDlg] = useState({ open: false });
+  const [pickedRefs, setPickedRefs] = useState([]);
+  const refOptions = useMemo(() => {
+    const list = Array.isArray(refData?.items)
+      ? refData.items
+      : Array.isArray(refData)
+      ? refData
+      : [];
+    return list;
+  }, [refData]);
+  const idOfRef = (r) => String(r?._id ?? r?.id ?? "");
+  const labelOfRef = (r) =>
+    r?.name || r?.nickname || (idOfRef(r) ? `#${idOfRef(r).slice(-4)}` : "");
 
-  // Helper: share hoặc mở preview nếu chia sẻ không khả dụng
-  const shareOrPreview = async (fileUri, { mimeType, uti, title }) => {
+  const [batchVideoDlg, setBatchVideoDlg] = useState({ open: false, url: "" });
+
+  const submitBatchAssign = useCallback(async () => {
+    const ids = Array.from(selectedMatchIds);
+    const refs = pickedRefs.map(idOfRef).filter(Boolean);
+    if (!ids.length) return RNAlert.alert("Thông báo", "Chưa chọn trận nào.");
+    if (!refs.length)
+      return RNAlert.alert("Thông báo", "Hãy chọn ít nhất 1 trọng tài.");
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType,
-          UTI: uti,
-          dialogTitle: title || "Chia sẻ tệp",
-        });
-        return;
-      }
-    } catch (e) {}
-    try {
-      const ok = await Linking.openURL(fileUri);
-      if (!ok) throw new Error("openURL returned false");
+      await batchAssign({ ids, referees: refs }).unwrap();
+      RNAlert.alert("Thành công", `Đã gán trọng tài cho ${ids.length} trận`);
+      setBatchRefDlg({ open: false });
+      setPickedRefs([]);
+      clearSelection();
+      await refetchMatches?.();
     } catch (e) {
-      RNAlert.alert(
-        "Không thể mở/chia sẻ tệp",
-        `Tệp đã được lưu tại:\n${fileUri}\n\nBạn có thể mở thủ công trong ứng dụng Files/Quản lý tệp.`
-      );
+      RNAlert.alert("Lỗi", e?.data?.message || "Gán trọng tài thất bại");
     }
-  };
+  }, [
+    selectedMatchIds,
+    pickedRefs,
+    batchAssign,
+    clearSelection,
+    refetchMatches,
+  ]);
 
-  // === PDF
-  const handleExportPDF = useCallback(async () => {
+  const submitBatchSetVideo = useCallback(async () => {
+    const ids = Array.from(selectedMatchIds);
+    const url = (batchVideoDlg.url || "").trim();
+    if (!ids.length) return RNAlert.alert("Thông báo", "Chưa chọn trận nào.");
+    if (!url) return RNAlert.alert("Thông báo", "Hãy nhập link video hợp lệ.");
     try {
-      const sections = buildExportPayload();
-      if (!sections.length) {
-        RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
-        return;
-      }
-      const html = buildExportHTML({
-        tourName: tour?.name || "",
-        typeLabel: TYPE_LABEL(tab),
-        sections,
-      });
-      const { uri } = await Print.printToFileAsync({ html });
-      await shareOrPreview(uri, {
-        mimeType: "application/pdf",
-        uti: "com.adobe.pdf",
-        title: "Xuất PDF",
-      });
+      await batchSetLiveUrl({ ids, video: url }).unwrap();
+      RNAlert.alert("Thành công", `Đã gán video cho ${ids.length} trận`);
+      setBatchVideoDlg({ open: false, url: "" });
+      clearSelection();
+      await refetchMatches?.();
     } catch (e) {
-      RNAlert.alert("Lỗi", "Xuất PDF thất bại.");
+      RNAlert.alert("Lỗi", e?.data?.message || "Gán video thất bại");
     }
-  }, [buildExportPayload, tab, tour?.name]);
+  }, [
+    selectedMatchIds,
+    batchVideoDlg.url,
+    batchSetLiveUrl,
+    clearSelection,
+    refetchMatches,
+  ]);
 
-  // === Word
-  const handleExportWord = useCallback(async () => {
-    try {
-      const sections = buildExportPayload();
-      if (!sections.length) {
-        RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
-        return;
-      }
-      const html = buildExportHTML({
-        tourName: tour?.name || "",
-        typeLabel: TYPE_LABEL(tab),
-        sections,
-      });
-      const content = `\ufeff${html}`;
-      const safeName = (tour?.name || "export")
-        .replace(/[^\p{L}\p{N}]+/gu, "_")
-        .replace(/^_+|_+$/g, "")
-        .toLowerCase();
-      const fileName = `tournament_${safeName}_${tab}_${new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:T]/g, "-")}.doc`;
-      const fileUri = FileSystem.cacheDirectory + fileName;
-      await FileSystem.writeAsStringAsync(fileUri, content, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-      await shareOrPreview(fileUri, {
-        mimeType: "application/msword",
-        uti: "com.microsoft.word.doc",
-        title: "Xuất Word",
-      });
-    } catch (e) {
-      RNAlert.alert("Lỗi", "Xuất Word thất bại.");
-    }
-  }, [buildExportPayload, tab, tour?.name]);
-
-  /* ----------- SHEET STATES ----------- */
+  /* ----------- Sheets state (giữ nguyên) ----------- */
   const [refMgrOpen, setRefMgrOpen] = useState(false);
   const [assignCourtSheet, setAssignCourtSheet] = useState({
     open: false,
@@ -1061,7 +1018,7 @@ export default function ManageScreen() {
     bracket: null,
   });
 
-  /* ----------- small UI (THEMED) ----------- */
+  /* ----------- small THEMED chips ----------- */
   const Pill = ({ label, kind = "default" }) => {
     const st =
       kind === "primary"
@@ -1080,7 +1037,6 @@ export default function ManageScreen() {
       </View>
     );
   };
-
   const StatusPill = ({ status }) => {
     const v = t.statusTone(status);
     return (
@@ -1096,34 +1052,30 @@ export default function ManageScreen() {
       </View>
     );
   };
-
-  const BusyChip = ({ court }) => {
-    return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          backgroundColor: "#fef3c7",
-          paddingHorizontal: 6,
-          paddingVertical: 2,
-          borderRadius: 999,
-        }}
-      >
-        <MaterialIcons name="warning" size={12} color="#b45309" />
-        <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
-          Đang thi đấu{court ? ` (${court})` : ""}
-        </Text>
-      </View>
-    );
-  };
-
+  const BusyChip = ({ court }) => (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#fef3c7",
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 999,
+      }}
+    >
+      <MaterialIcons name="warning" size={12} color="#b45309" />
+      <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
+        Đang thi đấu{court ? ` (${court})` : ""}
+      </Text>
+    </View>
+  );
   const MiniChipBtn = ({ icon, label, onPress, color = colors.primary }) => (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.miniBtn,
-        { borderColor: color, paddingHorizontal: 10, paddingVertical: 6 },
+        { borderColor: color },
         pressed && { opacity: 0.9 },
       ]}
     >
@@ -1136,7 +1088,6 @@ export default function ManageScreen() {
       </Text>
     </Pressable>
   );
-
   const VideoPill = ({ has }) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
       <View
@@ -1163,7 +1114,6 @@ export default function ManageScreen() {
       </View>
     </View>
   );
-
   const CourtPill = ({ name }) =>
     name ? (
       <View
@@ -1179,7 +1129,6 @@ export default function ManageScreen() {
         </Text>
       </View>
     ) : null;
-
   const ScorePill = ({ textVal }) =>
     textVal ? (
       <View
@@ -1196,6 +1145,97 @@ export default function ManageScreen() {
         </Text>
       </View>
     ) : null;
+
+  // Edge-fade horizontal scroller cho ActionButtons
+  const EdgeFadedHScroll = ({
+    children,
+    contentContainerStyle,
+    style,
+    bgColor = "#fff",
+    chevronColor = "#94a3b8",
+    ...props
+  }) => {
+    const [state, setState] = React.useState({
+      canScroll: false,
+      showL: false,
+      showR: false,
+    });
+    const boxW = React.useRef(0);
+    const contentW = React.useRef(0);
+
+    const update = React.useCallback((x = 0) => {
+      const can = contentW.current > boxW.current + 2;
+      const showL = can && x > 2;
+      const maxX = Math.max(0, contentW.current - boxW.current);
+      const showR = can && x < maxX - 2;
+      setState({ canScroll: can, showL, showR });
+    }, []);
+
+    return (
+      <View
+        onLayout={(e) => {
+          boxW.current = e.nativeEvent.layout.width || 0;
+          update(0);
+        }}
+        style={[{ position: "relative" }, style]}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onContentSizeChange={(w) => {
+            contentW.current = w || 0;
+            update(0);
+          }}
+          onScroll={(e) => update(e.nativeEvent.contentOffset.x || 0)}
+          scrollEventThrottle={16}
+          contentContainerStyle={contentContainerStyle}
+          {...props}
+        >
+          {children}
+        </ScrollView>
+
+        {/* LEFT hint */}
+        {state.canScroll && state.showL && (
+          <>
+            <LinearGradient
+              pointerEvents="none"
+              colors={[bgColor, "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.fadeLeft}
+            />
+            <View pointerEvents="none" style={[styles.chev, { left: 4 }]}>
+              <MaterialIcons
+                name="chevron-left"
+                size={16}
+                color={chevronColor}
+              />
+            </View>
+          </>
+        )}
+
+        {/* RIGHT hint */}
+        {state.canScroll && state.showR && (
+          <>
+            <LinearGradient
+              pointerEvents="none"
+              colors={["transparent", bgColor]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.fadeRight}
+            />
+            <View pointerEvents="none" style={[styles.chev, { right: 4 }]}>
+              <MaterialIcons
+                name="chevron-right"
+                size={16}
+                color={chevronColor}
+              />
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
 
   const ActionButtons = ({ m }) => {
     const has = !!m?.video;
@@ -1216,102 +1256,10 @@ export default function ManageScreen() {
           mimeType: "application/pdf",
           dialogTitle: "Biên bản trọng tài",
         });
-      } catch (e) {
+      } catch {
         RNAlert.alert("Lỗi", "Không xuất được biên bản.");
       }
     };
-
-    /* ===== EdgeFadedHScroll: Horizontal Scroll + fade hint ===== */
-    const EdgeFadedHScroll = ({
-      children,
-      contentContainerStyle,
-      style,
-      bgColor = "#fff",
-      chevronColor = "#94a3b8",
-      ...props
-    }) => {
-      const [state, setState] = React.useState({
-        canScroll: false,
-        showL: false,
-        showR: false,
-      });
-      const boxW = React.useRef(0);
-      const contentW = React.useRef(0);
-
-      const update = React.useCallback((x = 0) => {
-        const can = contentW.current > boxW.current + 2;
-        const showL = can && x > 2;
-        const maxX = Math.max(0, contentW.current - boxW.current);
-        const showR = can && x < maxX - 2;
-        setState({ canScroll: can, showL, showR });
-      }, []);
-
-      return (
-        <View
-          onLayout={(e) => {
-            boxW.current = e.nativeEvent.layout.width || 0;
-            update(0);
-          }}
-          style={[{ position: "relative" }, style]}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            onContentSizeChange={(w) => {
-              contentW.current = w || 0;
-              update(0);
-            }}
-            onScroll={(e) => update(e.nativeEvent.contentOffset.x || 0)}
-            scrollEventThrottle={16}
-            contentContainerStyle={contentContainerStyle}
-            {...props}
-          >
-            {children}
-          </ScrollView>
-
-          {/* LEFT hint */}
-          {state.canScroll && state.showL && (
-            <>
-              <LinearGradient
-                pointerEvents="none"
-                colors={[bgColor, "transparent"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.fadeLeft}
-              />
-              <View pointerEvents="none" style={[styles.chev, { left: 4 }]}>
-                <MaterialIcons
-                  name="chevron-left"
-                  size={16}
-                  color={chevronColor}
-                />
-              </View>
-            </>
-          )}
-
-          {/* RIGHT hint */}
-          {state.canScroll && state.showR && (
-            <>
-              <LinearGradient
-                pointerEvents="none"
-                colors={["transparent", bgColor]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.fadeRight}
-              />
-              <View pointerEvents="none" style={[styles.chev, { right: 4 }]}>
-                <MaterialIcons
-                  name="chevron-right"
-                  size={16}
-                  color={chevronColor}
-                />
-              </View>
-            </>
-          )}
-        </View>
-      );
-    };
-
     return (
       <EdgeFadedHScroll
         contentContainerStyle={styles.actionsWrap}
@@ -1364,7 +1312,7 @@ export default function ManageScreen() {
     );
   };
 
-  /* ----------- row render ----------- */
+  /* ----------- row render (with selection) ----------- */
   const renderMatchRow = ({ item: m }) => {
     const hasVideo = !!m?.video;
     const score = scoreText(m);
@@ -1382,17 +1330,12 @@ export default function ManageScreen() {
     const pAId = pairIdOf(m?.pairA);
     const pBId = pairIdOf(m?.pairB);
 
-    // 🔥 chỉ hiện chip nếu:
-    // - trận này CHƯA kết thúc
-    // - và bản thân trận này KHÔNG phải đang live
-    // - và cặp đó đang live ở TRẬN KHÁC
     const busyInfoA =
       !isThisMatchFinished &&
       !isThisMatchLive &&
       pAId &&
       liveBusyByPairId.has(pAId)
-        ? // lọc bỏ chính match này nếu lỡ cùng id
-          liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
+        ? liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
         : null;
     const busyInfoB =
       !isThisMatchFinished &&
@@ -1401,6 +1344,8 @@ export default function ManageScreen() {
       liveBusyByPairId.has(pBId)
         ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
         : null;
+
+    const checked = selectedMatchIds.has(String(m._id));
 
     return (
       <Pressable
@@ -1411,23 +1356,48 @@ export default function ManageScreen() {
           pressed && { opacity: 0.95 },
         ]}
       >
-        <ActionButtons m={m} />
-        <View style={styles.contentBlock}>
+        {/* ⬇️ Dòng riêng cho checkbox chọn item */}
+        <Pressable
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            toggleSelectMatch(m._id);
+          }}
+          style={({ pressed }) => [
+            styles.selectRow,
+            { borderColor: colors.border },
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <MaterialIcons
+            name={checked ? "check-box" : "check-box-outline-blank"}
+            size={20}
+            color={checked ? colors.primary : t.muted}
+          />
           <Text
-            style={[styles.code, { color: colors.text }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            style={{
+              color: colors.text,
+              fontWeight: "700",
+            }}
           >
+            {checked ? "Đã chọn" : ""}
+          </Text>
+          <View style={{ flex: 1 }} />
+          {/* hiển thị mã trận nhỏ bên phải cho tiện nhìn */}
+          <Text style={{ color: t.muted, fontSize: 12 }}>{matchCode(m)}</Text>
+        </Pressable>
+
+        {/* Action buttons */}
+        <ActionButtons m={m} />
+
+        {/* Nội dung */}
+        <View style={styles.contentBlock}>
+          <Text style={[styles.code, { color: colors.text }]} numberOfLines={1}>
             {matchCode(m)}
           </Text>
 
           {/* Pair A */}
           <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-            <Text
-              style={{ color: colors.text }}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
+            <Text style={{ color: colors.text }} numberOfLines={1}>
               {pairLabel(m?.pairA)}
             </Text>
             {busyInfoA ? <BusyChip court={busyInfoA.court} /> : null}
@@ -1435,11 +1405,7 @@ export default function ManageScreen() {
 
           {/* Pair B */}
           <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-            <Text
-              style={{ color: colors.text }}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
+            <Text style={{ color: colors.text }} numberOfLines={1}>
               {pairLabel(m?.pairB)}
             </Text>
             {busyInfoB ? <BusyChip court={busyInfoB.court} /> : null}
@@ -1466,7 +1432,12 @@ export default function ManageScreen() {
       (m) => String(m?.bracket?._id || m?.bracket) === bid
     );
     const list = filterSortMatches(matches);
-    const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}`;
+    const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}`;
+
+    const allSelected = isAllSelectedIn(list);
+    const selectedCount = list.filter((m) =>
+      selectedMatchIds.has(String(m._id))
+    ).length;
 
     return (
       <View
@@ -1490,24 +1461,43 @@ export default function ManageScreen() {
           >
             {b?.name || "Bracket"}
           </Text>
-
-          {/* Quản lý sân (open sheet) */}
-          <MiniChipBtn
-            icon="stadium"
-            label="Quản lý sân"
-            onPress={() => setCourtMgrSheet({ open: true, bracket: b })}
-          />
-          <MiniChipBtn
-            icon="settings"
-            label="Thiết lập LIVE"
-            onPress={() => setLiveSetupSheet({ open: true, bracket: b })}
-          />
           <Pill label={TYPE_LABEL(b?.type)} />
           {typeof b?.stage === "number" ? (
             <Pill label={`Stage ${b.stage}`} />
           ) : null}
           <Pill label={`${list.length} trận`} kind="primary" />
         </View>
+
+        {/* Select-all row (mobile) */}
+        {list.length > 0 && (
+          <View style={styles.selectAllRow}>
+            <Pressable
+              onPress={() => toggleSelectAllIn(list, !allSelected)}
+              style={({ pressed }) => [
+                { flexDirection: "row", alignItems: "center", gap: 8 },
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <MaterialIcons
+                name={
+                  allSelected
+                    ? "check-box"
+                    : selectedCount > 0
+                    ? "indeterminate-check-box"
+                    : "check-box-outline-blank"
+                }
+                size={18}
+                color={colors.text}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+              </Text>
+            </Pressable>
+            {selectedCount > 0 ? (
+              <Pill label={`${selectedCount} đã chọn`} />
+            ) : null}
+          </View>
+        )}
 
         {list.length === 0 ? (
           <View style={[styles.emptyBox, { borderColor: colors.border }]}>
@@ -1527,19 +1517,20 @@ export default function ManageScreen() {
     );
   };
 
-  // ===== Header-right dropdown w/ anchor =====
+  // Header dropdown (đơn giản)
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const hdrBtnRef = useRef(null);
 
   /* ----------- guards ----------- */
+  const isInitialLoading = tourLoading || brLoading || mLoading;
+  const hasError = tourErr || brErr || mErr;
+
   if (isInitialLoading) {
     return (
       <>
         <Stack.Screen
           options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
         />
-        <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <View style={[styles.center]}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </>
@@ -1552,7 +1543,7 @@ export default function ManageScreen() {
         <Stack.Screen
           options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
         />
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={[styles.screen]}>
           <View
             style={[
               styles.alert,
@@ -1580,7 +1571,7 @@ export default function ManageScreen() {
             headerTitleAlign: "center",
           }}
         />
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={[styles.screen]}>
           <View
             style={[
               styles.alert,
@@ -1601,29 +1592,6 @@ export default function ManageScreen() {
     );
   }
 
-  const MenuItem = ({ icon, label, onPress, danger }) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.9 }]}
-    >
-      <MaterialIcons
-        name={icon}
-        size={18}
-        color={danger ? "#ef4444" : colors.text}
-        style={{ marginRight: 8 }}
-      />
-      <Text
-        style={{
-          color: danger ? "#ef4444" : colors.text,
-          fontSize: 14,
-          fontWeight: "600",
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-
   /* ----------- render ----------- */
   return (
     <View style={{ flex: 1 }}>
@@ -1633,13 +1601,7 @@ export default function ManageScreen() {
           headerTitleAlign: "center",
           headerRight: () => (
             <Pressable
-              ref={hdrBtnRef}
-              onPress={() => {
-                hdrBtnRef.current?.measureInWindow?.((x, y, w, h) => {
-                  setMenuAnchor({ x, y, width: w, height: h });
-                  setHdrMenuOpen(true);
-                }) || setHdrMenuOpen(true);
-              }}
+              onPress={() => setHdrMenuOpen(true)}
               style={({ pressed }) => [
                 { paddingHorizontal: 8, paddingVertical: 4 },
                 pressed && { opacity: 0.7 },
@@ -1652,7 +1614,7 @@ export default function ManageScreen() {
         }}
       />
 
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <View style={[styles.screen]}>
         {/* Controls */}
         <View
           style={[
@@ -1695,12 +1657,14 @@ export default function ManageScreen() {
               colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
             />
             <Pill
-              label={`${bracketsOfTab.length} bracket • ${TYPE_LABEL(tab)}`}
+              label={`${
+                typesAvailable.length ? bracketsOfTab.length : 0
+              } bracket • ${TYPE_LABEL(tab)}`}
             />
           </View>
         </View>
 
-        {/* Tabs động */}
+        {/* Tabs */}
         <View style={[styles.tabs, { borderColor: colors.border }]}>
           {typesAvailable.map((tTab) => {
             const active = tTab.type === tab;
@@ -1730,7 +1694,7 @@ export default function ManageScreen() {
           })}
         </View>
 
-        {/* List brackets */}
+        {/* Brackets list */}
         <FlatList
           data={bracketsOfTab}
           keyExtractor={(b) => String(b._id)}
@@ -1738,7 +1702,9 @@ export default function ManageScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
           refreshing={refreshing || tourFetching || brFetching || mFetching}
           onRefresh={onRefresh}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{
+            paddingBottom: 24 + (selectedMatchIds.size > 0 ? 70 : 0),
+          }}
           ListEmptyComponent={
             <View
               style={[
@@ -1751,15 +1717,251 @@ export default function ManageScreen() {
               </Text>
             </View>
           }
-          extraData={liveBump}
+          extraData={`${liveBump}|${selBump}`}
         />
+
         {/* Viewer */}
         <ResponsiveMatchViewer
           open={viewer.open}
           matchId={viewer.matchId}
           onClose={closeMatch}
         />
-        {/* Modal gán link video */}
+
+        {/* Floating action bar when selected > 0 */}
+        {selectedMatchIds.size > 0 && (
+          <View
+            style={[
+              styles.bottomBar,
+              {
+                paddingBottom: 8 + insets.bottom,
+                backgroundColor: colors.card,
+                borderTopColor: colors.border,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.bottomRow,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Pill
+                label={`Đã chọn ${selectedMatchIds.size} trận`}
+                kind="primary"
+              />
+
+              {/* Scroll ngang có fade & mũi tên: dùng lại EdgeFadedHScroll ở trên */}
+              <View style={{ flex: 1 }}>
+                <EdgeFadedHScroll
+                  contentContainerStyle={styles.bottomActions}
+                  bgColor={colors.card}
+                  chevronColor={t.muted}
+                  fadeWidth={28}
+                  threshold={12}
+                  style={{ maxHeight: 40 }}
+                >
+                  <BtnOutline onPress={() => setBatchRefDlg({ open: true })}>
+                    <Text style={{ fontWeight: "700", color: colors.text }}>
+                      Gán trọng tài
+                    </Text>
+                  </BtnOutline>
+
+                  <BtnOutline
+                    onPress={() => setBatchVideoDlg({ open: true, url: "" })}
+                  >
+                    <Text style={{ fontWeight: "700", color: colors.text }}>
+                      Gán video
+                    </Text>
+                  </BtnOutline>
+
+                  <BtnOutline onPress={clearSelection}>
+                    <Text style={{ fontWeight: "700", color: colors.text }}>
+                      Bỏ chọn
+                    </Text>
+                  </BtnOutline>
+                </EdgeFadedHScroll>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ==== Header Menu ==== */}
+        <Modal
+          visible={hdrMenuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setHdrMenuOpen(false)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setHdrMenuOpen(false)}
+          >
+            <View />
+          </Pressable>
+          <View
+            style={[
+              styles.menuCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setHdrMenuOpen(false);
+                setRefMgrOpen(true);
+              }}
+            >
+              <MaterialIcons
+                name="how-to-reg"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                Quản lý trọng tài
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setHdrMenuOpen(false);
+                setCourtMgrSheet({ open: true, bracket: null });
+              }}
+            >
+              <MaterialIcons
+                name="stadium"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                Quản lý sân
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setHdrMenuOpen(false);
+                setLiveSetupSheet({ open: true, bracket: null });
+              }}
+            >
+              <MaterialIcons
+                name="movie"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                Thiết lập LIVE
+              </Text>
+            </Pressable>
+            <View style={{ height: 8 }} />
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                setHdrMenuOpen(false);
+                try {
+                  const sections = buildExportPayload();
+                  if (!sections.length)
+                    return RNAlert.alert(
+                      "Thông báo",
+                      "Không có dữ liệu để xuất."
+                    );
+                  const html = buildExportHTML({
+                    tourName: tour?.name || "",
+                    typeLabel: TYPE_LABEL(tab),
+                    sections,
+                  });
+                  const { uri } = await Print.printToFileAsync({ html });
+                  await Sharing.shareAsync(uri, {
+                    mimeType: "application/pdf",
+                    dialogTitle: "Xuất PDF",
+                  });
+                } catch {
+                  RNAlert.alert("Lỗi", "Xuất PDF thất bại.");
+                }
+              }}
+            >
+              <MaterialIcons
+                name="picture-as-pdf"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                Xuất PDF
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuItem}
+              onPress={async () => {
+                setHdrMenuOpen(false);
+                try {
+                  const sections = buildExportPayload();
+                  if (!sections.length)
+                    return RNAlert.alert(
+                      "Thông báo",
+                      "Không có dữ liệu để xuất."
+                    );
+                  const html = buildExportHTML({
+                    tourName: tour?.name || "",
+                    typeLabel: TYPE_LABEL(tab),
+                    sections,
+                  });
+                  const content = `\ufeff${html}`;
+                  const safeName = (tour?.name || "export")
+                    .replace(/[^\p{L}\p{N}]+/gu, "_")
+                    .replace(/^_+|_+$/g, "")
+                    .toLowerCase();
+                  const fileName = `tournament_${safeName}_${tab}_${new Date()
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace(/[:T]/g, "-")}.doc`;
+                  const fileUri = FileSystem.cacheDirectory + fileName;
+                  await FileSystem.writeAsStringAsync(fileUri, content, {
+                    encoding: FileSystem.EncodingType.UTF8,
+                  });
+                  await Sharing.shareAsync(fileUri, {
+                    mimeType: "application/msword",
+                    dialogTitle: "Xuất Word",
+                  });
+                } catch {
+                  RNAlert.alert("Lỗi", "Xuất Word thất bại.");
+                }
+              }}
+            >
+              <MaterialIcons
+                name="description"
+                size={18}
+                color={colors.text}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: colors.text, fontWeight: "700" }}>
+                Xuất Word
+              </Text>
+            </Pressable>
+            <MenuItem
+              icon="home"
+              label="Trang giải"
+              onPress={() => {
+                setHdrMenuOpen(false);
+                router.push(`/tournament/${tid}/home`);
+              }}
+            />
+            {isAdmin && (
+              <MenuItem
+                icon="casino"
+                label="Bốc thăm"
+                onPress={() => {
+                  setHdrMenuOpen(false);
+                  router.push(`/tournament/${tid}/draw`);
+                }}
+              />
+            )}
+          </View>
+        </Modal>
+
+        {/* ====== Single video modal ====== */}
         <Modal
           visible={videoDlg.open}
           transparent
@@ -1806,252 +2008,350 @@ export default function ManageScreen() {
                 <MaterialIcons name="link" size={18} color={t.muted} />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
-                  placeholder="URL video (YouTube/Facebook/TikTok/M3U8…)"
+                  placeholder="URL video (YouTube/Facebook/TikTok/M3U8...)"
                   placeholderTextColor={t.placeholder}
-                  autoCapitalize="none"
-                  autoCorrect={false}
                   value={videoDlg.url}
-                  onChangeText={(v) => setVideoDlg((s) => ({ ...s, url: v }))}
+                  onChangeText={(s) => setVideoDlg((v) => ({ ...v, url: s }))}
                 />
               </View>
-              <Text style={{ color: t.muted, fontSize: 12, marginTop: 4 }}>
-                Dán link live hoặc VOD. Để trống rồi Lưu để xoá link.
-              </Text>
 
               <View
                 style={{
                   flexDirection: "row",
                   justifyContent: "flex-end",
                   gap: 8,
-                  marginTop: 12,
+                  marginTop: 10,
                 }}
               >
-                <BtnOutline onPress={closeVideoDlg} tint={colors.primary}>
-                  Huỷ
+                <BtnOutline onPress={closeVideoDlg}>Đóng</BtnOutline>
+                <BtnOutline onPress={onSaveVideo}>
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>
+                    Lưu
+                  </Text>
                 </BtnOutline>
-                <BtnPrimary
-                  onPress={onSaveVideo}
-                  disabled={savingVideo}
-                  tint={colors.primary}
-                >
-                  {savingVideo
-                    ? "Đang lưu…"
-                    : videoDlg.url
-                    ? "Lưu link"
-                    : "Xoá link"}
-                </BtnPrimary>
               </View>
             </View>
-            <Pressable style={{ flex: 1 }} onPress={closeVideoDlg} />
           </View>
         </Modal>
 
-        {/* ===== Header dropdown ===== */}
+        {/* ====== NEW: Batch Referee modal ====== */}
         <Modal
-          visible={hdrMenuOpen}
+          visible={batchRefDlg.open}
           transparent
           animationType="fade"
-          onRequestClose={() => setHdrMenuOpen(false)}
+          onRequestClose={() => setBatchRefDlg({ open: false })}
         >
-          <View style={{ flex: 1 }}>
+          <View style={styles.modalBackdrop}>
             <Pressable
-              style={styles.menuBackdrop}
-              onPress={() => setHdrMenuOpen(false)}
+              style={{ flex: 1 }}
+              onPress={() => setBatchRefDlg({ open: false })}
             />
             <View
-              pointerEvents="box-none"
-              style={{
-                position: "absolute",
-                top: menuAnchor
-                  ? Math.max(
-                      (insets.top || 0) + 4,
-                      menuAnchor.y + (menuAnchor.height || 0) + 4
-                    )
-                  : (insets.top || 0) + 8,
-                right: menuAnchor
-                  ? Math.max(
-                      8,
-                      width - (menuAnchor.x + (menuAnchor.width || 0))
-                    )
-                  : 12,
-              }}
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  maxHeight: 460,
+                },
+              ]}
             >
               <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontWeight: "700",
+                    fontSize: 16,
+                  }}
+                >
+                  Gán trọng tài cho {selectedMatchIds.size} trận
+                </Text>
+                <IconBtn
+                  name="close"
+                  color={colors.text}
+                  size={20}
+                  onPress={() => setBatchRefDlg({ open: false })}
+                />
+              </View>
+
+              <View
                 style={[
-                  styles.menuBox,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  styles.inputWrap,
+                  { borderColor: colors.border, marginBottom: 10 },
                 ]}
               >
-                <MenuItem
-                  icon="groups"
-                  label="Quản lý trọng tài"
-                  onPress={() => {
-                    setHdrMenuOpen(false);
-                    setRefMgrOpen(true);
-                  }}
+                <MaterialIcons name="search" size={18} color={t.muted} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="Tìm trọng tài (tên, nickname...)"
+                  placeholderTextColor={t.placeholder}
+                  onChangeText={() => {}}
                 />
-                <MenuItem
-                  icon="picture-as-pdf"
-                  label="Xuất PDF"
-                  onPress={async () => {
-                    setHdrMenuOpen(false);
-                    await handleExportPDF();
-                  }}
-                />
-                <MenuItem
-                  icon="description"
-                  label="Xuất Word"
-                  onPress={async () => {
-                    setHdrMenuOpen(false);
-                    await handleExportWord();
-                  }}
-                />
-                <MenuItem
-                  icon="home"
-                  label="Trang giải"
-                  onPress={() => {
-                    setHdrMenuOpen(false);
-                    router.push(`/tournament/${tid}/home`);
-                  }}
-                />
-                {isAdmin && (
-                  <MenuItem
-                    icon="casino"
-                    label="Bốc thăm"
-                    onPress={() => {
-                      setHdrMenuOpen(false);
-                      router.push(`/tournament/${tid}/draw`);
-                    }}
-                  />
+              </View>
+
+              <ScrollView style={{ maxHeight: 320 }}>
+                {refsErr ? (
+                  <Text style={{ color: t.warnText }}>
+                    Không tải được danh sách trọng tài.
+                  </Text>
+                ) : refsLoading ? (
+                  <Text style={{ color: t.muted }}>Đang tải…</Text>
+                ) : refOptions.length === 0 ? (
+                  <Text style={{ color: t.muted }}>
+                    Chưa có trọng tài trong giải.
+                  </Text>
+                ) : (
+                  refOptions.map((r) => {
+                    const id = idOfRef(r);
+                    const chosen = pickedRefs.some((x) => idOfRef(x) === id);
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() =>
+                          setPickedRefs((prev) =>
+                            chosen
+                              ? prev.filter((x) => idOfRef(x) !== id)
+                              : [...prev, r]
+                          )
+                        }
+                        style={({ pressed }) => [
+                          styles.refRow,
+                          { borderColor: colors.border },
+                          pressed && { opacity: 0.9 },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={
+                            chosen ? "check-box" : "check-box-outline-blank"
+                          }
+                          size={18}
+                          color={chosen ? colors.primary : t.muted}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={{ color: colors.text, fontWeight: "700" }}>
+                          {r?.name || r?.nickname || "—"}
+                        </Text>
+                        {r?.nickname && r?.name ? (
+                          <Text style={{ color: t.muted, marginLeft: 6 }}>
+                            ({r.nickname})
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })
                 )}
+              </ScrollView>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
+                <BtnOutline onPress={() => setBatchRefDlg({ open: false })}>
+                  Đóng
+                </BtnOutline>
+                <Pressable
+                  onPress={submitBatchAssign}
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      opacity: pressed || batchingRefs ? 0.9 : 1,
+                    },
+                  ]}
+                  disabled={
+                    batchingRefs ||
+                    pickedRefs.length === 0 ||
+                    selectedMatchIds.size === 0
+                  }
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>Gán</Text>
+                </Pressable>
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* ===== SHEETS (gorhom) ===== */}
+        {/* ====== NEW: Batch Video modal ====== */}
+        <Modal
+          visible={batchVideoDlg.open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBatchVideoDlg({ open: false, url: "" })}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+            />
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontWeight: "700",
+                    fontSize: 16,
+                  }}
+                >
+                  Gán video cho {selectedMatchIds.size} trận
+                </Text>
+                <IconBtn
+                  name="close"
+                  color={colors.text}
+                  size={20}
+                  onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                />
+              </View>
+
+              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+                <MaterialIcons name="link" size={18} color={t.muted} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="URL video (Facebook/YouTube/M3U8...)"
+                  placeholderTextColor={t.placeholder}
+                  value={batchVideoDlg.url}
+                  onChangeText={(s) =>
+                    setBatchVideoDlg((v) => ({ ...v, url: s }))
+                  }
+                />
+              </View>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
+                <BtnOutline
+                  onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                >
+                  Đóng
+                </BtnOutline>
+                <Pressable
+                  onPress={submitBatchSetVideo}
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      opacity: pressed || batchingVideo ? 0.9 : 1,
+                    },
+                  ]}
+                  disabled={
+                    batchingVideo ||
+                    !batchVideoDlg.url.trim() ||
+                    selectedMatchIds.size === 0
+                  }
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>Gán</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ===== Sheets có sẵn ===== */}
         <ManageRefereesSheet
           open={refMgrOpen}
           onClose={() => setRefMgrOpen(false)}
           tournamentId={tid}
-          onChanged={() => {}}
+          onChanged={() => {
+            refetchMatches?.();
+            refetchBrackets?.();
+          }}
         />
         <AssignCourtSheet
           open={assignCourtSheet.open}
           onClose={() => setAssignCourtSheet({ open: false, match: null })}
-          tournamentId={tid}
           match={assignCourtSheet.match}
-          onAssigned={() => refetchMatches()}
+          tournamentId={tid}
+          onAssigned={() => refetchMatches?.()}
         />
         <AssignRefSheet
           open={assignRefSheet.open}
           onClose={() => setAssignRefSheet({ open: false, match: null })}
-          tournamentId={tid}
           match={assignRefSheet.match}
-          onChanged={() => refetchMatches()}
+          tournamentId={tid}
+          onChanged={() => refetchMatches?.()}
         />
         <CourtManagerSheet
           open={courtMgrSheet.open}
           onClose={() => setCourtMgrSheet({ open: false, bracket: null })}
           tournamentId={tid}
-          bracketId={String(courtMgrSheet.bracket?._id || "")}
-          bracketName={courtMgrSheet.bracket?.name}
-          tournamentName={tour?.name}
+          bracketId={null}
+          bracketName=""
+          tournamentName={tour?.name || ""}
         />
         <LiveSetupSheet
           open={liveSetupSheet.open}
           onClose={() => setLiveSetupSheet({ open: false, bracket: null })}
           tournamentId={tid}
-          bracketId={String(liveSetupSheet.bracket?._id || "")}
-          bracketName={liveSetupSheet.bracket?.name}
+          bracketId={null}
         />
       </View>
     </View>
   );
-}
 
-/* ---------------- small UI (buttons/chips) ---------------- */
-function BtnPrimary({ onPress, children, disabled, tint }) {
-  const bg = disabled ? "#94a3b8" : tint || "#0a84ff";
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        { backgroundColor: bg },
-        pressed && !disabled && { opacity: 0.9 },
-      ]}
-    >
-      <Text style={{ color: "#fff", fontWeight: "700" }}>{children}</Text>
-    </Pressable>
-  );
-}
-function BtnOutline({ onPress, children, tint }) {
-  const color = tint || "#0a84ff";
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.btn,
-        { borderWidth: 1, borderColor: color, backgroundColor: "transparent" },
-        pressed && { opacity: 0.95 },
-      ]}
-    >
-      <Text style={{ color, fontWeight: "700" }}>{children}</Text>
-    </Pressable>
-  );
-}
-function PickerChip({ label, onPress, icon, colorsTheme }) {
-  const bg = colorsTheme?.bg ?? "#eef2f7";
-  const fg = colorsTheme?.fg ?? "#263238";
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 6,
-          backgroundColor: bg,
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 999,
-        },
-        pressed && { opacity: 0.9 },
-      ]}
-    >
-      {icon ? <MaterialIcons name={icon} size={16} color={fg} /> : null}
-      <Text style={{ color: fg, fontSize: 12, fontWeight: "600" }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+  // ===== Export payload builder (reuse in header menu) =====
+  function buildRowsForBracket(matches) {
+    return matches.map((m) => {
+      const code = matchCode(m);
+      const a = pairLabel(m?.pairA);
+      const b = pairLabel(m?.pairB);
+      const court = courtNameOf(m) || "—";
+      const order =
+        Number.isFinite(m?.order) || typeof m?.order === "number"
+          ? `T${Number(m.order) + 1}`
+          : "—";
+      const score = scoreText(m) || "—";
+      return [code, a, b, court, order, score];
+    });
+  }
+  function buildExportPayload() {
+    const payload = [];
+    for (const b of bracketsOfTab) {
+      const bid = String(b?._id);
+      const matches = mergedAllMatches.filter(
+        (m) => String(m?.bracket?._id || m?.bracket) === bid
+      );
+      const list = filterSortMatches(matches);
+      payload.push({
+        title: `${b?.name || "Bracket"} — ${TYPE_LABEL(b?.type)}`,
+        rows: buildRowsForBracket(list),
+      });
+    }
+    return payload;
+  }
 }
 
 /* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16 },
+  screen: { flex: 1, padding: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  tabs: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 4,
-    gap: 8,
-    marginBottom: 12,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-  },
-
+  alert: { borderWidth: 1, borderRadius: 12, padding: 12 },
   toolbar: {
     borderWidth: 1,
     borderRadius: 12,
@@ -2060,112 +2360,82 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   inputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 10,
-    paddingVertical: Platform.select({ ios: 10, android: 8 }),
+    paddingVertical: 6,
+  },
+  input: { flex: 1, fontSize: 14, paddingVertical: 4 },
+  tabs: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    marginBottom: 12,
+  },
+  tabItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  card: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  bracketTitle: { fontSize: 16, fontWeight: "800" },
+  emptyBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+  },
+
+  matchRow: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    position: "relative",
+  },
+
+  /* ⬇️ dòng riêng cho checkbox của từng item */
+  selectRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    marginBottom: 8,
   },
-  input: { flex: 1, fontSize: 15 },
 
-  card: { borderWidth: 1, borderRadius: 14, padding: 12 },
-  bracketTitle: { fontSize: 16, fontWeight: "700" },
-
-  /* match row */
-  matchRow: { borderWidth: 1, borderRadius: 12, padding: 10 },
-  actionsWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingRight: 4,
-  },
-  contentBlock: { marginTop: 8, gap: 2 },
+  contentBlock: { gap: 6, marginTop: 6 },
+  code: { fontSize: 14, fontWeight: "800" },
   metaRow: {
     flexDirection: "row",
-    gap: 8,
     alignItems: "center",
-    marginTop: 6,
+    gap: 8,
     flexWrap: "wrap",
   },
 
-  code: { fontWeight: "700", marginBottom: 4 },
-
-  btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   miniBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-  },
-
-  alert: { borderWidth: 1, borderRadius: 12, padding: 12, marginVertical: 8 },
-  emptyBox: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-  },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 560,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 12,
-  },
-
-  // header dropdown
-  menuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.001)",
-  },
-  menuBox: {
-    minWidth: 220,
-    borderWidth: 1,
-    borderRadius: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 6,
+    borderRadius: 999,
+    borderWidth: 1,
   },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  fadeLeft: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 18,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    zIndex: 2,
-  },
-  fadeRight: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 18,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    zIndex: 2,
-  },
+  actionsWrap: { paddingRight: 6, gap: 6, alignItems: "center" },
+
+  fadeLeft: { position: "absolute", left: 0, top: 0, bottom: 0, width: 18 },
+  fadeRight: { position: "absolute", right: 0, top: 0, bottom: 0, width: 18 },
   chev: {
     position: "absolute",
     top: "50%",
@@ -2173,5 +2443,83 @@ const styles = StyleSheet.create({
     padding: 2,
     borderRadius: 999,
     zIndex: 3,
+  },
+
+  selectAllRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    // shadow
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: -2 },
+      },
+      android: { elevation: 10 },
+    }),
+  },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+  },
+  bottomActions: {
+    gap: 8,
+    alignItems: "center",
+    paddingRight: 6, // để EdgeFadedHScroll có chỗ fade
+  },
+
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
+  modalCard: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 20,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  menuCard: {
+    position: "absolute",
+    right: 12,
+    top: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 6,
+    minWidth: 220,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  refRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  primaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
 });

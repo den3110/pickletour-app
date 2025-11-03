@@ -737,6 +737,13 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (r, e, { matchId }) => [{ type: "Match", id: matchId }],
     }),
+    adminBatchSetMatchLiveUrl: builder.mutation({
+      query: ({ ids, video }) => ({
+        url: `/api/admin/matches/batch/live-url`, // BE: nhận { ids: string[], video: string }
+        method: "POST",
+        body: { ids, video },
+      }),
+    }),
   }),
 });
 
@@ -804,4 +811,5 @@ export const {
   useAdminGetMatchRefereesQuery,
   useVerifyManagerQuery,
   useRefereeSetBreakMutation,
+  useAdminBatchSetMatchLiveUrlMutation,
 } = tournamentsApiSlice;

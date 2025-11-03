@@ -63,7 +63,9 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const cid = asId(courtId);
         const bid = asId(bracket);
         return {
-          url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(cid)}/assign-next`,
+          url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
+            cid
+          )}/assign-next`,
           method: "POST",
           body: { bracket: bid },
         };
@@ -229,6 +231,30 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
       ],
       keepUnusedDataFor: 30,
     }),
+    // ⬇️ NEW: Xoá tất cả sân bằng API
+    deleteCourts: builder.mutation({
+      query: ({ tournamentId, bracket, cluster, force = true }) => ({
+        url: "/api/admin/courts/deleteAll",
+        method: "POST", // dùng POST để pass JSON body
+        body: { tournamentId, bracket, cluster, force },
+      }),
+      invalidatesTags: (r, e, arg) => [
+        { type: "Courts", id: `${arg.tournamentId}_${arg.bracket}` },
+        { type: "Matches", id: `${arg.tournamentId}_${arg.bracket}` },
+      ],
+    }),
+    // NEW: Xoá 1 sân cụ thể
+    deleteCourt: builder.mutation({
+      query: ({ tournamentId, courtId }) => ({
+        url: `/api/admin/courts/${courtId}`,
+        method: "DELETE",
+        body: { tournamentId },
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Courts", id: arg.tournamentId },
+        { type: "Court", id: arg.courtId },
+      ],
+    }),
   }),
 
   // nếu file này được inject nhiều lần ở môi trường hot-reload:
@@ -246,4 +272,6 @@ export const {
   useResetCourtsHttpMutation,
   useLazyGetSchedulerMatchesLiteQuery,
   useAdminListCourtsQuery,
+  useDeleteCourtMutation,
+  useDeleteCourtsMutation
 } = adminCourtApiSlice;

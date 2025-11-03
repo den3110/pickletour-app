@@ -33,10 +33,7 @@ import {
   useAdminSetCourtLiveConfigMutation,
   useAdminBulkSetCourtLiveConfigMutation,
 } from "@/slices/courtsApiSlice";
-import {
-  useAdminGetBracketsQuery,
-  useAdminListMatchesByTournamentQuery,
-} from "@/slices/tournamentsApiSlice";
+import { useAdminListMatchesByTournamentQuery } from "@/slices/tournamentsApiSlice";
 
 /* ---------- helpers ---------- */
 const isMongoId = (s) => typeof s === "string" && /^[a-f0-9]{24}$/i.test(s);
@@ -74,12 +71,8 @@ const matchBelongsToCourt = (m, court) => {
     court?.code ||
     (Number.isFinite(court?.number) ? `Sân ${court.number}` : "");
   return (
-    String(mLabel || "")
-      .trim()
-      .toLowerCase() ===
-    String(cLabel || "")
-      .trim()
-      .toLowerCase()
+    String(mLabel || "").trim().toLowerCase() ===
+    String(cLabel || "").trim().toLowerCase()
   );
 };
 const countByStatus = (matches) => {
@@ -116,9 +109,7 @@ const buildQuery = (obj) =>
 const looksLikeRTMP = (u) => /^rtmps?:\/\//i.test(String(u || "").trim());
 
 const splitRtmpUrl = (url) => {
-  const trimmed = String(url || "")
-    .trim()
-    .replace(/\/$/, "");
+  const trimmed = String(url || "").trim().replace(/\/$/, "");
   const idx = trimmed.lastIndexOf("/");
   if (idx < 0) return { server: trimmed, key: "" };
   return { server: trimmed.slice(0, idx), key: trimmed.slice(idx + 1) };
@@ -194,13 +185,15 @@ function ToggleButton({ value, onChange, colors }) {
   );
 }
 
-/* ================== SHEET (BottomSheetModal + BottomSheetFlatList) ================== */
+/* ================== SHEET (TOÀN GIẢI) ================== */
 export default function LiveSetupSheet({
   open,
   onClose,
   tournamentId,
-  bracketId,
-  bracketName: bracketNameProp,
+  // giữ tương thích prop cũ nhưng KHÔNG dùng nữa ở chế độ toàn giải:
+  bracketId, // eslint-disable-line no-unused-vars
+  bracketName: bracketNameProp, // eslint-disable-line no-unused-vars
+  tournamentName,
   buildCourtLiveUrl, // optional: (tid, bid, court) => string
 }) {
   const sheetRef = useRef(null);
@@ -214,28 +207,14 @@ export default function LiveSetupSheet({
     else sheetRef.current?.dismiss();
   }, [open]);
 
-  /* 1) Bracket name */
-  const { data: bracketsData, isLoading: brLoading } = useAdminGetBracketsQuery(
-    tournamentId,
-    { skip: !open }
-  );
-  const bracketName = useMemo(() => {
-    if (bracketNameProp) return bracketNameProp;
-    const list = Array.isArray(bracketsData)
-      ? bracketsData
-      : bracketsData?.items || [];
-    const b = list.find((x) => String(x?._id) === String(bracketId));
-    return b?.name || "";
-  }, [bracketsData, bracketId, bracketNameProp]);
-
-  /* 2) Courts */
+  /* 1) Courts — TOÀN GIẢI */
   const {
     data: courtsResp,
     isLoading: courtsLoading,
     isError: courtsErr,
     refetch: refetchCourts,
   } = useAdminListCourtsByTournamentQuery(
-    { tid: tournamentId, bracketId },
+    { tid: tournamentId }, // ❗ không truyền bracketId nữa
     { skip: !open }
   );
   const courts = useMemo(() => {
@@ -262,22 +241,21 @@ export default function LiveSetupSheet({
     }));
   }, [courtsResp]);
 
-  /* 3) Matches (thống kê) */
+  /* 2) Matches — TOÀN GIẢI (không lọc theo bracket) */
   const { data: matchPage, isLoading: matchesLoading } =
     useAdminListMatchesByTournamentQuery(
       { tid: tournamentId, page: 1, pageSize: 1000 },
       { skip: !open }
     );
-  const matchesOfBracket = useMemo(() => {
-    const list = Array.isArray(matchPage?.list) ? matchPage.list : [];
-    return list.filter(
-      (m) => String(m?.bracket?._id || m?.bracket || "") === String(bracketId)
-    );
-  }, [matchPage, bracketId]);
+  const matchesAll = useMemo(
+    () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
+    [matchPage]
+  );
+
   const matchesByCourtId = useMemo(() => {
     const map = new Map();
     for (const c of courts) map.set(String(c._id), []);
-    for (const m of matchesOfBracket) {
+    for (const m of matchesAll) {
       let assigned = false;
       const mid = extractCourtId(
         m?.courtAssigned || m?.assignedCourt || m?.court
@@ -296,9 +274,9 @@ export default function LiveSetupSheet({
       }
     }
     return map;
-  }, [courts, matchesOfBracket]);
+  }, [courts, matchesAll]);
 
-  /* 4) Form state */
+  /* 3) Form state */
   const [form, setForm] = useState({});
   const [overrideExisting, setOverrideExisting] = useState(false);
   const [busy, setBusy] = useState(new Set());
@@ -317,7 +295,7 @@ export default function LiveSetupSheet({
     initialFormRef.current = next;
   }, [open, courts]);
 
-  /* 5) Mutations */
+  /* 4) Mutations */
   const [setCourtCfg, { isLoading: saving }] =
     useAdminSetCourtLiveConfigMutation();
   const [bulkSetCourtCfg, { isLoading: bulkSaving }] =
@@ -406,10 +384,9 @@ export default function LiveSetupSheet({
       const cId = String(court?._id || "");
       const v = form[cId] || { enabled: false, videoUrl: "" };
 
-      // base params bắt buộc
+      // base params bắt buộc — TOÀN GIẢI (không yêu cầu bid)
       const baseParams = {
         tid: tournamentId,
-        bid: bracketId,
         courtId: cId,
 
         // auto flags
@@ -428,7 +405,7 @@ export default function LiveSetupSheet({
         baseParams.useFullUrl = "1";
         baseParams.fullUrl = guessUrl;
 
-        // (tuỳ thích) nếu bạn muốn đi server+key thay vì fullUrl:
+        // (tuỳ chọn) nếu bạn muốn server+key:
         // const { server, key } = splitRtmpUrl(guessUrl);
         // baseParams.useFullUrl = "0";
         // baseParams.server = server;
@@ -439,10 +416,8 @@ export default function LiveSetupSheet({
       const href = `/live/studio_court?${qs}`;
 
       try {
-        // Nếu bạn vẫn muốn override đường dẫn từ prop buildCourtLiveUrl,
-        // có thể ưu tiên nó. Ở đây mình vẫn đẩy href chuẩn đã chứa FULL params.
         const finalUrl = buildCourtLiveUrl
-          ? buildCourtLiveUrl(tournamentId, bracketId, court) || href
+          ? buildCourtLiveUrl(tournamentId, null, court) || href
           : href;
         router.push(finalUrl);
         sheetRef.current?.dismiss();
@@ -450,10 +425,10 @@ export default function LiveSetupSheet({
         RNAlert.alert("Không mở được", "Đường dẫn/route không hợp lệ.");
       }
     },
-    [form, tournamentId, bracketId, buildCourtLiveUrl]
+    [form, tournamentId, buildCourtLiveUrl]
   );
 
-  const loadingAny = courtsLoading || matchesLoading || brLoading;
+  const loadingAny = courtsLoading || matchesLoading;
 
   /* ---- render 1 court row ---- */
   const renderCourt = ({ item: c }) => {
@@ -593,11 +568,12 @@ export default function LiveSetupSheet({
       >
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>
-            Thiết lập LIVE — {bracketName || ""}
+            Thiết lập LIVE — Toàn giải
+            {tournamentName ? ` • ${tournamentName}` : ""}
           </Text>
           <Text style={{ color: "#94a3b8", fontSize: 12 }}>
-            Cấu hình LIVE theo SÂN. Khi trận bắt đầu (hoặc server áp dụng), URL
-            mặc định của sân sẽ tự gán cho trận thuộc sân đó.
+            Cấu hình LIVE theo SÂN cho TOÀN GIẢI. Khi trận bắt đầu (hoặc server
+            áp dụng), URL mặc định của sân sẽ tự gán cho mọi trận thuộc sân đó.
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -636,11 +612,11 @@ export default function LiveSetupSheet({
             size={18}
             color={overrideExisting ? colors.primary : "#94a3b8"}
           />
-          <Text style={{ color: colors.text, fontWeight: "600" }}>
-            Cho phép <Text style={{ fontWeight: "800" }}>ghi đè</Text> link LIVE
-            đã có trong trận
-          </Text>
         </Pressable>
+        <Text style={{ color: colors.text, fontWeight: "600" }}>
+          Cho phép <Text style={{ fontWeight: "800" }}>ghi đè</Text> link LIVE
+          đã có trong trận
+        </Text>
       </View>
     </>
   );
@@ -650,9 +626,7 @@ export default function LiveSetupSheet({
     <>
       {courtsErr ? (
         <View style={styles.alertBox}>
-          <Text style={{ color: "#ef4444" }}>
-            Không tải được danh sách sân.
-          </Text>
+          <Text style={{ color: "#ef4444" }}>Không tải được danh sách sân.</Text>
         </View>
       ) : loadingAny ? (
         <View style={[styles.center, { paddingVertical: 24 }]}>
@@ -660,9 +634,7 @@ export default function LiveSetupSheet({
         </View>
       ) : (
         <View style={styles.alertBox}>
-          <Text style={{ color: "#f59e0b" }}>
-            Chưa có sân trong bracket này.
-          </Text>
+          <Text style={{ color: "#f59e0b" }}>Chưa có sân trong giải này.</Text>
         </View>
       )}
     </>
@@ -715,6 +687,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   switchLine: { flexDirection: "row", alignItems: "center", gap: 8 },
   center: { alignItems: "center", justifyContent: "center" },

@@ -31,16 +31,24 @@ import {
   useUpsertCourtsMutation,
   useBuildGroupsQueueMutation,
   useAssignNextHttpMutation,
+  useDeleteCourtsMutation, // NEW: xoá tất cả
+  useDeleteCourtMutation, // NEW: xoá 1 sân
 } from "@/slices/adminCourtApiSlice";
 
 /* ================= helpers / formatters ================= */
-const isNum = (x) => typeof x === "number" && Number.isFinite(x);
-const isPO = (m) => {
-  const t = String(m?.type || m?.format || "").toLowerCase();
-  return t === "po" || m?.meta?.po === true;
-};
+const norm = (s) => String(s || "").toLowerCase();
+const GROUP_LIKE_SET = new Set(["group", "round_robin", "gsl", "swiss"]);
+const KO_SET = new Set([
+  "ko",
+  "knockout",
+  "double_elim",
+  "roundelim",
+  "elimination",
+]);
+
+const isPO = (m) => norm(m?.type || m?.format) === "po" || m?.meta?.po === true;
 const isKO = (m) => {
-  const t = String(m?.type || m?.format || "").toLowerCase();
+  const t = norm(m?.type || m?.format);
   return (
     t === "ko" ||
     t === "knockout" ||
@@ -50,12 +58,20 @@ const isKO = (m) => {
 };
 const isGroupLike = (m) => {
   if (!m) return false;
+  // ưu tiên theo bộ web
+  const bt = norm(m?.bracketType);
+  const t1 = norm(m?.type);
+  const t2 = norm(m?.format);
+  if (GROUP_LIKE_SET.has(bt)) return true;
+  if (KO_SET.has(bt)) return false;
+  if (GROUP_LIKE_SET.has(t1) || GROUP_LIKE_SET.has(t2)) return true;
+  if (KO_SET.has(t1) || KO_SET.has(t2)) return false;
+  // fallback RN cũ
   if (isPO(m) || isKO(m)) return false;
-  const t = String(m?.type || m?.format || "").toLowerCase();
-  if (t === "group" || t === "rr" || t === "roundrobin" || t === "round_robin")
-    return true;
   return !!m?.pool;
 };
+
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
 
 const viMatchStatus = (s) => {
   switch (s) {
@@ -100,6 +116,26 @@ const poolBoardLabel = (m) => {
   if (/^\d+$/.test(raw)) return `B${raw}`;
   return raw;
 };
+
+const isGlobalCodeString = (s) =>
+  typeof s === "string" && /^V\d+(?:-B\d+)?-T\d+$/.test(s);
+
+// chuyển labelKey dạng "V1 B3 T5" => "V1-B3-T5"
+const codeFromLabelKeyish = (lk) => {
+  const s = String(lk || "").trim();
+  if (!s) return null;
+  const nums = s.match(/\d+/g);
+  if (!nums || nums.length < 2) return null;
+  const v = Number(nums[0]);
+  if (/#?B\d+/i.test(s)) {
+    const b = nums.length >= 3 ? Number(nums[1]) : 1;
+    const t = Number(nums[nums.length - 1]);
+    return `V${v}-B${b}-T${t}`;
+  }
+  const t = Number(nums[nums.length - 1]);
+  return `V${v}-T${t}`;
+};
+
 const poolIndexNumber = (m) => {
   const lbl = poolBoardLabel(m);
   const hit = /^B(\d+)$/i.exec(lbl);
@@ -108,8 +144,6 @@ const poolIndexNumber = (m) => {
   return byLetter || 1;
 };
 
-const isGlobalCodeString = (s) =>
-  typeof s === "string" && /^V\d+(?:-B\d+)?-T\d+$/.test(s);
 const fallbackGlobalCode = (m, idx) => {
   const baseOrder =
     typeof m?.order === "number" && Number.isFinite(m.order)
@@ -123,17 +157,19 @@ const fallbackGlobalCode = (m, idx) => {
     const B = poolIndexNumber(m);
     return `V1-B${B}-T${T}`;
   }
-  const elimOffset = Number.isFinite(Number(m?.elimOffset))
-    ? Number(m.elimOffset)
-    : 0;
   const r = Number.isFinite(Number(m?.round)) ? Number(m.round) : 1;
-  const V = elimOffset + r;
-  return `V${V}-T${T}`;
+  return `V${r}-T${T}`;
 };
+
 const buildMatchCode = (m, idx) => {
   if (!m) return "";
-  if (isGlobalCodeString(m.globalCode)) return m.globalCode;
-  if (isGlobalCodeString(m.code)) return m.code;
+  // ưu tiên hiển thị theo web
+  if (isGlobalCodeString(m?.codeDisplay)) return m.codeDisplay;
+  if (isGlobalCodeString(m?.globalCode)) return m.globalCode;
+  if (isGlobalCodeString(m?.code)) return m.code;
+  const byLabel =
+    codeFromLabelKeyish(m?.labelKeyDisplay) || codeFromLabelKeyish(m?.labelKey);
+  if (isGlobalCodeString(byLabel)) return byLabel;
   return fallbackGlobalCode(m, idx);
 };
 
@@ -256,17 +292,19 @@ function IconBtn({ name, onPress, color, size = 18, style }) {
   );
 }
 
-function Btn({ variant = "solid", onPress, children, disabled }) {
+function Btn({ variant = "solid", onPress, children, disabled, danger }) {
   const t = useTokens();
+  const bg =
+    variant === "solid"
+      ? danger
+        ? "#ef4444"
+        : t.colors.primary
+      : "transparent";
   const base = [
     styles.btn,
     variant === "solid"
-      ? { backgroundColor: t.colors.primary }
-      : {
-          backgroundColor: "transparent",
-          borderColor: t.colors.primary,
-          borderWidth: 1,
-        },
+      ? { backgroundColor: bg }
+      : { borderColor: danger ? "#ef4444" : t.colors.primary, borderWidth: 1 },
     disabled && { opacity: 0.5 },
   ];
   return (
@@ -277,7 +315,12 @@ function Btn({ variant = "solid", onPress, children, disabled }) {
     >
       <Text
         style={{
-          color: variant === "solid" ? "#fff" : t.colors.primary,
+          color:
+            variant === "solid"
+              ? "#fff"
+              : danger
+              ? "#ef4444"
+              : t.colors.primary,
           fontWeight: "700",
         }}
       >
@@ -447,13 +490,14 @@ function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
   );
 }
 
-/* ================= CourtManagerSheet (sheet chính) ================= */
+/* ================= CourtManagerSheet (sheet chính — TOÀN GIẢI) ================= */
 export default function CourtManagerSheet({
   open,
   onClose,
   tournamentId,
-  bracketId,
-  bracketName,
+  // giữ tương thích nhưng KHÔNG dùng nữa:
+  bracketId, // eslint-disable-line no-unused-vars
+  bracketName, // eslint-disable-line no-unused-vars
   tournamentName,
   snapPoints: snapPointsProp,
 }) {
@@ -487,6 +531,9 @@ export default function CourtManagerSheet({
   const [buildQueue, { isLoading: buildingQueue }] =
     useBuildGroupsQueueMutation();
   const [assignNextHttp] = useAssignNextHttpMutation();
+  const [deleteCourts, { isLoading: deletingCourts }] =
+    useDeleteCourtsMutation();
+  const [deleteCourt, { isLoading: deletingOne }] = useDeleteCourtMutation();
 
   // open/close
   useEffect(() => {
@@ -494,11 +541,11 @@ export default function CourtManagerSheet({
     else sheetRef.current?.dismiss();
   }, [open]);
 
-  // join/leave socket room
+  // join/leave socket room — ⭐ TOÀN GIẢI (chỉ theo tournamentId)
   useEffect(() => {
-    if (!open || !socket || !tournamentId || !bracketId) return;
+    if (!open || !socket || !tournamentId) return;
 
-    const room = { tournamentId, bracket: bracketId };
+    const room = { tournamentId };
 
     const onState = ({ courts, matches, queue }) => {
       setCourts(courts || []);
@@ -532,7 +579,7 @@ export default function CourtManagerSheet({
       socket.off?.("match:update", reqState);
       socket.off?.("match:finish", reqState);
     };
-  }, [open, socket, tournamentId, bracketId]);
+  }, [open, socket, tournamentId]);
 
   // helpers for court
   const matchMap = useMemo(() => {
@@ -556,7 +603,8 @@ export default function CourtManagerSheet({
   const getMatchCodeForCourt = (c) => {
     const m = getMatchForCourt(c);
     if (!m) return "";
-    return buildMatchCode(m);
+    if (isGlobalCodeString(m.codeDisplay)) return m.codeDisplay;
+    return m.currentMatchCode || buildMatchCode(m);
   };
   const getTeamsForCourt = (c) => {
     const m = getMatchForCourt(c);
@@ -599,11 +647,13 @@ export default function CourtManagerSheet({
         : null;
     };
     const tripletOf = (m) => {
-      const code = isGlobalCodeString(m?.globalCode)
-        ? m.globalCode
-        : isGlobalCodeString(m?.code)
-        ? m.code
-        : fallbackGlobalCode(m);
+      const code =
+        (isGlobalCodeString(m?.codeDisplay) && m.codeDisplay) ||
+        (isGlobalCodeString(m?.globalCode) && m.globalCode) ||
+        (isGlobalCodeString(m?.code) && m.code) ||
+        codeFromLabelKeyish(m?.labelKeyDisplay) ||
+        codeFromLabelKeyish(m?.labelKey) ||
+        fallbackGlobalCode(m);
       return parseTripletFromCode(code) || { v: 999, b: 999, t: 999 };
     };
 
@@ -611,8 +661,10 @@ export default function CourtManagerSheet({
       const ta = tripletOf(a);
       const tb = tripletOf(b);
       if (ta.v !== tb.v) return ta.v - tb.v;
-      const ga = isGroupLike(a),
-        gb = isGroupLike(b);
+
+      const ga = isGroupLike(a);
+      const gb = isGroupLike(b);
+
       if (ga && gb) {
         if ((ta.t || 0) !== (tb.t || 0)) return (ta.t || 0) - (tb.t || 0);
         const ba = ta.b ?? 999,
@@ -623,8 +675,10 @@ export default function CourtManagerSheet({
       } else {
         return ga ? -1 : 1;
       }
+
       const sdiff = statusRank(a.status) - statusRank(b.status);
       if (sdiff !== 0) return sdiff;
+
       return (Number(a.order) || 9999) - (Number(b.order) || 9999);
     });
 
@@ -633,25 +687,21 @@ export default function CourtManagerSheet({
 
   /* ================ handlers ================ */
   const requestState = () => {
-    if (socket && tournamentId && bracketId) {
-      socket.emit("scheduler:requestState", {
-        tournamentId,
-        bracket: bracketId,
-      });
+    if (socket && tournamentId) {
+      socket.emit("scheduler:requestState", { tournamentId });
     }
   };
 
   const handleSaveCourts = async () => {
-    if (!tournamentId || !bracketId) {
-      Alert.alert("Lỗi", "Thiếu tournamentId hoặc bracketId.");
+    if (!tournamentId) {
+      Alert.alert("Lỗi", "Thiếu tournamentId.");
       return;
     }
     const payload =
       mode === "names"
-        ? { tournamentId, bracket: bracketId, names, autoAssign }
+        ? { tournamentId, names, autoAssign }
         : {
             tournamentId,
-            bracket: bracketId,
             count: Number(count) || 0,
             autoAssign,
           };
@@ -660,8 +710,8 @@ export default function CourtManagerSheet({
       Alert.alert(
         "Thành công",
         autoAssign
-          ? "Đã lưu danh sách sân. Tự động gán trận đang BẬT."
-          : "Đã lưu danh sách sân."
+          ? "Đã lưu danh sách sân toàn giải. Tự động gán trận đang BẬT."
+          : "Đã lưu danh sách sân toàn giải."
       );
       requestState();
     } catch (e) {
@@ -670,15 +720,12 @@ export default function CourtManagerSheet({
   };
 
   const handleBuildQueue = async () => {
-    if (!tournamentId || !bracketId) return;
+    if (!tournamentId) return;
     try {
-      const res = await buildQueue({
-        tournamentId,
-        bracket: bracketId,
-      }).unwrap();
+      const res = await buildQueue({ tournamentId }).unwrap();
       Alert.alert(
         "Thành công",
-        `Đã xếp ${res?.totalQueued ?? 0} trận vào hàng đợi.`
+        `Đã xếp ${res?.totalQueued ?? 0} trận vào hàng đợi toàn giải.`
       );
     } catch (e) {
       Alert.alert(
@@ -691,39 +738,122 @@ export default function CourtManagerSheet({
   };
 
   const handleAssignNext = async (courtId) => {
-    if (!tournamentId || !bracketId || !courtId) return;
+    if (!tournamentId || !courtId) return;
     socket?.emit?.("scheduler:assignNext", {
       tournamentId,
       courtId,
-      bracket: bracketId,
     });
-    await assignNextHttp({ tournamentId, courtId, bracket: bracketId })
+    await assignNextHttp({ tournamentId, courtId })
       .unwrap()
       .catch(() => {});
     requestState();
   };
 
   const handleResetAll = () => {
-    if (!tournamentId || !bracketId) return;
+    if (!tournamentId) return;
     Alert.alert(
-      "Xác nhận",
-      "Xoá TẤT CẢ sân và gỡ gán trận hiện tại?",
+      "Reset tất cả sân?",
+      "Reset TẤT CẢ sân của giải (gỡ gán & xoá khỏi bộ lập lịch).",
       [
         { text: "Huỷ", style: "cancel" },
         {
           text: "Đồng ý",
           style: "destructive",
           onPress: () => {
-            socket?.emit?.("scheduler:resetAll", {
-              tournamentId,
-              bracket: bracketId,
-            });
+            socket?.emit?.("scheduler:resetAll", { tournamentId });
             Alert.alert("Đã gửi lệnh", "Hệ thống đang reset tất cả sân.");
             requestState();
           },
         },
+      ]
+    );
+  };
+
+  const handleDeleteAllCourts = async () => {
+    if (!tournamentId) {
+      Alert.alert("Lỗi", "Thiếu tournamentId.");
+      return;
+    }
+    Alert.alert(
+      "Xoá TẤT CẢ sân?",
+      "Hành động này không thể hoàn tác.",
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteCourts({ tournamentId }).unwrap();
+              Alert.alert("Thành công", "Đã xoá tất cả sân.");
+              requestState();
+            } catch (e) {
+              Alert.alert(
+                "Lỗi",
+                e?.data?.message || e?.error || "Xoá sân thất bại"
+              );
+            }
+          },
+        },
       ],
       { cancelable: true }
+    );
+  };
+
+  // NEW: per-court delete busy set
+  const [busyDelete, setBusyDelete] = useState(() => new Set());
+
+  // NEW: Xoá 1 sân
+  const handleDeleteOneCourt = async (court) => {
+    if (!tournamentId || !court) return;
+
+    const courtId = court._id || court.id;
+    const label =
+      court?.name ||
+      court?.label ||
+      court?.title ||
+      court?.code ||
+      `#${String(courtId).slice(-4)}`;
+
+    const m = getMatchForCourt(court);
+    const isLive = String(m?.status || "").toLowerCase() === "live";
+    const note = isLive
+      ? "\n⚠️ Sân đang có TRẬN ĐANG THI ĐẤU. Bạn vẫn muốn xoá sân?"
+      : m
+      ? "\nSân đang có trận được gán. Bạn vẫn muốn xoá sân?"
+      : "";
+
+    Alert.alert(
+      `Xoá sân "${label}"?`,
+      `Hành động này không thể hoàn tác.${note}`,
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            const next = new Set(busyDelete);
+            next.add(String(courtId));
+            setBusyDelete(next);
+            try {
+              await deleteCourt({ tournamentId, courtId }).unwrap();
+              Alert.alert("Thành công", `Đã xoá sân "${label}".`);
+              requestState();
+            } catch (e) {
+              Alert.alert(
+                "Lỗi",
+                e?.data?.message || e?.error || "Xoá sân thất bại"
+              );
+            } finally {
+              setBusyDelete((s) => {
+                const d = new Set(s);
+                d.delete(String(courtId));
+                return d;
+              });
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -739,10 +869,9 @@ export default function CourtManagerSheet({
     setAssignCourt(null);
   };
   const confirmAssignSpecific = (matchId) => {
-    if (!tournamentId || !bracketId || !assignCourt || !matchId) return;
+    if (!tournamentId || !assignCourt || !matchId) return;
     socket?.emit?.("scheduler:assignSpecific", {
       tournamentId,
-      bracket: bracketId,
       courtId: assignCourt._id || assignCourt.id,
       matchId,
       replace: true,
@@ -777,8 +906,8 @@ export default function CourtManagerSheet({
             <Row style={{ alignItems: "center", gap: 8 }}>
               <MaterialIcons name="stadium" size={18} color={t.colors.text} />
               <Text style={[styles.title, { color: t.colors.text }]}>
-                Quản lý sân — {bracketName || "Bracket"}
-                {tournamentName ? ` • ${tournamentName}` : ""}
+                Quản lý sân — 
+                {tournamentName ? ` ${tournamentName}` : ""}
               </Text>
             </Row>
             <Row style={{ alignItems: "center", gap: 4 }}>
@@ -798,7 +927,7 @@ export default function CourtManagerSheet({
             ]}
           >
             <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-              Cấu hình sân cho giai đoạn
+              Cấu hình sân cho toàn giải
             </Text>
 
             {/* Mode toggle */}
@@ -921,7 +1050,6 @@ export default function CourtManagerSheet({
                 onValueChange={setAutoAssign}
                 trackColor={{ false: t.colors.border, true: t.colors.primary }}
                 thumbColor={
-                  // Android only; iOS auto-handles thumb
                   autoAssign
                     ? t.dark
                       ? "#e5e7eb"
@@ -935,25 +1063,34 @@ export default function CourtManagerSheet({
               />
             </Row>
 
-            <Row style={{ gap: 8, justifyContent: "flex-start" }}>
+            <Row
+              style={{ gap: 8, justifyContent: "flex-start", flexWrap: "wrap" }}
+            >
               <Btn onPress={handleSaveCourts} disabled={savingCourts}>
                 {savingCourts ? "Đang lưu..." : "Lưu danh sách sân"}
               </Btn>
               <Btn variant="outline" onPress={handleResetAll}>
                 Reset tất cả
               </Btn>
+              <Btn
+                danger
+                onPress={handleDeleteAllCourts}
+                disabled={deletingCourts}
+              >
+                {deletingCourts ? "Đang xoá..." : "Xoá tất cả sân"}
+              </Btn>
             </Row>
           </View>
 
           {/* Queue block */}
-          <View
+          {/* <View
             style={[
               styles.card,
               { backgroundColor: t.colors.card, borderColor: t.colors.border },
             ]}
           >
             <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-              Hàng đợi vòng bảng
+              Hàng đợi vòng bảng (toàn giải)
             </Text>
             <Text style={{ color: t.muted, marginBottom: 8 }}>
               Thuật toán: A1, B1, C1… sau đó A2, B2… (tránh VĐV đang thi đấu/chờ
@@ -964,7 +1101,7 @@ export default function CourtManagerSheet({
             </Btn>
           </View>
 
-          <Divider />
+          <Divider /> */}
 
           {/* Courts list */}
           <Row style={{ alignItems: "center", gap: 8 }}>
@@ -981,7 +1118,7 @@ export default function CourtManagerSheet({
               ]}
             >
               <Text style={{ color: t.chipInfoFg }}>
-                Chưa có sân nào cho giai đoạn này.
+                Chưa có sân nào cho giải này.
               </Text>
             </View>
           ) : (
@@ -1000,9 +1137,12 @@ export default function CourtManagerSheet({
                     : cs === "maintenance"
                     ? "warn"
                     : "info";
+                const cid = String(c._id || c.id);
+                const deletingThis = busyDelete.has(cid) || deletingOne;
+
                 return (
                   <View
-                    key={c._id || c.id}
+                    key={cid}
                     style={[
                       styles.paperRow,
                       {
@@ -1011,7 +1151,7 @@ export default function CourtManagerSheet({
                       },
                     ]}
                   >
-                    <View style={{ gap: 6 }}>
+                    <View style={{ gap: 6, flex: 1 }}>
                       <Row
                         style={{
                           alignItems: "center",
@@ -1073,7 +1213,7 @@ export default function CourtManagerSheet({
                       )}
                     </View>
 
-                    <Row style={{ gap: 6 }}>
+                    <Row style={{ gap: 6, flexWrap: "wrap" }}>
                       <Btn variant="outline" onPress={() => openAssignDlg(c)}>
                         Sửa trận vào sân
                       </Btn>
@@ -1083,6 +1223,15 @@ export default function CourtManagerSheet({
                         disabled={courtStatus(c) !== "idle"}
                       >
                         Gán trận kế tiếp
+                      </Btn>
+                      {/* NEW: Xoá sân */}
+                      <Btn
+                        variant="outline"
+                        danger
+                        onPress={() => handleDeleteOneCourt(c)}
+                        disabled={deletingThis}
+                      >
+                        {deletingThis ? "Đang xoá..." : "Xoá sân"}
                       </Btn>
                     </Row>
                   </View>
@@ -1161,20 +1310,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 
-  // tiny switch (custom)
-  switch: { paddingVertical: 4, paddingHorizontal: 2 },
-  switchTrack: {
-    width: 36,
-    height: 22,
-    borderRadius: 999,
-    justifyContent: "center",
-  },
-  switchThumb: {
-    width: 16,
-    height: 16,
-    borderRadius: 999,
-    backgroundColor: "#fff",
-  },
+  segment: {},
 
   itemRow: {
     borderWidth: 1,
