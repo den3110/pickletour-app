@@ -322,11 +322,15 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const status = error?.status || error?.originalStatus;
-    if (status === 401) {
+    if (status === 401 && !navigatedRef.current) {
+      navigatedRef.current = true; // ✅ Thêm flag để tránh duplicate
+      dispatch(apiSlice.util.resetApiState());
       dispatch(logoutAction());
-      router.replace("/login");
+      setTimeout(() => {
+        router.replace("/login");
+      }, 100);
     }
-  }, [error, dispatch]);
+  }, [error, dispatch]); // ✅ Không cần router vì dùng replace
 
   const [form, setForm] = useState(EMPTY);
   const [touched, setTouched] = useState({});
@@ -594,8 +598,10 @@ export default function ProfileScreen() {
       ]);
     }
   };
-
+  const logoutInProgressRef = useRef(false);
   const doLogout = async () => {
+    if (logoutInProgressRef.current) return; // ✅ Tránh gọi nhiều lần
+    logoutInProgressRef.current = true;
     try {
       const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
       if (deviceId) {
@@ -606,10 +612,21 @@ export default function ProfileScreen() {
         }
       }
       await logoutApiCall().unwrap();
-    } catch {}
-    dispatch(logoutAction());
-    router.replace("/login");
-    dispatch(apiSlice.util.resetApiState());
+      // ✅ Reset API state TRƯỚC
+      dispatch(apiSlice.util.resetApiState());
+
+      // ✅ Dispatch logout
+      dispatch(logoutAction());
+
+      // ✅ Navigate SAU CÙNG, và dùng setTimeout để đảm bảo
+      setTimeout(() => {
+        router.replace("/login");
+        logoutInProgressRef.current = false;
+      }, 150);
+    } catch (e) {
+      logoutInProgressRef.current = false;
+      if (__DEV__) console.log("logout api failed:", e);
+    }
   };
 
   // Thực sự gọi API xoá: body = { password }

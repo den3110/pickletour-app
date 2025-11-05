@@ -42,7 +42,7 @@ import { Image } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import CCCDModal from "../CCCDModal.native";
 import { useTheme } from "@react-navigation/native";
-
+import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
 /* ---------- Theme tokens ---------- */
 function useTokens() {
   const navTheme = useTheme?.() || {};
@@ -2078,17 +2078,26 @@ export default function RefereeJudgePanel({ matchId }) {
                   Đổi bên
                 </Text>
               </Ripple>
-
               <Ripple
                 onPress={() => setMenuOpen(true)}
-                style={[s.iconBtn, { backgroundColor: t.colors.card }]}
-                rippleContainerBorderRadius={8}
+                rippleContainerBorderRadius={999}
+                style={[
+                  s.btnDraw,
+                  {
+                    // viền theo màu chủ đạo, nền nhạt theo theme
+                    borderColor: t.colors.primary,
+                    backgroundColor: t.dark ? "#0a84ff22" : "#0a84ff15",
+                  },
+                ]}
               >
                 <MaterialIcons
-                  name="more-vert"
-                  size={20}
-                  color={t.colors.text}
+                  name="casino"
+                  size={16}
+                  color={t.colors.primary}
                 />
+                <Text style={[s.btnDrawText, { color: t.colors.primary }]}>
+                  Bốc thăm
+                </Text>
               </Ripple>
             </View>
 
@@ -2834,4 +2843,20 @@ const s = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
+  btnDraw: {
+    minHeight: 36,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    // nhẹ nhàng nổi khối
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  btnDrawText: { fontWeight: "800" },
 });

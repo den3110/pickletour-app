@@ -6,6 +6,7 @@ import React, {
   useState,
   useCallback,
   forwardRef,
+  memo,
 } from "react";
 import {
   View,
@@ -46,64 +47,66 @@ import { useRouter } from "expo-router";
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
 
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
+  return useMemo(() => {
+    const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+    const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
+    const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
 
-  const pageBg = scheme === "dark" ? "#0b0c0f" : "#f6f7fb";
+    const pageBg = scheme === "dark" ? "#0b0c0f" : "#f6f7fb";
 
-  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
+    const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
+    const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
 
-  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
-  const softBg2 = scheme === "dark" ? "#17181c" : "#f8fafc";
-  const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
+    const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
+    const softBg2 = scheme === "dark" ? "#17181c" : "#f8fafc";
+    const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
 
-  const banner = {
-    live: {
-      bg: scheme === "dark" ? "rgba(124,192,255,0.18)" : "#e3f2fd",
-      text: scheme === "dark" ? "#d7ebff" : "#0f172a",
-    },
-    info: {
-      bg: scheme === "dark" ? "rgba(148,163,184,0.18)" : "#f1f5f9",
-      text: scheme === "dark" ? "#e2e8f0" : "#0f172a",
-    },
-  };
+    const banner = {
+      live: {
+        bg: scheme === "dark" ? "rgba(124,192,255,0.18)" : "#e3f2fd",
+        text: scheme === "dark" ? "#d7ebff" : "#0f172a",
+      },
+      info: {
+        bg: scheme === "dark" ? "rgba(148,163,184,0.18)" : "#f1f5f9",
+        text: scheme === "dark" ? "#e2e8f0" : "#0f172a",
+      },
+    };
 
-  const chip = {
-    bg: scheme === "dark" ? "rgba(199,210,254,0.16)" : "#eef2ff",
-    bd: scheme === "dark" ? "#6366f1" : "#c7d2fe",
-    text: scheme === "dark" ? "#e0e7ff" : "#3730a3",
-  };
+    const chip = {
+      bg: scheme === "dark" ? "rgba(199,210,254,0.16)" : "#eef2ff",
+      bd: scheme === "dark" ? "#6366f1" : "#c7d2fe",
+      text: scheme === "dark" ? "#e0e7ff" : "#3730a3",
+    };
 
-  const success = {
-    bgSoft: scheme === "dark" ? "rgba(16,185,129,0.18)" : "#ecfdf5",
-    bdSoft: scheme === "dark" ? "#34d399" : "#a7f3d0",
-    text: scheme === "dark" ? "#a7f3d0" : "#065f46",
-  };
+    const success = {
+      bgSoft: scheme === "dark" ? "rgba(16,185,129,0.18)" : "#ecfdf5",
+      bdSoft: scheme === "dark" ? "#34d399" : "#a7f3d0",
+      text: scheme === "dark" ? "#a7f3d0" : "#065f46",
+    };
 
-  const danger = {
-    bgSoft: scheme === "dark" ? "rgba(248,113,113,0.16)" : "#fff1f2",
-    bdSoft: scheme === "dark" ? "#f87171" : "#fecaca",
-    text: scheme === "dark" ? "#fecaca" : "#b91c1c",
-  };
+    const danger = {
+      bgSoft: scheme === "dark" ? "rgba(248,113,113,0.16)" : "#fff1f2",
+      bdSoft: scheme === "dark" ? "#f87171" : "#fecaca",
+      text: scheme === "dark" ? "#fecaca" : "#b91c1c",
+    };
 
-  return {
-    scheme,
-    tint,
-    textPrimary,
-    textSecondary,
-    pageBg,
-    cardBg,
-    cardBorder,
-    softBg,
-    softBg2,
-    softBorder,
-    banner,
-    chip,
-    success,
-    danger,
-  };
+    return {
+      scheme,
+      tint,
+      textPrimary,
+      textSecondary,
+      pageBg,
+      cardBg,
+      cardBorder,
+      softBg,
+      softBg2,
+      softBorder,
+      banner,
+      chip,
+      success,
+      danger,
+    };
+  }, [scheme]);
 }
 
 /* =============== OVERLAY helpers =============== */
@@ -278,7 +281,7 @@ const parseVT = (m) => {
       if (Number.isFinite(n)) {
         t = n >= 1 ? n : n + 1;
         break;
-      } // order 0-based -> +1
+      }
     }
   }
   return { v, t };
@@ -364,32 +367,48 @@ function formatStatus(status) {
 }
 
 /* ---------- PlayerLink ---------- */
-function PlayerLink({ person, onOpen, align = "left" }) {
-  const T = useThemeTokens();
-  if (!person) return null;
-  const uid =
-    person?.user?._id ||
-    person?.user?.id ||
-    person?.user ||
-    person?._id ||
-    person?.id ||
-    null;
+const PlayerLink = memo(
+  ({ person, onOpen, align = "left", serving = false }) => {
+    const T = useThemeTokens();
+    if (!person) return null;
+    const uid =
+      person?.user?._id ||
+      person?.user?.id ||
+      person?.user ||
+      person?._id ||
+      person?.id ||
+      null;
 
-  const handlePress = () => uid && onOpen?.(uid);
+    const handlePress = useCallback(() => {
+      if (uid && onOpen) onOpen(uid);
+    }, [uid, onOpen]);
 
-  return (
-    <Text
-      onPress={handlePress}
-      style={[
-        styles.linkText,
-        { color: T.tint },
-        align === "right" && { textAlign: "right" },
-      ]}
-    >
-      {nameWithNick(person)}
-    </Text>
-  );
-}
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          justifyContent: align === "right" ? "flex-end" : "flex-start",
+        }}
+      >
+        <Text
+          onPress={handlePress}
+          style={[
+            styles.linkText,
+            { color: T.tint },
+            align === "right" && { textAlign: "right" },
+          ]}
+        >
+          {nameWithNick(person)}
+        </Text>
+        {serving && (
+          <MaterialIcons name="sports-tennis" size={14} color={T.tint} />
+        )}
+      </View>
+    );
+  }
+);
 
 /* ---------- Hooks: chống nháy ---------- */
 function useDelayedFlag(flag, ms = 250) {
@@ -707,7 +726,7 @@ function normalizeStreams(m) {
 }
 
 /* ---------- AspectBox (RN) ---------- */
-function AspectBox({ ratio = 16 / 9, children }) {
+const AspectBox = memo(({ ratio = 16 / 9, children }) => {
   const T = useThemeTokens();
   return (
     <View
@@ -719,10 +738,10 @@ function AspectBox({ ratio = 16 / 9, children }) {
       {children}
     </View>
   );
-}
+});
 
 /* ---------- StreamPlayer (RN) ---------- */
-function StreamPlayer({ stream }) {
+const StreamPlayer = memo(({ stream }) => {
   const [ratio, setRatio] = useState(
     stream?.aspect === "9:16" ? 9 / 16 : 16 / 9
   );
@@ -770,10 +789,10 @@ function StreamPlayer({ stream }) {
     default:
       return null;
   }
-}
+});
 
 /* ---------- Banner trạng thái ---------- */
-function StatusBanner({ status, hasStreams }) {
+const StatusBanner = memo(({ status, hasStreams }) => {
   const T = useThemeTokens();
   const text =
     status === "live"
@@ -795,16 +814,20 @@ function StatusBanner({ status, hasStreams }) {
       <Text style={[styles.bannerText, { color: sty.text }]}>▶ {text}</Text>
     </View>
   );
-}
+});
 
 /* ---------- Segmented Control: Status ---------- */
-function SegmentedStatus({ value, onChange, disabled }) {
+const SegmentedStatus = memo(({ value, onChange, disabled }) => {
   const T = useThemeTokens();
-  const items = [
-    { key: "scheduled", label: "Scheduled" },
-    { key: "live", label: "Live" },
-    { key: "finished", label: "Finished" },
-  ];
+  const items = useMemo(
+    () => [
+      { key: "scheduled", label: "Scheduled" },
+      { key: "live", label: "Live" },
+      { key: "finished", label: "Finished" },
+    ],
+    []
+  );
+
   return (
     <View
       style={[
@@ -839,36 +862,38 @@ function SegmentedStatus({ value, onChange, disabled }) {
       })}
     </View>
   );
-}
+});
 
 /* ---------- Nút có icon trái ---------- */
-function AdminBtn({ style, textStyle, icon, label, onPress, disabled }) {
-  const T = useThemeTokens();
-  return (
-    <TouchableOpacity
-      style={[
-        styles.btn,
-        { backgroundColor: T.cardBg, borderColor: T.softBorder },
-        style,
-      ]}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      <View style={styles.btnContent}>
-        {!!icon && (
-          <MaterialIcons
-            name={icon}
-            size={18}
-            style={[styles.btnIcon, { color: T.textPrimary }, textStyle]}
-          />
-        )}
-        <Text style={[styles.btnText, { color: T.textPrimary }, textStyle]}>
-          {label}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
+const AdminBtn = memo(
+  ({ style, textStyle, icon, label, onPress, disabled }) => {
+    const T = useThemeTokens();
+    return (
+      <TouchableOpacity
+        style={[
+          styles.btn,
+          { backgroundColor: T.cardBg, borderColor: T.softBorder },
+          style,
+        ]}
+        onPress={onPress}
+        disabled={disabled}
+      >
+        <View style={styles.btnContent}>
+          {!!icon && (
+            <MaterialIcons
+              name={icon}
+              size={18}
+              style={[styles.btnIcon, { color: T.textPrimary }, textStyle]}
+            />
+          )}
+          <Text style={[styles.btnText, { color: T.textPrimary }, textStyle]}>
+            {label}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+);
 
 /* ============== LIVE UTILS (destinations + studio url) ============== */
 const encodeB64Json = (obj) => {
@@ -878,8 +903,6 @@ const encodeB64Json = (obj) => {
     return "";
   }
 };
-
-// ===== Expo Router: build full params for Studio screen =====
 
 const splitRtmpUrl = (url) => {
   if (!url || !/^rtmps?:\/\//i.test(url))
@@ -949,7 +972,6 @@ const extractDestinations = (data, match) => {
   });
 };
 
-// ===== Expo Router: build full params for Studio screen =====
 const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
   const params = {};
   if (match?._id) params.matchId = String(match._id);
@@ -958,7 +980,6 @@ const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
 
   const dests = extractDestinations(data, match);
 
-  // danh sách RTMP tối giản (để prefill nhanh ở màn Studio)
   const minimal = dests.map((d) => ({
     platform: d.platform,
     server_url: d.server_url || d.secure_stream_url || "",
@@ -968,7 +989,6 @@ const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
   const d64 = encodeB64Json(minimal);
   if (d64) params.d64 = d64;
 
-  // tiện-param + gói chi tiết từng nền tảng (base64 JSON)
   const fb = dests.find((d) => d.platform === "facebook");
   if (fb) {
     let k = fb.stream_key;
@@ -1019,10 +1039,8 @@ const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
     params.tiktok_d64 = encodeB64Json(tiktok);
   }
 
-  // raw để debug (tuỳ bạn dùng ở Studio)
   params.raw_d64 = encodeB64Json({ data, extracted: dests });
 
-  // đảm bảo params là string (Expo Router query yêu cầu string)
   Object.keys(params).forEach((k) => {
     if (typeof params[k] !== "string") params[k] = String(params[k]);
   });
@@ -1030,21 +1048,9 @@ const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
   return params;
 };
 
-const isLocalHost = (host) => {
-  if (!host) return false;
-  return (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    /^192\.168\./.test(host) ||
-    /^10\./.test(host) ||
-    /\.local$/.test(host)
-  );
-};
 function buildStudioUrlMobile(baseUrl, data, match, baseOrigin) {
   let base = baseUrl || "/live/studio";
   const origin = baseOrigin || "https://pickletour.vn";
-  // Nếu base là absolute → chỉ lấy path + search, giữ origin param
   if (typeof base === "string" && /^https?:\/\//i.test(base)) {
     try {
       const parsed = new URL(base);
@@ -1098,10 +1104,18 @@ function buildStudioUrlMobile(baseUrl, data, match, baseOrigin) {
 }
 
 /* ---------- BottomSheet: LIVE info ---------- */
-const LineBox = ({ label, value, hidden, onCopy, onOpen }) => {
+const LineBox = memo(({ label, value, hidden, onCopy, onOpen }) => {
   const T = useThemeTokens();
-  const router = useRouter();
   if (!value) return null;
+
+  const handleCopy = useCallback(() => {
+    if (onCopy) onCopy(value);
+  }, [onCopy, value]);
+
+  const handleOpen = useCallback(() => {
+    if (onOpen) onOpen(value);
+  }, [onOpen, value]);
+
   return (
     <View style={{ gap: 6 }}>
       <Text style={{ fontSize: 12, color: T.textSecondary }}>{label}</Text>
@@ -1122,7 +1136,7 @@ const LineBox = ({ label, value, hidden, onCopy, onOpen }) => {
         {onCopy && (
           <TouchableOpacity
             style={[styles.btn, { borderColor: T.softBorder }]}
-            onPress={() => onCopy(value)}
+            onPress={handleCopy}
           >
             <MaterialIcons
               name="content-copy"
@@ -1134,7 +1148,7 @@ const LineBox = ({ label, value, hidden, onCopy, onOpen }) => {
         {onOpen && (
           <TouchableOpacity
             style={[styles.btn, { borderColor: T.softBorder }]}
-            onPress={() => onOpen(value)}
+            onPress={handleOpen}
           >
             <MaterialIcons name="open-in-new" size={18} color={T.textPrimary} />
           </TouchableOpacity>
@@ -1142,11 +1156,16 @@ const LineBox = ({ label, value, hidden, onCopy, onOpen }) => {
       </View>
     </View>
   );
-};
+});
 
-const DestinationCard = ({ d, onCopy }) => {
+const DestinationCard = memo(({ d, onCopy }) => {
   const T = useThemeTokens();
   const openUrl = d.permalink_url || d.watch_url || d.room_url || null;
+
+  const handleOpenUrl = useCallback(() => {
+    if (openUrl) Linking.openURL(openUrl);
+  }, [openUrl]);
+
   return (
     <View
       style={{
@@ -1164,7 +1183,7 @@ const DestinationCard = ({ d, onCopy }) => {
         </Text>
         <View style={{ flex: 1 }} />
         {openUrl && (
-          <TouchableOpacity onPress={() => Linking.openURL(openUrl)}>
+          <TouchableOpacity onPress={handleOpenUrl}>
             <MaterialIcons name="open-in-new" size={18} color={T.textPrimary} />
           </TouchableOpacity>
         )}
@@ -1189,144 +1208,133 @@ const DestinationCard = ({ d, onCopy }) => {
       )}
     </View>
   );
-};
+});
 
-const LiveInfoSheet = forwardRef(function LiveInfoSheet(
-  { match, data, baseOrigin, onClose },
-  ref
-) {
-  const T = useThemeTokens();
-  const router = useRouter();
-  const snapPoints = useMemo(() => ["60%", "92%"], []);
-  const overlayPref = data?.overlay_url || "";
-  const studioParams = useMemo(
-    () => buildStudioParams(baseOrigin, data, match, overlayPref),
-    [baseOrigin, data, match, overlayPref]
-  );
-  const studioPath = useMemo(
-    () => data?.studio_route || data?.studio_path || "/live/studio",
-    [data]
-  );
+const LiveInfoSheet = memo(
+  forwardRef(function LiveInfoSheet({ match, data, baseOrigin, onClose }, ref) {
+    const T = useThemeTokens();
+    const router = useRouter();
+    const snapPoints = useMemo(() => ["60%", "92%"], []);
+    const overlayPref = data?.overlay_url || "";
+    const studioParams = useMemo(
+      () => buildStudioParams(baseOrigin, data, match, overlayPref),
+      [baseOrigin, data, match, overlayPref]
+    );
+    const studioPath = useMemo(
+      () => data?.studio_route || data?.studio_path || "/live/studio",
+      [data]
+    );
 
-  const closeSheetsThenGoStudio = useCallback(() => {
-    // Đóng sheet hiện tại (BottomSheetModal => dùng dismiss)
-    ref?.current?.dismiss?.();
-    onClose?.();
+    const closeSheetsThenGoStudio = useCallback(() => {
+      ref?.current?.dismiss?.();
+      onClose?.();
 
-    // Điều hướng sau 1 tick để tránh giật khung hình
-    setTimeout(() => {
-      router.push({ pathname: studioPath, params: studioParams });
-    }, 0);
-  }, [router, studioPath, studioParams, onClose]);
+      setTimeout(() => {
+        router.push({ pathname: studioPath, params: studioParams });
+      }, 100); // ✅ tăng delay để tránh giật
+    }, [router, studioPath, studioParams, onClose, ref]);
 
-  const renderBackdrop = useCallback(
-    (props) => (
-      <BottomSheetBackdrop
-        {...props}
-        appearsOnIndex={0}
-        disappearsOnIndex={-1}
-      />
-    ),
-    []
-  );
+    const renderBackdrop = useCallback(
+      (props) => (
+        <BottomSheetBackdrop
+          {...props}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          opacity={0.5}
+        />
+      ),
+      []
+    );
 
-  const copy = async (v) => {
-    try {
-      await Clipboard.setStringAsync(v || "");
-      Toast.show({ type: "success", text1: "Đã copy" });
-    } catch {}
-  };
+    const copy = useCallback(async (v) => {
+      try {
+        await Clipboard.setStringAsync(v || "");
+        Toast.show({ type: "success", text1: "Đã copy" });
+      } catch {}
+    }, []);
 
-  const destinations = useMemo(
-    () => extractDestinations(data, match),
-    [data, match]
-  );
-  const studioHref = useMemo(
-    () => buildStudioUrlMobile(data?.studio_url, data, match, baseOrigin),
-    [data, match, baseOrigin]
-  );
-  const primaryLink = useMemo(
-    () => data?.permalink_url || data?.watch_url || null,
-    [data]
-  );
+    const destinations = useMemo(
+      () => extractDestinations(data, match),
+      [data, match]
+    );
 
-  return (
-    <BottomSheetModal
-      ref={ref}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      onDismiss={onClose}
-    >
-      <BottomSheetScrollView contentContainerStyle={{ padding: 14, gap: 12 }}>
-        <Text style={{ fontWeight: "800", color: T.textPrimary }}>
-          LIVE Outputs (#{match?.code || String(match?._id || "").slice(-5)})
-        </Text>
+    const primaryLink = useMemo(
+      () => data?.permalink_url || data?.watch_url || null,
+      [data]
+    );
 
-        <View style={{ gap: 10 }}>
-          {/* Primary encoder */}
-          {data?.secure_stream_url &&
-            !(data?.server_url || data?.stream_key) && (
+    const handleOpenPrimaryLink = useCallback(() => {
+      if (primaryLink) Linking.openURL(primaryLink);
+    }, [primaryLink]);
+
+    const handleOpenOverlay = useCallback(() => {
+      if (data?.overlay_url) Linking.openURL(data.overlay_url);
+    }, [data?.overlay_url]);
+
+    return (
+      <BottomSheetModal
+        ref={ref}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        onDismiss={onClose}
+        enableDynamicSizing={false}
+        animateOnMount
+      >
+        <BottomSheetScrollView
+          contentContainerStyle={{ padding: 14, gap: 12 }}
+          removeClippedSubviews
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={{ fontWeight: "800", color: T.textPrimary }}>
+            LIVE Outputs (#{match?.code || String(match?._id || "").slice(-5)})
+          </Text>
+
+          <View style={{ gap: 10 }}>
+            {data?.secure_stream_url &&
+              !(data?.server_url || data?.stream_key) && (
+                <LineBox
+                  label="Secure Stream URL (RTMPS)"
+                  value={data.secure_stream_url}
+                  onCopy={copy}
+                />
+              )}
+            {data?.server_url && (
               <LineBox
-                label="Secure Stream URL (RTMPS)"
-                value={data.secure_stream_url}
+                label="Server URL (RTMPS)"
+                value={data.server_url}
                 onCopy={copy}
               />
             )}
-          {data?.server_url && (
-            <LineBox
-              label="Server URL (RTMPS)"
-              value={data.server_url}
-              onCopy={copy}
-            />
-          )}
-          {data?.stream_key && (
-            <LineBox
-              label="Stream Key"
-              value={data.stream_key}
-              onCopy={copy}
-              hidden
-            />
-          )}
-        </View>
+            {data?.stream_key && (
+              <LineBox
+                label="Stream Key"
+                value={data.stream_key}
+                onCopy={copy}
+                hidden
+              />
+            )}
+          </View>
 
-        {/* Overlay & Studio */}
-        <View style={{ gap: 10 }}>
-          <Text style={{ fontWeight: "700", color: T.textPrimary }}>
-            Overlay & Studio
-          </Text>
-          {data?.overlay_url && (
-            <LineBox
-              label="Overlay URL (Browser Source)"
-              value={data.overlay_url}
-              onCopy={copy}
-              onOpen={(v) => Linking.openURL(v)}
-            />
-          )}
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity
-              style={[
-                styles.btn,
-                { borderColor: T.softBorder, backgroundColor: T.cardBg },
-              ]}
-              onPress={closeSheetsThenGoStudio}
-            >
-              <Text
-                style={[
-                  styles.btnText,
-                  { color: T.textPrimary, fontWeight: "700" },
-                ]}
-              >
-                Open Studio
-              </Text>
-            </TouchableOpacity>
-            {primaryLink && (
+          <View style={{ gap: 10 }}>
+            <Text style={{ fontWeight: "700", color: T.textPrimary }}>
+              Overlay & Studio
+            </Text>
+            {data?.overlay_url && (
+              <LineBox
+                label="Overlay URL (Browser Source)"
+                value={data.overlay_url}
+                onCopy={copy}
+                onOpen={handleOpenOverlay}
+              />
+            )}
+            <View style={{ flexDirection: "row", gap: 8 }}>
               <TouchableOpacity
                 style={[
                   styles.btn,
                   { borderColor: T.softBorder, backgroundColor: T.cardBg },
                 ]}
-                onPress={() => Linking.openURL(primaryLink)}
+                onPress={closeSheetsThenGoStudio}
               >
                 <Text
                   style={[
@@ -1334,179 +1342,201 @@ const LiveInfoSheet = forwardRef(function LiveInfoSheet(
                     { color: T.textPrimary, fontWeight: "700" },
                   ]}
                 >
-                  Open Live
+                  Open Studio
                 </Text>
               </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {!!destinations.length && (
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontWeight: "700", color: T.textPrimary }}>
-              Destinations
-            </Text>
-            <View style={{ gap: 8 }}>
-              {destinations.map((d, i) => (
-                <DestinationCard
-                  key={`${d.platform}-${d.id || i}`}
-                  d={d}
-                  onCopy={copy}
-                />
-              ))}
+              {primaryLink && (
+                <TouchableOpacity
+                  style={[
+                    styles.btn,
+                    { borderColor: T.softBorder, backgroundColor: T.cardBg },
+                  ]}
+                  onPress={handleOpenPrimaryLink}
+                >
+                  <Text
+                    style={[
+                      styles.btnText,
+                      { color: T.textPrimary, fontWeight: "700" },
+                    ]}
+                  >
+                    Open Live
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-        )}
 
-        <View style={{ height: 8 }} />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
-  );
-});
+          {!!destinations.length && (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontWeight: "700", color: T.textPrimary }}>
+                Destinations
+              </Text>
+              <View style={{ gap: 8 }}>
+                {destinations.map((d, i) => (
+                  <DestinationCard
+                    key={`${d.platform}-${d.id || i}`}
+                    d={d}
+                    onCopy={copy}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={{ height: 8 }} />
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    );
+  })
+);
 
 /* ---------- Thanh công cụ quản trị ---------- */
-function AdminToolbar({
-  status,
-  editMode,
-  busy,
-  onEnterEdit,
-  onSave,
-  onReset,
-  onAddSet,
-  onExitEdit,
-  onSetStatus,
-  onSetWinner,
-}) {
-  const T = useThemeTokens();
-  const confirmWinner = (side) => {
-    Alert.alert(
-      "Xác nhận",
-      `Kết thúc trận và đặt đội ${side} thắng?`,
-      [
-        { text: "Huỷ" },
-        {
-          text: "Xác nhận",
-          style: "destructive",
-          onPress: () => onSetWinner?.(side),
-        },
-      ],
-      { cancelable: true }
+const AdminToolbar = memo(
+  ({
+    status,
+    editMode,
+    busy,
+    onEnterEdit,
+    onSave,
+    onReset,
+    onAddSet,
+    onExitEdit,
+    onSetStatus,
+    onSetWinner,
+  }) => {
+    const T = useThemeTokens();
+    const confirmWinner = useCallback(
+      (side) => {
+        Alert.alert(
+          "Xác nhận",
+          `Kết thúc trận và đặt đội ${side} thắng?`,
+          [
+            { text: "Huỷ" },
+            {
+              text: "Xác nhận",
+              style: "destructive",
+              onPress: () => onSetWinner?.(side),
+            },
+          ],
+          { cancelable: true }
+        );
+      },
+      [onSetWinner]
     );
-  };
 
-  return (
-    <View
-      style={[
-        styles.adminCard,
-        { backgroundColor: T.cardBg, borderColor: T.cardBorder },
-      ]}
-    >
-      <View style={styles.adminHeader}>
-        <Text style={[styles.adminTitle, { color: T.textPrimary }]}>
-          QUẢN TRỊ TRẬN
-        </Text>
-        <Text style={[styles.adminSub, { color: T.textSecondary }]}>
-          Chỉnh sửa tỉ số • Đặt đội thắng • Đổi trạng thái
-        </Text>
-      </View>
+    return (
+      <View
+        style={[
+          styles.adminCard,
+          { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+        ]}
+      >
+        <View style={styles.adminHeader}>
+          <Text style={[styles.adminTitle, { color: T.textPrimary }]}>
+            QUẢN TRỊ TRẬN
+          </Text>
+          <Text style={[styles.adminSub, { color: T.textSecondary }]}>
+            Chỉnh sửa tỉ số • Đặt đội thắng • Đổi trạng thái
+          </Text>
+        </View>
 
-      {/* Hàng 1: Segmented Status */}
-      <View style={styles.adminRow}>
-        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
-          Trạng thái
-        </Text>
-        <SegmentedStatus
-          value={status}
-          onChange={(s) => onSetStatus?.(s)}
-          disabled={busy}
-        />
-      </View>
-
-      {/* Hàng 2: Nhóm chỉnh sửa tỉ số */}
-      <View style={styles.adminRow}>
-        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>Tỉ số</Text>
-        {!editMode ? (
-          <AdminBtn
-            icon="edit"
-            label="Chỉnh sửa tỉ số"
-            onPress={onEnterEdit}
+        <View style={styles.adminRow}>
+          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
+            Trạng thái
+          </Text>
+          <SegmentedStatus
+            value={status}
+            onChange={(s) => onSetStatus?.(s)}
             disabled={busy}
-          />
-        ) : (
-          <View style={styles.rowWrap}>
-            <AdminBtn
-              icon="save"
-              label="Lưu tỉ số"
-              onPress={onSave}
-              disabled={busy}
-              style={[
-                styles.btnPrimary,
-                { backgroundColor: T.tint, borderColor: T.tint },
-              ]}
-              textStyle={[styles.btnPrimaryText]}
-            />
-            <AdminBtn
-              icon="undo"
-              label="Hoàn tác"
-              onPress={onReset}
-              disabled={busy}
-            />
-            <AdminBtn
-              icon="add"
-              label="Thêm set"
-              onPress={onAddSet}
-              disabled={busy}
-            />
-            <AdminBtn
-              icon="close"
-              label="Thoát sửa"
-              onPress={onExitEdit}
-              disabled={busy}
-              style={styles.btnGhost}
-            />
-          </View>
-        )}
-      </View>
-
-      {/* Hàng 3: Đặt đội thắng nhanh */}
-      <View style={styles.adminRow}>
-        <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
-          Kết quả
-        </Text>
-        <View style={styles.rowWrap}>
-          <AdminBtn
-            icon="emoji-events"
-            label="Đặt A thắng"
-            onPress={() => confirmWinner("A")}
-            disabled={busy}
-            style={[
-              styles.btnSuccessOutline,
-              {
-                backgroundColor: T.success.bgSoft,
-                borderColor: T.success.bdSoft,
-              },
-            ]}
-            textStyle={{ color: T.success.text, fontWeight: "700" }}
-          />
-          <AdminBtn
-            icon="emoji-events"
-            label="Đặt B thắng"
-            onPress={() => confirmWinner("B")}
-            disabled={busy}
-            style={[
-              styles.btnSuccessOutline,
-              {
-                backgroundColor: T.success.bgSoft,
-                borderColor: T.success.bdSoft,
-              },
-            ]}
-            textStyle={{ color: T.success.text, fontWeight: "700" }}
           />
         </View>
+
+        <View style={styles.adminRow}>
+          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
+            Tỉ số
+          </Text>
+          {!editMode ? (
+            <AdminBtn
+              icon="edit"
+              label="Chỉnh sửa tỉ số"
+              onPress={onEnterEdit}
+              disabled={busy}
+            />
+          ) : (
+            <View style={styles.rowWrap}>
+              <AdminBtn
+                icon="save"
+                label="Lưu tỉ số"
+                onPress={onSave}
+                disabled={busy}
+                style={[
+                  styles.btnPrimary,
+                  { backgroundColor: T.tint, borderColor: T.tint },
+                ]}
+                textStyle={[styles.btnPrimaryText]}
+              />
+              <AdminBtn
+                icon="undo"
+                label="Hoàn tác"
+                onPress={onReset}
+                disabled={busy}
+              />
+              <AdminBtn
+                icon="add"
+                label="Thêm set"
+                onPress={onAddSet}
+                disabled={busy}
+              />
+              <AdminBtn
+                icon="close"
+                label="Thoát sửa"
+                onPress={onExitEdit}
+                disabled={busy}
+                style={styles.btnGhost}
+              />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.adminRow}>
+          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
+            Kết quả
+          </Text>
+          <View style={styles.rowWrap}>
+            <AdminBtn
+              icon="emoji-events"
+              label="Đặt A thắng"
+              onPress={() => confirmWinner("A")}
+              disabled={busy}
+              style={[
+                styles.btnSuccessOutline,
+                {
+                  backgroundColor: T.success.bgSoft,
+                  borderColor: T.success.bdSoft,
+                },
+              ]}
+              textStyle={{ color: T.success.text, fontWeight: "700" }}
+            />
+            <AdminBtn
+              icon="emoji-events"
+              label="Đặt B thắng"
+              onPress={() => confirmWinner("B")}
+              disabled={busy}
+              style={[
+                styles.btnSuccessOutline,
+                {
+                  backgroundColor: T.success.bgSoft,
+                  borderColor: T.success.bdSoft,
+                },
+              ]}
+              textStyle={{ color: T.success.text, fontWeight: "700" }}
+            />
+          </View>
+        </View>
       </View>
-    </View>
-  );
-}
+    );
+  }
+);
 
 function _getIdLike(x) {
   if (!x) return null;
@@ -1553,10 +1583,14 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const { userInfo } = useSelector((s) => s.auth || {});
   const roleStr = String(userInfo?.role || "").toLowerCase();
-  const roles = new Set(
-    [...(userInfo?.roles || []), ...(userInfo?.permissions || [])]
-      .filter(Boolean)
-      .map((x) => String(x).toLowerCase())
+  const roles = useMemo(
+    () =>
+      new Set(
+        [...(userInfo?.roles || []), ...(userInfo?.permissions || [])]
+          .filter(Boolean)
+          .map((x) => String(x).toLowerCase())
+      ),
+    [userInfo]
   );
 
   const tour =
@@ -1577,35 +1611,30 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const canManage = isAdmin || isManager;
   const canSeeOverlay = canManage;
 
-  // Popup hồ sơ
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileUserId, setProfileUserId] = useState(null);
-  const openProfile = (uid) => {
+  const openProfile = useCallback((uid) => {
     if (!uid) return;
     const norm = uid?._id || uid?.id || uid?.userId || uid?.uid || uid || null;
     if (norm) {
       setProfileUserId(String(norm));
       setProfileOpen(true);
     }
-  };
-  const closeProfile = () => setProfileOpen(false);
+  }, []);
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
 
-  // LOCK theo match id
   const loading = Boolean(isLoading || liveLoading);
   const {
     lockedId,
     view: mm,
     setView,
     waiting,
-  } = useLockedMatch(m, {
-    loading,
-  });
+  } = useLockedMatch(m, { loading });
   const showSpinnerDelayed = useDelayedFlag(waiting, 250);
 
-  // ===== Local patch (scores/status/teams) =====
   const [localPatch, setLocalPatch] = useState(null);
   useEffect(() => {
-    setLocalPatch(null); // đổi trận -> bỏ patch
+    setLocalPatch(null);
   }, [lockedId]);
 
   const merged = useMemo(
@@ -1613,7 +1642,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     [mm, localPatch]
   );
 
-  // xác định trọng tài
   const myIdForCheck =
     userInfo?._id ||
     userInfo?.id ||
@@ -1660,53 +1688,171 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     ]);
     return pool.has(uid);
   }
+  // ===== Serve detection (ai đang giao) =====
+  const _idOf = (p) =>
+    (p?.user?._id ||
+      p?.user?.id ||
+      p?._id ||
+      p?.id ||
+      p?.userId ||
+      p?.uid ||
+      p) &&
+    String(
+      p?.user?._id || p?.user?.id || p?._id || p?.id || p?.userId || p?.uid || p
+    );
+
+  function _parseServeCode(x) {
+    if (!x) return {};
+    const s = String(x).toUpperCase();
+    const m = s.match(/\b([AB])\s*-?\s*([12])?\b/);
+    if (m) return { side: m[1], member: m[2] ? parseInt(m[2], 10) : null };
+    return {};
+  }
+
+  function resolveServeFlags(m, { isSingle }) {
+    const flags = { a1: false, a2: false, b1: false, b2: false };
+    if (!m) return flags;
+
+    const A1 = _idOf(m?.pairA?.player1);
+    const A2 = _idOf(m?.pairA?.player2);
+    const B1 = _idOf(m?.pairB?.player1);
+    const B2 = _idOf(m?.pairB?.player2);
+
+    const ids = new Set();
+    const push = (v) => {
+      const id = _idOf(v);
+      if (id) ids.add(id);
+    };
+
+    // Các khả năng lưu user đang giao
+    push(m?.serveUser);
+    push(m?.serveBy);
+    push(m?.serverUser);
+    push(m?.serverUserId);
+    push(m?.servingUser);
+    push(m?.servingUserId);
+    push(m?.meta?.serveUser);
+    push(m?.serve?.user);
+    push(m?.serve?.userId);
+    push(m?.serve?.by);
+    push(m?.refState?.serve?.user);
+    (Array.isArray(m?.servers) ? m.servers : []).forEach(push);
+    (Array.isArray(m?.serves) ? m.serves : []).forEach(push);
+
+    let matched = false;
+    if (ids.size) {
+      if (A1 && ids.has(A1)) flags.a1 = matched = true;
+      if (A2 && ids.has(A2)) flags.a2 = matched = true;
+      if (B1 && ids.has(B1)) flags.b1 = matched = true;
+      if (B2 && ids.has(B2)) flags.b2 = matched = true;
+    }
+    if (matched) return flags;
+
+    // Không có userId -> thử theo mã/side
+    const codeSources = [
+      m?.serve?.code,
+      m?.serveCode,
+      m?.rally?.server,
+      m?.refState?.serve,
+      m?.meta?.serveCode,
+      typeof m?.serve === "string" ? m?.serve : null,
+      typeof m?.server === "string" ? m?.server : null,
+    ].filter(Boolean);
+
+    let side = null;
+    let member = null;
+    for (const c of codeSources) {
+      const r = _parseServeCode(c);
+      if (r.side) {
+        side = r.side;
+        member = r.member ?? member;
+        break;
+      }
+    }
+    if (!side) {
+      side = (
+        m?.serve?.side ||
+        m?.serveSide ||
+        m?.currentServeSide ||
+        m?.serverSide ||
+        ""
+      )
+        .toString()
+        .toUpperCase();
+      member =
+        m?.serve?.member ??
+        m?.serve?.player ??
+        m?.serve?.index ??
+        m?.serve?.playerIdx ??
+        null;
+    }
+    if (side === "A") {
+      if (member === 2 && A2) flags.a2 = true;
+      else flags.a1 = true; // mặc định A1 (single cũng A1)
+    } else if (side === "B") {
+      if (member === 2 && B2) flags.b2 = true;
+      else flags.b1 = true; // mặc định B1
+    }
+    return flags;
+  }
 
   const isRefereeHere = isUserRefereeOfMatch(userInfo, merged);
 
   const status = merged?.status || "scheduled";
   const shownGameScores = merged?.gameScores ?? [];
 
-  // Streams
   const streams = useMemo(() => normalizeStreams(merged || {}), [merged]);
-  const pickInitialIndex = (arr) => {
+  const pickInitialIndex = useCallback((arr) => {
     if (!arr.length) return -1;
     const primary = arr.findIndex((s) => s.primary);
     if (primary >= 0) return primary;
     const emb = arr.findIndex((s) => s.canEmbed);
     if (emb >= 0) return emb;
     return 0;
-  };
-  const [activeIdx, setActiveIdx] = useState(pickInitialIndex(streams));
+  }, []);
+
+  const [activeIdx, setActiveIdx] = useState(() => pickInitialIndex(streams));
   const [showPlayer, setShowPlayer] = useState(false);
+
   useEffect(() => {
     setActiveIdx(pickInitialIndex(streams));
     setShowPlayer(false);
-  }, [lockedId]); // chỉ khi đổi trận
+  }, [lockedId, pickInitialIndex, streams]);
 
-  const activeStream =
-    activeIdx >= 0 && activeIdx < streams.length ? streams[activeIdx] : null;
+  const activeStream = useMemo(
+    () =>
+      activeIdx >= 0 && activeIdx < streams.length ? streams[activeIdx] : null,
+    [activeIdx, streams]
+  );
 
-  // Overlay & time
-  const displayTime = toDateSafe(pickDisplayTime(merged));
-  const timeLabel =
-    displayTime && status !== "finished"
-      ? `Giờ đấu: ${formatClock(displayTime)}`
-      : displayTime && status === "finished"
-      ? `Bắt đầu: ${formatClock(displayTime)}`
-      : null;
+  const displayTime = useMemo(
+    () => toDateSafe(pickDisplayTime(merged)),
+    [merged]
+  );
+  const timeLabel = useMemo(() => {
+    if (!displayTime) return null;
+    if (status !== "finished") return `Giờ đấu: ${formatClock(displayTime)}`;
+    return `Bắt đầu: ${formatClock(displayTime)}`;
+  }, [displayTime, status]);
 
-  const overlayBase = resolveWebBase(merged?.tournament, merged?.overlay);
-  const overlayUrl = buildOverlayUrl(overlayBase, lockedId, {
-    theme: T.scheme,
-    size: "md",
-    showSets: true,
-    autoNext: true,
-  });
+  const overlayBase = useMemo(
+    () => resolveWebBase(merged?.tournament, merged?.overlay),
+    [merged?.tournament, merged?.overlay]
+  );
+  const overlayUrl = useMemo(
+    () =>
+      buildOverlayUrl(overlayBase, lockedId, {
+        theme: T.scheme,
+        size: "md",
+        showSets: true,
+        autoNext: true,
+      }),
+    [overlayBase, lockedId, T.scheme]
+  );
 
-  // Admin edit states
   const [editMode, setEditMode] = useState(false);
-  const enterEdit = () => setEditMode(true);
-  const exitEdit = () => setEditMode(false);
+  const enterEdit = useCallback(() => setEditMode(true), []);
+  const exitEdit = useCallback(() => setEditMode(false), []);
   const [busy, setBusy] = useState(false);
   const [editScores, setEditScores] = useState([...(shownGameScores || [])]);
 
@@ -1714,46 +1860,61 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     setEditScores([...(merged?.gameScores ?? [])]);
   }, [lockedId, merged?.gameScores]);
 
-  const sanitizeInt = (v) => {
+  const sanitizeInt = useCallback((v) => {
     const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
     if (!Number.isFinite(n) || n < 0) return 0;
     return Math.min(n, 99);
-  };
-  const setCell = (idx, side, val) => {
-    setEditScores((old) => {
-      const arr = [...(Array.isArray(old) ? old : [])];
-      while (arr.length <= idx) arr.push({ a: 0, b: 0 });
-      const row = { ...(arr[idx] || { a: 0, b: 0 }) };
-      row[side] = sanitizeInt(val);
-      arr[idx] = row;
-      return arr;
-    });
-  };
-  const addSet = () => setEditScores((old) => [...(old || []), { a: 0, b: 0 }]);
-  const removeSet = (idx) =>
-    setEditScores((old) => (old || []).filter((_, i) => i !== idx));
-  const resetEdits = () => setEditScores([...(merged?.gameScores ?? [])]);
+  }, []);
 
-  // RTK mutation
+  const setCell = useCallback(
+    (idx, side, val) => {
+      setEditScores((old) => {
+        const arr = [...(Array.isArray(old) ? old : [])];
+        while (arr.length <= idx) arr.push({ a: 0, b: 0 });
+        const row = { ...(arr[idx] || { a: 0, b: 0 }) };
+        row[side] = sanitizeInt(val);
+        arr[idx] = row;
+        return arr;
+      });
+    },
+    [sanitizeInt]
+  );
+
+  const addSet = useCallback(
+    () => setEditScores((old) => [...(old || []), { a: 0, b: 0 }]),
+    []
+  );
+  const removeSet = useCallback(
+    (idx) => setEditScores((old) => (old || []).filter((_, i) => i !== idx)),
+    []
+  );
+  const resetEdits = useCallback(
+    () => setEditScores([...(merged?.gameScores ?? [])]),
+    [merged?.gameScores]
+  );
+
   const [adminPatchMatch] = useAdminPatchMatchMutation();
 
-  const doPatch = async (body, { successMsg = "Đã cập nhật." } = {}) => {
-    if (!lockedId) return;
-    setBusy(true);
-    try {
-      await adminPatchMatch({ id: lockedId, body }).unwrap();
-      Toast.show({ type: "success", text1: successMsg });
-      onSaved?.();
-    } catch (e) {
-      const msg = e?.data?.message || e?.message || "Không cập nhật được";
-      Toast.show({ type: "error", text1: "Lỗi", text2: msg });
-      throw e;
-    } finally {
-      setBusy(false);
-    }
-  };
+  const doPatch = useCallback(
+    async (body, { successMsg = "Đã cập nhật." } = {}) => {
+      if (!lockedId) return;
+      setBusy(true);
+      try {
+        await adminPatchMatch({ id: lockedId, body }).unwrap();
+        Toast.show({ type: "success", text1: successMsg });
+        onSaved?.();
+      } catch (e) {
+        const msg = e?.data?.message || e?.message || "Không cập nhật được";
+        Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+        throw e;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [adminPatchMatch, lockedId, onSaved]
+  );
 
-  const handleSaveScores = async () => {
+  const handleSaveScores = useCallback(async () => {
     if (!canManage || !lockedId) return;
     try {
       await doPatch(
@@ -1766,42 +1927,50 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       setLocalPatch((p) => ({ ...(p || {}), gameScores: editScores }));
       exitEdit();
     } catch {}
-  };
+  }, [canManage, lockedId, doPatch, editScores, status, exitEdit]);
 
-  const handleSetWinner = async (side /* 'A' | 'B' */) => {
-    if (!canManage || !lockedId) return;
-    try {
-      await doPatch(
-        { winner: side, status: "finished" },
-        { successMsg: `Đã đặt đội ${side} thắng.` }
-      );
-      setLocalPatch((p) => ({ ...(p || {}), status: "finished" }));
-    } catch {}
-  };
+  const handleSetWinner = useCallback(
+    async (side) => {
+      if (!canManage || !lockedId) return;
+      try {
+        await doPatch(
+          { winner: side, status: "finished" },
+          { successMsg: `Đã đặt đội ${side} thắng.` }
+        );
+        setLocalPatch((p) => ({ ...(p || {}), status: "finished" }));
+      } catch {}
+    },
+    [canManage, lockedId, doPatch]
+  );
 
-  const handleSetStatus = async (newStatus) => {
-    if (!canManage || !lockedId) return;
-    try {
-      const body =
-        newStatus === "finished"
-          ? { status: newStatus }
-          : { status: newStatus, winner: "" };
-      await doPatch(body, { successMsg: `Đã đổi trạng thái: ${newStatus}` });
-      setLocalPatch((p) => ({ ...(p || {}), status: newStatus }));
-    } catch {}
-  };
+  const handleSetStatus = useCallback(
+    async (newStatus) => {
+      if (!canManage || !lockedId) return;
+      try {
+        const body =
+          newStatus === "finished"
+            ? { status: newStatus }
+            : { status: newStatus, winner: "" };
+        await doPatch(body, { successMsg: `Đã đổi trạng thái: ${newStatus}` });
+        setLocalPatch((p) => ({ ...(p || {}), status: newStatus }));
+      } catch {}
+    },
+    [canManage, lockedId, doPatch]
+  );
 
-  const { A: setsA, B: setsB } = countGamesWon(shownGameScores);
+  const { A: setsA, B: setsB } = useMemo(
+    () => countGamesWon(shownGameScores),
+    [shownGameScores]
+  );
 
-  // ===== LIVE: create + info sheet =====
   const [createLive, { isLoading: creatingLive }] =
     useCreateFacebookLiveForMatchMutation();
   const liveSheetRef = useRef(null);
   const [liveData, setLiveData] = useState(null);
 
-  const presentLiveSheet = () => {
+  const presentLiveSheet = useCallback(() => {
     liveSheetRef.current?.present?.();
-  };
+  }, []);
 
   const prefillFromMatch = useCallback(() => {
     const fb = merged?.facebookLive || {};
@@ -1850,7 +2019,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     }));
   }, [merged, overlayUrl]);
 
-  const handleCreateLive = async () => {
+  const handleCreateLive = useCallback(async () => {
     if (!lockedId) return;
     try {
       const res = await createLive(lockedId).unwrap();
@@ -1858,7 +2027,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       setLiveData(clean);
       presentLiveSheet();
     } catch (err) {
-      // fallback: mở sheet với dữ liệu hiện có
       Toast.show({
         type: "error",
         text1: "Không tạo được LIVE",
@@ -1867,37 +2035,68 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       prefillFromMatch();
       presentLiveSheet();
     }
-  };
+  }, [lockedId, createLive, presentLiveSheet, prefillFromMatch]);
 
-  const handleOpenLiveInfo = () => {
+  const handleOpenLiveInfo = useCallback(() => {
     prefillFromMatch();
     presentLiveSheet();
-  };
+  }, [prefillFromMatch, presentLiveSheet]);
 
-  // Render states
   const showSpinner = waiting && showSpinnerDelayed;
   const showError = !waiting && !mm;
 
-  const isSingle =
-    String(merged?.tournament?.eventType || "").toLowerCase() === "single";
-  // Nhãn đội để truyền cho panel trọng tài
-  const teamAName = merged?.pairA
-    ? [merged?.pairA?.player1, !isSingle && merged?.pairA?.player2]
+  const isSingle = useMemo(
+    () =>
+      String(merged?.tournament?.eventType || "").toLowerCase() === "single",
+    [merged?.tournament?.eventType]
+  );
+  const serveFlags = useMemo(
+    () => resolveServeFlags(merged, { isSingle }),
+    [merged, isSingle]
+  );
+  const teamAName = useMemo(() => {
+    if (merged?.pairA) {
+      return [merged?.pairA?.player1, !isSingle && merged?.pairA?.player2]
         .filter(Boolean)
         .map((p) => nameWithNick(p))
-        .join(" & ")
-    : merged?.previousA
-    ? smartDepLabel(merged, merged.previousA)
-    : seedLabel(merged?.seedA);
+        .join(" & ");
+    }
+    if (merged?.previousA) return smartDepLabel(merged, merged.previousA);
+    return seedLabel(merged?.seedA);
+  }, [merged, isSingle]);
 
-  const teamBName = merged?.pairB
-    ? [merged?.pairB?.player1, !isSingle && merged?.pairB?.player2]
+  const teamBName = useMemo(() => {
+    if (merged?.pairB) {
+      return [merged?.pairB?.player1, !isSingle && merged?.pairB?.player2]
         .filter(Boolean)
         .map((p) => nameWithNick(p))
-        .join(" & ")
-    : merged?.previousB
-    ? smartDepLabel(merged, merged.previousB)
-    : seedLabel(merged?.seedB);
+        .join(" & ");
+    }
+    if (merged?.previousB) return smartDepLabel(merged, merged.previousB);
+    return seedLabel(merged?.seedB);
+  }, [merged, isSingle]);
+
+  const togglePlayer = useCallback(() => setShowPlayer((v) => !v), []);
+
+  const handleCopyOverlay = useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(overlayUrl);
+      Toast.show({
+        type: "success",
+        text1: "Đã copy link overlay",
+      });
+    } catch {
+      Toast.show({ type: "error", text1: "Copy thất bại" });
+    }
+  }, [overlayUrl]);
+
+  const handleOpenOverlay = useCallback(() => {
+    Linking.openURL(overlayUrl);
+  }, [overlayUrl]);
+
+  const handleOpenActiveStream = useCallback(() => {
+    if (activeStream?.url) Linking.openURL(activeStream.url);
+  }, [activeStream]);
 
   if (showSpinner) {
     return (
@@ -1931,11 +2130,11 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           styles.container,
           { backgroundColor: "transparent" },
         ]}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews
       >
-        {/* Banner trạng thái */}
         <StatusBanner status={status} hasStreams={streams.length > 0} />
 
-        {/* Khu video */}
         {activeStream && (
           <View style={{ gap: 8 }}>
             <View style={styles.rowWrap}>
@@ -1950,7 +2149,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                     },
                     styles.btnFluid,
                   ]}
-                  onPress={() => setShowPlayer((v) => !v)}
+                  onPress={togglePlayer}
                   disabled={busy}
                 >
                   <Text
@@ -1972,7 +2171,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   styles.btnFluid,
                   { backgroundColor: T.cardBg, borderColor: T.softBorder },
                 ]}
-                onPress={() => Linking.openURL(activeStream.url)}
+                onPress={handleOpenActiveStream}
                 disabled={busy}
               >
                 <Text style={[styles.btnText, { color: T.textPrimary }]}>
@@ -1987,7 +2186,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           </View>
         )}
 
-        {/* Overlay */}
         {overlayUrl && canSeeOverlay && (
           <View
             style={[
@@ -2023,17 +2221,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   styles.btnFluid,
                   { backgroundColor: T.cardBg, borderColor: T.softBorder },
                 ]}
-                onPress={async () => {
-                  try {
-                    await Clipboard.setStringAsync(overlayUrl);
-                    Toast.show({
-                      type: "success",
-                      text1: "Đã copy link overlay",
-                    });
-                  } catch {
-                    Toast.show({ type: "error", text1: "Copy thất bại" });
-                  }
-                }}
+                onPress={handleCopyOverlay}
               >
                 <Text style={[styles.btnText, { color: T.textPrimary }]}>
                   Copy link
@@ -2045,7 +2233,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   styles.btnFluid,
                   { backgroundColor: T.tint, borderColor: T.tint },
                 ]}
-                onPress={() => Linking.openURL(overlayUrl)}
+                onPress={handleOpenOverlay}
               >
                 <Text style={styles.btnPrimaryText}>Mở overlay</Text>
               </TouchableOpacity>
@@ -2055,7 +2243,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               tỉ số.
             </Text>
 
-            {/* NEW: LIVE buttons for Admin/Manager */}
             {canManage && (
               <View style={[styles.rowWrap, { marginTop: 10 }]}>
                 <AdminBtn
@@ -2077,7 +2264,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           </View>
         )}
 
-        {/* Điểm số */}
         <View
           style={[
             styles.card,
@@ -2089,7 +2275,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           </Text>
 
           <View style={[styles.row, { alignItems: "flex-start" }]}>
-            {/* Đội A */}
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={[styles.muted, { color: T.textSecondary }]}>
                 Đội A
@@ -2099,6 +2284,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   <PlayerLink
                     person={merged.pairA?.player1}
                     onOpen={openProfile}
+                    serving={!!serveFlags.a1}
                   />
                   {!isSingle && merged.pairA?.player2 && (
                     <>
@@ -2109,6 +2295,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                       <PlayerLink
                         person={merged.pairA.player2}
                         onOpen={openProfile}
+                        serving={!!serveFlags.a2}
                       />
                     </>
                   )}
@@ -2122,7 +2309,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               )}
             </View>
 
-            {/* Điểm hiện tại */}
             <View style={{ minWidth: 140, alignItems: "center" }}>
               {status === "live" && (
                 <Text style={[styles.mutedSmall, { color: T.textSecondary }]}>
@@ -2139,7 +2325,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               </Text>
             </View>
 
-            {/* Đội B */}
             <View style={{ flex: 1, paddingLeft: 8 }}>
               <Text
                 style={[
@@ -2155,6 +2340,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                     person={merged.pairB?.player1}
                     onOpen={openProfile}
                     align="right"
+                    serving={!!serveFlags.b1}
                   />
                   {!isSingle && merged.pairB?.player2 && (
                     <>
@@ -2171,6 +2357,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                         person={merged.pairB.player2}
                         onOpen={openProfile}
                         align="right"
+                        serving={!!serveFlags.b2}
                       />
                     </>
                   )}
@@ -2190,7 +2377,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             </View>
           </View>
 
-          {/* Bảng set điểm */}
           {!!(editMode ? editScores?.length : shownGameScores?.length) && (
             <View style={{ marginTop: 12 }}>
               <View
@@ -2317,7 +2503,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             </View>
           )}
 
-          {/* Chips rule + trạng thái */}
           <View style={styles.chipsWrap}>
             {timeLabel && <Chip label={timeLabel} />}
             <Chip label={`BO: ${merged?.rules?.bestOf ?? 3}`} />
@@ -2329,22 +2514,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             <Chip label={`Trạng thái: ${formatStatus(status)}`} />
           </View>
 
-          {/* Panel chấm điểm dành cho TRỌNG TÀI được gán */}
-          {/* {isRefereeHere && merged?._id && (
-            <View style={{ marginTop: 12 }}>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  { marginBottom: 6, color: T.textSecondary },
-                ]}
-              >
-                Bàn chấm (trọng tài)
-              </Text>
-              <RefereeJudgePanel matchId={String(merged._id)} />
-            </View>
-          )} */}
-
-          {/* Admin toolbar */}
           {canManage && (
             <AdminToolbar
               status={status}
@@ -2361,7 +2530,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           )}
         </View>
 
-        {/* Popup hồ sơ VĐV */}
         <PublicProfileDialog
           open={profileOpen}
           onClose={closeProfile}
@@ -2369,7 +2537,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         />
       </ScrollView>
 
-      {/* BottomSheet LIVE info */}
       {canManage && (
         <LiveInfoSheet
           ref={liveSheetRef}
@@ -2384,7 +2551,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 }
 
 /* ---------- Chip nhỏ (themed) ---------- */
-function Chip({ label }) {
+const Chip = memo(({ label }) => {
   const T = useThemeTokens();
   return (
     <View
@@ -2396,7 +2563,7 @@ function Chip({ label }) {
       <Text style={[styles.chipText, { color: T.chip.text }]}>{label}</Text>
     </View>
   );
-}
+});
 
 function makePropSignature(m) {
   if (!m) return "";
@@ -2532,7 +2699,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
 
-  /* ===== Admin toolbar ===== */
   adminCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -2559,7 +2725,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* segmented */
   segment: {
     flexDirection: "row",
     borderRadius: 999,
@@ -2583,7 +2748,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* buttons (icon row) */
   btnContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -2592,4 +2756,5 @@ const styles = StyleSheet.create({
   },
   btnIcon: {},
   btnSuccessOutline: {},
+  btnGhost: {},
 });

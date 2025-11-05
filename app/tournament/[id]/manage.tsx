@@ -5,6 +5,7 @@ import React, {
   useState,
   useCallback,
   useRef,
+  memo,
 } from "react";
 import {
   ActivityIndicator,
@@ -19,6 +20,8 @@ import {
   View,
   ScrollView,
   Animated,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
@@ -36,12 +39,12 @@ import {
   useAdminGetBracketsQuery,
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
-  useAdminBatchSetMatchLiveUrlMutation, // ⬅️ NEW (batch video)
+  useAdminBatchSetMatchLiveUrlMutation,
 } from "@/slices/tournamentsApiSlice";
 
 import {
-  useBatchAssignRefereeMutation, // ⬅️ NEW (batch referee)
-  useListTournamentRefereesQuery, // ⬅️ NEW (referee options)
+  useBatchAssignRefereeMutation,
+  useListTournamentRefereesQuery,
 } from "@/slices/refereeScopeApiSlice";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
@@ -53,7 +56,6 @@ import AssignCourtSheet from "@/components/sheets/AssignCourtSheet";
 import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
 import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
-import { Platform } from "react-native";
 
 /* ---------------- helpers ---------------- */
 const TYPE_LABEL = (t) => {
@@ -149,7 +151,6 @@ const isPendingNotAssigned = (m) =>
     "assigned",
   ].includes(String(m?.status || "").toLowerCase());
 
-// KO luôn sau cùng, RoundElim ngay trước KO
 const typeOrderWeight = (t) => {
   const k = String(t || "").toLowerCase();
   if (k === "group") return 1;
@@ -163,14 +164,14 @@ const typeOrderWeight = (t) => {
   return 7000;
 };
 
-const IconBtn = ({ name, onPress, color = "#111", size = 18, style }) => (
+const IconBtn = memo(({ name, onPress, color = "#111", size = 18, style }) => (
   <Pressable
     onPress={onPress}
     style={({ pressed }) => [style, pressed && { opacity: 0.8 }]}
   >
     <MaterialIcons name={name} size={size} color={color} />
   </Pressable>
-);
+));
 
 // Trọng tài
 const _extractRefereeIds = (m) => {
@@ -386,12 +387,13 @@ function getThemeTokens(colors, dark) {
   };
 }
 
-/* ---------- small local UI comps ---------- */
-const BtnOutline = ({ onPress, children }) => {
+/* ---------- small local UI comps (MEMOIZED) ---------- */
+const BtnOutline = memo(({ onPress, children, disabled }) => {
   const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         {
           paddingHorizontal: 12,
@@ -399,6 +401,7 @@ const BtnOutline = ({ onPress, children }) => {
           borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border,
+          opacity: disabled ? 0.5 : 1,
         },
         pressed && { opacity: 0.9 },
       ]}
@@ -406,10 +409,9 @@ const BtnOutline = ({ onPress, children }) => {
       <Text style={{ color: colors.text, fontWeight: "700" }}>{children}</Text>
     </Pressable>
   );
-};
+});
 
-const PickerChip = ({ label, onPress, icon, colorsTheme }) => {
-  const { colors, dark } = useTheme();
+const PickerChip = memo(({ label, onPress, icon, colorsTheme }) => {
   return (
     <Pressable
       onPress={onPress}
@@ -434,10 +436,50 @@ const PickerChip = ({ label, onPress, icon, colorsTheme }) => {
       </Text>
     </Pressable>
   );
-};
+});
 
-const MenuItem = ({ icon, label, onPress, danger }) => {
-  const { colors, dark } = useTheme();
+const CheckChip = memo(({ checked, label, onPress }) => {
+  const onBg = "#dcfce7";
+  const onFg = "#166534";
+  const offBg = "#eef2f7";
+  const offFg = "#263238";
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: checked ? onBg : offBg,
+          borderWidth: 0,
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <MaterialIcons
+        name={checked ? "check-box" : "check-box-outline-blank"}
+        size={14}
+        color={checked ? onFg : offFg}
+      />
+      <Text
+        style={{
+          color: checked ? onFg : offFg,
+          fontSize: 12,
+          fontWeight: "700",
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+});
+
+const MenuItem = memo(({ icon, label, onPress, danger }) => {
+  const { colors } = useTheme();
 
   return (
     <Pressable
@@ -461,7 +503,347 @@ const MenuItem = ({ icon, label, onPress, danger }) => {
       </Text>
     </Pressable>
   );
-};
+});
+
+/* ----------- small THEMED chips (MEMOIZED) ----------- */
+const Pill = memo(({ label, kind = "default" }) => {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+  const st =
+    kind === "primary"
+      ? { bg: t.chipInfoBg, fg: t.chipInfoFg }
+      : { bg: t.chipDefaultBg, fg: t.chipDefaultFg };
+  return (
+    <View
+      style={{
+        backgroundColor: st.bg,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+      }}
+    >
+      <Text style={{ color: st.fg, fontSize: 12 }}>{label}</Text>
+    </View>
+  );
+});
+
+const StatusPill = memo(({ status }) => {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+  const v = t.statusTone(status);
+  return (
+    <View
+      style={{
+        backgroundColor: v.bg,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+      }}
+    >
+      <Text style={{ color: v.fg, fontSize: 12 }}>{v.label}</Text>
+    </View>
+  );
+});
+
+const BusyChip = memo(({ court }) => (
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: "#fef3c7",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 999,
+    }}
+  >
+    <MaterialIcons name="warning" size={12} color="#b45309" />
+    <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
+      Đang thi đấu{court ? ` (${court})` : ""}
+    </Text>
+  </View>
+));
+
+const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => (
+  <Pressable
+    onPress={onPress}
+    style={({ pressed }) => [
+      styles.miniBtn,
+      { borderColor: color },
+      pressed && { opacity: 0.9 },
+    ]}
+  >
+    <MaterialIcons name={icon} size={16} color={color} />
+    <Text style={{ color, fontSize: 12, fontWeight: "700" }} numberOfLines={1}>
+      {label}
+    </Text>
+  </Pressable>
+));
+
+const VideoPill = memo(({ has }) => {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+          backgroundColor: has ? t.successBg : t.chipDefaultBg,
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 999,
+        }}
+      >
+        <MaterialIcons
+          name="videocam"
+          size={14}
+          color={has ? t.successFg : t.chipDefaultFg}
+        />
+        <Text
+          style={{ color: has ? t.successFg : t.chipDefaultFg, fontSize: 12 }}
+        >
+          Video
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+const CourtPill = memo(({ name }) => {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+  return name ? (
+    <View
+      style={{
+        backgroundColor: t.courtBg,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 999,
+      }}
+    >
+      <Text style={{ color: t.courtFg, fontSize: 12 }} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  ) : null;
+});
+
+const ScorePill = memo(({ textVal }) => {
+  const { colors } = useTheme();
+  return textVal ? (
+    <View
+      style={{
+        borderColor: colors.border,
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+      }}
+    >
+      <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
+        {textVal}
+      </Text>
+    </View>
+  ) : null;
+});
+
+// ✅ FIX: EdgeFadedHScroll - không nháy chevron
+const EdgeFadedHScroll = memo(
+  ({
+    children,
+    contentContainerStyle,
+    style,
+    bgColor = "#fff",
+    chevronColor = "#94a3b8",
+    ...props
+  }) => {
+    const [state, setState] = useState({
+      canScroll: false,
+      showL: false,
+      showR: false,
+    });
+    const boxW = useRef(0);
+    const contentW = useRef(0);
+    const scrollX = useRef(0);
+    const updateTimer = useRef(null);
+
+    const update = useCallback((x = 0) => {
+      scrollX.current = x;
+      if (updateTimer.current) return; // throttle
+      updateTimer.current = setTimeout(() => {
+        updateTimer.current = null;
+        const can = contentW.current > boxW.current + 2;
+        const showL = can && scrollX.current > 2;
+        const maxX = Math.max(0, contentW.current - boxW.current);
+        const showR = can && scrollX.current < maxX - 2;
+
+        setState((prev) => {
+          if (
+            prev.canScroll === can &&
+            prev.showL === showL &&
+            prev.showR === showR
+          ) {
+            return prev; // ✅ không setState nếu không đổi
+          }
+          return { canScroll: can, showL, showR };
+        });
+      }, 100); // throttle 100ms
+    }, []);
+
+    useEffect(() => {
+      return () => {
+        if (updateTimer.current) clearTimeout(updateTimer.current);
+      };
+    }, []);
+
+    return (
+      <View
+        onLayout={(e) => {
+          boxW.current = e.nativeEvent.layout.width || 0;
+          update(scrollX.current);
+        }}
+        style={[{ position: "relative" }, style]}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onContentSizeChange={(w) => {
+            contentW.current = w || 0;
+            update(scrollX.current);
+          }}
+          onScroll={(e) => update(e.nativeEvent.contentOffset.x || 0)}
+          scrollEventThrottle={100}
+          contentContainerStyle={contentContainerStyle}
+          {...props}
+        >
+          {children}
+        </ScrollView>
+
+        {state.canScroll && state.showL && (
+          <>
+            <LinearGradient
+              pointerEvents="none"
+              colors={[bgColor, "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.fadeLeft}
+            />
+            <View pointerEvents="none" style={[styles.chev, { left: 4 }]}>
+              <MaterialIcons
+                name="chevron-left"
+                size={16}
+                color={chevronColor}
+              />
+            </View>
+          </>
+        )}
+
+        {state.canScroll && state.showR && (
+          <>
+            <LinearGradient
+              pointerEvents="none"
+              colors={["transparent", bgColor]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.fadeRight}
+            />
+            <View pointerEvents="none" style={[styles.chev, { right: 4 }]}>
+              <MaterialIcons
+                name="chevron-right"
+                size={16}
+                color={chevronColor}
+              />
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }
+);
+
+const ActionButtons = memo(({ m, tour, me, onOpenVideoDlg, onOpenSheet }) => {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+
+  const has = !!m?.video;
+  const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
+
+  const onOpenRefNote = useCallback(async () => {
+    try {
+      const html = buildRefReportHTML({
+        tourName: tour?.name || "",
+        code: matchCode(m),
+        court: courtNameOf(m),
+        referee: refereeNames(m),
+        team1: pairLabel(m?.pairA),
+        team2: pairLabel(m?.pairB),
+        logoUrl: "",
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Biên bản trọng tài",
+      });
+    } catch {
+      RNAlert.alert("Lỗi", "Không xuất được biên bản.");
+    }
+  }, [tour, m]);
+
+  const handleOpenVideo = useCallback(() => {
+    Linking.openURL(m.video).catch(() =>
+      RNAlert.alert("Lỗi", "Không mở được liên kết.")
+    );
+  }, [m.video]);
+
+  const handleStartMatch = useCallback(() => {
+    router.push(refereeRouteOf(m));
+  }, [m]);
+
+  return (
+    <EdgeFadedHScroll
+      contentContainerStyle={styles.actionsWrap}
+      bgColor={colors.card}
+      chevronColor={t.muted}
+    >
+      <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
+      <MiniChipBtn
+        icon="stadium"
+        label="Gán sân"
+        onPress={() => onOpenSheet("court", m)}
+      />
+      <MiniChipBtn
+        icon="how-to-reg"
+        label="Gán trọng tài"
+        onPress={() => onOpenSheet("ref", m)}
+      />
+      {canStart && (
+        <MiniChipBtn
+          icon="play-arrow"
+          label="Bắt trận"
+          onPress={handleStartMatch}
+        />
+      )}
+      {has && (
+        <MiniChipBtn icon="open-in-new" label="Mở" onPress={handleOpenVideo} />
+      )}
+      <MiniChipBtn
+        icon="edit"
+        label={has ? "Sửa video" : "Thêm video"}
+        onPress={() => onOpenVideoDlg(m)}
+      />
+      {has && (
+        <MiniChipBtn
+          icon="link-off"
+          label="Xoá"
+          color="#ef4444"
+          onPress={() => onOpenVideoDlg(m, "")}
+        />
+      )}
+    </EdgeFadedHScroll>
+  );
+});
 
 /* ---------------- main ---------------- */
 export default function ManageScreen() {
@@ -530,18 +912,16 @@ export default function ManageScreen() {
 
   const [setLiveUrl] = useAdminSetMatchLiveUrlMutation();
   const [batchSetLiveUrl, { isLoading: batchingVideo }] =
-    useAdminBatchSetMatchLiveUrlMutation(); // NEW
+    useAdminBatchSetMatchLiveUrlMutation();
 
-  // Batch referee APIs
   const {
     data: refData,
     isLoading: refsLoading,
     error: refsErr,
-  } = useListTournamentRefereesQuery({ tid }, { skip: false }); // NEW
+  } = useListTournamentRefereesQuery({ tid }, { skip: false });
   const [batchAssign, { isLoading: batchingRefs }] =
-    useBatchAssignRefereeMutation(); // NEW
+    useBatchAssignRefereeMutation();
 
-  // Keep refs to refetchers
   const refetchMatchesRef = useRef(refetchMatches);
   const refetchBracketsRef = useRef(refetchBrackets);
   useEffect(() => {
@@ -591,18 +971,21 @@ export default function ManageScreen() {
     }
   }, [typesAvailable, tab]);
 
-  // Lọc/sort
   const [q, setQ] = useState("");
-  const [sortKey, setSortKey] = useState("time"); // "round" | "order" | "time"
+  const [sortKey, setSortKey] = useState("time");
   const [sortDir, setSortDir] = useState("asc");
 
-  // allMatches
+  const [courtFilter, setCourtFilter] = useState("");
+  const [hideBye, setHideBye] = useState(false);
+
+  const [courtPickerOpen, setCourtPickerOpen] = useState(false);
+  const [courtOptions, setCourtOptions] = useState([]);
+
   const allMatches = useMemo(
     () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
     [matchPage?.list]
   );
 
-  /* ======== Realtime: seed & listen ======== */
   const seededFingerprintRef = useRef("");
   useEffect(() => {
     if (!allMatches.length) return;
@@ -712,7 +1095,6 @@ export default function ManageScreen() {
     };
   }, [socket, requestSnapshot]);
 
-  // join ALL matches for room updates
   const allMatchIds = useMemo(() => {
     if (!allMatches.length) return [];
     return allMatches.map((m) => String(m?._id)).filter(Boolean);
@@ -742,7 +1124,6 @@ export default function ManageScreen() {
     };
   }, [socket, allMatchIds, requestSnapshot]);
 
-  // merged matches chỉ của giải hiện tại
   const mergedAllMatches = useMemo(() => {
     const vals = Array.from(liveMapRef.current.values());
     return vals.filter(
@@ -750,7 +1131,6 @@ export default function ManageScreen() {
     );
   }, [tid, liveBump]);
 
-  // Busy map cho cặp
   const liveBusyByPairId = useMemo(() => {
     const mp = new Map();
     for (const m of mergedAllMatches) {
@@ -770,7 +1150,37 @@ export default function ManageScreen() {
     return mp;
   }, [mergedAllMatches]);
 
-  // Sort helpers
+  const isByePair = useCallback((p) => {
+    if (!p) return false;
+    if (p.isBye || p.bye) return true;
+    const label = (p.name || "").toString();
+    if (label && /bye/i.test(label)) return true;
+    const a = p.player1 ? personNickname(p.player1) : "";
+    const b = p.player2 ? personNickname(p.player2) : "";
+    return /bye/i.test(`${a} ${b}`);
+  }, []);
+  const isByeMatch = useCallback(
+    (m) => isByePair(m?.pairA) || isByePair(m?.pairB),
+    [isByePair]
+  );
+
+  const collectCourts = useCallback(() => {
+    const s = new Set();
+    mergedAllMatches.forEach((m) => {
+      const c = courtNameOf(m).trim();
+      if (c) s.add(c);
+    });
+    return Array.from(s).sort((a, b) =>
+      a.localeCompare(b, "vi", { numeric: true })
+    );
+  }, [mergedAllMatches]);
+
+  useEffect(() => {
+    if (!courtFilter) return;
+    const now = collectCourts();
+    if (!now.includes(courtFilter)) setCourtFilter("");
+  }, [collectCourts, courtFilter]);
+
   const bucketWeight = (m) =>
     isLive(m)
       ? 0
@@ -782,53 +1192,62 @@ export default function ManageScreen() {
       ? 3
       : 4;
 
-  const secondaryCmp = (a, b) => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    if (sortKey === "order") {
-      if ((a?.order ?? 0) !== (b?.order ?? 0))
+  const secondaryCmp = useCallback(
+    (a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (sortKey === "order") {
+        if ((a?.order ?? 0) !== (b?.order ?? 0))
+          return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
+        if ((a?.round ?? 0) !== (b?.round ?? 0))
+          return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
+        const ta = new Date(a?.scheduledAt || a?.createdAt || 0).getTime();
+        const tb = new Date(b?.scheduledAt || b?.createdAt || 0).getTime();
+        return (ta - tb) * dir;
+      }
+      if (sortKey === "time") {
+        const ta = new Date(a?.scheduledAt || a?.createdAt || 0).getTime();
+        const tb = new Date(b?.scheduledAt || b?.createdAt || 0).getTime();
+        if (ta !== tb) return (ta - tb) * dir;
+        if ((a?.round ?? 0) !== (b?.round ?? 0))
+          return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
         return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
+      }
       if ((a?.round ?? 0) !== (b?.round ?? 0))
         return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
+      if ((a?.order ?? 0) !== (b?.order ?? 0))
+        return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
       const ta = new Date(a?.scheduledAt || a?.createdAt || 0).getTime();
       const tb = new Date(b?.scheduledAt || b?.createdAt || 0).getTime();
       return (ta - tb) * dir;
-    }
-    if (sortKey === "time") {
-      const ta = new Date(a?.scheduledAt || a?.createdAt || 0).getTime();
-      const tb = new Date(b?.scheduledAt || b?.createdAt || 0).getTime();
-      if (ta !== tb) return (ta - tb) * dir;
-      if ((a?.round ?? 0) !== (b?.round ?? 0))
-        return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
-      return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
-    }
-    // default round
-    if ((a?.round ?? 0) !== (b?.round ?? 0))
-      return ((a?.round ?? 0) - (b?.round ?? 0)) * dir;
-    if ((a?.order ?? 0) !== (b?.order ?? 0))
-      return ((a?.order ?? 0) - (b?.order ?? 0)) * dir;
-    const ta = new Date(a?.scheduledAt || a?.createdAt || 0).getTime();
-    const tb = new Date(b?.scheduledAt || b?.createdAt || 0).getTime();
-    return (ta - tb) * dir;
-  };
+    },
+    [sortKey, sortDir]
+  );
 
   const filterSortMatches = useCallback(
     (list) => {
       const kw = q.trim().toLowerCase();
       return list
         .filter((m) => {
-          if (!kw) return true;
-          const text = [
-            matchCode(m),
-            pairLabel(m?.pairA),
-            pairLabel(m?.pairB),
-            m?.status,
-            m?.video,
-            courtNameOf(m),
-            scoreText(m),
-          ]
-            .join(" ")
-            .toLowerCase();
-          return text.includes(kw);
+          if (kw) {
+            const text = [
+              matchCode(m),
+              pairLabel(m?.pairA),
+              pairLabel(m?.pairB),
+              m?.status,
+              m?.video,
+              courtNameOf(m),
+              scoreText(m),
+            ]
+              .join(" ")
+              .toLowerCase();
+            if (!text.includes(kw)) return false;
+          }
+          if (courtFilter) {
+            if (courtNameOf(m) !== courtFilter) return false;
+          }
+          if (hideBye && isByeMatch(m)) return false;
+
+          return true;
         })
         .sort((a, b) => {
           const wa = bucketWeight(a);
@@ -837,25 +1256,33 @@ export default function ManageScreen() {
           return secondaryCmp(a, b);
         });
     },
-    [q, sortKey, sortDir]
+    [q, courtFilter, hideBye, isByeMatch, secondaryCmp]
   );
 
-  // Viewer
   const [viewer, setViewer] = useState({ open: false, matchId: null });
-  const openMatch = (mid) => setViewer({ open: true, matchId: mid });
-  const closeMatch = () => setViewer({ open: false, matchId: null });
+  const openMatch = useCallback(
+    (mid) => setViewer({ open: true, matchId: mid }),
+    []
+  );
+  const closeMatch = useCallback(
+    () => setViewer({ open: false, matchId: null }),
+    []
+  );
 
-  // Single video dialog
   const [videoDlg, setVideoDlg] = useState({
     open: false,
     match: null,
     url: "",
   });
-  const openVideoDlg = (m) =>
-    setVideoDlg({ open: true, match: m, url: m?.video || "" });
-  const closeVideoDlg = () =>
-    setVideoDlg({ open: false, match: null, url: "" });
-  const onSaveVideo = async () => {
+  const openVideoDlg = useCallback((m, urlOverride) => {
+    const url = typeof urlOverride === "string" ? urlOverride : m?.video || "";
+    setVideoDlg({ open: true, match: m, url });
+  }, []);
+  const closeVideoDlg = useCallback(
+    () => setVideoDlg({ open: false, match: null, url: "" }),
+    []
+  );
+  const onSaveVideo = useCallback(async () => {
     try {
       if (!videoDlg.match?._id) return;
       await setLiveUrl({
@@ -874,20 +1301,18 @@ export default function ManageScreen() {
         e?.data?.message || e?.error || "Không lưu được link video"
       );
     }
-  };
+  }, [videoDlg, setLiveUrl, closeVideoDlg, refetchMatches]);
 
-  // Refresh
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       await Promise.all([refetchTour(), refetchBrackets(), refetchMatches()]);
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [refetchTour, refetchBrackets, refetchMatches]);
 
-  // Brackets theo tab
   const bracketsOfTab = useMemo(() => {
     const list = (bracketsData || []).filter(
       (b) => String(b?.type || "").toLowerCase() === String(tab).toLowerCase()
@@ -901,7 +1326,6 @@ export default function ManageScreen() {
     });
   }, [bracketsData, tab]);
 
-  // ======= NEW: Selection like Web =======
   const [selectedMatchIds, setSelectedMatchIds] = useState(() => new Set());
   const [selBump, setSelBump] = useState(0);
   const toggleSelectMatch = useCallback((mid) => {
@@ -936,7 +1360,6 @@ export default function ManageScreen() {
     setSelBump((x) => x + 1);
   }, []);
 
-  // ======= NEW: Batch dialogs state =======
   const [batchRefDlg, setBatchRefDlg] = useState({ open: false });
   const [pickedRefs, setPickedRefs] = useState([]);
   const refOptions = useMemo(() => {
@@ -948,8 +1371,6 @@ export default function ManageScreen() {
     return list;
   }, [refData]);
   const idOfRef = (r) => String(r?._id ?? r?.id ?? "");
-  const labelOfRef = (r) =>
-    r?.name || r?.nickname || (idOfRef(r) ? `#${idOfRef(r).slice(-4)}` : "");
 
   const [batchVideoDlg, setBatchVideoDlg] = useState({ open: false, url: "" });
 
@@ -999,7 +1420,6 @@ export default function ManageScreen() {
     refetchMatches,
   ]);
 
-  /* ----------- Sheets state (giữ nguyên) ----------- */
   const [refMgrOpen, setRefMgrOpen] = useState(false);
   const [assignCourtSheet, setAssignCourtSheet] = useState({
     open: false,
@@ -1018,511 +1438,348 @@ export default function ManageScreen() {
     bracket: null,
   });
 
-  /* ----------- small THEMED chips ----------- */
-  const Pill = ({ label, kind = "default" }) => {
-    const st =
-      kind === "primary"
-        ? { bg: t.chipInfoBg, fg: t.chipInfoFg }
-        : { bg: t.chipDefaultBg, fg: t.chipDefaultFg };
-    return (
-      <View
-        style={{
-          backgroundColor: st.bg,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 8,
-        }}
-      >
-        <Text style={{ color: st.fg, fontSize: 12 }}>{label}</Text>
-      </View>
-    );
-  };
-  const StatusPill = ({ status }) => {
-    const v = t.statusTone(status);
-    return (
-      <View
-        style={{
-          backgroundColor: v.bg,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 8,
-        }}
-      >
-        <Text style={{ color: v.fg, fontSize: 12 }}>{v.label}</Text>
-      </View>
-    );
-  };
-  const BusyChip = ({ court }) => (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: "#fef3c7",
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 999,
-      }}
-    >
-      <MaterialIcons name="warning" size={12} color="#b45309" />
-      <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
-        Đang thi đấu{court ? ` (${court})` : ""}
-      </Text>
-    </View>
-  );
-  const MiniChipBtn = ({ icon, label, onPress, color = colors.primary }) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.miniBtn,
-        { borderColor: color },
-        pressed && { opacity: 0.9 },
-      ]}
-    >
-      <MaterialIcons name={icon} size={16} color={color} />
-      <Text
-        style={{ color, fontSize: 12, fontWeight: "700" }}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-  const VideoPill = ({ has }) => (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          backgroundColor: has ? t.successBg : t.chipDefaultBg,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 999,
-        }}
-      >
-        <MaterialIcons
-          name="videocam"
-          size={14}
-          color={has ? t.successFg : t.chipDefaultFg}
-        />
-        <Text
-          style={{ color: has ? t.successFg : t.chipDefaultFg, fontSize: 12 }}
-        >
-          Video
-        </Text>
-      </View>
-    </View>
-  );
-  const CourtPill = ({ name }) =>
-    name ? (
-      <View
-        style={{
-          backgroundColor: t.courtBg,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 999,
-        }}
-      >
-        <Text style={{ color: t.courtFg, fontSize: 12 }} numberOfLines={1}>
-          {name}
-        </Text>
-      </View>
-    ) : null;
-  const ScorePill = ({ textVal }) =>
-    textVal ? (
-      <View
-        style={{
-          borderColor: colors.border,
-          borderWidth: 1,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-          borderRadius: 8,
-        }}
-      >
-        <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
-          {textVal}
-        </Text>
-      </View>
-    ) : null;
+  const handleOpenSheet = useCallback((type, m) => {
+    if (type === "court") setAssignCourtSheet({ open: true, match: m });
+    else if (type === "ref") setAssignRefSheet({ open: true, match: m });
+  }, []);
 
-  // Edge-fade horizontal scroller cho ActionButtons
-  const EdgeFadedHScroll = ({
-    children,
-    contentContainerStyle,
-    style,
-    bgColor = "#fff",
-    chevronColor = "#94a3b8",
-    ...props
-  }) => {
-    const [state, setState] = React.useState({
-      canScroll: false,
-      showL: false,
-      showR: false,
-    });
-    const boxW = React.useRef(0);
-    const contentW = React.useRef(0);
+  // ✅ MEMOIZED renderMatchRow
+  const renderMatchRow = useCallback(
+    ({ item: m }) => {
+      const hasVideo = !!m?.video;
+      const score = scoreText(m);
+      const courtLabel = courtNameOf(m);
+      const ordNum =
+        typeof m?.order === "number"
+          ? m.order
+          : m?.order != null
+          ? parseInt(String(m?.order), 10)
+          : null;
 
-    const update = React.useCallback((x = 0) => {
-      const can = contentW.current > boxW.current + 2;
-      const showL = can && x > 2;
-      const maxX = Math.max(0, contentW.current - boxW.current);
-      const showR = can && x < maxX - 2;
-      setState({ canScroll: can, showL, showR });
-    }, []);
+      const isThisMatchLive = isLive(m);
+      const isThisMatchFinished = isFinished(m);
 
-    return (
-      <View
-        onLayout={(e) => {
-          boxW.current = e.nativeEvent.layout.width || 0;
-          update(0);
-        }}
-        style={[{ position: "relative" }, style]}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          onContentSizeChange={(w) => {
-            contentW.current = w || 0;
-            update(0);
-          }}
-          onScroll={(e) => update(e.nativeEvent.contentOffset.x || 0)}
-          scrollEventThrottle={16}
-          contentContainerStyle={contentContainerStyle}
-          {...props}
-        >
-          {children}
-        </ScrollView>
+      const pAId = pairIdOf(m?.pairA);
+      const pBId = pairIdOf(m?.pairB);
 
-        {/* LEFT hint */}
-        {state.canScroll && state.showL && (
-          <>
-            <LinearGradient
-              pointerEvents="none"
-              colors={[bgColor, "transparent"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.fadeLeft}
-            />
-            <View pointerEvents="none" style={[styles.chev, { left: 4 }]}>
-              <MaterialIcons
-                name="chevron-left"
-                size={16}
-                color={chevronColor}
-              />
-            </View>
-          </>
-        )}
+      const busyInfoA =
+        !isThisMatchFinished &&
+        !isThisMatchLive &&
+        pAId &&
+        liveBusyByPairId.has(pAId)
+          ? liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
+          : null;
+      const busyInfoB =
+        !isThisMatchFinished &&
+        !isThisMatchLive &&
+        pBId &&
+        liveBusyByPairId.has(pBId)
+          ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
+          : null;
 
-        {/* RIGHT hint */}
-        {state.canScroll && state.showR && (
-          <>
-            <LinearGradient
-              pointerEvents="none"
-              colors={["transparent", bgColor]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.fadeRight}
-            />
-            <View pointerEvents="none" style={[styles.chev, { right: 4 }]}>
-              <MaterialIcons
-                name="chevron-right"
-                size={16}
-                color={chevronColor}
-              />
-            </View>
-          </>
-        )}
-      </View>
-    );
-  };
+      const checked = selectedMatchIds.has(String(m._id));
 
-  const ActionButtons = ({ m }) => {
-    const has = !!m?.video;
-    const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
-    const onOpenRefNote = async () => {
-      try {
-        const html = buildRefReportHTML({
-          tourName: tour?.name || "",
-          code: matchCode(m),
-          court: courtNameOf(m),
-          referee: refereeNames(m),
-          team1: pairLabel(m?.pairA),
-          team2: pairLabel(m?.pairB),
-          logoUrl: "",
-        });
-        const { uri } = await Print.printToFileAsync({ html });
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: "Biên bản trọng tài",
-        });
-      } catch {
-        RNAlert.alert("Lỗi", "Không xuất được biên bản.");
-      }
-    };
-    return (
-      <EdgeFadedHScroll
-        contentContainerStyle={styles.actionsWrap}
-        bgColor={colors.card}
-        chevronColor={t.muted}
-      >
-        <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
-        <MiniChipBtn
-          icon="stadium"
-          label="Gán sân"
-          onPress={() => setAssignCourtSheet({ open: true, match: m })}
-        />
-        <MiniChipBtn
-          icon="how-to-reg"
-          label="Gán trọng tài"
-          onPress={() => setAssignRefSheet({ open: true, match: m })}
-        />
-        {canStart && (
-          <MiniChipBtn
-            icon="play-arrow"
-            label="Bắt trận"
-            onPress={() => router.push(refereeRouteOf(m))}
-          />
-        )}
-        {has && (
-          <MiniChipBtn
-            icon="open-in-new"
-            label="Mở"
-            onPress={() =>
-              Linking.openURL(m.video).catch(() =>
-                RNAlert.alert("Lỗi", "Không mở được liên kết.")
-              )
-            }
-          />
-        )}
-        <MiniChipBtn
-          icon="edit"
-          label={has ? "Sửa video" : "Thêm video"}
-          onPress={() => openVideoDlg(m)}
-        />
-        {has && (
-          <MiniChipBtn
-            icon="link-off"
-            label="Xoá"
-            color="#ef4444"
-            onPress={() => setVideoDlg({ open: true, match: m, url: "" })}
-          />
-        )}
-      </EdgeFadedHScroll>
-    );
-  };
-
-  /* ----------- row render (with selection) ----------- */
-  const renderMatchRow = ({ item: m }) => {
-    const hasVideo = !!m?.video;
-    const score = scoreText(m);
-    const courtLabel = courtNameOf(m);
-    const ordNum =
-      typeof m?.order === "number"
-        ? m.order
-        : m?.order != null
-        ? parseInt(String(m?.order), 10)
-        : null;
-
-    const isThisMatchLive = isLive(m);
-    const isThisMatchFinished = isFinished(m);
-
-    const pAId = pairIdOf(m?.pairA);
-    const pBId = pairIdOf(m?.pairB);
-
-    const busyInfoA =
-      !isThisMatchFinished &&
-      !isThisMatchLive &&
-      pAId &&
-      liveBusyByPairId.has(pAId)
-        ? liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
-        : null;
-    const busyInfoB =
-      !isThisMatchFinished &&
-      !isThisMatchLive &&
-      pBId &&
-      liveBusyByPairId.has(pBId)
-        ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
-        : null;
-
-    const checked = selectedMatchIds.has(String(m._id));
-
-    return (
-      <Pressable
-        onPress={() => openMatch(m._id)}
-        style={({ pressed }) => [
-          styles.matchRow,
-          { borderColor: colors.border, backgroundColor: colors.card },
-          pressed && { opacity: 0.95 },
-        ]}
-      >
-        {/* ⬇️ Dòng riêng cho checkbox chọn item */}
+      return (
         <Pressable
-          onPress={(e) => {
-            e?.stopPropagation?.();
-            toggleSelectMatch(m._id);
-          }}
+          onPress={() => openMatch(m._id)}
           style={({ pressed }) => [
-            styles.selectRow,
-            { borderColor: colors.border },
-            pressed && { opacity: 0.9 },
+            styles.matchRow,
+            { borderColor: colors.border, backgroundColor: colors.card },
+            pressed && { opacity: 0.95 },
           ]}
         >
-          <MaterialIcons
-            name={checked ? "check-box" : "check-box-outline-blank"}
-            size={20}
-            color={checked ? colors.primary : t.muted}
+          <Pressable
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              toggleSelectMatch(m._id);
+            }}
+            style={({ pressed }) => [
+              styles.selectRow,
+              { borderColor: colors.border },
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <MaterialIcons
+              name={checked ? "check-box" : "check-box-outline-blank"}
+              size={20}
+              color={checked ? colors.primary : t.muted}
+            />
+            <Text
+              style={{
+                color: colors.text,
+                fontWeight: "700",
+              }}
+            >
+              {checked ? "Đã chọn" : ""}
+            </Text>
+            <View style={{ flex: 1 }} />
+            <Text style={{ color: t.muted, fontSize: 12 }}>{matchCode(m)}</Text>
+          </Pressable>
+
+          <ActionButtons
+            m={m}
+            tour={tour}
+            me={me}
+            onOpenVideoDlg={openVideoDlg}
+            onOpenSheet={handleOpenSheet}
           />
-          <Text
+
+          <View style={styles.contentBlock}>
+            <Text
+              style={[styles.code, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {matchCode(m)}
+            </Text>
+
+            <View
+              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
+            >
+              <Text style={{ color: colors.text }} numberOfLines={1}>
+                {pairLabel(m?.pairA)}
+              </Text>
+              {busyInfoA ? <BusyChip court={busyInfoA.court} /> : null}
+            </View>
+
+            <View
+              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
+            >
+              <Text style={{ color: colors.text }} numberOfLines={1}>
+                {pairLabel(m?.pairB)}
+              </Text>
+              {busyInfoB ? <BusyChip court={busyInfoB.court} /> : null}
+            </View>
+
+            <View style={styles.metaRow}>
+              <StatusPill status={m?.status} />
+              <CourtPill name={courtLabel} />
+              <ScorePill textVal={score} />
+              <Text style={{ color: t.muted, fontSize: 12 }}>
+                Vòng {m?.round ?? "—"} • Thứ tự{" "}
+                {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
+              </Text>
+              <VideoPill has={hasVideo} />
+            </View>
+          </View>
+        </Pressable>
+      );
+    },
+    [
+      colors,
+      t,
+      tour,
+      me,
+      liveBusyByPairId,
+      selectedMatchIds,
+      openMatch,
+      toggleSelectMatch,
+      openVideoDlg,
+      handleOpenSheet,
+    ]
+  );
+
+  // ✅ MEMOIZED renderBracket
+  const renderBracket = useCallback(
+    ({ item: b }) => {
+      const bid = String(b?._id);
+      const matches = mergedAllMatches.filter(
+        (m) => String(m?.bracket?._id || m?.bracket) === bid
+      );
+      const list = filterSortMatches(matches);
+      const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}|${courtFilter}|${hideBye}`;
+
+      const allSelected = isAllSelectedIn(list);
+      const selectedCount = list.filter((m) =>
+        selectedMatchIds.has(String(m._id))
+      ).length;
+
+      return (
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <View
             style={{
-              color: colors.text,
-              fontWeight: "700",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
+              flexWrap: "wrap",
             }}
           >
-            {checked ? "Đã chọn" : ""}
-          </Text>
-          <View style={{ flex: 1 }} />
-          {/* hiển thị mã trận nhỏ bên phải cho tiện nhìn */}
-          <Text style={{ color: t.muted, fontSize: 12 }}>{matchCode(m)}</Text>
-        </Pressable>
-
-        {/* Action buttons */}
-        <ActionButtons m={m} />
-
-        {/* Nội dung */}
-        <View style={styles.contentBlock}>
-          <Text style={[styles.code, { color: colors.text }]} numberOfLines={1}>
-            {matchCode(m)}
-          </Text>
-
-          {/* Pair A */}
-          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-            <Text style={{ color: colors.text }} numberOfLines={1}>
-              {pairLabel(m?.pairA)}
-            </Text>
-            {busyInfoA ? <BusyChip court={busyInfoA.court} /> : null}
-          </View>
-
-          {/* Pair B */}
-          <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-            <Text style={{ color: colors.text }} numberOfLines={1}>
-              {pairLabel(m?.pairB)}
-            </Text>
-            {busyInfoB ? <BusyChip court={busyInfoB.court} /> : null}
-          </View>
-
-          <View style={styles.metaRow}>
-            <StatusPill status={m?.status} />
-            <CourtPill name={courtLabel} />
-            <ScorePill textVal={score} />
-            <Text style={{ color: t.muted, fontSize: 12 }}>
-              Vòng {m?.round ?? "—"} • Thứ tự{" "}
-              {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
-            </Text>
-            <VideoPill has={hasVideo} />
-          </View>
-        </View>
-      </Pressable>
-    );
-  };
-
-  const renderBracket = ({ item: b }) => {
-    const bid = String(b?._id);
-    const matches = mergedAllMatches.filter(
-      (m) => String(m?.bracket?._id || m?.bracket) === bid
-    );
-    const list = filterSortMatches(matches);
-    const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}`;
-
-    const allSelected = isAllSelectedIn(list);
-    const selectedCount = list.filter((m) =>
-      selectedMatchIds.has(String(m._id))
-    ).length;
-
-    return (
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <Text
-            style={[styles.bracketTitle, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {b?.name || "Bracket"}
-          </Text>
-          <Pill label={TYPE_LABEL(b?.type)} />
-          {typeof b?.stage === "number" ? (
-            <Pill label={`Stage ${b.stage}`} />
-          ) : null}
-          <Pill label={`${list.length} trận`} kind="primary" />
-        </View>
-
-        {/* Select-all row (mobile) */}
-        {list.length > 0 && (
-          <View style={styles.selectAllRow}>
-            <Pressable
-              onPress={() => toggleSelectAllIn(list, !allSelected)}
-              style={({ pressed }) => [
-                { flexDirection: "row", alignItems: "center", gap: 8 },
-                pressed && { opacity: 0.9 },
-              ]}
+            <Text
+              style={[styles.bracketTitle, { color: colors.text }]}
+              numberOfLines={1}
             >
-              <MaterialIcons
-                name={
-                  allSelected
-                    ? "check-box"
-                    : selectedCount > 0
-                    ? "indeterminate-check-box"
-                    : "check-box-outline-blank"
-                }
-                size={18}
-                color={colors.text}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-              </Text>
-            </Pressable>
-            {selectedCount > 0 ? (
-              <Pill label={`${selectedCount} đã chọn`} />
+              {b?.name || "Bracket"}
+            </Text>
+            <Pill label={TYPE_LABEL(b?.type)} />
+            {typeof b?.stage === "number" ? (
+              <Pill label={`Stage ${b.stage}`} />
             ) : null}
+            <Pill label={`${list.length} trận`} kind="primary" />
           </View>
-        )}
 
-        {list.length === 0 ? (
-          <View style={[styles.emptyBox, { borderColor: colors.border }]}>
-            <Text style={{ color: t.muted }}>Chưa có trận nào.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={list}
-            keyExtractor={(m) => String(m._id)}
-            renderItem={renderMatchRow}
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            scrollEnabled={false}
-            extraData={listVersion}
-          />
-        )}
-      </View>
-    );
-  };
+          {list.length > 0 && (
+            <View style={styles.selectAllRow}>
+              <Pressable
+                onPress={() => toggleSelectAllIn(list, !allSelected)}
+                style={({ pressed }) => [
+                  { flexDirection: "row", alignItems: "center", gap: 8 },
+                  pressed && { opacity: 0.9 },
+                ]}
+              >
+                <MaterialIcons
+                  name={
+                    allSelected
+                      ? "check-box"
+                      : selectedCount > 0
+                      ? "indeterminate-check-box"
+                      : "check-box-outline-blank"
+                  }
+                  size={18}
+                  color={colors.text}
+                />
+                <Text style={{ color: colors.text, fontWeight: "700" }}>
+                  {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                </Text>
+              </Pressable>
+              {selectedCount > 0 ? (
+                <Pill label={`${selectedCount} đã chọn`} />
+              ) : null}
+            </View>
+          )}
 
-  // Header dropdown (đơn giản)
+          {list.length === 0 ? (
+            <View style={[styles.emptyBox, { borderColor: colors.border }]}>
+              <Text style={{ color: t.muted }}>Chưa có trận nào.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={list}
+              keyExtractor={(m) => String(m._id)}
+              renderItem={renderMatchRow}
+              ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+              scrollEnabled={false}
+              extraData={listVersion}
+              removeClippedSubviews={Platform.OS === "android"}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+            />
+          )}
+        </View>
+      );
+    },
+    [
+      colors,
+      t,
+      mergedAllMatches,
+      filterSortMatches,
+      sortKey,
+      sortDir,
+      q,
+      liveBump,
+      selBump,
+      courtFilter,
+      hideBye,
+      isAllSelectedIn,
+      selectedMatchIds,
+      toggleSelectAllIn,
+      renderMatchRow,
+    ]
+  );
+
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
 
-  /* ----------- guards ----------- */
   const isInitialLoading = tourLoading || brLoading || mLoading;
   const hasError = tourErr || brErr || mErr;
+
+  const buildRowsForBracket = useCallback((matches) => {
+    return matches.map((m) => {
+      const code = matchCode(m);
+      const a = pairLabel(m?.pairA);
+      const b = pairLabel(m?.pairB);
+      const court = courtNameOf(m) || "—";
+      const order =
+        Number.isFinite(m?.order) || typeof m?.order === "number"
+          ? `T${Number(m.order) + 1}`
+          : "—";
+      const score = scoreText(m) || "—";
+      return [code, a, b, court, order, score];
+    });
+  }, []);
+
+  const buildExportPayload = useCallback(() => {
+    const payload = [];
+    for (const b of bracketsOfTab) {
+      const bid = String(b?._id);
+      const matches = mergedAllMatches.filter(
+        (m) => String(m?.bracket?._id || m?.bracket) === bid
+      );
+      const list = filterSortMatches(matches);
+      payload.push({
+        title: `${b?.name || "Bracket"} — ${TYPE_LABEL(b?.type)}`,
+        rows: buildRowsForBracket(list),
+      });
+    }
+    return payload;
+  }, [bracketsOfTab, mergedAllMatches, filterSortMatches, buildRowsForBracket]);
+
+  const handleExportPDF = useCallback(async () => {
+    setHdrMenuOpen(false);
+    try {
+      const sections = buildExportPayload();
+      if (!sections.length)
+        return RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
+      const html = buildExportHTML({
+        tourName: tour?.name || "",
+        typeLabel: TYPE_LABEL(tab),
+        sections,
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Xuất PDF",
+      });
+    } catch {
+      RNAlert.alert("Lỗi", "Xuất PDF thất bại.");
+    }
+  }, [buildExportPayload, tour, tab]);
+
+  const handleExportWord = useCallback(async () => {
+    setHdrMenuOpen(false);
+    try {
+      const sections = buildExportPayload();
+      if (!sections.length)
+        return RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
+      const html = buildExportHTML({
+        tourName: tour?.name || "",
+        typeLabel: TYPE_LABEL(tab),
+        sections,
+      });
+      const content = `\ufeff${html}`;
+      const safeName = (tour?.name || "export")
+        .replace(/[^\p{L}\p{N}]+/gu, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase();
+      const fileName = `tournament_${safeName}_${tab}_${new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:T]/g, "-")}.doc`;
+      const fileUri = FileSystem.cacheDirectory + fileName;
+      await FileSystem.writeAsStringAsync(fileUri, content, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      await Sharing.shareAsync(fileUri, {
+        mimeType: "application/msword",
+        dialogTitle: "Xuất Word",
+      });
+    } catch {
+      RNAlert.alert("Lỗi", "Xuất Word thất bại.");
+    }
+  }, [buildExportPayload, tour, tab]);
 
   if (isInitialLoading) {
     return (
@@ -1592,7 +1849,6 @@ export default function ManageScreen() {
     );
   }
 
-  /* ----------- render ----------- */
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen
@@ -1615,7 +1871,6 @@ export default function ManageScreen() {
       />
 
       <View style={[styles.screen]}>
-        {/* Controls */}
         <View
           style={[
             styles.toolbar,
@@ -1656,6 +1911,23 @@ export default function ManageScreen() {
               icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
               colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
             />
+
+            <PickerChip
+              label={`Sân: ${courtFilter || "Tất cả"}`}
+              onPress={() => {
+                setCourtOptions(collectCourts());
+                setCourtPickerOpen(true);
+              }}
+              icon="stadium"
+              colorsTheme={{ bg: t.courtBg, fg: t.courtFg }}
+            />
+
+            <CheckChip
+              checked={hideBye}
+              label="Ẩn BYE"
+              onPress={() => setHideBye((v) => !v)}
+            />
+
             <Pill
               label={`${
                 typesAvailable.length ? bracketsOfTab.length : 0
@@ -1664,7 +1936,6 @@ export default function ManageScreen() {
           </View>
         </View>
 
-        {/* Tabs */}
         <View style={[styles.tabs, { borderColor: colors.border }]}>
           {typesAvailable.map((tTab) => {
             const active = tTab.type === tab;
@@ -1694,7 +1965,6 @@ export default function ManageScreen() {
           })}
         </View>
 
-        {/* Brackets list */}
         <FlatList
           data={bracketsOfTab}
           keyExtractor={(b) => String(b._id)}
@@ -1717,17 +1987,18 @@ export default function ManageScreen() {
               </Text>
             </View>
           }
-          extraData={`${liveBump}|${selBump}`}
+          extraData={`${liveBump}|${selBump}|${courtFilter}|${hideBye}`}
+          removeClippedSubviews={Platform.OS === "android"}
+          maxToRenderPerBatch={3}
+          windowSize={5}
         />
 
-        {/* Viewer */}
         <ResponsiveMatchViewer
           open={viewer.open}
           matchId={viewer.matchId}
           onClose={closeMatch}
         />
 
-        {/* Floating action bar when selected > 0 */}
         {selectedMatchIds.size > 0 && (
           <View
             style={[
@@ -1750,14 +2021,11 @@ export default function ManageScreen() {
                 kind="primary"
               />
 
-              {/* Scroll ngang có fade & mũi tên: dùng lại EdgeFadedHScroll ở trên */}
               <View style={{ flex: 1 }}>
                 <EdgeFadedHScroll
                   contentContainerStyle={styles.bottomActions}
                   bgColor={colors.card}
                   chevronColor={t.muted}
-                  fadeWidth={28}
-                  threshold={12}
                   style={{ maxHeight: 40 }}
                 >
                   <BtnOutline onPress={() => setBatchRefDlg({ open: true })}>
@@ -1804,142 +2072,41 @@ export default function ManageScreen() {
               { backgroundColor: colors.card, borderColor: colors.border },
             ]}
           >
-            <Pressable
-              style={styles.menuItem}
+            <MenuItem
+              icon="how-to-reg"
+              label="Quản lý trọng tài"
               onPress={() => {
                 setHdrMenuOpen(false);
                 setRefMgrOpen(true);
               }}
-            >
-              <MaterialIcons
-                name="how-to-reg"
-                size={18}
-                color={colors.text}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                Quản lý trọng tài
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuItem}
+            />
+            <MenuItem
+              icon="stadium"
+              label="Quản lý sân"
               onPress={() => {
                 setHdrMenuOpen(false);
                 setCourtMgrSheet({ open: true, bracket: null });
               }}
-            >
-              <MaterialIcons
-                name="stadium"
-                size={18}
-                color={colors.text}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                Quản lý sân
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuItem}
+            />
+            <MenuItem
+              icon="movie"
+              label="Thiết lập LIVE"
               onPress={() => {
                 setHdrMenuOpen(false);
                 setLiveSetupSheet({ open: true, bracket: null });
               }}
-            >
-              <MaterialIcons
-                name="movie"
-                size={18}
-                color={colors.text}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                Thiết lập LIVE
-              </Text>
-            </Pressable>
+            />
             <View style={{ height: 8 }} />
-            <Pressable
-              style={styles.menuItem}
-              onPress={async () => {
-                setHdrMenuOpen(false);
-                try {
-                  const sections = buildExportPayload();
-                  if (!sections.length)
-                    return RNAlert.alert(
-                      "Thông báo",
-                      "Không có dữ liệu để xuất."
-                    );
-                  const html = buildExportHTML({
-                    tourName: tour?.name || "",
-                    typeLabel: TYPE_LABEL(tab),
-                    sections,
-                  });
-                  const { uri } = await Print.printToFileAsync({ html });
-                  await Sharing.shareAsync(uri, {
-                    mimeType: "application/pdf",
-                    dialogTitle: "Xuất PDF",
-                  });
-                } catch {
-                  RNAlert.alert("Lỗi", "Xuất PDF thất bại.");
-                }
-              }}
-            >
-              <MaterialIcons
-                name="picture-as-pdf"
-                size={18}
-                color={colors.text}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                Xuất PDF
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuItem}
-              onPress={async () => {
-                setHdrMenuOpen(false);
-                try {
-                  const sections = buildExportPayload();
-                  if (!sections.length)
-                    return RNAlert.alert(
-                      "Thông báo",
-                      "Không có dữ liệu để xuất."
-                    );
-                  const html = buildExportHTML({
-                    tourName: tour?.name || "",
-                    typeLabel: TYPE_LABEL(tab),
-                    sections,
-                  });
-                  const content = `\ufeff${html}`;
-                  const safeName = (tour?.name || "export")
-                    .replace(/[^\p{L}\p{N}]+/gu, "_")
-                    .replace(/^_+|_+$/g, "")
-                    .toLowerCase();
-                  const fileName = `tournament_${safeName}_${tab}_${new Date()
-                    .toISOString()
-                    .slice(0, 19)
-                    .replace(/[:T]/g, "-")}.doc`;
-                  const fileUri = FileSystem.cacheDirectory + fileName;
-                  await FileSystem.writeAsStringAsync(fileUri, content, {
-                    encoding: FileSystem.EncodingType.UTF8,
-                  });
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: "application/msword",
-                    dialogTitle: "Xuất Word",
-                  });
-                } catch {
-                  RNAlert.alert("Lỗi", "Xuất Word thất bại.");
-                }
-              }}
-            >
-              <MaterialIcons
-                name="description"
-                size={18}
-                color={colors.text}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={{ color: colors.text, fontWeight: "700" }}>
-                Xuất Word
-              </Text>
-            </Pressable>
+            <MenuItem
+              icon="picture-as-pdf"
+              label="Xuất PDF"
+              onPress={handleExportPDF}
+            />
+            <MenuItem
+              icon="description"
+              label="Xuất Word"
+              onPress={handleExportWord}
+            />
             <MenuItem
               icon="home"
               label="Trang giải"
@@ -1961,15 +2128,359 @@ export default function ManageScreen() {
           </View>
         </Modal>
 
-        {/* ====== Single video modal ====== */}
+        {/* ====== Single video modal (✅ WITH KEYBOARD FIX) ====== */}
         <Modal
           visible={videoDlg.open}
           transparent
           animationType="fade"
           onRequestClose={closeVideoDlg}
         >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.modalBackdrop}>
+              <Pressable style={{ flex: 1 }} onPress={closeVideoDlg} />
+              <View
+                style={[
+                  styles.modalCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontWeight: "700",
+                      fontSize: 16,
+                    }}
+                  >
+                    {(videoDlg?.match &&
+                      (videoDlg.match.code || matchCode(videoDlg.match))) ||
+                      ""}{" "}
+                    — Link video
+                  </Text>
+                  <IconBtn
+                    name="close"
+                    color={colors.text}
+                    size={20}
+                    onPress={closeVideoDlg}
+                  />
+                </View>
+
+                <View
+                  style={[styles.inputWrap, { borderColor: colors.border }]}
+                >
+                  <MaterialIcons name="link" size={18} color={t.muted} />
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="URL video (YouTube/Facebook/TikTok/M3U8...)"
+                    placeholderTextColor={t.placeholder}
+                    value={videoDlg.url}
+                    onChangeText={(s) => setVideoDlg((v) => ({ ...v, url: s }))}
+                  />
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    marginTop: 10,
+                  }}
+                >
+                  <BtnOutline onPress={closeVideoDlg}>Đóng</BtnOutline>
+                  <BtnOutline onPress={onSaveVideo}>
+                    <Text style={{ color: colors.text, fontWeight: "700" }}>
+                      Lưu
+                    </Text>
+                  </BtnOutline>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* ====== Batch Referee modal (✅ WITH KEYBOARD FIX) ====== */}
+        {/* ====== Batch Referee modal (✅ FIXED LAYOUT) ====== */}
+        <Modal
+          visible={batchRefDlg.open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBatchRefDlg({ open: false })}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.modalBackdrop}>
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => setBatchRefDlg({ open: false })}
+              />
+              <View
+                style={[
+                  styles.modalCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    maxHeight: 460,
+                  },
+                ]}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontWeight: "700",
+                      fontSize: 16,
+                    }}
+                  >
+                    Gán trọng tài cho {selectedMatchIds.size} trận
+                  </Text>
+                  <IconBtn
+                    name="close"
+                    color={colors.text}
+                    size={20}
+                    onPress={() => setBatchRefDlg({ open: false })}
+                  />
+                </View>
+
+                <View
+                  style={[
+                    styles.inputWrap,
+                    { borderColor: colors.border, marginBottom: 10 },
+                  ]}
+                >
+                  <MaterialIcons name="search" size={18} color={t.muted} />
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="Tìm trọng tài (tên, nickname...)"
+                    placeholderTextColor={t.placeholder}
+                    onChangeText={() => {}}
+                  />
+                </View>
+
+                <ScrollView
+                  style={{ maxHeight: 280 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {refsErr ? (
+                    <Text style={{ color: t.warnText }}>
+                      Không tải được danh sách trọng tài.
+                    </Text>
+                  ) : refsLoading ? (
+                    <Text style={{ color: t.muted }}>Đang tải…</Text>
+                  ) : refOptions.length === 0 ? (
+                    <Text style={{ color: t.muted }}>
+                      Chưa có trọng tài trong giải.
+                    </Text>
+                  ) : (
+                    refOptions.map((r) => {
+                      const id = idOfRef(r);
+                      const chosen = pickedRefs.some((x) => idOfRef(x) === id);
+                      return (
+                        <Pressable
+                          key={id}
+                          onPress={() =>
+                            setPickedRefs((prev) =>
+                              chosen
+                                ? prev.filter((x) => idOfRef(x) !== id)
+                                : [...prev, r]
+                            )
+                          }
+                          style={({ pressed }) => [
+                            styles.refRow,
+                            { borderColor: colors.border },
+                            pressed && { opacity: 0.9 },
+                          ]}
+                        >
+                          <MaterialIcons
+                            name={
+                              chosen ? "check-box" : "check-box-outline-blank"
+                            }
+                            size={18}
+                            color={chosen ? colors.primary : t.muted}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text
+                            style={{ color: colors.text, fontWeight: "700" }}
+                          >
+                            {r?.name || r?.nickname || "—"}
+                          </Text>
+                          {r?.nickname && r?.name ? (
+                            <Text style={{ color: t.muted, marginLeft: 6 }}>
+                              ({r.nickname})
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    marginTop: 10,
+                  }}
+                >
+                  <BtnOutline onPress={() => setBatchRefDlg({ open: false })}>
+                    Đóng
+                  </BtnOutline>
+                  <Pressable
+                    onPress={submitBatchAssign}
+                    style={({ pressed }) => [
+                      styles.primaryBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: pressed || batchingRefs ? 0.9 : 1,
+                      },
+                    ]}
+                    disabled={
+                      batchingRefs ||
+                      pickedRefs.length === 0 ||
+                      selectedMatchIds.size === 0
+                    }
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "800" }}>
+                      Gán
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* ====== Batch Video modal (✅ WITH KEYBOARD FIX) ====== */}
+        <Modal
+          visible={batchVideoDlg.open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBatchVideoDlg({ open: false, url: "" })}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.modalBackdrop}>
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+              />
+              <View
+                style={[
+                  styles.modalCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontWeight: "700",
+                      fontSize: 16,
+                    }}
+                  >
+                    Gán video cho {selectedMatchIds.size} trận
+                  </Text>
+                  <IconBtn
+                    name="close"
+                    color={colors.text}
+                    size={20}
+                    onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                  />
+                </View>
+
+                <View
+                  style={[styles.inputWrap, { borderColor: colors.border }]}
+                >
+                  <MaterialIcons name="link" size={18} color={t.muted} />
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="URL video (Facebook/YouTube/M3U8...)"
+                    placeholderTextColor={t.placeholder}
+                    value={batchVideoDlg.url}
+                    onChangeText={(s) =>
+                      setBatchVideoDlg((v) => ({ ...v, url: s }))
+                    }
+                  />
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    marginTop: 10,
+                  }}
+                >
+                  <BtnOutline
+                    onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                  >
+                    Đóng
+                  </BtnOutline>
+                  <Pressable
+                    onPress={submitBatchSetVideo}
+                    style={({ pressed }) => [
+                      styles.primaryBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: pressed || batchingVideo ? 0.9 : 1,
+                      },
+                    ]}
+                    disabled={
+                      batchingVideo ||
+                      !batchVideoDlg.url.trim() ||
+                      selectedMatchIds.size === 0
+                    }
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "800" }}>
+                      Gán
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* ===== Court Picker modal ===== */}
+        <Modal
+          visible={courtPickerOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCourtPickerOpen(false)}
+        >
           <View style={styles.modalBackdrop}>
-            <Pressable style={{ flex: 1 }} onPress={closeVideoDlg} />
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => setCourtPickerOpen(false)}
+            />
             <View
               style={[
                 styles.modalCard,
@@ -1991,136 +2502,57 @@ export default function ManageScreen() {
                     fontSize: 16,
                   }}
                 >
-                  {(videoDlg?.match &&
-                    (videoDlg.match.code || matchCode(videoDlg.match))) ||
-                    ""}{" "}
-                  — Link video
+                  Chọn sân để lọc
                 </Text>
                 <IconBtn
                   name="close"
                   color={colors.text}
                   size={20}
-                  onPress={closeVideoDlg}
-                />
-              </View>
-
-              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
-                <MaterialIcons name="link" size={18} color={t.muted} />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="URL video (YouTube/Facebook/TikTok/M3U8...)"
-                  placeholderTextColor={t.placeholder}
-                  value={videoDlg.url}
-                  onChangeText={(s) => setVideoDlg((v) => ({ ...v, url: s }))}
-                />
-              </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
-                <BtnOutline onPress={closeVideoDlg}>Đóng</BtnOutline>
-                <BtnOutline onPress={onSaveVideo}>
-                  <Text style={{ color: colors.text, fontWeight: "700" }}>
-                    Lưu
-                  </Text>
-                </BtnOutline>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* ====== NEW: Batch Referee modal ====== */}
-        <Modal
-          visible={batchRefDlg.open}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setBatchRefDlg({ open: false })}
-        >
-          <View style={styles.modalBackdrop}>
-            <Pressable
-              style={{ flex: 1 }}
-              onPress={() => setBatchRefDlg({ open: false })}
-            />
-            <View
-              style={[
-                styles.modalCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  maxHeight: 460,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontWeight: "700",
-                    fontSize: 16,
-                  }}
-                >
-                  Gán trọng tài cho {selectedMatchIds.size} trận
-                </Text>
-                <IconBtn
-                  name="close"
-                  color={colors.text}
-                  size={20}
-                  onPress={() => setBatchRefDlg({ open: false })}
-                />
-              </View>
-
-              <View
-                style={[
-                  styles.inputWrap,
-                  { borderColor: colors.border, marginBottom: 10 },
-                ]}
-              >
-                <MaterialIcons name="search" size={18} color={t.muted} />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Tìm trọng tài (tên, nickname...)"
-                  placeholderTextColor={t.placeholder}
-                  onChangeText={() => {}}
+                  onPress={() => setCourtPickerOpen(false)}
                 />
               </View>
 
               <ScrollView style={{ maxHeight: 320 }}>
-                {refsErr ? (
-                  <Text style={{ color: t.warnText }}>
-                    Không tải được danh sách trọng tài.
+                <Pressable
+                  onPress={() => {
+                    setCourtFilter("");
+                    setCourtPickerOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.refRow,
+                    { borderColor: colors.border },
+                    pressed && { opacity: 0.9 },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={
+                      !courtFilter
+                        ? "radio-button-checked"
+                        : "radio-button-unchecked"
+                    }
+                    size={18}
+                    color={!courtFilter ? colors.primary : t.muted}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={{ color: colors.text, fontWeight: "700" }}>
+                    Tất cả sân
                   </Text>
-                ) : refsLoading ? (
-                  <Text style={{ color: t.muted }}>Đang tải…</Text>
-                ) : refOptions.length === 0 ? (
-                  <Text style={{ color: t.muted }}>
-                    Chưa có trọng tài trong giải.
+                </Pressable>
+
+                {courtOptions.length === 0 ? (
+                  <Text style={{ color: t.muted, paddingVertical: 8 }}>
+                    Chưa có sân nào.
                   </Text>
                 ) : (
-                  refOptions.map((r) => {
-                    const id = idOfRef(r);
-                    const chosen = pickedRefs.some((x) => idOfRef(x) === id);
+                  courtOptions.map((c) => {
+                    const chosen = courtFilter === c;
                     return (
                       <Pressable
-                        key={id}
-                        onPress={() =>
-                          setPickedRefs((prev) =>
-                            chosen
-                              ? prev.filter((x) => idOfRef(x) !== id)
-                              : [...prev, r]
-                          )
-                        }
+                        key={c}
+                        onPress={() => {
+                          setCourtFilter(c);
+                          setCourtPickerOpen(false);
+                        }}
                         style={({ pressed }) => [
                           styles.refRow,
                           { borderColor: colors.border },
@@ -2129,20 +2561,17 @@ export default function ManageScreen() {
                       >
                         <MaterialIcons
                           name={
-                            chosen ? "check-box" : "check-box-outline-blank"
+                            chosen
+                              ? "radio-button-checked"
+                              : "radio-button-unchecked"
                           }
                           size={18}
                           color={chosen ? colors.primary : t.muted}
                           style={{ marginRight: 8 }}
                         />
                         <Text style={{ color: colors.text, fontWeight: "700" }}>
-                          {r?.name || r?.nickname || "—"}
+                          {c}
                         </Text>
-                        {r?.nickname && r?.name ? (
-                          <Text style={{ color: t.muted, marginLeft: 6 }}>
-                            ({r.nickname})
-                          </Text>
-                        ) : null}
                       </Pressable>
                     );
                   })
@@ -2157,123 +2586,14 @@ export default function ManageScreen() {
                   marginTop: 10,
                 }}
               >
-                <BtnOutline onPress={() => setBatchRefDlg({ open: false })}>
+                <BtnOutline onPress={() => setCourtPickerOpen(false)}>
                   Đóng
                 </BtnOutline>
-                <Pressable
-                  onPress={submitBatchAssign}
-                  style={({ pressed }) => [
-                    styles.primaryBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: pressed || batchingRefs ? 0.9 : 1,
-                    },
-                  ]}
-                  disabled={
-                    batchingRefs ||
-                    pickedRefs.length === 0 ||
-                    selectedMatchIds.size === 0
-                  }
-                >
-                  <Text style={{ color: "#fff", fontWeight: "800" }}>Gán</Text>
-                </Pressable>
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* ====== NEW: Batch Video modal ====== */}
-        <Modal
-          visible={batchVideoDlg.open}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setBatchVideoDlg({ open: false, url: "" })}
-        >
-          <View style={styles.modalBackdrop}>
-            <Pressable
-              style={{ flex: 1 }}
-              onPress={() => setBatchVideoDlg({ open: false, url: "" })}
-            />
-            <View
-              style={[
-                styles.modalCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontWeight: "700",
-                    fontSize: 16,
-                  }}
-                >
-                  Gán video cho {selectedMatchIds.size} trận
-                </Text>
-                <IconBtn
-                  name="close"
-                  color={colors.text}
-                  size={20}
-                  onPress={() => setBatchVideoDlg({ open: false, url: "" })}
-                />
-              </View>
-
-              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
-                <MaterialIcons name="link" size={18} color={t.muted} />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="URL video (Facebook/YouTube/M3U8...)"
-                  placeholderTextColor={t.placeholder}
-                  value={batchVideoDlg.url}
-                  onChangeText={(s) =>
-                    setBatchVideoDlg((v) => ({ ...v, url: s }))
-                  }
-                />
-              </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
-                <BtnOutline
-                  onPress={() => setBatchVideoDlg({ open: false, url: "" })}
-                >
-                  Đóng
-                </BtnOutline>
-                <Pressable
-                  onPress={submitBatchSetVideo}
-                  style={({ pressed }) => [
-                    styles.primaryBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: pressed || batchingVideo ? 0.9 : 1,
-                    },
-                  ]}
-                  disabled={
-                    batchingVideo ||
-                    !batchVideoDlg.url.trim() ||
-                    selectedMatchIds.size === 0
-                  }
-                >
-                  <Text style={{ color: "#fff", fontWeight: "800" }}>Gán</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* ===== Sheets có sẵn ===== */}
         <ManageRefereesSheet
           open={refMgrOpen}
           onClose={() => setRefMgrOpen(false)}
@@ -2314,40 +2634,8 @@ export default function ManageScreen() {
       </View>
     </View>
   );
-
-  // ===== Export payload builder (reuse in header menu) =====
-  function buildRowsForBracket(matches) {
-    return matches.map((m) => {
-      const code = matchCode(m);
-      const a = pairLabel(m?.pairA);
-      const b = pairLabel(m?.pairB);
-      const court = courtNameOf(m) || "—";
-      const order =
-        Number.isFinite(m?.order) || typeof m?.order === "number"
-          ? `T${Number(m.order) + 1}`
-          : "—";
-      const score = scoreText(m) || "—";
-      return [code, a, b, court, order, score];
-    });
-  }
-  function buildExportPayload() {
-    const payload = [];
-    for (const b of bracketsOfTab) {
-      const bid = String(b?._id);
-      const matches = mergedAllMatches.filter(
-        (m) => String(m?.bracket?._id || m?.bracket) === bid
-      );
-      const list = filterSortMatches(matches);
-      payload.push({
-        title: `${b?.name || "Bracket"} — ${TYPE_LABEL(b?.type)}`,
-        rows: buildRowsForBracket(list),
-      });
-    }
-    return payload;
-  }
 }
 
-/* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -2403,7 +2691,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
-  /* ⬇️ dòng riêng cho checkbox của từng item */
   selectRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2460,7 +2747,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 8,
     borderTopWidth: 1,
-    // shadow
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -2483,7 +2769,7 @@ const styles = StyleSheet.create({
   bottomActions: {
     gap: 8,
     alignItems: "center",
-    paddingRight: 6, // để EdgeFadedHScroll có chỗ fade
+    paddingRight: 6,
   },
 
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },

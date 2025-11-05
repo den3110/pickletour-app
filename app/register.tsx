@@ -1,8 +1,7 @@
 // app/(auth)/register.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,10 +14,14 @@ import {
   View,
   Keyboard,
   FlatList,
-  TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImageManipulator from "expo-image-manipulator";
+import { Image as ExpoImage } from "expo-image";
+import ImageView from "react-native-image-viewing";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Stack, router, Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -97,37 +100,6 @@ const PROVINCES = [
   "Yên Bái",
 ];
 
-function vnNormalize(s = "") {
-  return s
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .trim();
-}
-
-async function pickImage(maxBytes = MAX_FILE_SIZE) {
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.9,
-  });
-  if (res.canceled) return null;
-  const asset = res.assets[0];
-  const uri = asset.uri;
-  const info = await FileSystem.getInfoAsync(uri, { size: true });
-  if (info.size && info.size > maxBytes) {
-    Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
-    return null;
-  }
-  const ext = asset.fileName?.split(".").pop() || uri.split(".").pop() || "jpg";
-  const name = asset.fileName || `avatar.${ext}`;
-  const type =
-    asset.mimeType ||
-    (ext.toLowerCase() === "png" ? "image/png" : "image/jpeg");
-  return { uri, name, type, size: info.size };
-}
-
 function cleanPhone(v) {
   if (typeof v !== "string") return "";
   let s = v.trim();
@@ -137,14 +109,118 @@ function cleanPhone(v) {
   return s;
 }
 
-// ---- Các trường optional cần nhắc (tuỳ bạn) ----
-function getMissingOptional(form, hasAvatar) {
-  const missing = [];
-  if (!(form?.email || "").trim()) missing.push("Email");
-  if (!cleanPhone(form?.phone || "")) missing.push("Số điện thoại");
-  if (!form?.province) missing.push("Tỉnh/Thành phố");
-  if (!hasAvatar) missing.push("Ảnh đại diện");
-  return missing;
+async function pickImage(maxBytes = MAX_FILE_SIZE) {
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.9,
+    allowsEditing: false,
+    exif: false,
+  });
+  if (res.canceled) return null;
+
+  let asset = res.assets?.[0];
+  if (!asset?.uri) return null;
+
+  let uri = asset.uri;
+  // Lấy tên + phần mở rộng an toàn
+  let name =
+    asset.fileName || uri.split(/[\\/]/).pop() || `image_${Date.now()}.jpg`;
+
+  let ext = (name.split(".").pop() || "").toLowerCase();
+  let type =
+    asset.mimeType ||
+    (ext === "png"
+      ? "image/png"
+      : ext === "webp"
+      ? "image/webp"
+      : "image/jpeg");
+
+  // Chuyển HEIC/HEIF → JPEG
+  const isHeic = /heic|heif$/i.test(ext) || /heic|heif/i.test(type || "");
+  if (isHeic) {
+    const out = await ImageManipulator.manipulateAsync(uri, [], {
+      compress: 0.9,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    uri = out.uri;
+    name = name.replace(/\.(heic|heif)$/i, ".jpg");
+    type = "image/jpeg";
+    ext = "jpg";
+  }
+
+  // Kiểm tra size
+  const info = await FileSystem.getInfoAsync(uri, { size: true });
+  const size = info.size || 0;
+  if (size > maxBytes) {
+    Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
+    return null;
+  }
+
+  // Bảo đảm có đuôi hợp lệ
+  if (!/\.(png|jpe?g|webp)$/i.test(name)) {
+    const suf = /png/i.test(type) ? "png" : /webp/i.test(type) ? "webp" : "jpg";
+    if (!name.includes(".")) name = `${name}.${suf}`;
+  }
+
+  return { uri, name, type, size };
+}
+
+function validateAll(form, avatarUrl, accepted) {
+  const name = (form.name || "").trim();
+  const nickname = (form.nickname || "").trim();
+  const phoneRaw = cleanPhone(form.phone || "");
+  const email = (form.email || "").trim();
+  const province = form.province || "";
+  const password = form.password || "";
+  const confirmPassword = form.confirmPassword || "";
+
+  const fields = {
+    name: "",
+    nickname: "",
+    email: "",
+    phone: "",
+    province: "",
+    password: "",
+    confirmPassword: "",
+    terms: "",
+  };
+  let avatar = "";
+
+  if (!name) fields.name = "Vui lòng nhập họ và tên.";
+  else if (name.length < 2) fields.name = "Họ và tên tối thiểu 2 ký tự.";
+
+  if (!nickname) fields.nickname = "Vui lòng nhập biệt danh.";
+  if (!email) fields.email = "Vui lòng nhập email.";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    fields.email = "Email không hợp lệ.";
+
+  if (!phoneRaw) fields.phone = "Vui lòng nhập số điện thoại.";
+  else if (!/^0\d{9}$/.test(phoneRaw))
+    fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+
+  if (!province) fields.province = "Vui lòng chọn Tỉnh/Thành phố.";
+
+  if (!password) fields.password = "Vui lòng nhập mật khẩu.";
+  else if (password.length < 6)
+    fields.password = "Mật khẩu phải có ít nhất 6 ký tự.";
+
+  if (!confirmPassword) fields.confirmPassword = "Vui lòng xác nhận mật khẩu.";
+  else if (password !== confirmPassword)
+    fields.confirmPassword = "Mật khẩu và xác nhận không khớp.";
+
+  if (!accepted) fields.terms = "Bạn cần đồng ý Điều khoản & Chính sách.";
+  if (!avatarUrl) avatar = "Vui lòng chọn ảnh đại diện.";
+
+  const messages = [
+    ...Object.values(fields).filter(Boolean),
+    ...(avatar ? [avatar] : []),
+  ];
+  return {
+    fields,
+    avatar,
+    hasErrors: messages.length > 0,
+    messages,
+  };
 }
 
 /* ==================== Screen ==================== */
@@ -156,6 +232,7 @@ export default function RegisterScreen() {
   const textPrimary = isDark ? "#fff" : "#111";
   const textSecondary = isDark ? "#c9c9c9" : "#444";
   const border = isDark ? "#2e2f33" : "#dfe3ea";
+  const danger = "#e53935";
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
@@ -165,10 +242,11 @@ export default function RegisterScreen() {
     useUploadAvatarMutation();
 
   const [form, setForm] = useState({
+    name: "",
     nickname: "",
     email: "",
     phone: "",
-    province: "", // optional
+    province: "",
     password: "",
     confirmPassword: "",
   });
@@ -177,61 +255,36 @@ export default function RegisterScreen() {
   const [accepted, setAccepted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
 
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
+  // ===== Avatar (giống profile): preview modal -> upload -> lưu URL
+  const [avatarUrl, setAvatarUrl] = useState(""); // URL remote sau upload
+  const [avatarTemp, setAvatarTemp] = useState(null); // file tạm trước khi upload
+  const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false); // phóng to ảnh
 
-  const errors = useMemo(() => {
-    const nickname = (form.nickname || "").trim();
-    const phone = cleanPhone(form.phone || "");
-    const email = (form.email || "").trim();
-    const password = form.password || "";
-    const confirmPassword = form.confirmPassword || "";
+  const [showErrors, setShowErrors] = useState(false);
 
-    const errs = [];
-    if (nickname && nickname.length < 1) errs.push("Biệt danh không hợp lệ.");
-    if (phone && !/^0\d{9}$/.test(phone))
-      errs.push("SĐT phải bắt đầu 0 và đủ 10 số.");
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      errs.push("Email không hợp lệ.");
-    if (password && password.length < 6)
-      errs.push("Mật khẩu tối thiểu 6 ký tự.");
-    if (password !== confirmPassword)
-      errs.push("Mật khẩu và xác nhận không khớp.");
-    return errs;
-  }, [form]);
-
-  const validateRequired = () => {
-    const nickname = (form.nickname || "").trim();
-    const password = form.password || "";
-    const confirmPassword = form.confirmPassword || "";
-    const reqErrs = [];
-    if (!nickname) reqErrs.push("Biệt danh không được để trống.");
-    if (password.length < 6) reqErrs.push("Mật khẩu phải có ít nhất 6 ký tự.");
-    if (password !== confirmPassword)
-      reqErrs.push("Mật khẩu và xác nhận mật khẩu không khớp.");
-    if (!accepted) reqErrs.push("Bạn cần đồng ý Điều khoản & Chính sách.");
-    return reqErrs.concat(errors);
-  };
+  const validation = useMemo(
+    () => validateAll(form, avatarUrl, accepted),
+    [form, avatarUrl, accepted]
+  );
+  const errorsList = useMemo(() => validation.messages, [validation]);
 
   const doRegister = async () => {
     try {
       const cleaned = {
+        name: (form.name || "").trim(),
         nickname: (form.nickname || "").trim(),
-        email: (form.email || "").trim() || undefined,
-        phone: cleanPhone(form.phone || "") || undefined,
-        province: form.province || undefined, // optional
+        email: (form.email || "").trim(),
+        phone: cleanPhone(form.phone || ""),
+        province: form.province,
         password: form.password,
+        avatar: avatarUrl, // gửi kèm avatar đã upload
       };
 
       const res = await register(cleaned).unwrap();
       dispatch(setCredentials(res));
       await saveUserInfo(res);
-
-      if (avatarFile) {
-        try {
-          await uploadAvatar(avatarFile).unwrap();
-        } catch {}
-      }
 
       router.replace("/(tabs)/profile");
     } catch (err) {
@@ -241,40 +294,22 @@ export default function RegisterScreen() {
   };
 
   const onSubmit = async () => {
-    const allErrs = validateRequired(); // chỉ check trường bắt buộc
-    if (allErrs.length) {
-      Alert.alert("Lỗi", allErrs.join("\n"));
+    setShowErrors(true);
+    if (validation.hasErrors) {
+      Alert.alert("Thiếu/Không hợp lệ", validation.messages.join("\n"));
       return;
     }
-
-    // === Nhắc các trường KHÔNG bắt buộc ===
-    const hasAvatar = !!avatarFile || !!avatarPreview;
-    const missingOptional = getMissingOptional(form, hasAvatar);
-
-    if (missingOptional.length) {
-      Alert.alert(
-        "Thiếu thông tin",
-        `Bạn chưa nhập:\n• ${missingOptional.join(
-          "\n• "
-        )}\n\nBạn có thể bổ sung sau tại trang Hồ sơ.`,
-        [
-          { text: "Bổ sung", style: "default" },
-          {
-            text: "Bỏ qua & đăng ký",
-            style: "destructive",
-            onPress: () => doRegister(),
-          },
-        ]
-      );
-      return;
-    }
-
-    // Không thiếu optional → đăng ký luôn
-    doRegister();
+    await doRegister();
   };
 
-  const submitDisabled = isLoading || uploadingAvatar || !accepted;
+  const submitDisabled = isLoading || uploadingAvatar || avatarSaving;
   const shouldRedirect = !!userInfo;
+
+  // safe avatar uri (tránh null → lỗi handler)
+  const safeAvatar = (() => {
+    const u = normalizeUrl(avatarUrl || "");
+    return u ? String(u).replace(/\\/g, "/") : undefined;
+  })();
 
   return shouldRedirect ? (
     <Redirect href="/(tabs)" />
@@ -294,7 +329,7 @@ export default function RegisterScreen() {
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
-            {/* Avatar */}
+            {/* Avatar (giống profile) */}
             <View
               style={{
                 flexDirection: "row",
@@ -303,31 +338,54 @@ export default function RegisterScreen() {
                 marginBottom: 8,
               }}
             >
-              <View
-                style={[
-                  styles.avatarWrap,
-                  {
-                    backgroundColor: isDark ? "#22252a" : "#f3f5f9",
-                    borderColor: border,
-                  },
-                ]}
+              <Pressable
+                onPress={() => safeAvatar && setViewerOpen(true)}
+                style={({ pressed }) => [{ opacity: pressed ? 0.97 : 1 }]}
               >
-                <Image
-                  source={{
-                    uri:
-                      normalizeUrl(avatarPreview) ||
-                      "https://dummyimage.com/160x160/cccccc/ffffff&text=?",
-                  }}
-                  style={{ width: 80, height: 80, borderRadius: 40 }}
-                />
-              </View>
+                <View
+                  style={[
+                    styles.avatarWrap,
+                    {
+                      backgroundColor: isDark ? "#22252a" : "#f3f5f9",
+                      borderColor: border,
+                    },
+                  ]}
+                >
+                  {safeAvatar ? (
+                    <ExpoImage
+                      source={{ uri: safeAvatar }}
+                      style={{ width: 80, height: 80, borderRadius: 40 }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={150}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 40,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <MaterialIcons
+                        name="person"
+                        size={34}
+                        color={isDark ? "#909399" : "#9aa0a6"}
+                      />
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+
               <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
                 <Pressable
                   onPress={async () => {
                     const f = await pickImage();
                     if (!f) return;
-                    setAvatarFile(f);
-                    setAvatarPreview(f.uri);
+                    setAvatarTemp(f); // giữ file để xem trước
+                    setAvatarConfirmOpen(true); // mở modal xác nhận
                   }}
                   style={({ pressed }) => [
                     styles.btn,
@@ -339,32 +397,68 @@ export default function RegisterScreen() {
                     pressed && { opacity: 0.95 },
                   ]}
                 >
-                  <Text style={[styles.btnText, { color: textPrimary }]}>
-                    Chọn ảnh đại diện
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <MaterialIcons
+                      name="photo-camera"
+                      size={18}
+                      color={textPrimary}
+                    />
+                    <Text
+                      style={[
+                        styles.btnText,
+                        {
+                          color:
+                            showErrors && validation.avatar
+                              ? danger
+                              : textPrimary,
+                        },
+                      ]}
+                    >
+                      Chọn ảnh đại diện *
+                    </Text>
+                  </View>
                 </Pressable>
 
-                {avatarPreview ? (
+                {!!safeAvatar && (
                   <Pressable
-                    onPress={() => {
-                      setAvatarFile(null);
-                      setAvatarPreview("");
-                    }}
+                    onPress={() => setAvatarUrl("")}
                     style={({ pressed }) => [
                       styles.btn,
                       styles.btnTextOnly,
                       pressed && { opacity: 0.9 },
                     ]}
                   >
-                    <Text style={[styles.btnText, { color: "#e53935" }]}>
+                    <Text style={[styles.btnText, { color: danger }]}>
                       Xóa ảnh
                     </Text>
                   </Pressable>
-                ) : null}
+                )}
               </View>
             </View>
+            {showErrors && validation.avatar ? (
+              <Text style={[styles.errorText, { color: danger }]}>
+                {validation.avatar}
+              </Text>
+            ) : null}
 
             {/* Fields */}
+            <Field
+              label="Họ và tên"
+              value={form.name}
+              onChangeText={(v) => handleChange("name", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              required
+              error={showErrors && !!validation.fields.name}
+              helperText={showErrors ? validation.fields.name : ""}
+            />
             <Field
               label="Nickname"
               value={form.nickname}
@@ -373,29 +467,37 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               required
+              error={showErrors && !!validation.fields.nickname}
+              helperText={showErrors ? validation.fields.nickname : ""}
             />
             <Field
-              label="Email (tuỳ chọn)"
+              label="Email"
               value={form.email}
               onChangeText={(v) => handleChange("email", v)}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="email-address"
+              required
+              error={showErrors && !!validation.fields.email}
+              helperText={showErrors ? validation.fields.email : ""}
             />
             <Field
-              label="Số điện thoại (tuỳ chọn)"
+              label="Số điện thoại"
               value={form.phone}
               onChangeText={(v) => handleChange("phone", v)}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="phone-pad"
+              required
+              error={showErrors && !!validation.fields.phone}
+              helperText={showErrors ? validation.fields.phone : ""}
             />
 
-            {/* Province (optional select) */}
+            {/* Province (required select) */}
             <FieldSelect
-              label="Tỉnh/Thành phố (tuỳ chọn)"
+              label="Tỉnh/Thành phố"
               value={form.province}
               onSelect={(val) => handleChange("province", val)}
               options={PROVINCES}
@@ -403,6 +505,9 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               tint={tint}
+              required
+              error={showErrors && !!validation.fields.province}
+              helperText={showErrors ? validation.fields.province : ""}
             />
 
             <Field
@@ -414,6 +519,8 @@ export default function RegisterScreen() {
               textSecondary={textSecondary}
               secureTextEntry
               required
+              error={showErrors && !!validation.fields.password}
+              helperText={showErrors ? validation.fields.password : ""}
             />
             <Field
               label="Xác nhận mật khẩu"
@@ -424,6 +531,8 @@ export default function RegisterScreen() {
               textSecondary={textSecondary}
               secureTextEntry
               required
+              error={showErrors && !!validation.fields.confirmPassword}
+              helperText={showErrors ? validation.fields.confirmPassword : ""}
             />
 
             {/* Terms */}
@@ -439,7 +548,11 @@ export default function RegisterScreen() {
                   style={[
                     styles.checkboxBox,
                     {
-                      borderColor: accepted ? tint : border,
+                      borderColor: accepted
+                        ? tint
+                        : showErrors && validation.fields.terms
+                        ? "#e53935"
+                        : border,
                       backgroundColor: accepted ? tint : "transparent",
                     },
                   ]}
@@ -466,6 +579,13 @@ export default function RegisterScreen() {
                   .
                 </Text>
               </Pressable>
+              {showErrors && validation.fields.terms ? (
+                <Text
+                  style={[styles.errorText, { color: danger, marginTop: 6 }]}
+                >
+                  {validation.fields.terms}
+                </Text>
+              ) : null}
             </View>
 
             {/* Submit */}
@@ -479,7 +599,9 @@ export default function RegisterScreen() {
               ]}
             >
               <Text style={styles.btnTextWhite}>
-                {isLoading || uploadingAvatar ? "Đang xử lý…" : "Đăng ký"}
+                {isLoading || uploadingAvatar || avatarSaving
+                  ? "Đang xử lý…"
+                  : "Đăng ký"}
               </Text>
             </Pressable>
 
@@ -514,6 +636,128 @@ export default function RegisterScreen() {
         textSecondary={textSecondary}
         tint={tint}
       />
+
+      {/* ===== Avatar Preview Modal (Xác nhận → upload) ===== */}
+      <Modal
+        visible={avatarConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !avatarSaving && setAvatarConfirmOpen(false)}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              Xác nhận ảnh đại diện
+            </Text>
+
+            {!!avatarTemp?.uri && (
+              <ExpoImage
+                source={{ uri: avatarTemp.uri }}
+                style={{
+                  width: 200,
+                  height: 200,
+                  borderRadius: 100,
+                  alignSelf: "center",
+                }}
+                contentFit="cover"
+                cachePolicy="none"
+                transition={100}
+              />
+            )}
+
+            <Text
+              style={{
+                marginTop: 10,
+                color: textSecondary,
+                textAlign: "center",
+                fontSize: 12,
+              }}
+            >
+              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm “Xác nhận”.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 14,
+                justifyContent: "center",
+              }}
+            >
+              <Pressable
+                disabled={avatarSaving}
+                onPress={() => {
+                  setAvatarConfirmOpen(false);
+                  setAvatarTemp(null);
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnOutline,
+                  {
+                    borderColor: border,
+                    minWidth: 100,
+                    opacity: avatarSaving ? 0.6 : pressed ? 0.95 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: textPrimary }]}>
+                  Huỷ
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={avatarSaving || !avatarTemp}
+                onPress={async () => {
+                  if (!avatarTemp) return;
+                  setAvatarSaving(true);
+                  try {
+                    const up = await uploadAvatar(avatarTemp).unwrap();
+                    const url = up?.url || up?.data?.url;
+                    if (!url) throw new Error("Không nhận được URL ảnh");
+                    setAvatarUrl(url);
+                    setAvatarConfirmOpen(false);
+                    setAvatarTemp(null);
+                  } catch (e) {
+                    Alert.alert(
+                      "Lỗi",
+                      e?.data?.message || e?.message || "Upload ảnh thất bại"
+                    );
+                  } finally {
+                    setAvatarSaving(false);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor: tint,
+                    minWidth: 120,
+                    opacity: avatarSaving ? 0.7 : pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {avatarSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnTextWhite}>Xác nhận</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===== Viewer phóng to avatar ===== */}
+      <ImageView
+        images={safeAvatar ? [{ uri: safeAvatar }] : []}
+        visible={viewerOpen}
+        onRequestClose={() => setViewerOpen(false)}
+        backgroundColor={isDark ? "#0b0b0c" : "#ffffff"}
+      />
     </>
   );
 }
@@ -530,7 +774,10 @@ function Field({
   border,
   textPrimary,
   textSecondary,
+  error = false,
+  helperText = "",
 }) {
+  const danger = "#e53935";
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={[styles.label, { color: textSecondary }]}>
@@ -542,12 +789,22 @@ function Field({
         onChangeText={onChangeText}
         placeholder={label}
         placeholderTextColor="#9aa0a6"
-        style={[styles.input, { borderColor: border, color: textPrimary }]}
+        style={[
+          styles.input,
+          {
+            borderColor: error ? danger : border,
+            color: textPrimary,
+          },
+        ]}
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
         maxLength={maxLength}
         autoCapitalize="none"
+        autoCorrect={false}
       />
+      {error ? (
+        <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
+      ) : null}
     </View>
   );
 }
@@ -561,13 +818,16 @@ function FieldSelect({
   textPrimary,
   textSecondary,
   tint = "#0a84ff",
+  required = false,
+  error = false,
+  helperText = "",
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [kbHeight, setKbHeight] = useState(0);
-  const searchRef = React.useRef(null);
+  const searchRef = useRef(null);
+  const danger = "#e53935";
 
-  // --- bỏ dấu & normalize ---
   const unaccentVN = (s = "") =>
     s
       .normalize("NFD")
@@ -583,8 +843,7 @@ function FieldSelect({
     return options.filter((name) => norm(name).includes(nq));
   }, [q, options]);
 
-  // Bàn phím
-  React.useEffect(() => {
+  useEffect(() => {
     const onShow = (e) => setKbHeight(e.endCoordinates?.height ?? 0);
     const onHide = () => setKbHeight(0);
     const s1 =
@@ -601,7 +860,7 @@ function FieldSelect({
     };
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 50);
     else setQ("");
   }, [open]);
@@ -641,14 +900,21 @@ function FieldSelect({
 
   return (
     <View style={{ marginBottom: 10 }}>
-      <Text style={[styles.label, { color: textSecondary }]}>{label}</Text>
+      <Text style={[styles.label, { color: textSecondary }]}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
 
       {/* Trigger */}
       <Pressable
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
           styles.input,
-          { borderColor: border, flexDirection: "row", alignItems: "center" },
+          {
+            borderColor: error ? danger : border,
+            flexDirection: "row",
+            alignItems: "center",
+          },
           pressed && { opacity: 0.95 },
         ]}
       >
@@ -660,10 +926,13 @@ function FieldSelect({
             fontSize: 16,
           }}
         >
-          {value || "Chọn tỉnh/thành (không bắt buộc)"}
+          {value || "Chọn tỉnh/thành"}
         </Text>
         <Text style={{ color: "#9aa0a6" }}>▼</Text>
       </Pressable>
+      {error ? (
+        <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
+      ) : null}
 
       {/* Modal */}
       <Modal
@@ -862,10 +1131,10 @@ function TermsModal({
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Dữ liệu thu thập
               </Text>
-              {"\n"}• Tài khoản: nickname, mật khẩu (được băm), email/SĐT (tuỳ
-              chọn).{"\n"}• Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới tính,
-              tỉnh/thành, CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời gian
-              đăng nhập, IP, log lỗi, thống kê sử dụng.{"\n\n"}
+              {"\n"}• Tài khoản: nickname, mật khẩu (được băm), email/SĐT.{"\n"}
+              • Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới tính, tỉnh/thành,
+              CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời gian đăng nhập,
+              IP, log lỗi, thống kê sử dụng.{"\n\n"}
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Mục đích
               </Text>
@@ -949,7 +1218,7 @@ function TermsModal({
               11) Luật áp dụng & Liên hệ
             </Text>
             <Text
-              style={{ color: textSecondary, marginTop: 4, marginBottom: 10 }}
+              style={{ color: textSecondary, marginBottom: 10, marginTop: 4 }}
             >
               • Áp dụng pháp luật Việt Nam; tranh chấp ưu tiên thương lượng, sau
               đó theo thẩm quyền.{"\n"}• Liên hệ: pickletour@gmail.com
@@ -993,6 +1262,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    overflow: "hidden",
   },
   label: { fontSize: 13, marginBottom: 6 },
   input: {
@@ -1027,16 +1297,31 @@ const styles = StyleSheet.create({
   },
   checkboxTick: { color: "#fff", fontWeight: "900", lineHeight: 18 },
 
+  errorText: { fontSize: 12, marginTop: 6 },
+
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
   },
+  modalBackdropCenter: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
   modalCard: {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
-    maxHeight: "85%",
+  },
+  previewCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: "row",

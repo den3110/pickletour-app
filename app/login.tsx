@@ -19,6 +19,7 @@ import { useLoginMutation } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import apiSlice from "@/slices/apiSlice";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
@@ -39,7 +40,11 @@ const isLikelyPhone = (raw) => {
 /** Logo cục bộ: đặt file ở /assets/logo.png */
 const LOGO_SRC = require("@/assets/images/icon.png");
 
+/** Chiều cao vùng nút cố định dưới cùng (để chừa khoảng trống ScrollView) */
+const BOTTOM_ACTIONS_H = 132;
+
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
   const tint = isDark ? "#7cc0ff" : "#0a84ff";
@@ -120,128 +125,167 @@ export default function LoginScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: cardBg, borderColor: border },
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scroll,
+              {
+                paddingBottom: BOTTOM_ACTIONS_H + insets.bottom + 16, // chừa chỗ cho nút cố định
+              },
             ]}
+            keyboardShouldPersistTaps="handled"
           >
-            {/* Logo (Expo Image) */}
             <View
               style={[
-                styles.logoWrap,
-                { backgroundColor: logoBg, borderColor: border },
+                styles.card,
+                { backgroundColor: cardBg, borderColor: border },
               ]}
             >
-              <Image
-                source={LOGO_SRC}
-                style={styles.logo}
-                contentFit="contain"
-                transition={150}
-                cachePolicy="memory-disk"
-              />
-            </View>
-
-            <Text style={[styles.title, { color: textPrimary }]}>
-              Đăng nhập
-            </Text>
-
-            <View style={styles.form}>
-              <Text style={[styles.label, { color: textSecondary }]}>
-                Email / Số điện thoại hoặc Nickname
-              </Text>
-              <TextInput
-                value={loginId}
-                onChangeText={setLoginId}
-                placeholder="Email / Số điện thoại hoặc Nickname"
-                placeholderTextColor="#9aa0a6"
-                style={[
-                  styles.input,
-                  { borderColor: border, color: textPrimary },
-                ]}
-                autoCapitalize="none"
-                autoCorrect={false}
-                // keyboardType={kbType}
-                textContentType="username"
-                autoComplete="username"
-                returnKeyType="next"
-              />
-
-              <Text
-                style={[styles.label, { color: textSecondary, marginTop: 12 }]}
-              >
-                Mật khẩu
-              </Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor="#9aa0a6"
-                style={[
-                  styles.input,
-                  { borderColor: border, color: textPrimary },
-                ]}
-                secureTextEntry
-                textContentType="password"
-                autoComplete="password"
-                returnKeyType="done"
-                onSubmitEditing={onSubmit}
-              />
-
-              {/* Quên mật khẩu */}
-              <Pressable
-                onPress={() => router.push("/forgot-password")}
-                style={{ alignSelf: "flex-end", marginTop: 8 }}
-              >
-                <Text style={[styles.link, { color: tint }]}>
-                  Quên mật khẩu?
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={onSubmit}
-                disabled={isLoading}
-                style={({ pressed }) => [
-                  styles.btn,
-                  { backgroundColor: tint },
-                  pressed && { opacity: 0.9 },
-                  isLoading && { opacity: 0.7 },
-                ]}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.btnText}>Đăng nhập</Text>
-                )}
-              </Pressable>
-            </View>
-
-            <View style={styles.footerRow}>
-              <Pressable onPress={() => router.push("/register")}>
-                <Text style={[styles.link, { color: tint }]}>
-                  Chưa có tài khoản? Đăng ký ngay
-                </Text>
-              </Pressable>
-
+              {/* Logo (Expo Image) */}
               <View
-                style={{
-                  justifyContent: "center",
-                  alignItems: "center",
-                  width: "100%",
-                  marginTop: 20,
-                }}
+                style={[
+                  styles.logoWrap,
+                  { backgroundColor: logoBg, borderColor: border },
+                ]}
               >
-                <Pressable onPress={() => router.push("/(tabs)")}>
-                  <Text style={[styles.link, { color: tint }]}>
-                    Quay lại trang chủ
+                <Image
+                  source={LOGO_SRC}
+                  style={styles.logo}
+                  contentFit="contain"
+                  transition={150}
+                  cachePolicy="memory-disk"
+                />
+              </View>
+
+              <Text style={[styles.title, { color: textPrimary }]}>
+                Đăng nhập
+              </Text>
+
+              <View style={styles.form}>
+                <Text style={[styles.label, { color: textSecondary }]}>
+                  Email / Số điện thoại hoặc Nickname
+                </Text>
+                <TextInput
+                  value={loginId}
+                  onChangeText={setLoginId}
+                  placeholder="Email / Số điện thoại hoặc Nickname"
+                  placeholderTextColor="#9aa0a6"
+                  style={[
+                    styles.input,
+                    { borderColor: border, color: textPrimary },
+                  ]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType={"default"}
+                  textContentType="username"
+                  autoComplete="username"
+                  returnKeyType="next"
+                />
+
+                <Text
+                  style={[
+                    styles.label,
+                    { color: textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  Mật khẩu
+                </Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9aa0a6"
+                  style={[
+                    styles.input,
+                    { borderColor: border, color: textPrimary },
+                  ]}
+                  secureTextEntry
+                  textContentType="password"
+                  autoComplete="password"
+                  returnKeyType="done"
+                  onSubmitEditing={onSubmit}
+                />
+
+                {/* Đăng nhập */}
+                <Pressable
+                  onPress={onSubmit}
+                  disabled={isLoading}
+                  style={({ pressed }) => [
+                    styles.btnSolid,
+                    {
+                      backgroundColor: tint,
+                      opacity: isLoading ? 0.7 : pressed ? 0.9 : 1,
+                    },
+                  ]}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.btnTextWhite}>Đăng nhập</Text>
+                  )}
+                </Pressable>
+
+                {/* Quên mật khẩu — dưới nút đăng nhập, căn giữa, màu đen */}
+                <Pressable
+                  onPress={() => router.push("/forgot-password")}
+                  style={{ alignSelf: "center", marginTop: 10 }}
+                >
+                  <Text
+                    style={{
+                      color: "#111", // đen cho theme sáng
+                      fontWeight: "700",
+                    }}
+                  >
+                    Quên mật khẩu?
                   </Text>
                 </Pressable>
               </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
       </KeyboardAvoidingView>
+      {/* ===== Nút cố định dưới cùng ===== */}
+      <View
+        style={[
+          styles.bottomActions,
+          {
+            backgroundColor: cardBg,
+            borderTopColor: border,
+            paddingBottom: insets.bottom + 10,
+          },
+        ]}
+      >
+        {/* Trang chủ (outline đen) */}
+        <Pressable
+          onPress={() => router.push("/(tabs)")}
+          style={({ pressed }) => [
+            styles.btnOutlinePill,
+            {
+              borderColor: border,
+              opacity: pressed ? 0.92 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.btnOutlineText, { color: "#555" }]}>
+            Trang chủ
+          </Text>
+        </Pressable>
+
+        {/* Đăng ký (outline xanh) */}
+        <Pressable
+          onPress={() => router.push("/register")}
+          style={({ pressed }) => [
+            styles.btnOutlinePill,
+            {
+              borderColor: tint,
+              opacity: pressed ? 0.92 : 1,
+              marginTop: 10,
+            },
+          ]}
+        >
+          <Text style={[styles.btnOutlineText, { color: tint }]}>Đăng ký</Text>
+        </Pressable>
+      </View>
     </>
   );
 }
@@ -258,7 +302,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  /* Logo container có nền nhẹ + viền, tạo cảm giác “badge” */
+  /* Logo container: nền nhẹ + viền */
   logoWrap: {
     alignSelf: "center",
     width: 110,
@@ -273,11 +317,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
-  logo: {
-    width: 88,
-    height: 88,
-    borderRadius: 18,
-  },
+  logo: { width: 88, height: 88, borderRadius: 18 },
   title: {
     fontSize: 22,
     fontWeight: "700",
@@ -293,13 +333,32 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.select({ ios: 12, android: 10 }),
     fontSize: 16,
   },
-  btn: {
+
+  /* Buttons */
+  btnSolid: {
     marginTop: 18,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
   },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  footerRow: { marginTop: 12, alignItems: "flex-end" },
-  link: { fontSize: 14, fontWeight: "600" },
+  btnTextWhite: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  /* Bottom fixed actions */
+  bottomActions: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+  },
+  btnOutlinePill: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 999, // góc 50% (pill)
+    borderWidth: 1, // viền rõ ràng
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnOutlineText: { fontWeight: "700", fontSize: 16 },
 });

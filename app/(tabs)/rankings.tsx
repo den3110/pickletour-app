@@ -1,4 +1,5 @@
 // app/screens/RankingListScreen.jsx
+// ✅ OPTIMIZED VERSION - Reduced lag, smooth scrolling, lazy image loading
 import { useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -6,6 +7,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  memo,
 } from "react";
 import {
   ActivityIndicator,
@@ -28,6 +30,7 @@ import {
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
 import { useTheme } from "@react-navigation/native";
+import ImageViewing from "react-native-image-viewing";
 
 import { useGetRankingsQuery } from "@/slices/rankingsApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
@@ -53,60 +56,63 @@ const MIN_RATING = 1.6;
 const MAX_RATING = 8.0;
 const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
 
+// ✅ Card height estimate for getItemLayout
+const CARD_HEIGHT_ESTIMATE = 280;
+
 /* ================= Theme ================= */
 function useThemeColors() {
   const navTheme = useTheme();
   const sysScheme = useColorScheme?.() || "light";
-  // ✅ Ưu tiên app theme; chỉ fallback hệ thống nếu app không set
   const isDark =
     typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
 
-  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
-  const textPrimary = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#000");
-  const textSecondary = isDark ? "#d1d1d1" : "#333";
-  const cardBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
-  const pageBg =
-    navTheme?.colors?.background ?? (isDark ? "#0e0f12" : "#fafafa");
-  const softBg = isDark ? "#1e1f23" : "#eef1f6";
-  const softBorder =
-    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#cfd6e4");
-  const border = navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
-  const skeleton = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-  const muted = isDark ? "#9aa0a6" : "#6b7280";
-  const inputBg = isDark ? "#1e1f23" : "#ffffff";
-  const inputBorder = isDark ? "#3a3b40" : "#ddd";
-  // dùng màu card để sticky match với header/card theo theme (như Dashboard)
-  const stickyBg = cardBg;
-  const ghostBg = isDark ? "#2a2c31" : "#eeeeee";
-  const ghostText = isDark ? "#ffffff" : "#111111";
-  const outlineNeutral = isDark ? "#bbbbbb" : "#555555";
-  // error box
-  const errBg = isDark ? "#3a1f21" : "#ffebee";
-  const errBorder = isDark ? "#6e2a34" : "#ffcdd2";
-  const errText = isDark ? "#ffb3b8" : "#b71c1c";
+  // ✅ Memo để tránh recalc
+  return useMemo(() => {
+    const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+    const textPrimary = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#000");
+    const textSecondary = isDark ? "#d1d1d1" : "#333";
+    const cardBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
+    const pageBg =
+      navTheme?.colors?.background ?? (isDark ? "#0e0f12" : "#fafafa");
+    const softBg = isDark ? "#1e1f23" : "#eef1f6";
+    const softBorder =
+      navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#cfd6e4");
+    const border = navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
+    const skeleton = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+    const muted = isDark ? "#9aa0a6" : "#6b7280";
+    const inputBg = isDark ? "#1e1f23" : "#ffffff";
+    const inputBorder = isDark ? "#3a3b40" : "#ddd";
+    const stickyBg = cardBg;
+    const ghostBg = isDark ? "#2a2c31" : "#eeeeee";
+    const ghostText = isDark ? "#ffffff" : "#111111";
+    const outlineNeutral = isDark ? "#bbbbbb" : "#555555";
+    const errBg = isDark ? "#3a1f21" : "#ffebee";
+    const errBorder = isDark ? "#6e2a34" : "#ffcdd2";
+    const errText = isDark ? "#ffb3b8" : "#b71c1c";
 
-  return {
-    scheme: isDark ? "dark" : "light",
-    tint,
-    textPrimary,
-    textSecondary,
-    cardBg,
-    pageBg,
-    softBg,
-    softBorder,
-    border,
-    skeleton,
-    muted,
-    inputBg,
-    inputBorder,
-    stickyBg,
-    ghostBg,
-    ghostText,
-    outlineNeutral,
-    errBg,
-    errBorder,
-    errText,
-  };
+    return {
+      scheme: isDark ? "dark" : "light",
+      tint,
+      textPrimary,
+      textSecondary,
+      cardBg,
+      pageBg,
+      softBg,
+      softBorder,
+      border,
+      skeleton,
+      muted,
+      inputBg,
+      inputBorder,
+      stickyBg,
+      ghostBg,
+      ghostText,
+      outlineNeutral,
+      errBg,
+      errBorder,
+      errText,
+    };
+  }, [navTheme, isDark]);
 }
 
 /* ================= Helpers ================= */
@@ -188,14 +194,13 @@ const getMedalColors = (medal) => {
   }
 };
 
-// quyền chấm
 const canGradeUser = (me, targetProvince) => {
   if (me?.role === "admin") return true;
   if (!me?.evaluator?.enabled) return false;
   const scopes = me?.evaluator?.gradingScopes?.provinces || [];
   return !!targetProvince && scopes.includes(String(targetProvince).trim());
 };
-// quyền xem KYC
+
 const canViewKycAdmin = (me, status) =>
   me?.role === "admin" && (status === "verified" || status === "pending");
 
@@ -209,7 +214,7 @@ const getVerifyChip = (status, tierColor) => {
 };
 
 /* ================= Small UI ================= */
-const Pill = ({ label, bg, fg }) => {
+const Pill = memo(({ label, bg, fg }) => {
   const C = useThemeColors();
   return (
     <View
@@ -227,7 +232,7 @@ const Pill = ({ label, bg, fg }) => {
       </Text>
     </View>
   );
-};
+});
 
 /* ================= Skeletons ================= */
 const Pulse = ({ children }) => {
@@ -252,6 +257,7 @@ const Pulse = ({ children }) => {
   }, [opacity]);
   return <Animated.View style={{ opacity }}>{children}</Animated.View>;
 };
+
 const SkelBlock = ({ w = "100%", h = 14, r = 8, style }) => {
   const C = useThemeColors();
   return (
@@ -265,48 +271,57 @@ const SkelBlock = ({ w = "100%", h = 14, r = 8, style }) => {
     </Pulse>
   );
 };
+
 const SkelPill = ({ w = 70 }) => (
   <SkelBlock w={w} h={20} r={999} style={{ marginRight: 6, marginTop: 6 }} />
 );
 
-const RankingCardSkeleton = () => (
-  <View style={[styles.card, useCardSurface()]}>
-    <View style={styles.rowCenter}>
-      <SkelBlock w={54} h={54} r={27} />
-      <View style={{ flex: 1, marginHorizontal: 12 }}>
-        <SkelBlock w="60%" h={16} />
-        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-          <SkelPill w={60} />
-          <SkelPill w={110} />
-          <SkelPill w={90} />
+const RankingCardSkeleton = memo(() => {
+  const C = useThemeColors();
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: C.cardBg, borderColor: C.border },
+      ]}
+    >
+      <View style={styles.rowCenter}>
+        <SkelBlock w={54} h={54} r={27} />
+        <View style={{ flex: 1, marginHorizontal: 12 }}>
+          <SkelBlock w="60%" h={16} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+            <SkelPill w={60} />
+            <SkelPill w={110} />
+            <SkelPill w={90} />
+          </View>
         </View>
+        <SkelPill w={90} />
       </View>
-      <SkelPill w={90} />
-    </View>
 
-    <View style={{ marginTop: 8 }}>
-      <SkelBlock w="100%" h={24} r={10} />
-    </View>
+      <View style={{ marginTop: 8 }}>
+        <SkelBlock w="100%" h={24} r={10} />
+      </View>
 
-    <View style={[styles.scoreRow, { marginTop: 12 }]}>
-      <SkelBlock w="30%" h={16} />
-      <SkelBlock w="30%" h={16} />
-    </View>
+      <View style={[styles.scoreRow, { marginTop: 12 }]}>
+        <SkelBlock w="30%" h={16} />
+        <SkelBlock w="30%" h={16} />
+      </View>
 
-    <View style={[styles.metaRow, { marginTop: 10 }]}>
-      <SkelBlock w="35%" h={12} />
-      <SkelBlock w="35%" h={12} />
-    </View>
+      <View style={[styles.metaRow, { marginTop: 10 }]}>
+        <SkelBlock w="35%" h={12} />
+        <SkelBlock w="35%" h={12} />
+      </View>
 
-    <View style={[styles.actionRow, { marginTop: 12 }]}>
-      <SkelBlock w={90} h={34} r={10} />
-      <SkelBlock w={100} h={34} r={10} />
-      <SkelBlock w={90} h={34} r={10} />
+      <View style={[styles.actionRow, { marginTop: 12 }]}>
+        <SkelBlock w={90} h={34} r={10} />
+        <SkelBlock w={100} h={34} r={10} />
+        <SkelBlock w={90} h={34} r={10} />
+      </View>
     </View>
-  </View>
-);
+  );
+});
 
-const FullListSkeleton = ({ count = 6 }) => {
+const FullListSkeleton = memo(({ count = 6 }) => {
   const data = useMemo(() => Array.from({ length: count }), [count]);
   const C = useThemeColors();
   return (
@@ -330,21 +345,13 @@ const FullListSkeleton = ({ count = 6 }) => {
       removeClippedSubviews
     />
   );
-};
+});
 
-/* helpers to reuse themed card surface */
-function useCardSurface(extra = {}) {
+/* ================= Optimized Avatar (no animation for non-podium) ================= */
+const FlameAvatar = memo(({ uri, medal, onPress }) => {
   const C = useThemeColors();
-  return {
-    backgroundColor: C.cardBg,
-    borderColor: C.border,
-    ...extra,
-  };
-}
 
-/* ================= Flame Avatar (only for podium users) ================= */
-const FlameAvatar = ({ uri, medal, onPress }) => {
-  const C = useThemeColors();
+  // ✅ Không animate nếu không có medal
   if (!medal) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
@@ -355,18 +362,29 @@ const FlameAvatar = ({ uri, medal, onPress }) => {
           ]}
         >
           <ExpoImage
-            source={normalizeUrl(uri)}
+            source={normalizeUrl(uri) || PLACE}
             style={styles.avatarImg}
             contentFit="cover"
             transition={150}
             cachePolicy="memory-disk"
+            placeholder={PLACE}
+            placeholderContentFit="cover"
+            priority="normal"
           />
         </View>
       </TouchableOpacity>
     );
   }
 
+  // ✅ Chỉ animate cho podium users
+  return <FlameAvatarAnimated uri={uri} medal={medal} onPress={onPress} />;
+});
+
+// ✅ Separate animated component - chỉ render khi cần
+const FlameAvatarAnimated = memo(({ uri, medal, onPress }) => {
+  const C = useThemeColors();
   const anim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -436,22 +454,46 @@ const FlameAvatar = ({ uri, medal, onPress }) => {
           ]}
         >
           <ExpoImage
-            source={normalizeUrl(uri)}
+            source={normalizeUrl(uri) || PLACE}
             style={styles.avatarImg}
             contentFit="cover"
             transition={150}
             cachePolicy="memory-disk"
+            placeholder={PLACE}
+            placeholderContentFit="cover"
+            priority="high"
           />
         </View>
       </View>
     </TouchableOpacity>
   );
-};
+});
 
-/* ================= Flame Card (border+glow if podium) ================= */
-const FlameCard = ({ medal, children }) => {
-  const anim = useRef(new Animated.Value(0)).current;
+/* ================= Optimized Card (no animation for non-podium) ================= */
+const FlameCard = memo(({ medal, children }) => {
   const C = useThemeColors();
+
+  // ✅ Không animate nếu không có medal
+  if (!medal) {
+    return (
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+
+  // ✅ Chỉ animate cho podium
+  return <FlameCardAnimated medal={medal}>{children}</FlameCardAnimated>;
+});
+
+const FlameCardAnimated = memo(({ medal, children }) => {
+  const C = useThemeColors();
+  const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -487,9 +529,6 @@ const FlameCard = ({ medal, children }) => {
     outputRange: [1, 1.015],
   });
 
-  if (!medal)
-    return <View style={[styles.card, useCardSurface()]}>{children}</View>;
-
   return (
     <View style={styles.flameCardWrap}>
       <Animated.View
@@ -506,14 +545,180 @@ const FlameCard = ({ medal, children }) => {
       <View
         style={[
           styles.card,
-          useCardSurface({ borderWidth: 1.5, borderColor: border }),
+          {
+            backgroundColor: C.cardBg,
+            borderColor: border,
+            borderWidth: 1.5,
+          },
         ]}
       >
         {children}
       </View>
     </View>
   );
-};
+});
+
+/* ================= Optimized RankingCard Component ================= */
+const RankingCard = memo(
+  ({
+    item,
+    index,
+    podium,
+    scorePatch,
+    cccdPatch,
+    me,
+    onOpenProfile,
+    onOpenZoom,
+    onOpenGrade,
+    onOpenKyc,
+    onGoToTournament,
+  }) => {
+    const C = useThemeColors();
+    const r = item;
+    const u = r?.user || {};
+    const avatarSrc = u?.avatar || PLACE;
+    const age = calcAge(u);
+
+    const tierHex =
+      r?.tierColor === "red"
+        ? HEX.red
+        : r?.tierColor === "yellow"
+        ? HEX.yellow
+        : HEX.grey;
+
+    const sp = scorePatch[u?._id || ""] || {};
+    const patched = {
+      single: sp.single ?? r?.single,
+      double: sp.double ?? r?.double,
+      updatedAt: sp.updatedAt ?? r?.updatedAt,
+    };
+
+    const effectiveStatus = cccdPatch[u?._id] || u?.cccdStatus;
+    const chip = getVerifyChip(effectiveStatus, r?.tierColor);
+
+    const allowGrade = canGradeUser(me, u?.province);
+    const allowKyc = canViewKycAdmin(me, effectiveStatus);
+
+    return (
+      <FlameCard medal={podium?.medal}>
+        {/* Header */}
+        <View style={styles.rowCenter}>
+          <FlameAvatar
+            uri={avatarSrc}
+            medal={podium?.medal}
+            onPress={() => onOpenZoom(avatarSrc)}
+          />
+          <View style={{ flex: 1, marginHorizontal: 12 }}>
+            <Text style={[styles.nick, { color: C.textPrimary }]}>
+              {u?.nickname || "---"}
+            </Text>
+          </View>
+          <Pill label={chip.label} bg={chip.bg} fg={chip.fg} />
+        </View>
+
+        {/* Medal */}
+        {podium?.medal && (
+          <View style={styles.medalRow}>
+            <Pressable
+              onPress={() => onGoToTournament(podium.picked)}
+              style={[
+                styles.medalPill,
+                {
+                  borderColor: getMedalColors(podium.medal).border,
+                  backgroundColor: C.cardBg,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.medalPillText,
+                  { color: getMedalColors(podium.medal).text },
+                ]}
+              >
+                {podium.label}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Info chips */}
+        <View style={styles.pillRowBelowMedal}>
+          {Number.isFinite(age) && <Pill label={`${age} tuổi`} />}
+          <Pill label={`Giới tính: ${genderLabel(u?.gender)}`} />
+          <Pill label={`Tỉnh: ${u?.province || "--"}`} />
+        </View>
+
+        {/* Scores */}
+        <View style={styles.scoreRow}>
+          <Text style={[styles.score, { color: tierHex }]}>
+            Đôi: {fmt3(patched.double)}
+          </Text>
+          <Text style={[styles.score, { color: tierHex }]}>
+            Đơn: {fmt3(patched.single)}
+          </Text>
+        </View>
+
+        {/* Meta */}
+        <View style={styles.metaRow}>
+          <Text style={[styles.metaText, { color: C.muted }]}>
+            Cập nhật:{" "}
+            {patched?.updatedAt
+              ? new Date(patched.updatedAt).toLocaleDateString()
+              : "--"}
+          </Text>
+          <Text style={[styles.metaText, { color: C.muted }]}>
+            Tham gia:{" "}
+            {u?.createdAt ? new Date(u.createdAt).toLocaleDateString() : "--"}
+          </Text>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.successBtn, { backgroundColor: HEX.green }]}
+            onPress={() => onOpenProfile(u?._id)}
+          >
+            <Text style={styles.successBtnText}>Hồ sơ</Text>
+          </TouchableOpacity>
+
+          {allowGrade && (
+            <TouchableOpacity
+              style={[styles.outlineBtn, { borderColor: C.tint }]}
+              onPress={() => onOpenGrade(u, r)}
+            >
+              <Text style={[styles.outlineBtnText, { color: C.tint }]}>
+                Chấm trình
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {allowKyc && (
+            <TouchableOpacity
+              style={[styles.outlineBtn, { borderColor: C.outlineNeutral }]}
+              onPress={() => onOpenKyc(u)}
+            >
+              <Text
+                style={[styles.outlineBtnText, { color: C.outlineNeutral }]}
+              >
+                Xem KYC
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </FlameCard>
+    );
+  },
+  // ✅ Custom comparison để tránh re-render không cần thiết
+  (prev, next) => {
+    return (
+      prev.item?._id === next.item?._id &&
+      prev.scorePatch === next.scorePatch &&
+      prev.cccdPatch === next.cccdPatch &&
+      prev.podium?.medal === next.podium?.medal &&
+      prev.me?.role === next.me?.role
+    );
+  }
+);
 
 /* ================= Main Screen ================= */
 export default function RankingListScreen() {
@@ -533,7 +738,7 @@ export default function RankingListScreen() {
   const list = data?.docs ?? [];
   const totalPages = data?.totalPages ?? 0;
 
-  // podium map (userId -> { medal, label, picked })
+  // podium map
   const podiumByUser = useMemo(() => {
     const src = data?.podiums30d || {};
     const rank = { gold: 3, silver: 2, bronze: 1 };
@@ -574,7 +779,7 @@ export default function RankingListScreen() {
     [router]
   );
 
-  // me (phân quyền)
+  // me
   const [skipMe, setSkipMe] = useState(false);
   const {
     data: meData,
@@ -619,21 +824,20 @@ export default function RankingListScreen() {
   // zoom avatar
   const [zoomSrc, setZoomSrc] = useState("");
   const [zoomOpen, setZoomOpen] = useState(false);
-  const openZoom = (src) => {
+  const openZoom = useCallback((src) => {
     setZoomSrc(src || PLACE);
     setZoomOpen(true);
-  };
-  const closeZoom = () => setZoomOpen(false);
+  }, []);
+  const closeZoom = useCallback(() => setZoomOpen(false), []);
 
   // profile dialog
-
   const [openProfile, setOpenProfile] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const handleOpenProfile = (id) => {
+  const handleOpenProfile = useCallback((id) => {
     setSelectedId(id);
     setOpenProfile(true);
-  };
-  const handleCloseProfile = () => setOpenProfile(false);
+  }, []);
+  const handleCloseProfile = useCallback(() => setOpenProfile(false), []);
 
   // grade modal
   const [gradeOpen, setGradeOpen] = useState(false);
@@ -642,7 +846,7 @@ export default function RankingListScreen() {
   const [gradeDoubles, setGradeDoubles] = useState("");
   const [gradeMsg, setGradeMsg] = useState("");
 
-  const openGrade = (u, r) => {
+  const openGrade = useCallback((u, r) => {
     const singlesBase = Number.isFinite(r?.single)
       ? r.single
       : u?.localRatings?.singles ?? u?.ratingSingle;
@@ -662,11 +866,12 @@ export default function RankingListScreen() {
     );
     setGradeMsg("");
     setGradeOpen(true);
-  };
+  }, []);
+
   const normalizeDecimalInput = (v) =>
     typeof v === "string" ? v.replace(/,/g, ".").trim() : v;
+
   const submitGrade = async () => {
-    // 🟣 chuẩn hoá input từ bàn phím số: "2,2" -> "2.2"
     const singlesStr = normalizeDecimalInput(gradeSingles);
     const doublesStr = normalizeDecimalInput(gradeDoubles);
 
@@ -720,14 +925,49 @@ export default function RankingListScreen() {
       );
     }
   };
+
+  // ✅ KYC Image Viewer State
+  const [kycImageViewerVisible, setKycImageViewerVisible] = useState(false);
+  const [kycImageViewerIndex, setKycImageViewerIndex] = useState(0);
+  const [kycImages, setKycImages] = useState([]);
+
+  // ✅ Function để mở KYC Image Viewer
+  const openKycImageViewer = useCallback((user, side) => {
+    const frontImg = user?.cccdImages?.front;
+    const backImg = user?.cccdImages?.back;
+
+    const images = [];
+    if (frontImg) {
+      images.push({
+        uri: normalizeUrl(frontImg) || PLACE,
+      });
+    }
+    if (backImg) {
+      images.push({
+        uri: normalizeUrl(backImg) || PLACE,
+      });
+    }
+
+    if (images.length === 0) return;
+
+    setKycImages(images);
+    // Set index dựa trên ảnh nào được ấn (front = 0, back = 1)
+    setKycImageViewerIndex(side === "back" && images.length > 1 ? 1 : 0);
+    setKycImageViewerVisible(true);
+  }, []);
+
+  const closeKycImageViewer = useCallback(() => {
+    setKycImageViewerVisible(false);
+  }, []);
+
   // KYC modal
   const [kycOpen, setKycOpen] = useState(false);
   const [kycUser, setKycUser] = useState(null);
-  const openKyc = (u) => {
+  const openKyc = useCallback((u) => {
     setKycUser(u || null);
     setKycOpen(true);
-  };
-  const closeKyc = () => setKycOpen(false);
+  }, []);
+  const closeKyc = useCallback(() => setKycOpen(false), []);
 
   const doReview = async (action) => {
     if (!kycUser?._id) return;
@@ -737,12 +977,10 @@ export default function RankingListScreen() {
       setCccdPatch((m) => ({ ...m, [kycUser._id]: nextStatus }));
       setKycUser((v) => (v ? { ...v, cccdStatus: nextStatus } : v));
       setKycOpen(false);
-    } catch (_err) {
-      // giữ nguyên modal nếu lỗi
-    }
+    } catch (_err) {}
   };
 
-  // pagination change
+  // pagination
   const handleChangePage = useCallback(
     (oneBasedPage) => {
       const zeroBased = oneBasedPage - 1;
@@ -754,147 +992,56 @@ export default function RankingListScreen() {
     },
     [dispatch, page]
   );
-  const themeKey = C.scheme; // "light" | "dark"  -> đổi khi theme đổi
-  // render item
+
+  // ✅ getItemLayout for better performance
+  const getItemLayout = useCallback(
+    (_, index) => ({
+      length: CARD_HEIGHT_ESTIMATE,
+      offset: CARD_HEIGHT_ESTIMATE * index,
+      index,
+    }),
+    []
+  );
+
+  // ✅ keyExtractor
+  const keyExtractor = useCallback(
+    (item, i) => String(item?._id || item?.user?._id || i),
+    []
+  );
+
+  // ✅ renderItem memo
   const renderItem = useCallback(
     ({ item, index }) => {
-      const r = item;
-      const u = r?.user || {};
-      const avatarSrc = u?.avatar || PLACE;
-      const age = calcAge(u);
-      const uid = u?._id && String(u._id);
+      const uid = item?.user?._id && String(item.user._id);
       const podium = uid ? podiumByUser[uid] : null;
 
-      const tierHex =
-        r?.tierColor === "red"
-          ? HEX.red
-          : r?.tierColor === "yellow"
-          ? HEX.yellow
-          : HEX.grey;
-
-      const sp = scorePatch[u?._id || ""] || {};
-      const patched = {
-        single: sp.single ?? r?.single,
-        double: sp.double ?? r?.double,
-        updatedAt: sp.updatedAt ?? r?.updatedAt,
-      };
-
-      const effectiveStatus = cccdPatch[u?._id] || u?.cccdStatus;
-      const chip = getVerifyChip(effectiveStatus, r?.tierColor);
-
-      const allowGrade = canGradeUser(me, u?.province);
-      const allowKyc = canViewKycAdmin(me, effectiveStatus);
-
       return (
-        <FlameCard medal={podium?.medal} key={r?._id || u?._id || index}>
-          {/* Header: Avatar + Tên + Chip xác thực */}
-          <View style={styles.rowCenter}>
-            <FlameAvatar
-              uri={avatarSrc}
-              medal={podium?.medal}
-              onPress={() => openZoom(avatarSrc)}
-            />
-            <View style={{ flex: 1, marginHorizontal: 12 }}>
-              <Text style={[styles.nick, { color: C.textPrimary }]}>
-                {u?.nickname || "---"}
-              </Text>
-            </View>
-            <Pill label={chip.label} bg={chip.bg} fg={chip.fg} />
-          </View>
-
-          {/* Chip giải */}
-          {podium?.medal && (
-            <View style={styles.medalRow}>
-              <Pressable
-                onPress={() => goToTournament(podium.picked)}
-                style={[
-                  styles.medalPill,
-                  {
-                    borderColor: getMedalColors(podium.medal).border,
-                    backgroundColor: C.cardBg,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.medalPillText,
-                    { color: getMedalColors(podium.medal).text },
-                  ]}
-                >
-                  {podium.label}
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* info chips */}
-          <View style={styles.pillRowBelowMedal}>
-            {Number.isFinite(age) && <Pill label={`${age} tuổi`} />}
-            <Pill label={`Giới tính: ${genderLabel(u?.gender)}`} />
-            <Pill label={`Tỉnh: ${u?.province || "--"}`} />
-          </View>
-
-          {/* Scores */}
-          <View style={styles.scoreRow}>
-            <Text style={[styles.score, { color: tierHex }]}>
-              Đôi: {fmt3(patched.double)}
-            </Text>
-            <Text style={[styles.score, { color: tierHex }]}>
-              Đơn: {fmt3(patched.single)}
-            </Text>
-          </View>
-
-          {/* Meta */}
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: C.muted }]}>
-              Cập nhật:{" "}
-              {patched?.updatedAt
-                ? new Date(patched.updatedAt).toLocaleDateString()
-                : "--"}
-            </Text>
-            <Text style={[styles.metaText, { color: C.muted }]}>
-              Tham gia:{" "}
-              {u?.createdAt ? new Date(u.createdAt).toLocaleDateString() : "--"}
-            </Text>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.successBtn, { backgroundColor: HEX.green }]}
-              onPress={() => handleOpenProfile(u?._id)}
-            >
-              <Text style={styles.successBtnText}>Hồ sơ</Text>
-            </TouchableOpacity>
-
-            {allowGrade && (
-              <TouchableOpacity
-                style={[styles.outlineBtn, { borderColor: C.tint }]}
-                onPress={() => openGrade(u, r)}
-              >
-                <Text style={[styles.outlineBtnText, { color: C.tint }]}>
-                  Chấm trình
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {allowKyc && (
-              <TouchableOpacity
-                style={[styles.outlineBtn, { borderColor: C.outlineNeutral }]}
-                onPress={() => openKyc(u)}
-              >
-                <Text
-                  style={[styles.outlineBtnText, { color: C.outlineNeutral }]}
-                >
-                  Xem KYC
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </FlameCard>
+        <RankingCard
+          item={item}
+          index={index}
+          podium={podium}
+          scorePatch={scorePatch}
+          cccdPatch={cccdPatch}
+          me={me}
+          onOpenProfile={handleOpenProfile}
+          onOpenZoom={openZoom}
+          onOpenGrade={openGrade}
+          onOpenKyc={openKyc}
+          onGoToTournament={goToTournament}
+        />
       );
     },
-    [me, scorePatch, cccdPatch, podiumByUser, themeKey]
+    [
+      podiumByUser,
+      scorePatch,
+      cccdPatch,
+      me,
+      handleOpenProfile,
+      openZoom,
+      openGrade,
+      openKyc,
+      goToTournament,
+    ]
   );
 
   // skeleton flags
@@ -904,15 +1051,60 @@ export default function RankingListScreen() {
   const showHeaderRefetchSkeleton =
     !error && isFetching && (list?.length ?? 0) > 0;
 
+  // ✅ ListHeaderComponent memo
+  const ListHeader = useMemo(
+    () => (
+      <View>
+        <View
+          style={[styles.legendStickyWrap, { backgroundColor: C.stickyBg }]}
+        >
+          <View style={styles.legendRow}>
+            <Pill label="Điểm vàng: Đã xác thực" bg={HEX.yellow} fg="#000" />
+            <Pill label="Điểm đỏ: Tự chấm" bg={HEX.red} fg="#fff" />
+            <Pill label="Điểm xám: Chưa xác thực" bg={HEX.grey} fg="#fff" />
+          </View>
+        </View>
+        {showHeaderRefetchSkeleton ? (
+          <View style={{ paddingHorizontal: 0, paddingBottom: 4 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <RankingCardSkeleton key={`skh-${i}`} />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    ),
+    [C.stickyBg, showHeaderRefetchSkeleton]
+  );
+
+  // ✅ ListFooterComponent memo
+  const ListFooter = useMemo(
+    () =>
+      totalPages > 1 ? (
+        <View style={styles.pagiWrap}>
+          <PaginationRN
+            count={totalPages}
+            page={page + 1}
+            onChange={handleChangePage}
+            siblingCount={1}
+            boundaryCount={1}
+            showPrevNext
+            showFirstButton
+            showLastButton
+            size="md"
+          />
+          {isFetching && (
+            <View style={{ marginTop: 8 }}>
+              <ActivityIndicator />
+            </View>
+          )}
+        </View>
+      ) : null,
+    [totalPages, page, handleChangePage, isFetching]
+  );
+
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: C.pageBg },
-        // isIOS && { paddingBottom: 50 },
-      ]}
-    >
-      {/* TOP BAR + SEARCH */}
+    <View style={[styles.container, { backgroundColor: C.pageBg }]}>
+      {/* TOP BAR */}
       <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: C.textPrimary }]}>
@@ -975,39 +1167,10 @@ export default function RankingListScreen() {
         <FlatList
           ref={flatRef}
           data={list}
-          keyExtractor={(item, i) => String(item?._id || item?.user?._id || i)}
+          keyExtractor={keyExtractor}
           renderItem={renderItem}
-          ListHeaderComponent={
-            <View>
-              <View
-                style={[
-                  styles.legendStickyWrap,
-                  { backgroundColor: C.stickyBg },
-                ]}
-              >
-                <View style={styles.legendRow}>
-                  <Pill
-                    label="Điểm vàng: Đã xác thực"
-                    bg={HEX.yellow}
-                    fg="#000"
-                  />
-                  <Pill label="Điểm đỏ: Tự chấm" bg={HEX.red} fg="#fff" />
-                  <Pill
-                    label="Điểm xám: Chưa xác thực"
-                    bg={HEX.grey}
-                    fg="#fff"
-                  />
-                </View>
-              </View>
-              {showHeaderRefetchSkeleton ? (
-                <View style={{ paddingHorizontal: 0, paddingBottom: 4 }}>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <RankingCardSkeleton key={`skh-${i}`} />
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          }
+          getItemLayout={getItemLayout}
+          ListHeaderComponent={ListHeader}
           ListHeaderComponentStyle={{ backgroundColor: C.stickyBg }}
           stickyHeaderIndices={[0]}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 }}
@@ -1016,35 +1179,16 @@ export default function RankingListScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isFetching && (list?.length ?? 0) > 0 && !error}
-              onRefresh={() => refetch()}
+              onRefresh={refetch}
               tintColor={C.textSecondary}
             />
           }
-          ListFooterComponent={
-            totalPages > 1 ? (
-              <View style={styles.pagiWrap}>
-                <PaginationRN
-                  count={totalPages}
-                  page={page + 1}
-                  onChange={handleChangePage}
-                  siblingCount={1}
-                  boundaryCount={1}
-                  showPrevNext
-                  showFirstButton
-                  showLastButton
-                  size="md"
-                />
-                {isFetching && (
-                  <View style={{ marginTop: 8 }}>
-                    <ActivityIndicator />
-                  </View>
-                )}
-              </View>
-            ) : null
-          }
-          removeClippedSubviews
+          ListFooterComponent={ListFooter}
+          removeClippedSubviews={Platform.OS === "android"}
+          maxToRenderPerBatch={6}
+          updateCellsBatchingPeriod={50}
           initialNumToRender={8}
-          windowSize={8}
+          windowSize={10}
         />
       )}
 
@@ -1175,6 +1319,7 @@ export default function RankingListScreen() {
                 })()}
               </View>
 
+              {/* Ảnh CCCD - Click để mở ImageViewing */}
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {["front", "back"].map((side) => (
                   <TouchableOpacity
@@ -1188,7 +1333,7 @@ export default function RankingListScreen() {
                       },
                     ]}
                     activeOpacity={0.85}
-                    onPress={() => openZoom(kycUser?.cccdImages?.[side])}
+                    // onPress={() => openKycImageViewer(kycUser, side)}
                   >
                     <ExpoImage
                       source={
@@ -1198,6 +1343,8 @@ export default function RankingListScreen() {
                       contentFit="contain"
                       transition={150}
                       cachePolicy="memory-disk"
+                      placeholder={PLACE}
+                      placeholderContentFit="contain"
                     />
                     <View style={styles.kycBadge}>
                       <Text style={styles.kycBadgeText}>
@@ -1282,7 +1429,7 @@ export default function RankingListScreen() {
         </View>
       </Modal>
 
-      {/* Zoom avatar */}
+      {/* Zoom avatar modal */}
       <Modal
         visible={zoomOpen}
         animationType="fade"
@@ -1317,6 +1464,18 @@ export default function RankingListScreen() {
         open={openProfile}
         onClose={handleCloseProfile}
         userId={selectedId}
+      />
+
+      {/* ✅ KYC Image Viewer - ĐƯA RA NGOÀI TOP LEVEL */}
+      <ImageViewing
+        images={kycImages}
+        imageIndex={kycImageViewerIndex}
+        visible={kycImageViewerVisible}
+        onRequestClose={closeKycImageViewer}
+        presentationStyle="overFullScreen"
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        backgroundColor="rgba(0,0,0,0.9)"
       />
     </View>
   );
@@ -1379,7 +1538,6 @@ const styles = StyleSheet.create({
   },
   legendRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
-  /* Card & flames */
   flameCardWrap: { position: "relative", marginTop: 12 },
   cardFlameGlow: {
     position: "absolute",
@@ -1403,7 +1561,6 @@ const styles = StyleSheet.create({
 
   rowCenter: { flexDirection: "row", alignItems: "center" },
 
-  /* Avatar flames */
   flameWrap: {
     width: 60,
     height: 60,
@@ -1429,7 +1586,6 @@ const styles = StyleSheet.create({
 
   nick: { fontSize: 16, fontWeight: "700" },
 
-  /* Medal pill */
   medalRow: { marginTop: 8 },
   medalPill: {
     width: "100%",
@@ -1440,7 +1596,6 @@ const styles = StyleSheet.create({
   },
   medalPillText: { fontSize: 12, fontWeight: "800" },
 
-  /* info chips */
   pill: {
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -1455,7 +1610,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  /* score/meta/actions */
   scoreRow: { flexDirection: "row", gap: 16, marginTop: 10 },
   score: { fontSize: 14, fontWeight: "700" },
   metaRow: {
@@ -1487,7 +1641,6 @@ const styles = StyleSheet.create({
   },
   ghostBtnText: { fontWeight: "700" },
 
-  /* Footer pagination */
   pagiWrap: {
     paddingTop: 8,
     paddingBottom: 8,
@@ -1496,7 +1649,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
-  /* Error box */
   errorBox: {
     margin: 16,
     borderRadius: 12,
@@ -1505,7 +1657,6 @@ const styles = StyleSheet.create({
   },
   errorText: {},
 
-  /* Modal base */
   modalBackdrop: {
     backgroundColor: "rgba(0,0,0,0.6)",
     flex: 1,
@@ -1532,7 +1683,6 @@ const styles = StyleSheet.create({
   },
   modalCloseText: { fontWeight: "700" },
 
-  /* Sheet */
   sheet: {
     width: "100%",
     maxWidth: 560,
@@ -1542,7 +1692,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 18, fontWeight: "800", marginBottom: 8 },
 
-  /* KYC */
   kycImgWrap: {
     borderRadius: 10,
     borderWidth: 1,
@@ -1560,12 +1709,10 @@ const styles = StyleSheet.create({
   },
   kycBadgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 
-  /* Info rows */
   infoRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
   infoLabel: { width: 110, fontSize: 13 },
   infoValue: { flex: 1, fontSize: 15, fontWeight: "700" },
 
-  /* Inputs */
   inputRow: { marginTop: 10 },
   inputLabel: { fontSize: 12 },
   input: {

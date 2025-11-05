@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  memo,
 } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +24,7 @@ import {
   Linking,
   TouchableOpacity,
   useColorScheme,
+  ScrollView,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
 import {
@@ -55,51 +57,52 @@ const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 /* =============== THEME =============== */
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const pageBg = scheme === "dark" ? "#0e0f12" : "#f7f9fc";
-  const cardBg = scheme === "dark" ? "#111214" : "#fff";
-  const border = scheme === "dark" ? "#2f3136" : "#e5e7eb";
-  const textPrimary = scheme === "dark" ? "#fff" : "#111";
-  const muted = scheme === "dark" ? "#9aa0a6" : "#6b7280";
-  const chipBg = scheme === "dark" ? "#22252a" : "#eef2f7";
-  const chipFg = scheme === "dark" ? "#e5e7eb" : "#263238";
-  const inputBg = scheme === "dark" ? "#1a1c21" : "#fff";
-  const inputBorder = border;
-  const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
-  const ghostText = textPrimary;
-  const skeleton =
-    scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  return useMemo(() => {
+    const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
+    const pageBg = scheme === "dark" ? "#0e0f12" : "#f7f9fc";
+    const cardBg = scheme === "dark" ? "#111214" : "#fff";
+    const border = scheme === "dark" ? "#2f3136" : "#e5e7eb";
+    const textPrimary = scheme === "dark" ? "#fff" : "#111";
+    const muted = scheme === "dark" ? "#9aa0a6" : "#6b7280";
+    const chipBg = scheme === "dark" ? "#22252a" : "#eef2f7";
+    const chipFg = scheme === "dark" ? "#e5e7eb" : "#263238";
+    const inputBg = scheme === "dark" ? "#1a1c21" : "#fff";
+    const inputBorder = border;
+    const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
+    const ghostText = textPrimary;
+    const skeleton =
+      scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
 
-  // Alerts
-  const errBg = scheme === "dark" ? "#3a1f21" : "#fee2e2";
-  const errBorder = scheme === "dark" ? "#6e2a34" : "#ef4444";
-  const errText = scheme === "dark" ? "#ffb3b8" : "#991b1b";
-  const infoBg = scheme === "dark" ? "#26324a" : "#eff6ff";
-  const infoBorder = scheme === "dark" ? "#3c4f74" : "#93c5fd";
-  const infoText = scheme === "dark" ? "#cfe3ff" : "#1e3a8a";
+    const errBg = scheme === "dark" ? "#3a1f21" : "#fee2e2";
+    const errBorder = scheme === "dark" ? "#6e2a34" : "#ef4444";
+    const errText = scheme === "dark" ? "#ffb3b8" : "#991b1b";
+    const infoBg = scheme === "dark" ? "#26324a" : "#eff6ff";
+    const infoBorder = scheme === "dark" ? "#3c4f74" : "#93c5fd";
+    const infoText = scheme === "dark" ? "#cfe3ff" : "#1e3a8a";
 
-  return {
-    scheme,
-    tint,
-    pageBg,
-    cardBg,
-    border,
-    textPrimary,
-    muted,
-    chipBg,
-    chipFg,
-    inputBg,
-    inputBorder,
-    ghostBg,
-    ghostText,
-    skeleton,
-    errBg,
-    errBorder,
-    errText,
-    infoBg,
-    infoBorder,
-    infoText,
-  };
+    return {
+      scheme,
+      tint,
+      pageBg,
+      cardBg,
+      border,
+      textPrimary,
+      muted,
+      chipBg,
+      chipFg,
+      inputBg,
+      inputBorder,
+      ghostBg,
+      ghostText,
+      skeleton,
+      errBg,
+      errBorder,
+      errText,
+      infoBg,
+      infoBorder,
+      infoText,
+    };
+  }, [scheme]);
 }
 
 /* ---------------- helpers ---------------- */
@@ -112,7 +115,7 @@ const normType = (t?: string) => {
 
 const displayName = (pl: any) => {
   if (!pl) return "—";
-  const fn = pl.fullName || pl.name || "";
+  const fn = pl.fullName || pl?.name || "";
   const nn = pl.nickName || pl.nickname || "";
   return nn ? `${fn} (${nn})` : fn || "—";
 };
@@ -136,7 +139,6 @@ const fmtRange = (a?: string, b?: string) => {
   return A || B || "—";
 };
 
-/* cap / delta & màu tổng điểm */
 const getScoreCap = (tour: any, isSingles: boolean) =>
   Number(
     isSingles ? tour?.singleCap ?? tour?.scoreCap ?? 0 : tour?.scoreCap ?? 0
@@ -153,7 +155,6 @@ const getMaxDelta = (tour: any) =>
 
 type TotalState = "success" | "warning" | "error" | "default";
 
-/** ✅ Logic màu tổng điểm: total < cap+delta => xanh; = => vàng; > => đỏ */
 const decideTotalState = (total: number, cap: number, delta?: number) => {
   const t = Number(total);
   const c = Number(cap);
@@ -176,198 +177,13 @@ const chipColorsByState: Record<TotalState, { bg: string; fg: string }> = {
   default: { bg: "#eeeeee", fg: "#424242" },
 };
 
-/* -------- small atoms (RN) -------- */
-const Chip = ({
-  label,
-  bg,
-  fg,
-}: {
-  label: string;
-  bg?: string;
-  fg?: string;
-}) => {
-  const C = useThemeColors();
-  return (
-    <View style={[styles.chip, { backgroundColor: bg ?? C.chipBg }]}>
-      <Text
-        numberOfLines={1}
-        style={[styles.chipTxt, { color: fg ?? C.chipFg }]}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-};
-
-function PrimaryBtn({
-  onPress,
-  children,
-  disabled,
-}: {
-  onPress: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  const C = useThemeColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        { backgroundColor: disabled ? "#9aa0a6" : C.tint },
-        pressed && !disabled && { opacity: 0.9 },
-      ]}
-    >
-      <Text style={styles.btnWhite}>{children}</Text>
-    </Pressable>
-  );
-}
-function OutlineBtn({
-  onPress,
-  children,
-  disabled,
-}: {
-  onPress: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  const C = useThemeColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        styles.btnOutline,
-        { borderColor: disabled ? "#c7c7c7" : C.tint },
-        pressed && !disabled && { opacity: 0.95 },
-      ]}
-    >
-      <Text style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : C.tint }}>
-        {children}
-      </Text>
-    </Pressable>
-  );
-}
-
-function PaymentChip({ status, paidAt }: { status?: string; paidAt?: string }) {
-  const isPaid = status === "Paid";
-  const when = paidAt ? new Date(paidAt) : null;
-  const whenText = when && !isNaN(+when) ? ` • ${when.toLocaleString()}` : "";
-  return (
-    <Chip
-      label={isPaid ? `Đã thanh toán${whenText}` : "Chưa thanh toán"}
-      bg={isPaid ? "#e8f5e9" : undefined}
-      fg={isPaid ? "#2e7d32" : undefined}
-    />
-  );
-}
-function CheckinChip({ checkinAt }: { checkinAt?: string }) {
-  const C = useThemeColors();
-  const ok = !!checkinAt;
-  return (
-    <Chip
-      label={
-        ok
-          ? `Đã check-in • ${new Date(checkinAt!).toLocaleString()}`
-          : "Chưa check-in"
-      }
-      bg={ok ? "#e0f2fe" : C.chipBg}
-      fg={ok ? "#075985" : C.chipFg}
-    />
-  );
-}
-
-function StatItem({ label, value, hint }: any) {
-  const C = useThemeColors();
-  return (
-    <View style={{ padding: 8 }}>
-      <Text style={{ color: C.muted, fontSize: 12 }}>{label}</Text>
-      <Text
-        style={{
-          color: C.textPrimary,
-          fontWeight: "800",
-          fontSize: 18,
-          marginTop: 2,
-        }}
-      >
-        {String(value)}
-      </Text>
-      {hint ? (
-        <Text style={{ color: C.muted, fontSize: 12 }}>{hint}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-/** VĐV 1 (Bạn) */
-function SelfPlayerReadonly({
-  me,
-  isSingles,
-}: {
-  me: any;
-  isSingles: boolean;
-}) {
-  const C = useThemeColors();
-  if (!me?._id) return null;
-  const display = me?.nickname || me?.name || "Tôi";
-  const scoreVal = isSingles ? me?.score?.single : me?.score?.double;
-  return (
-    <View
-      style={[
-        styles.selfCard,
-        { backgroundColor: C.cardBg, borderColor: C.border },
-      ]}
-    >
-      <Text
-        style={{ fontWeight: "700", marginBottom: 8, color: C.textPrimary }}
-      >
-        VĐV 1 (Bạn)
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <ExpoImage
-          source={{ uri: normalizeUrl(me?.avatar) || PLACE }}
-          style={{
-            width: 46,
-            height: 46,
-            borderRadius: 23,
-            backgroundColor: "#eee",
-          }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={0}
-        />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={{ fontWeight: "600", color: C.textPrimary }}
-          >
-            {display}
-          </Text>
-          <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
-            {me?.phone || "—"}
-          </Text>
-        </View>
-        <Chip
-          label={`Điểm ${isSingles ? "đơn" : "đôi"}: ${roundTo3(
-            Number(scoreVal ?? 0)
-          )}`}
-          bg={C.cardBg}
-          fg={C.textPrimary}
-        />
-      </View>
-    </View>
-  );
-}
-
-/* ---------- Payment & Complaint helpers ---------- */
 const maskPhone = (phone?: string) => {
   if (!phone) return "*******???";
   const d = String(phone).replace(/\D/g, "");
   const tail = d.slice(-3) || "???";
   return "*******" + tail;
 };
+
 const regCodeOf = (r: any) =>
   r?.code ||
   r?.shortCode ||
@@ -399,6 +215,7 @@ const getQrProviderConfig = (tour: any) => {
     "";
   return { bank, acc };
 };
+
 const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
   const { bank, acc } = getQrProviderConfig(tour);
   if (!bank || !acc) return null;
@@ -418,50 +235,256 @@ const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
   return `https://qr.sepay.vn/img?${params.toString()}`;
 };
 
-/* --------- Action cell (có Thanh toán & Khiếu nại) --------- */
-function ActionCell({
-  r,
-  canManage,
-  isOwner,
-  onTogglePayment,
-  onCancel,
-  onOpenComplaint,
-  onOpenPayment,
-  busy,
-}: any) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: 6,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      {canManage && (
-        <OutlineBtn
-          onPress={() => onTogglePayment(r)}
-          disabled={busy?.settingPayment}
-        >
-          {r?.payment?.status === "Paid" ? "Bỏ thanh toán" : "Xác nhận phí 💰"}
-        </OutlineBtn>
-      )}
-      <PrimaryBtn onPress={() => onOpenPayment(r)}>Thanh toán</PrimaryBtn>
-      <OutlineBtn onPress={() => onOpenComplaint(r)}>⚠️ Khiếu nại</OutlineBtn>
-      {(canManage || isOwner) && (
-        <OutlineBtn
-          onPress={() => onCancel(r)}
-          disabled={busy?.deletingId === r?._id}
-        >
-          🗑️ Huỷ
-        </OutlineBtn>
-      )}
-    </View>
-  );
+/* ===== Hook: keyboard height ===== */
+function useKeyboardHeight() {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const onShow = (e: any) => setH(e?.endCoordinates?.height ?? 0);
+    const onHide = () => setH(0);
+    const s1 = Keyboard.addListener("keyboardWillShow", onShow);
+    const s2 = Keyboard.addListener("keyboardWillHide", onHide);
+    const s3 = Keyboard.addListener("keyboardDidShow", onShow);
+    const s4 = Keyboard.addListener("keyboardDidHide", onHide);
+    return () => {
+      s1.remove();
+      s2.remove();
+      s3.remove();
+      s4.remove();
+    };
+  }, []);
+  return h;
 }
 
-/* ---------- HTML columns (contact + content) ---------- */
-function HtmlCols({ tour }: { tour: any }) {
+/* -------- MEMOIZED ATOMS -------- */
+const Chip = memo(
+  ({ label, bg, fg }: { label: string; bg?: string; fg?: string }) => {
+    const C = useThemeColors();
+    return (
+      <View style={[styles.chip, { backgroundColor: bg ?? C.chipBg }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.chipTxt, { color: fg ?? C.chipFg }]}
+        >
+          {label}
+        </Text>
+      </View>
+    );
+  }
+);
+
+const PrimaryBtn = memo(
+  ({
+    onPress,
+    children,
+    disabled,
+  }: {
+    onPress: () => void;
+    children: React.ReactNode;
+    disabled?: boolean;
+  }) => {
+    const C = useThemeColors();
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => [
+          styles.btn,
+          { backgroundColor: disabled ? "#9aa0a6" : C.tint },
+          pressed && !disabled && { opacity: 0.9 },
+        ]}
+      >
+        <Text style={styles.btnWhite}>{children}</Text>
+      </Pressable>
+    );
+  }
+);
+
+const OutlineBtn = memo(
+  ({
+    onPress,
+    children,
+    disabled,
+  }: {
+    onPress: () => void;
+    children: React.ReactNode;
+    disabled?: boolean;
+  }) => {
+    const C = useThemeColors();
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => [
+          styles.btn,
+          styles.btnOutline,
+          { borderColor: disabled ? "#c7c7c7" : C.tint },
+          pressed && !disabled && { opacity: 0.95 },
+        ]}
+      >
+        <Text
+          style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : C.tint }}
+        >
+          {children}
+        </Text>
+      </Pressable>
+    );
+  }
+);
+
+const PaymentChip = memo(
+  ({ status, paidAt }: { status?: string; paidAt?: string }) => {
+    const isPaid = status === "Paid";
+    const when = paidAt ? new Date(paidAt) : null;
+    const whenText = when && !isNaN(+when) ? ` • ${when.toLocaleString()}` : "";
+    return (
+      <Chip
+        label={isPaid ? `Đã thanh toán${whenText}` : "Chưa thanh toán"}
+        bg={isPaid ? "#e8f5e9" : undefined}
+        fg={isPaid ? "#2e7d32" : undefined}
+      />
+    );
+  }
+);
+
+const CheckinChip = memo(({ checkinAt }: { checkinAt?: string }) => {
+  const C = useThemeColors();
+  const ok = !!checkinAt;
+  return (
+    <Chip
+      label={
+        ok
+          ? `Đã check-in • ${new Date(checkinAt!).toLocaleString()}`
+          : "Chưa check-in"
+      }
+      bg={ok ? "#e0f2fe" : C.chipBg}
+      fg={ok ? "#075985" : C.chipFg}
+    />
+  );
+});
+
+const StatItem = memo(({ label, value, hint }: any) => {
+  const C = useThemeColors();
+  return (
+    <View style={{ padding: 8 }}>
+      <Text style={{ color: C.muted, fontSize: 12 }}>{label}</Text>
+      <Text
+        style={{
+          color: C.textPrimary,
+          fontWeight: "800",
+          fontSize: 18,
+          marginTop: 2,
+        }}
+      >
+        {String(value)}
+      </Text>
+      {hint ? (
+        <Text style={{ color: C.muted, fontSize: 12 }}>{hint}</Text>
+      ) : null}
+    </View>
+  );
+});
+
+const SelfPlayerReadonly = memo(
+  ({ me, isSingles }: { me: any; isSingles: boolean }) => {
+    const C = useThemeColors();
+    if (!me?._id) return null;
+    const display = me?.nickname || me?.name || "Tôi";
+    const scoreVal = isSingles ? me?.score?.single : me?.score?.double;
+    return (
+      <View
+        style={[
+          styles.selfCard,
+          { backgroundColor: C.cardBg, borderColor: C.border },
+        ]}
+      >
+        <Text
+          style={{ fontWeight: "700", marginBottom: 8, color: C.textPrimary }}
+        >
+          VĐV 1 (Bạn)
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <ExpoImage
+            source={{ uri: normalizeUrl(me?.avatar) || PLACE }}
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 23,
+              backgroundColor: "#eee",
+            }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ fontWeight: "600", color: C.textPrimary }}
+            >
+              {display}
+            </Text>
+            <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
+              {me?.phone || "—"}
+            </Text>
+          </View>
+          <Chip
+            label={`Điểm ${isSingles ? "đơn" : "đôi"}: ${roundTo3(
+              Number(scoreVal ?? 0)
+            )}`}
+            bg={C.cardBg}
+            fg={C.textPrimary}
+          />
+        </View>
+      </View>
+    );
+  }
+);
+
+const ActionCell = memo(
+  ({
+    r,
+    canManage,
+    isOwner,
+    onTogglePayment,
+    onCancel,
+    onOpenComplaint,
+    onOpenPayment,
+    busy,
+  }: any) => {
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 6,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        {canManage && (
+          <OutlineBtn
+            onPress={() => onTogglePayment(r)}
+            disabled={busy?.settingPayment}
+          >
+            {r?.payment?.status === "Paid"
+              ? "Bỏ thanh toán"
+              : "Xác nhận phí 💰"}
+          </OutlineBtn>
+        )}
+        <PrimaryBtn onPress={() => onOpenPayment(r)}>Thanh toán</PrimaryBtn>
+        <OutlineBtn onPress={() => onOpenComplaint(r)}>⚠️ Khiếu nại</OutlineBtn>
+        {(canManage || isOwner) && (
+          <OutlineBtn
+            onPress={() => onCancel(r)}
+            disabled={busy?.deletingId === r?._id}
+          >
+            🗑️ Huỷ
+          </OutlineBtn>
+        )}
+      </View>
+    );
+  }
+);
+
+const HtmlCols = memo(({ tour }: { tour: any }) => {
   const { width } = useWindowDimensions();
   const C = useThemeColors();
   const GAP = 12;
@@ -473,40 +496,43 @@ function HtmlCols({ tour }: { tour: any }) {
     ? Math.floor((width - 16 * 2 - GAP) / 2)
     : width - 16 * 2;
 
-  const common = {
-    contentWidth: colContentWidth,
-    defaultTextProps: { selectable: true },
-    onLinkPress: (_e: any, href?: string) =>
-      href && Linking.openURL(href).catch(() => {}),
-    tagsStyles: {
-      a: { color: C.tint, textDecorationLine: "underline" },
-      img: { borderRadius: 8 },
-      p: { marginBottom: 8, lineHeight: 20, color: C.textPrimary },
-      li: { color: C.textPrimary },
-      ul: { marginBottom: 8, paddingLeft: 18 },
-      ol: { marginBottom: 8, paddingLeft: 18 },
-      h1: {
-        fontSize: 20,
-        fontWeight: "700",
-        marginBottom: 6,
-        color: C.textPrimary,
+  const common = useMemo(
+    () => ({
+      contentWidth: colContentWidth,
+      defaultTextProps: { selectable: true },
+      onLinkPress: (_e: any, href?: string) =>
+        href && Linking.openURL(href).catch(() => {}),
+      tagsStyles: {
+        a: { color: C.tint, textDecorationLine: "underline" },
+        img: { borderRadius: 8 },
+        p: { marginBottom: 8, lineHeight: 20, color: C.textPrimary },
+        li: { color: C.textPrimary },
+        ul: { marginBottom: 8, paddingLeft: 18 },
+        ol: { marginBottom: 8, paddingLeft: 18 },
+        h1: {
+          fontSize: 20,
+          fontWeight: "700",
+          marginBottom: 6,
+          color: C.textPrimary,
+        },
+        h2: {
+          fontSize: 18,
+          fontWeight: "700",
+          marginBottom: 6,
+          color: C.textPrimary,
+        },
+        h3: {
+          fontSize: 16,
+          fontWeight: "700",
+          marginBottom: 6,
+          color: C.textPrimary,
+        },
+        strong: { color: C.textPrimary },
       },
-      h2: {
-        fontSize: 18,
-        fontWeight: "700",
-        marginBottom: 6,
-        color: C.textPrimary,
-      },
-      h3: {
-        fontSize: 16,
-        fontWeight: "700",
-        marginBottom: 6,
-        color: C.textPrimary,
-      },
-      strong: { color: C.textPrimary },
-    },
-    renderersProps: { img: { enableExperimentalPercentWidth: true } },
-  } as const;
+      renderersProps: { img: { enableExperimentalPercentWidth: true } },
+    }),
+    [colContentWidth, C]
+  );
 
   return (
     <View style={{ marginTop: 12 }}>
@@ -539,7 +565,10 @@ function HtmlCols({ tour }: { tour: any }) {
                 { backgroundColor: C.cardBg, borderColor: C.border },
               ]}
             >
-              <RenderHTML source={{ html: tour.contactHtml }} {...common} />
+              <RenderHTML
+                source={{ html: tour?.contactHtml }}
+                {...(common as any)}
+              />
             </View>
           </View>
         )}
@@ -561,37 +590,20 @@ function HtmlCols({ tour }: { tour: any }) {
                 { backgroundColor: C.cardBg, borderColor: C.border },
               ]}
             >
-              <RenderHTML source={{ html: tour.contentHtml }} {...common} />
+              <RenderHTML
+                source={{ html: tour?.contentHtml }}
+                {...(common as any)}
+              />
             </View>
           </View>
         )}
       </View>
     </View>
   );
-}
+});
 
-/* ===== Hook: keyboard height (để tránh bàn phím che nội dung) ===== */
-function useKeyboardHeight() {
-  const [h, setH] = useState(0);
-  useEffect(() => {
-    const onShow = (e: any) => setH(e?.endCoordinates?.height ?? 0);
-    const onHide = () => setH(0);
-    const s1 = Keyboard.addListener("keyboardWillShow", onShow);
-    const s2 = Keyboard.addListener("keyboardWillHide", onHide);
-    const s3 = Keyboard.addListener("keyboardDidShow", onShow);
-    const s4 = Keyboard.addListener("keyboardDidHide", onHide);
-    return () => {
-      s1.remove();
-      s2.remove();
-      s3.remove();
-      s4.remove();
-    };
-  }, []);
-  return h;
-}
-
-/* ===== Item đã memo để mượt hơn ===== */
-const RegItem = React.memo(
+/* ===== MEMOIZED RegItem ===== */
+const RegItem = memo(
   function RegItem({
     r,
     index,
@@ -615,8 +627,6 @@ const RegItem = React.memo(
     const { state } = decideTotalState(total, cap, delta);
     const { bg, fg } = chipColorsByState[state];
     const players = [r?.player1, r?.player2].filter(Boolean);
-
-    // ✅ Lấy mã đăng ký để hiển thị
     const code = regCodeOf(r);
 
     return (
@@ -631,13 +641,11 @@ const RegItem = React.memo(
           },
         ]}
       >
-        {/* ✅ Hàng đầu: Mã đăng ký + STT */}
         <View style={styles.cardTopRow}>
           <Chip label={`Mã đăng ký: ${code}`} />
           <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
         </View>
 
-        {/* (giữ nguyên phần còn lại) */}
         {players.map((pl: any, idx: number) => (
           <View
             key={`${pl?.phone || pl?.fullName || idx}`}
@@ -772,11 +780,11 @@ export default function TournamentRegistrationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<any>>(null);
+  const searchInputRef = useRef<TextInput>(null);
 
   const { data: me, isLoading: meLoading, error: meErr } = useGetMeScoreQuery();
   const isLoggedIn = !!me?._id;
 
-  /* ─── queries ─── */
   const {
     data: tour,
     isLoading: tourLoading,
@@ -807,10 +815,8 @@ export default function TournamentRegistrationScreen() {
   const [createComplaint, { isLoading: sendingComplaint }] =
     useCreateComplaintMutation();
 
-  /* ─── local state ─── */
   const [p1Admin, setP1Admin] = useState<any>(null);
   const [p2, setP2] = useState<any>(null);
-
   const [msg, setMsg] = useState("");
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
@@ -826,8 +832,6 @@ export default function TournamentRegistrationScreen() {
   });
   const [newPlayer, setNewPlayer] = useState<any>(null);
   const [profile, setProfile] = useState({ open: false, userId: null as any });
-
-  // complaint & payment
   const [complaintDlg, setComplaintDlg] = useState({
     open: false,
     reg: null as any,
@@ -838,7 +842,6 @@ export default function TournamentRegistrationScreen() {
     reg: null as any,
   });
 
-  // ===== Search & infinite pagination (client-side) =====
   const PAGE_SIZE = 15;
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -846,10 +849,8 @@ export default function TournamentRegistrationScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // tránh che nội dung khi bàn phím mở
   const kbHeight = useKeyboardHeight();
 
-  // auto gợi ý VĐV1 là chính admin (nếu muốn)
   useEffect(() => {
     if ((me as any)?._id && !p1Admin) setP1Admin(me);
   }, [me, p1Admin]);
@@ -859,11 +860,14 @@ export default function TournamentRegistrationScreen() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const matchStr = (s?: string) =>
-    (s || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+  const matchStr = useCallback(
+    (s?: string) =>
+      (s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, ""),
+    []
+  );
 
   const filteredRegs = useMemo(() => {
     if (!debouncedQ) return regs;
@@ -877,7 +881,7 @@ export default function TournamentRegistrationScreen() {
       } ${code}`.toLowerCase();
       return matchStr(text).includes(qn);
     });
-  }, [regs, debouncedQ]);
+  }, [regs, debouncedQ, matchStr]);
 
   useEffect(() => {
     setTake(PAGE_SIZE);
@@ -917,19 +921,25 @@ export default function TournamentRegistrationScreen() {
 
   const isManager = useMemo(() => {
     if (!isLoggedIn || !tour) return false;
-    if (String(tour.createdBy) === String(me._id)) return true;
-    if (Array.isArray(tour.managers)) {
-      return tour.managers.some(
+    if (String(tour?.createdBy) === String(me._id)) return true;
+    if (Array.isArray(tour?.managers)) {
+      return tour?.managers.some(
         (m: any) => String(m?.user ?? m) === String(me._id)
       );
     }
-    return !!tour.isManager;
+    return !!tour?.isManager;
   }, [isLoggedIn, me, tour]);
-  const isAdmin = !!(
-    me?.isAdmin ||
-    me?.role === "admin" ||
-    (Array.isArray(me?.roles) && me.roles.includes("admin"))
+
+  const isAdmin = useMemo(
+    () =>
+      !!(
+        me?.isAdmin ||
+        me?.role === "admin" ||
+        (Array.isArray(me?.roles) && me.roles.includes("admin"))
+      ),
+    [me]
   );
+
   const canManage = isLoggedIn && (isManager || isAdmin);
 
   const pendingInvitesHere = useMemo(() => {
@@ -948,8 +958,7 @@ export default function TournamentRegistrationScreen() {
   const cap = useMemo(() => getScoreCap(tour, isSingles), [tour, isSingles]);
   const delta = useMemo(() => getMaxDelta(tour), [tour]);
 
-  /* ─── actions ─── */
-  const submit = async () => {
+  const submit = useCallback(async () => {
     if (!isLoggedIn)
       return Alert.alert(
         "Thông báo",
@@ -1046,122 +1055,156 @@ export default function TournamentRegistrationScreen() {
         );
       }
     }
-  };
+  }, [
+    isLoggedIn,
+    isAdmin,
+    p1Admin,
+    me,
+    isDoubles,
+    p2,
+    id,
+    msg,
+    createInvite,
+    isSingles,
+    refetchRegs,
+    refetchInvites,
+    router,
+  ]);
 
-  const handleCancel = (r: any) => {
-    if (!isLoggedIn)
-      return Alert.alert(
-        "Thông báo",
-        "Vui lòng đăng nhập để đăng ký giải đấu."
-      );
-    if (!canManage && r?.payment?.status === "Paid") {
-      return Alert.alert(
-        "Không thể huỷ",
-        "Đã nộp lệ phí, vui lòng liên hệ BTC để hỗ trợ."
-      );
-    }
-    if (!canManage) {
-      const isOwner = me && String(r?.createdBy) === String(me?._id);
-      if (!isOwner)
-        return Alert.alert("Không có quyền", "Bạn không thể huỷ đăng ký này.");
-    }
-    const extraWarn =
-      r?.payment?.status === "Paid"
-        ? "\n⚠️ Cặp này đã nộp lệ phí. Hãy đảm bảo hoàn tiền/offline theo quy trình trước khi xoá."
-        : "";
-    Alert.alert(
-      "Xác nhận",
-      `Bạn chắc chắn muốn huỷ cặp đăng ký này?${extraWarn}`,
-      [
-        { text: "Không", style: "cancel" },
-        {
-          text: "Có, huỷ",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setCancelingId(r._id);
-              if (canManage) await adminDeleteReg(r._id).unwrap();
-              else await cancelReg(r._id).unwrap();
-              Alert.alert("Thành công", "Đã huỷ đăng ký");
-              refetchRegs();
-            } catch (e: any) {
-              Alert.alert(
-                "Lỗi",
-                e?.data?.message || e?.error || "Huỷ đăng ký thất bại"
-              );
-            } finally {
-              setCancelingId(null);
-            }
+  const handleCancel = useCallback(
+    (r: any) => {
+      if (!isLoggedIn)
+        return Alert.alert(
+          "Thông báo",
+          "Vui lòng đăng nhập để đăng ký giải đấu."
+        );
+      if (!canManage && r?.payment?.status === "Paid") {
+        return Alert.alert(
+          "Không thể huỷ",
+          "Đã nộp lệ phí, vui lòng liên hệ BTC để hỗ trợ."
+        );
+      }
+      if (!canManage) {
+        const isOwner = me && String(r?.createdBy) === String(me?._id);
+        if (!isOwner)
+          return Alert.alert(
+            "Không có quyền",
+            "Bạn không thể huỷ đăng ký này."
+          );
+      }
+      const extraWarn =
+        r?.payment?.status === "Paid"
+          ? "\n⚠️ Cặp này đã nộp lệ phí. Hãy đảm bảo hoàn tiền/offline theo quy trình trước khi xoá."
+          : "";
+      Alert.alert(
+        "Xác nhận",
+        `Bạn chắc chắn muốn huỷ cặp đăng ký này?${extraWarn}`,
+        [
+          { text: "Không", style: "cancel" },
+          {
+            text: "Có, huỷ",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setCancelingId(r._id);
+                if (canManage) await adminDeleteReg(r._id).unwrap();
+                else await cancelReg(r._id).unwrap();
+                Alert.alert("Thành công", "Đã huỷ đăng ký");
+                refetchRegs();
+              } catch (e: any) {
+                Alert.alert(
+                  "Lỗi",
+                  e?.data?.message || e?.error || "Huỷ đăng ký thất bại"
+                );
+              } finally {
+                setCancelingId(null);
+              }
+            },
           },
-        },
-      ]
-    );
-  };
+        ]
+      );
+    },
+    [isLoggedIn, canManage, me, adminDeleteReg, cancelReg, refetchRegs]
+  );
 
-  const handleInviteRespond = async (
-    inviteId: string,
-    action: "accept" | "decline"
-  ) => {
-    if (!isLoggedIn)
-      return Alert.alert(
-        "Thông báo",
-        "Vui lòng đăng nhập để phản hồi lời mời."
-      );
-    try {
-      await respondInvite({ inviteId, action }).unwrap();
-      Alert.alert(
-        "OK",
-        action === "accept" ? "Đã chấp nhận lời mời" : "Đã từ chối"
-      );
-      await Promise.all([refetchInvites(), refetchRegs()]);
-    } catch (e: any) {
-      Alert.alert(
-        "Lỗi",
-        e?.data?.message || e?.error || "Không thể gửi phản hồi"
-      );
-    }
-  };
+  const handleInviteRespond = useCallback(
+    async (inviteId: string, action: "accept" | "decline") => {
+      if (!isLoggedIn)
+        return Alert.alert(
+          "Thông báo",
+          "Vui lòng đăng nhập để phản hồi lời mời."
+        );
+      try {
+        await respondInvite({ inviteId, action }).unwrap();
+        Alert.alert(
+          "OK",
+          action === "accept" ? "Đã chấp nhận lời mời" : "Đã từ chối"
+        );
+        await Promise.all([refetchInvites(), refetchRegs()]);
+      } catch (e: any) {
+        Alert.alert(
+          "Lỗi",
+          e?.data?.message || e?.error || "Không thể gửi phản hồi"
+        );
+      }
+    },
+    [isLoggedIn, respondInvite, refetchInvites, refetchRegs]
+  );
 
-  const togglePayment = async (r: any) => {
-    if (!canManage)
-      return Alert.alert(
-        "Thông báo",
-        "Bạn không có quyền cập nhật thanh toán."
-      );
-    const next = r?.payment?.status === "Paid" ? "Unpaid" : "Paid";
-    try {
-      await setPaymentStatus({ regId: r._id, status: next }).unwrap();
-      Alert.alert(
-        "OK",
-        next === "Paid"
-          ? "Đã xác nhận đã thanh toán"
-          : "Đã chuyển về chưa thanh toán"
-      );
-      refetchRegs();
-    } catch (e: any) {
-      Alert.alert(
-        "Lỗi",
-        e?.data?.message || e?.error || "Cập nhật thanh toán thất bại"
-      );
-    }
-  };
+  const togglePayment = useCallback(
+    async (r: any) => {
+      if (!canManage)
+        return Alert.alert(
+          "Thông báo",
+          "Bạn không có quyền cập nhật thanh toán."
+        );
+      const next = r?.payment?.status === "Paid" ? "Unpaid" : "Paid";
+      try {
+        await setPaymentStatus({ regId: r._id, status: next }).unwrap();
+        Alert.alert(
+          "OK",
+          next === "Paid"
+            ? "Đã xác nhận đã thanh toán"
+            : "Đã chuyển về chưa thanh toán"
+        );
+        refetchRegs();
+      } catch (e: any) {
+        Alert.alert(
+          "Lỗi",
+          e?.data?.message || e?.error || "Cập nhật thanh toán thất bại"
+        );
+      }
+    },
+    [canManage, setPaymentStatus, refetchRegs]
+  );
 
-  const openPreview = (src?: string, name?: string) =>
-    setImgPreview({
-      open: true,
-      src: normalizeUrl(src) || PLACE,
-      name: name || "",
-    });
-  const closePreview = () => setImgPreview({ open: false, src: "", name: "" });
+  const openPreview = useCallback(
+    (src?: string, name?: string) =>
+      setImgPreview({
+        open: true,
+        src: normalizeUrl(src) || PLACE,
+        name: name || "",
+      }),
+    []
+  );
+  const closePreview = useCallback(
+    () => setImgPreview({ open: false, src: "", name: "" }),
+    []
+  );
 
-  const openReplace = (reg: any, slot: "p1" | "p2") => {
-    if (!canManage) return;
-    setReplaceDlg({ open: true, reg, slot });
-    setNewPlayer(null);
-  };
-  const closeReplace = () =>
-    setReplaceDlg({ open: false, reg: null as any, slot: "p1" });
-  const submitReplace = async () => {
+  const openReplace = useCallback(
+    (reg: any, slot: "p1" | "p2") => {
+      if (!canManage) return;
+      setReplaceDlg({ open: true, reg, slot });
+      setNewPlayer(null);
+    },
+    [canManage]
+  );
+  const closeReplace = useCallback(
+    () => setReplaceDlg({ open: false, reg: null as any, slot: "p1" }),
+    []
+  );
+  const submitReplace = useCallback(async () => {
     if (!replaceDlg?.reg?._id)
       return Alert.alert("Thiếu thông tin", "Chọn cặp cần thay.");
     if (!newPlayer?._id) return Alert.alert("Thiếu thông tin", "Chọn VĐV mới");
@@ -1177,19 +1220,23 @@ export default function TournamentRegistrationScreen() {
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || e?.error || "Không thể thay VĐV");
     }
-  };
+  }, [replaceDlg, newPlayer, replacePlayer, closeReplace, refetchRegs]);
 
-  const openProfileByPlayer = (pl: any) => {
+  const openProfileByPlayer = useCallback((pl: any) => {
     const uid = getUserId(pl);
     if (uid) setProfile({ open: true, userId: uid });
     else Alert.alert("Thông báo", "Không tìm thấy userId của VĐV này.");
-  };
+  }, []);
 
-  const openComplaint = (reg: any) =>
-    setComplaintDlg({ open: true, reg, text: "" });
-  const closeComplaint = () =>
-    setComplaintDlg({ open: false, reg: null as any, text: "" });
-  const submitComplaint = async () => {
+  const openComplaint = useCallback(
+    (reg: any) => setComplaintDlg({ open: true, reg, text: "" }),
+    []
+  );
+  const closeComplaint = useCallback(
+    () => setComplaintDlg({ open: false, reg: null as any, text: "" }),
+    []
+  );
+  const submitComplaint = useCallback(async () => {
     const regId = complaintDlg?.reg?._id;
     const content = complaintDlg.text?.trim();
     if (!content)
@@ -1208,48 +1255,73 @@ export default function TournamentRegistrationScreen() {
         e?.data?.message || e?.error || "Gửi khiếu nại thất bại"
       );
     }
-  };
+  }, [complaintDlg, isLoggedIn, createComplaint, id, closeComplaint]);
 
-  const openPayment = (reg: any) => setPaymentDlg({ open: true, reg });
-  const closePayment = () => setPaymentDlg({ open: false, reg: null as any });
+  const openPayment = useCallback(
+    (reg: any) => setPaymentDlg({ open: true, reg }),
+    []
+  );
+  const closePayment = useCallback(
+    () => setPaymentDlg({ open: false, reg: null as any }),
+    []
+  );
 
-  const onGoDraw = () => router.push(`/tournament/${id}/draw`);
-  const onGoManage = () => router.push(`/tournament/${id}/manage`);
+  const onGoDraw = useCallback(
+    () => router.push(`/tournament/${id}/draw`),
+    [router, id]
+  );
+  const onGoManage = useCallback(
+    () => router.push(`/tournament/${id}/manage`),
+    [router, id]
+  );
 
-  /* ───────────────── Guards ───────────────── */
-  if (tourLoading) {
-    return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.pageBg }]}>
-        <ActivityIndicator />
-      </SafeAreaView>
-    );
-  }
-  if (tourErr) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: C.pageBg }]}>
-        <View
-          style={[
-            styles.alert,
-            { borderColor: C.errBorder, backgroundColor: C.errBg },
-          ]}
-        >
-          <Text style={{ color: C.errText }}>
-            {(tourErr as any)?.data?.message ||
-              (tourErr as any)?.error ||
-              "Lỗi tải giải đấu"}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  if (!tour) return null;
+  const renderItem = useCallback(
+    ({ item: r, index }: any) => {
+      const isOwner = isLoggedIn && String(r?.createdBy) === String(me?._id);
+      return (
+        <RegItem
+          r={r}
+          index={index}
+          isSingles={isSingles}
+          canManage={canManage}
+          cap={cap}
+          delta={delta}
+          isOwner={isOwner}
+          onPreview={openPreview}
+          onOpenProfile={openProfileByPlayer}
+          onOpenReplace={openReplace}
+          onTogglePayment={togglePayment}
+          onCancel={handleCancel}
+          onOpenComplaint={openComplaint}
+          onOpenPayment={openPayment}
+          cancelingId={cancelingId}
+          settingPayment={settingPayment}
+        />
+      );
+    },
+    [
+      isLoggedIn,
+      me,
+      isSingles,
+      canManage,
+      cap,
+      delta,
+      openPreview,
+      openProfileByPlayer,
+      openReplace,
+      togglePayment,
+      handleCancel,
+      openComplaint,
+      openPayment,
+      cancelingId,
+      settingPayment,
+    ]
+  );
 
   const isSinglesLabel = isSingles ? "Giải đơn" : "Giải đôi";
 
-  /* ───────────────── Header (bao gồm search) ───────────────── */
   const HeaderBlock = (
     <View style={{ padding: 16, paddingBottom: 8 }}>
-      {/* Header */}
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: C.textPrimary }]}>
           Đăng ký giải đấu
@@ -1261,7 +1333,6 @@ export default function TournamentRegistrationScreen() {
         />
       </View>
 
-      {/* Thông tin giải */}
       <View
         style={[
           styles.sectionCard,
@@ -1272,13 +1343,13 @@ export default function TournamentRegistrationScreen() {
           style={[styles.tourName, { color: C.textPrimary }]}
           numberOfLines={1}
         >
-          {tour.name}
+          {tour?.name}
         </Text>
         <Text style={[styles.muted, { color: C.muted }]}>
-          {tour.location || "—"}
+          {tour?.location || "—"}
         </Text>
         <Text style={[styles.muted, { color: C.muted }]}>
-          {fmtRange(tour.startDate, tour.endDate)}
+          {fmtRange(tour?.startDate, tour?.endDate)}
         </Text>
 
         <View style={{ height: 8 }} />
@@ -1310,7 +1381,6 @@ export default function TournamentRegistrationScreen() {
         <HtmlCols tour={tour} />
       </View>
 
-      {/* Thông báo đăng nhập */}
       {meLoading
         ? null
         : !isLoggedIn && (
@@ -1326,7 +1396,6 @@ export default function TournamentRegistrationScreen() {
             </View>
           )}
 
-      {/* Lời mời đang chờ */}
       {isLoggedIn && pendingInvitesHere.length > 0 && (
         <View
           style={[
@@ -1335,7 +1404,11 @@ export default function TournamentRegistrationScreen() {
           ]}
         >
           <Text
-            style={{ fontWeight: "800", marginBottom: 8, color: C.textPrimary }}
+            style={{
+              fontWeight: "800",
+              marginBottom: 8,
+              color: C.textPrimary,
+            }}
           >
             Lời mời đang chờ xác nhận
           </Text>
@@ -1420,7 +1493,6 @@ export default function TournamentRegistrationScreen() {
         </View>
       )}
 
-      {/* FORM đăng ký */}
       <View
         style={[
           styles.sectionCard,
@@ -1463,7 +1535,7 @@ export default function TournamentRegistrationScreen() {
               <View style={{ marginTop: 8 }}>
                 <PlayerSelector
                   label="VĐV 1"
-                  eventType={tour.eventType}
+                  eventType={tour?.eventType}
                   onChange={setP1Admin}
                 />
               </View>
@@ -1471,7 +1543,7 @@ export default function TournamentRegistrationScreen() {
                 <View style={{ marginTop: 12 }}>
                   <PlayerSelector
                     label="VĐV 2"
-                    eventType={tour.eventType}
+                    eventType={tour?.eventType}
                     onChange={setP2}
                   />
                 </View>
@@ -1484,7 +1556,7 @@ export default function TournamentRegistrationScreen() {
                 <View style={{ marginTop: 12 }}>
                   <PlayerSelector
                     label="VĐV 2"
-                    eventType={tour.eventType}
+                    eventType={tour?.eventType}
                     onChange={setP2}
                   />
                 </View>
@@ -1593,7 +1665,6 @@ export default function TournamentRegistrationScreen() {
         </View>
       )}
 
-      {/* Tiêu đề + Search danh sách */}
       <View style={{ marginTop: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text
@@ -1610,6 +1681,7 @@ export default function TournamentRegistrationScreen() {
 
         <View style={styles.searchWrap}>
           <TextInput
+            ref={searchInputRef}
             value={q}
             onChangeText={setQ}
             placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
@@ -1635,7 +1707,6 @@ export default function TournamentRegistrationScreen() {
         </View>
       </View>
 
-      {/* Thông báo lỗi / loading */}
       {regsLoading ? (
         <View style={{ paddingVertical: 16, alignItems: "center" }}>
           <ActivityIndicator />
@@ -1657,12 +1728,52 @@ export default function TournamentRegistrationScreen() {
     </View>
   );
 
-  /* ===================== LIST ===================== */
+  const ListFooter = useMemo(
+    () => (
+      <View style={{ padding: 16, alignItems: "center" }}>
+        {loadingMore && <ActivityIndicator />}
+        {!loadingMore && !canLoadMore && filteredRegs.length > 0 && (
+          <Text style={{ color: C.muted, fontSize: 12 }}>
+            — Đã hết dữ liệu —
+          </Text>
+        )}
+      </View>
+    ),
+    [loadingMore, canLoadMore, filteredRegs.length, C.muted]
+  );
+
+  if (tourLoading) {
+    return (
+      <SafeAreaView style={[styles.center, { backgroundColor: C.pageBg }]}>
+        <ActivityIndicator />
+      </SafeAreaView>
+    );
+  }
+  if (tourErr) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: C.pageBg }]}>
+        <View
+          style={[
+            styles.alert,
+            { borderColor: C.errBorder, backgroundColor: C.errBg },
+          ]}
+        >
+          <Text style={{ color: C.errText }}>
+            {(tourErr as any)?.data?.message ||
+              (tourErr as any)?.error ||
+              "Lỗi tải giải đấu"}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  if (!tour) return null;
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: C.pageBg }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={insets.top}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
     >
       <FlashList
         ref={listRef}
@@ -1670,48 +1781,18 @@ export default function TournamentRegistrationScreen() {
         refreshing={refreshing}
         onRefresh={onRefresh}
         keyExtractor={(item, i) => String(item?._id || i)}
-        renderItem={({ item: r, index }) => {
-          const isOwner =
-            isLoggedIn && String(r?.createdBy) === String(me?._id);
-          return (
-            <RegItem
-              r={r}
-              index={index}
-              isSingles={isSingles}
-              canManage={canManage}
-              cap={cap}
-              delta={delta}
-              isOwner={isOwner}
-              onPreview={openPreview}
-              onOpenProfile={openProfileByPlayer}
-              onOpenReplace={openReplace}
-              onTogglePayment={togglePayment}
-              onCancel={handleCancel}
-              onOpenComplaint={openComplaint}
-              onOpenPayment={openPayment}
-              cancelingId={cancelingId}
-              settingPayment={settingPayment}
-            />
-          );
-        }}
+        renderItem={renderItem}
         ListHeaderComponent={HeaderBlock}
-        ListFooterComponent={
-          <View style={{ padding: 16, alignItems: "center" }}>
-            {loadingMore && <ActivityIndicator />}
-            {!loadingMore && !canLoadMore && filteredRegs.length > 0 && (
-              <Text style={{ color: C.muted, fontSize: 12 }}>
-                — Đã hết dữ liệu —
-              </Text>
-            )}
-          </View>
-        }
+        ListFooterComponent={ListFooter}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         estimatedItemSize={220}
-        removeClippedSubviews
-        contentContainerStyle={{ paddingBottom: 16 + kbHeight }}
+        removeClippedSubviews={Platform.OS === "android"}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
       />
 
       {/* Preview ảnh */}
@@ -1754,47 +1835,56 @@ export default function TournamentRegistrationScreen() {
         animationType="slide"
         onRequestClose={closeReplace}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: C.cardBg, borderColor: C.border },
-            ]}
-          >
-            <Text
-              style={{
-                fontWeight: "800",
-                fontSize: 16,
-                marginBottom: 8,
-                color: C.textPrimary,
-              }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalBackdrop}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
             >
-              {replaceDlg.slot === "p2" ? "Thay/Thêm VĐV 2" : "Thay VĐV 1"}
-            </Text>
-
-            <PlayerSelector
-              label="Chọn VĐV mới"
-              eventType={tour?.eventType}
-              onChange={setNewPlayer}
-            />
-            <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
-              Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
-            </Text>
-
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-              <OutlineBtn onPress={closeReplace}>Huỷ</OutlineBtn>
-              <PrimaryBtn
-                onPress={submitReplace}
-                disabled={replacing || !newPlayer?._id}
+              <View
+                style={[
+                  styles.modalCard,
+                  { backgroundColor: C.cardBg, borderColor: C.border },
+                ]}
               >
-                {replacing ? "Đang lưu…" : "Lưu thay đổi"}
-              </PrimaryBtn>
-            </View>
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    fontSize: 16,
+                    marginBottom: 8,
+                    color: C.textPrimary,
+                  }}
+                >
+                  {replaceDlg.slot === "p2" ? "Thay/Thêm VĐV 2" : "Thay VĐV 1"}
+                </Text>
+
+                <PlayerSelector
+                  label="Chọn VĐV mới"
+                  eventType={tour?.eventType}
+                  onChange={setNewPlayer}
+                />
+                <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+                  Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
+                </Text>
+
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                  <OutlineBtn onPress={closeReplace}>Huỷ</OutlineBtn>
+                  <PrimaryBtn
+                    onPress={submitReplace}
+                    disabled={replacing || !newPlayer?._id}
+                  >
+                    {replacing ? "Đang lưu…" : "Lưu thay đổi"}
+                  </PrimaryBtn>
+                </View>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Sheet hồ sơ công khai */}
       <PublicProfileSheet
         open={profile.open}
         onClose={() => setProfile({ open: false, userId: null })}
@@ -1808,54 +1898,66 @@ export default function TournamentRegistrationScreen() {
         animationType="slide"
         onRequestClose={closeComplaint}
       >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: C.cardBg, borderColor: C.border },
-            ]}
-          >
-            <Text
-              style={{
-                fontWeight: "800",
-                fontSize: 16,
-                marginBottom: 8,
-                color: C.textPrimary,
-              }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalBackdrop}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
             >
-              Khiếu nại đăng ký
-            </Text>
-            <Text style={{ color: C.textPrimary, marginBottom: 6 }}>
-              Vui lòng mô tả chi tiết vấn đề. BTC sẽ tiếp nhận và phản hồi.
-            </Text>
-            <TextInput
-              value={complaintDlg.text}
-              onChangeText={(t) => setComplaintDlg((s) => ({ ...s, text: t }))}
-              multiline
-              numberOfLines={5}
-              style={[
-                styles.textarea,
-                {
-                  minHeight: 120,
-                  backgroundColor: C.inputBg,
-                  borderColor: C.inputBorder,
-                  color: C.textPrimary,
-                },
-              ]}
-              placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
-              placeholderTextColor={C.muted}
-            />
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-              <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
-              <PrimaryBtn
-                onPress={submitComplaint}
-                disabled={sendingComplaint || !complaintDlg.text.trim()}
+              <View
+                style={[
+                  styles.modalCard,
+                  { backgroundColor: C.cardBg, borderColor: C.border },
+                ]}
               >
-                {sendingComplaint ? "Đang gửi…" : "Gửi khiếu nại"}
-              </PrimaryBtn>
-            </View>
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    fontSize: 16,
+                    marginBottom: 8,
+                    color: C.textPrimary,
+                  }}
+                >
+                  Khiếu nại đăng ký
+                </Text>
+                <Text style={{ color: C.textPrimary, marginBottom: 6 }}>
+                  Vui lòng mô tả chi tiết vấn đề. BTC sẽ tiếp nhận và phản hồi.
+                </Text>
+                <TextInput
+                  value={complaintDlg.text}
+                  onChangeText={(t) =>
+                    setComplaintDlg((s) => ({ ...s, text: t }))
+                  }
+                  multiline
+                  numberOfLines={5}
+                  style={[
+                    styles.textarea,
+                    {
+                      minHeight: 120,
+                      backgroundColor: C.inputBg,
+                      borderColor: C.inputBorder,
+                      color: C.textPrimary,
+                    },
+                  ]}
+                  placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
+                  placeholderTextColor={C.muted}
+                />
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                  <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
+                  <PrimaryBtn
+                    onPress={submitComplaint}
+                    disabled={sendingComplaint || !complaintDlg.text.trim()}
+                  >
+                    {sendingComplaint ? "Đang gửi…" : "Gửi khiếu nại"}
+                  </PrimaryBtn>
+                </View>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal Thanh toán QR */}
@@ -1866,117 +1968,126 @@ export default function TournamentRegistrationScreen() {
         onRequestClose={closePayment}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: C.cardBg, borderColor: C.border },
-            ]}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
           >
-            <Text
-              style={{
-                fontWeight: "800",
-                fontSize: 16,
-                marginBottom: 8,
-                color: C.textPrimary,
-              }}
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: C.cardBg, borderColor: C.border },
+              ]}
             >
-              Thanh toán lệ phí
-            </Text>
-            {paymentDlg.reg ? (
-              <>
-                {(() => {
-                  const code = regCodeOf(paymentDlg.reg);
-                  const ph = maskPhone(
-                    paymentDlg.reg?.player1?.phone ||
-                      paymentDlg.reg?.player2?.phone ||
-                      me?.phone ||
-                      ""
-                  );
-                  return (
-                    <Text style={{ color: C.textPrimary, marginBottom: 8 }}>
-                      Quét QR để thanh toán cho mã đăng ký{" "}
-                      <Text style={{ fontWeight: "800" }}>{code}</Text>.{"\n"}
-                      SĐT xác nhận: {ph}.
-                    </Text>
-                  );
-                })()}
-                {(() => {
-                  const url = qrImgUrlFor(tour, paymentDlg.reg, me?.phone);
-                  if (!url) {
-                    return (
-                      <View
-                        style={[
-                          styles.alert,
-                          {
-                            borderColor: C.infoBorder,
-                            backgroundColor: C.infoBg,
-                          },
-                        ]}
-                      >
-                        <Text style={{ color: C.infoText }}>
-                          Chưa có QR thanh toán. Dùng mục{" "}
-                          <Text style={{ fontWeight: "800" }}>Khiếu nại</Text>{" "}
-                          để liên hệ BTC.
-                        </Text>
-                      </View>
+              <Text
+                style={{
+                  fontWeight: "800",
+                  fontSize: 16,
+                  marginBottom: 8,
+                  color: C.textPrimary,
+                }}
+              >
+                Thanh toán lệ phí
+              </Text>
+              {paymentDlg.reg ? (
+                <>
+                  {(() => {
+                    const code = regCodeOf(paymentDlg.reg);
+                    const ph = maskPhone(
+                      paymentDlg.reg?.player1?.phone ||
+                        paymentDlg.reg?.player2?.phone ||
+                        me?.phone ||
+                        ""
                     );
-                  }
-                  return (
-                    <>
-                      <View style={{ alignItems: "center", marginVertical: 8 }}>
-                        <ExpoImage
-                          source={{ uri: url }}
-                          style={{
-                            width: 260,
-                            height: 260,
-                            borderRadius: 12,
-                            backgroundColor: C.ghostBg,
-                          }}
-                          contentFit="cover"
-                          cachePolicy="memory-disk"
-                          transition={0}
-                        />
-                      </View>
-                      <Text
-                        style={{
-                          color: C.muted,
-                          fontSize: 12,
-                          textAlign: "center",
-                        }}
-                      >
-                        Quét mã QR để thanh toán phí đăng ký giải đấu.
+                    return (
+                      <Text style={{ color: C.textPrimary, marginBottom: 8 }}>
+                        Quét QR để thanh toán cho mã đăng ký{" "}
+                        <Text style={{ fontWeight: "800" }}>{code}</Text>.{"\n"}
+                        SĐT xác nhận: {ph}.
                       </Text>
-                    </>
-                  );
-                })()}
-              </>
-            ) : null}
-
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-              {!paymentDlg.reg ||
-              !qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
-                <OutlineBtn
-                  onPress={() =>
-                    setComplaintDlg({
-                      open: true,
-                      reg: paymentDlg.reg,
-                      text: "",
-                    })
-                  }
-                >
-                  ⚠️ Khiếu nại
-                </OutlineBtn>
+                    );
+                  })()}
+                  {(() => {
+                    const url = qrImgUrlFor(tour, paymentDlg.reg, me?.phone);
+                    if (!url) {
+                      return (
+                        <View
+                          style={[
+                            styles.alert,
+                            {
+                              borderColor: C.infoBorder,
+                              backgroundColor: C.infoBg,
+                            },
+                          ]}
+                        >
+                          <Text style={{ color: C.infoText }}>
+                            Chưa có QR thanh toán. Dùng mục{" "}
+                            <Text style={{ fontWeight: "800" }}>Khiếu nại</Text>{" "}
+                            để liên hệ BTC.
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <>
+                        <View
+                          style={{
+                            alignItems: "center",
+                            marginVertical: 8,
+                          }}
+                        >
+                          <ExpoImage
+                            source={{ uri: url }}
+                            style={{
+                              width: 260,
+                              height: 260,
+                              borderRadius: 12,
+                              backgroundColor: C.ghostBg,
+                            }}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={0}
+                          />
+                        </View>
+                        <Text
+                          style={{
+                            color: C.muted,
+                            fontSize: 12,
+                            textAlign: "center",
+                          }}
+                        >
+                          Quét mã QR để thanh toán phí đăng ký giải đấu.
+                        </Text>
+                      </>
+                    );
+                  })()}
+                </>
               ) : null}
-              <PrimaryBtn onPress={closePayment}>Đóng</PrimaryBtn>
+
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                {!paymentDlg.reg ||
+                !qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
+                  <OutlineBtn
+                    onPress={() =>
+                      setComplaintDlg({
+                        open: true,
+                        reg: paymentDlg.reg,
+                        text: "",
+                      })
+                    }
+                  >
+                    ⚠️ Khiếu nại
+                  </OutlineBtn>
+                ) : null}
+                <PrimaryBtn onPress={closePayment}>Đóng</PrimaryBtn>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </KeyboardAvoidingView>
   );
 }
 
-/* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -2021,7 +2132,6 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
 
-  /* Search */
   searchWrap: { marginTop: 10, position: "relative" },
   searchInput: {
     borderWidth: 1,
@@ -2064,6 +2174,7 @@ const styles = StyleSheet.create({
   },
   btnOutline: { borderWidth: 1, backgroundColor: "transparent" },
   btnWhite: { color: "#fff", fontWeight: "700" },
+  btnText: { fontWeight: "700" },
 
   alert: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
 

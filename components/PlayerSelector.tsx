@@ -1,8 +1,8 @@
 // components/PlayerSelector.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +10,7 @@ import {
   View,
   ViewStyle,
   useColorScheme,
+  ScrollView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
@@ -82,43 +83,63 @@ export default function PlayerSelector({
 
   const [trigger, { data = [], isFetching }] = useLazySearchUserQuery();
 
+  // Ref để không kích hoạt search ngay sau khi chọn item (setInput programmatic)
+  const ignoreNextSearchRef = useRef(false);
+
+  // Đảm bảo onChange không gây vòng lặp do identity thay đổi
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   // Debounce search
   useEffect(() => {
     const q = input.trim();
+
+    // Nếu vừa setInput khi chọn item → bỏ qua 1 lần search
+    if (ignoreNextSearchRef.current) {
+      ignoreNextSearchRef.current = false;
+      return;
+    }
+
     if (!q) {
       setOpen(false);
       return;
     }
+
     const id = setTimeout(() => {
       if (queryAsObject) trigger({ q, eventType });
       else trigger(q);
       setOpen(true);
     }, 300);
+
     return () => clearTimeout(id);
   }, [input, trigger, queryAsObject, eventType]);
 
-  // báo lên parent
+  // Báo giá trị đã chọn lên parent (ổn định, tránh loop do onChange identity)
   useEffect(() => {
-    onChange?.(value || null);
-  }, [value, onChange]);
+    onChangeRef.current?.(value || null);
+  }, [value]);
 
   const options = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
   const scoreKey = eventType === "double" ? "double" : "single";
   const scoreOf = (u: any) => u?.score?.[scoreKey] ?? 0;
 
-  // Helpers hiển thị
   const getName = (o: any) =>
     o?.name || o?.fullName || o?.nickname || o?.phone || "";
 
   const selectUser = (u: any) => {
     setValue(u);
+    ignoreNextSearchRef.current = true; // chặn debounce mở lại
     setInput(getName(u));
     setOpen(false);
+    Keyboard.dismiss();
   };
 
   const clearAll = () => {
     setValue(null);
+    ignoreNextSearchRef.current = true; // chặn debounce
     setInput("");
     setOpen(false);
   };
@@ -146,6 +167,7 @@ export default function PlayerSelector({
           style={[styles.input, { color: C.textPrimary }]}
           selectionColor={C.tint}
           onFocus={() => setOpen(!!input.trim())}
+          // onBlur không đóng ngay để không “ăn” mất sự kiện chọn; đã đóng khi select
         />
         {isFetching ? (
           <ActivityIndicator size="small" color={C.tint} />
@@ -160,7 +182,7 @@ export default function PlayerSelector({
         ) : null}
       </View>
 
-      {/* Dropdown suggestions */}
+      {/* Dropdown suggestions — dùng ScrollView để tránh nested VirtualizedList */}
       {open && (
         <View
           style={[
@@ -177,11 +199,11 @@ export default function PlayerSelector({
               <Text style={{ color: C.muted }}>Không có kết quả</Text>
             </View>
           ) : (
-            <FlatList
+            <ScrollView
               keyboardShouldPersistTaps="handled"
-              data={options}
-              keyExtractor={(item, i) => String(item?._id || item?.phone || i)}
-              renderItem={({ item }) => {
+              style={{ maxHeight: 260 }}
+            >
+              {options.map((item: any, i: number) => {
                 const name =
                   item?.name || item?.fullName || item?.nickname || "—";
                 const nick = item?.nickname ? `@${item.nickname}` : "";
@@ -190,6 +212,7 @@ export default function PlayerSelector({
                   : "";
                 return (
                   <Pressable
+                    key={String(item?._id || item?.phone || i)}
                     onPress={() => selectUser(item)}
                     style={({ pressed }) => [
                       styles.optionRow,
@@ -221,9 +244,8 @@ export default function PlayerSelector({
                     </View>
                   </Pressable>
                 );
-              }}
-              style={{ maxHeight: 260 }}
-            />
+              })}
+            </ScrollView>
           )}
         </View>
       )}

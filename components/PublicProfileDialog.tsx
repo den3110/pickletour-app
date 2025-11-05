@@ -1117,7 +1117,7 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
 
   /* ---------- Rating Section (có fix) ---------- */
   const handleDeleteHistory = (h: any) => {
-    if (!viewerIsAdmin) return;
+    if (!viewerIsAdmin || !presentedRef.current) return;
     const historyId = h?._id ?? h?.id;
     const uid = h?.user?._id || userId;
     if (!historyId || !uid) {
@@ -2337,4 +2337,3 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
-
