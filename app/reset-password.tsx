@@ -28,6 +28,9 @@ import {
   useVerifyResetOtpMutation,
   useResetPasswordMutation,
 } from "@/slices/usersApiSlice";
+import LottieView from "lottie-react-native"; // ⬅️ NEW
+
+const OTP_LOTTIE = require("@/assets/lottie/otp-verification.json"); // ⬅️ NEW
 
 const OTP_LEN = 6;
 
@@ -116,7 +119,6 @@ export default function ResetPasswordOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // Lấy param an toàn từ expo-router (có thể là string | string[])
   const getParam = (k, def = "") => {
     const v = params?.[k];
     if (Array.isArray(v)) return v[0] ?? def;
@@ -169,6 +171,17 @@ export default function ResetPasswordOtpScreen() {
     [isDark]
   );
 
+  // ⬇️ NEW: điều khiển OTP animation
+  const otpAnimRef = useRef<LottieView>(null);
+  useEffect(() => {
+    if (phase === "otp") {
+      requestAnimationFrame(() => {
+        otpAnimRef.current?.reset?.();
+        otpAnimRef.current?.play?.();
+      });
+    }
+  }, [phase]);
+
   useEffect(() => {
     const id = setInterval(() => {
       setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
@@ -194,13 +207,16 @@ export default function ResetPasswordOtpScreen() {
         platform: "app",
       }).unwrap();
       if (typeof res?.expiresIn === "number") setSecondsLeft(res.expiresIn);
-      setPhase("pwd"); // ✅ OTP hợp lệ → mở form mật khẩu
+      setPhase("pwd");
       RNAlert.alert("Thành công", "OTP hợp lệ. Vui lòng nhập mật khẩu mới.");
     } catch (err) {
       RNAlert.alert(
         "Thất bại",
         err?.data?.message || "OTP không hợp lệ hoặc đã hết hạn."
       );
+      // gợi ý: có thể reset & play lại anim để nhấn mạnh
+      otpAnimRef.current?.reset?.();
+      otpAnimRef.current?.play?.();
     }
   }, [canVerify, verifyResetOtp, initialEmail, otp]);
 
@@ -222,12 +238,17 @@ export default function ResetPasswordOtpScreen() {
       const ttl = typeof res?.expiresIn === "number" ? res.expiresIn : 600;
       setSecondsLeft(ttl);
       setResendCooldown(30);
-      setPhase("otp"); // quay lại bước OTP nếu trước đó đã verify
+      setPhase("otp");
       setOtp("");
       RNAlert.alert(
         "Đã gửi lại OTP",
         `Kiểm tra email ${masked || initialEmail}.`
       );
+      // replay anim sau khi gửi lại
+      requestAnimationFrame(() => {
+        otpAnimRef.current?.reset?.();
+        otpAnimRef.current?.play?.();
+      });
     } catch (err) {
       RNAlert.alert(
         "Lỗi",
@@ -244,7 +265,7 @@ export default function ResetPasswordOtpScreen() {
       await resetPassword({
         platform: "app",
         email: initialEmail,
-        otp, // dùng lại OTP đã verify
+        otp,
         password: pwd,
       }).unwrap();
 
@@ -292,7 +313,22 @@ export default function ResetPasswordOtpScreen() {
                 .
               </Text>
 
-              {/* Bước 1: OTP (luôn hiện), nhưng chỉ editable khi phase === "otp" */}
+              {/* ⬇️ NEW: Lottie OTP — chỉ hiện ở phase OTP */}
+              {phase === "otp" && (
+                <View style={styles.otpAnimWrap}>
+                  <LottieView
+                    ref={otpAnimRef}
+                    source={OTP_LOTTIE}
+                    autoPlay
+                    loop
+                    resizeMode="contain"
+                    style={styles.otpAnim}
+                    pointerEvents="none"
+                  />
+                </View>
+              )}
+
+              {/* Bước 1: OTP (luôn render), editable tuỳ phase */}
               <OtpCells
                 value={otp}
                 setValue={setOtp}
@@ -353,7 +389,6 @@ export default function ResetPasswordOtpScreen() {
                   </View>
                 </>
               ) : (
-                // ✅ OTP hợp lệ mới render form mật khẩu (ẩn hoàn toàn trước đó)
                 <>
                   <SuccessBanner>
                     OTP hợp lệ. Nhập mật khẩu mới bên dưới.
@@ -505,6 +540,16 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "800", marginBottom: 6 },
   desc: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
   bold: { fontWeight: "700" },
+
+  // OTP anim (NEW)
+  otpAnimWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  otpAnim: { width: 130, height: 130 },
+
   successBanner: {
     backgroundColor: "#e6f4ea",
     borderColor: "#c7e6d1",

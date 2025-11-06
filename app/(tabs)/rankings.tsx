@@ -26,6 +26,7 @@ import {
   Platform,
   ScrollView,
   useColorScheme,
+  SafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
@@ -1103,381 +1104,392 @@ export default function RankingListScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: C.pageBg }]}>
-      {/* TOP BAR */}
-      <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: C.textPrimary }]}>
-            Bảng xếp hạng
-          </Text>
-          {canSelfAssess && me !== null && (
-            <TouchableOpacity
-              onPress={() => router.push("/levelpoint")}
-              style={[styles.primaryBtn, { backgroundColor: C.tint }]}
-            >
-              <Text style={styles.primaryBtnText}>Tự chấm trình</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <TextInput
-          placeholder="Tìm kiếm"
-          value={kw}
-          onChangeText={setKw}
-          style={[
-            styles.searchInput,
-            {
-              backgroundColor: C.inputBg,
-              borderColor: C.inputBorder,
-              color: C.textPrimary,
-            },
-          ]}
-          placeholderTextColor={C.muted}
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          blurOnSubmit={false}
-          onSubmitEditing={() => Keyboard.dismiss()}
-        />
-      </View>
-
-      {error ? (
-        <View
-          style={[
-            styles.errorBox,
-            { backgroundColor: C.errBg, borderColor: C.errBorder },
-          ]}
-        >
-          <Text style={[styles.errorText, { color: C.errText }]}>
-            {error?.data?.message || error?.error || "Có lỗi xảy ra"}
-          </Text>
-          <TouchableOpacity
-            onPress={refetch}
-            style={[
-              styles.primaryBtn,
-              { marginTop: 8, backgroundColor: C.tint },
-            ]}
-          >
-            <Text style={styles.primaryBtnText}>Thử lại</Text>
-          </TouchableOpacity>
-        </View>
-      ) : isInitialSkeleton ? (
-        <FullListSkeleton count={6} />
-      ) : (
-        <FlatList
-          ref={flatRef}
-          data={list}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          getItemLayout={getItemLayout}
-          ListHeaderComponent={ListHeader}
-          ListHeaderComponentStyle={{ backgroundColor: C.stickyBg }}
-          stickyHeaderIndices={[0]}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 }}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="on-drag"
-          refreshControl={
-            <RefreshControl
-              refreshing={isFetching && (list?.length ?? 0) > 0 && !error}
-              onRefresh={refetch}
-              tintColor={C.textSecondary}
-            />
-          }
-          ListFooterComponent={ListFooter}
-          removeClippedSubviews={Platform.OS === "android"}
-          maxToRenderPerBatch={6}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={8}
-          windowSize={10}
-        />
-      )}
-
-      {/* Modal CHẤM TRÌNH */}
-      <Modal
-        visible={gradeOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setGradeOpen(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.sheet,
-              { backgroundColor: C.cardBg, borderColor: C.border },
-            ]}
-          >
-            <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
-              Chấm trình – {gradeUser?.nickname}
+    <SafeAreaView style={{flex: 1}}>
+      <View style={[styles.container, { backgroundColor: C.pageBg }]}>
+        {/* TOP BAR */}
+        <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, { color: C.textPrimary }]}>
+              Bảng xếp hạng
             </Text>
-
-            <View style={styles.inputRow}>
-              <Text
-                style={[styles.inputLabel, { color: C.muted }]}
-              >{`Điểm đơn (${MIN_RATING} – ${MAX_RATING})`}</Text>
-              <TextInput
-                value={gradeSingles}
-                onChangeText={setGradeSingles}
-                keyboardType="decimal-pad"
-                placeholder="VD: 4.50"
-                placeholderTextColor={C.muted}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: C.inputBg,
-                    borderColor: C.inputBorder,
-                    color: C.textPrimary,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.inputRow}>
-              <Text
-                style={[styles.inputLabel, { color: C.muted }]}
-              >{`Điểm đôi (${MIN_RATING} – ${MAX_RATING})`}</Text>
-              <TextInput
-                value={gradeDoubles}
-                onChangeText={setGradeDoubles}
-                keyboardType="decimal-pad"
-                placeholder="VD: 4.30"
-                placeholderTextColor={C.muted}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: C.inputBg,
-                    borderColor: C.inputBorder,
-                    color: C.textPrimary,
-                  },
-                ]}
-              />
-            </View>
-
-            {gradeMsg ? (
-              <Text style={[styles.errorText, { color: C.errText }]}>
-                {gradeMsg}
-              </Text>
-            ) : null}
-
-            <View style={[styles.actionRow, { marginTop: 12 }]}>
+            {canSelfAssess && me !== null && (
               <TouchableOpacity
-                style={[styles.ghostBtn, { backgroundColor: C.ghostBg }]}
-                onPress={() => setGradeOpen(false)}
+                onPress={() => router.push("/levelpoint")}
+                style={[styles.primaryBtn, { backgroundColor: C.tint }]}
               >
-                <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
-                  Huỷ
-                </Text>
+                <Text style={styles.primaryBtnText}>Tự chấm trình</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.primaryBtn,
-                  {
-                    flexGrow: 1,
-                    alignItems: "center",
-                    backgroundColor: C.tint,
-                  },
-                ]}
-                onPress={submitGrade}
-                disabled={creating}
-              >
-                <Text style={styles.primaryBtnText}>
-                  {creating ? "Đang lưu..." : "Gửi chấm trình"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            )}
           </View>
-        </View>
-      </Modal>
 
-      {/* Modal KYC */}
-      <Modal
-        visible={kycOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={closeKyc}
-      >
-        <View style={styles.modalBackdrop}>
-          <View
+          <TextInput
+            placeholder="Tìm kiếm"
+            value={kw}
+            onChangeText={setKw}
             style={[
-              styles.sheet,
+              styles.searchInput,
               {
-                maxHeight: "88%",
-                backgroundColor: C.cardBg,
-                borderColor: C.border,
+                backgroundColor: C.inputBg,
+                borderColor: C.inputBorder,
+                color: C.textPrimary,
               },
             ]}
+            placeholderTextColor={C.muted}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            blurOnSubmit={false}
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+        </View>
+
+        {error ? (
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: C.errBg, borderColor: C.errBorder },
+            ]}
           >
-            <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
-              KYC – {kycUser?.name || kycUser?.nickname || "--"}
+            <Text style={[styles.errorText, { color: C.errText }]}>
+              {error?.data?.message || error?.error || "Có lỗi xảy ra"}
             </Text>
-
-            <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
-              <View style={{ marginBottom: 8 }}>
-                {(() => {
-                  const eff = cccdPatch[kycUser?._id] || kycUser?.cccdStatus;
-                  const chip = getVerifyChip(eff, null);
-                  return <Pill label={chip.label} bg={chip.bg} fg={chip.fg} />;
-                })()}
-              </View>
-
-              {/* Ảnh CCCD - Click để mở ImageViewing */}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {["front", "back"].map((side) => (
-                  <TouchableOpacity
-                    key={side}
-                    style={[
-                      styles.kycImgWrap,
-                      {
-                        flex: 1,
-                        backgroundColor: C.stickyBg,
-                        borderColor: C.border,
-                      },
-                    ]}
-                    activeOpacity={0.85}
-                    // onPress={() => openKycImageViewer(kycUser, side)}
-                  >
-                    <ExpoImage
-                      source={
-                        normalizeUrl(kycUser?.cccdImages?.[side]) || PLACE
-                      }
-                      style={[styles.kycImg, { backgroundColor: C.stickyBg }]}
-                      contentFit="contain"
-                      transition={150}
-                      cachePolicy="memory-disk"
-                      placeholder={PLACE}
-                      placeholderContentFit="contain"
-                    />
-                    <View style={styles.kycBadge}>
-                      <Text style={styles.kycBadgeText}>
-                        {side === "front" ? "Mặt trước" : "Mặt sau"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={{ marginTop: 10 }}>
-                <InfoRow label="Họ & tên" value={kycUser?.name || "—"} />
-                <InfoRow label="Ngày sinh" value={formatViDate(kycUser?.dob)} />
-                <InfoRow label="Số CCCD" value={kycUser?.cccd || "—"} mono />
-                <InfoRow
-                  label="Tỉnh / Thành"
-                  value={kycUser?.province || "—"}
-                />
-                {kycUser?.note ? (
-                  <View
-                    style={{
-                      marginTop: 8,
-                      backgroundColor: C.softBg,
-                      borderRadius: 8,
-                      padding: 8,
-                      borderWidth: 1,
-                      borderColor: C.softBorder,
-                    }}
-                  >
-                    <Text
-                      style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}
-                    >
-                      Ghi chú
-                    </Text>
-                    <Text style={{ fontSize: 14, color: C.textPrimary }}>
-                      {kycUser?.note}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </ScrollView>
-
-            {me?.role === "admin" && (
-              <View style={[styles.actionRow, { marginTop: 4 }]}>
-                <TouchableOpacity
-                  style={[styles.outlineBtn, { borderColor: "#d32f2f" }]}
-                  onPress={() => doReview("reject")}
-                  disabled={reviewing}
-                >
-                  <Text style={[styles.outlineBtnText, { color: "#d32f2f" }]}>
-                    {reviewing ? "Đang xử lý..." : "Từ chối"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.outlineBtn, { borderColor: "#2e7d32" }]}
-                  onPress={() => doReview("approve")}
-                  disabled={reviewing}
-                >
-                  <Text style={[styles.outlineBtnText, { color: "#2e7d32" }]}>
-                    {reviewing ? "Đang xử lý..." : "Duyệt"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             <TouchableOpacity
+              onPress={refetch}
               style={[
-                styles.ghostBtn,
-                {
-                  marginTop: 8,
-                  alignSelf: "center",
-                  backgroundColor: C.ghostBg,
-                },
+                styles.primaryBtn,
+                { marginTop: 8, backgroundColor: C.tint },
               ]}
-              onPress={closeKyc}
             >
-              <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
-                Đóng
-              </Text>
+              <Text style={styles.primaryBtnText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        ) : isInitialSkeleton ? (
+          <FullListSkeleton count={6} />
+        ) : (
+          <FlatList
+            ref={flatRef}
+            data={list}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            getItemLayout={getItemLayout}
+            ListHeaderComponent={ListHeader}
+            ListHeaderComponentStyle={{ backgroundColor: C.stickyBg }}
+            stickyHeaderIndices={[0]}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 }}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="on-drag"
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching && (list?.length ?? 0) > 0 && !error}
+                onRefresh={refetch}
+                tintColor={C.textSecondary}
+              />
+            }
+            ListFooterComponent={ListFooter}
+            removeClippedSubviews={Platform.OS === "android"}
+            maxToRenderPerBatch={6}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={8}
+            windowSize={10}
+          />
+        )}
 
-      {/* Zoom avatar modal */}
-      <Modal
-        visible={zoomOpen}
-        animationType="fade"
-        transparent
-        statusBarTranslucent
-        presentationStyle="overFullScreen"
-        onRequestClose={closeZoom}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalBox, { backgroundColor: C.cardBg }]}>
-            <ExpoImage
-              source={normalizeUrl(zoomSrc) || PLACE}
-              style={[styles.zoomImg, { backgroundColor: C.pageBg }]}
-              contentFit="contain"
-              transition={150}
-              cachePolicy="memory-disk"
-            />
-            <Pressable
-              onPress={closeZoom}
-              style={[styles.modalCloseBtn, { backgroundColor: C.ghostBg }]}
+        {/* Modal CHẤM TRÌNH */}
+        <Modal
+          visible={gradeOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setGradeOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.sheet,
+                { backgroundColor: C.cardBg, borderColor: C.border },
+              ]}
             >
-              <Text style={[styles.modalCloseText, { color: C.ghostText }]}>
-                Đóng
+              <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
+                Chấm trình – {gradeUser?.nickname}
               </Text>
-            </Pressable>
+
+              <View style={styles.inputRow}>
+                <Text
+                  style={[styles.inputLabel, { color: C.muted }]}
+                >{`Điểm đơn (${MIN_RATING} – ${MAX_RATING})`}</Text>
+                <TextInput
+                  value={gradeSingles}
+                  onChangeText={setGradeSingles}
+                  keyboardType="decimal-pad"
+                  placeholder="VD: 4.50"
+                  placeholderTextColor={C.muted}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: C.inputBg,
+                      borderColor: C.inputBorder,
+                      color: C.textPrimary,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.inputRow}>
+                <Text
+                  style={[styles.inputLabel, { color: C.muted }]}
+                >{`Điểm đôi (${MIN_RATING} – ${MAX_RATING})`}</Text>
+                <TextInput
+                  value={gradeDoubles}
+                  onChangeText={setGradeDoubles}
+                  keyboardType="decimal-pad"
+                  placeholder="VD: 4.30"
+                  placeholderTextColor={C.muted}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: C.inputBg,
+                      borderColor: C.inputBorder,
+                      color: C.textPrimary,
+                    },
+                  ]}
+                />
+              </View>
+
+              {gradeMsg ? (
+                <Text style={[styles.errorText, { color: C.errText }]}>
+                  {gradeMsg}
+                </Text>
+              ) : null}
+
+              <View style={[styles.actionRow, { marginTop: 12 }]}>
+                <TouchableOpacity
+                  style={[styles.ghostBtn, { backgroundColor: C.ghostBg }]}
+                  onPress={() => setGradeOpen(false)}
+                >
+                  <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
+                    Huỷ
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.primaryBtn,
+                    {
+                      flexGrow: 1,
+                      alignItems: "center",
+                      backgroundColor: C.tint,
+                    },
+                  ]}
+                  onPress={submitGrade}
+                  disabled={creating}
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {creating ? "Đang lưu..." : "Gửi chấm trình"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Public profile dialog */}
-      <PublicProfileDialog
-        open={openProfile}
-        onClose={handleCloseProfile}
-        userId={selectedId}
-      />
+        {/* Modal KYC */}
+        <Modal
+          visible={kycOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={closeKyc}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.sheet,
+                {
+                  maxHeight: "88%",
+                  backgroundColor: C.cardBg,
+                  borderColor: C.border,
+                },
+              ]}
+            >
+              <Text style={[styles.sheetTitle, { color: C.textPrimary }]}>
+                KYC – {kycUser?.name || kycUser?.nickname || "--"}
+              </Text>
 
-      {/* ✅ KYC Image Viewer - ĐƯA RA NGOÀI TOP LEVEL */}
-      <ImageViewing
-        images={kycImages}
-        imageIndex={kycImageViewerIndex}
-        visible={kycImageViewerVisible}
-        onRequestClose={closeKycImageViewer}
-        presentationStyle="overFullScreen"
-        swipeToCloseEnabled={true}
-        doubleTapToZoomEnabled={true}
-        backgroundColor="rgba(0,0,0,0.9)"
-      />
-    </View>
+              <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+                <View style={{ marginBottom: 8 }}>
+                  {(() => {
+                    const eff = cccdPatch[kycUser?._id] || kycUser?.cccdStatus;
+                    const chip = getVerifyChip(eff, null);
+                    return (
+                      <Pill label={chip.label} bg={chip.bg} fg={chip.fg} />
+                    );
+                  })()}
+                </View>
+
+                {/* Ảnh CCCD - Click để mở ImageViewing */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {["front", "back"].map((side) => (
+                    <TouchableOpacity
+                      key={side}
+                      style={[
+                        styles.kycImgWrap,
+                        {
+                          flex: 1,
+                          backgroundColor: C.stickyBg,
+                          borderColor: C.border,
+                        },
+                      ]}
+                      activeOpacity={0.85}
+                      // onPress={() => openKycImageViewer(kycUser, side)}
+                    >
+                      <ExpoImage
+                        source={
+                          normalizeUrl(kycUser?.cccdImages?.[side]) || PLACE
+                        }
+                        style={[styles.kycImg, { backgroundColor: C.stickyBg }]}
+                        contentFit="contain"
+                        transition={150}
+                        cachePolicy="memory-disk"
+                        placeholder={PLACE}
+                        placeholderContentFit="contain"
+                      />
+                      <View style={styles.kycBadge}>
+                        <Text style={styles.kycBadgeText}>
+                          {side === "front" ? "Mặt trước" : "Mặt sau"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={{ marginTop: 10 }}>
+                  <InfoRow label="Họ & tên" value={kycUser?.name || "—"} />
+                  <InfoRow
+                    label="Ngày sinh"
+                    value={formatViDate(kycUser?.dob)}
+                  />
+                  <InfoRow label="Số CCCD" value={kycUser?.cccd || "—"} mono />
+                  <InfoRow
+                    label="Tỉnh / Thành"
+                    value={kycUser?.province || "—"}
+                  />
+                  {kycUser?.note ? (
+                    <View
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: C.softBg,
+                        borderRadius: 8,
+                        padding: 8,
+                        borderWidth: 1,
+                        borderColor: C.softBorder,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: C.muted,
+                          fontSize: 12,
+                          marginBottom: 4,
+                        }}
+                      >
+                        Ghi chú
+                      </Text>
+                      <Text style={{ fontSize: 14, color: C.textPrimary }}>
+                        {kycUser?.note}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+
+              {me?.role === "admin" && (
+                <View style={[styles.actionRow, { marginTop: 4 }]}>
+                  <TouchableOpacity
+                    style={[styles.outlineBtn, { borderColor: "#d32f2f" }]}
+                    onPress={() => doReview("reject")}
+                    disabled={reviewing}
+                  >
+                    <Text style={[styles.outlineBtnText, { color: "#d32f2f" }]}>
+                      {reviewing ? "Đang xử lý..." : "Từ chối"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.outlineBtn, { borderColor: "#2e7d32" }]}
+                    onPress={() => doReview("approve")}
+                    disabled={reviewing}
+                  >
+                    <Text style={[styles.outlineBtnText, { color: "#2e7d32" }]}>
+                      {reviewing ? "Đang xử lý..." : "Duyệt"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.ghostBtn,
+                  {
+                    marginTop: 8,
+                    alignSelf: "center",
+                    backgroundColor: C.ghostBg,
+                  },
+                ]}
+                onPress={closeKyc}
+              >
+                <Text style={[styles.ghostBtnText, { color: C.ghostText }]}>
+                  Đóng
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Zoom avatar modal */}
+        <Modal
+          visible={zoomOpen}
+          animationType="fade"
+          transparent
+          statusBarTranslucent
+          presentationStyle="overFullScreen"
+          onRequestClose={closeZoom}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalBox, { backgroundColor: C.cardBg }]}>
+              <ExpoImage
+                source={normalizeUrl(zoomSrc) || PLACE}
+                style={[styles.zoomImg, { backgroundColor: C.pageBg }]}
+                contentFit="contain"
+                transition={150}
+                cachePolicy="memory-disk"
+              />
+              <Pressable
+                onPress={closeZoom}
+                style={[styles.modalCloseBtn, { backgroundColor: C.ghostBg }]}
+              >
+                <Text style={[styles.modalCloseText, { color: C.ghostText }]}>
+                  Đóng
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Public profile dialog */}
+        <PublicProfileDialog
+          open={openProfile}
+          onClose={handleCloseProfile}
+          userId={selectedId}
+        />
+
+        {/* ✅ KYC Image Viewer - ĐƯA RA NGOÀI TOP LEVEL */}
+        <ImageViewing
+          images={kycImages}
+          imageIndex={kycImageViewerIndex}
+          visible={kycImageViewerVisible}
+          onRequestClose={closeKycImageViewer}
+          presentationStyle="overFullScreen"
+          swipeToCloseEnabled={true}
+          doubleTapToZoomEnabled={true}
+          backgroundColor="rgba(0,0,0,0.9)"
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -1506,15 +1518,16 @@ function formatViDate(d) {
 /* ============== Styles ============== */
 const { width } = Dimensions.get("window");
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 20 },
+  container: { flex: 1 },
 
   topWrap: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+    paddingTop: 0
   },
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
     marginBottom: 10,
   },

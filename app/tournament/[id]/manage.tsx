@@ -56,6 +56,7 @@ import AssignCourtSheet from "@/components/sheets/AssignCourtSheet";
 import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
 import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
+import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 
 /* ---------------- helpers ---------------- */
 const TYPE_LABEL = (t) => {
@@ -2208,166 +2209,21 @@ export default function ManageScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
-        {/* ====== Batch Referee modal (✅ WITH KEYBOARD FIX) ====== */}
         {/* ====== Batch Referee modal (✅ FIXED LAYOUT) ====== */}
-        <Modal
+        <BatchAssignRefModal
           visible={batchRefDlg.open}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setBatchRefDlg({ open: false })}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={{ flex: 1 }}
-          >
-            <View style={styles.modalBackdrop}>
-              <Pressable
-                style={{ flex: 1 }}
-                onPress={() => setBatchRefDlg({ open: false })}
-              />
-              <View
-                style={[
-                  styles.modalCard,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    maxHeight: 460,
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontWeight: "700",
-                      fontSize: 16,
-                    }}
-                  >
-                    Gán trọng tài cho {selectedMatchIds.size} trận
-                  </Text>
-                  <IconBtn
-                    name="close"
-                    color={colors.text}
-                    size={20}
-                    onPress={() => setBatchRefDlg({ open: false })}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.inputWrap,
-                    { borderColor: colors.border, marginBottom: 10 },
-                  ]}
-                >
-                  <MaterialIcons name="search" size={18} color={t.muted} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Tìm trọng tài (tên, nickname...)"
-                    placeholderTextColor={t.placeholder}
-                    onChangeText={() => {}}
-                  />
-                </View>
-
-                <ScrollView
-                  style={{ maxHeight: 280 }}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {refsErr ? (
-                    <Text style={{ color: t.warnText }}>
-                      Không tải được danh sách trọng tài.
-                    </Text>
-                  ) : refsLoading ? (
-                    <Text style={{ color: t.muted }}>Đang tải…</Text>
-                  ) : refOptions.length === 0 ? (
-                    <Text style={{ color: t.muted }}>
-                      Chưa có trọng tài trong giải.
-                    </Text>
-                  ) : (
-                    refOptions.map((r) => {
-                      const id = idOfRef(r);
-                      const chosen = pickedRefs.some((x) => idOfRef(x) === id);
-                      return (
-                        <Pressable
-                          key={id}
-                          onPress={() =>
-                            setPickedRefs((prev) =>
-                              chosen
-                                ? prev.filter((x) => idOfRef(x) !== id)
-                                : [...prev, r]
-                            )
-                          }
-                          style={({ pressed }) => [
-                            styles.refRow,
-                            { borderColor: colors.border },
-                            pressed && { opacity: 0.9 },
-                          ]}
-                        >
-                          <MaterialIcons
-                            name={
-                              chosen ? "check-box" : "check-box-outline-blank"
-                            }
-                            size={18}
-                            color={chosen ? colors.primary : t.muted}
-                            style={{ marginRight: 8 }}
-                          />
-                          <Text
-                            style={{ color: colors.text, fontWeight: "700" }}
-                          >
-                            {r?.name || r?.nickname || "—"}
-                          </Text>
-                          {r?.nickname && r?.name ? (
-                            <Text style={{ color: t.muted, marginLeft: 6 }}>
-                              ({r.nickname})
-                            </Text>
-                          ) : null}
-                        </Pressable>
-                      );
-                    })
-                  )}
-                </ScrollView>
-
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    gap: 8,
-                    marginTop: 10,
-                  }}
-                >
-                  <BtnOutline onPress={() => setBatchRefDlg({ open: false })}>
-                    Đóng
-                  </BtnOutline>
-                  <Pressable
-                    onPress={submitBatchAssign}
-                    style={({ pressed }) => [
-                      styles.primaryBtn,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: pressed || batchingRefs ? 0.9 : 1,
-                      },
-                    ]}
-                    disabled={
-                      batchingRefs ||
-                      pickedRefs.length === 0 ||
-                      selectedMatchIds.size === 0
-                    }
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "800" }}>
-                      Gán
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+          onClose={() => setBatchRefDlg({ open: false })}
+          tournamentId={tid /* hoặc tournamentId bạn đang có */}
+          selectedMatchIds={selectedMatchIds}
+          colors={colors}
+          t={t}
+          styles={styles}
+          IconBtn={IconBtn}
+          BtnOutline={BtnOutline}
+          onAssigned={() => {
+            refetchMatches?.();
+          }}
+        />
 
         {/* ====== Batch Video modal (✅ WITH KEYBOARD FIX) ====== */}
         <Modal

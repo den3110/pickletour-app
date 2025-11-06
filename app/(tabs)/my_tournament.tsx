@@ -19,6 +19,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -674,7 +675,7 @@ function LoginPrompt({ tokens }) {
         </View>
         <Text style={[styles.loginTitle, { color: tokens.colors.text }]}>
           Hãy đăng nhập để xem{" "}
-          <Text style={{ fontWeight: "900" }}>Giải của tôi</Text>
+          <Text style={{ fontWeight: "700" }}>Giải của tôi</Text>
         </Text>
         <Text style={{ color: tokens.sub, textAlign: "center", marginTop: 6 }}>
           Sau khi đăng nhập, bạn sẽ thấy danh sách các giải mình đã tham gia,
@@ -1023,7 +1024,7 @@ export default function MyTournament() {
   );
 
   return (
-    <>
+    <SafeAreaView style={{flex: 1}}>
       <Stack.Screen
         options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
       />
@@ -1086,7 +1087,7 @@ export default function MyTournament() {
         matchId={matchId}
         onClose={() => setOpen(false)}
       />
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -1099,10 +1100,10 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderBottomWidth: 1,
   },
-  pageHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
+  pageHeader: { paddingBottom: 10 },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: Platform.select({ ios: "800", android: "700", default: "700" }),
+    fontSize: 20,
+    fontWeight: Platform.select({ ios: "700", android: "700", default: "700" }),
   },
   pageSub: { marginTop: 6 },
 

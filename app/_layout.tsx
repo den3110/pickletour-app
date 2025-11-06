@@ -19,6 +19,7 @@ import {
   AppState,
   InteractionManager,
   DeviceEventEmitter,
+  Platform,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -127,7 +128,9 @@ export default function RootLayout() {
 
   // 🔄 Overlay khi đổi theme
   const [themeApplying, setThemeApplying] = React.useState(false);
-  const themeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const themeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Đọc PREF_THEME lúc boot + khi app active
   const loadPrefTheme = React.useCallback(async () => {
@@ -220,8 +223,8 @@ export default function RootLayout() {
     (async () => {
       try {
         await SplashScreen.hideAsync();
-      } catch {}
-      finally {
+      } catch {
+      } finally {
         hiddenRef.current = true; // chỉ chốt sau khi gọi hide
         // double-tap an toàn
         setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 300);
@@ -314,7 +317,11 @@ export default function RootLayout() {
               <SafeAreaProvider>
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}
-                  edges={["top", "left", "right"]}
+                  edges={[
+                    "left",
+                    "right",
+                    Platform.OS === "android" ? "top" : "",
+                  ]}
                 >
                   {/* ⚠️ onLayout cần collapsable={false} để chắc chắn fire trên Android */}
                   <View
@@ -439,6 +446,19 @@ export default function RootLayout() {
                           name="tournament/[id]/home"
                           options={{
                             title: "Tổng quan giải đấu",
+                            headerTitleAlign: "center",
+                            headerBackTitle: "Quay lại",
+                            headerTintColor: navTheme.colors.primary,
+                            headerTitleStyle: {
+                              color: navTheme.colors.text,
+                              fontWeight: "700",
+                            },
+                          }}
+                        />
+                        <Stack.Screen
+                          name="tournament/[id]/index"
+                          options={{
+                            title: "Giải đấu",
                             headerTitleAlign: "center",
                             headerBackTitle: "Quay lại",
                             headerTintColor: navTheme.colors.primary,

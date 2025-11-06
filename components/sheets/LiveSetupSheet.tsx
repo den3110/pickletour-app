@@ -20,7 +20,7 @@ import {
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
-  BottomSheetFlatList, // dùng FlatList của gorhom để tránh nested scroll cảnh báo
+  BottomSheetFlatList,
 } from "@gorhom/bottom-sheet";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -71,8 +71,12 @@ const matchBelongsToCourt = (m, court) => {
     court?.code ||
     (Number.isFinite(court?.number) ? `Sân ${court.number}` : "");
   return (
-    String(mLabel || "").trim().toLowerCase() ===
-    String(cLabel || "").trim().toLowerCase()
+    String(mLabel || "")
+      .trim()
+      .toLowerCase() ===
+    String(cLabel || "")
+      .trim()
+      .toLowerCase()
   );
 };
 const countByStatus = (matches) => {
@@ -109,7 +113,9 @@ const buildQuery = (obj) =>
 const looksLikeRTMP = (u) => /^rtmps?:\/\//i.test(String(u || "").trim());
 
 const splitRtmpUrl = (url) => {
-  const trimmed = String(url || "").trim().replace(/\/$/, "");
+  const trimmed = String(url || "")
+    .trim()
+    .replace(/\/$/, "");
   const idx = trimmed.lastIndexOf("/");
   if (idx < 0) return { server: trimmed, key: "" };
   return { server: trimmed.slice(0, idx), key: trimmed.slice(idx + 1) };
@@ -148,7 +154,7 @@ function BtnOutline({ onPress, children, tint, danger }) {
   );
 }
 
-/* ---------- ToggleButton: hiển thị “Đang bật/Đang tắt” như một NÚT ---------- */
+/* ---------- ToggleButton ---------- */
 function ToggleButton({ value, onChange, colors }) {
   const active = !!value;
   return (
@@ -190,9 +196,8 @@ export default function LiveSetupSheet({
   open,
   onClose,
   tournamentId,
-  // giữ tương thích prop cũ nhưng KHÔNG dùng nữa ở chế độ toàn giải:
-  bracketId, // eslint-disable-line no-unused-vars
-  bracketName: bracketNameProp, // eslint-disable-line no-unused-vars
+  bracketId, // không dùng trong mode toàn giải, giữ để tương thích
+  bracketName: bracketNameProp, // không dùng
   tournamentName,
   buildCourtLiveUrl, // optional: (tid, bid, court) => string
 }) {
@@ -214,9 +219,10 @@ export default function LiveSetupSheet({
     isError: courtsErr,
     refetch: refetchCourts,
   } = useAdminListCourtsByTournamentQuery(
-    { tid: tournamentId }, // ❗ không truyền bracketId nữa
+    { tid: tournamentId },
     { skip: !open }
   );
+
   const courts = useMemo(() => {
     const items = Array.isArray(courtsResp)
       ? courtsResp
@@ -241,12 +247,16 @@ export default function LiveSetupSheet({
     }));
   }, [courtsResp]);
 
-  /* 2) Matches — TOÀN GIẢI (không lọc theo bracket) */
-  const { data: matchPage, isLoading: matchesLoading } =
-    useAdminListMatchesByTournamentQuery(
-      { tid: tournamentId, page: 1, pageSize: 1000 },
-      { skip: !open }
-    );
+  /* 2) Matches — TOÀN GIẢI */
+  const {
+    data: matchPage,
+    isLoading: matchesLoading,
+    refetch: refetchMatches,
+  } = useAdminListMatchesByTournamentQuery(
+    { tid: tournamentId, page: 1, pageSize: 1000 },
+    { skip: !open }
+  );
+
   const matchesAll = useMemo(
     () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
     [matchPage]
@@ -276,11 +286,20 @@ export default function LiveSetupSheet({
     return map;
   }, [courts, matchesAll]);
 
+  /* 🔁 MỖI LẦN MỞ: refetch courts + matches */
+  useEffect(() => {
+    if (open && tournamentId) {
+      refetchCourts?.();
+      refetchMatches?.();
+    }
+  }, [open, tournamentId, refetchCourts, refetchMatches]);
+
   /* 3) Form state */
   const [form, setForm] = useState({});
   const [overrideExisting, setOverrideExisting] = useState(false);
   const [busy, setBusy] = useState(new Set());
   const initialFormRef = useRef({});
+
   useEffect(() => {
     if (!open) return;
     const next = {};
@@ -370,7 +389,10 @@ export default function LiveSetupSheet({
       );
       const newSnap = { ...initialFormRef.current };
       for (const it of items) {
-        newSnap[it.courtId] = { enabled: it.enabled, videoUrl: it.videoUrl };
+        newSnap[it.courtId] = {
+          enabled: it.enabled,
+          videoUrl: it.videoUrl,
+        };
       }
       initialFormRef.current = newSnap;
       await refetchCourts?.();
@@ -384,32 +406,20 @@ export default function LiveSetupSheet({
       const cId = String(court?._id || "");
       const v = form[cId] || { enabled: false, videoUrl: "" };
 
-      // base params bắt buộc — TOÀN GIẢI (không yêu cầu bid)
       const baseParams = {
         tid: tournamentId,
         courtId: cId,
-
-        // auto flags
         autoOnLive: "1",
         autoCreateIfMissing: "1",
-
-        // điều hướng sau khi kết thúc
         tournamentHref: `/tournament/${tournamentId}/manage`,
         homeHref: "/",
       };
 
-      // Nếu người dùng đã điền URL RTMP vào "URL LIVE mặc định", prefill cho studio
       const guessUrl = String(v.videoUrl || "").trim();
       if (looksLikeRTMP(guessUrl)) {
-        // Prefill theo “full url”
         baseParams.useFullUrl = "1";
         baseParams.fullUrl = guessUrl;
-
-        // (tuỳ chọn) nếu bạn muốn server+key:
-        // const { server, key } = splitRtmpUrl(guessUrl);
-        // baseParams.useFullUrl = "0";
-        // baseParams.server = server;
-        // baseParams.key = key;
+        // hoặc sử dụng splitRtmpUrl nếu bạn muốn server/key riêng
       }
 
       const qs = buildQuery(baseParams);
@@ -454,11 +464,13 @@ export default function LiveSetupSheet({
           </View>
 
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {/* ✅ Chỉ hiện nút Tắt khi đang bật */}
             {v.enabled && (
               <BtnOutline
                 onPress={() => {
-                  onChangeCourtField(c._id, { enabled: false, videoUrl: "" });
+                  onChangeCourtField(c._id, {
+                    enabled: false,
+                    videoUrl: "",
+                  });
                   saveCourt(c._id);
                 }}
                 tint={colors.primary}
@@ -512,7 +524,6 @@ export default function LiveSetupSheet({
               </Text>
             </View>
 
-            {/* ✅ ToggleButton rõ ràng là NÚT */}
             <ToggleButton
               value={v.enabled}
               onChange={(val) => onChangeCourtField(c._id, { enabled: val })}
@@ -524,7 +535,7 @@ export default function LiveSetupSheet({
             <Text style={{ color: "#64748b", fontSize: 12 }}>
               LIVE hiện tại (mẫu từ trận):{" "}
               <Text style={{ color: colors.text }}>
-                {sample ? sample : "(chưa có)"}
+                {sample || "(chưa có)"}
               </Text>
             </Text>
 
@@ -556,10 +567,9 @@ export default function LiveSetupSheet({
     );
   };
 
-  /* ---- header cho list ---- */
+  /* ---- header ---- */
   const ListHeader = (
     <>
-      {/* Header bar */}
       <View
         style={[
           styles.header,
@@ -567,13 +577,19 @@ export default function LiveSetupSheet({
         ]}
       >
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontWeight: "800",
+              fontSize: 16,
+            }}
+          >
             Thiết lập LIVE — Toàn giải
             {tournamentName ? ` • ${tournamentName}` : ""}
           </Text>
           <Text style={{ color: "#94a3b8", fontSize: 12 }}>
-            Cấu hình LIVE theo SÂN cho TOÀN GIẢI. Khi trận bắt đầu (hoặc server
-            áp dụng), URL mặc định của sân sẽ tự gán cho mọi trận thuộc sân đó.
+            Cấu hình LIVE theo SÂN cho TOÀN GIẢI. Khi trận bắt đầu, URL mặc định
+            của sân sẽ tự gán cho trận ở sân đó.
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -593,7 +609,6 @@ export default function LiveSetupSheet({
         </View>
       </View>
 
-      {/* Global option */}
       <View
         style={[
           styles.globalBar,
@@ -621,12 +636,13 @@ export default function LiveSetupSheet({
     </>
   );
 
-  /* ---- empty / error / loading ---- */
   const ListEmpty = (
     <>
       {courtsErr ? (
         <View style={styles.alertBox}>
-          <Text style={{ color: "#ef4444" }}>Không tải được danh sách sân.</Text>
+          <Text style={{ color: "#ef4444" }}>
+            Không tải được danh sách sân.
+          </Text>
         </View>
       ) : loadingAny ? (
         <View style={[styles.center, { paddingVertical: 24 }]}>
@@ -717,8 +733,6 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 15 },
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
-
-  // ✅ Toggle button style
   toggleBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -727,7 +741,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-
   alertBox: {
     marginTop: 12,
     padding: 12,

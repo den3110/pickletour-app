@@ -4,11 +4,15 @@ import { Platform, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { BlurView } from "expo-blur";
+import LottieView from "lottie-react-native";
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+
+/** Lottie icon cho tab Home (active) */
+const HOME_LOTTIE = require("@/assets/lottie/home-lt-icon.json");
 
 const makeIcon = (
   sfName: string,
@@ -22,6 +26,60 @@ const makeIcon = (
     );
 };
 
+/** Icon Home: active = Lottie, inactive = icon cũ */
+const HomeTabIcon = React.memo(function HomeTabIcon({
+  color,
+  size = 28,
+  focused,
+  triggerPlay, // 🔥 Nhận trigger từ parent
+}: {
+  color: string;
+  size?: number;
+  focused?: boolean;
+  triggerPlay?: number; // counter để trigger animation
+}) {
+  const lottieRef = React.useRef<LottieView>(null);
+
+  // 🔥 Khi focused = true lần đầu → play animation
+  React.useEffect(() => {
+    if (focused) {
+      lottieRef.current?.reset?.();
+      lottieRef.current?.play?.();
+    } else {
+      lottieRef.current?.reset?.();
+    }
+  }, [focused]);
+
+  // 🔥 Khi triggerPlay thay đổi (tab được nhấn lại) → replay animation
+  React.useEffect(() => {
+    if (focused && triggerPlay && triggerPlay > 0) {
+      lottieRef.current?.reset?.();
+      lottieRef.current?.play?.();
+    }
+  }, [triggerPlay, focused]);
+
+  if (!focused) {
+    // Inactive → icon cũ theo platform, giữ màu theo `color`
+    return Platform.OS === "ios" ? (
+      <IconSymbol size={size} name="house.fill" color={color} />
+    ) : (
+      <MaterialCommunityIcons name="home" size={size} color={color} />
+    );
+  }
+
+  // Active → Lottie
+  return (
+    <LottieView
+      ref={lottieRef}
+      source={HOME_LOTTIE}
+      autoPlay={false}
+      loop={false}
+      style={{ width: size + 6, height: size + 6, marginTop: 2 }}
+      pointerEvents="none"
+    />
+  );
+});
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const userInfo = useSelector((s: any) => s.auth?.userInfo);
@@ -31,9 +89,18 @@ export default function TabLayout() {
     [userInfo?.isAdmin, userInfo?.role]
   );
 
+  // 🆕 Xác định đã đăng nhập chưa
+  const isAuthed = React.useMemo(
+    () => !!(userInfo?._id || userInfo?.email || userInfo?.token),
+    [userInfo?._id, userInfo?.email, userInfo?.token]
+  );
+
   const isDark = colorScheme === "dark";
 
-  // 🎨 Custom TabBar Background Component
+  // 🔥 State để trigger animation khi nhấn lại tab Home
+  const [homeAnimTrigger, setHomeAnimTrigger] = React.useState(0);
+
+  // Custom TabBar Background
   const TabBarBackground = React.useCallback(() => {
     return (
       <BlurView
@@ -51,53 +118,27 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-
-        // // 💎 Liquid Glass Styling
-        // tabBarStyle: Platform.select({
-        //   ios: {
-        //     position: "absolute",
-        //     backgroundColor: "transparent",
-        //     borderTopWidth: 0,
-        //     elevation: 0,
-        //     shadowOpacity: 0,
-        //     // 🎨 Thêm padding để đẹp hơn
-        //     paddingTop: 8,
-        //     height: 88,
-        //   },
-        //   android: {
-        //     position: "absolute",
-        //     backgroundColor: isDark
-        //       ? "rgba(17, 18, 20, 0.9)"
-        //       : "rgba(255, 255, 255, 0.9)",
-        //     borderTopWidth: 0,
-        //     elevation: 8,
-        //     shadowColor: isDark ? "#000" : "#000",
-        //     shadowOffset: { width: 0, height: -4 },
-        //     shadowOpacity: 0.1,
-        //     shadowRadius: 8,
-        //     paddingTop: 8,
-        //     height: 72,
-        //   },
-        // }),
-
-        // // 🎨 Label styling
-        // tabBarLabelStyle: {
-        //   fontSize: 11,
-        //   fontWeight: "600",
-        // },
-
-        // // 🎨 Icon container styling
-        // tabBarIconStyle: {
-        //   marginTop: 4,
-        // },
       }}
     >
-      {/* 🏠 Trang chủ */}
+      {/* 🏠 Trang chủ (active = Lottie, inactive = icon cũ) */}
       <Tabs.Screen
         name="index"
+        listeners={{
+          tabPress: () => {
+            // 🔥 Mỗi lần ấn tab Home → increment trigger để replay animation
+            setHomeAnimTrigger((prev) => prev + 1);
+          },
+        }}
         options={{
           title: "Trang chủ",
-          tabBarIcon: makeIcon("house.fill", "home"),
+          tabBarIcon: ({ color, size, focused }) => (
+            <HomeTabIcon
+              color={color}
+              size={size}
+              focused={focused}
+              triggerPlay={homeAnimTrigger} // 🔥 Pass trigger vào
+            />
+          ),
         }}
       />
 
@@ -137,9 +178,7 @@ export default function TabLayout() {
                 title: "Quản trị",
                 tabBarIcon: makeIcon("lock.shield.fill", "shield-lock"),
               }
-            : {
-                href: null,
-              }
+            : { href: null }
         }
       />
 
@@ -152,13 +191,20 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 👤 Hồ sơ */}
+      {/* 👤 Hồ sơ — ẩn nếu chưa đăng nhập */}
       <Tabs.Screen
         name="profile"
-        options={{
-          title: "Hồ sơ",
-          tabBarIcon: makeIcon("person.crop.circle.fill", "account-circle"),
-        }}
+        options={
+          isAuthed
+            ? {
+                title: "Hồ sơ",
+                tabBarIcon: makeIcon(
+                  "person.crop.circle.fill",
+                  "account-circle"
+                ),
+              }
+            : { href: null }
+        }
       />
     </Tabs>
   );

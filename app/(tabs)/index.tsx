@@ -16,6 +16,10 @@ import Hero from "@/components/Hero";
 import { AntDesign, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useGetContactContentQuery } from "@/slices/cmsApiSlice";
+import LottieView from "lottie-react-native"; // ⬅️ NEW
+
+/* ---------- Lottie asset ---------- */
+const BG_3D = require("@/assets/lottie/bg-3d.json");
 
 /* ---------- Fallback ---------- */
 const FALLBACK = {
@@ -227,7 +231,20 @@ export default function HomeScreen() {
         style={{ backgroundColor: bg }}
         contentContainerStyle={{ paddingBottom: 24 }}
       >
+        {/* ⬇️ NEW: 3D BG strip (full width, h≈240, bo góc dưới 20) */}
+        <View style={styles.hero3dWrap}>
+          <LottieView
+            source={BG_3D}
+            autoPlay
+            loop
+            resizeMode="cover"
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        </View>
+
         <Hero />
+
         <View style={{ height: 8 }} />
         {/* 👇 Card Liên hệ đặt ở trang chủ */}
         <View style={{ paddingHorizontal: 16 }}>
@@ -239,6 +256,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  // NEW: 3D bg section
+  hero3dWrap: {
+    width: "100%",
+    height: 240, // ~2-300 như yêu cầu
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: "hidden", // cần để bo góc ăn vào Lottie
+    marginBottom: 8,
+  },
+
   card: {
     borderWidth: 1,
     borderRadius: 16,

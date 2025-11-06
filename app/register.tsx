@@ -678,7 +678,7 @@ export default function RegisterScreen() {
                 fontSize: 12,
               }}
             >
-              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm “Xác nhận”.
+              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm "Xác nhận".
             </Text>
 
             <View
@@ -1047,10 +1047,20 @@ function TermsModal({
         <View
           style={[
             styles.modalCard,
-            { backgroundColor: cardBg, borderColor: border },
+            {
+              backgroundColor: cardBg,
+              borderColor: border,
+              maxHeight: "90%", // FIXED: Thêm maxHeight để tránh tràn màn hình
+            },
           ]}
         >
-          <View style={styles.modalHeader}>
+          {/* FIXED: Thêm borderBottom cho header */}
+          <View
+            style={[
+              styles.modalHeader,
+              { borderBottomWidth: 1, borderColor: border },
+            ]}
+          >
             <Pressable onPress={onClose} style={styles.modalBtn}>
               <Text style={[styles.modalBtnText, { color: textPrimary }]}>
                 Đóng
@@ -1076,65 +1086,85 @@ function TermsModal({
             </Pressable>
           </View>
 
-          <ScrollView style={{ paddingHorizontal: 14, paddingBottom: 16 }}>
-            <Text style={{ color: textSecondary, fontSize: 12, marginTop: 4 }}>
+          {/* FIXED: Dùng contentContainerStyle thay vì style để padding hoạt động đúng */}
+          <ScrollView
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={{
+              paddingHorizontal: 14,
+              paddingTop: 12,
+              paddingBottom: 20,
+            }}
+          >
+            <Text
+              style={{ color: textSecondary, fontSize: 12, marginBottom: 4 }}
+            >
               Cập nhật lần cuối: 04/09/2025
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               1) Giới thiệu
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               Ứng dụng dùng để quản lý/tham gia hoạt động pickleball. Bằng việc
               tạo tài khoản hoặc tiếp tục sử dụng, bạn đồng ý với tài liệu này.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               2) Tài khoản
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Cung cấp thông tin chính xác và cập nhật.{"\n"}• Tự bảo mật mật
               khẩu; thông báo ngay nếu nghi ngờ truy cập trái phép.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               3) Hành vi bị cấm
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Mạo danh, quấy rối, phát tán nội dung vi phạm pháp luật.{"\n"}•
               Can thiệp hệ thống, dò quét lỗ hổng, truy cập trái phép.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               4) Nội dung do bạn cung cấp
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Bạn chịu trách nhiệm về thông tin/ảnh đã tải lên.{"\n"}• Chúng
               tôi có quyền sử dụng nội dung ở mức cần thiết để vận hành dịch vụ.
               {"\n"}• Ảnh CCCD (nếu cung cấp) chỉ dùng cho mục đích xác minh.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               5) Quyền riêng tư (tóm tắt)
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Dữ liệu thu thập
               </Text>
-              {"\n"}• Tài khoản: nickname, mật khẩu (được băm), email/SĐT.{"\n"}
-              • Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới tính, tỉnh/thành,
-              CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời gian đăng nhập,
-              IP, log lỗi, thống kê sử dụng.{"\n\n"}
+              {"\n"}• Tài khoản: nickname, mật khẩu (được băm), email/SĐT (tuỳ
+              chọn).{"\n"}• Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới tính,
+              tỉnh/thành, CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời gian
+              đăng nhập, IP, log lỗi, thống kê sử dụng.{"\n\n"}
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Mục đích
               </Text>
@@ -1161,64 +1191,74 @@ function TermsModal({
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               6) Camera & Quét QR CCCD
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Quét QR xử lý trên thiết bị, không lưu khung hình.{"\n"}• Ảnh
               CCCD chỉ dùng xác minh; có thể yêu cầu xoá sau khi hoàn tất.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               7) Lưu phiên (SecureStore/AsyncStorage)
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Ứng dụng lưu phiên để đăng nhập nhanh. Đăng xuất để xoá phiên
               trên thiết bị.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               8) Chấm dứt & Đình chỉ
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Bạn có thể xoá tài khoản bất cứ lúc nào.{"\n"}• Chúng tôi có thể
               tạm ngưng/chấm dứt nếu có vi phạm hoặc rủi ro an ninh.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               9) Miễn trừ & Giới hạn trách nhiệm
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
-              • Dịch vụ cung cấp “như hiện có”. Trong phạm vi luật cho phép,
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
+              • Dịch vụ cung cấp "như hiện có". Trong phạm vi luật cho phép,
               chúng tôi không chịu trách nhiệm cho thiệt hại gián tiếp/phát sinh
               do việc sử dụng.{"\n"}• Không điều nào ở đây loại trừ trách nhiệm
               pháp lý bắt buộc.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               10) Thay đổi điều khoản
             </Text>
-            <Text style={{ color: textSecondary, marginTop: 4 }}>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
               • Khi cập nhật đáng kể, ứng dụng sẽ thông báo; tiếp tục sử dụng
               tức là bạn chấp nhận bản mới.
             </Text>
 
             <Text
-              style={{ color: textPrimary, fontWeight: "700", marginTop: 10 }}
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
               11) Luật áp dụng & Liên hệ
             </Text>
             <Text
-              style={{ color: textSecondary, marginBottom: 10, marginTop: 4 }}
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
             >
               • Áp dụng pháp luật Việt Nam; tranh chấp ưu tiên thương lượng, sau
               đó theo thẩm quyền.{"\n"}• Liên hệ: pickletour@gmail.com
@@ -1228,11 +1268,11 @@ function TermsModal({
               style={{
                 color: textSecondary,
                 fontStyle: "italic",
-                marginTop: 6,
-                marginBottom: 10,
+                marginTop: 12,
+                lineHeight: 20,
               }}
             >
-              Nhấn “Đồng ý” nghĩa là bạn đã đọc và chấp nhận Điều khoản & Chính
+              Nhấn "Đồng ý" nghĩa là bạn đã đọc và chấp nhận Điều khoản & Chính
               sách.
             </Text>
           </ScrollView>

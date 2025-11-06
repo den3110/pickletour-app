@@ -184,8 +184,56 @@ function SkeletonCard({ border, cardBg, skBase }) {
   );
 }
 
+function useThemeTokens() {
+  // 1) Lấy theme từ React Navigation (nếu có)
+  const navTheme = useTheme?.() || {};
+  // 2) Fallback: nếu đứng ngoài ThemeProvider, dùng system scheme
+  const scheme = useColorScheme?.() || "light";
+  const isDark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
+  const primary = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const text = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#0b1220");
+  const cardBg = navTheme?.colors?.card ?? (isDark ? "#11161c" : "#ffffff");
+  const border = navTheme?.colors?.border ?? (isDark ? "#212a33" : "#e8edf3");
+  const bg = navTheme?.colors?.background ?? (isDark ? "#0b0f14" : "#fafbff");
+
+  return {
+    isDark,
+    // base palette
+    colors: {
+      primary,
+      text,
+      card: cardBg,
+      border,
+      background: bg,
+    },
+
+    // text phụ & nền phụ
+    sub: isDark ? "#b9c1cc" : "#586174",
+    muted: isDark ? "#0f141a" : "#f3f6fb",
+    inputBg: isDark ? "#0f141a" : "#f5f7fb",
+
+    // chips
+    chipBg: isDark ? "#121a22" : "#eef2f7",
+
+    // accents
+    tint: primary,
+    success: "#22c55e",
+    danger: "#ef4444",
+    warning: "#f59e0b",
+    shadow: "rgba(16,24,40,0.08)",
+
+    // info chips (xanh nhạt)
+    chipInfoBg: isDark ? "#1f2937" : "#eef2f7",
+    chipInfoFg: isDark ? "#e5e7eb" : "#263238",
+    chipInfoBd: isDark ? "#334155" : "#e2e8f0",
+  };
+}
+
 export default function TournamentDashboardScreen() {
   const t = useTokens();
+  const tokens = useThemeTokens();
 
   const scheme = t.dark ? "dark" : "light"; // cho iOS ActionSheet
   const tint = t.colors.primary;
@@ -466,6 +514,9 @@ export default function TournamentDashboardScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={[styles.screen, { backgroundColor: t.colors.background }]}>
+        <Text style={[styles.pageTitle, { color: tokens.colors.text }]}>
+          Giải đấu
+        </Text>
         {/* Tabs */}
         <TabsBar value={tab} onChange={setTab} t={t} />
 
@@ -688,7 +739,7 @@ function OutlineBtn({ onPress, children, t }) {
 
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16 },
+  screen: { flex: 1, paddingHorizontal: 16 },
   input: {
     borderWidth: 1,
     borderRadius: 12,
@@ -729,4 +780,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700" },
   btn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   btnTextWhite: { color: "#fff", fontWeight: "700" },
+   pageTitle: {
+    fontSize: 20,
+    fontWeight: Platform.select({ ios: "700", android: "700", default: "700" }),
+    paddingBottom: 8
+  },
 });

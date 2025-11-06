@@ -18,6 +18,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useForgotPasswordMutation } from "@/slices/usersApiSlice";
+import LottieView from "lottie-react-native"; // ⬅️ NEW
+
+// ⬅️ NEW: asset Lottie
+const FORGOT_LOTTIE = require("@/assets/lottie/forgot-password.json");
 
 function SuccessBanner({ children }) {
   return (
@@ -65,10 +69,8 @@ export default function ForgotPasswordScreen() {
         platform: "app", // yêu cầu BE check tồn tại & gửi OTP
       }).unwrap();
 
-      // Lưu để hiện banner nếu cần
       if (res?.masked) setSentTo(res.masked);
 
-      // ✅ Chỉ đi tiếp khi email tồn tại & đã gửi OTP
       if (res?.exists === true && res?.channel === "otp") {
         const params = new URLSearchParams({
           email: normEmail,
@@ -81,7 +83,6 @@ export default function ForgotPasswordScreen() {
         return;
       }
 
-      // ❌ Không tồn tại hoặc không gửi được OTP
       RNAlert.alert(
         "Không thể tiếp tục",
         res?.message || "Email không tồn tại hoặc không gửi được OTP."
@@ -95,7 +96,6 @@ export default function ForgotPasswordScreen() {
   }, [emailValid, email, isLoading, forgotPassword, router]);
 
   const goLogin = useCallback(() => {
-    // Tuỳ flow: quay lại, hoặc replace trực tiếp tới /login
     router.back();
     // router.replace("/login");
   }, [router]);
@@ -118,6 +118,18 @@ export default function ForgotPasswordScreen() {
                 { backgroundColor: themed.cardBg, borderColor: themed.border },
               ]}
             >
+              {/* ⬇️ NEW: Lottie ở trên đầu, căn giữa */}
+              <View style={styles.animWrap}>
+                <LottieView
+                  source={FORGOT_LOTTIE}
+                  autoPlay
+                  loop
+                  resizeMode="contain"
+                  style={styles.anim}
+                  pointerEvents="none"
+                />
+              </View>
+
               <Text style={[styles.title, { color: themed.text }]}>
                 Quên mật khẩu
               </Text>
@@ -227,6 +239,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
   },
+  // ⬇️ NEW
+  animWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  anim: { width: 180, height: 180 },
+
   title: {
     fontSize: 22,
     fontWeight: "700",

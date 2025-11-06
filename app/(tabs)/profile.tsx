@@ -9,8 +9,8 @@
 
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import { File } from "expo-file-system";
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { Image as ExpoImage } from "expo-image";
 import { router, Stack } from "expo-router";
@@ -58,6 +58,8 @@ import { usePlatform } from "@/hooks/usePlatform";
 import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
 import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
+
+const { SaveFormat } = ImageManipulator;
 
 /* ---------- Config ---------- */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -183,51 +185,59 @@ function XImage({
   );
 }
 
+async function ensureUnderLimit(uri, maxBytes = MAX_FILE_SIZE) {
+  const info = await FileSystem.getInfoAsync(uri, { size: true });
+  if (!info.exists) return uri;
+  if (info.size <= maxBytes) return uri;
+  // Nén nhanh xuống JPEG 0.8
+  const res = await ImageManipulator.manipulateAsync(uri, [], {
+    compress: 0.8,
+    format: SaveFormat.JPEG,
+  });
+  return res.uri;
+}
+
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.9,
+    quality: 1,
   });
   if (res.canceled) return null;
 
-  let asset = res.assets[0];
+  const asset = res.assets[0];
   let uri = asset.uri;
+  const origName = asset.fileName || "image";
+  const mime = asset.mimeType || "image/jpeg";
 
-  // (giữ nguyên cách lấy File theo code cũ của bạn)
-  let f = new File(asset);
-  let size = f.size;
-  let mime = f.type;
-  let name = f.name || asset.fileName || "image";
-
-  const isHeic =
-    /heic|heif/i.test(mime || "") || /\.heic|\.heif$/i.test(name || "");
+  const isHeic = /heic|heif/i.test(mime) || /\.(heic|heif)$/i.test(origName);
   if (isHeic) {
-    const ctx = ImageManipulator.manipulate(uri);
-    const ref = await ctx.renderAsync();
-    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.9 });
+    const out = await ImageManipulator.manipulateAsync(uri, [], {
+      compress: 0.9,
+      format: SaveFormat.JPEG,
+    });
     uri = out.uri;
-    f = new File(uri);
-    size = f.size;
-    mime = "image/jpeg";
-    name = (name || "image").replace(/\.(heic|heif)$/i, ".jpg");
   }
 
+  uri = await ensureUnderLimit(uri, maxBytes);
+
+  const sizeInfo = await FileSystem.getInfoAsync(uri, { size: true });
+  const size = sizeInfo.size || undefined;
   if (typeof size === "number" && size > maxBytes) {
     Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
     return null;
   }
 
-  if (!/\.jpe?g|\.png|\.webp$/i.test(name || "")) {
-    const ext = /png/i.test(mime) ? "png" : /webp/i.test(mime) ? "webp" : "jpg";
-    if (!name.includes(".")) name = `${name}.${ext}`;
+  let name = origName
+    .replace(/\.(heic|heif)$/i, ".jpg")
+    .replace(/[^\w\-.]+/g, "_");
+  if (!/\.(jpe?g|png|webp)$/i.test(name)) {
+    name = `${name}.jpg`;
   }
-  const type =
-    mime ||
-    (name.endsWith(".png")
-      ? "image/png"
-      : name.endsWith(".webp")
-      ? "image/webp"
-      : "image/jpeg");
+  const type = /\.png$/i.test(name)
+    ? "image/png"
+    : /\.webp$/i.test(name)
+    ? "image/webp"
+    : "image/jpeg";
 
   return { uri, name, type, size };
 }
@@ -479,7 +489,7 @@ export default function ProfileScreen() {
       else if (day > new Date()) e.dob = "Không được ở tương lai";
     }
     if (!d.province) e.province = "Bắt buộc";
-    if (d.cccd && !/^\d{12}$/.test(d.cccd.trim()))
+    if (d.cccd && /^\d+$/.test(d.cccd) && d.cccd.length !== 12)
       e.cccd = "CCCD phải đủ 12 số";
     if (d.password) {
       if (d.password.length < 6) e.password = "Tối thiểu 6 ký tự";
@@ -740,21 +750,11 @@ export default function ProfileScreen() {
   const [delPwModalOpen, setDelPwModalOpen] = useState(false);
   const [delPw, setDelPw] = useState("");
   const [delBusy, setDelBusy] = useState(false);
+
+  const avatarUrl = normalizeUrl(form.avatar) || "";
+  const coverUrl = normalizeUrl(form.cover) || "";
   // ===== Render gate =====
-  if (!userInfo) {
-    return (
-      <>
-        <Stack.Screen
-          options={{ title: "Profile", headerTitleAlign: "center" }}
-        />
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <Text>Đang kiểm tra đăng nhập…</Text>
-        </View>
-      </>
-    );
-  }
+ 
 
   if (fetching || !user) {
     return (
@@ -770,9 +770,6 @@ export default function ProfileScreen() {
       </>
     );
   }
-
-  const avatarUrl = normalizeUrl(form.avatar) || "";
-  const coverUrl = normalizeUrl(form.cover) || "";
 
   return (
     <>
@@ -1669,7 +1666,7 @@ export default function ProfileScreen() {
                   if (!coverTemp) return;
                   setCoverSaving(true);
                   try {
-                    // 1) Upload cover
+                    // 1) Upload cover (dùng cùng endpoint uploadAvatar theo logic cũ)
                     const up = await uploadAvatar(coverTemp).unwrap();
                     const url = up?.url || up?.data?.url;
                     if (!url) throw new Error("Không nhận được URL ảnh");
