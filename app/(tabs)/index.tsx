@@ -232,7 +232,7 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         {/* ⬇️ NEW: 3D BG strip (full width, h≈240, bo góc dưới 20) */}
-        <View style={styles.hero3dWrap}>
+        {/* <View style={styles.hero3dWrap}>
           <LottieView
             source={BG_3D}
             autoPlay
@@ -241,7 +241,7 @@ export default function HomeScreen() {
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
-        </View>
+        </View> */}
 
         <Hero />
 
