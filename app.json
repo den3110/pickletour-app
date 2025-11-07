@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour.vn",
     "slug": "pickletour-app",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "pickletourapp",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "infoPlist": {
         "NSCameraUsageDescription": "pickletour.vn uses the camera to scan the CCCD QR code, auto-fill profile info, and livestream matches.",
         "NSMicrophoneUsageDescription": "pickletour.vn uses the microphone to capture audio for livestreams and video recordings.",
