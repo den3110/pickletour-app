@@ -521,6 +521,31 @@ export default function RootLayout() {
                           }}
                         />
                         <Stack.Screen
+                          name="live/home"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="admin/home"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="clubs"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="login"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+
+                        <Stack.Screen
                           name="404"
                           options={{
                             headerTitleAlign: "center",

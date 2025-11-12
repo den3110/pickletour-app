@@ -40,6 +40,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useCreateFacebookLiveForMatchMutation } from "@/slices/adminMatchLiveApiSlice";
 import { useRouter } from "expo-router";
+import { useSocket } from "@/context/SocketContext";
 
 /* =====================================
  * THEME TOKENS (giống phong cách Hero)
@@ -110,6 +111,23 @@ function useThemeTokens() {
 }
 
 /* =============== OVERLAY helpers =============== */
+
+const sid = (x) => {
+  if (!x) return "";
+  const v = x?._id ?? x?.id ?? x;
+  return v ? String(v) : "";
+};
+const getMatchIdFromPayload = (payload = {}) =>
+  sid(payload.matchId) ||
+  sid(payload.match) ||
+  sid(payload.id) ||
+  sid(payload._id) ||
+  sid(payload?.data?.matchId) ||
+  sid(payload?.data?.match) ||
+  sid(payload?.snapshot?._id) ||
+  "";
+const isSameId = (a, b) => a && b && String(a) === String(b);
+
 const _safeURL = (u) => {
   try {
     const x = new URL(u);
@@ -1580,6 +1598,7 @@ function amRefereeOfThisMatch(me, m) {
 /* ===================== Component chính (Native) ===================== */
 function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const T = useThemeTokens();
+  const socket = useSocket();
 
   const { userInfo } = useSelector((s) => s.auth || {});
   const roleStr = String(userInfo?.role || "").toLowerCase();
@@ -1642,6 +1661,74 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     [mm, localPatch]
   );
 
+  // giữ onSaved mới nhất cho debounce
+  const onSavedRef = useRef(onSaved);
+  useEffect(() => {
+    onSavedRef.current = onSaved;
+  }, [onSaved]);
+
+  const debouncedRefreshRef = useRef(null);
+  const debouncedRefresh = useCallback(() => {
+    if (debouncedRefreshRef.current) clearTimeout(debouncedRefreshRef.current);
+    debouncedRefreshRef.current = setTimeout(() => {
+      onSavedRef.current?.();
+    }, 200);
+  }, []);
+
+  const applyLocalScoreIfAny = useCallback((payload = {}) => {
+    const gameScores =
+      payload.gameScores ??
+      payload.scores ??
+      payload.data?.gameScores ??
+      payload.data?.scores ??
+      payload.snapshot?.gameScores;
+
+    if (Array.isArray(gameScores)) {
+      setLocalPatch((p) => ({ ...(p || {}), gameScores }));
+    }
+  }, []);
+
+  const applyLocalStreamIfAny = useCallback((payload = {}) => {
+    const snap = payload.snapshot || payload.data || payload || {};
+
+    const candidates = [
+      snap.video,
+      snap.videoUrl,
+      snap.meta?.video,
+      snap.link,
+      snap.url,
+      snap.sources?.video,
+    ]
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean);
+
+    const streamsArr =
+      snap.streams ||
+      snap.meta?.streams ||
+      snap.links?.items ||
+      snap.sources?.items ||
+      [];
+
+    const hasVideo = candidates.length > 0;
+    const hasStreams = Array.isArray(streamsArr) && streamsArr.length > 0;
+    if (!hasVideo && !hasStreams) return;
+
+    setLocalPatch((p) => {
+      const next = { ...(p || {}) };
+      if (hasVideo) {
+        const v = candidates[0];
+        next.video = v;
+        next.videoUrl = v;
+        next.meta = { ...(next.meta || {}), video: v };
+      }
+      if (hasStreams) {
+        next.streams = streamsArr;
+        next.meta = { ...(next.meta || {}), streams: streamsArr };
+      }
+      return next;
+    });
+  }, []);
+
   const myIdForCheck =
     userInfo?._id ||
     userInfo?.id ||
@@ -1658,6 +1745,75 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       merged?.referees,
     ]
   );
+
+  useEffect(() => {
+    if (!socket || !lockedId) return;
+
+    const forThis = (payload) =>
+      isSameId(getMatchIdFromPayload(payload), lockedId);
+
+    const SCORE_EVENTS = [
+      "score:updated",
+      "score:patched",
+      "score:added",
+      "score:undone",
+      "match:snapshot",
+    ];
+    const REFRESH_EVENTS = [
+      "match:patched",
+      "match:started",
+      "match:finished",
+      "match:forfeited",
+      "draw:matchUpdated",
+      "match:teamsUpdated",
+      "status:updated",
+    ];
+    const STREAM_EVENTS = ["match:snapshot", "stream:updated", "video:set"];
+
+    const onScore = (payload = {}) => {
+      if (!forThis(payload)) return;
+      applyLocalScoreIfAny(payload);
+
+      const hasScores = Array.isArray(
+        payload.gameScores ??
+          payload.scores ??
+          payload.data?.gameScores ??
+          payload.data?.scores ??
+          payload.snapshot?.gameScores
+      );
+      if (!hasScores) debouncedRefresh();
+    };
+
+    const onGenericRefresh = (payload = {}) => {
+      if (!forThis(payload)) return;
+      debouncedRefresh();
+    };
+
+    const onStream = (payload = {}) => {
+      if (!forThis(payload)) return;
+      applyLocalStreamIfAny(payload);
+    };
+
+    SCORE_EVENTS.forEach((ev) => socket.on(ev, onScore));
+    REFRESH_EVENTS.forEach((ev) => socket.on(ev, onGenericRefresh));
+    STREAM_EVENTS.forEach((ev) => socket.on(ev, onStream));
+
+    return () => {
+      SCORE_EVENTS.forEach((ev) => socket.off(ev, onScore));
+      REFRESH_EVENTS.forEach((ev) => socket.off(ev, onGenericRefresh));
+      STREAM_EVENTS.forEach((ev) => socket.off(ev, onStream));
+      if (debouncedRefreshRef.current) {
+        clearTimeout(debouncedRefreshRef.current);
+        debouncedRefreshRef.current = null;
+      }
+    };
+  }, [
+    socket,
+    lockedId,
+    applyLocalScoreIfAny,
+    applyLocalStreamIfAny,
+    debouncedRefresh,
+  ]);
 
   function collectIds(x) {
     if (!x) return [];
@@ -1849,16 +2005,45 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       }),
     [overlayBase, lockedId, T.scheme]
   );
-
+  // ===== Edit scores (Native) =====
   const [editMode, setEditMode] = useState(false);
-  const enterEdit = useCallback(() => setEditMode(true), []);
-  const exitEdit = useCallback(() => setEditMode(false), []);
   const [busy, setBusy] = useState(false);
-  const [editScores, setEditScores] = useState([...(shownGameScores || [])]);
+  const [editScores, setEditScores] = useState(() => [
+    ...(merged?.gameScores ?? []),
+  ]);
 
+  // Khi bấm "Chỉnh sửa tỉ số":
+  // - Bật editMode
+  // - Nếu chưa có set nào thì tạo 1 set {a:0, b:0} để luôn có ô input
+  const enterEdit = useCallback(() => {
+    setEditMode(true);
+    setEditScores((prev) => {
+      const arr = Array.isArray(prev) ? [...prev] : [];
+      return arr.length ? arr : [{ a: 0, b: 0 }];
+    });
+  }, []);
+
+  const exitEdit = useCallback(() => setEditMode(false), []);
+
+  // Cho editScores luôn follow gameScores từ server/socket
+  // nhưng nếu đang edit và server trả về rỗng thì giữ lại ít nhất 1 set
   useEffect(() => {
-    setEditScores([...(merged?.gameScores ?? [])]);
-  }, [lockedId, merged?.gameScores]);
+    const base = [...(merged?.gameScores ?? [])];
+
+    setEditScores((prev) => {
+      if (editMode) {
+        if (base.length > 0) {
+          // có điểm -> input nhảy theo điểm mới
+          return base;
+        }
+        // không có điểm mà đang edit -> giữ input cũ hoặc tạo 1 set
+        return prev && prev.length ? prev : [{ a: 0, b: 0 }];
+      }
+
+      // không ở chế độ edit -> bám đúng dữ liệu server
+      return base;
+    });
+  }, [lockedId, merged?.gameScores, editMode]);
 
   const sanitizeInt = useCallback((v) => {
     const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);

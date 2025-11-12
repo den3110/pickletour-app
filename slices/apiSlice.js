@@ -254,6 +254,10 @@ export const apiSlice = createApi({
     "ADMIN_QUEUE",
     "ADMIN_COURTS",
     "LiveSession",
+    "FeaturedLeaderboard",
+    "Club",
+    "ClubMember",
+    "JoinRequest"
   ],
   endpoints: () => ({}),
 });

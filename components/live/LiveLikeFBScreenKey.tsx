@@ -59,19 +59,20 @@ const Live = (NativeModules as any).FacebookLiveModule;
 /* ====== Overlay URL builder (fallback) ====== */
 const overlayUrlForMatch = (mid?: string | null): string | null => {
   if (!mid || !process.env.EXPO_PUBLIC_BASE_URL) return null;
-  
+
   const baseUrl = process.env.EXPO_PUBLIC_BASE_URL;
   const params = new URLSearchParams({
     matchId: mid,
-    theme: 'dark',
-    size: 'md',
-    showSets: '1',
-    autoNext: '1',
-    overlay: '1',
-    'scale-score': '.5',
-    isactivebreak: '1'
+    theme: "dark",
+    size: "md",
+    showSets: "1",
+    autoNext: "1",
+    overlay: "1",
+    "scale-score": ".5",
+    isactivebreak: "1",
+    sLimit: "12",
   });
-  
+
   return `${baseUrl}/overlay/score?${params}`;
 };
 /* ====== DEBUG ====== */
@@ -598,7 +599,7 @@ export default function LiveLikeFBScreenKey({
       court: court?.name,
       currentMatchId: cm?._id || null,
       statusMatch: cm?.status || null,
-      isBreak: cm?.isBreak || null
+      isBreak: cm?.isBreak || null,
     });
   }, [courtData, courtsFetching, courtsLoading, courtsError, shouldPoll]);
 

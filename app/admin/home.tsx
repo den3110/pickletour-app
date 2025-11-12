@@ -648,7 +648,7 @@ export default function AdminUsersScreen() {
         />
 
         {/* Pagination */}
-        <View style={{ paddingVertical: 8, marginBottom: 50 }}>
+        <View style={{ paddingVertical: 8}}>
           <PaginationRN
             page={page + 1}
             count={serverTotalPages}

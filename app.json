@@ -35,7 +35,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",

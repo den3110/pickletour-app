@@ -10,6 +10,7 @@ import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { CustomTabBar } from "@/components/tabbar/Customtabbar";
 
 /** Lottie icon cho tab Home (active) */
 const HOME_LOTTIE = require("@/assets/lottie/home-lt-icon.json");
@@ -31,16 +32,15 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
   color,
   size = 28,
   focused,
-  triggerPlay, // 🔥 Nhận trigger từ parent
+  triggerPlay,
 }: {
   color: string;
   size?: number;
   focused?: boolean;
-  triggerPlay?: number; // counter để trigger animation
+  triggerPlay?: number;
 }) {
   const lottieRef = React.useRef<LottieView>(null);
 
-  // 🔥 Khi focused = true lần đầu → play animation
   React.useEffect(() => {
     if (focused) {
       lottieRef.current?.reset?.();
@@ -50,7 +50,6 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
     }
   }, [focused]);
 
-  // 🔥 Khi triggerPlay thay đổi (tab được nhấn lại) → replay animation
   React.useEffect(() => {
     if (focused && triggerPlay && triggerPlay > 0) {
       lottieRef.current?.reset?.();
@@ -59,7 +58,6 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
   }, [triggerPlay, focused]);
 
   if (!focused) {
-    // Inactive → icon cũ theo platform, giữ màu theo `color`
     return Platform.OS === "ios" ? (
       <IconSymbol size={size} name="house.fill" color={color} />
     ) : (
@@ -67,7 +65,6 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
     );
   }
 
-  // Active → Lottie
   return (
     <LottieView
       ref={lottieRef}
@@ -89,7 +86,6 @@ export default function TabLayout() {
     [userInfo?.isAdmin, userInfo?.role]
   );
 
-  // 🆕 Xác định đã đăng nhập chưa
   const isAuthed = React.useMemo(
     () => !!(userInfo?._id || userInfo?.email || userInfo?.token),
     [userInfo?._id, userInfo?.email, userInfo?.token]
@@ -97,35 +93,28 @@ export default function TabLayout() {
 
   const isDark = colorScheme === "dark";
 
-  // 🔥 State để trigger animation khi nhấn lại tab Home
   const [homeAnimTrigger, setHomeAnimTrigger] = React.useState(0);
 
-  // Custom TabBar Background
-  const TabBarBackground = React.useCallback(() => {
-    return (
-      <BlurView
-        intensity={isDark ? 80 : 100}
-        tint={isDark ? "dark" : "light"}
-        style={StyleSheet.absoluteFill}
-      />
-    );
-  }, [isDark]);
+  // 🎨 Custom TabBar với floating button
+  const renderTabBar = React.useCallback(
+    (props: any) => <CustomTabBar {...props} isDark={isDark} />,
+    [isDark]
+  );
 
   return (
     <Tabs
+      tabBar={renderTabBar}
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
+        tabBarHideOnKeyboard: true,
       }}
     >
-      {/* 🏠 Trang chủ (active = Lottie, inactive = icon cũ) */}
+      {/* 🏠 Trang chủ - Tab 1 */}
       <Tabs.Screen
         name="index"
         listeners={{
           tabPress: () => {
-            // 🔥 Mỗi lần ấn tab Home → increment trigger để replay animation
             setHomeAnimTrigger((prev) => prev + 1);
           },
         }}
@@ -136,13 +125,13 @@ export default function TabLayout() {
               color={color}
               size={size}
               focused={focused}
-              triggerPlay={homeAnimTrigger} // 🔥 Pass trigger vào
+              triggerPlay={homeAnimTrigger}
             />
           ),
         }}
       />
 
-      {/* 🏆 Giải đấu */}
+      {/* 🏆 Giải đấu - Tab 2 */}
       <Tabs.Screen
         name="tournaments"
         options={{
@@ -151,7 +140,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 📊 Xếp hạng */}
+      {/* 📊 Xếp hạng (BXH) - Tab 3 - FLOATING BUTTON Ở GIỮA */}
       <Tabs.Screen
         name="rankings"
         options={{
@@ -160,7 +149,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 🎾 Giải của tôi */}
+      {/* 🎾 Giải của tôi - Tab 4 */}
       <Tabs.Screen
         name="my_tournament"
         options={{
@@ -169,42 +158,29 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 🔒 Quản trị */}
+      {/* 👤 Hồ sơ - Tab 5 */}
       <Tabs.Screen
-        name="admin"
-        options={
-          isAdmin
-            ? {
-                title: "Quản trị",
-                tabBarIcon: makeIcon("lock.shield.fill", "shield-lock"),
-              }
-            : { href: null }
-        }
-      />
-
-      {/* 📡 Live */}
-      <Tabs.Screen
-        name="live"
+        name="profile"
         options={{
-          title: "Live",
-          tabBarIcon: makeIcon("dot.radiowaves.left.and.right", "broadcast"),
+          title: "Hồ sơ",
+          tabBarIcon: makeIcon("person.crop.circle.fill", "account-circle"),
         }}
       />
 
-      {/* 👤 Hồ sơ — ẩn nếu chưa đăng nhập */}
+      {/* 🔒 Quản trị - Ẩn khỏi tab bar */}
       <Tabs.Screen
-        name="profile"
-        options={
-          isAuthed
-            ? {
-                title: "Hồ sơ",
-                tabBarIcon: makeIcon(
-                  "person.crop.circle.fill",
-                  "account-circle"
-                ),
-              }
-            : { href: null }
-        }
+        name="admin"
+        options={{
+          href: null, // Ẩn hoàn toàn
+        }}
+      />
+
+      {/* 📡 Live - Ẩn khỏi tab bar */}
+      <Tabs.Screen
+        name="live"
+        options={{
+          href: null, // Ẩn hoàn toàn
+        }}
       />
     </Tabs>
   );

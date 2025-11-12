@@ -12,6 +12,15 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+     reauth: builder.query({
+      query: () => ({
+        url: "/api/users/reauth",
+        method: "GET",
+      }),
+      // nếu dùng cookie httpOnly: thêm credentials
+      // queryFn: async(...) => ...
+      providesTags: ["Auth"],
+    }),
     logout: builder.mutation({
       query: () => ({
         url: `${USERS_URL}/logout`,
@@ -147,4 +156,5 @@ export const {
   useDeleteRatingHistoryMutation,
   useGetUserAchievementsQuery,
   useIssueOsAuthTokenMutation,
+  useReauthQuery
 } = userApiSlice;

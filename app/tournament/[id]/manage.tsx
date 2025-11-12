@@ -33,7 +33,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
-
+import { BlurView } from "expo-blur";
 import {
   useGetTournamentQuery,
   useAdminGetBracketsQuery,
@@ -565,21 +565,87 @@ const BusyChip = memo(({ court }) => (
   </View>
 ));
 
-const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.miniBtn,
-      { borderColor: color },
-      pressed && { opacity: 0.9 },
-    ]}
-  >
-    <MaterialIcons name={icon} size={16} color={color} />
-    <Text style={{ color, fontSize: 12, fontWeight: "700" }} numberOfLines={1}>
-      {label}
-    </Text>
-  </Pressable>
-));
+const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={{ borderRadius: 999 }}
+    >
+      {({ pressed }) => (
+        <Animated.View
+          style={[
+            {
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: color,
+              overflow: "hidden",
+              transform: [{ scale }],
+              opacity: pressed ? 0.9 : 1,
+              marginRight: 4, // cho đều giữa các chip
+            },
+          ]}
+        >
+          {/* lớp blur + glass bên trong, không che border */}
+          <BlurView
+            intensity={35}
+            tint="light"
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={["rgba(255,255,255,0.26)", "rgba(255,255,255,0.02)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <View
+            style={[
+              styles.miniBtn,
+              {
+                borderWidth: 0,
+                backgroundColor: "rgba(255,255,255,0.04)",
+              },
+            ]}
+          >
+            <MaterialIcons name={icon} size={16} color={color} />
+            <Text
+              style={{
+                color,
+                fontSize: 12,
+                fontWeight: "700",
+              }}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
+    </Pressable>
+  );
+});
 
 const VideoPill = memo(({ has }) => {
   const { colors, dark } = useTheme();
@@ -764,87 +830,100 @@ const EdgeFadedHScroll = memo(
   }
 );
 
-const ActionButtons = memo(({ m, tour, me, onOpenVideoDlg, onOpenSheet }) => {
-  const { colors, dark } = useTheme();
-  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+const ActionButtons = memo(
+  ({ m, tour, me, onOpenVideoDlg, onOpenSheet, canManage }) => {
+    const { colors, dark } = useTheme();
+    const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
 
-  const has = !!m?.video;
-  const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
+    const has = !!m?.video;
+    const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
 
-  const onOpenRefNote = useCallback(async () => {
-    try {
-      const html = buildRefReportHTML({
-        tourName: tour?.name || "",
-        code: matchCode(m),
-        court: courtNameOf(m),
-        referee: refereeNames(m),
-        team1: pairLabel(m?.pairA),
-        team2: pairLabel(m?.pairB),
-        logoUrl: "",
-      });
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, {
-        mimeType: "application/pdf",
-        dialogTitle: "Biên bản trọng tài",
-      });
-    } catch {
-      RNAlert.alert("Lỗi", "Không xuất được biên bản.");
-    }
-  }, [tour, m]);
+    const onOpenRefNote = useCallback(async () => {
+      try {
+        const html = buildRefReportHTML({
+          tourName: tour?.name || "",
+          code: matchCode(m),
+          court: courtNameOf(m),
+          referee: refereeNames(m),
+          team1: pairLabel(m?.pairA),
+          team2: pairLabel(m?.pairB),
+          logoUrl: "",
+        });
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "Biên bản trọng tài",
+        });
+      } catch {
+        RNAlert.alert("Lỗi", "Không xuất được biên bản.");
+      }
+    }, [tour, m]);
 
-  const handleOpenVideo = useCallback(() => {
-    Linking.openURL(m.video).catch(() =>
-      RNAlert.alert("Lỗi", "Không mở được liên kết.")
+    const handleOpenVideo = useCallback(() => {
+      Linking.openURL(m.video).catch(() =>
+        RNAlert.alert("Lỗi", "Không mở được liên kết.")
+      );
+    }, [m.video]);
+
+    const handleStartMatch = useCallback(() => {
+      router.push(refereeRouteOf(m));
+    }, [m]);
+
+    return (
+      <EdgeFadedHScroll
+        contentContainerStyle={styles.actionsWrap}
+        bgColor={colors.card}
+        chevronColor={t.muted}
+      >
+        <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
+
+        <MiniChipBtn
+          icon="stadium"
+          label="Gán sân"
+          onPress={() => onOpenSheet("court", m)}
+        />
+        <MiniChipBtn
+          icon="how-to-reg"
+          label="Gán trọng tài"
+          onPress={() => onOpenSheet("ref", m)}
+        />
+
+        {has && (
+          <MiniChipBtn
+            icon="open-in-new"
+            label="Mở"
+            onPress={handleOpenVideo}
+          />
+        )}
+
+        {/* ⬇️ Nút Thêm/Sửa video */}
+        <MiniChipBtn
+          icon="edit"
+          label={has ? "Sửa video" : "Thêm video"}
+          onPress={() => onOpenVideoDlg(m)}
+        />
+
+        {/* ⬇️ Nút Bắt trận nằm cạnh nút Thêm/Sửa video */}
+        {(canStart || canManage) && (
+          <MiniChipBtn
+            icon="play-arrow"
+            label="Bắt trận"
+            onPress={handleStartMatch}
+          />
+        )}
+
+        {has && (
+          <MiniChipBtn
+            icon="link-off"
+            label="Xoá"
+            color="#ef4444"
+            onPress={() => onOpenVideoDlg(m, "")}
+          />
+        )}
+      </EdgeFadedHScroll>
     );
-  }, [m.video]);
-
-  const handleStartMatch = useCallback(() => {
-    router.push(refereeRouteOf(m));
-  }, [m]);
-
-  return (
-    <EdgeFadedHScroll
-      contentContainerStyle={styles.actionsWrap}
-      bgColor={colors.card}
-      chevronColor={t.muted}
-    >
-      <MiniChipBtn icon="print" label="Biên bản TT" onPress={onOpenRefNote} />
-      <MiniChipBtn
-        icon="stadium"
-        label="Gán sân"
-        onPress={() => onOpenSheet("court", m)}
-      />
-      <MiniChipBtn
-        icon="how-to-reg"
-        label="Gán trọng tài"
-        onPress={() => onOpenSheet("ref", m)}
-      />
-      {canStart && (
-        <MiniChipBtn
-          icon="play-arrow"
-          label="Bắt trận"
-          onPress={handleStartMatch}
-        />
-      )}
-      {has && (
-        <MiniChipBtn icon="open-in-new" label="Mở" onPress={handleOpenVideo} />
-      )}
-      <MiniChipBtn
-        icon="edit"
-        label={has ? "Sửa video" : "Thêm video"}
-        onPress={() => onOpenVideoDlg(m)}
-      />
-      {has && (
-        <MiniChipBtn
-          icon="link-off"
-          label="Xoá"
-          color="#ef4444"
-          onPress={() => onOpenVideoDlg(m, "")}
-        />
-      )}
-    </EdgeFadedHScroll>
-  );
-});
+  }
+);
 
 /* ---------------- main ---------------- */
 export default function ManageScreen() {
@@ -977,7 +1056,7 @@ export default function ManageScreen() {
   const [sortDir, setSortDir] = useState("asc");
 
   const [courtFilter, setCourtFilter] = useState("");
-  const [hideBye, setHideBye] = useState(false);
+  const [showBye, setShowBye] = useState(true);
 
   const [courtPickerOpen, setCourtPickerOpen] = useState(false);
   const [courtOptions, setCourtOptions] = useState([]);
@@ -1246,7 +1325,7 @@ export default function ManageScreen() {
           if (courtFilter) {
             if (courtNameOf(m) !== courtFilter) return false;
           }
-          if (hideBye && isByeMatch(m)) return false;
+          if (showBye && isByeMatch(m)) return false;
 
           return true;
         })
@@ -1257,7 +1336,7 @@ export default function ManageScreen() {
           return secondaryCmp(a, b);
         });
     },
-    [q, courtFilter, hideBye, isByeMatch, secondaryCmp]
+    [q, courtFilter, showBye, isByeMatch, secondaryCmp]
   );
 
   const [viewer, setViewer] = useState({ open: false, matchId: null });
@@ -1521,6 +1600,7 @@ export default function ManageScreen() {
             m={m}
             tour={tour}
             me={me}
+            canManage={canManage}
             onOpenVideoDlg={openVideoDlg}
             onOpenSheet={handleOpenSheet}
           />
@@ -1587,7 +1667,7 @@ export default function ManageScreen() {
         (m) => String(m?.bracket?._id || m?.bracket) === bid
       );
       const list = filterSortMatches(matches);
-      const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}|${courtFilter}|${hideBye}`;
+      const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}|${courtFilter}|${showBye}`;
 
       const allSelected = isAllSelectedIn(list);
       const selectedCount = list.filter((m) =>
@@ -1684,7 +1764,7 @@ export default function ManageScreen() {
       liveBump,
       selBump,
       courtFilter,
-      hideBye,
+      showBye,
       isAllSelectedIn,
       selectedMatchIds,
       toggleSelectAllIn,
@@ -1825,7 +1905,7 @@ export default function ManageScreen() {
       <>
         <Stack.Screen
           options={{
-            title: `Quản lý giải: ${tour?.name || ""}`,
+            title: `${tour?.name || ""}`,
             headerTitleAlign: "center",
           }}
         />
@@ -1854,7 +1934,7 @@ export default function ManageScreen() {
     <View style={{ flex: 1 }}>
       <Stack.Screen
         options={{
-          title: `Quản lý giải: ${tour?.name || ""}`,
+          title: `${tour?.name || ""}`,
           headerTitleAlign: "center",
           headerRight: () => (
             <Pressable
@@ -1865,7 +1945,28 @@ export default function ManageScreen() {
               ]}
               hitSlop={12}
             >
-              <MaterialIcons name="more-vert" size={22} color={colors.text} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <MaterialIcons
+                  name="tune" // icon gợi ý: tinh chỉnh / chức năng
+                  size={20}
+                  color={colors.text}
+                />
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 12,
+                    fontWeight: "600",
+                  }}
+                >
+                  Chức năng
+                </Text>
+              </View>
             </Pressable>
           ),
         }}
@@ -1924,9 +2025,9 @@ export default function ManageScreen() {
             />
 
             <CheckChip
-              checked={hideBye}
-              label="Ẩn BYE"
-              onPress={() => setHideBye((v) => !v)}
+              checked={showBye}
+              label="Hiện BYE"
+              onPress={() => setShowBye((v) => !v)}
             />
 
             <Pill
@@ -1988,7 +2089,7 @@ export default function ManageScreen() {
               </Text>
             </View>
           }
-          extraData={`${liveBump}|${selBump}|${courtFilter}|${hideBye}`}
+          extraData={`${liveBump}|${selBump}|${courtFilter}|${showBye}`}
           removeClippedSubviews={Platform.OS === "android"}
           maxToRenderPerBatch={3}
           windowSize={5}

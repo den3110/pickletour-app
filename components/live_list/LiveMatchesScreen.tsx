@@ -20,12 +20,17 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   useColorScheme,
+  Animated,
+  Easing,
 } from "react-native";
+import { useTheme } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import LottieView from "lottie-react-native";
+
 import LiveMatchCard from "./LiveMatchCard";
 import { useGetLiveMatchesQuery } from "@/slices/liveApiSlice";
 import FiltersBottomSheet from "./FiltersModal";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@react-navigation/native";
 
 const LIMIT = 12;
 const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
@@ -56,6 +61,10 @@ function useThemeTokens() {
     text: isDark ? "#e0e7ff" : "#1976d2",
   };
 
+  // skeleton tones
+  const skelBase = isDark ? "#1a1c20" : "#e9eef5";
+  const skelShine = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.55)";
+
   return {
     scheme,
     tint,
@@ -66,10 +75,12 @@ function useThemeTokens() {
     cardBg,
     cardBorder,
     chip,
+    skeleton: { base: skelBase, shine: skelShine },
+    isDark,
   };
 }
 
-// ===== utilities =====
+/* ============ utilities ============ */
 function useTickingAgo() {
   const [ts, setTs] = useState(Date.now());
   useEffect(() => {
@@ -87,7 +98,121 @@ function useDebouncedValue(value, delay = 350) {
   return debounced;
 }
 
-// ===== Header (memo) =====
+/* ============ Shimmer Skeleton ============ */
+const Shimmer = memo(function Shimmer({ style, shineColor }) {
+  const translate = useRef(new Animated.Value(-1)).current;
+  const widthRef = useRef(300);
+  const onLayout = useCallback((e) => {
+    widthRef.current = e.nativeEvent.layout.width || 300;
+  }, []);
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(translate, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [translate]);
+
+  const transformX = translate.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-widthRef.current, widthRef.current],
+  });
+
+  return (
+    <View style={[{ overflow: "hidden" }, style]} onLayout={onLayout}>
+      <Animated.View
+        style={{
+          position: "absolute",
+          left: -widthRef.current,
+          top: 0,
+          bottom: 0,
+          width: widthRef.current * 2,
+          transform: [{ translateX: transformX }],
+        }}
+      >
+        <LinearGradient
+          colors={["transparent", shineColor, "transparent"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+    </View>
+  );
+});
+
+const SkeletonBlock = memo(function SkeletonBlock({ T, w, h, r = 8, style }) {
+  return (
+    <View
+      style={[
+        {
+          width: w,
+          height: h,
+          borderRadius: r,
+          backgroundColor: T.skeleton.base,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
+      <Shimmer style={{ flex: 1 }} shineColor={T.skeleton.shine} />
+    </View>
+  );
+});
+
+const SkeletonCard = memo(function SkeletonCard({ T }) {
+  return (
+    <View
+      style={[
+        styles.skelCard,
+        { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+      ]}
+    >
+      {/* top row: code + small tag */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <SkeletonBlock T={T} w={120} h={14} />
+        <SkeletonBlock T={T} w={64} h={14} />
+        <View style={{ flex: 1 }} />
+        <SkeletonBlock T={T} w={40} h={14} />
+      </View>
+
+      {/* title row */}
+      <SkeletonBlock T={T} w={"80%"} h={18} style={{ marginTop: 12 }} />
+      <SkeletonBlock T={T} w={"50%"} h={14} style={{ marginTop: 8 }} />
+
+      {/* footer chips */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginTop: 14,
+        }}
+      >
+        <SkeletonBlock T={T} w={76} h={24} r={12} />
+        <SkeletonBlock T={T} w={64} h={24} r={12} />
+        <SkeletonBlock T={T} w={56} h={24} r={12} />
+      </View>
+    </View>
+  );
+});
+
+const SkeletonList = memo(function SkeletonList({ T, count = 6 }) {
+  return (
+    <View style={{ paddingHorizontal: 0 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} T={T} />
+      ))}
+    </View>
+  );
+});
+
+/* ============ Header ============ */
 const Header = memo(function Header(props) {
   const T = useThemeTokens();
   const {
@@ -119,7 +244,12 @@ const Header = memo(function Header(props) {
           { backgroundColor: T.cardBg, borderColor: T.cardBorder },
         ]}
       >
-        <Text style={[styles.searchIcon, { color: T.textSecondary }]}>🔍</Text>
+        <LottieView
+          source={require("@/assets/lottie/empty-search.json")}
+          autoPlay
+          loop
+          style={styles.searchLottie}
+        />
         <TextInput
           ref={searchInputRef}
           style={[styles.searchInput, { color: T.textPrimary }]}
@@ -245,6 +375,7 @@ const Header = memo(function Header(props) {
   );
 });
 
+/* ============ Screen ============ */
 export default function LiveMatchesScreen() {
   const T = useThemeTokens();
   const insets = useSafeAreaInsets();
@@ -267,8 +398,7 @@ export default function LiveMatchesScreen() {
   const submitSearchTick = useRef(0);
   const bumpSubmitTick = () => (submitSearchTick.current += 1);
 
-  // Query args — BE hiện tại chỉ dùng windowMs + maybe excludeFinished,
-  // các field khác BE sẽ bỏ qua cũng không sao.
+  // Query args
   const qArgs = useMemo(() => {
     const filteredStatuses = excludeFinished
       ? statuses.filter((s) => s !== "finished")
@@ -304,8 +434,6 @@ export default function LiveMatchesScreen() {
   }, [data]);
 
   const total = data?.count ?? items.length;
-  // BE không trả pages nên ép =1
-  const pages = 1;
 
   // updatedAgo
   const tick = useTickingAgo();
@@ -409,16 +537,25 @@ export default function LiveMatchesScreen() {
       windowHours,
       autoRefresh,
       refreshSec,
+      // intentionally keep searchInputRef/setSearchFocused stable
     ]
   );
 
-  // vì BE luôn trả 1 mảng nên footer phân trang ẩn đi
-  const footerEl = null;
+  // Skeleton logic: show when initial loading or fetching with no data; hide during manual pull-to-refresh spinner
+  const showSkeleton =
+    (isLoading || (isFetching && items.length === 0)) && !isManualRefreshing;
+
+  const skeletonEl = useMemo(() => <SkeletonList T={T} />, [T.scheme]);
 
   const renderEmpty = useCallback(() => {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={[styles.emptyIcon, { color: T.textSecondary }]}>🔍</Text>
+        <LottieView
+          source={require("@/assets/lottie/empty-search.json")}
+          autoPlay
+          loop
+          style={styles.emptyLottie}
+        />
         <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>
           Không có trận phù hợp
         </Text>
@@ -441,9 +578,9 @@ export default function LiveMatchesScreen() {
           keyExtractor={(item) => item.matchId || item._id}
           renderItem={renderItem}
           ListHeaderComponent={headerEl}
-          ListFooterComponent={footerEl}
+          ListFooterComponent={null}
           extraData={T.scheme}
-          ListEmptyComponent={!isLoading && renderEmpty}
+          ListEmptyComponent={showSkeleton ? skeletonEl : renderEmpty}
           onRefresh={handlePullToRefresh}
           refreshing={isManualRefreshing && isFetching}
           contentContainerStyle={[
@@ -479,6 +616,7 @@ export default function LiveMatchesScreen() {
   );
 }
 
+/* ============ styles ============ */
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { padding: 12 },
@@ -499,7 +637,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  searchIcon: { fontSize: 18, marginRight: 8 },
+  searchLottie: { width: 20, height: 20, marginRight: 8 },
   searchInput: { flex: 1, fontSize: 15, padding: 0 },
   clearBtn: { padding: 4, marginLeft: 4 },
   clearBtnText: { fontSize: 18 },
@@ -561,9 +699,17 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 12, fontWeight: "500" },
 
+  /* skeleton cards */
+  skelCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+
   /* empty */
   emptyContainer: { paddingVertical: 80, alignItems: "center" },
-  emptyIcon: { fontSize: 48, marginBottom: 16, opacity: 0.5 },
+  emptyLottie: { width: 160, height: 160, marginBottom: 16, opacity: 0.9 },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "600",
