@@ -8,6 +8,7 @@ import {
   useRejectJoinMutation,
 } from "@/slices/clubsApiSlice";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 export default function JoinRequestsSheetRN({
   clubId,
@@ -37,7 +38,7 @@ export default function JoinRequestsSheetRN({
         <GlassCard key={r._id} style={{ marginTop: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <Image
-              source={{ uri: r.user?.avatar }}
+              source={{ uri: normalizeUrl(r.user?.avatar) }}
               style={{ width: 40, height: 40, borderRadius: 20 }}
             />
             <View style={{ flex: 1 }}>

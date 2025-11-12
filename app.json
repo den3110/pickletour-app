@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour.vn",
     "slug": "pickletour-app",
-    "version": "1.0.11",
+    "version": "1.0.12",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "pickletourapp",
@@ -11,12 +11,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "NSCameraUsageDescription": "pickletour.vn uses the camera to scan the CCCD QR code, auto-fill profile info, and livestream matches.",
         "NSMicrophoneUsageDescription": "pickletour.vn uses the microphone to capture audio for livestreams and video recordings.",
         "NSPhotoLibraryUsageDescription": "pickletour.vn lets you pick photos to upload your avatar and CCCD verification images. Example: choose front/back CCCD images to verify.",
         "NSFaceIDUsageDescription": "pickletour.vn dùng Face ID/Touch ID/Passcode để xác thực các hành động nhạy cảm như xoá tài khoản.",
+        "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn.",
+        "NSRemindersUsageDescription": "Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -39,7 +41,9 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
       ]
     },
     "web": {
@@ -48,6 +52,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn."
+        }
+      ],
       "expo-router",
       [
         "expo-local-authentication",

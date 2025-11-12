@@ -1,4 +1,3 @@
-// components/clubs/ClubMembersCarouselRN.tsx
 import React, { useMemo } from "react";
 import {
   View,
@@ -16,6 +15,7 @@ import {
   useSetRoleMutation,
 } from "@/slices/clubsApiSlice";
 import * as Haptics from "expo-haptics";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const AVATAR_FALLBACK =
   "https://dummyimage.com/200x200/ede9fe/4f378b&text=User";
@@ -148,6 +148,8 @@ export default function ClubMembersCarouselRN({
           const name =
             m?.user?.nickname || m?.user?.fullName || m?.user?.email || "User";
           const role = m?.role;
+          const avatarUri =
+            (m?.user?.avatar && String(m?.user?.avatar)) || AVATAR_FALLBACK;
 
           const toggleTitle = role === "admin" ? "Bỏ admin" : "Cấp admin";
 
@@ -155,9 +157,17 @@ export default function ClubMembersCarouselRN({
             <GradLightCard style={{ width: 164 }}>
               <View style={{ alignItems: "center" }}>
                 <Image
-                  source={{ uri: m?.user?.avatar || AVATAR_FALLBACK }}
+                  source={{ uri: normalizeUrl(avatarUri) }}
                   style={styles.avatar}
                   contentFit="cover"
+                  // ✅ Bật cache: lưu cả RAM và disk
+                  cachePolicy="memory-disk"
+                  // Mượt mà hơn khi hiện ảnh
+                  transition={150}
+                  // Giúp Image recycles khi list cuộn dài
+                  recyclingKey={`member-${m?.user?._id || m?._id}`}
+                  // Placeholder trong lúc tải
+                  placeholder={{ uri: AVATAR_FALLBACK }}
                 />
                 <Text style={styles.name} numberOfLines={1}>
                   {name}

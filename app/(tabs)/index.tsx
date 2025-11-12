@@ -70,7 +70,7 @@ const FEATURES = [
     iconLib: "Ionicons",
     title: "Lịch thi đấu",
     color: "#FF6B6B",
-    link: "/development",
+    link: "/schedule",
   },
   {
     id: 2,
@@ -86,7 +86,7 @@ const FEATURES = [
     iconLib: "Ionicons",
     title: "Thống kê",
     color: "#45B7D1",
-    link: "/development",
+    link: "/stats/user",
   },
   {
     id: 4,
@@ -505,7 +505,7 @@ function AthleteIsland() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Image
-            source={{ uri: avatarUrl }}
+            source={{ uri: normalizeUrl(avatarUrl) }}
             style={styles.avatar}
             contentFit="cover"
             transition={200}
@@ -858,7 +858,7 @@ function NewsCard({ news, theme }) {
         <Image
           source={{
             uri:
-              news.thumbImageUrl ||
+              normalizeUrl(news.thumbImageUrl) ||
               "https://dummyimage.com/400x300/A29BFE/ffffff&text=News",
           }}
           style={styles.newsImage}
@@ -987,7 +987,7 @@ function LeaderboardCard({ athlete, theme }) {
         </View>
 
         <Image
-          source={{ uri: athlete.avatar }}
+          source={{ uri: normalizeUrl(athlete.avatar) }}
           style={styles.leaderboardAvatar}
           contentFit="cover"
           transition={200}

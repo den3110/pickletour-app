@@ -247,7 +247,6 @@ export default function AdminUsersScreen() {
   /* Guard admin */
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin");
-  if (!isAdmin) return <Redirect href="/(tabs)" />;
 
   /* UI state / filters */
   const dispatch = useDispatch();
@@ -567,6 +566,8 @@ export default function AdminUsersScreen() {
     />
   );
 
+  if (!isAdmin) return <Redirect href="/(tabs)" />;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: tokens.pageBg }}>
       <View style={{ flex: 1, backgroundColor: tokens.pageBg }}>
@@ -648,7 +649,7 @@ export default function AdminUsersScreen() {
         />
 
         {/* Pagination */}
-        <View style={{ paddingVertical: 8}}>
+        <View style={{ paddingVertical: 8 }}>
           <PaginationRN
             page={page + 1}
             count={serverTotalPages}

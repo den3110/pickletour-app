@@ -70,7 +70,7 @@ const overlayUrlForMatch = (mid?: string | null): string | null => {
     overlay: "1",
     "scale-score": ".5",
     isactivebreak: "1",
-    sLimit: "12",
+    slimit: "12",
   });
 
   return `${baseUrl}/overlay/score?${params}`;

@@ -3,6 +3,7 @@ import React from "react";
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const FALLBACK_COVER =
   "https://dummyimage.com/1600x900/161a24/2b3340&text=Club+Cover";
@@ -40,7 +41,7 @@ export default function ClubHeaderRN({ club }: { club: any }) {
 
   return (
     <View style={styles.wrap}>
-      <Image source={{ uri: cover }} style={styles.cover} contentFit="cover" />
+      <Image source={{ uri: normalizeUrl(cover) }} style={styles.cover} contentFit="cover" />
       {/* Giữ overlay gradient nền sau như bạn gửi */}
       <LinearGradient
         colors={["#667eea", "#764ba2"]}
@@ -52,7 +53,7 @@ export default function ClubHeaderRN({ club }: { club: any }) {
 
       <View style={styles.info}>
         <View style={styles.avatarWrap}>
-          <Image source={{ uri: logo }} style={styles.avatar} contentFit="cover" />
+          <Image source={{ uri: normalizeUrl(logo) }} style={styles.avatar} contentFit="cover" />
         </View>
 
         <Text style={styles.name} numberOfLines={2}>

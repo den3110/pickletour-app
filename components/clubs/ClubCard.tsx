@@ -1,18 +1,18 @@
-// components/clubs/ClubCard.tsx
 import React from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Dimensions,
   Text,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Avatar, Chip } from "@/components/ui/Chip";
+import { Chip } from "@/components/ui/Chip";
 import type { Club } from "@/types/club.types";
+import { Image as ExpoImage } from "expo-image";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 32;
@@ -23,7 +23,6 @@ interface ClubCardProps {
 }
 
 export default function ClubCard({ club, onPress }: ClubCardProps) {
-    // console.log(club)
   const cover =
     club.coverUrl || club.logoUrl || "https://via.placeholder.com/400x200";
   const logo = club.logoUrl || "https://via.placeholder.com/80";
@@ -32,9 +31,16 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
       <Animated.View entering={FadeIn.duration(300)} style={styles.card}>
-        {/* Cover Image with Gradient Overlay */}
+        {/* Cover Image with Gradient Overlay (expo-image) */}
         <View style={styles.coverContainer}>
-          <Image source={{ uri: cover }} style={styles.cover} />
+          <ExpoImage
+            source={{ uri: normalizeUrl(cover) }}
+            style={styles.cover}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+            recyclingKey={`cover-${cover}`}
+          />
           <LinearGradient
             colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.4)"]}
             style={styles.coverGradient}
@@ -54,9 +60,16 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Logo Avatar */}
+          {/* Logo Avatar (expo-image, cached) */}
           <View style={styles.avatarContainer}>
-            <Avatar source={{ uri: logo }} size={64} style={styles.avatar} />
+            <ExpoImage
+              source={{ uri: normalizeUrl(logo) }}
+              style={styles.avatar}
+              contentFit="cover"
+              transition={150}
+              cachePolicy="memory-disk"
+              recyclingKey={`logo-${logo}`}
+            />
             {club.isVerified && (
               <View style={styles.avatarBadge}>
                 <MaterialCommunityIcons
@@ -154,7 +167,6 @@ const styles = StyleSheet.create({
   cover: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   coverGradient: {
     position: "absolute",
@@ -184,6 +196,9 @@ const styles = StyleSheet.create({
     left: 16,
   },
   avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#fff",
     borderWidth: 3,
     borderColor: "#fff",

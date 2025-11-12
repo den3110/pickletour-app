@@ -257,7 +257,11 @@ export const apiSlice = createApi({
     "FeaturedLeaderboard",
     "Club",
     "ClubMember",
-    "JoinRequest"
+    "JoinRequest",
+    "Auth",
+    "MarkedDates",
+    "UpcomingMatches",
+    "Schedule",
   ],
   endpoints: () => ({}),
 });

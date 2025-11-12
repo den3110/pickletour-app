@@ -353,7 +353,7 @@ export default function RegisterScreen() {
                 >
                   {safeAvatar ? (
                     <ExpoImage
-                      source={{ uri: safeAvatar }}
+                      source={{ uri: normalizeUrl(safeAvatar) }}
                       style={{ width: 80, height: 80, borderRadius: 40 }}
                       contentFit="cover"
                       cachePolicy="memory-disk"
@@ -657,7 +657,7 @@ export default function RegisterScreen() {
 
             {!!avatarTemp?.uri && (
               <ExpoImage
-                source={{ uri: avatarTemp.uri }}
+                source={{ uri: normalizeUrl(avatarTemp.uri) }}
                 style={{
                   width: 200,
                   height: 200,
@@ -753,7 +753,7 @@ export default function RegisterScreen() {
 
       {/* ===== Viewer phóng to avatar ===== */}
       <ImageView
-        images={safeAvatar ? [{ uri: safeAvatar }] : []}
+        images={safeAvatar ? [{ uri: normalizeUrl(safeAvatar) }] : []}
         visible={viewerOpen}
         onRequestClose={() => setViewerOpen(false)}
         backgroundColor={isDark ? "#0b0b0c" : "#ffffff"}

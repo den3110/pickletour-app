@@ -175,7 +175,7 @@ function XImage({
   const safeUri = uri ? String(uri).replace(/\\/g, "/") : undefined;
   return (
     <ExpoImage
-      source={safeUri ? { uri: safeUri } : undefined}
+      source={safeUri ? { uri: normalizeUrl(safeUri) } : undefined}
       style={style}
       contentFit={contentFit}
       cachePolicy={isRemote ? cacheRemote : "none"}

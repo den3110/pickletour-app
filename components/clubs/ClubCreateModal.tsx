@@ -38,6 +38,7 @@ import { VN_PROVINCES } from "@/constants/provinces";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 type ClubCreateModalProps = {
   visible: boolean;
@@ -367,7 +368,7 @@ export default function ClubCreateModal({
             <Animated.View style={[styles.coverWrap, { height: coverHeight }]}>
               {form.coverUrl ? (
                 <Image
-                  source={{ uri: form.coverUrl }}
+                  source={{ uri: normalizeUrl(form.coverUrl) }}
                   style={styles.coverImg}
                   contentFit="cover"
                 />
@@ -419,7 +420,7 @@ export default function ClubCreateModal({
               />
               {form.logoUrl ? (
                 <Image
-                  source={{ uri: form.logoUrl }}
+                  source={{ uri: normalizeUrl(form.logoUrl) }}
                   style={styles.logoImg}
                   contentFit="cover"
                 />

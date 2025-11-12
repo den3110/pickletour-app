@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
@@ -15,11 +16,13 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import RenderHTML from "react-native-render-html";
 import { useGetNewsDetailQuery } from "@/slices/newsApiSlice";
 
 const FALLBACK_IMG =
   "https://dummyimage.com/800x450/A29BFE/ffffff&text=Pickleball+News";
 
+/* ========== Utils ========== */
 function formatDate(d) {
   if (!d) return "-";
   try {
@@ -33,6 +36,12 @@ function formatDate(d) {
   }
 }
 
+function normalizeNewlines(s = "") {
+  // Dùng khi phải fallback qua contentText
+  let x = String(s).replace(/\r\n?/g, "\n").replace(/\\n/g, "\n");
+  return x.replace(/\n{3,}/g, "\n\n");
+}
+
 const openUrl = (url) => {
   if (!url) return;
   Linking.canOpenURL(url)
@@ -40,15 +49,18 @@ const openUrl = (url) => {
     .catch(() => {});
 };
 
+/* ========== Screen ========== */
 export default function NewsDetailScreen() {
   const { slug } = useLocalSearchParams();
   const theme = useTheme();
   const headerHeight = useHeaderHeight();
+  const { width: screenWidth } = useWindowDimensions();
 
   const isDark = !!theme?.dark;
   const bg = theme?.colors?.background ?? (isDark ? "#0b0f14" : "#f5f7fb");
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const sub = isDark ? "#b0b0b0" : "#666666";
+  const link = isDark ? "#7cc7ff" : "#1976d2";
 
   const {
     data: article,
@@ -76,6 +88,22 @@ export default function NewsDetailScreen() {
       }
     }
     return "";
+  }, [article]);
+
+  const plainText = useMemo(() => {
+    // Fallback khi không có HTML
+    return article?.contentText ? normalizeNewlines(article.contentText) : "";
+  }, [article]);
+
+  const htmlSource = useMemo(() => {
+    if (article?.contentHtml) {
+      // Có thể lọc bỏ script/style nếu cần:
+      const cleaned = String(article.contentHtml)
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+      return { html: cleaned };
+    }
+    return null;
   }, [article]);
 
   return (
@@ -165,7 +193,7 @@ export default function NewsDetailScreen() {
           <ScrollView
             contentContainerStyle={[
               styles.scrollContent,
-              { paddingTop: headerHeight + 8 }, // đẩy nội dung xuống dưới header
+              { paddingTop: headerHeight + 8 },
             ]}
             contentInsetAdjustmentBehavior="never"
             showsVerticalScrollIndicator={false}
@@ -229,13 +257,63 @@ export default function NewsDetailScreen() {
 
             {/* Content */}
             <View style={styles.contentWrap}>
-              {article.contentText ? (
+              {htmlSource ? (
+                <RenderHTML
+                  source={htmlSource}
+                  contentWidth={screenWidth - 32} // 16px padding 2 bên
+                  defaultTextProps={{
+                    selectable: false,
+                    allowFontScaling: true,
+                  }}
+                  baseStyle={{
+                    color: text,
+                    fontSize: 14,
+                    lineHeight: 22,
+                  }}
+                  tagsStyles={{
+                    p: { marginTop: 0, marginBottom: 10 },
+                    div: { marginBottom: 8 },
+                    em: { fontStyle: "italic" },
+                    i: { fontStyle: "italic" },
+                    strong: { fontWeight: "700" },
+                    b: { fontWeight: "700" },
+                    a: { color: link, textDecorationLine: "underline" },
+                    h1: { fontSize: 22, fontWeight: "800", marginBottom: 12 },
+                    h2: { fontSize: 20, fontWeight: "800", marginBottom: 10 },
+                    h3: { fontSize: 18, fontWeight: "700", marginBottom: 8 },
+                    h4: { fontSize: 16, fontWeight: "700", marginBottom: 6 },
+                    ul: { marginBottom: 10, paddingLeft: 18 },
+                    ol: { marginBottom: 10, paddingLeft: 18 },
+                    li: { marginBottom: 6 },
+                    blockquote: {
+                      borderLeftWidth: 3,
+                      borderLeftColor: isDark ? "#4a5568" : "#cbd5e0",
+                      paddingLeft: 10,
+                      marginBottom: 12,
+                      opacity: 0.9,
+                    },
+                    img: {
+                      marginVertical: 8,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                    },
+                    figure: { marginBottom: 8 },
+                    figcaption: {
+                      color: sub,
+                      fontSize: 12,
+                      marginTop: 4,
+                      textAlign: "center",
+                    },
+                  }}
+                  renderersProps={{
+                    a: {
+                      onPress: (_event, href) => openUrl(href),
+                    },
+                  }}
+                />
+              ) : plainText ? (
                 <Text style={[styles.contentText, { color: text }]}>
-                  {article.contentText}
-                </Text>
-              ) : article.contentHtml ? (
-                <Text style={[styles.contentText, { color: text }]}>
-                  {article.contentHtml.replace(/<[^>]+>/g, "")}
+                  {plainText}
                 </Text>
               ) : (
                 <Text style={[styles.contentText, { color: sub }]}>

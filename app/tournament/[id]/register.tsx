@@ -2036,7 +2036,7 @@ export default function TournamentRegistrationScreen() {
                           }}
                         >
                           <ExpoImage
-                            source={{ uri: url }}
+                            source={{ uri: normalizeUrl(url) }}
                             style={{
                               width: 260,
                               height: 260,

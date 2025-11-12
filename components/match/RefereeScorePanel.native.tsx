@@ -229,7 +229,7 @@ const NameBadge = memo(
                 style={{ marginRight: 6, borderRadius: AV_SIZE / 2 }}
               >
                 <Image
-                  source={{ uri: avatarUri }}
+                  source={{ uri: normalizeUrl(avatarUri) }}
                   style={{
                     width: AV_SIZE,
                     height: AV_SIZE,

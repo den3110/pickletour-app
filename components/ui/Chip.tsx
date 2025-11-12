@@ -1,4 +1,5 @@
 // components/ui/Chip.tsx
+import { normalizeUrl } from "@/utils/normalizeUri";
 import React from "react";
 import {
   View,
@@ -93,7 +94,7 @@ interface AvatarProps {
 export function Avatar({ source, size = 40, style }: AvatarProps) {
   return (
     <Image
-      source={source?.uri ? source : require("../../assets/images/icon.png")}
+      source={source?.uri ? normalizeUrl(source) : require("../../assets/images/icon.png")}
       style={[
         avatarStyles.avatar,
         { width: size, height: size, borderRadius: size / 2 },

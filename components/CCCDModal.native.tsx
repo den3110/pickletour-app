@@ -103,7 +103,7 @@ export default function CCCDModal({ visible, onClose, user }) {
                 <View style={s.imgCard}>
                   <Text style={s.label}>Mặt trước</Text>
                   <Image
-                    source={{ uri: imgs.front }}
+                    source={{ uri: normalizeUrl(imgs.front) }}
                     style={s.img}
                     contentFit="contain"
                     cachePolicy="memory-disk"
@@ -116,7 +116,7 @@ export default function CCCDModal({ visible, onClose, user }) {
                 <View style={s.imgCard}>
                   <Text style={s.label}>Mặt sau</Text>
                   <Image
-                    source={{ uri: imgs.back }}
+                    source={{ uri: normalizeUrl(imgs.back) }}
                     style={s.img}
                     contentFit="contain"
                     cachePolicy="memory-disk"

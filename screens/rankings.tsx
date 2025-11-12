@@ -1159,28 +1159,30 @@ export default function RankingListScreen({ isBack = false }) {
         {/* TOP BAR */}
         <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
           <View style={styles.headerRow}>
-            {isBack ? (
-              <Pressable
-                onPress={() => router.back()}
-                hitSlop={12}
-                style={({ pressed }) => [
-                  styles.backBtn,
-                  { backgroundColor: pressed ? tokens.muted : "transparent" },
-                ]}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={22}
-                  color={tokens.colors.text}
-                />
-              </Pressable>
-            ) : (
-              // giữ chỗ để tiêu đề không bị xô lệch khi không có nút
-              <View />
-            )}
-            <Text style={[styles.title, { color: C.textPrimary }]}>
-              Bảng xếp hạng
-            </Text>
+            <View style={{display: "flex", flexDirection: "row", alignItems: "center" }}>
+              {isBack ? (
+                <Pressable
+                  onPress={() => router.back()}
+                  hitSlop={12}
+                  style={({ pressed }) => [
+                    styles.backBtn,
+                    { backgroundColor: pressed ? tokens.muted : "transparent" },
+                  ]}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={22}
+                    color={tokens.colors.text}
+                  />
+                </Pressable>
+              ) : (
+                // giữ chỗ để tiêu đề không bị xô lệch khi không có nút
+                <View />
+              )}
+              <Text style={[styles.title, { color: C.textPrimary }]}>
+                Bảng xếp hạng
+              </Text>
+            </View>
             {canSelfAssess && me !== null && (
               <TouchableOpacity
                 onPress={() => router.push("/levelpoint")}
@@ -1799,6 +1801,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     borderBottomWidth: 0, // nếu muốn có gạch dưới: 1
     marginBottom: 8,

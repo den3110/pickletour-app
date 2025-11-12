@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useGetNewsQuery } from "@/slices/newsApiSlice";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const FALLBACK_IMG =
   "https://dummyimage.com/600x400/A29BFE/ffffff&text=Pickleball+News";
@@ -170,7 +171,7 @@ function NewsListItem({ item, theme }) {
       <View style={styles.imageWrap}>
         <Image
           source={{
-            uri: item.thumbImageUrl || item.heroImageUrl || FALLBACK_IMG,
+            uri: normalizeUrl(item.thumbImageUrl || item.heroImageUrl || FALLBACK_IMG),
           }}
           style={styles.image}
           contentFit="cover"

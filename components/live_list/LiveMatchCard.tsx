@@ -14,6 +14,7 @@ import { Image as ExpoImage } from "expo-image";
 import InfoModal from "./InfoModal";
 import { useTheme } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 /* ============================
  * THEME TOKENS
@@ -392,7 +393,7 @@ export default function LiveMatchCard({
           >
             {heroSrc ? (
               <ExpoImage
-                source={{ uri: heroSrc, cacheKey }}
+                source={{ uri: normalizeUrl(heroSrc), cacheKey }}
                 style={styles.thumbnail}
                 onError={heroErr}
                 contentFit="cover"

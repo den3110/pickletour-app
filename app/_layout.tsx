@@ -1,8 +1,4 @@
-// app/_layout.tsx
-if (__DEV__) {
-  require("../dev/reactotron");
-  require("../dev/ws-logger");
-}
+
 
 import {
   DarkTheme,
@@ -38,7 +34,11 @@ import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import Toast from "react-native-toast-message";
 import * as SecureStore from "expo-secure-store";
-
+// app/_layout.tsx
+if (__DEV__) {
+  require("../dev/reactotron");
+  require("../dev/ws-logger");
+}
 const SPLASH_FONT_FAILSAFE_MS = 1500;
 const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"

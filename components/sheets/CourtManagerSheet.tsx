@@ -906,8 +906,7 @@ export default function CourtManagerSheet({
             <Row style={{ alignItems: "center", gap: 8 }}>
               <MaterialIcons name="stadium" size={18} color={t.colors.text} />
               <Text style={[styles.title, { color: t.colors.text }]}>
-                Quản lý sân — 
-                {tournamentName ? ` ${tournamentName}` : ""}
+                Quản lý sân —{tournamentName ? ` ${tournamentName}` : ""}
               </Text>
             </Row>
             <Row style={{ alignItems: "center", gap: 4 }}>
@@ -1082,27 +1081,6 @@ export default function CourtManagerSheet({
             </Row>
           </View>
 
-          {/* Queue block */}
-          {/* <View
-            style={[
-              styles.card,
-              { backgroundColor: t.colors.card, borderColor: t.colors.border },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-              Hàng đợi vòng bảng (toàn giải)
-            </Text>
-            <Text style={{ color: t.muted, marginBottom: 8 }}>
-              Thuật toán: A1, B1, C1… sau đó A2, B2… (tránh VĐV đang thi đấu/chờ
-              sân).
-            </Text>
-            <Btn onPress={handleBuildQueue} disabled={buildingQueue}>
-              {buildingQueue ? "Đang xếp..." : "Xếp hàng đợi"}
-            </Btn>
-          </View>
-
-          <Divider /> */}
-
           {/* Courts list */}
           <Row style={{ alignItems: "center", gap: 8 }}>
             <Text style={[styles.cardTitle, { color: t.colors.text }]}>
@@ -1213,27 +1191,35 @@ export default function CourtManagerSheet({
                       )}
                     </View>
 
-                    <Row style={{ gap: 6, flexWrap: "wrap" }}>
-                      <Btn variant="outline" onPress={() => openAssignDlg(c)}>
-                        Sửa trận vào sân
-                      </Btn>
-                      <Btn
-                        variant="outline"
-                        onPress={() => handleAssignNext(c._id || c.id)}
-                        disabled={courtStatus(c) !== "idle"}
+                    {/* Actions — LUÔN là 1 dòng riêng, full width */}
+                    <View style={{ width: "100%", marginTop: 6 }}>
+                      <Row
+                        style={{
+                          gap: 8,
+                          flexWrap: "nowrap",
+                          justifyContent: "flex-start",
+                        }}
                       >
-                        Gán trận kế tiếp
-                      </Btn>
-                      {/* NEW: Xoá sân */}
-                      <Btn
-                        variant="outline"
-                        danger
-                        onPress={() => handleDeleteOneCourt(c)}
-                        disabled={deletingThis}
-                      >
-                        {deletingThis ? "Đang xoá..." : "Xoá sân"}
-                      </Btn>
-                    </Row>
+                        <Btn variant="outline" onPress={() => openAssignDlg(c)}>
+                          Sửa trận vào sân
+                        </Btn>
+                        <Btn
+                          variant="outline"
+                          onPress={() => handleAssignNext(c._id || c.id)}
+                          disabled={courtStatus(c) !== "idle"}
+                        >
+                          Gán trận kế tiếp
+                        </Btn>
+                        <Btn
+                          variant="outline"
+                          danger
+                          onPress={() => handleDeleteOneCourt(c)}
+                          disabled={deletingThis}
+                        >
+                          {deletingThis ? "Đang xoá..." : "Xoá sân"}
+                        </Btn>
+                      </Row>
+                    </View>
                   </View>
                 );
               })}
@@ -1296,8 +1282,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
     gap: 10,
     flexWrap: "wrap",
   },
