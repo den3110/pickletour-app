@@ -17,8 +17,9 @@
         "NSMicrophoneUsageDescription": "pickletour.vn uses the microphone to capture audio for livestreams and video recordings.",
         "NSPhotoLibraryUsageDescription": "pickletour.vn lets you pick photos to upload your avatar and CCCD verification images. Example: choose front/back CCCD images to verify.",
         "NSFaceIDUsageDescription": "pickletour.vn dùng Face ID/Touch ID/Passcode để xác thực các hành động nhạy cảm như xoá tài khoản.",
-        "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn.",
+        "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn và nhắc nhở tự động.",
         "NSRemindersUsageDescription": "Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "Ứng dụng cần quyền để thêm sự kiện trận đấu vào lịch của bạn.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -42,8 +43,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
-        "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
       ]
     },
     "web": {
