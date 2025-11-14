@@ -318,9 +318,10 @@ export default function RootLayout() {
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}
                   edges={[
-                    "left",
-                    "right",
+                    // "left",
+                    // "right",
                     Platform.OS === "android" ? "top" : "",
+                    Platform.OS === "android" ? "bottom" : "",
                   ]}
                 >
                   {/* ⚠️ onLayout cần collapsable={false} để chắc chắn fire trên Android */}

@@ -7,7 +7,6 @@ import {
   FlatList,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +19,7 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SKELETON_COUNT = 6;
 const BANNER_RATIO = 16 / 9;
@@ -235,7 +235,8 @@ function useThemeTokens() {
 export default function TournamentDashboardScreen({ isBack = false }) {
   const t = useTokens();
   const tokens = useThemeTokens();
-
+  const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
   const scheme = t.dark ? "dark" : "light"; // cho iOS ActionSheet
   const tint = t.colors.primary;
   const cardBg = t.colors.card;
@@ -602,7 +603,9 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 renderItem={renderItem}
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                contentContainerStyle={{ paddingBottom: 24 }}
+                contentContainerStyle={{
+                  paddingBottom: 50 ,
+                }}
                 ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
                 ListEmptyComponent={
                   <View

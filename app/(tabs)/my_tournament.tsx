@@ -4,8 +4,9 @@
 // - Banner có nút Thu gọn/Mở rộng (finished mặc định thu gọn)
 // - Sắp xếp TRONG MỖI GIẢI: LIVE → UPCOMING → FINISHED (phụ theo thời gian)
 // - Điểm số ưu tiên scoreText, fallback gameScores/sets
+// - NEW: Skeleton loading cho danh sách giải + trận
 
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import React, {
   useMemo,
   useState,
@@ -19,7 +20,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -253,6 +253,152 @@ function ScoreBadgeFromMatch({ m, tokens }) {
       <Text style={{ fontWeight: "700", color: tokens.colors.text }}>
         {text}
       </Text>
+    </View>
+  );
+}
+
+/* ========== Skeleton components ========== */
+
+function SkeletonBlock({
+  width = "100%",
+  height = 14,
+  radius = 8,
+  style,
+  tokens,
+}) {
+  return (
+    <View
+      style={[
+        {
+          width,
+          height,
+          borderRadius: radius,
+          backgroundColor: tokens.muted,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+function SkeletonMatchRow({ tokens }) {
+  return (
+    <View
+      style={[
+        styles.matchRow,
+        {
+          borderColor: tokens.colors.border,
+          backgroundColor: tokens.colors.card,
+        },
+      ]}
+    >
+      <View style={[styles.matchAccent, { backgroundColor: tokens.muted }]} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <SkeletonBlock tokens={tokens} width="70%" height={14} />
+        <SkeletonBlock tokens={tokens} width="55%" height={14} />
+        <SkeletonBlock
+          tokens={tokens}
+          width={90}
+          height={18}
+          radius={10}
+          style={{ marginTop: 2 }}
+        />
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 12,
+            marginTop: 4,
+          }}
+        >
+          <SkeletonBlock tokens={tokens} width={80} height={12} />
+          <SkeletonBlock tokens={tokens} width={70} height={12} />
+          <SkeletonBlock tokens={tokens} width={60} height={12} />
+        </View>
+      </View>
+      <View style={styles.chev}>
+        <SkeletonBlock tokens={tokens} width={16} height={16} radius={8} />
+      </View>
+    </View>
+  );
+}
+
+function SkeletonTournamentCard({ tokens }) {
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: tokens.colors.card,
+          borderColor: tokens.colors.border,
+          shadowColor: tokens.shadow,
+        },
+      ]}
+    >
+      {/* Banner skeleton */}
+      <View style={styles.bannerContainer}>
+        <SkeletonBlock tokens={tokens} width="100%" height="100%" radius={0} />
+      </View>
+
+      <View style={{ padding: 14, gap: 10 }}>
+        {/* Meta date + title */}
+        <SkeletonBlock tokens={tokens} width="70%" height={18} />
+        <SkeletonBlock tokens={tokens} width="45%" height={14} />
+
+        {/* Search skeleton */}
+        <SkeletonBlock
+          tokens={tokens}
+          width="100%"
+          height={36}
+          radius={12}
+          style={{ marginTop: 4 }}
+        />
+
+        {/* Filter chips */}
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          <SkeletonBlock tokens={tokens} width={90} height={26} radius={999} />
+          <SkeletonBlock tokens={tokens} width={100} height={26} radius={999} />
+          <SkeletonBlock tokens={tokens} width={96} height={26} radius={999} />
+        </View>
+
+        {/* A few match rows */}
+        <View style={{ gap: 10, marginTop: 8 }}>
+          <SkeletonMatchRow tokens={tokens} />
+          <SkeletonMatchRow tokens={tokens} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SkeletonHeader({ tokens }) {
+  return (
+    <View
+      style={[
+        styles.stickyHeader,
+        {
+          backgroundColor: tokens.colors.background,
+          borderBottomColor: tokens.colors.border,
+        },
+      ]}
+    >
+      <View style={styles.pageHeader}>
+        <SkeletonBlock
+          tokens={tokens}
+          width={140}
+          height={22}
+          radius={6}
+          style={{ marginBottom: 10, marginTop: 4 }}
+        />
+        <SkeletonBlock
+          tokens={tokens}
+          width="100%"
+          height={38}
+          radius={12}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonBlock tokens={tokens} width={160} height={14} radius={6} />
+      </View>
     </View>
   );
 }
@@ -1024,7 +1170,9 @@ export default function MyTournament() {
   );
 
   return (
-    <SafeAreaView style={{flex: 1}}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: tokens.colors.background }}
+    >
       <Stack.Screen
         options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
       />
@@ -1032,16 +1180,24 @@ export default function MyTournament() {
       {!isAuthed ? (
         <LoginPrompt tokens={tokens} />
       ) : isLoading ? (
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: tokens.colors.background,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <ActivityIndicator color={tokens.tint} />
-        </View>
+        // 🔥 Skeleton loading
+        <FlatList
+          data={[1, 2, 3]}
+          keyExtractor={(i) => String(i)}
+          renderItem={() => <SkeletonTournamentCard tokens={tokens} />}
+          contentContainerStyle={[
+            styles.screen,
+            {
+              backgroundColor: tokens.colors.background,
+              paddingBottom: (insets?.bottom ?? 0) + 28,
+            },
+          ]}
+          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+          ListHeaderComponent={<SkeletonHeader tokens={tokens} />}
+          ListFooterComponent={
+            <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
+          }
+        />
       ) : (
         <FlatList
           data={tournaments}
@@ -1153,7 +1309,11 @@ const styles = StyleSheet.create({
   },
   bannerTitle: {
     fontSize: 18,
-    fontWeight: Platform.select({ ios: "800", android: "700", default: "700" }),
+    fontWeight: Platform.select({
+      ios: "800",
+      android: "700",
+      default: "700",
+    }),
   },
   statusTag: {
     paddingHorizontal: 10,
@@ -1186,7 +1346,11 @@ const styles = StyleSheet.create({
 
   team: {
     fontSize: 15,
-    fontWeight: Platform.select({ ios: "700", android: "700", default: "700" }),
+    fontWeight: Platform.select({
+      ios: "700",
+      android: "700",
+      default: "700",
+    }),
   },
   matchRow: {
     borderWidth: 1,
@@ -1255,7 +1419,11 @@ const styles = StyleSheet.create({
   },
   loginTitle: {
     fontSize: 18,
-    fontWeight: Platform.select({ ios: "800", android: "700", default: "800" }),
+    fontWeight: Platform.select({
+      ios: "800",
+      android: "700",
+      default: "800",
+    }),
     textAlign: "center",
   },
   loginBtn: {

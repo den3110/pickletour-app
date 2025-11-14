@@ -6,7 +6,7 @@ export const scheduleApiSlice = apiSlice.injectEndpoints({
     // Get full schedule
     getMySchedule: builder.query({
       query: ({ startDate, endDate, timezone, status, tournamentId } = {}) => ({
-        url: "/schedule/my-matches",
+        url: "/api/schedule/my-matches",
         params: { startDate, endDate, timezone, status, tournamentId },
       }),
       transformResponse: (response) => response.data,
@@ -16,7 +16,7 @@ export const scheduleApiSlice = apiSlice.injectEndpoints({
     // Get matches by specific date
     getMatchesByDate: builder.query({
       query: ({ date, timezone } = {}) => ({
-        url: `/schedule/date/${date}`,
+        url: `/api/schedule/date/${date}`,
         params: { timezone },
       }),
       transformResponse: (response) => response.data,
@@ -28,7 +28,7 @@ export const scheduleApiSlice = apiSlice.injectEndpoints({
     // Get upcoming matches
     getUpcomingMatches: builder.query({
       query: ({ days = 7, timezone } = {}) => ({
-        url: "/schedule/upcoming",
+        url: "/api/schedule/upcoming",
         params: { days, timezone },
       }),
       transformResponse: (response) => response.data,
@@ -38,7 +38,7 @@ export const scheduleApiSlice = apiSlice.injectEndpoints({
     // Get marked dates for calendar
     getMarkedDates: builder.query({
       query: ({ month, timezone } = {}) => ({
-        url: "/schedule/marked-dates",
+        url: "/api/schedule/marked-dates",
         params: { month, timezone },
       }),
       transformResponse: (response) => response.data,

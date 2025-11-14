@@ -12,7 +12,7 @@ import { Picker } from "@react-native-picker/picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { Image as ExpoImage } from "expo-image";
+import { Image as ExpoImage, Image } from "expo-image";
 import { router, Stack } from "expo-router";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -37,7 +37,10 @@ import {
 import ImageView from "react-native-image-viewing";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { logout as logoutAction } from "@/slices/authSlice";
 import {
@@ -171,16 +174,20 @@ function XImage({
   transition = 150,
   recyclingKey,
 }) {
-  const isRemote = isRemoteUri(uri);
+  const isRemote = isRemoteUri(uri); // http/https ?
   const safeUri = uri ? String(uri).replace(/\\/g, "/") : undefined;
+
+  // Remote thì mới normalize về API/CDN, local thì giữ nguyên file://
+  const finalUri = normalizeUrl(safeUri);
+
   return (
     <ExpoImage
-      source={safeUri ? { uri: normalizeUrl(safeUri) } : undefined}
+      source={finalUri ? { uri: finalUri } : undefined}
       style={style}
       contentFit={contentFit}
       cachePolicy={isRemote ? cacheRemote : "none"}
       transition={isRemote ? transition : 0}
-      recyclingKey={recyclingKey || safeUri || Math.random().toString(36)}
+      recyclingKey={recyclingKey || finalUri || Math.random().toString(36)}
     />
   );
 }
@@ -281,6 +288,22 @@ function useTokens() {
     subtext: dark ? "#c9c9c9" : "#555",
     skeletonBase: dark ? "#22262c" : "#e9eef5",
   };
+}
+
+function Skeleton({ width, height, borderRadius = 8, color, style }) {
+  return (
+    <View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: color || "#e5e7eb",
+        },
+        style,
+      ]}
+    />
+  );
 }
 
 export default function ProfileScreen({ isBack = false }) {
@@ -751,25 +774,165 @@ export default function ProfileScreen({ isBack = false }) {
 
   const avatarUrl = normalizeUrl(form.avatar) || "";
   const coverUrl = normalizeUrl(form.cover) || "";
-  // ===== Render gate =====
 
+  // ===== Render gate: Skeleton khi đang tải =====
   if (fetching || !user) {
+    const skColor = t.skeletonBase;
+    const skCardStyle = [
+      styles.card,
+      { backgroundColor: t.colors.card, borderColor: t.colors.border },
+    ];
+
     return (
       <>
         <Stack.Screen
           options={{ title: "Profile", headerTitleAlign: "center" }}
         />
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <Text>Đang tải…</Text>
+        <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={{
+              paddingBottom: insets.bottom + 20,
+            }}
+          >
+            {/* Header skeleton: cover + avatar + name + chips */}
+            <View
+              style={[
+                styles.headerWrap,
+                {
+                  backgroundColor: t.colors.card,
+                  borderColor: t.colors.border,
+                },
+              ]}
+            >
+              {/* Cover */}
+              <View style={[styles.cover, { backgroundColor: t.muted }]} />
+
+              <View style={styles.headerBottom}>
+                {/* Avatar */}
+                <View style={styles.avatarStack}>
+                  <View
+                    style={[
+                      styles.avatarWrap,
+                      {
+                        borderColor: t.colors.card,
+                        backgroundColor: t.colors.card,
+                      },
+                    ]}
+                  >
+                    <Skeleton
+                      width={AVATAR_SIZE - 4}
+                      height={AVATAR_SIZE - 4}
+                      borderRadius={(AVATAR_SIZE - 4) / 2}
+                      color={skColor}
+                    />
+                  </View>
+                </View>
+
+                {/* Name + nickname */}
+                <View style={{ alignItems: "center", marginTop: 8 }}>
+                  <Skeleton
+                    width={160}
+                    height={18}
+                    borderRadius={9}
+                    color={skColor}
+                  />
+                  <View style={{ height: 8 }} />
+                  <Skeleton
+                    width={100}
+                    height={14}
+                    borderRadius={7}
+                    color={skColor}
+                  />
+                </View>
+
+                {/* Chips row */}
+                <View style={{ height: 32, marginTop: 12 }}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                      alignItems: "center",
+                      paddingHorizontal: 16,
+                    }}
+                  >
+                    <Skeleton
+                      width={110}
+                      height={26}
+                      borderRadius={999}
+                      color={skColor}
+                    />
+                    <View style={{ width: 8 }} />
+                    <Skeleton
+                      width={150}
+                      height={26}
+                      borderRadius={999}
+                      color={skColor}
+                    />
+                    <View style={{ width: 8 }} />
+                    <Skeleton
+                      width={150}
+                      height={26}
+                      borderRadius={999}
+                      color={skColor}
+                    />
+                  </ScrollView>
+                </View>
+              </View>
+            </View>
+
+            {/* TabBar skeleton */}
+            <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+              <Skeleton
+                width="100%"
+                height={40}
+                borderRadius={12}
+                color={skColor}
+              />
+            </View>
+
+            {/* Body cards skeleton */}
+            <View style={{ padding: 16, gap: 12 }}>
+              {[1, 2, 3].map((k) => (
+                <View key={k} style={skCardStyle}>
+                  <Skeleton
+                    width={140}
+                    height={16}
+                    borderRadius={8}
+                    color={skColor}
+                  />
+                  <View style={{ height: 12 }} />
+                  <Skeleton
+                    width="100%"
+                    height={12}
+                    borderRadius={6}
+                    color={skColor}
+                  />
+                  <View style={{ height: 6 }} />
+                  <Skeleton
+                    width="80%"
+                    height={12}
+                    borderRadius={6}
+                    color={skColor}
+                  />
+                  <View style={{ height: 6 }} />
+                  <Skeleton
+                    width="60%"
+                    height={12}
+                    borderRadius={6}
+                    color={skColor}
+                  />
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       </>
     );
   }
 
   return (
-    <>
+    <SafeAreaView style={{ flex: 1 }}>
       {/* <Stack.Screen
         options={{ title: "Profile", headerTitleAlign: "center" }}
       /> */}
@@ -809,7 +972,7 @@ export default function ProfileScreen({ isBack = false }) {
                 >
                   <XImage
                     uri={
-                      coverUrl ||
+                      normalizeUrl(coverUrl) ||
                       "https://dummyimage.com/1200x400/ced4da/ffffff&text="
                     }
                     contentFit="cover"
@@ -876,7 +1039,7 @@ export default function ProfileScreen({ isBack = false }) {
                     >
                       <XImage
                         uri={
-                          avatarUrl ||
+                          normalizeUrl(avatarUrl) ||
                           "https://dummyimage.com/160x160/cccccc/ffffff&text=?"
                         }
                         contentFit="cover"
@@ -1513,10 +1676,10 @@ export default function ProfileScreen({ isBack = false }) {
             <Text style={[styles.modalTitle, { color: textPrimary }]}>
               Xác nhận ảnh đại diện
             </Text>
-
+            {/* {console.log(avatarTemp)} */}
             {!!avatarTemp?.uri && (
-              <XImage
-                uri={avatarTemp.uri}
+              <Image
+                source={{ uri: avatarTemp.uri }}
                 contentFit="cover"
                 style={{
                   width: AVATAR_SIZE * 2,
@@ -1643,8 +1806,8 @@ export default function ProfileScreen({ isBack = false }) {
             </Text>
 
             {!!coverTemp?.uri && (
-              <XImage
-                uri={coverTemp.uri}
+              <Image
+                source={{ uri: coverTemp.uri }}
                 contentFit="cover"
                 style={{
                   width: "100%",
@@ -1887,7 +2050,7 @@ export default function ProfileScreen({ isBack = false }) {
           </View>
         </View>
       </Modal>
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -2362,8 +2525,8 @@ function PickBox({ label, file, onPick, border, muted, textSecondary }) {
         >
           {hasImg ? (
             <>
-              <XImage
-                uri={file.uri}
+              <Image
+                source={{ uri: file.uri }}
                 contentFit="cover"
                 style={sx.img}
                 transition={100}
@@ -2453,8 +2616,8 @@ function PreviewBox({
           disabled={!onPress}
           style={({ pressed }) => [{ opacity: pressed ? 0.96 : 1 }]}
         >
-          <XImage
-            uri={uri?.replace(/\\/g, "/")}
+          <Image
+            source={{ uri: normalizeUrl(uri?.replace(/\\/g, "/")) }}
             contentFit="contain"
             style={{ width: "100%", height: 120, borderRadius: 8 }}
             transition={150}

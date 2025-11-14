@@ -17,7 +17,7 @@ import {
   UIManager,
   Linking,
 } from "react-native";
-import { Calendar } from "react-native-calendars";
+import { Calendar, LocaleConfig } from "react-native-calendars";
 import { DateTime } from "luxon";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { router, Stack } from "expo-router";
@@ -30,6 +30,52 @@ import {
   useGetUpcomingMatchesQuery,
 } from "@/slices/scheduleApiSlice";
 import { useMatchCalendar } from "@/hooks/useMatchCalendar";
+import AuthGuard from "@/components/auth/AuthGuard";
+
+// ===== CALENDAR LOCALE (VIETNAMESE) =====
+LocaleConfig.locales["vi"] = {
+  monthNames: [
+    "Tháng 1",
+    "Tháng 2",
+    "Tháng 3",
+    "Tháng 4",
+    "Tháng 5",
+    "Tháng 6",
+    "Tháng 7",
+    "Tháng 8",
+    "Tháng 9",
+    "Tháng 10",
+    "Tháng 11",
+    "Tháng 12",
+  ],
+  monthNamesShort: [
+    "Thg 1",
+    "Thg 2",
+    "Thg 3",
+    "Thg 4",
+    "Thg 5",
+    "Thg 6",
+    "Thg 7",
+    "Thg 8",
+    "Thg 9",
+    "Thg 10",
+    "Thg 11",
+    "Thg 12",
+  ],
+  dayNames: [
+    "Chủ nhật",
+    "Thứ hai",
+    "Thứ ba",
+    "Thứ tư",
+    "Thứ năm",
+    "Thứ sáu",
+    "Thứ bảy",
+  ],
+  dayNamesShort: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+  today: "Hôm nay",
+};
+
+LocaleConfig.defaultLocale = "vi";
 
 // Enable LayoutAnimation for Android
 if (
@@ -95,6 +141,30 @@ interface DayData {
   hasMultipleBrackets: boolean;
 }
 
+const VI_WEEKDAYS = [
+  "Thứ hai",
+  "Thứ ba",
+  "Thứ tư",
+  "Thứ năm",
+  "Thứ sáu",
+  "Thứ bảy",
+  "Chủ nhật",
+];
+
+function formatSelectedDateVi(isoDate: string) {
+  if (!isoDate) return "";
+  const dt = DateTime.fromISO(isoDate);
+  if (!dt.isValid) return "";
+
+  const dayLabel = VI_WEEKDAYS[dt.weekday - 1]; // weekday: 1 = Mon ... 7 = Sun
+
+  // 20 tháng 11
+  const day = dt.toFormat("dd");
+  const month = dt.toFormat("MM");
+
+  return `${dayLabel}, ${day} tháng ${month}`;
+}
+
 // ============= MAIN COMPONENT =============
 export default function MatchScheduleScreen() {
   const [selectedDate, setSelectedDate] = useState(
@@ -119,6 +189,7 @@ export default function MatchScheduleScreen() {
     openCalendarApp,
     checkPermission,
     requestPermission,
+    removeFromCalendar,
   } = useMatchCalendar();
 
   // Queries
@@ -327,9 +398,9 @@ export default function MatchScheduleScreen() {
     if (granted) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        "✅ Đã cấp quyền!",
+        "Đã cấp quyền!",
         "Bạn có thể thêm trận đấu vào lịch hệ thống ngay bây giờ.",
-        [{ text: "Tuyệt vời!" }]
+        [{ text: "Đóng" }]
       );
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -351,7 +422,7 @@ export default function MatchScheduleScreen() {
   }, [requestPermission]);
 
   return (
-    <>
+    <AuthGuard>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
@@ -376,7 +447,10 @@ export default function MatchScheduleScreen() {
                 <View>
                   <Text style={styles.headerTitle}>Lịch Thi Đấu</Text>
                   <Text style={styles.headerSubtitle}>
-                    {DateTime.fromISO(currentMonth).toFormat("MMMM yyyy")}
+                    Tháng{" "}
+                    {DateTime.fromISO(currentMonth)
+                      .setLocale("vi")
+                      .toFormat("MM yyyy")}
                   </Text>
                 </View>
                 <View style={styles.headerActions}>
@@ -500,6 +574,8 @@ export default function MatchScheduleScreen() {
                     theme={calendarTheme}
                     enableSwipeMonths
                     hideExtraDays={false}
+                    monthFormat={"MMMM yyyy"} // dùng monthNames tiếng Việt
+                    firstDay={1} // tuỳ, cho tuần bắt đầu từ Thứ 2
                     style={styles.calendar}
                   />
                 </View>
@@ -510,9 +586,7 @@ export default function MatchScheduleScreen() {
                     <View style={styles.sectionTitleRow}>
                       <Icon name="calendar-today" size={22} color="#1F2937" />
                       <Text style={styles.sectionTitle}>
-                        {DateTime.fromISO(selectedDate).toFormat(
-                          "cccc, dd MMMM"
-                        )}
+                        {formatSelectedDateVi(selectedDate)}
                       </Text>
                     </View>
                     {selectedDateMatches.length > 0 && (
@@ -542,11 +616,16 @@ export default function MatchScheduleScreen() {
                           Haptics.impactAsync(
                             Haptics.ImpactFeedbackStyle.Light
                           );
-                          router.push(`/match/${match._id}`);
+                          router.push({
+                            pathname: `/match/${match._id}/home`,
+                            params: { isBack: true },
+                          });
                         }}
                         onAddToCalendar={addToCalendar}
                         checkInCalendar={checkInCalendar}
                         hasCalendarPermission={hasCalendarPermission}
+                        openCalendarApp={openCalendarApp}
+                        onRemoveFromCalendar={removeFromCalendar}
                       />
                     ))
                   )}
@@ -571,11 +650,16 @@ export default function MatchScheduleScreen() {
                       dayIndex={dayIndex}
                       onMatchPress={(matchId: string) => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        router.push(`/match/${matchId}`);
+                        router.push({
+                          pathname: `/match/${matchId}/home`,
+                          params: { isBack: true },
+                        });
                       }}
                       onAddToCalendar={addToCalendar}
                       checkInCalendar={checkInCalendar}
                       hasCalendarPermission={hasCalendarPermission}
+                      openCalendarApp={openCalendarApp}
+                      onRemoveFromCalendar={removeFromCalendar}
                     />
                   ))
                 )}
@@ -612,7 +696,10 @@ export default function MatchScheduleScreen() {
                           Haptics.impactAsync(
                             Haptics.ImpactFeedbackStyle.Light
                           );
-                          router.push(`/match/${match._id}`);
+                          router.push({
+                            pathname: `/match/${match._id}/home`,
+                            params: { isBack: true },
+                          });
                         }}
                       />
                     ))}
@@ -648,7 +735,7 @@ export default function MatchScheduleScreen() {
           />
         )}
       </View>
-    </>
+    </AuthGuard>
   );
 }
 
@@ -671,11 +758,13 @@ const EnhancedMatchCard = ({
   onAddToCalendar,
   checkInCalendar,
   hasCalendarPermission,
+  openCalendarApp, // 👈 thêm prop này
+  onRemoveFromCalendar,
 }: any) => {
   const [inCalendar, setInCalendar] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const scaleAnim = useState(new Animated.Value(0))[0];
-
   useEffect(() => {
     // Entrance animation
     Animated.spring(scaleAnim, {
@@ -694,9 +783,26 @@ const EnhancedMatchCard = ({
     setInCalendar(status);
   };
 
-  const handleAddToCalendar = async () => {
+  const handleCalendarPress = async () => {
     if (isAdding) return;
 
+    // Nếu đã nằm trong lịch rồi -> mở Calendar đúng giờ trận
+    if (inCalendar) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      if (openCalendarApp) {
+        const targetDate = new Date(match.scheduledAt);
+        try {
+          await openCalendarApp(targetDate);
+        } catch (e) {
+          console.log("openCalendarApp error:", e);
+        }
+      }
+
+      return;
+    }
+
+    // Chưa trong lịch -> thêm rồi mở Calendar
     setIsAdding(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -704,9 +810,38 @@ const EnhancedMatchCard = ({
     if (success) {
       setInCalendar(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (openCalendarApp) {
+        const targetDate = new Date(match.scheduledAt);
+        try {
+          await openCalendarApp(targetDate);
+        } catch (e) {
+          console.log("openCalendarApp error:", e);
+        }
+      }
     }
 
     setIsAdding(false);
+  };
+
+  const handleRemoveFromCalendar = async () => {
+    if (!onRemoveFromCalendar || isRemoving) return;
+
+    setIsRemoving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const ok = await onRemoveFromCalendar(match?._id);
+      if (ok) {
+        setInCalendar(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      console.log("removeFromCalendar error:", e);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+
+    setIsRemoving(false);
   };
 
   const status = getStatusConfig(match.status);
@@ -820,35 +955,54 @@ const EnhancedMatchCard = ({
 
             {/* Calendar button */}
             {match.isUpcoming && hasCalendarPermission && (
-              <TouchableOpacity
-                style={[
-                  styles.calendarBtn,
-                  inCalendar && styles.calendarBtnActive,
-                ]}
-                onPress={handleAddToCalendar}
-                disabled={isAdding || inCalendar}
-                activeOpacity={0.7}
-              >
-                {isAdding ? (
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                ) : (
-                  <>
-                    <Icon
-                      name={inCalendar ? "calendar-check" : "calendar-plus"}
-                      size={16}
-                      color={inCalendar ? "#10B981" : "#3B82F6"}
-                    />
-                    <Text
-                      style={[
-                        styles.calendarBtnText,
-                        inCalendar && styles.calendarBtnTextActive,
-                      ]}
-                    >
-                      {inCalendar ? "Trong lịch" : "Thêm lịch"}
-                    </Text>
-                  </>
+              <View style={styles.calendarActions}>
+                {/* Nút thêm / mở lịch */}
+                <TouchableOpacity
+                  style={[
+                    styles.calendarBtn,
+                    inCalendar && styles.calendarBtnActive,
+                  ]}
+                  onPress={handleCalendarPress}
+                  disabled={isAdding || isRemoving}
+                  activeOpacity={0.7}
+                >
+                  {isAdding ? (
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                  ) : (
+                    <>
+                      <Icon
+                        name={inCalendar ? "calendar-check" : "calendar-plus"}
+                        size={16}
+                        color={inCalendar ? "#10B981" : "#3B82F6"}
+                      />
+                      <Text
+                        style={[
+                          styles.calendarBtnText,
+                          inCalendar && styles.calendarBtnTextActive,
+                        ]}
+                      >
+                        {inCalendar ? "Trong lịch" : "Thêm lịch"}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Nút xoá đặt lịch (icon-only) */}
+                {inCalendar && onRemoveFromCalendar && (
+                  <TouchableOpacity
+                    style={styles.calendarDeleteBtn}
+                    onPress={handleRemoveFromCalendar}
+                    disabled={isRemoving}
+                    activeOpacity={0.7}
+                  >
+                    {isRemoving ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <Icon name="calendar-remove" size={18} color="#EF4444" />
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -955,10 +1109,17 @@ const DaySection = ({
   onAddToCalendar,
   checkInCalendar,
   hasCalendarPermission,
+  openCalendarApp,
+  onRemoveFromCalendar,
 }: any) => {
   const isToday = dayData.date === DateTime.now().toISODate();
   const fadeAnim = useState(new Animated.Value(0))[0];
-
+  const dt = DateTime.fromISO(dayData.date);
+  const weekdayLabel =
+    dt.isValid && dt.weekday >= 1 && dt.weekday <= 7
+      ? VI_WEEKDAYS[dt.weekday - 1]
+      : dayData.date;
+  const monthLabel = dt.isValid ? `Thg ${dt.toFormat("M")}` : "";
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -975,15 +1136,15 @@ const DaySection = ({
         <View style={styles.dayHeaderLeft}>
           <View style={[styles.dayBadge, isToday && styles.dayBadgeToday]}>
             <Text style={[styles.dayNumber, isToday && styles.dayNumberToday]}>
-              {DateTime.fromISO(dayData.date).toFormat("dd")}
+              {dt.toFormat("dd")}
             </Text>
             <Text style={[styles.dayMonth, isToday && styles.dayMonthToday]}>
-              {DateTime.fromISO(dayData.date).toFormat("MMM")}
+              {monthLabel}
             </Text>
           </View>
           <View style={styles.dayInfo}>
             <Text style={[styles.dayTitle, isToday && styles.dayTitleToday]}>
-              {DateTime.fromISO(dayData.date).toFormat("cccc")}
+              {weekdayLabel}
               {isToday && " • Hôm nay"}
             </Text>
             <Text style={styles.daySubtitle} numberOfLines={1}>
@@ -1006,6 +1167,8 @@ const DaySection = ({
           onAddToCalendar={onAddToCalendar}
           checkInCalendar={checkInCalendar}
           hasCalendarPermission={hasCalendarPermission}
+          openCalendarApp={openCalendarApp}
+          onRemoveFromCalendar={onRemoveFromCalendar}
         />
       ))}
     </Animated.View>
@@ -1989,5 +2152,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#FFF",
+  },
+  calendarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  calendarDeleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

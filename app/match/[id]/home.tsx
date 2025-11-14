@@ -89,7 +89,7 @@ function buildVsTitle(m: any): string {
 
 /* ---------- page ---------- */
 export default function MatchHomePage() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, isBack } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const T = useThemeTokens();
@@ -165,7 +165,13 @@ export default function MatchHomePage() {
           headerTintColor: T.text,
           headerLeft: () => (
             <Pressable
-              onPress={() => router.replace("/(tabs)")}
+              onPress={() => {
+                if (isBack) {
+                  router.back();
+                } else {
+                  router.replace("/(tabs)");
+                }
+              }}
               hitSlop={12}
               style={{ paddingHorizontal: 6, paddingVertical: 4 }}
             >

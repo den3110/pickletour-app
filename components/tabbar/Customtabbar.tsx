@@ -16,6 +16,7 @@ import Animated, {
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TAB_BAR_HEIGHT = 65;
@@ -33,20 +34,22 @@ export function CustomTabBar({
   navigation,
   isDark,
 }: CustomTabBarProps) {
-  // 🔥 Filter out tabs có href: null - QUAN TRỌNG để không còn khoảng trống!
+  const insets = useSafeAreaInsets();
+
+  // 🔧 Quan trọng: chỉ Android mới bị nav bar đè → dùng safe area cho Android
+  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
+
   const visibleRoutes = state.routes.filter((route) => {
     const { options } = descriptors[route.key];
     return options.href !== null;
   });
 
-  // 🎯 Tìm index của tab "rankings" (BXH) trong visibleRoutes - đây luôn là floating button
   const floatingButtonIndex = visibleRoutes.findIndex(
     (route) => route.name === "rankings"
   );
 
   const renderTabButton = (route: any, visibleIndex: number) => {
     const { options } = descriptors[route.key];
-    // Tìm original index trong state để check isFocused
     const originalIndex = state.routes.findIndex((r) => r.key === route.key);
     const isFocused = state.index === originalIndex;
 
@@ -89,7 +92,7 @@ export function CustomTabBar({
       });
     };
 
-    // 🌟 FLOATING BUTTON - Luôn là tab "rankings" (BXH)
+    // FLOATING BUTTON (rankings)
     if (visibleIndex === floatingButtonIndex) {
       return (
         <View key={route.key} style={styles.floatingContainer}>
@@ -103,7 +106,6 @@ export function CustomTabBar({
             activeOpacity={0.85}
           >
             <Animated.View style={[styles.floatingButton, animatedStyle]}>
-              {/* Outer ring for active state */}
               {isFocused && (
                 <View
                   style={[
@@ -117,7 +119,6 @@ export function CustomTabBar({
                 />
               )}
 
-              {/* Main button */}
               <View
                 style={[
                   styles.floatingButtonInner,
@@ -139,9 +140,8 @@ export function CustomTabBar({
                 })}
               </View>
 
-              {/* Small indicator dot when active */}
               {isFocused && (
-                <View style={styles.activeDotSmall}>
+                <View className="activeDotSmall">
                   <View
                     style={[
                       styles.activeDotInner,
@@ -158,7 +158,7 @@ export function CustomTabBar({
       );
     }
 
-    // Regular tab button
+    // Normal tab
     return (
       <TouchableOpacity
         key={route.key}
@@ -199,17 +199,28 @@ export function CustomTabBar({
     );
   };
 
-  // ✅ Transparent background - không còn background xấu
-  const bgColor = "transparent"; 
+  const bgColor = "transparent";
 
   return (
-    <View style={styles.wrapper}>
-      {/* Floating Button - render trước để nó ở trên cùng */}
+    <View
+      style={[
+        styles.wrapper,
+        {
+          // giữ nguyên chiều cao cũ
+          height: TAB_BAR_HEIGHT + CURVE_HEIGHT,
+          // 🔧 FIX CHÍNH: kéo cả tabbar lên khỏi thanh điều hướng Android
+          bottom: Platform.OS === "android" ? bottomInset : 0,
+        },
+      ]}
+    >
+      {/* Floating button ở trên cùng */}
       <View style={styles.floatingButtonAbsolute}>
         {visibleRoutes.map((route, visibleIndex) => {
           if (visibleIndex === floatingButtonIndex) {
             const { options } = descriptors[route.key];
-            const originalIndex = state.routes.findIndex((r) => r.key === route.key);
+            const originalIndex = state.routes.findIndex(
+              (r) => r.key === route.key
+            );
             const isFocused = state.index === originalIndex;
 
             const onPress = () => {
@@ -264,9 +275,8 @@ export function CustomTabBar({
         })}
       </View>
 
-      {/* Tab Bar với curved notch */}
+      {/* TabBar + curve */}
       <View style={styles.tabBarContainer}>
-        {/* Curved notch sử dụng absolute positioning */}
         <View style={styles.curveWrapper}>
           <Svg
             width={SCREEN_WIDTH}
@@ -278,9 +288,13 @@ export function CustomTabBar({
                 M 0,${CURVE_HEIGHT + 10}
                 L 0,${CURVE_HEIGHT}
                 L ${(SCREEN_WIDTH - CURVE_WIDTH) / 2},${CURVE_HEIGHT}
-                Q ${(SCREEN_WIDTH - CURVE_WIDTH) / 2},0 ${SCREEN_WIDTH / 2 - FLOATING_BUTTON_SIZE / 2 - 10},0
+                Q ${(SCREEN_WIDTH - CURVE_WIDTH) / 2},0 ${
+                SCREEN_WIDTH / 2 - FLOATING_BUTTON_SIZE / 2 - 10
+              },0
                 L ${SCREEN_WIDTH / 2 + FLOATING_BUTTON_SIZE / 2 + 10},0
-                Q ${(SCREEN_WIDTH + CURVE_WIDTH) / 2},0 ${(SCREEN_WIDTH + CURVE_WIDTH) / 2},${CURVE_HEIGHT}
+                Q ${(SCREEN_WIDTH + CURVE_WIDTH) / 2},0 ${
+                (SCREEN_WIDTH + CURVE_WIDTH) / 2
+              },${CURVE_HEIGHT}
                 L ${SCREEN_WIDTH},${CURVE_HEIGHT}
                 L ${SCREEN_WIDTH},${CURVE_HEIGHT + 10}
                 Z
@@ -302,11 +316,13 @@ export function CustomTabBar({
                 backgroundColor: isDark
                   ? "rgba(28, 28, 30, 0.85)"
                   : "rgba(255, 255, 255, 0.85)",
+                // 🔧 Dùng thêm inset cho padding bottom để icon không dính sát mép
+                paddingBottom:
+                  Platform.OS === "ios" ? 20 : Math.max(bottomInset, 8),
               },
             ]}
           >
             {visibleRoutes.map((route, visibleIndex) => {
-              // Skip floating button vì đã render ở trên
               if (visibleIndex === floatingButtonIndex) {
                 return <View key={route.key} style={styles.tabButton} />;
               }
@@ -322,10 +338,10 @@ export function CustomTabBar({
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    height: TAB_BAR_HEIGHT + CURVE_HEIGHT,
+    // ❌ bỏ bottom: 0, vì mình set bottom động trong component
+    // bottom: 0,
   },
   floatingButtonAbsolute: {
     position: "absolute",
@@ -393,7 +409,6 @@ const styles = StyleSheet.create({
   tabBarContent: {
     flexDirection: "row",
     height: TAB_BAR_HEIGHT,
-    paddingBottom: Platform.OS === "ios" ? 20 : 8,
     borderTopWidth: 0.5,
     borderTopColor: "rgba(0, 0, 0, 0.1)",
   },

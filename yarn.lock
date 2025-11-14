@@ -2337,6 +2337,11 @@ acorn@^8.15.0:
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.15.0.tgz#a360898bc415edaac46c8241f6383975b930b816"
   integrity sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==
 
+add@^2.0.6:
+  version "2.0.6"
+  resolved "https://registry.yarnpkg.com/add/-/add-2.0.6.tgz#248f0a9f6e5a528ef2295dbeec30532130ae2235"
+  integrity sha512-j5QzrmsokwWWp6kUcJQySpbG+xfOBqqKnup3OIk1pz+kB/80SLorZ9V8zHFLO92Lcd+hbvq8bT+zOGoPkmBV0Q==
+
 agent-base@^7.1.2:
   version "7.1.4"
   resolved "https://registry.yarnpkg.com/agent-base/-/agent-base-7.1.4.tgz#e3cd76d4c548ee895d3c3fd8dc1f6c5b9032e7a8"
@@ -3106,6 +3111,11 @@ cross-spawn@^7.0.3, cross-spawn@^7.0.6:
     shebang-command "^2.0.0"
     which "^2.0.1"
 
+crypto-js@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/crypto-js/-/crypto-js-4.2.0.tgz#4d931639ecdfd12ff80e8186dba6af2c2e856631"
+  integrity sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==
+
 crypto-random-string@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/crypto-random-string/-/crypto-random-string-2.0.0.tgz#ef2a7a966ec11083388369baa02ebead229b30d5"
@@ -3819,6 +3829,11 @@ event-target-shim@^5.0.0:
   resolved "https://registry.yarnpkg.com/event-target-shim/-/event-target-shim-5.0.1.tgz#5d4d3ebdf9583d63a5333ce2deb7480ab2b05789"
   integrity sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==
 
+events@^3.3.0:
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/events/-/events-3.3.0.tgz#31a95ad0a924e2d2c419a813aeb2c4e878ea7400"
+  integrity sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==
+
 exec-async@^2.2.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/exec-async/-/exec-async-2.2.0.tgz#c7c5ad2eef3478d38390c6dd3acfe8af0efc8301"
@@ -3936,6 +3951,11 @@ expo-image@~3.0.10:
   version "3.0.10"
   resolved "https://registry.yarnpkg.com/expo-image/-/expo-image-3.0.10.tgz#a589098c3688d76c6e238ae90e1efc06ac4902b0"
   integrity sha512-i4qNCEf9Ur7vDqdfDdFfWnNCAF2efDTdahuDy9iELPS2nzMKBLeeGA2KxYEPuRylGCS96Rwm+SOZJu6INc2ADQ==
+
+expo-intent-launcher@^13.0.7:
+  version "13.0.7"
+  resolved "https://registry.yarnpkg.com/expo-intent-launcher/-/expo-intent-launcher-13.0.7.tgz#c86488d47f8fba908a9dd0d1460a3ea06b0cefdc"
+  integrity sha512-4em7utK59gftgBwokpw+TQkyY27C5JH28LLrM/ZTABIsAMRUEqS+Inzd/xtN0hvxo2Z8aTsd+N1WRcCdOehYdg==
 
 expo-keep-awake@~15.0.7:
   version "15.0.7"
@@ -6550,6 +6570,13 @@ react-native-worklets@^0.5.1:
     convert-source-map "^2.0.0"
     semver "7.7.2"
 
+react-native-youtube-iframe@^2.4.1:
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/react-native-youtube-iframe/-/react-native-youtube-iframe-2.4.1.tgz#0117093ae7d0cd5b84f6748865bc04c9e1d12069"
+  integrity sha512-MIzVlQYp6sc/Z7b0YwluALd0UbACQ7vscpcVVTmcHvQ5ujN2f6LJdDFxI++xy7TUeJS73k8vBdlznb5bT/P/Gg==
+  dependencies:
+    events "^3.3.0"
+
 react-native@0.81.5:
   version "0.81.5"
   resolved "https://registry.yarnpkg.com/react-native/-/react-native-0.81.5.tgz#6c963f137d3979b22aef2d8482067775c8fe2fed"
@@ -8092,6 +8119,11 @@ yargs@^17.6.2:
     string-width "^4.2.3"
     y18n "^5.0.5"
     yargs-parser "^21.1.1"
+
+yarn@^1.22.22:
+  version "1.22.22"
+  resolved "https://registry.yarnpkg.com/yarn/-/yarn-1.22.22.tgz#ac34549e6aa8e7ead463a7407e1c7390f61a6610"
+  integrity sha512-prL3kGtyG7o9Z9Sv8IPfBNrWTDmXB4Qbes8A9rEzt6wkJV8mUvoirjU0Mp3GGAU06Y0XQyA3/2/RQFVuK7MTfg==
 
 yocto-queue@^0.1.0:
   version "0.1.0"

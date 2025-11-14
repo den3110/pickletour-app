@@ -416,23 +416,24 @@ export default function ClubCreateModal({
                 onPress={() => pickImage("logoUrl")}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 activeOpacity={0.9}
-                style={StyleSheet.absoluteFill}
-              />
-              {form.logoUrl ? (
-                <Image
-                  source={{ uri: normalizeUrl(form.logoUrl) }}
-                  style={styles.logoImg}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.logoPlaceholder}>
-                  <MaterialCommunityIcons
-                    name="camera-plus"
-                    size={20}
-                    color="#ffffffd0"
+                style={{ flex: 1 }}
+              >
+                {form.logoUrl ? (
+                  <Image
+                    source={{ uri: normalizeUrl(form.logoUrl) }}
+                    style={styles.logoImg}
+                    contentFit="cover"
                   />
-                </View>
-              )}
+                ) : (
+                  <View style={styles.logoPlaceholder}>
+                    <MaterialCommunityIcons
+                      name="camera-plus"
+                      size={20}
+                      color="#ffffffd0"
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
             </Animated.View>
           </View>
         </Animated.View>

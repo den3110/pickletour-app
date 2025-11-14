@@ -36,6 +36,7 @@ import { useDispatch } from "react-redux";
 import { useReauthQuery } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
+import ImageViewing from "react-native-image-viewing";
 /* ---------- Lottie asset ---------- */
 const BG_3D = require("@/assets/lottie/bg-3d.json");
 
@@ -90,11 +91,11 @@ const FEATURES = [
   },
   {
     id: 4,
-    icon: "people",
+    icon: "school", // 🔁 đổi icon cho hợp “Hướng dẫn”
     iconLib: "Ionicons",
-    title: "Đối thủ",
+    title: "Hướng dẫn", // 🔁 đổi tiêu đề
     color: "#FFA502",
-    link: "/development",
+    link: "/guide", // 🔁 trỏ sang màn mới
   },
   {
     id: 5,
@@ -451,6 +452,19 @@ function AthleteIsland() {
   const avatarUrl =
     normalizeUrl(userInfo?.avatar) || "https://i.pravatar.cc/150?img=12";
   const name = userInfo?.name || "Người dùng";
+  // console.log(userInfo?.role);
+  const roleUser = () => {
+    switch (userInfo?.role) {
+      case "user":
+        return "Vận động viên";
+      case "referee":
+        return "Trọng tài";
+      case "admin":
+        return "Admin";
+      default:
+        return "Khách";
+    }
+  };
   // 🆕 Trường hợp chưa đăng nhập
   if (!userInfo) {
     return (
@@ -523,7 +537,8 @@ function AthleteIsland() {
           <Text style={styles.athleteName} numberOfLines={1}>
             {name}
           </Text>
-          <Text style={styles.athleteTitle}>Vận động viên</Text>
+
+          <Text style={styles.athleteTitle}>{roleUser()}</Text>
         </TouchableOpacity>
 
         <LinearGradient
@@ -629,6 +644,17 @@ function TournamentCard({ tournament, theme }) {
   const subtext = isDark ? "#b0b0b0" : "#666666";
   const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
 
+  // 🔹 Nền cho image viewer theo theme
+  const viewerBackground = isDark
+    ? "rgba(0,0,0,0.98)"
+    : "rgba(255,255,255,0.98)";
+
+  const [imageVisible, setImageVisible] = useState(false);
+
+  const imageUri =
+    normalizeUrl(tournament.image) ||
+    "https://dummyimage.com/600x400/4ECDC4/ffffff&text=Tournament";
+
   return (
     <View
       style={[
@@ -636,17 +662,15 @@ function TournamentCard({ tournament, theme }) {
         { backgroundColor: bg, borderColor: border },
       ]}
     >
-      <TouchableOpacity
-        activeOpacity={0.95}
-        onPress={() => router.push(`/tournament/${tournament._id}`)}
-      >
-        <View style={styles.tournamentImageContainer}>
+      {/* ... phần card y như cũ ... */}
+      {/* Phần image: bấm vào chỉ mở viewer, KHÔNG điều hướng */}
+      <View style={styles.tournamentImageContainer}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setImageVisible(true)}
+        >
           <Image
-            source={{
-              uri:
-                normalizeUrl(tournament.image) ||
-                "https://dummyimage.com/600x400/4ECDC4/ffffff&text=Tournament",
-            }}
+            source={{ uri: imageUri }}
             style={styles.tournamentImage}
             contentFit="cover"
             transition={200}
@@ -655,10 +679,15 @@ function TournamentCard({ tournament, theme }) {
             colors={["transparent", "rgba(0,0,0,0.7)"]}
             style={styles.tournamentImageGradient}
           />
-
           <AnimatedStatusChip />
-        </View>
+        </TouchableOpacity>
+      </View>
 
+      {/* Phần info: bấm vào sẽ đi tới đăng ký */}
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={() => router.push(`/tournament/${tournament._id}/register`)}
+      >
         <View style={styles.tournamentInfo}>
           <Text
             style={[styles.tournamentName, { color: text }]}
@@ -704,6 +733,14 @@ function TournamentCard({ tournament, theme }) {
           <Text style={styles.registerButtonText}>Đăng ký giải đấu</Text>
         </AnimatedGradientButton>
       </View>
+      <ImageViewing
+        images={[{ uri: imageUri }]}
+        imageIndex={0}
+        visible={imageVisible}
+        onRequestClose={() => setImageVisible(false)}
+        swipeToCloseEnabled
+        backgroundColor={viewerBackground} // ✅ nền theo theme
+      />
     </View>
   );
 }
@@ -1431,7 +1468,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "transparent",
   },
 
   avatarBorder: {

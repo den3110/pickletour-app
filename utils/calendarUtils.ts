@@ -4,10 +4,11 @@ import { Platform, Alert, Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ===== CONSTANTS =====
-const CALENDAR_NAME = "Pickleball Matches";
+const CALENDAR_NAME = "Trận đấu Pickletour";
 const CALENDAR_COLOR = "#3B82F6";
 const STORAGE_KEY = "pickleballCalendarId";
-
+// ✨ THÊM HẰNG SỐ NÀY NGAY DƯỚI
+const APPLE_EPOCH_MS = new Date("2001-01-01T00:00:00Z").getTime();
 // ===== TYPES =====
 export interface Match {
   _id: string;
@@ -31,6 +32,10 @@ export interface CalendarEventDetails {
   location?: string;
   notes?: string;
   alarms?: Array<{ relativeOffset: number }>; // minutes before event
+}
+
+function dateToCalshowSeconds(date: Date) {
+  return Math.floor((date.getTime() - APPLE_EPOCH_MS) / 1000);
 }
 
 // ===== PERMISSION =====
@@ -349,27 +354,46 @@ export async function isMatchInCalendar(matchId: string): Promise<boolean> {
 // ===== OPEN CALENDAR APP =====
 export async function openCalendarApp(matchId?: string): Promise<void> {
   try {
+    let targetDate: Date | null = null;
+
+    // Nếu có matchId -> cố gắng lấy event và dùng startDate của event
     if (matchId) {
       const eventId = await getMatchEventId(matchId);
       if (eventId) {
-        // Open specific event (iOS only)
-        if (Platform.OS === "ios") {
-          const url = `calshow:${eventId}`;
-          const canOpen = await Linking.canOpenURL(url);
-          if (canOpen) {
-            await Linking.openURL(url);
-            return;
+        try {
+          const event = await Calendar.getEventAsync(eventId);
+          if (event?.startDate) {
+            targetDate = new Date(event.startDate as any);
           }
+        } catch (e) {
+          console.warn("⚠️ Cannot get event by id, fallback to today:", e);
         }
       }
     }
 
-    // Open calendar app (general)
+    // Nếu không lấy được gì, dùng ngày hôm nay
+    if (!targetDate) {
+      targetDate = new Date();
+    }
+
     if (Platform.OS === "ios") {
-      await Linking.openURL("calshow://");
+      // iOS: calshow:<secondsSince2001>
+      const seconds = dateToCalshowSeconds(targetDate);
+      const url = `calshow:${seconds}`;
+
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        return;
+      }
+
+      // Fallback: chỉ mở app Calendar
+      await Linking.openURL("calshow:");
     } else {
-      // Android - open default calendar
-      await Linking.openURL("content://com.android.calendar/time/");
+      // Android: content://com.android.calendar/time/<millisSince1970>
+      const millis = targetDate.getTime();
+      const url = `content://com.android.calendar/time/${millis}`;
+      await Linking.openURL(url);
     }
   } catch (error) {
     console.error("Open calendar app error:", error);

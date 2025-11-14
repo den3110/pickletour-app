@@ -6,6 +6,7 @@ import {
   StyleSheet,
   useColorScheme,
   AccessibilityState,
+  Platform,
 } from "react-native";
 
 type Props = {
@@ -186,7 +187,7 @@ export default function PaginationRN({
     ]
   );
 
-  const sz = size === "sm" ? 32 : 38;
+  const sz = size === "sm" ? 32 : (Platform.OS === "android" ? 40 : 38);
 
   return (
     <View style={[styles.root]}>

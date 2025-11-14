@@ -72,7 +72,6 @@ const overlayUrlForMatch = (mid?: string | null): string | null => {
     isactivebreak: "1",
     slimit: "12",
   });
-
   return `${baseUrl}/overlay/score?${params}`;
 };
 /* ====== DEBUG ====== */

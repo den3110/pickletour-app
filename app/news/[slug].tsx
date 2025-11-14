@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
-  Linking,
   useWindowDimensions,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
@@ -18,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import RenderHTML from "react-native-render-html";
 import { useGetNewsDetailQuery } from "@/slices/newsApiSlice";
+import { openInApp } from "@/utils/openInApp"; // ⬅️ dùng in-app browser
 
 const FALLBACK_IMG =
   "https://dummyimage.com/800x450/A29BFE/ffffff&text=Pickleball+News";
@@ -37,16 +37,14 @@ function formatDate(d) {
 }
 
 function normalizeNewlines(s = "") {
-  // Dùng khi phải fallback qua contentText
   let x = String(s).replace(/\r\n?/g, "\n").replace(/\\n/g, "\n");
   return x.replace(/\n{3,}/g, "\n\n");
 }
 
-const openUrl = (url) => {
+// Wrapper để mở link trong in-app browser
+const openUrl = (url, title = "") => {
   if (!url) return;
-  Linking.canOpenURL(url)
-    .then((ok) => ok && Linking.openURL(url))
-    .catch(() => {});
+  openInApp(url, { title });
 };
 
 /* ========== Screen ========== */
@@ -91,13 +89,11 @@ export default function NewsDetailScreen() {
   }, [article]);
 
   const plainText = useMemo(() => {
-    // Fallback khi không có HTML
     return article?.contentText ? normalizeNewlines(article.contentText) : "";
   }, [article]);
 
   const htmlSource = useMemo(() => {
     if (article?.contentHtml) {
-      // Có thể lọc bỏ script/style nếu cần:
       const cleaned = String(article.contentHtml)
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
@@ -152,7 +148,7 @@ export default function NewsDetailScreen() {
                 ) : null}
                 {article?.sourceUrl ? (
                   <TouchableOpacity
-                    onPress={() => openUrl(article.sourceUrl)}
+                    onPress={() => openUrl(article.sourceUrl, article.title)}
                     style={styles.headerRightIconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
@@ -260,7 +256,7 @@ export default function NewsDetailScreen() {
               {htmlSource ? (
                 <RenderHTML
                   source={htmlSource}
-                  contentWidth={screenWidth - 32} // 16px padding 2 bên
+                  contentWidth={screenWidth - 32}
                   defaultTextProps={{
                     selectable: false,
                     allowFontScaling: true,
@@ -326,7 +322,7 @@ export default function NewsDetailScreen() {
             {article.sourceUrl && (
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => openUrl(article.sourceUrl)}
+                onPress={() => openUrl(article.sourceUrl, article.title)}
                 style={styles.originBtnWrapper}
               >
                 <LinearGradient
@@ -350,12 +346,8 @@ export default function NewsDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   heroWrap: {
     height: 220,
     borderBottomLeftRadius: 18,
@@ -363,10 +355,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 12,
   },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-  },
+  heroImage: { width: "100%", height: "100%" },
   heroOverlay: {
     position: "absolute",
     bottom: 0,
@@ -374,12 +363,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 90,
   },
-  heroTitleWrap: {
-    position: "absolute",
-    bottom: 14,
-    left: 16,
-    right: 16,
-  },
+  heroTitleWrap: { position: "absolute", bottom: 14, left: 16, right: 16 },
   heroTitle: {
     fontSize: 20,
     fontWeight: "900",
@@ -388,20 +372,9 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
-  metaWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
-    gap: 2,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-  },
+  metaWrap: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, gap: 2 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  metaText: { fontSize: 12 },
   tagsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -415,23 +388,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(162,155,254,0.18)",
   },
-  tagText: {
-    fontSize: 11,
-    color: "#A29BFE",
-    fontWeight: "600",
-  },
-  contentWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-  },
-  contentText: {
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  originBtnWrapper: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-  },
+  tagText: { fontSize: 11, color: "#A29BFE", fontWeight: "600" },
+  contentWrap: { paddingHorizontal: 16, paddingTop: 4 },
+  contentText: { fontSize: 14, lineHeight: 22 },
+  originBtnWrapper: { marginTop: 16, paddingHorizontal: 16 },
   originBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -440,11 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
   },
-  originBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  originBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
   center: {
     flex: 1,
     alignItems: "center",
@@ -452,14 +408,8 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 24,
   },
-  loadingText: {
-    fontSize: 13,
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#ff4d4f",
-    textAlign: "center",
-  },
+  loadingText: { fontSize: 13 },
+  errorText: { fontSize: 14, color: "#ff4d4f", textAlign: "center" },
   retryBtn: {
     marginTop: 4,
     paddingHorizontal: 14,
@@ -467,10 +417,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "#A29BFE",
   },
-  retryText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
+  retryText: { color: "#fff", fontWeight: "600" },
 
   // Header
   newsBackBtn: {

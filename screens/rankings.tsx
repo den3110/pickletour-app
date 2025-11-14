@@ -26,7 +26,6 @@ import {
   Platform,
   ScrollView,
   useColorScheme,
-  SafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
@@ -44,6 +43,7 @@ import PaginationRN from "@/components/PaginationRN";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { usePlatform } from "@/hooks/usePlatform";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 /* ================= Consts ================= */
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";

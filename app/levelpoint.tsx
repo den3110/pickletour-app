@@ -1,4 +1,5 @@
 // app/screens/LevelPointScreen.jsx
+import AuthGuard from "@/components/auth/AuthGuard";
 import {
   useCreateAssessmentMutation,
   useGetLatestAssessmentQuery,
@@ -406,183 +407,190 @@ export default function LevelPointScreen({ userId: userIdProp }) {
   const disabledBg = T.scheme === "dark" ? "#334155" : "#9aa0a6";
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.canvasBg }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-          keyboardShouldPersistTaps="handled"
+    <AuthGuard>
+      <View style={{ flex: 1, backgroundColor: T.canvasBg }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: T.textPrimary }]}>
-              Bảng tự đánh giá trình Pickleball
-            </Text>
-            {!!latestChipText && (
-              <Pill
-                label={latestChipText}
-                bg={latestError ? "#fee2e2" : T.chipBg}
-                fg={latestError ? "#991b1b" : T.chipFg}
-              />
-            )}
-          </View>
-
-          {/* (tuỳ chọn) Legend */}
-          {/* <Legend palette={{ tint: T.tint, success: T.success }} /> */}
-
-          {/* Inputs */}
-          <View
-            style={[
-              styles.card,
-              { padding: 12, borderColor: T.border, backgroundColor: T.cardBg },
-            ]}
+          <ScrollView
+            contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+            keyboardShouldPersistTaps="handled"
           >
-            <View
-              style={[
-                styles.inputRow,
-                { flexDirection: isWide ? "row" : "column" },
-              ]}
-            >
-              <InputCard
-                label="Trình ĐƠN (Single)"
-                value={singleInput}
-                setValue={setSingleInput}
-                color="primary"
-                didPrefillRef={didPrefillRef}
-                initializing={initializing}
-                palette={{
-                  tint: T.tint,
-                  success: T.success,
-                  border: T.border,
-                  danger: T.danger,
-                  softBg: T.softBg,
-                  inputBg: T.inputBg,
-                  textPrimary: T.textPrimary,
-                  textSecondary: T.textSecondary,
-                }}
-              />
-              <InputCard
-                label="Trình ĐÔI (Double)"
-                value={doubleInput}
-                setValue={setDoubleInput}
-                color="success"
-                didPrefillRef={didPrefillRef}
-                initializing={initializing}
-                palette={{
-                  tint: T.tint,
-                  success: T.success,
-                  border: T.border,
-                  danger: T.danger,
-                  softBg: T.softBg,
-                  inputBg: T.inputBg,
-                  textPrimary: T.textPrimary,
-                  textSecondary: T.textSecondary,
-                }}
-              />
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <Text style={[styles.title, { color: T.textPrimary }]}>
+                Bảng tự đánh giá trình Pickleball
+              </Text>
+              {!!latestChipText && (
+                <Pill
+                  label={latestChipText}
+                  bg={latestError ? "#fee2e2" : T.chipBg}
+                  fg={latestError ? "#991b1b" : T.chipFg}
+                />
+              )}
             </View>
 
-            {/* Chips & Actions */}
+            {/* (tuỳ chọn) Legend */}
+            {/* <Legend palette={{ tint: T.tint, success: T.success }} /> */}
+
+            {/* Inputs */}
             <View
               style={[
-                styles.actionsRow,
-                { flexDirection: isWide ? "row" : "column" },
+                styles.card,
+                {
+                  padding: 12,
+                  borderColor: T.border,
+                  backgroundColor: T.cardBg,
+                },
               ]}
             >
               <View
-                style={[styles.inlineRow, { marginBottom: isWide ? 0 : 8 }]}
+                style={[
+                  styles.inputRow,
+                  { flexDirection: isWide ? "row" : "column" },
+                ]}
               >
-                {singleValid && (
-                  <Pill
-                    label={`Đơn: ${singleVal?.toFixed(3)}`}
-                    bg={T.scheme === "dark" ? "#1e3a8a33" : "#dbeafe"}
-                    fg={T.scheme === "dark" ? "#bfdbfe" : "#1e3a8a"}
-                  />
-                )}
-                {doubleValid && (
-                  <Pill
-                    label={`Đôi: ${doubleVal?.toFixed(3)}`}
-                    bg={T.scheme === "dark" ? "#052e1633" : "#dcfce7"}
-                    fg={T.scheme === "dark" ? "#86efac" : "#166534"}
-                  />
-                )}
-              </View>
-
-              <View style={[styles.inlineRow]}>
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={saving || !userId}
-                  style={[
-                    styles.primaryBtn,
-                    { backgroundColor: T.tint },
-                    (saving || !userId) && { backgroundColor: disabledBg },
-                  ]}
-                  activeOpacity={0.9}
-                >
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>Cập nhật</Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    setSingleInput("");
-                    setDoubleInput("");
-                    didPrefillRef.current = false;
-                  }}
-                  style={[styles.secondaryBtn, { borderColor: T.tint }]}
-                  activeOpacity={0.9}
-                >
-                  <Text style={[styles.secondaryBtnText, { color: T.tint }]}>
-                    Đặt lại
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Text style={[styles.captionText, { color: T.textSecondary }]}>
-              Màu sắc: <Text style={{ fontWeight: "700" }}>xanh lam</Text> = ĐƠN
-              (Single), <Text style={{ fontWeight: "700" }}>xanh lục</Text> =
-              ĐÔI (Double). Nhập số trong dải {DUPR_MIN.toFixed(3)}–
-              {DUPR_MAX.toFixed(3)}.
-            </Text>
-          </View>
-
-          {/* Rubric */}
-          <View
-            style={[
-              styles.card,
-              { borderColor: T.border, backgroundColor: T.cardBg },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-              📝 Bảng tự đánh giá trình độ Pickleball (tham khảo DUPR)
-            </Text>
-            <View style={{ gap: 10 }}>
-              {RUBRIC.map((r) => (
-                <RubricItem
-                  key={r.level}
-                  r={r}
-                  activeSingle={nearestSingle === r.level}
-                  activeDouble={nearestDouble === r.level}
+                <InputCard
+                  label="Trình ĐƠN (Single)"
+                  value={singleInput}
+                  setValue={setSingleInput}
+                  color="primary"
+                  didPrefillRef={didPrefillRef}
+                  initializing={initializing}
                   palette={{
                     tint: T.tint,
                     success: T.success,
                     border: T.border,
+                    danger: T.danger,
+                    softBg: T.softBg,
+                    inputBg: T.inputBg,
                     textPrimary: T.textPrimary,
                     textSecondary: T.textSecondary,
                   }}
-                  scheme={T.scheme}
                 />
-              ))}
+                <InputCard
+                  label="Trình ĐÔI (Double)"
+                  value={doubleInput}
+                  setValue={setDoubleInput}
+                  color="success"
+                  didPrefillRef={didPrefillRef}
+                  initializing={initializing}
+                  palette={{
+                    tint: T.tint,
+                    success: T.success,
+                    border: T.border,
+                    danger: T.danger,
+                    softBg: T.softBg,
+                    inputBg: T.inputBg,
+                    textPrimary: T.textPrimary,
+                    textSecondary: T.textSecondary,
+                  }}
+                />
+              </View>
+
+              {/* Chips & Actions */}
+              <View
+                style={[
+                  styles.actionsRow,
+                  { flexDirection: isWide ? "row" : "column" },
+                ]}
+              >
+                <View
+                  style={[styles.inlineRow, { marginBottom: isWide ? 0 : 8 }]}
+                >
+                  {singleValid && (
+                    <Pill
+                      label={`Đơn: ${singleVal?.toFixed(3)}`}
+                      bg={T.scheme === "dark" ? "#1e3a8a33" : "#dbeafe"}
+                      fg={T.scheme === "dark" ? "#bfdbfe" : "#1e3a8a"}
+                    />
+                  )}
+                  {doubleValid && (
+                    <Pill
+                      label={`Đôi: ${doubleVal?.toFixed(3)}`}
+                      bg={T.scheme === "dark" ? "#052e1633" : "#dcfce7"}
+                      fg={T.scheme === "dark" ? "#86efac" : "#166534"}
+                    />
+                  )}
+                </View>
+
+                <View style={[styles.inlineRow]}>
+                  <TouchableOpacity
+                    onPress={handleSubmit}
+                    disabled={saving || !userId}
+                    style={[
+                      styles.primaryBtn,
+                      { backgroundColor: T.tint },
+                      (saving || !userId) && { backgroundColor: disabledBg },
+                    ]}
+                    activeOpacity={0.9}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.primaryBtnText}>Cập nhật</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSingleInput("");
+                      setDoubleInput("");
+                      didPrefillRef.current = false;
+                    }}
+                    style={[styles.secondaryBtn, { borderColor: T.tint }]}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={[styles.secondaryBtnText, { color: T.tint }]}>
+                      Đặt lại
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={[styles.captionText, { color: T.textSecondary }]}>
+                Màu sắc: <Text style={{ fontWeight: "700" }}>xanh lam</Text> =
+                ĐƠN (Single),{" "}
+                <Text style={{ fontWeight: "700" }}>xanh lục</Text> = ĐÔI
+                (Double). Nhập số trong dải {DUPR_MIN.toFixed(3)}–
+                {DUPR_MAX.toFixed(3)}.
+              </Text>
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+
+            {/* Rubric */}
+            <View
+              style={[
+                styles.card,
+                { borderColor: T.border, backgroundColor: T.cardBg },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
+                📝 Bảng tự đánh giá trình độ Pickleball (tham khảo DUPR)
+              </Text>
+              <View style={{ gap: 10 }}>
+                {RUBRIC.map((r) => (
+                  <RubricItem
+                    key={r.level}
+                    r={r}
+                    activeSingle={nearestSingle === r.level}
+                    activeDouble={nearestDouble === r.level}
+                    palette={{
+                      tint: T.tint,
+                      success: T.success,
+                      border: T.border,
+                      textPrimary: T.textPrimary,
+                      textSecondary: T.textSecondary,
+                    }}
+                    scheme={T.scheme}
+                  />
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </AuthGuard>
   );
 }
 

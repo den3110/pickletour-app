@@ -84,7 +84,7 @@ export default function Forbidden403() {
 
           <Text style={[styles.desc, { color: sub }]}>
             Bạn không có quyền truy cập trang này. Hãy đăng nhập bằng tài khoản
-            admin hoặc quay lại trang trước.
+            hoặc quay lại trang trước.
           </Text>
 
           <View style={styles.actions}>

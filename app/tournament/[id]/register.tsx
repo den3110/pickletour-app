@@ -51,7 +51,8 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { Image as ExpoImage } from "expo-image";
 import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
-
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
 /* =============== THEME =============== */
@@ -117,7 +118,7 @@ const displayName = (pl: any) => {
   if (!pl) return "—";
   const fn = pl.fullName || pl?.name || "";
   const nn = pl.nickName || pl.nickname || "";
-  return nn ? `${fn} (${nn})` : fn || "—";
+  return nn ? `${nn}` : fn || "—";
 };
 
 const getUserId = (pl: any) => {
@@ -484,55 +485,234 @@ const ActionCell = memo(
   }
 );
 
+const HTML_PREVIEW_MAX_HEIGHT = 260;
+
+const HtmlPreviewBlock = memo(
+  ({
+    title,
+    html,
+    contentWidth,
+  }: {
+    title: string;
+    html: string;
+    contentWidth: number;
+  }) => {
+    const C = useThemeColors();
+    const [open, setOpen] = useState(false);
+    const insets = useSafeAreaInsets();
+
+    const hasMore = useMemo(() => {
+      if (!html) return false;
+      // đo chiều dài text (bỏ tag) để đoán là dài
+      const txt = String(html)
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return txt.length > 260;
+    }, [html]);
+
+    const common = useMemo(
+      () => ({
+        contentWidth,
+        defaultTextProps: { selectable: true },
+        onLinkPress: (_e: any, href?: string) =>
+          href && Linking.openURL(href).catch(() => {}),
+        tagsStyles: {
+          a: { color: C.tint, textDecorationLine: "underline" },
+          img: { borderRadius: 8 },
+          p: { marginBottom: 8, lineHeight: 20, color: C.textPrimary },
+          li: { color: C.textPrimary },
+          ul: { marginBottom: 8, paddingLeft: 18 },
+          ol: { marginBottom: 8, paddingLeft: 18 },
+          h1: {
+            fontSize: 20,
+            fontWeight: "700",
+            marginBottom: 6,
+            color: C.textPrimary,
+          },
+          h2: {
+            fontSize: 18,
+            fontWeight: "700",
+            marginBottom: 6,
+            color: C.textPrimary,
+          },
+          h3: {
+            fontSize: 16,
+            fontWeight: "700",
+            marginBottom: 6,
+            color: C.textPrimary,
+          },
+          strong: { color: C.textPrimary },
+        },
+        renderersProps: { img: { enableExperimentalPercentWidth: true } },
+      }),
+      [contentWidth, C]
+    );
+
+    if (!html) return null;
+
+    return (
+      <>
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: "700",
+            marginBottom: 8,
+            color: C.textPrimary,
+          }}
+        >
+          {title}
+        </Text>
+
+        <View
+          style={[
+            styles.htmlCard,
+            { backgroundColor: C.cardBg, borderColor: C.border },
+          ]}
+        >
+          {/* PREVIEW THU GỌN */}
+          <View
+            style={{
+              maxHeight: HTML_PREVIEW_MAX_HEIGHT,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <RenderHTML source={{ html }} {...(common as any)} />
+
+            {hasMore && (
+              <LinearGradient
+                pointerEvents="none"
+                colors={[
+                  C.scheme === "dark"
+                    ? "rgba(17,18,20,0)" // trong suốt
+                    : "rgba(255,255,255,0)",
+                  C.scheme === "dark"
+                    ? "rgba(17,18,20,0.3)" // bắt đầu mờ dần
+                    : "rgba(255,255,255,0.4)",
+                  C.scheme === "dark"
+                    ? "rgba(17,18,20,0.7)" // mờ nhiều hơn
+                    : "rgba(255,255,255,0.85)",
+                  C.scheme === "dark"
+                    ? "rgba(17,18,20,0.95)" // gần như đục
+                    : "rgba(255,255,255,0.98)",
+                  C.scheme === "dark"
+                    ? "#111214" // màu card đúng 100%
+                    : "#ffffff",
+                ]}
+                locations={[0, 0.3, 0.6, 0.85, 1]} // điều chỉnh vị trí chuyển màu
+                style={styles.htmlFade}
+              />
+            )}
+          </View>
+
+          {hasMore && (
+            <View style={{ alignItems: "center", marginTop: 4 }}>
+              <TouchableOpacity
+                style={styles.htmlMoreBtn}
+                onPress={() => setOpen(true)}
+              >
+                <Text
+                  style={{
+                    color: C.tint,
+                    fontWeight: "600",
+                    fontSize: 13,
+                  }}
+                >
+                  Xem thêm
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* MODAL FULL MÀN HÌNH */}
+        <Modal
+          visible={open}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setOpen(false)}
+        >
+          {(() => {
+            return (
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: C.pageBg,
+                  paddingTop: insets.top,
+                }}
+              >
+                <View
+                  style={[
+                    styles.fullHtmlHeader,
+                    { borderBottomColor: C.border },
+                  ]}
+                >
+                  <TouchableOpacity
+                    onPress={() => setOpen(false)}
+                    style={[
+                      styles.fullHtmlCloseBtn,
+                      { backgroundColor: C.ghostBg },
+                    ]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 20,
+                        fontWeight: "800",
+                        color: C.textPrimary,
+                      }}
+                    >
+                      ✕
+                    </Text>
+                  </TouchableOpacity>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      flex: 1,
+                      textAlign: "center",
+                      fontWeight: "800",
+                      fontSize: 16,
+                      color: C.textPrimary,
+                    }}
+                  >
+                    {title}
+                  </Text>
+                  <View style={styles.fullHtmlCloseBtn} />
+                </View>
+
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{
+                    paddingHorizontal: 16,
+                    paddingBottom: 24,
+                    paddingTop: 8,
+                  }}
+                >
+                  <RenderHTML source={{ html }} {...(common as any)} />
+                </ScrollView>
+              </View>
+            );
+          })()}
+        </Modal>
+      </>
+    );
+  }
+);
+
 const HtmlCols = memo(({ tour }: { tour: any }) => {
   const { width } = useWindowDimensions();
-  const C = useThemeColors();
   const GAP = 12;
   const twoCols = width >= 820;
 
   if (!tour?.contactHtml && !tour?.contentHtml) return null;
 
-  const colContentWidth = twoCols
+  const colWidth = twoCols
     ? Math.floor((width - 16 * 2 - GAP) / 2)
     : width - 16 * 2;
 
-  const common = useMemo(
-    () => ({
-      contentWidth: colContentWidth,
-      defaultTextProps: { selectable: true },
-      onLinkPress: (_e: any, href?: string) =>
-        href && Linking.openURL(href).catch(() => {}),
-      tagsStyles: {
-        a: { color: C.tint, textDecorationLine: "underline" },
-        img: { borderRadius: 8 },
-        p: { marginBottom: 8, lineHeight: 20, color: C.textPrimary },
-        li: { color: C.textPrimary },
-        ul: { marginBottom: 8, paddingLeft: 18 },
-        ol: { marginBottom: 8, paddingLeft: 18 },
-        h1: {
-          fontSize: 20,
-          fontWeight: "700",
-          marginBottom: 6,
-          color: C.textPrimary,
-        },
-        h2: {
-          fontSize: 18,
-          fontWeight: "700",
-          marginBottom: 6,
-          color: C.textPrimary,
-        },
-        h3: {
-          fontSize: 16,
-          fontWeight: "700",
-          marginBottom: 6,
-          color: C.textPrimary,
-        },
-        strong: { color: C.textPrimary },
-      },
-      renderersProps: { img: { enableExperimentalPercentWidth: true } },
-    }),
-    [colContentWidth, C]
-  );
+  // trừ padding card ~20
+  const contentWidth = Math.max(colWidth - 20, 200);
 
   return (
     <View style={{ marginTop: 12 }}>
@@ -545,56 +725,25 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
         {!!tour?.contactHtml && (
           <View
             style={{
-              width: twoCols ? colContentWidth : "100%",
+              width: twoCols ? colWidth : "100%",
               marginBottom: twoCols ? 0 : 12,
             }}
           >
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "700",
-                marginBottom: 8,
-                color: C.textPrimary,
-              }}
-            >
-              Thông tin liên hệ
-            </Text>
-            <View
-              style={[
-                styles.htmlCard,
-                { backgroundColor: C.cardBg, borderColor: C.border },
-              ]}
-            >
-              <RenderHTML
-                source={{ html: tour?.contactHtml }}
-                {...(common as any)}
-              />
-            </View>
+            <HtmlPreviewBlock
+              title="Thông tin liên hệ"
+              html={tour.contactHtml}
+              contentWidth={contentWidth}
+            />
           </View>
         )}
+
         {!!tour?.contentHtml && (
-          <View style={{ width: twoCols ? colContentWidth : "100%" }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "700",
-                marginBottom: 8,
-                color: C.textPrimary,
-              }}
-            >
-              Nội dung giải đấu
-            </Text>
-            <View
-              style={[
-                styles.htmlCard,
-                { backgroundColor: C.cardBg, borderColor: C.border },
-              ]}
-            >
-              <RenderHTML
-                source={{ html: tour?.contentHtml }}
-                {...(common as any)}
-              />
-            </View>
+          <View style={{ width: twoCols ? colWidth : "100%" }}>
+            <HtmlPreviewBlock
+              title="Nội dung giải đấu"
+              html={tour.contentHtml}
+              contentWidth={contentWidth}
+            />
           </View>
         )}
       </View>
@@ -603,175 +752,155 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
 });
 
 /* ===== MEMOIZED RegItem ===== */
-const RegItem = memo(
-  function RegItem({
-    r,
-    index,
-    isSingles,
-    canManage,
-    cap,
-    delta,
-    isOwner,
-    onPreview,
-    onOpenProfile,
-    onOpenReplace,
-    onTogglePayment,
-    onCancel,
-    onOpenComplaint,
-    onOpenPayment,
-    cancelingId,
-    settingPayment,
-  }: any) {
-    const C = useThemeColors();
-    const total = totalScoreOf(r, isSingles);
-    const { state } = decideTotalState(total, cap, delta);
-    const { bg, fg } = chipColorsByState[state];
-    const players = [r?.player1, r?.player2].filter(Boolean);
-    const code = regCodeOf(r);
+const RegItem = memo(function RegItem({
+  r,
+  index,
+  isSingles,
+  canManage,
+  cap,
+  delta,
+  isOwner,
+  onPreview,
+  onOpenProfile,
+  onOpenReplace,
+  onTogglePayment,
+  onCancel,
+  onOpenComplaint,
+  onOpenPayment,
+  cancelingId,
+  settingPayment,
+}: any) {
+  const C = useThemeColors();
+  const total = totalScoreOf(r, isSingles);
+  const { state } = decideTotalState(total, cap, delta);
+  const { bg, fg } = chipColorsByState[state];
+  const players = [r?.player1, r?.player2].filter(Boolean);
+  const code = regCodeOf(r);
 
-    return (
-      <View
-        style={[
-          styles.card,
-          {
-            marginHorizontal: 16,
-            marginTop: 8,
-            backgroundColor: C.cardBg,
-            borderColor: C.border,
-          },
-        ]}
-      >
-        <View style={styles.cardTopRow}>
-          <Chip label={`Mã đăng ký: ${code}`} />
-          <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
-        </View>
-
-        {players.map((pl: any, idx: number) => (
-          <View
-            key={`${pl?.phone || pl?.fullName || idx}`}
-            style={{ marginTop: 10 }}
-          >
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-            >
-              <Pressable
-                onPress={() => onPreview(pl?.avatar || PLACE, displayName(pl))}
-              >
-                <ExpoImage
-                  source={{ uri: normalizeUrl(pl?.avatar) || PLACE }}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: "#eee",
-                  }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  transition={0}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={() => onOpenProfile(pl)}
-                style={{ flex: 1, minWidth: 0 }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{ fontWeight: "600", color: C.textPrimary }}
-                >
-                  {displayName(pl)}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: C.muted, fontSize: 12 }}
-                >
-                  {pl?.phone || ""}
-                </Text>
-              </Pressable>
-
-              <Chip
-                label={`Điểm: ${roundTo3(pl?.score) ?? 0}`}
-                bg={C.cardBg}
-                fg={C.textPrimary}
-              />
-              {canManage && (
-                <OutlineBtn
-                  onPress={() => onOpenReplace(r, idx === 0 ? "p1" : "p2")}
-                >
-                  Thay VĐV
-                </OutlineBtn>
-              )}
-            </View>
-          </View>
-        ))}
-
-        {!isSingles && !r.player2 && canManage && (
-          <View style={{ marginTop: 8 }}>
-            <OutlineBtn onPress={() => onOpenReplace(r, "p2")}>
-              Thêm VĐV 2
-            </OutlineBtn>
-          </View>
-        )}
-
-        <Text style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
-          {new Date(r.createdAt).toLocaleString()}
-        </Text>
-
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            marginTop: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          <PaymentChip status={r.payment?.status} paidAt={r.payment?.paidAt} />
-          <CheckinChip checkinAt={r.checkinAt} />
-        </View>
-
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 6,
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <Text style={{ fontWeight: "600", color: C.textPrimary }}>
-            Tổng điểm:
-          </Text>
-          <Chip label={`${roundTo3(total)}`} bg={bg} fg={fg} />
-        </View>
-
-        <View style={{ marginTop: 10 }}>
-          <ActionCell
-            r={r}
-            canManage={canManage}
-            isOwner={isOwner}
-            onTogglePayment={onTogglePayment}
-            onCancel={onCancel}
-            onOpenComplaint={onOpenComplaint}
-            onOpenPayment={onOpenPayment}
-            busy={{ settingPayment, deletingId: cancelingId }}
-          />
-        </View>
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          marginHorizontal: 16,
+          marginTop: 8,
+          backgroundColor: C.cardBg,
+          borderColor: C.border,
+        },
+      ]}
+    >
+      <View style={styles.cardTopRow}>
+        <Chip label={`Mã đăng ký: ${code}`} />
+        <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
       </View>
-    );
-  },
-  (a, b) => {
-    return (
-      a.r?._id === b.r?._id &&
-      a.r?.payment?.status === b.r?.payment?.status &&
-      a.r?.checkinAt === b.r?.checkinAt &&
-      a.r?.player2?._id === b.r?.player2?._id &&
-      a.isSingles === b.isSingles &&
-      a.canManage === b.canManage &&
-      a.index === b.index &&
-      a.cancelingId === b.cancelingId &&
-      a.settingPayment === b.settingPayment
-    );
-  }
-);
+
+      {players.map((pl: any, idx: number) => (
+        <View
+          key={`${pl?.phone || pl?.fullName || idx}`}
+          style={{ marginTop: 10 }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Pressable
+              onPress={() => onPreview(pl?.avatar || PLACE, displayName(pl))}
+            >
+              <ExpoImage
+                source={{ uri: normalizeUrl(pl?.avatar) || PLACE }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#eee",
+                }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={() => onOpenProfile(pl)}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{ fontWeight: "600", color: C.textPrimary }}
+              >
+                {displayName(pl)}
+              </Text>
+              <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
+                {pl?.phone || ""}
+              </Text>
+            </Pressable>
+
+            <Chip
+              label={`Điểm: ${roundTo3(pl?.score) ?? 0}`}
+              bg={C.cardBg}
+              fg={C.textPrimary}
+            />
+            {canManage && (
+              <OutlineBtn
+                onPress={() => onOpenReplace(r, idx === 0 ? "p1" : "p2")}
+              >
+                Thay VĐV
+              </OutlineBtn>
+            )}
+          </View>
+        </View>
+      ))}
+
+      {!isSingles && !r.player2 && canManage && (
+        <View style={{ marginTop: 8 }}>
+          <OutlineBtn onPress={() => onOpenReplace(r, "p2")}>
+            Thêm VĐV 2
+          </OutlineBtn>
+        </View>
+      )}
+
+      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
+        {new Date(r.createdAt).toLocaleString()}
+      </Text>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 8,
+          marginTop: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <PaymentChip status={r.payment?.status} paidAt={r.payment?.paidAt} />
+        <CheckinChip checkinAt={r.checkinAt} />
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 6,
+          alignItems: "center",
+          marginTop: 8,
+        }}
+      >
+        <Text style={{ fontWeight: "600", color: C.textPrimary }}>
+          Tổng điểm:
+        </Text>
+        <Chip label={`${roundTo3(total)}`} bg={bg} fg={fg} />
+      </View>
+
+      <View style={{ marginTop: 10 }}>
+        <ActionCell
+          r={r}
+          canManage={canManage}
+          isOwner={isOwner}
+          onTogglePayment={onTogglePayment}
+          onCancel={onCancel}
+          onOpenComplaint={onOpenComplaint}
+          onOpenPayment={onOpenPayment}
+          busy={{ settingPayment, deletingId: cancelingId }}
+        />
+      </View>
+    </View>
+  );
+});
 
 /* ===================== Screen ===================== */
 export default function TournamentRegistrationScreen() {
@@ -781,7 +910,7 @@ export default function TournamentRegistrationScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<any>>(null);
   const searchInputRef = useRef<TextInput>(null);
-
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const { data: me, isLoading: meLoading, error: meErr } = useGetMeScoreQuery();
   const isLoggedIn = !!me?._id;
 
@@ -859,6 +988,15 @@ export default function TournamentRegistrationScreen() {
     const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
     return () => clearTimeout(t);
   }, [q]);
+
+  useEffect(() => {
+    if (searchModalOpen) {
+      const t = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [searchModalOpen]);
 
   const matchStr = useCallback(
     (s?: string) =>
@@ -1680,31 +1818,50 @@ export default function TournamentRegistrationScreen() {
         </View>
 
         <View style={styles.searchWrap}>
-          <TextInput
-            ref={searchInputRef}
-            value={q}
-            onChangeText={setQ}
-            placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
-            placeholderTextColor={C.muted}
+          <Pressable
+            onPress={() => setSearchModalOpen(true)}
             style={[
               styles.searchInput,
               {
                 backgroundColor: C.inputBg,
                 borderColor: C.inputBorder,
-                color: C.textPrimary,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
               },
             ]}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onSubmitEditing={() => Keyboard.dismiss()}
-          />
-          {q.length > 0 && (
-            <Pressable style={styles.clearBtn} onPress={() => setQ("")}>
-              <Text style={{ fontWeight: "800", color: C.muted }}>✕</Text>
-            </Pressable>
-          )}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                color: q ? C.textPrimary : C.muted,
+              }}
+            >
+              {q || "Tìm theo VĐV, SĐT, mã ĐK…"}
+            </Text>
+            <Ionicons name="search" size={18} color={C.muted} />
+          </Pressable>
         </View>
+
+        {regsLoading ? (
+          <View style={{ paddingVertical: 16, alignItems: "center" }}>
+            <ActivityIndicator />
+          </View>
+        ) : regsErr ? (
+          <View
+            style={[
+              styles.alert,
+              { borderColor: C.errBorder, backgroundColor: C.errBg },
+            ]}
+          >
+            <Text style={{ color: C.errText }}>
+              {(regsErr as any)?.data?.message ||
+                (regsErr as any)?.error ||
+                "Lỗi tải danh sách"}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {regsLoading ? (
@@ -1795,6 +1952,124 @@ export default function TournamentRegistrationScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
       />
 
+      {/* Modal search danh sách đăng ký (full màn) */}
+      <Modal
+        visible={searchModalOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          setSearchModalOpen(false);
+          Keyboard.dismiss();
+        }}
+      >
+        {(() => {
+          return (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flex: 1 }}
+            >
+              <View style={{ flex: 1, paddingTop: insets.top }}>
+                {/* Header search + nút đóng */}
+                <View
+                  style={[
+                    styles.fullModalHeader,
+                    { borderBottomColor: C.border },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      ref={searchInputRef}
+                      value={q}
+                      onChangeText={(text) => {
+                        setQ(text);
+                        if (text.length === 0) {
+                          // khi xoá hết ký tự thì đóng modal + ẩn bàn phím
+                          setSearchModalOpen(false);
+                          Keyboard.dismiss();
+                        }
+                      }}
+                      placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
+                      placeholderTextColor={C.muted}
+                      style={[
+                        styles.searchInput,
+                        {
+                          backgroundColor: C.inputBg,
+                          borderColor: C.inputBorder,
+                          color: C.textPrimary,
+                        },
+                      ]}
+                      returnKeyType="search"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchModalOpen(false); // đóng modal nhưng giữ nguyên q
+                      Keyboard.dismiss();
+                    }}
+                    style={[
+                      styles.searchCloseBtn,
+                      { backgroundColor: C.ghostBg },
+                    ]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close" size={20} color={C.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* List trong modal */}
+                {regsLoading ? (
+                  <View
+                    style={{
+                      paddingVertical: 16,
+                      alignItems: "center",
+                    }}
+                  >
+                    <ActivityIndicator />
+                  </View>
+                ) : regsErr ? (
+                  <View
+                    style={[
+                      styles.alert,
+                      { borderColor: C.errBorder, backgroundColor: C.errBg },
+                    ]}
+                  >
+                    <Text style={{ color: C.errText }}>
+                      {(regsErr as any)?.data?.message ||
+                        (regsErr as any)?.error ||
+                        "Lỗi tải danh sách"}
+                    </Text>
+                  </View>
+                ) : (
+                  <FlashList
+                    data={listData}
+                    keyExtractor={(item, i) => String(item?._id || i)}
+                    renderItem={renderItem}
+                    onEndReached={loadMore}
+                    onEndReachedThreshold={0.5}
+                    keyboardDismissMode="on-drag"
+                    keyboardShouldPersistTaps="handled"
+                    estimatedItemSize={220}
+                    removeClippedSubviews={Platform.OS === "android"}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    ListFooterComponent={ListFooter}
+                    contentContainerStyle={{
+                      paddingTop: 8,
+                      paddingBottom: Math.max(16, kbHeight),
+                    }}
+                  />
+                )}
+              </View>
+            </KeyboardAvoidingView>
+          );
+        })()}
+      </Modal>
+
       {/* Preview ảnh */}
       <Modal
         visible={imgPreview.open}
@@ -1829,62 +2104,98 @@ export default function TournamentRegistrationScreen() {
       </Modal>
 
       {/* Modal thay VĐV */}
+      {/* Modal thay VĐV – full screen */}
+
       <Modal
         visible={replaceDlg.open}
-        transparent
         animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={closeReplace}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalBackdrop}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        {(() => {
+          return (
+            <SafeAreaView
+              style={[styles.fullModalContainer, { backgroundColor: C.pageBg }]}
             >
-              <View
-                style={[
-                  styles.modalCard,
-                  { backgroundColor: C.cardBg, borderColor: C.border },
-                ]}
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={{ flex: 1 }}
               >
-                <Text
-                  style={{
-                    fontWeight: "800",
-                    fontSize: 16,
-                    marginBottom: 8,
-                    color: C.textPrimary,
-                  }}
-                >
-                  {replaceDlg.slot === "p2" ? "Thay/Thêm VĐV 2" : "Thay VĐV 1"}
-                </Text>
-
-                <PlayerSelector
-                  label="Chọn VĐV mới"
-                  eventType={tour?.eventType}
-                  onChange={setNewPlayer}
-                />
-                <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
-                  Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
-                </Text>
-
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-                  <OutlineBtn onPress={closeReplace}>Huỷ</OutlineBtn>
-                  <PrimaryBtn
-                    onPress={submitReplace}
-                    disabled={replacing || !newPlayer?._id}
+                <View style={{ flex: 1, paddingTop: insets.top }}>
+                  {/* Header */}
+                  <View
+                    style={[
+                      styles.fullModalHeader,
+                      { borderBottomColor: C.border },
+                    ]}
                   >
-                    {replacing ? "Đang lưu…" : "Lưu thay đổi"}
-                  </PrimaryBtn>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                    <TouchableOpacity
+                      onPress={closeReplace}
+                      style={styles.fullModalHeaderBtn}
+                    >
+                      <Text style={{ color: C.textPrimary }}>Đóng</Text>
+                    </TouchableOpacity>
 
+                    <Text
+                      style={{
+                        fontWeight: "800",
+                        fontSize: 16,
+                        color: C.textPrimary,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {replaceDlg.slot === "p2"
+                        ? "Thay/Thêm VĐV 2"
+                        : "Thay VĐV 1"}
+                    </Text>
+
+                    {/* dummy để canh giữa tiêu đề */}
+                    <View style={styles.fullModalHeaderBtn} />
+                  </View>
+
+                  {/* Body */}
+                  <ScrollView
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+                  >
+                    <PlayerSelector
+                      label="Chọn VĐV mới"
+                      eventType={tour?.eventType}
+                      onChange={setNewPlayer}
+                    />
+
+                    <Text
+                      style={{
+                        color: C.muted,
+                        fontSize: 12,
+                        marginTop: 6,
+                      }}
+                    >
+                      Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
+                    </Text>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 8,
+                        marginTop: 16,
+                      }}
+                    >
+                      <OutlineBtn onPress={closeReplace}>Huỷ</OutlineBtn>
+                      <PrimaryBtn
+                        onPress={submitReplace}
+                        disabled={replacing || !newPlayer?._id}
+                      >
+                        {replacing ? "Đang lưu…" : "Lưu thay đổi"}
+                      </PrimaryBtn>
+                    </View>
+                  </ScrollView>
+                </View>
+              </KeyboardAvoidingView>
+            </SafeAreaView>
+          );
+        })()}
+      </Modal>
       <PublicProfileSheet
         open={profile.open}
         onClose={() => setProfile({ open: false, userId: null })}
@@ -1905,7 +2216,10 @@ export default function TournamentRegistrationScreen() {
           <View style={styles.modalBackdrop}>
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+              }}
             >
               <View
                 style={[
@@ -2204,10 +2518,65 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+  htmlFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 100,
+  },
+
+  htmlMoreBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  fullHtmlContainer: {
+    flex: 1,
+  },
+  fullHtmlHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  fullHtmlCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // tròn 50%
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   selfCard: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
   },
   row: { flexDirection: "row", gap: 8 },
+  fullModalContainer: {
+    flex: 1,
+  },
+  fullModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  fullModalHeaderBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    minWidth: 60,
+    alignItems: "flex-start",
+  },
+  searchCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // tròn 50%
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
 });

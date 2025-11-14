@@ -24,6 +24,7 @@ import ImageView from "react-native-image-viewing";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Stack, router, Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useRegisterMutation } from "@/slices/usersApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
@@ -100,6 +101,29 @@ const PROVINCES = [
   "Yên Bái",
 ];
 
+// 👇 Label hiển thị, sẽ map sang enum trong model: male / female / other
+const GENDERS = ["Nam", "Nữ", "Khác"];
+
+function formatDobLabel(dobStr) {
+  if (!dobStr) return "";
+  const parts = dobStr.split("-");
+  if (parts.length !== 3) return dobStr;
+  const [y, m, d] = parts.map((p) => parseInt(p, 10));
+  if (!y || !m || !d) return dobStr;
+  const dd = String(d).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  return `${dd}/${mm}/${y}`;
+}
+
+function parseDobString(dobStr) {
+  if (!dobStr) return null;
+  const parts = dobStr.split("-");
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts.map((p) => parseInt(p, 10));
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
 function cleanPhone(v) {
   if (typeof v !== "string") return "";
   let s = v.trim();
@@ -171,6 +195,7 @@ function validateAll(form, avatarUrl, accepted) {
   const phoneRaw = cleanPhone(form.phone || "");
   const email = (form.email || "").trim();
   const province = form.province || "";
+  const gender = form.gender || ""; // 👈 gender từ form (label)
   const password = form.password || "";
   const confirmPassword = form.confirmPassword || "";
 
@@ -179,6 +204,7 @@ function validateAll(form, avatarUrl, accepted) {
     nickname: "",
     email: "",
     phone: "",
+    gender: "",
     province: "",
     password: "",
     confirmPassword: "",
@@ -190,6 +216,7 @@ function validateAll(form, avatarUrl, accepted) {
   else if (name.length < 2) fields.name = "Họ và tên tối thiểu 2 ký tự.";
 
   if (!nickname) fields.nickname = "Vui lòng nhập biệt danh.";
+
   if (!email) fields.email = "Vui lòng nhập email.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     fields.email = "Email không hợp lệ.";
@@ -197,6 +224,9 @@ function validateAll(form, avatarUrl, accepted) {
   if (!phoneRaw) fields.phone = "Vui lòng nhập số điện thoại.";
   else if (!/^0\d{9}$/.test(phoneRaw))
     fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+
+  // 👇 Giới tính bắt buộc chọn
+  if (!gender) fields.gender = "Vui lòng chọn giới tính.";
 
   if (!province) fields.province = "Vui lòng chọn Tỉnh/Thành phố.";
 
@@ -246,6 +276,8 @@ export default function RegisterScreen() {
     nickname: "",
     email: "",
     phone: "",
+    gender: "", // 👈 thêm gender vào form
+    dob: "", // 👈 ngày sinh dạng "YYYY-MM-DD"
     province: "",
     password: "",
     confirmPassword: "",
@@ -262,21 +294,47 @@ export default function RegisterScreen() {
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false); // phóng to ảnh
 
+  // DOB picker
+  const [dobPickerOpen, setDobPickerOpen] = useState(false);
+  const [dobDraft, setDobDraft] = useState(null);
+
   const [showErrors, setShowErrors] = useState(false);
+
+  const openDobPicker = () => {
+    const existing = parseDobString(form.dob);
+    setDobDraft(existing || new Date(2000, 0, 1));
+    setDobPickerOpen(true);
+  };
+
+  const commitDob = (date) => {
+    if (!date) return;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    handleChange("dob", `${yyyy}-${mm}-${dd}`);
+  };
 
   const validation = useMemo(
     () => validateAll(form, avatarUrl, accepted),
     [form, avatarUrl, accepted]
   );
-  const errorsList = useMemo(() => validation.messages, [validation]);
+  const errorsList = useMemo(() => validation.messages, [validation]); // (hiện chưa dùng, giữ nguyên)
 
   const doRegister = async () => {
     try {
+      // 👇 Map label → enum trong model
+      let genderCode = "unspecified";
+      if (form.gender === "Nam") genderCode = "male";
+      else if (form.gender === "Nữ") genderCode = "female";
+      else if (form.gender === "Khác") genderCode = "other";
+
       const cleaned = {
         name: (form.name || "").trim(),
         nickname: (form.nickname || "").trim(),
         email: (form.email || "").trim(),
         phone: cleanPhone(form.phone || ""),
+        gender: genderCode, // 👈 gửi đúng với schema: male/female/other/unspecified
+        dob: form.dob || undefined,
         province: form.province,
         password: form.password,
         avatar: avatarUrl, // gửi kèm avatar đã upload
@@ -495,6 +553,52 @@ export default function RegisterScreen() {
               helperText={showErrors ? validation.fields.phone : ""}
             />
 
+            {/* Gender (required select) */}
+            <FieldSelect
+              label="Giới tính"
+              value={form.gender}
+              onSelect={(val) => handleChange("gender", val)}
+              options={GENDERS}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              tint={tint}
+              required
+              error={showErrors && !!validation.fields.gender}
+              helperText={showErrors ? validation.fields.gender : ""}
+              placeholder="Chọn giới tính"
+            />
+
+            {/* DOB (optional) */}
+            <View style={{ marginBottom: 10 }}>
+              <Text style={[styles.label, { color: textSecondary }]}>
+                Ngày sinh
+              </Text>
+              <Pressable
+                onPress={openDobPicker}
+                style={({ pressed }) => [
+                  styles.input,
+                  {
+                    borderColor: border,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  },
+                  pressed && { opacity: 0.95 },
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: form.dob ? textPrimary : "#9aa0a6",
+                    flex: 1,
+                    fontSize: 16,
+                  }}
+                >
+                  {form.dob ? formatDobLabel(form.dob) : "Chọn ngày sinh"}
+                </Text>
+              </Pressable>
+            </View>
+
             {/* Province (required select) */}
             <FieldSelect
               label="Tỉnh/Thành phố"
@@ -637,6 +741,86 @@ export default function RegisterScreen() {
         tint={tint}
       />
 
+      {/* DOB Picker Modal */}
+      <Modal
+        visible={dobPickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDobPickerOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: cardBg,
+                borderColor: border,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.modalHeader,
+                { borderBottomWidth: 1, borderColor: border },
+              ]}
+            >
+              <Pressable
+                onPress={() => setDobPickerOpen(false)}
+                style={styles.modalBtn}
+              >
+                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                  Đóng
+                </Text>
+              </Pressable>
+              <Text style={[styles.modalTitle, { color: textPrimary }]}>
+                Chọn ngày sinh
+              </Text>
+              <Pressable
+                onPress={() => {
+                  if (dobDraft) {
+                    commitDob(dobDraft);
+                  }
+                  setDobPickerOpen(false);
+                }}
+                style={styles.modalBtn}
+              >
+                <Text style={[styles.modalBtnText, { color: tint }]}>Xong</Text>
+              </Pressable>
+            </View>
+
+            <View
+              style={{
+                padding: 12,
+                alignItems: "center",
+              }}
+            >
+              <DateTimePicker
+                value={
+                  dobDraft || parseDobString(form.dob) || new Date(2000, 0, 1)
+                }
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                maximumDate={new Date()}
+                minimumDate={new Date(1900, 0, 1)}
+                locale="vi-VN" // 👈 tháng hiển thị tiếng Việt trên iOS
+                onChange={(event, selectedDate) => {
+                  if (Platform.OS === "android") {
+                    if (event.type === "set" && selectedDate) {
+                      commitDob(selectedDate);
+                    }
+                    setDobPickerOpen(false);
+                  } else {
+                    if (selectedDate) {
+                      setDobDraft(selectedDate);
+                    }
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ===== Avatar Preview Modal (Xác nhận → upload) ===== */}
       <Modal
         visible={avatarConfirmOpen}
@@ -657,7 +841,7 @@ export default function RegisterScreen() {
 
             {!!avatarTemp?.uri && (
               <ExpoImage
-                source={{ uri: normalizeUrl(avatarTemp.uri) }}
+                source={{ uri: avatarTemp.uri }}
                 style={{
                   width: 200,
                   height: 200,
@@ -821,6 +1005,7 @@ function FieldSelect({
   required = false,
   error = false,
   helperText = "",
+  placeholder = "Chọn tỉnh/thành", // 👈 cho phép custom placeholder (giới tính / tỉnh)
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -926,7 +1111,7 @@ function FieldSelect({
             fontSize: 16,
           }}
         >
-          {value || "Chọn tỉnh/thành"}
+          {value || placeholder}
         </Text>
         <Text style={{ color: "#9aa0a6" }}>▼</Text>
       </Pressable>
@@ -970,7 +1155,7 @@ function FieldSelect({
                 </Text>
               </Pressable>
               <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                Chọn tỉnh/thành
+                {`Chọn ${label}`}
               </Text>
               <View style={styles.modalBtn}>
                 <Text style={[styles.modalBtnText, { color: "transparent" }]}>
@@ -989,7 +1174,7 @@ function FieldSelect({
             >
               <TextInput
                 ref={searchRef}
-                placeholder="Tìm tỉnh/thành…"
+                placeholder={`Tìm ${label.toLowerCase()}…`}
                 placeholderTextColor="#9aa0a6"
                 value={q}
                 onChangeText={setQ}
@@ -1273,7 +1458,7 @@ function TermsModal({
               }}
             >
               Nhấn "Đồng ý" nghĩa là bạn đã đọc và chấp nhận Điều khoản & Chính
-              sách.
+              Sách.
             </Text>
           </ScrollView>
         </View>

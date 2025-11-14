@@ -34,6 +34,7 @@ import {
   useGetUserProfileExQuery,
 } from "@/slices/userStatsApiSlice";
 import { Stack } from "expo-router";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 /* =================== Consts & Utils =================== */
 const tz = "Asia/Bangkok";
@@ -484,114 +485,119 @@ export default function UserStatsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: PADX,
-        }}
-      >
-        <Text style={styles.h1}>Thống kê cá nhân</Text>
-        <Text style={styles.h2}>{name || "User"}</Text>
+      <AuthGuard>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: PADX,
+          }}
+        >
+          <Text style={styles.h1}>Thống kê cá nhân</Text>
+          <Text style={styles.h2}>{name || "User"}</Text>
 
-        {/* Quick range */}
-        <View style={styles.quickRow}>
-          {[7, 14, 30, 90].map((d) => (
-            <TouchableOpacity
-              key={d}
-              onPress={() => quick(d)}
-              style={styles.quickBtn}
-            >
-              <Text style={styles.quickText}>{d}N</Text>
-            </TouchableOpacity>
-          ))}
-          <Text style={styles.rangeTxt}>
-            {range.from} → {range.to}
-          </Text>
-        </View>
-
-        {/* Profile + Ranking mini */}
-        <ChartCard title="Hồ sơ & Ranking" subtitle="Thông tin nhanh">
-          <View style={styles.kpis}>
-            <KPI label="Tier" value={pf?.ranking?.tierLabel || "-"} />
-            <KPI label="Reputation" value={fmt(pf?.ranking?.reputation)} />
-            <KPI
-              label="Giải đã tham gia"
-              value={fmt(ov?.kpis?.tournamentsPlayed)}
-            />
-            <KPI label="Đăng ký" value={fmt(ov?.kpis?.registrations)} />
+          {/* Quick range */}
+          <View style={styles.quickRow}>
+            {[7, 14, 30, 90].map((d) => (
+              <TouchableOpacity
+                key={d}
+                onPress={() => quick(d)}
+                style={styles.quickBtn}
+              >
+                <Text style={styles.quickText}>{d}N</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={styles.rangeTxt}>
+              {range.from} → {range.to}
+            </Text>
           </View>
-          <View style={{ marginTop: 8, alignItems: "center" }}>
-            <Radar
-              single={pf?.ranking?.single || 0}
-              double={pf?.ranking?.double || 0}
-              mix={pf?.ranking?.mix || 0}
-            />
-          </View>
-        </ChartCard>
 
-        {/* KPIs tổng quan */}
-        <ChartCard title="Tổng quan" subtitle="Kết quả & thời lượng">
-          <View style={styles.kpis}>
-            <KPI label="Trận" value={fmt(ov?.kpis?.totalMatches)} />
-            <KPI label="Winrate" value={`${ov?.kpis?.winrate ?? 0}%`} />
-            <KPI label="Thắng" value={fmt(ov?.kpis?.wins)} />
-            <KPI label="Thua" value={fmt(ov?.kpis?.losses)} />
-            <KPI label="Đang live" value={fmt(ov?.kpis?.liveMatches)} />
-            <KPI label="Đã xong" value={fmt(ov?.kpis?.finishedMatches)} />
-            <KPI label="Tổng phút" value={fmt(ov?.kpis?.totalPlayMin)} />
-            <KPI label="Phút/trận" value={fmt(ov?.kpis?.avgMatchMin)} />
-          </View>
-        </ChartCard>
-
-        {/* Donut: status */}
-        <ChartCard title="Phân bố trạng thái trận" subtitle="Donut">
-          <Donut
-            items={byStatus.map((x: any) => ({
-              label: String(x.label ?? x._id ?? "Khác"),
-              value: Number(x.value ?? 0),
-            }))}
-            centerTitle="Tổng trận"
-          />
-        </ChartCard>
-
-        {/* Donut: top tournaments */}
-        <ChartCard title="Giải tham gia nhiều" subtitle="Top 10">
-          <Donut
-            items={topTours.slice(0, 10).map((x: any) => ({
-              label: String(x.label ?? x.name ?? "Giải"),
-              value: Number(x.value ?? x.count ?? 0),
-            }))}
-            centerTitle="Số trận"
-          />
-        </ChartCard>
-
-        {/* Heatmap */}
-        <ChartCard title="Khung giờ hoạt động" subtitle="Heatmap 7×24">
-          <Heatmap
-            grid={safeArr(
-              hm?.grid as number[][],
-              Array.from({ length: 7 }, () => Array(24).fill(0))
-            )}
-          />
-        </ChartCard>
-
-        {/* Top đối thủ */}
-        <ChartCard title="Top đối thủ" subtitle="Gặp nhiều nhất">
-          {opps.map((x: any, i: number) => (
-            <View key={`${x?._id || x?.name || "opp"}-${i}`} style={styles.row}>
-              <Text style={{ color: "#fff", flex: 1 }} numberOfLines={1}>
-                {i + 1}. {x?.name || x?.nickname || "Ẩn danh"}
-              </Text>
-              <Text style={{ color: "#ddd" }}>
-                x{fmt(x?.times ?? x?.count ?? 0)}
-              </Text>
+          {/* Profile + Ranking mini */}
+          <ChartCard title="Hồ sơ & Ranking" subtitle="Thông tin nhanh">
+            <View style={styles.kpis}>
+              <KPI label="Tier" value={pf?.ranking?.tierLabel || "-"} />
+              <KPI label="Reputation" value={fmt(pf?.ranking?.reputation)} />
+              <KPI
+                label="Giải đã tham gia"
+                value={fmt(ov?.kpis?.tournamentsPlayed)}
+              />
+              <KPI label="Đăng ký" value={fmt(ov?.kpis?.registrations)} />
             </View>
-          ))}
-        </ChartCard>
+            <View style={{ marginTop: 8, alignItems: "center" }}>
+              <Radar
+                single={pf?.ranking?.single || 0}
+                double={pf?.ranking?.double || 0}
+                mix={pf?.ranking?.mix || 0}
+              />
+            </View>
+          </ChartCard>
 
-        <View style={{ height: 28 }} />
-      </ScrollView>
+          {/* KPIs tổng quan */}
+          <ChartCard title="Tổng quan" subtitle="Kết quả & thời lượng">
+            <View style={styles.kpis}>
+              <KPI label="Trận" value={fmt(ov?.kpis?.totalMatches)} />
+              <KPI label="Winrate" value={`${ov?.kpis?.winrate ?? 0}%`} />
+              <KPI label="Thắng" value={fmt(ov?.kpis?.wins)} />
+              <KPI label="Thua" value={fmt(ov?.kpis?.losses)} />
+              <KPI label="Đang live" value={fmt(ov?.kpis?.liveMatches)} />
+              <KPI label="Đã xong" value={fmt(ov?.kpis?.finishedMatches)} />
+              <KPI label="Tổng phút" value={fmt(ov?.kpis?.totalPlayMin)} />
+              <KPI label="Phút/trận" value={fmt(ov?.kpis?.avgMatchMin)} />
+            </View>
+          </ChartCard>
+
+          {/* Donut: status */}
+          <ChartCard title="Phân bố trạng thái trận" subtitle="Donut">
+            <Donut
+              items={byStatus.map((x: any) => ({
+                label: String(x.label ?? x._id ?? "Khác"),
+                value: Number(x.value ?? 0),
+              }))}
+              centerTitle="Tổng trận"
+            />
+          </ChartCard>
+
+          {/* Donut: top tournaments */}
+          <ChartCard title="Giải tham gia nhiều" subtitle="Top 10">
+            <Donut
+              items={topTours.slice(0, 10).map((x: any) => ({
+                label: String(x.label ?? x.name ?? "Giải"),
+                value: Number(x.value ?? x.count ?? 0),
+              }))}
+              centerTitle="Số trận"
+            />
+          </ChartCard>
+
+          {/* Heatmap */}
+          <ChartCard title="Khung giờ hoạt động" subtitle="Heatmap 7×24">
+            <Heatmap
+              grid={safeArr(
+                hm?.grid as number[][],
+                Array.from({ length: 7 }, () => Array(24).fill(0))
+              )}
+            />
+          </ChartCard>
+
+          {/* Top đối thủ */}
+          <ChartCard title="Top đối thủ" subtitle="Gặp nhiều nhất">
+            {opps.map((x: any, i: number) => (
+              <View
+                key={`${x?._id || x?.name || "opp"}-${i}`}
+                style={styles.row}
+              >
+                <Text style={{ color: "#fff", flex: 1 }} numberOfLines={1}>
+                  {i + 1}. {x?.name || x?.nickname || "Ẩn danh"}
+                </Text>
+                <Text style={{ color: "#ddd" }}>
+                  x{fmt(x?.times ?? x?.count ?? 0)}
+                </Text>
+              </View>
+            ))}
+          </ChartCard>
+
+          <View style={{ height: 28 }} />
+        </ScrollView>
+      </AuthGuard>
     </SafeAreaView>
   );
 }

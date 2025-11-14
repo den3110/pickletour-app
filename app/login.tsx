@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   Alert,
   useColorScheme,
+  Keyboard, // ⬅️ THÊM
 } from "react-native";
 import { Image } from "expo-image";
 import { router, Stack, Redirect } from "expo-router";
@@ -20,7 +21,7 @@ import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import apiSlice from "@/slices/apiSlice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import LottieView from "lottie-react-native"; // ⬅️ NEW
+import LottieView from "lottie-react-native";
 
 /* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
@@ -35,15 +36,12 @@ const normPhone = (v) => {
 const isLikelyPhone = (raw) => {
   if (!raw) return false;
   const s = normPhone(raw);
-  return /^0\d{8,10}$/.test(s); // 9–11 số tuỳ mạng
+  return /^0\d{8,10}$/.test(s);
 };
 
-/** Logo cục bộ: đặt file ở /assets/logo.png */
 const LOGO_SRC = require("@/assets/images/icon.png");
-/** Lottie background */
 const BG_LOTTIE = require("@/assets/lottie/animated-bg.json");
 
-/** Chiều cao vùng nút cố định dưới cùng (để chừa khoảng trống ScrollView) */
 const BOTTOM_ACTIONS_H = 132;
 
 export default function LoginScreen() {
@@ -64,8 +62,23 @@ export default function LoginScreen() {
   // State
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [keyboardVisible, setKeyboardVisible] = useState(false); // ⬅️ THÊM
 
-  // Loại input
+  // ⬅️ THÊM: Lắng nghe keyboard
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const kind = useMemo(() => {
     const v = (loginId || "").trim();
     if (v.includes("@")) return "email";
@@ -97,7 +110,7 @@ export default function LoginScreen() {
         ? { email: normEmail(id), password: pass }
         : kind === "phone"
         ? { phone: normPhone(id), password: pass }
-        : { nickname: id, password: pass }; // BE cần hỗ trợ nickname
+        : { nickname: id, password: pass };
 
     try {
       const res = await login(payload).unwrap();
@@ -124,9 +137,7 @@ export default function LoginScreen() {
   ) : (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      {/* ===== Root container để đặt BG Lottie phía sau toàn bộ ===== */}
       <View style={{ flex: 1 }}>
-        {/* BG Lottie (absolute, không chặn touch) */}
         <LottieView
           source={BG_LOTTIE}
           autoPlay
@@ -135,7 +146,6 @@ export default function LoginScreen() {
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
-        {/* Scrim nhẹ để nội dung nổi bật hơn */}
         <View
           pointerEvents="none"
           style={[
@@ -157,7 +167,10 @@ export default function LoginScreen() {
               contentContainerStyle={[
                 styles.scroll,
                 {
-                  paddingBottom: BOTTOM_ACTIONS_H + insets.bottom + 16, // chừa chỗ cho nút cố định
+                  // ⬅️ SỬA: Chỉ padding khi keyboard KHÔNG hiện
+                  paddingBottom: keyboardVisible
+                    ? 16
+                    : BOTTOM_ACTIONS_H + insets.bottom + 16,
                 },
               ]}
               keyboardShouldPersistTaps="handled"
@@ -168,7 +181,6 @@ export default function LoginScreen() {
                   { backgroundColor: cardBg, borderColor: border },
                 ]}
               >
-                {/* Logo (Expo Image) */}
                 <View
                   style={[
                     styles.logoWrap,
@@ -190,12 +202,12 @@ export default function LoginScreen() {
 
                 <View style={styles.form}>
                   <Text style={[styles.label, { color: textSecondary }]}>
-                    Email / Số điện thoại hoặc Nickname
+                    Email / Số điện thoại
                   </Text>
                   <TextInput
                     value={loginId}
                     onChangeText={setLoginId}
-                    placeholder="Email / Số điện thoại hoặc Nickname"
+                    placeholder="Email / Số điện thoại"
                     placeholderTextColor="#9aa0a6"
                     style={[
                       styles.input,
@@ -233,7 +245,6 @@ export default function LoginScreen() {
                     onSubmitEditing={onSubmit}
                   />
 
-                  {/* Đăng nhập */}
                   <Pressable
                     onPress={onSubmit}
                     disabled={isLoading}
@@ -252,7 +263,6 @@ export default function LoginScreen() {
                     )}
                   </Pressable>
 
-                  {/* Quên mật khẩu — dưới nút đăng nhập, căn giữa, màu đen */}
                   <Pressable
                     onPress={() => router.push("/forgot-password")}
                     style={{ alignSelf: "center", marginTop: 10 }}
@@ -272,50 +282,50 @@ export default function LoginScreen() {
           </View>
         </KeyboardAvoidingView>
 
-        {/* ===== Nút cố định dưới cùng (nằm trên BG) ===== */}
-        <View
-          style={[
-            styles.bottomActions,
-            {
-              backgroundColor: cardBg,
-              borderTopColor: border,
-              paddingBottom: insets.bottom + 10,
-            },
-          ]}
-        >
-          {/* Trang chủ (outline đen) */}
-          <Pressable
-            onPress={() => router.push("/(tabs)")}
-            style={({ pressed }) => [
-              styles.btnOutlinePill,
+        {/* ⬅️ SỬA: Chỉ hiện 2 nút khi keyboard KHÔNG hiện */}
+        {!keyboardVisible && (
+          <View
+            style={[
+              styles.bottomActions,
               {
-                borderColor: border,
-                opacity: pressed ? 0.92 : 1,
+                backgroundColor: cardBg,
+                borderTopColor: border,
+                paddingBottom: insets.bottom + 10,
               },
             ]}
           >
-            <Text style={[styles.btnOutlineText, { color: "#555" }]}>
-              Trang chủ
-            </Text>
-          </Pressable>
+            <Pressable
+              onPress={() => router.push("/(tabs)")}
+              style={({ pressed }) => [
+                styles.btnOutlinePill,
+                {
+                  borderColor: border,
+                  opacity: pressed ? 0.92 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.btnOutlineText, { color: "#555" }]}>
+                Trang chủ
+              </Text>
+            </Pressable>
 
-          {/* Đăng ký (outline xanh) */}
-          <Pressable
-            onPress={() => router.push("/register")}
-            style={({ pressed }) => [
-              styles.btnOutlinePill,
-              {
-                borderColor: tint,
-                opacity: pressed ? 0.92 : 1,
-                marginTop: 10,
-              },
-            ]}
-          >
-            <Text style={[styles.btnOutlineText, { color: tint }]}>
-              Đăng ký
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              onPress={() => router.push("/register")}
+              style={({ pressed }) => [
+                styles.btnOutlinePill,
+                {
+                  borderColor: tint,
+                  opacity: pressed ? 0.92 : 1,
+                  marginTop: 10,
+                },
+              ]}
+            >
+              <Text style={[styles.btnOutlineText, { color: tint }]}>
+                Đăng ký
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </>
   );
@@ -333,7 +343,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  /* Logo container: nền nhẹ + viền */
   logoWrap: {
     alignSelf: "center",
     width: 110,
@@ -364,8 +373,6 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.select({ ios: 12, android: 10 }),
     fontSize: 16,
   },
-
-  /* Buttons */
   btnSolid: {
     marginTop: 18,
     paddingVertical: 14,
@@ -373,8 +380,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnTextWhite: { color: "#fff", fontWeight: "700", fontSize: 16 },
-
-  /* Bottom fixed actions */
   bottomActions: {
     position: "absolute",
     left: 0,
@@ -386,8 +391,8 @@ const styles = StyleSheet.create({
   btnOutlinePill: {
     width: "100%",
     paddingVertical: 14,
-    borderRadius: 999, // góc 50% (pill)
-    borderWidth: 1, // viền rõ ràng
+    borderRadius: 999,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
