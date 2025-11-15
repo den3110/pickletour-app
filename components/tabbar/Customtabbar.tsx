@@ -209,7 +209,7 @@ export function CustomTabBar({
           // giữ nguyên chiều cao cũ
           height: TAB_BAR_HEIGHT + CURVE_HEIGHT,
           // 🔧 FIX CHÍNH: kéo cả tabbar lên khỏi thanh điều hướng Android
-          bottom: Platform.OS === "android" ? bottomInset : 0,
+          bottom: Platform.OS === "android" ? 0 : 0,
         },
       ]}
     >
