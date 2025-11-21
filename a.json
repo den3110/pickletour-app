@@ -1,0 +1,1652 @@
+{
+  "_id": "68d7ccffc6d361dcd741b07a",
+  "tournament": {
+    "_id": "68c81897630cb625c458ea6f",
+    "name": "Giải 9",
+    "eventType": "double"
+  },
+  "bracket": {
+    "_id": "68d7ccffc6d361dcd741b070",
+    "name": "Knockout",
+    "type": "knockout",
+    "stage": 2
+  },
+  "format": "knockout",
+  "branch": "main",
+  "pool": { "id": null, "name": "" },
+  "phase": null,
+  "swissRound": null,
+  "rrRound": null,
+  "round": 1,
+  "order": 0,
+  "code": "R1#0",
+  "pairA": {
+    "_id": "68ca8e5e805040f95ff4c003",
+    "tournament": "68c81897630cb625c458ea6f",
+    "player1": {
+      "user": {
+        "_id": "68b9b4a94fdec30f1eb284be",
+        "name": "Nguyễn Duy Tùng",
+        "nickname": "top1pickleball",
+        "phone": "0388015982",
+        "avatar": "http://localhost:5001/uploads/avatars/1758181217843-download.jpg",
+        "cccd": "036091012395",
+        "cccdImages": {
+          "front": "/uploads/cccd\\1758768433239-front.jpeg",
+          "back": "/uploads/cccd\\1758768433254-back.jpeg"
+        }
+      },
+      "phone": "0388015982",
+      "fullName": "Nguyễn A",
+      "nickName": "top1pickleball",
+      "avatar": "http://192.168.0.105:5001/uploads/avatars/1758102099726-54f85cb1-ce0b-4298-b6a7-f3fde6526365.jpg",
+      "score": 2.5,
+      "nickname": "top1pickleball",
+      "name": "Nguyễn Duy Tùng",
+      "cccd": "036091012395",
+      "cccdImages": {
+        "front": "/uploads/cccd\\1758768433239-front.jpeg",
+        "back": "/uploads/cccd\\1758768433254-back.jpeg"
+      }
+    },
+    "player2": {
+      "user": {
+        "_id": "68a3fdd26d40542a9ad59118",
+        "name": "Trần Gia Long",
+        "nickname": "long.tran",
+        "phone": "0823433783",
+        "avatar": "",
+        "cccdImages": {
+          "front": "/uploads/cccd\\1757437323139-front.png",
+          "back": "/uploads/cccd\\1757437323140-back.png"
+        },
+        "cccd": "011512454545"
+      },
+      "phone": "0823433783",
+      "fullName": "Trần Gia Long",
+      "nickName": "long.tran",
+      "avatar": "",
+      "score": 5,
+      "nickname": "long.tran",
+      "name": "Trần Gia Long",
+      "cccd": "011512454545",
+      "cccdImages": {
+        "front": "/uploads/cccd\\1757437323139-front.png",
+        "back": "/uploads/cccd\\1757437323140-back.png"
+      }
+    },
+    "message": "",
+    "payment": { "status": "Paid", "paidAt": "2025-10-04T06:58:26.744Z" },
+    "createdBy": "68b9b4a94fdec30f1eb284be",
+    "createdAt": "2025-09-17T10:33:02.299Z",
+    "updatedAt": "2025-10-04T06:58:26.744Z",
+    "__v": 0,
+    "code": 10001
+  },
+  "pairB": {
+    "_id": "68cef52895e4a2f32093a339",
+    "tournament": "68c81897630cb625c458ea6f",
+    "player1": {
+      "user": {
+        "_id": "68a3fdd36d40542a9ad59120",
+        "name": "Đặng Tuấn Tú",
+        "nickname": "tu.dang",
+        "phone": "0324940350",
+        "avatar": "",
+        "cccdImages": {
+          "front": "/uploads/cccd\\1758387396825-front.png",
+          "back": "/uploads/cccd\\1758387396828-back.png"
+        },
+        "cccd": "121545845454"
+      },
+      "phone": "0324940350",
+      "fullName": "Đặng Tuấn Tú",
+      "nickName": "tu.dang",
+      "avatar": "",
+      "score": 0,
+      "nickname": "tu.dang",
+      "name": "Đặng Tuấn Tú",
+      "cccd": "121545845454",
+      "cccdImages": {
+        "front": "/uploads/cccd\\1758387396825-front.png",
+        "back": "/uploads/cccd\\1758387396828-back.png"
+      }
+    },
+    "player2": {
+      "user": {
+        "_id": "68a5374ea1cfc57219ae08d7",
+        "name": "Võ Tuấn Hạnh",
+        "nickname": "hanh.vo",
+        "phone": "0825107389",
+        "avatar": "",
+        "cccd": "562395757427",
+        "cccdImages": { "front": "", "back": "" }
+      },
+      "phone": "0825107389",
+      "fullName": "Võ Tuấn Hạnh",
+      "nickName": "hanh.vo",
+      "avatar": "",
+      "score": 4.5,
+      "nickname": "hanh.vo",
+      "name": "Võ Tuấn Hạnh",
+      "cccd": "562395757427",
+      "cccdImages": { "front": "", "back": "" }
+    },
+    "message": "",
+    "payment": { "status": "Paid", "paidAt": "2025-10-04T06:58:25.504Z" },
+    "createdBy": "68a3fdd36d40542a9ad59120",
+    "code": 10020,
+    "createdAt": "2025-09-20T18:40:40.291Z",
+    "updatedAt": "2025-10-04T06:58:25.505Z",
+    "__v": 0
+  },
+  "previousA": null,
+  "previousB": null,
+  "rules": {
+    "bestOf": 3,
+    "pointsToWin": 11,
+    "winByTwo": true,
+    "cap": { "mode": "none", "points": null }
+  },
+  "status": "live",
+  "winner": "",
+  "referee": [
+    { "_id": "68962f46b97b30b76b3002a7", "name": "ref1", "nickname": "ref1" },
+    {
+      "_id": "6898b4e171cf0d788a270cb3",
+      "name": "Nguyễn Trọng Tài",
+      "nickname": "ref11"
+    },
+    {
+      "_id": "68a3fdd16d40542a9ad5910e",
+      "name": "Huỳnh Gia Quân",
+      "nickname": "quan.huynh"
+    },
+    {
+      "_id": "68a6b2a5e3c3de219aec9dde",
+      "name": "Hồ Thuỳ Tú",
+      "nickname": "tu.ho"
+    },
+    {
+      "_id": "68a3fdd26d40542a9ad59118",
+      "name": "Trần Gia Long",
+      "nickname": "long.tran"
+    },
+    {
+      "_id": "68a6b2c5e3c3de219aec9e1c",
+      "name": "Bùi Quốc Châu",
+      "nickname": "chau.bui"
+    },
+    {
+      "_id": "68b9b4a94fdec30f1eb284be",
+      "name": "Nguyễn Duy Tùng",
+      "nickname": "top1pickleball"
+    }
+  ],
+  "note": "",
+  "nextMatch": "68d7ccffc6d361dcd741b083",
+  "nextSlot": "A",
+  "scheduledAt": null,
+  "court": "68e0c3a2d6c6f5cc00684f99",
+  "courtLabel": "Sân 1",
+  "courtCluster": "68d7ccffc6d361dcd741b070",
+  "queueOrder": 1,
+  "assignedAt": "2025-10-04T08:06:52.140Z",
+  "participants": [
+    "68b9b4a94fdec30f1eb284be",
+    "68a3fdd26d40542a9ad59118",
+    "68a3fdd36d40542a9ad59120",
+    "68a5374ea1cfc57219ae08d7"
+  ],
+  "currentGame": 0,
+  "serve": {
+    "side": "A",
+    "server": 1,
+    "serverId": "68a3fdd26d40542a9ad59118",
+    "receiverId": "68a5374ea1cfc57219ae08d7"
+  },
+  "startedAt": "2025-10-11T19:06:28.818Z",
+  "finishedAt": null,
+  "liveBy": "6898b4e171cf0d788a270cb3",
+  "liveVersion": 117,
+  "video": "",
+  "ratingDelta": 0,
+  "ratingApplied": false,
+  "ratingAppliedAt": null,
+  "stageIndex": 1,
+  "labelKey": "V1#R1#1",
+  "gameScores": [
+    { "a": 14, "b": 9, "capped": false, "_id": "68f8f8510b19b7a2f09ff5f1" }
+  ],
+  "liveLog": [
+    {
+      "type": "point",
+      "by": "6898b4e171cf0d788a270cb3",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-11T19:06:34.965Z",
+      "_id": "68eaaabad967d3ef72b2425c"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:36.831Z",
+      "_id": "68f87fe80b19b7a2f09f4850"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:38.083Z",
+      "_id": "68f87fea0b19b7a2f09f48a6"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:39.341Z",
+      "_id": "68f87feb0b19b7a2f09f4903"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:40.691Z",
+      "_id": "68f87fec0b19b7a2f09f495f"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:42.773Z",
+      "_id": "68f87fee0b19b7a2f09f49bf"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:43.957Z",
+      "_id": "68f87fef0b19b7a2f09f4a21"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:44.653Z",
+      "_id": "68f87ff00b19b7a2f09f4a86"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:46.374Z",
+      "_id": "68f87ff20b19b7a2f09f4af0"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:51.146Z",
+      "_id": "68f87ff70b19b7a2f09f4b60"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:52.930Z",
+      "_id": "68f87ff80b19b7a2f09f4bce"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:54.173Z",
+      "_id": "68f87ffa0b19b7a2f09f4c43"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:54.754Z",
+      "_id": "68f87ffa0b19b7a2f09f4cb7"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T06:55:55.096Z",
+      "_id": "68f87ffb0b19b7a2f09f4d2e"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:55.322Z",
+      "_id": "68f87ffb0b19b7a2f09f4da8"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T06:55:56.746Z",
+      "_id": "68f87ffc0b19b7a2f09f4e26"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T06:56:01.242Z",
+      "_id": "68f880010b19b7a2f09f4e91"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T06:56:02.248Z",
+      "_id": "68f880020b19b7a2f09f4eca"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T06:56:03.002Z",
+      "_id": "68f880030b19b7a2f09f4eff"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T06:56:03.644Z",
+      "_id": "68f880030b19b7a2f09f4f34"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T06:56:04.605Z",
+      "_id": "68f880040b19b7a2f09f4f6a"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T06:56:05.437Z",
+      "_id": "68f880050b19b7a2f09f4fa1"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T06:56:07.526Z",
+      "_id": "68f880070b19b7a2f09f4fd9"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:56:20.703Z",
+      "_id": "68f880140b19b7a2f09f503a"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:56:21.243Z",
+      "_id": "68f880150b19b7a2f09f50d2"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T06:56:23.103Z",
+      "_id": "68f880170b19b7a2f09f516d"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T07:03:06.299Z",
+      "_id": "68f881aa0b19b7a2f09f552c"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T07:03:07.575Z",
+      "_id": "68f881ab0b19b7a2f09f55ce"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:07:07.670Z",
+      "_id": "68f8829b0b19b7a2f09f56b9"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T07:07:08.662Z",
+      "_id": "68f8829c0b19b7a2f09f56fd"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:07:10.516Z",
+      "_id": "68f8829e0b19b7a2f09f573d"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T07:07:11.339Z",
+      "_id": "68f8829f0b19b7a2f09f577e"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:11:21.894Z",
+      "_id": "68f883990b19b7a2f09f5a9d"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T07:11:22.509Z",
+      "_id": "68f8839a0b19b7a2f09f5ae0"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:11:22.933Z",
+      "_id": "68f8839a0b19b7a2f09f5b24"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T07:11:23.504Z",
+      "_id": "68f8839b0b19b7a2f09f5b69"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:11:24.324Z",
+      "_id": "68f8839c0b19b7a2f09f5bb0"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T07:11:24.919Z",
+      "_id": "68f8839c0b19b7a2f09f5bf8"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T07:11:26.943Z",
+      "_id": "68f8839e0b19b7a2f09f5c40"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T07:11:28.174Z",
+      "_id": "68f883a00b19b7a2f09f5cb5"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T07:11:29.553Z",
+      "_id": "68f883a10b19b7a2f09f5d75"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68b9b4a94fdec30f1eb284be"
+      },
+      "at": "2025-10-22T07:11:32.528Z",
+      "_id": "68f883a40b19b7a2f09f5e06"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T11:24:08.122Z",
+      "_id": "68f8bed80b19b7a2f09f823e"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68b9b4a94fdec30f1eb284be"
+      },
+      "at": "2025-10-22T11:24:09.198Z",
+      "_id": "68f8bed90b19b7a2f09f828f"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T11:24:09.892Z",
+      "_id": "68f8bed90b19b7a2f09f82dd"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68b9b4a94fdec30f1eb284be"
+      },
+      "at": "2025-10-22T11:24:10.590Z",
+      "_id": "68f8beda0b19b7a2f09f832c"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T11:24:11.694Z",
+      "_id": "68f8bedb0b19b7a2f09f837c"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68b9b4a94fdec30f1eb284be"
+      },
+      "at": "2025-10-22T11:24:12.241Z",
+      "_id": "68f8bedc0b19b7a2f09f83cd"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:02.647Z",
+      "_id": "68f8bfc20b19b7a2f09f854f"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:28:04.851Z",
+      "_id": "68f8bfc40b19b7a2f09f8632"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:28:05.678Z",
+      "_id": "68f8bfc50b19b7a2f09f8718"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:06.970Z",
+      "_id": "68f8bfc60b19b7a2f09f8801"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T11:28:07.862Z",
+      "_id": "68f8bfc70b19b7a2f09f88ee"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T11:28:08.791Z",
+      "_id": "68f8bfc80b19b7a2f09f89df"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:10.019Z",
+      "_id": "68f8bfca0b19b7a2f09f8ad1"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:28:11.392Z",
+      "_id": "68f8bfcb0b19b7a2f09f8bc6"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T11:28:14.545Z",
+      "_id": "68f8bfce0b19b7a2f09f8c81"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T11:28:15.419Z",
+      "_id": "68f8bfcf0b19b7a2f09f8ce1"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T11:28:16.140Z",
+      "_id": "68f8bfd00b19b7a2f09f8d3d"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T11:28:16.906Z",
+      "_id": "68f8bfd00b19b7a2f09f8d9a"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T11:28:17.668Z",
+      "_id": "68f8bfd10b19b7a2f09f8df8"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T11:28:18.652Z",
+      "_id": "68f8bfd20b19b7a2f09f8e57"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T11:28:19.224Z",
+      "_id": "68f8bfd30b19b7a2f09f8eb7"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:19.973Z",
+      "_id": "68f8bfd30b19b7a2f09f8f5d"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:20.618Z",
+      "_id": "68f8bfd40b19b7a2f09f906d"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:21.368Z",
+      "_id": "68f8bfd50b19b7a2f09f9180"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:28:21.613Z",
+      "_id": "68f8bfd50b19b7a2f09f9296"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:29:35.061Z",
+      "_id": "68f8c01f0b19b7a2f09f93dd"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T11:29:36.742Z",
+      "_id": "68f8c0200b19b7a2f09f94fd"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:38.587Z",
+      "_id": "68f8c0220b19b7a2f09f961c"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:39.019Z",
+      "_id": "68f8c0230b19b7a2f09f973e"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:39.330Z",
+      "_id": "68f8c0230b19b7a2f09f9863"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:39.563Z",
+      "_id": "68f8c0230b19b7a2f09f998b"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:39.811Z",
+      "_id": "68f8c0230b19b7a2f09f9ab6"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:40.450Z",
+      "_id": "68f8c0240b19b7a2f09f9be5"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:40.844Z",
+      "_id": "68f8c0240b19b7a2f09f9d16"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:41.472Z",
+      "_id": "68f8c0250b19b7a2f09f9e4a"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:41.955Z",
+      "_id": "68f8c0250b19b7a2f09f9f81"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:42.428Z",
+      "_id": "68f8c0260b19b7a2f09fa0c8"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:47.646Z",
+      "_id": "68f8c02b0b19b7a2f09fa20c"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T11:29:48.761Z",
+      "_id": "68f8c02c0b19b7a2f09fa34c"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 2 }
+      },
+      "at": "2025-10-22T12:41:59.395Z",
+      "_id": "68f8d1170b19b7a2f09fae67"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T12:42:00.642Z",
+      "_id": "68f8d1180b19b7a2f09fafad"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:10.081Z",
+      "_id": "68f8d91a0b19b7a2f09fbeb9"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:11.687Z",
+      "_id": "68f8d91b0b19b7a2f09fbf2f"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:12.802Z",
+      "_id": "68f8d91c0b19b7a2f09fbfa7"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:13.227Z",
+      "_id": "68f8d91d0b19b7a2f09fc01f"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:13.881Z",
+      "_id": "68f8d91d0b19b7a2f09fc098"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:41.986Z",
+      "_id": "68f8d9390b19b7a2f09fc118"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:42.598Z",
+      "_id": "68f8d93a0b19b7a2f09fc197"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:43.218Z",
+      "_id": "68f8d93b0b19b7a2f09fc213"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:43.860Z",
+      "_id": "68f8d93b0b19b7a2f09fc290"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:44.556Z",
+      "_id": "68f8d93c0b19b7a2f09fc30e"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:45.243Z",
+      "_id": "68f8d93d0b19b7a2f09fc38d"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:47.740Z",
+      "_id": "68f8d93f0b19b7a2f09fc40d"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:48.679Z",
+      "_id": "68f8d9400b19b7a2f09fc48f"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:50.516Z",
+      "_id": "68f8d9420b19b7a2f09fc511"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:16:51.143Z",
+      "_id": "68f8d9430b19b7a2f09fc594"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:16:51.717Z",
+      "_id": "68f8d9430b19b7a2f09fc618"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:35:27.355Z",
+      "_id": "68f8dd9f0b19b7a2f09fc777"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T13:35:28.089Z",
+      "_id": "68f8dda00b19b7a2f09fc801"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T13:35:28.990Z",
+      "_id": "68f8dda00b19b7a2f09fc888"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a3fdd36d40542a9ad59120"
+      },
+      "at": "2025-10-22T14:09:11.827Z",
+      "_id": "68f8e5870b19b7a2f09fd685"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 1 }
+      },
+      "at": "2025-10-22T14:15:49.536Z",
+      "_id": "68f8e7150b19b7a2f09fdb2d"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": -1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T14:15:54.169Z",
+      "_id": "68f8e71a0b19b7a2f09fdcb6"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "B",
+        "step": 1,
+        "prevServe": { "side": "B", "server": 2 }
+      },
+      "at": "2025-10-22T14:16:41.833Z",
+      "_id": "68f8e7490b19b7a2f09fdeec"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T14:33:35.709Z",
+      "_id": "68f8eb3f0b19b7a2f09fe215"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T14:33:36.421Z",
+      "_id": "68f8eb400b19b7a2f09fe2a7"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T14:33:36.898Z",
+      "_id": "68f8eb400b19b7a2f09fe328"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T14:33:37.184Z",
+      "_id": "68f8eb410b19b7a2f09fe3b7"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T14:33:37.252Z",
+      "_id": "68f8eb410b19b7a2f09fe43a"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T14:33:37.864Z",
+      "_id": "68f8eb410b19b7a2f09fe4cd"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T14:33:38.635Z",
+      "_id": "68f8eb420b19b7a2f09fe55f"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T14:33:39.372Z",
+      "_id": "68f8eb430b19b7a2f09fe5f2"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "B", "server": 1 },
+        "next": { "side": "B", "server": 1 },
+        "serverId": "68a5374ea1cfc57219ae08d7"
+      },
+      "at": "2025-10-22T14:33:40.772Z",
+      "_id": "68f8eb440b19b7a2f09fe686"
+    },
+    {
+      "type": "serve",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "prevServe": { "side": "A", "server": 1 },
+        "next": { "side": "A", "server": 1 },
+        "serverId": "68a3fdd26d40542a9ad59118"
+      },
+      "at": "2025-10-22T14:33:41.443Z",
+      "_id": "68f8eb450b19b7a2f09fe71b"
+    },
+    {
+      "type": "point",
+      "by": "68b9b4a94fdec30f1eb284be",
+      "payload": {
+        "team": "A",
+        "step": 1,
+        "prevServe": { "side": "A", "server": 1 }
+      },
+      "at": "2025-10-22T15:29:21.980Z",
+      "_id": "68f8f8510b19b7a2f09ff5f2"
+    }
+  ],
+  "__v": 119,
+  "createdAt": "2025-09-27T11:39:43.215Z",
+  "updatedAt": "2025-10-22T15:48:28.249Z",
+  "facebookLive": {
+    "id": "821918623687161",
+    "pageId": "956858681111269",
+    "permalink_url": "https://www.facebook.com/956858681111269/videos/821918623687161/",
+    "secure_stream_url": "rtmps://live-api-s.facebook.com:443/rtmp/821918623687161?s_bl=1&s_ow=10&s_psm=1&s_pub=1&s_sw=0&s_tids=1&s_vt=api-s&a=Ab3smJfeqQeOQTRdbKogjlZI",
+    "server_url": "rtmps://live-api-s.facebook.com:443/rtmp/",
+    "stream_key": "821918623687161?s_bl=1&s_ow=10&s_psm=1&s_pub=1&s_sw=0&s_tids=1&s_vt=api-s&a=Ab3smJfeqQeOQTRdbKogjlZI",
+    "status": "CREATED",
+    "createdAt": "2025-10-20T17:29:59.373Z"
+  },
+  "meta": {
+    "facebook": {
+      "pageId": "956858681111269",
+      "pageName": "PT03 (956858681111269)",
+      "permalinkUrl": "https://www.facebook.com/956858681111269/videos/821918623687161/",
+      "live": {
+        "id": "821918623687161",
+        "serverUrl": "rtmps://live-api-s.facebook.com:443/rtmp/",
+        "streamKey": "821918623687161?s_bl=1&s_ow=10&s_psm=1&s_pub=1&s_sw=0&s_tids=1&s_vt=api-s&a=Ab3smJfeqQeOQTRdbKogjlZI",
+        "streamKeyMasked": "821918…jlZI",
+        "status": "CREATED",
+        "createdAt": "2025-10-20T17:29:59.375Z",
+        "permalinkUrl": "https://www.facebook.com/956858681111269/videos/821918623687161/"
+      },
+      "raw": {
+        "id": "821918623687161",
+        "stream_url": "rtmps://live-api-s.facebook.com:443/rtmp/821918623687161?s_bl=1&s_ow=10&s_psm=1&s_pub=1&s_sw=0&s_tids=1&s_vt=api-s&a=Ab3smJfeqQeOQTRdbKogjlZI",
+        "secure_stream_url": "•••",
+        "stream_secondary_urls": [],
+        "secure_stream_secondary_urls": []
+      }
+    },
+    "youtube": {
+      "videoId": "907V3EM9-k4",
+      "watchUrl": "https://www.youtube.com/watch?v=907V3EM9-k4",
+      "live": {
+        "serverUrl": "rtmps://a.rtmps.youtube.com/live2",
+        "streamKey": "smb9-wx71-v3dp-7z7q-fa38",
+        "streamKeyMasked": "smb9-w…fa38",
+        "status": "CREATED",
+        "createdAt": "2025-10-20T17:30:03.885Z"
+      },
+      "raw": {
+        "broadcast": {
+          "kind": "youtube#liveBroadcast",
+          "etag": "6UUF7W1sVDsPC3v8Qim9oFFVdXE",
+          "id": "907V3EM9-k4",
+          "snippet": {
+            "publishedAt": "2025-10-20T17:30:02Z",
+            "channelId": "UCMne8LllXxNwP8Cx_Mm0h2g",
+            "title": "Giải 9 – V1#R1#1 · Sân 1",
+            "description": "Trực tiếp trận đấu trên PickleTour.\nScoreboard overlay: https://pickletour.vn/overlay/score?matchId=68d7ccffc6d361dcd741b07a&theme=fb&ratio=16:9&safe=1",
+            "thumbnails": {
+              "default": {
+                "url": "https://i.ytimg.com/vi/907V3EM9-k4/default_live.jpg",
+                "width": 120,
+                "height": 90
+              },
+              "medium": {
+                "url": "https://i.ytimg.com/vi/907V3EM9-k4/mqdefault_live.jpg",
+                "width": 320,
+                "height": 180
+              },
+              "high": {
+                "url": "https://i.ytimg.com/vi/907V3EM9-k4/hqdefault_live.jpg",
+                "width": 480,
+                "height": 360
+              }
+            },
+            "scheduledStartTime": "2025-10-20T17:30:01Z",
+            "isDefaultBroadcast": false,
+            "liveChatId": "KicKGFVDTW5lOExsbFh4TndQOEN4X01tMGgyZxILOTA3VjNFTTktazQ"
+          },
+          "status": {
+            "lifeCycleStatus": "created",
+            "privacyStatus": "unlisted",
+            "recordingStatus": "notRecording",
+            "madeForKids": false,
+            "selfDeclaredMadeForKids": false
+          },
+          "contentDetails": {
+            "monitorStream": {
+              "enableMonitorStream": true,
+              "broadcastStreamDelayMs": 0,
+              "embedHtml": "<iframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/907V3EM9-k4?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen></iframe>"
+            },
+            "enableEmbed": true,
+            "enableDvr": true,
+            "enableContentEncryption": false,
+            "recordFromStart": true,
+            "enableClosedCaptions": false,
+            "closedCaptionsType": "closedCaptionsDisabled",
+            "enableLowLatency": false,
+            "latencyPreference": "normal",
+            "projection": "rectangular",
+            "enableAutoStart": true,
+            "enableAutoStop": true
+          }
+        },
+        "stream": {
+          "kind": "youtube#liveStream",
+          "etag": "AJnwPc7vclzvcC7P2tCyi90QjDU",
+          "id": "Mne8LllXxNwP8Cx_Mm0h2g1760774105301488",
+          "snippet": {
+            "publishedAt": "2025-10-18T07:55:05Z",
+            "channelId": "UCMne8LllXxNwP8Cx_Mm0h2g",
+            "title": "PickleTour Reusable",
+            "description": "",
+            "isDefaultStream": false
+          },
+          "cdn": {
+            "ingestionType": "rtmp",
+            "ingestionInfo": {
+              "streamName": "smb9-wx71-v3dp-7z7q-fa38",
+              "ingestionAddress": "rtmp://a.rtmp.youtube.com/live2",
+              "backupIngestionAddress": "rtmp://b.rtmp.youtube.com/live2?backup=1",
+              "rtmpsIngestionAddress": "rtmps://a.rtmps.youtube.com/live2",
+              "rtmpsBackupIngestionAddress": "rtmps://b.rtmps.youtube.com/live2?backup=1"
+            },
+            "resolution": "variable",
+            "frameRate": "variable"
+          },
+          "contentDetails": {
+            "closedCaptionsIngestionUrl": "http://upload.youtube.com/closedcaption?cid=smb9-wx71-v3dp-7z7q-fa38",
+            "isReusable": true
+          }
+        }
+      }
+    }
+  },
+  "slots": {
+    "serverId": "68a3fdd26d40542a9ad59118",
+    "updatedAt": "2025-10-22T15:48:28.246Z",
+    "version": 1,
+    "base": {
+      "A": { "68b9b4a94fdec30f1eb284be": 1, "68a3fdd26d40542a9ad59118": 2 },
+      "B": { "68a3fdd36d40542a9ad59120": 2, "68a5374ea1cfc57219ae08d7": 1 }
+    }
+  }
+}

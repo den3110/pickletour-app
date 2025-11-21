@@ -1,0 +1,138 @@
+{
+  "expo": {
+    "name": "Pickletour",
+    "slug": "pickletour-app",
+    "version": "1.0.14",
+    "orientation": "default",
+    "icon": "./assets/images/icon.png",
+    "scheme": "pickletourapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pkt.pickletour",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "buildNumber": "17",
+      "associatedDomains": [
+        "applinks:pickletour.vn",
+        "applinks:www.pickletour.vn"
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ứng dụng cần dùng camera để quét mã QR trên CCCD, chụp ảnh và hỗ trợ phát trực tiếp các trận đấu.",
+        "NSMicrophoneUsageDescription": "Ứng dụng cần dùng micro để thu âm khi bạn phát trực tiếp hoặc ghi hình video.",
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần truy cập thư viện ảnh để bạn chọn ảnh đại diện và ảnh CCCD (mặt trước/mặt sau) để xác minh tài khoản.",
+        "NSFaceIDUsageDescription": "Ứng dụng dùng Face ID/Touch ID/Passcode để xác thực các hành động nhạy cảm như xoá tài khoản.",
+        "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn và nhắc nhở tự động.",
+        "NSRemindersUsageDescription": "Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "Ứng dụng cần quyền để thêm sự kiện trận đấu vào lịch của bạn.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.pkt.pickletour",
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 13,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "pickletour.vn"
+            },
+            {
+              "scheme": "https",
+              "host": "www.pickletour.vn"
+            },
+            {
+              "scheme": "pickletour"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn."
+        }
+      ],
+      "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan the CCCD QR to auto-fill profile/tournament info.",
+          "microphonePermission": "Capture audio for livestreams and video recordings."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pick photos to upload your avatar and CCCD images.",
+          "cameraPermission": "Scan the CCCD QR to auto-fill profile information."
+        }
+      ],
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "33bf4371-b5a6-4121-a651-99f3c2f19ba2"
+      }
+    }
+  }
+}
