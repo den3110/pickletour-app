@@ -1934,6 +1934,7 @@ export default function ManageScreen() {
 
   const isInitialLoading = tourLoading || brLoading || mLoading;
   const hasError = tourErr || brErr || mErr;
+  const isRetryingError = refreshing || tourFetching || brFetching || mFetching;
 
   const buildRowsForBracket = useCallback((matches) => {
     return matches.map((m) => {
@@ -2043,15 +2044,75 @@ export default function ManageScreen() {
           <View
             style={[
               styles.alert,
-              { borderColor: t.dangerBorder, backgroundColor: t.dangerBg },
+              {
+                borderColor: t.dangerBorder,
+                backgroundColor: t.dangerBg,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                opacity: isRetryingError ? 0.9 : 1,
+              },
             ]}
           >
-            <Text style={{ color: t.dangerText }}>
+            <Text style={{ color: t.dangerText, flex: 1 }}>
               {tourErr?.data?.message ||
                 brErr?.data?.message ||
                 mErr?.data?.message ||
                 "Lỗi tải dữ liệu"}
             </Text>
+
+            <Pressable
+              onPress={onRefresh}
+              disabled={isRetryingError}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: t.dangerBorder,
+                  opacity: pressed || isRetryingError ? 0.7 : 1,
+                },
+              ]}
+              hitSlop={10}
+            >
+              {isRetryingError ? (
+                <>
+                  <ActivityIndicator size="small" color={t.dangerText} />
+                  <Text
+                    style={{
+                      marginLeft: 6,
+                      color: t.dangerText,
+                      fontSize: 12,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Đang thử lại...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <MaterialIcons
+                    name="refresh"
+                    size={16}
+                    color={t.dangerText}
+                  />
+                  <Text
+                    style={{
+                      marginLeft: 4,
+                      color: t.dangerText,
+                      fontSize: 12,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Thử lại
+                  </Text>
+                </>
+              )}
+            </Pressable>
           </View>
         </View>
       </>

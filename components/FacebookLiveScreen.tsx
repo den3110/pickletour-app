@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 14,
   },
-  progressText: { color: "#fff", marginTop: 12, fontWeight: "600" },
+  progressText: { color: "#fff", marginTop: 80, fontWeight: "600" },
 
   cancelBigBtn: {
     position: "absolute",

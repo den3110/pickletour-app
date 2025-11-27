@@ -10,7 +10,6 @@ import * as Application from "expo-application";
 import { useSelector } from "react-redux";
 import { useRegisterPushTokenMutation } from "@/slices/pushApiSlice";
 
-// Hiển thị banner khi app đang foreground (iOS)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -20,25 +19,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ===== Keys trong SecureStore =====
-// NOTE: apiSlice đang đọc "deviceId" và "pushToken"
 export const LEGACY_DEVICE_ID_KEY = "PT_DEVICE_ID";
 export const DEVICE_ID_KEY = "deviceId";
 export const PUSH_TOKEN_KEY = "pushToken";
 
 async function getOrCreateDeviceId() {
-  // 1) Thử key chuẩn
   let id = await SecureStore.getItemAsync(DEVICE_ID_KEY);
   if (id) return id;
 
-  // 2) Tương thích ngược: nếu có key cũ thì copy sang key mới
   const legacy = await SecureStore.getItemAsync(LEGACY_DEVICE_ID_KEY);
   if (legacy) {
     await SecureStore.setItemAsync(DEVICE_ID_KEY, legacy);
     return legacy;
   }
 
-  // 3) Tạo mới, lưu cả hai key (để code cũ vẫn chạy được)
   const bytes = await Crypto.getRandomBytesAsync(16);
   id = Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -52,14 +46,9 @@ async function getOrCreateDeviceId() {
 
 export function useExpoPushToken() {
   const [expoPushToken, setToken] = useState<string | null>(null);
-
-  // Lấy thông tin đăng nhập hiện tại từ Redux
   const auth = useSelector((s: any) => s.auth?.userInfo);
-
-  // RTK Query mutation để đăng ký token lên server
   const [registerPushToken] = useRegisterPushTokenMutation();
 
-  // Gửi token lên server
   const syncPushToken = async (token: string | null) => {
     if (!token) return;
     if (!auth?._id) return;
@@ -77,73 +66,114 @@ export function useExpoPushToken() {
         deviceId,
         appVersion,
       }).unwrap();
+      
+      if (__DEV__) {
+        console.log("✅ Push token registered:", token);
+      }
     } catch (e) {
-      if (__DEV__) console.log("registerPushToken failed", e);
+      if (__DEV__) console.log("❌ registerPushToken failed", e);
     }
   };
 
   useEffect(() => {
     (async () => {
-      if (Platform.OS === "web") return; // skip web
-      if (!Device.isDevice) return;
-
-      // Android: thiết lập channel
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#FF231F7C",
-        });
+      if (Platform.OS === "web") {
+        console.log("⚠️ Push notifications not supported on web");
+        return;
+      }
+      
+      if (!Device.isDevice) {
+        console.log("⚠️ Must use physical device for push notifications");
+        return;
       }
 
-      // Quyền thông báo
+      // ✅ Check nếu đang chạy trong Expo Go
+      const isExpoGo = Constants.appOwnership === "expo";
+      if (isExpoGo) {
+        console.warn("⚠️ Push notifications require a development build. Run 'eas build --profile development --platform android'");
+        return;
+      }
+
+      // Android: Setup notification channel
+      if (Platform.OS === "android") {
+        try {
+          await Notifications.setNotificationChannelAsync("default", {
+            name: "default",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#FF231F7C",
+          });
+          console.log("✅ Android notification channel created");
+        } catch (e) {
+          console.error("❌ Failed to create notification channel:", e);
+        }
+      }
+
+      // ✅ Request permissions với logs chi tiết
+      console.log("📱 Checking notification permissions...");
       const { status: existing } = await Notifications.getPermissionsAsync();
+      console.log("   Current permission status:", existing);
+      
       let finalStatus = existing;
+      
       if (existing !== "granted") {
+        console.log("📱 Requesting notification permissions...");
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        console.log("   New permission status:", finalStatus);
       }
 
       if (finalStatus !== "granted") {
-        // ❌ Không có quyền → xoá token khỏi SecureStore (tránh gửi header cũ)
+        console.warn("❌ Notification permission denied");
         await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
         setToken(null);
         return;
       }
 
-      // ProjectId từ EAS
+      console.log("✅ Notification permission granted");
+
+      // Get project ID
       const projectId =
         (Constants?.expoConfig?.extra as any)?.eas?.projectId ??
         (Constants as any)?.easConfig?.projectId;
+        
       if (!projectId) {
-        if (__DEV__) console.warn("Missing EAS projectId for push token");
+        console.error("❌ Missing EAS projectId. Run 'eas build:configure'");
         return;
       }
 
-      // Lấy token & lưu vào SecureStore để apiSlice gửi X-Push-Token
-      const token = (await Notifications.getExpoPushTokenAsync({ projectId }))
-        .data;
-      setToken(token);
-      console.log("token", token)
-      await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+      console.log("📱 Getting Expo push token...");
+      console.log("   Project ID:", projectId);
 
-      // Gửi ngay nếu đã đăng nhập sẵn
-      await syncPushToken(token);
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync({ 
+          projectId 
+        });
+        const token = tokenData.data;
+        
+        console.log("✅ Got push token:", token);
+        setToken(token);
+        await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+        await syncPushToken(token);
+      } catch (e) {
+        console.error("❌ Failed to get push token:", e);
+      }
     })();
 
-    const sub1 = Notifications.addNotificationReceivedListener(() => {});
-    const sub2 = Notifications.addNotificationResponseReceivedListener(
-      () => {}
-    );
+    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
+      console.log("📬 Notification received:", notification);
+    });
+    
+    const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log("👆 Notification tapped:", response);
+    });
+    
     return () => {
       sub1.remove();
       sub2.remove();
     };
-    // giữ init 1 lần
   }, []);
 
-  // Re-sync khi user đăng nhập/đăng xuất hoặc token refresh
   useEffect(() => {
     if (expoPushToken && auth?._id) {
       syncPushToken(expoPushToken);

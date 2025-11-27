@@ -14,6 +14,8 @@ import {
   InteractionManager,
   DeviceEventEmitter,
   Platform,
+  BackHandler,
+  Alert,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -87,6 +89,14 @@ const AppDarkTheme = {
 };
 /* ===================================================== */
 
+/* ===================== STATE MACHINE ===================== */
+type AppLifecycle =
+  | { phase: "initializing" }
+  | { phase: "splash-hiding" }
+  | { phase: "ready" }
+  | { phase: "navigating"; target: string };
+/* ===================================================== */
+
 function Boot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
   useExpoPushToken();
@@ -122,9 +132,9 @@ function Boot({ children }: { children: React.ReactNode }) {
 }
 
 const isExpoGo = Constants.appOwnership === "expo";
+
 export default function RootLayout() {
   const segments = useSegments();
-  // const pathname = usePathname();
 
   // Initialize analytics
   useEffect(() => {
@@ -134,11 +144,11 @@ export default function RootLayout() {
 
   // Track screen changes
   useEffect(() => {
-    if (isExpoGo) return; 
+    if (isExpoGo) return;
     const screenName = segments.join("/") || "(tabs)";
-    // console.log(screenName)
     analytics.logScreenView(screenName);
   }, [segments]);
+
   // 1) Scheme hệ thống
   const systemScheme = useColorScheme(); // "light" | "dark"
   // 2) Pref đọc từ SecureStore
@@ -234,102 +244,246 @@ export default function RootLayout() {
   }, []);
   const fontsReady = fontsLoaded || fontTimeout;
 
-  // Splash hide control
+  /* ==================== STATE MACHINE NAVIGATION ==================== */
+  const [lifecycle, setLifecycle] = React.useState<AppLifecycle>({
+    phase: "initializing",
+  });
+
+  const navigationQueue = React.useRef<string[]>([]);
   const hiddenRef = React.useRef(false);
   const [firstFrameDone, setFirstFrameDone] = React.useState(false);
 
-  const hideSplashSafe = React.useCallback(() => {
-    if (hiddenRef.current) return;
-    (async () => {
-      try {
-        await SplashScreen.hideAsync();
-      } catch {
-      } finally {
-        hiddenRef.current = true; // chỉ chốt sau khi gọi hide
-        // double-tap an toàn
-        setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 300);
-      }
-    })();
+  // Transition to ready
+  const transitionToReady = React.useCallback(() => {
+    setLifecycle((prev) => {
+      if (prev.phase === "ready" || prev.phase === "navigating") return prev;
+      return { phase: "ready" };
+    });
   }, []);
+
+  // Hide splash
+  const hideSplashSafe = React.useCallback(async () => {
+    if (hiddenRef.current) return;
+    if (lifecycle.phase !== "initializing") return;
+
+    setLifecycle({ phase: "splash-hiding" });
+
+    try {
+      await SplashScreen.hideAsync();
+    } catch {
+    } finally {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve(null));
+        });
+      });
+
+      hiddenRef.current = true;
+      transitionToReady();
+
+      setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 300);
+    }
+  }, [lifecycle.phase, transitionToReady]);
 
   const onLayoutRoot = React.useCallback(() => {
     if (!firstFrameDone) setFirstFrameDone(true);
   }, [firstFrameDone]);
 
+  // Trigger hide splash
   React.useEffect(() => {
-    if (firstFrameDone && fontsReady) hideSplashSafe();
-  }, [firstFrameDone, fontsReady, hideSplashSafe]);
+    if (firstFrameDone && fontsReady && lifecycle.phase === "initializing") {
+      hideSplashSafe();
+    }
+  }, [firstFrameDone, fontsReady, lifecycle.phase, hideSplashSafe]);
 
   // Failsafe hide toàn cục
   React.useEffect(() => {
     const t = setTimeout(() => {
-      if (!hiddenRef.current) hideSplashSafe();
+      if (
+        lifecycle.phase === "initializing" ||
+        lifecycle.phase === "splash-hiding"
+      ) {
+        if (__DEV__) {
+          console.warn("⚠️ Force transition to ready after timeout");
+        }
+        transitionToReady();
+      }
     }, SPLASH_GLOBAL_FAILSAFE_MS);
     return () => clearTimeout(t);
-  }, [hideSplashSafe]);
+  }, [lifecycle.phase, transitionToReady]);
 
   // Ensure hide khi app trở lại foreground
   React.useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active" && !hiddenRef.current) hideSplashSafe();
+      if (s === "active") {
+        if (
+          lifecycle.phase === "initializing" ||
+          lifecycle.phase === "splash-hiding"
+        ) {
+          hideSplashSafe();
+        }
+      }
     });
     return () => sub.remove();
-  }, [hideSplashSafe]);
+  }, [lifecycle.phase, hideSplashSafe]);
+
+  // ✅ Global Android back button handler
+  React.useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        const { router } = require("expo-router");
+
+        // Check if can go back
+        if (router.canGoBack()) {
+          router.back();
+          return true;
+        }
+
+        // Can't go back, check current route
+        const currentSegments = router.segments || [];
+        const isAtTabs =
+          currentSegments.length === 0 ||
+          currentSegments[0] === "(tabs)" ||
+          (currentSegments.length === 1 && currentSegments[0] === "(tabs)");
+
+        if (!isAtTabs) {
+          // Not at tabs, go to tabs
+          router.replace("/(tabs)");
+          return true;
+        }
+
+        // At tabs, show exit confirmation
+        Alert.alert("Thoát ứng dụng", "Bạn có muốn thoát PickleTour?", [
+          { text: "Hủy", style: "cancel" },
+          { text: "Thoát", onPress: () => BackHandler.exitApp() },
+        ]);
+        return true;
+      }
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
+  // Queue navigation with proper stack
+  const queueNavigation = React.useCallback(
+    (url: string) => {
+      if (lifecycle.phase === "ready") {
+        setLifecycle({ phase: "navigating", target: url });
+      } else {
+        if (!navigationQueue.current.includes(url)) {
+          navigationQueue.current.push(url);
+        }
+      }
+    },
+    [lifecycle.phase]
+  );
+
+  // Process queue when ready
+  React.useEffect(() => {
+    if (lifecycle.phase === "ready" && navigationQueue.current.length > 0) {
+      const target = navigationQueue.current[0];
+      navigationQueue.current = [];
+      setLifecycle({ phase: "navigating", target });
+    }
+  }, [lifecycle.phase]);
+
+  // ✅ Actual navigation with stack building
+  React.useEffect(() => {
+    if (lifecycle.phase !== "navigating") return;
+
+    const { router } = require("expo-router");
+    const target = lifecycle.target;
+
+    InteractionManager.runAfterInteractions(() => {
+      if (__DEV__) {
+        console.log("🚀 Navigating:", target);
+      }
+
+      // Check if cold start (no back stack)
+      const isColdStart = !router.canGoBack();
+
+      if (isColdStart && target !== "/(tabs)") {
+        // Cold start to deep link: ensure home in stack first
+        if (__DEV__) {
+          console.log("🔥 Cold start detected, building stack...");
+        }
+
+        // Go to home first
+        router.replace("/(tabs)");
+
+        // Then push target
+        setTimeout(() => {
+          router.push(target);
+          setLifecycle({ phase: "ready" });
+        }, 100);
+      } else {
+        // Normal navigation or already at tabs
+        if (target === "/(tabs)") {
+          router.replace(target);
+        } else {
+          router.push(target);
+        }
+        setLifecycle({ phase: "ready" });
+      }
+    });
+  }, [lifecycle]);
 
   /* -------------------- Notification routing -------------------- */
-  const pendingUrlRef = React.useRef<string | null>(null);
   const lastHandledIdRef = React.useRef<string | null>(null);
 
-  const extractUrl = (n?: Notifications.Notification | null) => {
-    const data: any = n?.request?.content?.data ?? {};
-    return data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null);
-  };
-
-  const navigateIfReady = React.useCallback(() => {
-    if (!hiddenRef.current) return;
-    const url = pendingUrlRef.current;
-    if (!url) return;
-    const { router } = require("expo-router");
-    InteractionManager.runAfterInteractions(() => {
-      router.replace(url);
-      pendingUrlRef.current = null;
-    });
-  }, []);
+  const extractUrl = React.useCallback(
+    (n?: Notifications.Notification | null) => {
+      const data: any = n?.request?.content?.data ?? {};
+      return (
+        data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null)
+      );
+    },
+    []
+  );
 
   React.useEffect(() => {
     let sub: Notifications.Subscription | null = null;
 
     (async () => {
+      if (Platform.OS === "ios") {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
       const resp = await Notifications.getLastNotificationResponseAsync();
       const n = resp?.notification;
       const id = n?.request?.identifier ?? "";
+
       if (id && id !== lastHandledIdRef.current) {
         lastHandledIdRef.current = id;
-        pendingUrlRef.current = extractUrl(n);
-        navigateIfReady();
+        const url = extractUrl(n);
+        if (url) {
+          queueNavigation(url);
+        }
       }
     })();
 
     sub = Notifications.addNotificationResponseReceivedListener((resp) => {
       const n = resp?.notification;
       const id = n?.request?.identifier ?? "";
+
       if (id && id === lastHandledIdRef.current) return;
+
       lastHandledIdRef.current = id || String(Date.now());
-      pendingUrlRef.current = extractUrl(n);
-      navigateIfReady();
+      const url = extractUrl(n);
+      if (url) {
+        queueNavigation(url);
+      }
     });
 
     return () => {
       if (sub) sub.remove();
     };
-  }, [navigateIfReady]);
-
-  React.useEffect(() => {
-    if (hiddenRef.current) navigateIfReady();
-  }, [firstFrameDone, fontsReady, navigateIfReady]);
+  }, [queueNavigation, extractUrl]);
 
   /* -------------------- Deep Linking Handler -------------------- */
-  const pendingDeepLinkRef = React.useRef<string | null>(null);
   const lastHandledDeepLinkRef = React.useRef<string | null>(null);
 
   const parseDeepLink = React.useCallback((url: string) => {
@@ -346,15 +500,11 @@ export default function RootLayout() {
         });
       }
 
-      // Xử lý custom scheme: pickletour://tournament/123
-      // Hoặc Universal Link: https://pickletour.com/tournament/123
       if (path) {
-        // Tournament
         if (path.startsWith("tournament/")) {
           const segments = path.split("/");
           const id = segments[1];
           if (id) {
-            // Check sub-routes
             if (segments[2] === "register") {
               return `/tournament/${id}/register`;
             } else if (segments[2] === "checkin") {
@@ -369,9 +519,7 @@ export default function RootLayout() {
               return `/tournament/${id}/home`;
             }
           }
-        }
-        // Match
-        else if (path.startsWith("match/")) {
+        } else if (path.startsWith("match/")) {
           const segments = path.split("/");
           const id = segments[1];
           if (id) {
@@ -381,34 +529,25 @@ export default function RootLayout() {
               return `/match/${id}/home`;
             }
           }
-        }
-        // Live Stream
-        else if (path.startsWith("live/")) {
+        } else if (path.startsWith("live/")) {
           const id = path.split("/")[1];
           if (id) {
             return `/live/${id}`;
           } else {
             return "/live/home";
           }
-        }
-        // Profile
-        else if (path.startsWith("profile/")) {
+        } else if (path.startsWith("profile/")) {
           const username = path.split("/")[1];
           if (username) {
             return `/profile/${username}`;
           }
-        }
-        // Clubs
-        else if (path.startsWith("clubs")) {
+        } else if (path.startsWith("clubs")) {
           return "/clubs";
-        }
-        // Level Point
-        else if (path.startsWith("levelpoint")) {
+        } else if (path.startsWith("levelpoint")) {
           return "/levelpoint";
         }
       }
 
-      // Fallback về trang chủ
       return "/(tabs)";
     } catch (error) {
       console.error("Deep Link Parse Error:", error);
@@ -416,27 +555,10 @@ export default function RootLayout() {
     }
   }, []);
 
-  const navigateDeepLinkIfReady = React.useCallback(() => {
-    if (!hiddenRef.current) return;
-    const targetPath = pendingDeepLinkRef.current;
-    if (!targetPath) return;
-
-    const { router } = require("expo-router");
-    InteractionManager.runAfterInteractions(() => {
-      if (__DEV__) {
-        console.log("🚀 Navigating to Deep Link:", targetPath);
-      }
-      router.push(targetPath);
-      pendingDeepLinkRef.current = null;
-    });
-  }, []);
-
-  // Handle Deep Links
   React.useEffect(() => {
     let linkingSubscription: { remove: () => void } | null = null;
 
     (async () => {
-      // Check initial URL khi app mở từ link
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl && initialUrl !== lastHandledDeepLinkRef.current) {
         if (__DEV__) {
@@ -445,13 +567,11 @@ export default function RootLayout() {
         lastHandledDeepLinkRef.current = initialUrl;
         const targetPath = parseDeepLink(initialUrl);
         if (targetPath) {
-          pendingDeepLinkRef.current = targetPath;
-          navigateDeepLinkIfReady();
+          queueNavigation(targetPath);
         }
       }
     })();
 
-    // Lắng nghe khi app đang mở và user click link
     linkingSubscription = Linking.addEventListener("url", (event) => {
       const url = event.url;
       if (url && url !== lastHandledDeepLinkRef.current) {
@@ -461,8 +581,7 @@ export default function RootLayout() {
         lastHandledDeepLinkRef.current = url;
         const targetPath = parseDeepLink(url);
         if (targetPath) {
-          pendingDeepLinkRef.current = targetPath;
-          navigateDeepLinkIfReady();
+          queueNavigation(targetPath);
         }
       }
     });
@@ -472,14 +591,7 @@ export default function RootLayout() {
         linkingSubscription.remove();
       }
     };
-  }, [parseDeepLink, navigateDeepLinkIfReady]);
-
-  // Retry navigate khi splash đã hide
-  React.useEffect(() => {
-    if (hiddenRef.current) {
-      navigateDeepLinkIfReady();
-    }
-  }, [firstFrameDone, fontsReady, navigateDeepLinkIfReady]);
+  }, [parseDeepLink, queueNavigation]);
 
   return (
     <Provider store={store}>
@@ -495,7 +607,6 @@ export default function RootLayout() {
                     Platform.OS === "android" ? "bottom" : "",
                   ]}
                 >
-                  {/* ⚠️ onLayout cần collapsable={false} để chắc chắn fire trên Android */}
                   <View
                     style={{ flex: 1 }}
                     onLayout={onLayoutRoot}
@@ -744,14 +855,12 @@ export default function RootLayout() {
                         />
                       </Stack>
 
-                      {/* ✅ StatusBar khớp theo theme đã resolve */}
                       <StatusBar
                         style={isDark ? "light" : "dark"}
                         backgroundColor={bg}
                         animated
                       />
 
-                      {/* 🔄 Overlay khi đang áp dụng theme */}
                       {themeApplying && (
                         <View
                           pointerEvents="auto"

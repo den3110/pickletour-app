@@ -1,7 +1,10 @@
 // app/live/studio_court.tsx
 import React, { useMemo } from "react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import LiveLikeFBScreenKey from "@/components/live/LiveLikeFBScreenKey"; // ← chỉnh path nếu khác
+import { Platform, View, Text } from "react-native";
+
+// ✅ KHÔNG import trực tiếp ở đây nữa
+// import LiveLikeFBScreenKey from "@/components/live/LiveLikeFBScreenKey";
 
 /* helpers */
 function toBool(v: any, def = false) {
@@ -22,12 +25,14 @@ function safeAtobUtf8(b64: string) {
   }
   return "";
 }
-// atob shim for RN/Expo
 const globalAtob =
   typeof atob !== "undefined"
     ? atob
     : (b64: string) =>
-        Buffer.from(b64.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("binary");
+        Buffer.from(
+          b64.replace(/-/g, "+").replace(/_/g, "/"),
+          "base64"
+        ).toString("binary");
 
 function splitRtmpUrl(url?: string) {
   const u = (url || "").trim().replace(/\/$/, "");
@@ -56,6 +61,12 @@ function normalizeDest(d: any): Dest {
   return { platform, server_url, stream_key, secure_stream_url };
 }
 
+// ✅ Dynamic import chỉ khi cần
+const LiveLikeFBScreenKey =
+  Platform.OS === "android"
+    ? require("@/components/live/LiveLikeFBScreenKey").default
+    : null;
+
 export default function StudioCourtPage() {
   const router = useRouter();
   const p = useLocalSearchParams<{
@@ -69,13 +80,11 @@ export default function StudioCourtPage() {
     tournamentHref?: string;
     homeHref?: string;
 
-    // prefill
     useFullUrl?: string;
     fullUrl?: string;
     server?: string;
     key?: string;
 
-    // optional: destinations base64(JSON)
     d64?: string;
   }>();
 
@@ -92,13 +101,14 @@ export default function StudioCourtPage() {
   const homeHref = toStr(p.homeHref);
 
   /* prefill from query directly */
-  let initialUseFullUrl = p.useFullUrl != null ? toBool(p.useFullUrl, true) : undefined;
+  let initialUseFullUrl =
+    p.useFullUrl != null ? toBool(p.useFullUrl, true) : undefined;
   let initialFullUrl = toStr(p.fullUrl);
   let initialServer = toStr(p.server);
   let initialStreamKey = toStr(p.key);
 
   /* prefill from d64 if missing */
-  if ((!initialFullUrl && !initialServer && !initialStreamKey) && p.d64) {
+  if (!initialFullUrl && !initialServer && !initialStreamKey && p.d64) {
     try {
       const decoded = safeAtobUtf8(String(p.d64));
       const arr = JSON.parse(decoded);
@@ -123,7 +133,33 @@ export default function StudioCourtPage() {
   if (initialUseFullUrl === undefined) {
     if (initialFullUrl) initialUseFullUrl = true;
     else if (initialServer && initialStreamKey) initialUseFullUrl = false;
-    else initialUseFullUrl = true; // default
+    else initialUseFullUrl = true;
+  }
+
+  // ✅ Early return cho iOS
+  if (Platform.OS !== "android" || !LiveLikeFBScreenKey) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            headerShown: false,
+            title: `Live Studio — Court ${courtId ? courtId.slice(-4) : ""}`,
+          }}
+        />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <Text style={{ fontSize: 16, textAlign: "center", color: "#666" }}>
+            Live streaming feature is only available on Android
+          </Text>
+        </View>
+      </>
+    );
   }
 
   return (

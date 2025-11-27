@@ -241,6 +241,7 @@ export const liveStreamingApiSlice = apiSlice.injectEndpoints({
       providesTags: (res, err, id) => [{ type: "Match", id }],
     }),
   }),
+  overrideExisting: true
 });
 
 // Export hooks

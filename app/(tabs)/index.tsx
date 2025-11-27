@@ -37,6 +37,7 @@ import { useReauthQuery } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import ImageViewing from "react-native-image-viewing";
+import TestNotificationButton from "@/tests/TestNotifcation";
 /* ---------- Lottie asset ---------- */
 const BG_3D = require("@/assets/lottie/bg-3d.json");
 
@@ -626,7 +627,7 @@ function FeaturesGrid() {
       <Text style={[styles.sectionTitle, { color: text }]}>
         Tính năng PickleTour
       </Text>
-
+      {__DEV__ && <TestNotificationButton />}
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />

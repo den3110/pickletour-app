@@ -161,6 +161,41 @@ const rawBaseQuery = fetchBaseQuery({
       headers.set("X-Push-Token", sanitizeHeaderValue(pushToken, 260)); // Expo token dài ~50-60, để 260 dư dả
     }
 
+    // ================== TIMEZONE HEADERS (copy từ web) ==================
+    try {
+      // Timezone dạng "Asia/Ho_Chi_Minh"
+      let tz = null;
+      if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+      if (!tz) {
+        // fallback nhẹ nếu môi trường không hỗ trợ Intl
+        tz = "Asia/Ho_Chi_Minh";
+      }
+      if (tz) {
+        headers.set("X-Timezone", tz);
+      }
+
+      // Offset phút so với UTC (VN: -420)
+      const offsetMinutes = new Date().getTimezoneOffset();
+      headers.set("X-Timezone-Offset", String(offsetMinutes));
+
+      // Format GMT±HH:MM từ offset
+      const offsetHoursFloat = -offsetMinutes / 60; // getTimezoneOffset là lệch SO VỚI UTC
+      const sign = offsetHoursFloat >= 0 ? "+" : "-";
+      const absTotalMinutes = Math.abs(offsetMinutes);
+      const absHours = Math.floor(absTotalMinutes / 60);
+      const absMinutes = absTotalMinutes % 60;
+
+      const pad = (n) => String(n).padStart(2, "0");
+      const gmt = `GMT${sign}${pad(absHours)}:${pad(absMinutes)}`; // ví dụ: GMT+07:00
+
+      headers.set("X-Timezone-Gmt", gmt);
+    } catch (e) {
+      console.log("Cannot resolve timezone", e);
+    }
+    // ===================================================================
+
     return headers;
   },
 });
@@ -262,6 +297,8 @@ export const apiSlice = createApi({
     "MarkedDates",
     "UpcomingMatches",
     "Schedule",
+    "Sponsor",
+    "Sponsors",
   ],
   endpoints: () => ({}),
 });

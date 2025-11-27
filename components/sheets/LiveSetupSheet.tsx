@@ -416,7 +416,7 @@ export default function LiveSetupSheet({
       }
 
       const qs = buildQuery(baseParams);
-      const href = `/live/studio_court?${qs}`;
+      const href = Platform.OS=== "android" ? `/live/studio_court_android?${qs}` : `/live/studio_court_ios?${qs}`;
 
       try {
         const finalUrl = buildCourtLiveUrl

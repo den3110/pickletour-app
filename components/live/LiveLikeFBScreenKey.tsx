@@ -1,16 +1,10 @@
-// LiveLikeFBScreenKey.tsx
-// AUTO-LIVE theo sân (Assigned → LIVE), mỗi trận = 1 video riêng
-// - Có match → gọi createLiveSession (BE mới: chỉ tạo Facebook Live, giữ page bận) → lấy RTMPS → start stream + overlay
-// - Hết match → stop stream ngay, KHÔNG đóng app; chờ 10 phút, rồi cảnh báo 10s (Huỷ để tiếp tục chờ)
-// - Có match mới trong lúc chờ → start stream mới
-// - Adaptive chất lượng/FPS theo máy (native hint nếu có; fallback an toàn)
-// - Tối ưu nhiệt/ram: thermalProtect(optional), dọn overlay/view khi stop, release(optional)
-// - NEW: Gate chọn orientation Dọc/Ngang trước khi bắt đầu phát
-// - NEW: Chỉ phát live khi match.status === "live"
-// - NEW: Native overlay thay WebView (Android), iOS giữ WebView
-// - NEW: Socket realtime thay polling - PARSE DATA TRỰC TIẾP
-
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -26,6 +20,7 @@ import {
   ActivityIndicator,
   requireNativeComponent,
   UIManager,
+  NativeEventEmitter,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +29,8 @@ import { PinchGestureHandler, State } from "react-native-gesture-handler";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
+import * as Brightness from "expo-brightness"; // ✅ THÊM
+import throttle from "lodash/throttle";
 
 /* ====== SFX ====== */
 import torch_on from "@/assets/sfx/click4.mp3";
@@ -49,12 +46,14 @@ import {
   useNotifyStreamEndedMutation,
   useGetOverlaySnapshotQuery,
 } from "@/slices/liveStreamingApiSlice";
+import { useGetOverlayConfigQuery } from "@/slices/overlayApiSlice";
 
 /* ====== Socket ====== */
 import { useSocket } from "@/context/SocketContext";
 import GapWarningOverlay from "./components/GapWarningOverlay";
 import StoppingOverlay from "./components/StoppingOverlay";
-import LiveTimerBar from "./components/LiveTimerBar";
+// import LiveTimerBar from "./components/LiveTimerBar";
+import { videoUploader } from "@/utils/videoUploader";
 
 /* ====== Native camera/rtmp ====== */
 const COMPONENT_NAME = "RtmpPreviewView";
@@ -66,7 +65,47 @@ const _CachedRtmpPreviewView =
 const RtmpPreviewView = _CachedRtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-/* ====== Overlay URL builder (our canonical URL) ====== */
+// ✅ Hook dùng native timer
+function useNativeLiveTimer(isActive: boolean, startAt: number | null) {
+  const elapsedMsRef = useRef(0);
+  const [displayTime, setDisplayTime] = useState(0);
+  const tickCountRef = useRef(0);
+
+  useEffect(() => {
+    if (!isActive || !startAt) {
+      elapsedMsRef.current = 0;
+      setDisplayTime(0);
+      return;
+    }
+
+    const eventEmitter = new NativeEventEmitter(Live);
+
+    const subscription = eventEmitter.addListener(
+      "onLiveTimerTick",
+      (event) => {
+        elapsedMsRef.current = event.elapsedMs;
+
+        // ✅ CHỈ update UI mỗi 1 giây (10 ticks)
+        tickCountRef.current++;
+        if (tickCountRef.current >= 10) {
+          tickCountRef.current = 0;
+          setDisplayTime(event.elapsedMs);
+        }
+      }
+    );
+
+    Live.startLiveTimer?.().catch(() => {});
+
+    return () => {
+      subscription.remove();
+      Live.stopLiveTimer?.().catch(() => {});
+    };
+  }, [isActive, startAt]);
+
+  return displayTime; // ✅ Return display time, không phải real-time
+}
+
+/* ====== Overlay URL builder ====== */
 const overlayUrlForMatch = (mid?: string | null): string | null => {
   if (!mid || !process.env.EXPO_PUBLIC_BASE_URL) return null;
 
@@ -82,9 +121,20 @@ const overlayUrlForMatch = (mid?: string | null): string | null => {
     isactivebreak: "1",
     slimit: "12",
   });
-  console.log(`${baseUrl}/overlay/score?${params}`);
 
   return `${baseUrl}/overlay/score?${params}`;
+};
+
+const getMatchIdFromPayload = (data: any): string | null => {
+  if (!data) return null;
+  if (typeof data._id === "string") return data._id;
+  if (typeof data.id === "string") return data.id;
+  if (typeof data.matchId === "string") return data.matchId;
+  if (data.match) {
+    if (typeof data.match._id === "string") return data.match._id;
+    if (typeof data.match.id === "string") return data.match.id;
+  }
+  return null;
 };
 
 /* ====== DEBUG ====== */
@@ -123,7 +173,6 @@ type QualityId =
   | "480p30"
   | "480p24";
 
-/* Preset giống kiểu chọn chất lượng YouTube */
 const QUALITY_PRESETS: Record<
   QualityId,
   {
@@ -139,7 +188,6 @@ const QUALITY_PRESETS: Record<
     label: "Tự động (khuyến nghị)",
     shortLabel: "Auto",
   },
-
   "720p30": {
     label: "720p • 30fps (Khuyến nghị 4G)",
     shortLabel: "720p30",
@@ -164,7 +212,6 @@ const QUALITY_PRESETS: Record<
     fps: 24,
     bitrate: 3_000_000,
   },
-
   "1080p30": {
     label: "1080p • 30fps (Cần WiFi tốt)",
     shortLabel: "1080p30",
@@ -181,7 +228,6 @@ const QUALITY_PRESETS: Record<
     fps: 60,
     bitrate: 6_500_000,
   },
-
   "540p30": {
     label: "540p • 30fps (4G yếu)",
     shortLabel: "540p",
@@ -190,7 +236,6 @@ const QUALITY_PRESETS: Record<
     fps: 30,
     bitrate: 2_500_000,
   },
-
   "480p30": {
     label: "480p • 30fps",
     shortLabel: "480p30",
@@ -209,7 +254,6 @@ const QUALITY_PRESETS: Record<
   },
 };
 
-/* ====== Gap timers (giữa trận) ====== */
 const GAP_WAIT_MS = 10 * 60 * 1000;
 const GAP_WARN_MS = 10 * 1000;
 
@@ -309,7 +353,6 @@ async function ensurePermissions() {
   );
 }
 
-/* ====== BE: parse FB RTMPS ====== */
 const extractFacebookLiveFromResponse = (liveData: any) => {
   if (!liveData || typeof liveData !== "object") return null;
 
@@ -331,7 +374,56 @@ const extractFacebookLiveFromResponse = (liveData: any) => {
   };
 };
 
+const formatDuration = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
 /* ================================================================================== */
+
+const ZoomBadge = React.memo(
+  ({ zoom, top, right }: { zoom: number; top: number; right: number }) => {
+    return (
+      <View style={[styles.zoomBadge, { top, right }]}>
+        <Text style={styles.zoomBadgeTxt}>{zoom.toFixed(1)}x</Text>
+      </View>
+    );
+  }
+);
+
+const TimerBadge = React.memo(
+  ({
+    elapsedMs,
+    top,
+    left,
+    right,
+  }: {
+    elapsedMs: number;
+    top: number;
+    left: number;
+    right: number;
+  }) => {
+    return (
+      <View
+        style={[styles.timerBadge, { top, left, right }]}
+        pointerEvents="none"
+      >
+        <View style={styles.timerBadgeContent}>
+          <Icon name="timer" size={16} color="#fff" />
+          <Text style={styles.timerBadgeText}>{formatDuration(elapsedMs)}</Text>
+        </View>
+      </View>
+    );
+  }
+);
 
 export default function LiveLikeFBScreenKey({
   tournamentHref,
@@ -353,37 +445,67 @@ export default function LiveLikeFBScreenKey({
   const safeLeft = insets.left ?? 0;
   const safeRight = insets.right ?? 0;
 
-  /* ==== Modes & UI ==== */
+  /* ==== States ==== */
   const [mode, setMode] = useState<Mode>("idle");
   const [statusText, setStatusText] = useState<string>(
     "Đang chờ trận được gán (assigned) vào sân…"
   );
   const [torchOn, setTorchOn] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
-
-  // ⏱️ Thời điểm bắt đầu live, dùng cho đồng hồ (tách sang component riêng)
   const [liveStartAt, setLiveStartAt] = useState<number | null>(null);
 
-  /* ==== Orientation gate ==== */
+  /* ==== Orientation ==== */
   const [orientation, setOrientation] = useState<Orient | null>(null);
   const [locking, setLocking] = useState(false);
   const orientationChosen = orientation !== null;
+
+  /* ==== Recording ==== */
+  const [isRecording, setIsRecording] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<number, number>>(
+    {}
+  );
+  const [pendingUploads, setPendingUploads] = useState(0);
+
+  // ✅ THÊM: States cho 2 tính năng mới
+  const [overlayVisibleOnUI, setOverlayVisibleOnUI] = useState(true);
+  const [batterySaverMode, setBatterySaverMode] = useState(false);
+  const brightnessBeforeSaverRef = useRef<number>(1);
+
+  // ✅ THÊM: Native timer
+  const elapsedMs = useNativeLiveTimer(mode === "live", liveStartAt);
+
+  useEffect(() => {
+    const unsubscribe = videoUploader.onProgress((progress) => {
+      setUploadProgress(progress);
+      const pending = Object.values(progress).filter(
+        (p) => p > 0 && p < 100 && p !== -1
+      ).length;
+      setPendingUploads(pending);
+    });
+    return unsubscribe;
+  }, []);
 
   const applyOrientationChoice = useCallback(async (choice: Orient) => {
     setLocking(true);
     try {
       await Haptics.selectionAsync();
+
       await ScreenOrientation.lockAsync(
         choice === "portrait"
           ? ScreenOrientation.OrientationLock.PORTRAIT
           : ScreenOrientation.OrientationLock.LANDSCAPE
       );
-    } catch {}
-    try {
+
       await Live.enableAutoRotate?.(false);
       await Live.lockOrientation?.(choice.toUpperCase());
-    } catch {}
-    setOrientation(choice);
+
+      // ✅ SỬA: Tăng delay từ 500ms → 1000ms để surface recreate an toàn
+      await new Promise((r) => setTimeout(r, 1000));
+
+      setOrientation(choice);
+    } catch (e) {
+      log("❌ Orientation lock failed", e);
+    }
     setLocking(false);
   }, []);
 
@@ -396,7 +518,7 @@ export default function LiveLikeFBScreenKey({
     } catch {}
   }, []);
 
-  /* ==== Streaming refs ==== */
+  /* ==== Refs ==== */
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
   const currentMatchRef = useRef<string | null>(null);
@@ -404,13 +526,16 @@ export default function LiveLikeFBScreenKey({
   const previewRetryRef = useRef<{ cancel: boolean }>({ cancel: false });
   const chosenProfileRef = useRef<StreamProfile | null>(null);
   const autoProfileRef = useRef<StreamProfile | null>(null);
+  const kickPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
-  /* ==== Gap wait / warn ==== */
+  /* ==== Gap ==== */
   const [gapWarnVisible, setGapWarnVisible] = useState(false);
   const gapWaitingRef = useRef(false);
   const gapTenMinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* ==== Zoom (UI & throttle) ==== */
+  /* ==== Zoom ==== */
   const clampZoomUI = (z: number) => Math.min(2, Math.max(0.5, z));
   const zoomUIRef = useRef(1);
   const [zoomUI, setZoomUI] = useState(1);
@@ -422,7 +547,7 @@ export default function LiveLikeFBScreenKey({
     null
   );
   const lastZoomSendTimeRef = useRef(0);
-  const MIN_ZOOM_SEND_INTERVAL = 100;
+  const MIN_ZOOM_SEND_INTERVAL = 500;
   const isFrontRef = useRef(false);
 
   const sendZoomRAF = useCallback((z: number) => {
@@ -431,6 +556,7 @@ export default function LiveLikeFBScreenKey({
 
     if (rounded === lastSentZoomRef.current) return;
 
+    // ✅ SỬA: Tăng interval check
     if (now - lastZoomSendTimeRef.current < MIN_ZOOM_SEND_INTERVAL) {
       pendingZoomRef.current = rounded;
 
@@ -438,6 +564,7 @@ export default function LiveLikeFBScreenKey({
         clearTimeout(zoomDebounceTimerRef.current);
       }
 
+      // ✅ SỬA: Tăng debounce timeout từ MIN_ZOOM_SEND_INTERVAL → MIN_ZOOM_SEND_INTERVAL * 1.5
       zoomDebounceTimerRef.current = setTimeout(() => {
         const finalZoom = pendingZoomRef.current;
         if (finalZoom != null && finalZoom !== lastSentZoomRef.current) {
@@ -447,7 +574,7 @@ export default function LiveLikeFBScreenKey({
         }
         pendingZoomRef.current = null;
         zoomDebounceTimerRef.current = null;
-      }, MIN_ZOOM_SEND_INTERVAL);
+      }, 800); // ✅ 800ms thay vì 300ms
 
       return;
     }
@@ -480,7 +607,7 @@ export default function LiveLikeFBScreenKey({
     };
   }, []);
 
-  /* ====== Quality state (menu bottom) ====== */
+  /* ==== Quality ==== */
   const [qualityMenuVisible, setQualityMenuVisible] = useState(false);
   const [qualityChoice, setQualityChoice] = useState<QualityId>("720p30");
   const qualityChoiceRef = useRef<QualityId>("720p30");
@@ -538,7 +665,7 @@ export default function LiveLikeFBScreenKey({
     };
   }, []);
 
-  /* ==== Preview bootstrap (iOS freeze fix) ==== */
+  /* ==== Preview bootstrap ==== */
   const startPreviewWithRetry = useCallback(async () => {
     if (startedPreviewRef.current) {
       if (Platform.OS === "ios") {
@@ -592,23 +719,36 @@ export default function LiveLikeFBScreenKey({
   }, []);
 
   const kickPreview = useCallback(async () => {
-    if (startedPreviewRef.current) {
-      if (Platform.OS === "ios") {
-        try {
-          await Live.refreshPreview?.();
-          log("kickPreview → refreshPreview(iOS)");
-        } catch (e) {
-          log("kickPreview → refreshPreview error", e);
-        }
-      }
-      return;
+    // ✅ Clear previous kick
+    if (kickPreviewDebounceRef.current) {
+      clearTimeout(kickPreviewDebounceRef.current);
     }
-    await startPreviewWithRetry();
+
+    // ✅ Debounce 200ms
+    kickPreviewDebounceRef.current = setTimeout(async () => {
+      if (startedPreviewRef.current) {
+        if (Platform.OS === "ios") {
+          try {
+            await Live.refreshPreview?.();
+            log("kickPreview → refreshPreview(iOS)");
+          } catch (e) {
+            log("kickPreview → refreshPreview error", e);
+          }
+        }
+        return;
+      }
+      await startPreviewWithRetry();
+    }, 200);
   }, [startPreviewWithRetry]);
 
   useEffect(() => {
-    Live.enableThermalProtect?.(true);
+    Live.enableThermalProtect?.(false);
+
     return () => {
+      if (kickPreviewDebounceRef.current) {
+        clearTimeout(kickPreviewDebounceRef.current);
+      }
+
       previewRetryRef.current.cancel = true;
       try {
         if (gapTenMinTimerRef.current) clearTimeout(gapTenMinTimerRef.current);
@@ -661,30 +801,35 @@ export default function LiveLikeFBScreenKey({
     const handler = async (nextState: AppStateStatus) => {
       if (nextState === "active") {
         previewRetryRef.current.cancel = false;
+
+        // ✅ Tăng delay từ 300ms → 1000ms
+        await new Promise((r) => setTimeout(r, 1000));
+
         if (!startedPreviewRef.current) {
           await startPreviewWithRetry();
         } else if (Platform.OS === "ios") {
+          // ✅ Thêm delay trước refresh
+          await new Promise((r) => setTimeout(r, 500));
           try {
             await Live.refreshPreview?.();
-            log("preview → AppState active refresh (iOS)");
           } catch (e) {
-            log("preview → AppState active refresh failed (iOS)", e);
+            log("preview refresh failed", e);
           }
-        }
-        if (shouldResumeLiveRef.current && lastUrlRef.current) {
-          shouldResumeLiveRef.current = false;
         }
       } else {
         previewRetryRef.current.cancel = true;
-        if (mode === "live" || mode === "stopping") {
-          shouldResumeLiveRef.current = true;
-        }
+
+        // ✅ Thêm delay trước stop
+        await new Promise((r) => setTimeout(r, 200));
+
         try {
           if (startedPreviewRef.current) {
             await Live.stopPreview?.();
             startedPreviewRef.current = false;
           }
-        } catch {}
+        } catch (e) {
+          log("stopPreview error", e);
+        }
       }
     };
 
@@ -692,7 +837,7 @@ export default function LiveLikeFBScreenKey({
     return () => sub.remove();
   }, [mode, startPreviewWithRetry]);
 
-  /* ==== Adaptive profile (orientation-aware + quality choice) ==== */
+  /* ==== Adaptive profile ==== */
   const pickAdaptiveProfile = useCallback(
     async (orient: Orient): Promise<StreamProfile> => {
       const finalize = (profile: StreamProfile): StreamProfile => {
@@ -796,6 +941,23 @@ export default function LiveLikeFBScreenKey({
 
   const stopNativeNow = useCallback(async () => {
     log("Live.stop → begin");
+
+    if (isRecording) {
+      try {
+        await videoUploader.stopRecording();
+        setIsRecording(false);
+        log("🎥 Recording stopped");
+
+        setTimeout(() => {
+          videoUploader
+            .cleanupOldRecordings(5)
+            .catch((e) => log("⚠️ Cleanup failed:", e));
+        }, 2000);
+      } catch (e) {
+        log("⚠️ Recording stop failed:", e);
+      }
+    }
+
     try {
       await Live.overlayRemove?.();
     } catch (e) {
@@ -811,96 +973,101 @@ export default function LiveLikeFBScreenKey({
     setLiveStartAt(null);
     lastUrlRef.current = null;
     log("Live.stop → done");
+  }, [isRecording]);
+
+  /* ==== Query ==== */
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
+
+  const [appActive, setAppActive] = useState(true);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) =>
+      setAppActive(s === "active")
+    );
+    return () => sub.remove();
   }, []);
 
-  // ✅ CHỈ fetch initial data, KHÔNG polling
-  const { data: courtData, refetch: refetchCourt } =
-    useGetCurrentMatchByCourtQuery(courtId, {
-      skip: !courtId,
+  const shouldPoll = isFocused && appActive && !!courtId;
+
+  const {
+    data: courtData,
+    isFetching: courtsFetching,
+    isLoading: courtsLoading,
+    error: courtsError,
+  } = useGetCurrentMatchByCourtQuery(courtId, {
+    skip: !shouldPoll,
+    pollingInterval: shouldPoll ? 5000 : 0,
+    refetchOnMountOrArgChange: true,
+  });
+
+  useEffect(() => {
+    log("poll-config", { shouldPoll, courtId });
+  }, [shouldPoll, courtId]);
+
+  useEffect(() => {
+    if (!shouldPoll) return;
+    if (courtsError) {
+      log("court error", courtsError);
+      return;
+    }
+    if (courtsLoading) {
+      log("court loading…");
+      return;
+    }
+    if (courtsFetching) log("court fetching…");
+
+    const court = courtData?.court;
+    const cm = courtData?.match || null;
+
+    log("court ok", {
+      court: court?.name,
+      currentMatchId: cm?._id || null,
+      statusMatch: cm?.status || null,
+      isBreak: cm?.isBreak || null,
+    });
+  }, [courtData, courtsFetching, courtsLoading, courtsError, shouldPoll]);
+
+  const matchObj = courtData?.match ?? null;
+  const currentMatchId: string | null = matchObj?._id ?? null;
+  const currentMatchStatus: string | null = matchObj?.status ?? null;
+
+  const overlayTournamentId =
+    matchObj?.tournament?._id || matchObj?.tournamentId || null;
+
+  const overlayParams = useMemo(() => {
+    const params: Record<string, any> = {
+      limit: 12,
+      featured: "1",
+    };
+
+    if (overlayTournamentId) {
+      params.tournamentId = overlayTournamentId;
+    }
+
+    return params;
+  }, [overlayTournamentId]);
+
+  const { data: overlayConfig, isLoading: overlayConfigLoading } =
+    useGetOverlayConfigQuery(overlayParams, {
+      skip: mode !== "live" || Platform.OS !== "android",
       pollingInterval: 0,
       refetchOnMountOrArgChange: true,
     });
 
-  // ✅ State để lưu match data realtime từ socket
-  const [currentMatchData, setCurrentMatchData] = useState<any>(null);
-
-  // ✅ Merge initial data từ RTK Query vào state
   useEffect(() => {
-    if (courtData?.match) {
-      log("Initial court data loaded", {
-        matchId: courtData.match._id,
-        status: courtData.match.status,
-      });
-      setCurrentMatchData(courtData.match);
-    }
-  }, [courtData]);
-
-  // ✅ ĐỊNH NGHĨA HÀM BÊN NGOÀI useEffect
-  const onCourtSnapshot = useCallback((data: any) => {
-    log("socket → court:snapshot", {
-      courtId: data?.court?._id,
-      matchId: data?.match?._id,
-      status: data?.match?.status,
-    });
-
-    if (data?.match) {
-      setCurrentMatchData((prev: any) => {
-        // Chỉ update nếu thực sự khác
-        if (
-          prev?._id === data.match._id &&
-          prev?.status === data.match.status &&
-          prev?.isBreak === data.match.isBreak
-        ) {
-          return prev; // Không trigger re-render
-        }
-        return data.match;
+    if (overlayConfig) {
+      log("Overlay config loaded", {
+        webLogoUrl: overlayConfig.webLogoUrl,
+        sponsorsCount: overlayConfig.sponsors?.length || 0,
       });
     }
-  }, []); // ✅ Không dependency vì dùng functional update
+  }, [overlayConfig]);
 
-  // ✅ SOCKET REALTIME cho Court Updates
-  useEffect(() => {
-    if (!courtId || !socket) {
-      log("socket → skip (no courtId or socket)");
-      return;
-    }
-
-    log("socket → joining court room", courtId);
-    socket.emit("court:join", { courtId });
-
-    socket.on("court:snapshot", onCourtSnapshot);
-
-    if (socket.connected) {
-      socket.emit("court:get-snapshot", { courtId });
-    }
-
-    return () => {
-      log("socket → leaving court room", courtId);
-      socket.emit("court:leave", { courtId });
-      socket.off("court:snapshot", onCourtSnapshot);
-    };
-  }, [courtId, socket, onCourtSnapshot]);
-
-
-  // ✅ FALLBACK: Refetch 10s một lần nếu socket disconnect
-  useEffect(() => {
-    if (!courtId || socket?.connected) return;
-
-    log("socket disconnected → fallback refetch every 10s");
-    const interval = setInterval(() => {
-      log("fallback → refetching court data");
-      refetchCourt();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [courtId, socket?.connected, refetchCourt]);
-
-  // ✅ Dùng currentMatchData thay vì courtData?.match
-  const matchObj = currentMatchData ?? null;
-  const currentMatchId: string | null = matchObj?._id ?? null;
-  const currentMatchStatus: string | null = matchObj?.status ?? null;
-
-  // ✅ Log để debug
   useEffect(() => {
     log("Current match state", {
       matchId: currentMatchId,
@@ -915,7 +1082,7 @@ export default function LiveLikeFBScreenKey({
     socket?.connected,
   ]);
 
-  /* ===================== create live session ===================== */
+  /* ==== Mutations ==== */
   const [createLiveSession] = useCreateLiveSessionMutation();
   const [notifyStreamStarted] = useNotifyStreamStartedMutation();
   const [notifyStreamEnded] = useNotifyStreamEndedMutation();
@@ -957,7 +1124,7 @@ export default function LiveLikeFBScreenKey({
     [createLiveSession]
   );
 
-  /* ===================== Gap wait helpers ===================== */
+  /* ==== Gap ==== */
   const clearGapTimers = useCallback(() => {
     gapWaitingRef.current = false;
     try {
@@ -990,11 +1157,10 @@ export default function LiveLikeFBScreenKey({
   }, [notifyStreamEnded, stopNativeNow, clearGapTimers]);
 
   const cancelAutoStop = useCallback(() => {
-    // Huỷ đếm 10s, nhưng tiếp tục chờ thêm 10 phút nữa
     beginGapWait();
   }, [beginGapWait]);
 
-  /* ===================== ✅ SOCKET cho Overlay - PARSE DATA TRỰC TIẾP ===================== */
+  /* ==== Socket overlay ==== */
   const { data: overlaySnapshot } = useGetOverlaySnapshotQuery(
     currentMatchId || "",
     {
@@ -1004,16 +1170,15 @@ export default function LiveLikeFBScreenKey({
     }
   );
 
-  // ✅ State để lưu realtime overlay data từ socket
   const [realtimeOverlayData, setRealtimeOverlayData] = useState<any>(null);
 
-  // ✅ Hàm update overlay - extract ra ngoài để gọi trực tiếp
   const updateOverlayNow = useCallback(
-    async (dataSource: any) => {
+    throttle(async (dataSource: any) => {
       if (!dataSource || mode !== "live" || Platform.OS !== "android") return;
 
       if (LOG) {
         console.log("overlay data source", dataSource);
+        console.log("overlay config", overlayConfig);
       }
 
       try {
@@ -1023,10 +1188,22 @@ export default function LiveLikeFBScreenKey({
           typeof val === "number" ? val : fallback;
         const safeBool = (val: any) => Boolean(val);
 
-        // Build overlay data theo format ScoreOverlayView.kt
-        
+        const webLogoUrl = safeStr(
+          overlayConfig?.webLogoUrl ||
+            process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
+            dataSource?.tournament?.overlay?.logoUrl ||
+            dataSource?.bracket?.overlay?.logoUrl
+        );
+
+        const sponsorLogos = Array.isArray(overlayConfig?.sponsors)
+          ? overlayConfig.sponsors.map((s: any) => s?.logoUrl).filter(Boolean)
+          : [];
+
+        if (LOG && sponsorLogos.length > 0) {
+          console.log(`✅ Loaded ${sponsorLogos.length} sponsor logos`);
+        }
+
         const overlayData = {
-          // Theme settings từ tournament.overlay hoặc bracket.overlay
           theme: safeStr(
             dataSource?.tournament?.overlay?.theme ||
               dataSource?.bracket?.overlay?.theme,
@@ -1073,14 +1250,12 @@ export default function LiveLikeFBScreenKey({
             1.0
           ),
 
-          // Tournament info
           tournamentName: safeStr(dataSource?.tournament?.name),
           courtName: safeStr(dataSource?.court?.name || dataSource?.courtName),
           tournamentLogoUrl: safeStr(dataSource?.tournament?.image),
           phaseText: safeStr(dataSource?.bracket?.name),
           roundLabel: safeStr(dataSource?.roundCode),
 
-          // Team info
           teamAName: safeStr(
             dataSource?.teams?.A?.name ||
               `${dataSource?.pairA?.player1?.nickname || "Team A"}`,
@@ -1092,7 +1267,6 @@ export default function LiveLikeFBScreenKey({
             "Team B"
           ),
 
-          // Current scores
           scoreA: safeNum(
             dataSource?.gameScores?.[dataSource?.currentGame || 0]?.a,
             0
@@ -1102,14 +1276,12 @@ export default function LiveLikeFBScreenKey({
             0
           ),
 
-          // Serve info
           serveSide: safeStr(dataSource?.serve?.side, "A").toUpperCase(),
           serveCount: Math.max(
             1,
             Math.min(2, safeNum(dataSource?.serve?.server, 1))
           ),
 
-          // Break info
           isBreak: safeBool(dataSource?.isBreak?.active || false),
           breakNote: safeStr(dataSource?.isBreak?.note || ""),
           breakTeams: `${safeStr(
@@ -1119,23 +1291,15 @@ export default function LiveLikeFBScreenKey({
             dataSource?.roundCode || dataSource?.bracket?.name
           ),
 
-          // Design mode
           isDefaultDesign: false,
-
-          // Overlay extras
           overlayEnabled: true,
-          webLogoUrl: safeStr(
-            process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
-              dataSource?.tournament?.overlay?.logoUrl ||
-              dataSource?.bracket?.overlay?.logoUrl
-          ),
-          sponsorLogos: [],
+          webLogoUrl,
+          sponsorLogos,
 
-          // Display settings
           showClock: false,
           scaleScore: 0.5,
+          showTime: true,
 
-          // Sets data
           sets: Array.isArray(dataSource?.gameScores)
             ? dataSource.gameScores.map((g: any, i: number) => ({
                 index: i + 1,
@@ -1148,18 +1312,21 @@ export default function LiveLikeFBScreenKey({
         };
 
         if (LOG) {
-          console.log("overlayUpdate → calling", overlayData);
+          console.log("overlayUpdate → calling", {
+            ...overlayData,
+            webLogoUrl: overlayData.webLogoUrl ? "✅" : "❌",
+            sponsorLogos: `${overlayData.sponsorLogos.length} logos`,
+          });
         }
         await Live.overlayUpdate?.(overlayData);
         log("overlayUpdate → OK");
       } catch (e) {
         log("overlayUpdate → error", e);
       }
-    },
-    [mode]
+    }, 2000),
+    [mode, overlayConfig]
   );
 
-  // ✅ Socket listener cho overlay realtime - GỌI TRỰC TIẾP
   useEffect(() => {
     if (!currentMatchId || !socket || mode !== "live") {
       return;
@@ -1168,22 +1335,39 @@ export default function LiveLikeFBScreenKey({
     log("socket → joining match room for overlay", currentMatchId);
     socket.emit("match:join", { matchId: currentMatchId });
 
-    // ✅ Handler cho match snapshot (full overlay data)
     const onMatchSnapshot = (data?: any) => {
+      const payloadMatchId = getMatchIdFromPayload(data);
+      const activeMatchId = currentMatchRef.current;
+
       log("socket → match:snapshot received", data);
+
+      if (
+        !payloadMatchId ||
+        !activeMatchId ||
+        payloadMatchId !== activeMatchId
+      ) {
+        return;
+      }
+
       if (data) {
         setRealtimeOverlayData(data);
-        // ✅ GỌI UPDATE NGAY LẬP TỨC
         updateOverlayNow(data);
       }
     };
 
-    // ✅ Handler cho score update (full data)
     const onScoreUpdate = (data?: any) => {
+      const payloadMatchId = getMatchIdFromPayload(data);
+      const activeMatchId = currentMatchRef.current;
       log("socket → score:updated received", data);
+      if (
+        !payloadMatchId ||
+        !activeMatchId ||
+        payloadMatchId !== activeMatchId
+      ) {
+        return;
+      }
       if (data) {
         setRealtimeOverlayData(data);
-        // ✅ GỌI UPDATE NGAY LẬP TỨC
         updateOverlayNow(data);
       }
     };
@@ -1199,7 +1383,6 @@ export default function LiveLikeFBScreenKey({
     };
   }, [currentMatchId, socket, mode, updateOverlayNow]);
 
-  // ✅ Fallback useEffect cho initial load từ RTK query
   useEffect(() => {
     if (!overlaySnapshot || realtimeOverlayData || mode !== "live") return;
 
@@ -1207,7 +1390,7 @@ export default function LiveLikeFBScreenKey({
     updateOverlayNow(overlaySnapshot);
   }, [overlaySnapshot, realtimeOverlayData, mode, updateOverlayNow]);
 
-  /* ===================== ✅ Start/Stop per match ===================== */
+  /* ==== Start for match ==== */
   const lastAutoStartedForRef = useRef<string | null>(null);
 
   const startForMatch = useCallback(
@@ -1243,7 +1426,6 @@ export default function LiveLikeFBScreenKey({
         chosenProfileRef.current = profile;
         await startNative(rtmpUrl, profile);
 
-        // ✅ OVERLAY: Android = Native, iOS = WebView
         if (Platform.OS === "android") {
           try {
             const fw = profile.width;
@@ -1259,8 +1441,8 @@ export default function LiveLikeFBScreenKey({
           const oUrl = overlayUrlForMatch(mid);
           if (oUrl) {
             try {
-              await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
-              await Live.overlaySetVisible?.(true);
+              // await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
+              // await Live.overlaySetVisible?.(true);
               log("overlay → loaded (webview)", oUrl);
             } catch (e) {
               log("overlay → failed (webview)", e);
@@ -1273,6 +1455,34 @@ export default function LiveLikeFBScreenKey({
         setLiveStartAt(Date.now());
         setMode("live");
         setStatusText("Đang LIVE…");
+
+        setTimeout(async () => {
+          try {
+            const support = await Live.checkRecordingSupport?.();
+            console.log("🎥 Recording support:", support);
+
+            if (!support?.supported) {
+              console.warn("⚠️ Recording not supported:", support?.reason);
+              return;
+            }
+
+            if (!support?.isStreaming) {
+              console.warn("⚠️ Stream not active");
+              return;
+            }
+
+            await videoUploader.startRecording(mid);
+            setIsRecording(true);
+            log("🎥 Recording started");
+          } catch (e) {
+            console.log("⚠️ Recording start failed (non-critical):", e);
+            Alert.alert(
+              "Cảnh báo",
+              "Không thể bắt đầu recording. Stream vẫn tiếp tục."
+            );
+          }
+        }, 2000);
+
         try {
           await (notifyStreamStarted as any)({
             matchId: mid,
@@ -1297,6 +1507,15 @@ export default function LiveLikeFBScreenKey({
       startNative,
     ]
   );
+
+  useEffect(() => {
+    return () => {
+      if (pendingUploads > 0) {
+        log("⚠️ Component unmounting with pending uploads, cancelling...");
+        videoUploader.cancelAllUploads();
+      }
+    };
+  }, [pendingUploads]);
 
   useEffect(() => {
     if (!autoOnLive || !courtId) return;
@@ -1425,34 +1644,54 @@ export default function LiveLikeFBScreenKey({
     orientationChosen,
   ]);
 
-  /* ====== Manual finish flow ====== */
-  /* ====== Manual finish flow (đếm trong component con, không setInterval ở parent) ====== */
+  /* ==== Manual finish ==== */
   const STOP_DURATION_MS = 5000;
 
   const handleFinishPress = useCallback(() => {
-    // Đổi mode trước cho UI nhảy ngay
     setMode("stopping");
-
-    // Haptics chạy async, không block UI
     Haptics.selectionAsync().catch(() => {});
   }, []);
 
   const handleStopDone = useCallback(async () => {
-    try {
-      await (notifyStreamEnded as any)({
-        matchId: currentMatchRef.current,
-        platform: "all",
-      }).unwrap?.();
-    } catch {}
-    await stopNativeNow();
+    // ✅ 1. Chuyển UI ngay lập tức - Không đợi cleanup
     setMode("ended");
-  }, [notifyStreamEnded, stopNativeNow]);
+    setStatusText("Đã kết thúc buổi phát trực tiếp.");
+    log("🎬 UI switched to ended - cleanup starting in background");
+
+    // ✅ 2. Cleanup chạy ngầm - Không block UI
+    Promise.all([
+      // Backend notification
+      (async () => {
+        try {
+          await (notifyStreamEnded as any)({
+            matchId: currentMatchRef.current,
+            platform: "all",
+          }).unwrap?.();
+          log("✅ BE notified: stream ended");
+        } catch (e) {
+          log("⚠️ BE notification failed (non-critical)", e);
+        }
+      })(),
+
+      // Native cleanup
+      (async () => {
+        try {
+          await stopNativeNow();
+          log("✅ Native cleanup completed");
+        } catch (e) {
+          log("⚠️ Native cleanup error", e);
+        }
+      })(),
+    ]).catch((e) => {
+      log("⚠️ Some cleanup failed (non-critical)", e);
+    });
+  }, [stopNativeNow, notifyStreamEnded]);
 
   const handleStopCancel = useCallback(() => {
     setMode("live");
   }, []);
 
-  /* ====== Toggles ====== */
+  /* ==== Toggles ==== */
   const onSwitch = useCallback(async () => {
     isFrontRef.current = !isFrontRef.current;
     await Live.switchCamera();
@@ -1493,21 +1732,82 @@ export default function LiveLikeFBScreenKey({
     }
   }, [micMuted, playSfx]);
 
-  /* ====== Pinch to zoom (iOS) ====== */
+  // ✅ THÊM: Toggle overlay UI handler
+  // ✅ SỬA: Toggle overlay handler
+  const toggleOverlayUI = useCallback(async () => {
+    const nextVisible = !overlayVisibleOnUI;
+    setOverlayVisibleOnUI(nextVisible);
+    await Haptics.selectionAsync();
+
+    try {
+      await Live.overlaySetVisibleOnPreview?.(nextVisible);
+      log(
+        `🎨 Overlay UI: ${
+          nextVisible ? "visible" : "hidden"
+        } (stream unchanged)`
+      );
+    } catch (e) {
+      log("⚠️ Toggle overlay UI error", e);
+      setOverlayVisibleOnUI(!nextVisible);
+    }
+  }, [overlayVisibleOnUI]);
+
+  // ✅ SỬA: Battery saver handler - Thực sự control brightness
+  const toggleBatterySaver = useCallback(async () => {
+    const nextMode = !batterySaverMode;
+    setBatterySaverMode(nextMode);
+    await Haptics.selectionAsync();
+
+    if (nextMode) {
+      try {
+        // Save current brightness
+        const current = await Brightness.getBrightnessAsync();
+        brightnessBeforeSaverRef.current = current;
+
+        // Set minimum brightness
+        await Brightness.setBrightnessAsync(0.01);
+
+        // Turn off torch
+        if (torchOn) {
+          setTorchOn(false);
+          await Live.toggleTorch(false);
+        }
+
+        log("🔋 Battery Saver Mode: ON (brightness: 0.01)");
+      } catch (e) {
+        log("⚠️ Battery saver setup error", e);
+      }
+    } else {
+      try {
+        // Restore brightness
+        const saved = brightnessBeforeSaverRef.current;
+        await Brightness.setBrightnessAsync(saved);
+
+        log("🔋 Battery Saver Mode: OFF (brightness restored)");
+      } catch (e) {
+        log("⚠️ Battery saver cleanup error", e);
+      }
+    }
+  }, [batterySaverMode, torchOn]);
+
+  /* ==== Pinch ==== */
   const onPinchEvent = useCallback(
     (e: any) => {
       if (Platform.OS !== "ios") return;
+      if (locking) return;
+
       const scale = e?.nativeEvent?.scale ?? 1;
       const desired = clampZoomUI(pinchBaseRef.current * scale);
-      const stepped = Math.round(desired * 10) / 10;
+      const stepped = Math.round(desired * 2) / 2; // 0.5 steps
 
-      if (stepped !== zoomUIRef.current) {
+      if (Math.abs(stepped - zoomUIRef.current) >= 0.3) {
+        // Tăng từ 0.15 → 0.3
         zoomUIRef.current = stepped;
-        setZoomUI(stepped);
+        // ❌ BỎ: setZoomUI(stepped);
         sendZoomRAF(stepped);
       }
     },
-    [sendZoomRAF]
+    [sendZoomRAF, locking]
   );
 
   const onPinchStateChange = useCallback((e: any) => {
@@ -1517,8 +1817,10 @@ export default function LiveLikeFBScreenKey({
     if (st === State.BEGAN) {
       pinchBaseRef.current = zoomUIRef.current;
     } else if (st === State.END || st === State.CANCELLED) {
-      const stepped = Math.round(zoomUIRef.current * 10) / 10;
+      const stepped = Math.round(zoomUIRef.current * 2) / 2;
       zoomUIRef.current = stepped;
+
+      // ✅ CHỈ update UI KHI gesture kết thúc
       setZoomUI(stepped);
 
       Live.setZoom?.(stepped);
@@ -1527,11 +1829,10 @@ export default function LiveLikeFBScreenKey({
     }
   }, []);
 
-  /* ====== Live timer effect ====== */
-
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
       <PinchGestureHandler
+        enabled={!locking}
         onGestureEvent={onPinchEvent}
         onHandlerStateChange={onPinchStateChange}
       >
@@ -1545,27 +1846,91 @@ export default function LiveLikeFBScreenKey({
       </PinchGestureHandler>
 
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, {}]}>
-        {/* Zoom + clock in-live */}
+        {/* Zoom + clock */}
+        {/* Zoom + Timer + LIVE badge */}
         {(mode === "live" || mode === "stopping") && (
           <>
+            {/* ❌ BỎ: LiveTimerBar component */}
+
+            {/* ✅ LIVE badge - Góc trái */}
             <View
               style={[
-                styles.zoomBadge,
-                { top: safeTop + 8, right: safeRight + 8 },
+                styles.liveTopLeft,
+                { top: safeTop + 8, left: safeLeft + 12 },
               ]}
             >
-              <Text style={styles.zoomBadgeTxt}>{zoomUI.toFixed(1)}x</Text>
+              <View style={styles.livePill}>
+                <Text style={styles.livePillTxt}>LIVE</Text>
+              </View>
             </View>
 
-            {/* ⏱️ Đồng hồ live tách riêng để re-render nhẹ hơn */}
-            <LiveTimerBar
-              mode={mode}
-              liveStartAt={liveStartAt}
-              safeTop={safeTop}
-              safeLeft={safeLeft}
-              safeRight={safeRight}
-            />
+            {/* ✅ Timer badge - GIỮA TRÊN */}
+            {/* <View
+              style={[
+                styles.timerBadge,
+                {
+                  top: safeTop + 8,
+                  left: safeLeft,
+                  right: safeRight,
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <View style={styles.timerBadgeContent}>
+                <Icon name="timer" size={16} color="#fff" />
+                <Text style={styles.timerBadgeText}>
+                  {formatDuration(elapsedMs)}
+                </Text>
+              </View>
+            </View> */}
+
+            {/* ✅ Zoom badge - Góc phải */}
+            <ZoomBadge zoom={zoomUI} top={safeTop + 8} right={safeRight + 8} />
           </>
+        )}
+
+        {/* Recording */}
+        {mode === "live" && isRecording && (
+          <View
+            style={[
+              styles.recordingBadge,
+              {
+                top: safeTop + 46, // ✅ Dưới timer bar
+                left: safeLeft + 12,
+              },
+            ]}
+          >
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>REC</Text>
+          </View>
+        )}
+
+        {/* Upload progress */}
+        {pendingUploads > 0 && (
+          <View
+            style={[
+              styles.uploadBadge,
+              { top: safeTop + 80, left: safeLeft + 12 },
+            ]}
+          >
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.uploadText}>
+              Uploading {pendingUploads} chunk{pendingUploads > 1 ? "s" : ""}
+            </Text>
+          </View>
+        )}
+
+        {/* Upload failed */}
+        {Object.values(uploadProgress).some((p) => p === -1) && (
+          <View
+            style={[
+              styles.uploadFailedBadge,
+              { top: safeTop + 80, right: safeRight + 12 },
+            ]}
+          >
+            <Icon name="alert-circle" size={14} color="#fff" />
+            <Text style={styles.uploadFailedText}>Upload lỗi</Text>
+          </View>
         )}
 
         {/* IDLE */}
@@ -1605,6 +1970,38 @@ export default function LiveLikeFBScreenKey({
                 },
               ]}
             >
+              {/* ✅ THÊM: Overlay UI Toggle */}
+              <Pressable
+                onPress={toggleOverlayUI}
+                style={[
+                  styles.bottomIconBtn,
+                  !overlayVisibleOnUI && styles.bottomIconBtnDisabled,
+                ]}
+                hitSlop={10}
+              >
+                <Icon
+                  name={overlayVisibleOnUI ? "eye" : "eye-off"}
+                  size={22}
+                  color="#fff"
+                />
+              </Pressable>
+
+              {/* ✅ THÊM: Battery Saver Toggle */}
+              <Pressable
+                onPress={toggleBatterySaver}
+                style={[
+                  styles.bottomIconBtn,
+                  batterySaverMode && styles.bottomIconBtnActive,
+                ]}
+                hitSlop={10}
+              >
+                <Icon
+                  name={batterySaverMode ? "battery-charging" : "battery"}
+                  size={22}
+                  color={batterySaverMode ? "#4ade80" : "#fff"}
+                />
+              </Pressable>
+
               <Pressable
                 onPress={onSwitch}
                 style={styles.bottomIconBtn}
@@ -1627,13 +2024,17 @@ export default function LiveLikeFBScreenKey({
 
               <Pressable
                 onPress={onToggleTorch}
-                style={styles.bottomIconBtn}
+                style={[
+                  styles.bottomIconBtn,
+                  batterySaverMode && styles.bottomIconBtnDisabled,
+                ]}
                 hitSlop={10}
+                disabled={batterySaverMode}
               >
                 <Icon
                   name={torchOn ? "flashlight-off" : "flashlight"}
                   size={22}
-                  color="#fff"
+                  color={batterySaverMode ? "#666" : "#fff"}
                 />
               </Pressable>
 
@@ -1784,6 +2185,54 @@ export default function LiveLikeFBScreenKey({
           </View>
         )}
 
+        {/* ✅ THÊM: Battery Saver Overlay */}
+        {mode === "live" && batterySaverMode && (
+          <Pressable
+            style={styles.batterySaverOverlay}
+            onPress={toggleBatterySaver} // ✅ THÊM: Tap anywhere
+            activeOpacity={1}
+          >
+            <View style={styles.batterySaverOverlay}>
+              <View style={styles.batterySaverContent}>
+                <Icon name="battery-charging" size={48} color="#4ade80" />
+                <Text style={styles.batterySaverTitle}>
+                  Chế độ tiết kiệm pin
+                </Text>
+                <Text style={styles.batterySaverDesc}>
+                  Camera đang live bình thường{"\n"}
+                  Màn hình tắt để tiết kiệm pin
+                </Text>
+
+                <View style={styles.batterySaverStats}>
+                  <View style={styles.batterySaverStat}>
+                    <Icon name="record-circle" size={16} color="#E53935" />
+                    <Text style={styles.batterySaverStatText}>LIVE</Text>
+                  </View>
+
+                  {isRecording && (
+                    <View style={styles.batterySaverStat}>
+                      <Icon name="record" size={16} color="#dc2626" />
+                      <Text style={styles.batterySaverStatText}>REC</Text>
+                    </View>
+                  )}
+
+                  {/* ✅ SỬA: Dùng native timer */}
+                  <View style={styles.batterySaverStat}>
+                    <Icon name="timer" size={16} color="#fff" />
+                    <Text style={styles.batterySaverStatText}>
+                      {formatDuration(elapsedMs)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.batterySaverHint}>
+                  Nhấn nút pin để tắt chế độ tiết kiệm pin
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        )}
+
         {/* ORIENTATION GATE */}
         {!orientationChosen && (
           <View style={styles.gateWrap} pointerEvents="auto">
@@ -1801,7 +2250,7 @@ export default function LiveLikeFBScreenKey({
                     pressed && styles.gateBtnPressed,
                   ]}
                 >
-                  <Text style={styles.gateEmoji}>📱↕️</Text>
+                  <Icon name="phone-rotate-portrait" size={32} color="#fff" />
                   <Text style={styles.gateBtnText}>Dọc</Text>
                 </Pressable>
 
@@ -1814,7 +2263,7 @@ export default function LiveLikeFBScreenKey({
                     pressed && styles.gateBtnPressed,
                   ]}
                 >
-                  <Text style={styles.gateEmoji}>📱↔️</Text>
+                  <Icon name="phone-rotate-landscape" size={32} color="#fff" />
                   <Text style={styles.gateBtnText}>Ngang</Text>
                 </Pressable>
               </View>
@@ -1847,28 +2296,9 @@ export default function LiveLikeFBScreenKey({
 /* ====== Styles ====== */
 const styles = StyleSheet.create({
   preview: StyleSheet.absoluteFillObject as ViewStyle,
-  topButtonsRow: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    zIndex: 999,
-  },
-  roundBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
+
   zoomBadge: {
     position: "absolute",
-    top: 16,
-    right: 16,
     paddingHorizontal: 10,
     height: 28,
     borderRadius: 14,
@@ -1877,23 +2307,60 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   zoomBadgeTxt: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  statusBarRow: {
+
+  recordingBadge: {
     position: "absolute",
-    top: 4,
-    left: 0,
-    right: 0,
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(220, 38, 38, 0.9)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 6,
   },
-  statusClock: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#17C964",
-    marginLeft: 8,
+  recordingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#fff",
   },
+  recordingText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  uploadBadge: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(59, 130, 246, 0.9)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 6,
+  },
+  uploadText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  uploadFailedBadge: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(239, 68, 68, 0.9)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  uploadFailedText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
   centerOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
@@ -1913,10 +2380,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
   },
+
   liveTopLeft: {
     position: "absolute",
-    top: 10,
-    left: 12,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1927,10 +2393,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   livePillTxt: { color: "#fff", fontWeight: "800", fontSize: 12 },
+
   liveBottomBar: {
     position: "absolute",
-    left: 10,
-    right: 10,
     backgroundColor: "rgba(0,0,0,0.75)",
     borderRadius: 10,
     height: 50,
@@ -1946,6 +2411,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 4,
   },
+  bottomIconBtnDisabled: {
+    opacity: 0.3,
+  },
+  bottomIconBtnActive: {
+    backgroundColor: "rgba(74, 222, 128, 0.2)",
+  },
   bottomQualityBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1958,7 +2429,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 6,
   },
-  liveIcon: { color: "#fff", fontSize: 18, marginHorizontal: 8 },
   finishBtn: {
     marginLeft: "auto",
     backgroundColor: "#fff",
@@ -1969,46 +2439,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   finishTxt: { color: "#111", fontWeight: "800", fontSize: 14 },
+
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.85)",
     alignItems: "center",
     justifyContent: "center",
   },
-  overlayTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 14,
-  },
-  progressText: {
-    color: "#fff",
-    marginTop: 12,
-    fontWeight: "600",
-  },
-  goLiveWrap: { position: "absolute", left: 16, right: 16 },
-  goLiveBtn: {
-    height: 46,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  goLiveTxt: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  cancelBigBtn: {
-    position: "absolute",
-    alignSelf: "center",
-    paddingHorizontal: 22,
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelBigTxt: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+
   endedTitle: {
     color: "#fff",
     fontSize: 18,
@@ -2025,6 +2463,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   endedBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "800" },
+
   gateWrap: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -2079,11 +2518,11 @@ const styles = StyleSheet.create({
     opacity: 0.75,
     transform: [{ scale: 0.99 }],
   },
-  gateEmoji: { fontSize: 26, marginBottom: 8 },
   gateBtnText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "800",
+    marginTop: 8,
   },
   gateHint: { color: "#fff", marginTop: 8, fontSize: 12 },
   gateHint2: {
@@ -2092,6 +2531,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
+
   qualityOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.6)",
@@ -2136,24 +2576,77 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  hdProcessingBanner: {
-    position: "absolute",
-    backgroundColor: "rgba(255, 165, 0, 0.95)",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+
+  // ✅ THÊM: Battery Saver Styles
+  batterySaverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    justifyContent: "center",
+    zIndex: 100,
   },
-  hdProcessingText: {
+  batterySaverContent: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  batterySaverTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  batterySaverDesc: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  batterySaverStats: {
+    flexDirection: "row",
+    marginTop: 24,
+    gap: 16,
+  },
+  batterySaverStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  batterySaverStatText: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "700",
   },
-  hdProcessingSub: {
-    color: "rgba(255, 255, 255, 0.95)",
-    fontSize: 10,
-    marginTop: 2,
+  batterySaverHint: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 12,
+    marginTop: 32,
+    textAlign: "center",
+  },
+  timerBadge: {
+    position: "absolute",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  timerBadgeContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    gap: 6,
+  },
+  timerBadgeText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });
