@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   StyleSheet,
   Dimensions,
   Animated,
@@ -13,6 +12,7 @@ import {
   Clipboard,
   Alert,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 // Note: LinearGradient only used for header and stat cards now
@@ -33,6 +33,7 @@ import {
   useGetMatchHistoryQuery,
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams } from "expo-router";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -215,8 +216,11 @@ const PlayerRowCompact = ({ player, highlight }) => {
   return (
     <View style={styles.playerRowCompact}>
       <Image
-        source={{ uri: player?.avatar || AVA_PLACE }}
+        source={{ uri: normalizeUrl(player?.avatar) || AVA_PLACE }}
         style={styles.playerAvatarCompact}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={150}
       />
       <View style={styles.playerInfoCompact}>
         <Text
@@ -265,8 +269,11 @@ const PlayerRow = ({ player, highlight, isWinSide }) => {
   return (
     <View style={styles.playerRow}>
       <Image
-        source={{ uri: player?.avatar || AVA_PLACE }}
+        source={{ uri: normalizeUrl(player?.avatar) || AVA_PLACE }}
         style={styles.playerAvatar}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={150}
       />
       <View style={styles.playerInfo}>
         <Text
@@ -574,8 +581,11 @@ export default function PublicProfileScreen() {
             ]}
           >
             <Image
-              source={{ uri: base?.avatar || AVA_PLACE }}
+              source={{ uri: normalizeUrl(base?.avatar) || AVA_PLACE }}
               style={styles.avatar}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
             />
             {base?.isAdmin && (
               <View style={styles.verifiedBadge}>
