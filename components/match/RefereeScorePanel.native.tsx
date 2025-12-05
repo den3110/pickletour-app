@@ -1613,23 +1613,15 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU (status !== live HOẶC waitingStart) → 0-0-2; nếu đang live → tay 1
   const toggleServeSide = () => {
-    if (!match?._id) return;
-
-    const prev = {
-      side: activeSide,
-      server: activeServerNum,
-      serverId: serverUidShow,
-    };
-
     const nextSide = activeSide === "A" ? "B" : "A";
-
     const preStart = waitingStart || match?.status !== "live";
+    const isDouble = eventType !== "single";
+    const wantOrder = preStart ? (isDouble ? 2 : 1) : 1;
 
-    const isDouble = eventType !== "single"; // 👈 thêm
-    const wantOrder = preStart ? (isDouble ? 2 : 1) : 1; // 👈 sửa dòng này
-
+    // ✅ Luôn lấy RIGHT COURT PLAYER = người có base=2
+    const baseMap = nextSide === "A" ? baseA : baseB;
     const uidRight =
-      getUidAtSlotNow(nextSide, 2) || getUidAtSlotNow(nextSide, 1) || "";
+      Object.entries(baseMap).find(([, base]) => Number(base) === 2)?.[0] || "";
 
     lastServerUidRef.current = uidRight;
 
@@ -1651,10 +1643,8 @@ export default function RefereeJudgePanel({ matchId }) {
           });
           return;
         }
-
         pushUndo({ t: "SERVE_SET", prev });
-
-        // 🛡️ Guard: nếu backend lỡ reset 0-0 khi đang mid-game → khôi phục điểm
+        // Guard: restore score nếu backend reset
         try {
           const res = await refetch();
           const m = res?.data || match;
