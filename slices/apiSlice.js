@@ -14,6 +14,23 @@ const BASE_URL =
   "http://192.168.0.105:5001";
 
 // ============== Helpers ==============
+const generateRequestId = () => {
+  try {
+    // Browser hỗ trợ chuẩn
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID();
+    }
+  } catch (e) {
+    console.log("Cannot use crypto.randomUUID", e);
+  }
+
+  // Fallback đơn giản nhưng đủ unique cho log
+  return "req_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+};
+
 function sanitizeHeaderValue(v, max = 120) {
   try {
     return String(v ?? "")
@@ -105,15 +122,25 @@ function getDetailedDeviceFields() {
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: BASE_URL,
   prepareHeaders: async (headers, { getState }) => {
-    // 1) Authorization
+    // 1) X-Request-Id (từ web)
+    try {
+      const requestId = generateRequestId();
+      if (requestId) {
+        headers.set("X-Request-Id", requestId);
+      }
+    } catch (e) {
+      console.log("Cannot set X-Request-Id", e);
+    }
+
+    // 2) Authorization
     const token = getState()?.auth?.userInfo?.token;
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    // 2) Version & device headers
+    // 3) Version & device headers
     const [deviceId, deviceName, pushToken] = await Promise.all([
       getDeviceId(),
       getDeviceName(),
-      getPushToken(), // NEW
+      getPushToken(),
     ]);
 
     const { brand, modelName, modelId, marketing } = getDetailedDeviceFields();
@@ -156,45 +183,69 @@ const rawBaseQuery = fetchBaseQuery({
     headers.set("X-Device-Model-Name", modelName);
     headers.set("X-Device-Model-Id", modelId);
 
-    // NEW: Gửi push token nếu có (đã sanitize)
+    // Push token nếu có
     if (pushToken) {
-      headers.set("X-Push-Token", sanitizeHeaderValue(pushToken, 260)); // Expo token dài ~50-60, để 260 dư dả
+      headers.set("X-Push-Token", sanitizeHeaderValue(pushToken, 260));
     }
 
-    // ================== TIMEZONE HEADERS (copy từ web) ==================
+    // ================== TIMEZONE HEADERS ==================
     try {
-      // Timezone dạng "Asia/Ho_Chi_Minh"
       let tz = null;
       if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
         tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       }
       if (!tz) {
-        // fallback nhẹ nếu môi trường không hỗ trợ Intl
         tz = "Asia/Ho_Chi_Minh";
       }
       if (tz) {
         headers.set("X-Timezone", tz);
       }
 
-      // Offset phút so với UTC (VN: -420)
       const offsetMinutes = new Date().getTimezoneOffset();
       headers.set("X-Timezone-Offset", String(offsetMinutes));
 
-      // Format GMT±HH:MM từ offset
-      const offsetHoursFloat = -offsetMinutes / 60; // getTimezoneOffset là lệch SO VỚI UTC
+      const offsetHoursFloat = -offsetMinutes / 60;
       const sign = offsetHoursFloat >= 0 ? "+" : "-";
       const absTotalMinutes = Math.abs(offsetMinutes);
       const absHours = Math.floor(absTotalMinutes / 60);
       const absMinutes = absTotalMinutes % 60;
 
       const pad = (n) => String(n).padStart(2, "0");
-      const gmt = `GMT${sign}${pad(absHours)}:${pad(absMinutes)}`; // ví dụ: GMT+07:00
+      const gmt = `GMT${sign}${pad(absHours)}:${pad(absMinutes)}`;
 
       headers.set("X-Timezone-Gmt", gmt);
     } catch (e) {
       console.log("Cannot resolve timezone", e);
     }
     // ===================================================================
+
+    // ✅ Bot context headers (từ web) + UserMatch header
+    try {
+      const state = getState();
+      const botCtx = state.botContext;
+
+      if (botCtx?.matchId) {
+        headers.set("x-pkt-match-id", botCtx.matchId);
+      }
+      if (botCtx?.tournamentId) {
+        headers.set("x-pkt-tournament-id", botCtx.tournamentId);
+      }
+      if (botCtx?.bracketId) {
+        headers.set("x-pkt-bracket-id", botCtx.bracketId);
+      }
+      if (botCtx?.courtCode) {
+        headers.set("x-pkt-court-code", botCtx.courtCode);
+      }
+
+      // 🔹 NEW: userMatch kind header (normal | user ...)
+      const userMatchHeader = state.userMatchHeader;
+      if (userMatchHeader?.kind) {
+        headers.set("x-pt-match-kind", userMatchHeader.kind);
+        headers.set("x-pkt-match-kind", userMatchHeader.kind);
+      }
+    } catch (error) {
+      console.log(error);
+    }
 
     return headers;
   },
@@ -299,6 +350,9 @@ export const apiSlice = createApi({
     "Schedule",
     "Sponsor",
     "Sponsors",
+    "FacebookPages",
+    "ChatHistory",
+    "Leaderboard",
   ],
   endpoints: () => ({}),
 });

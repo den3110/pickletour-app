@@ -21,6 +21,7 @@ import {
   requireNativeComponent,
   UIManager,
   NativeEventEmitter,
+  findNodeHandle,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,6 +32,7 @@ import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Brightness from "expo-brightness"; // ✅ THÊM
 import throttle from "lodash/throttle";
+import { NetworkStatsBottomSheet } from "./components/Networkstatsbottomsheet";
 
 /* ====== SFX ====== */
 import torch_on from "@/assets/sfx/click4.mp3";
@@ -65,45 +67,61 @@ const _CachedRtmpPreviewView =
 const RtmpPreviewView = _CachedRtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-// ✅ Hook dùng native timer
-function useNativeLiveTimer(isActive: boolean, startAt: number | null) {
-  const elapsedMsRef = useRef(0);
-  const [displayTime, setDisplayTime] = useState(0);
-  const tickCountRef = useRef(0);
+// ✅ Import Native Timer View
+const LiveTimerView = requireNativeComponent<{ startTimeMs: number }>(
+  "LiveTimerView"
+);
 
-  useEffect(() => {
-    if (!isActive || !startAt) {
-      elapsedMsRef.current = 0;
-      setDisplayTime(0);
-      return;
-    }
+const BatterySaverOverlay = React.memo(
+  ({
+    visible,
+    isRecording,
+    onToggle,
+    startAt,
+  }: {
+    visible: boolean;
+    isRecording: boolean;
+    onToggle: () => void;
+  }) => {
+    if (!visible) return null;
 
-    const eventEmitter = new NativeEventEmitter(Live);
+    return (
+      <Pressable
+        style={styles.batterySaverOverlay}
+        onPress={onToggle}
+        activeOpacity={1}
+      >
+        <View style={styles.batterySaverOverlay}>
+          <View style={styles.batterySaverContent}>
+            <Icon name="battery-charging" size={48} color="#4ade80" />
+            <Text style={styles.batterySaverTitle}>Chế độ tiết kiệm pin</Text>
+            <Text style={styles.batterySaverDesc}>
+              Camera đang live bình thường{"\n"}
+              Màn hình tắt để tiết kiệm pin
+            </Text>
 
-    const subscription = eventEmitter.addListener(
-      "onLiveTimerTick",
-      (event) => {
-        elapsedMsRef.current = event.elapsedMs;
+            <View style={styles.batterySaverStats}>
+              <View style={styles.batterySaverStat}>
+                <Icon name="record-circle" size={16} color="#E53935" />
+                <Text style={styles.batterySaverStatText}>LIVE</Text>
+              </View>
 
-        // ✅ CHỈ update UI mỗi 1 giây (10 ticks)
-        tickCountRef.current++;
-        if (tickCountRef.current >= 10) {
-          tickCountRef.current = 0;
-          setDisplayTime(event.elapsedMs);
-        }
-      }
+              {isRecording && (
+                <View style={styles.batterySaverStat}>
+                  <Icon name="record" size={16} color="#dc2626" />
+                  <Text style={styles.batterySaverStatText}>REC</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.batterySaverHint}>
+              Nhấn nút pin để tắt chế độ tiết kiệm pin
+            </Text>
+          </View>
+        </View>
+      </Pressable>
     );
-
-    Live.startLiveTimer?.().catch(() => {});
-
-    return () => {
-      subscription.remove();
-      Live.stopLiveTimer?.().catch(() => {});
-    };
-  }, [isActive, startAt]);
-
-  return displayTime; // ✅ Return display time, không phải real-time
-}
+  }
+);
 
 /* ====== Overlay URL builder ====== */
 const overlayUrlForMatch = (mid?: string | null): string | null => {
@@ -399,32 +417,6 @@ const ZoomBadge = React.memo(
   }
 );
 
-const TimerBadge = React.memo(
-  ({
-    elapsedMs,
-    top,
-    left,
-    right,
-  }: {
-    elapsedMs: number;
-    top: number;
-    left: number;
-    right: number;
-  }) => {
-    return (
-      <View
-        style={[styles.timerBadge, { top, left, right }]}
-        pointerEvents="none"
-      >
-        <View style={styles.timerBadgeContent}>
-          <Icon name="timer" size={16} color="#fff" />
-          <Text style={styles.timerBadgeText}>{formatDuration(elapsedMs)}</Text>
-        </View>
-      </View>
-    );
-  }
-);
-
 export default function LiveLikeFBScreenKey({
   tournamentHref,
   homeHref,
@@ -444,7 +436,7 @@ export default function LiveLikeFBScreenKey({
   const safeBottom = insets.bottom ?? 0;
   const safeLeft = insets.left ?? 0;
   const safeRight = insets.right ?? 0;
-
+  const [networkStatsVisible, setNetworkStatsVisible] = useState(false);
   /* ==== States ==== */
   const [mode, setMode] = useState<Mode>("idle");
   const [statusText, setStatusText] = useState<string>(
@@ -453,6 +445,12 @@ export default function LiveLikeFBScreenKey({
   const [torchOn, setTorchOn] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
   const [liveStartAt, setLiveStartAt] = useState<number | null>(null);
+
+  // Surface error recovery
+  const [surfaceError, setSurfaceError] = useState(false);
+  const recoveryAttemptsRef = useRef(0);
+  const MAX_RECOVERY_ATTEMPTS = 3;
+  const lastSuccessfulPreviewRef = useRef<number>(0);
 
   /* ==== Orientation ==== */
   const [orientation, setOrientation] = useState<Orient | null>(null);
@@ -471,9 +469,6 @@ export default function LiveLikeFBScreenKey({
   const [batterySaverMode, setBatterySaverMode] = useState(false);
   const brightnessBeforeSaverRef = useRef<number>(1);
 
-  // ✅ THÊM: Native timer
-  const elapsedMs = useNativeLiveTimer(mode === "live", liveStartAt);
-
   useEffect(() => {
     const unsubscribe = videoUploader.onProgress((progress) => {
       setUploadProgress(progress);
@@ -483,30 +478,6 @@ export default function LiveLikeFBScreenKey({
       setPendingUploads(pending);
     });
     return unsubscribe;
-  }, []);
-
-  const applyOrientationChoice = useCallback(async (choice: Orient) => {
-    setLocking(true);
-    try {
-      await Haptics.selectionAsync();
-
-      await ScreenOrientation.lockAsync(
-        choice === "portrait"
-          ? ScreenOrientation.OrientationLock.PORTRAIT
-          : ScreenOrientation.OrientationLock.LANDSCAPE
-      );
-
-      await Live.enableAutoRotate?.(false);
-      await Live.lockOrientation?.(choice.toUpperCase());
-
-      // ✅ SỬA: Tăng delay từ 500ms → 1000ms để surface recreate an toàn
-      await new Promise((r) => setTimeout(r, 1000));
-
-      setOrientation(choice);
-    } catch (e) {
-      log("❌ Orientation lock failed", e);
-    }
-    setLocking(false);
   }, []);
 
   const unlockOrientation = useCallback(async () => {
@@ -671,7 +642,7 @@ export default function LiveLikeFBScreenKey({
       if (Platform.OS === "ios") {
         try {
           await Live.refreshPreview?.();
-          log("preview → refreshPreview(iOS)");
+          log("preview → refreshed (iOS)");
         } catch (e) {
           log("preview → refreshPreview error", e);
         }
@@ -686,8 +657,7 @@ export default function LiveLikeFBScreenKey({
     }
 
     let attempts = 0;
-    const maxAttempts = 20;
-    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const maxAttempts = 15; // Tăng số lần retry
     previewRetryRef.current.cancel = false;
 
     while (
@@ -696,20 +666,40 @@ export default function LiveLikeFBScreenKey({
       attempts < maxAttempts
     ) {
       try {
+        log(`preview → attempt ${attempts + 1}/${maxAttempts}`);
+
+        // Đợi thêm ở lần đầu để surface có thời gian khởi tạo
+        if (attempts === 0) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+
         await Live.enableAutoRotate?.(true);
         await Live.startPreview?.();
 
+        // Reset zoom
         zoomUIRef.current = 1;
         setZoomUI(1);
         lastSentZoomRef.current = 1;
         Live.setZoom?.(1);
 
         startedPreviewRef.current = true;
-        log("preview → started");
+        lastSuccessfulPreviewRef.current = Date.now();
+        recoveryAttemptsRef.current = 0; // Reset recovery counter on success
+
+        log(`preview → started after ${attempts + 1} attempts`);
         return true;
       } catch (e: any) {
         const msg = String(e?.message || e);
-        await delay(/surface|invalid|illegalargument/i.test(msg) ? 150 : 120);
+        const isSurfaceError = /surface|invalid|illegalargument/i.test(msg);
+
+        log(`preview → attempt ${attempts + 1} failed: ${msg}`);
+
+        // Exponential backoff với max delay
+        const baseDelay = isSurfaceError ? 300 : 150;
+        const delay = Math.min(baseDelay * Math.pow(1.5, attempts), 2000);
+
+        log(`preview → waiting ${delay}ms before retry...`);
+        await new Promise((r) => setTimeout(r, delay));
       }
       attempts += 1;
     }
@@ -718,13 +708,66 @@ export default function LiveLikeFBScreenKey({
     return startedPreviewRef.current;
   }, []);
 
+  const applyOrientationChoice = useCallback(
+    async (choice: Orient) => {
+      setLocking(true);
+      try {
+        await Haptics.selectionAsync();
+
+        // ✅ CRITICAL: Stop preview TRƯỚC khi change orientation
+        if (startedPreviewRef.current) {
+          try {
+            log("orientation → stopping preview before change");
+            await Live.stopPreview?.();
+            startedPreviewRef.current = false;
+            // Đợi surface destroy hoàn toàn
+            await new Promise((r) => setTimeout(r, 300));
+          } catch (e) {
+            log("orientation → stopPreview error (ignored):", e);
+          }
+        }
+
+        await ScreenOrientation.lockAsync(
+          choice === "portrait"
+            ? ScreenOrientation.OrientationLock.PORTRAIT
+            : ScreenOrientation.OrientationLock.LANDSCAPE
+        );
+
+        await Live.enableAutoRotate?.(false);
+        await Live.lockOrientation?.(choice.toUpperCase());
+
+        // ✅ Đợi lâu hơn cho surface recreate
+        log("orientation → waiting for surface recreate...");
+        await new Promise((r) => setTimeout(r, 1500));
+
+        setOrientation(choice);
+
+        // ✅ Restart preview với retry
+        log("orientation → restarting preview...");
+        await new Promise((r) => setTimeout(r, 500));
+        const success = await startPreviewWithRetry();
+
+        if (!success) {
+          log("orientation → preview restart failed, will retry...");
+          // Retry thêm lần nữa
+          await new Promise((r) => setTimeout(r, 1000));
+          await startPreviewWithRetry();
+        }
+      } catch (e) {
+        log("❌ Orientation lock failed", e);
+      }
+      setLocking(false);
+    },
+    [startPreviewWithRetry]
+  );
+
   const kickPreview = useCallback(async () => {
-    // ✅ Clear previous kick
+    // Clear previous kick
     if (kickPreviewDebounceRef.current) {
       clearTimeout(kickPreviewDebounceRef.current);
     }
 
-    // ✅ Debounce 200ms
+    // Debounce 300ms (tăng từ 200ms)
     kickPreviewDebounceRef.current = setTimeout(async () => {
       if (startedPreviewRef.current) {
         if (Platform.OS === "ios") {
@@ -737,22 +780,28 @@ export default function LiveLikeFBScreenKey({
         }
         return;
       }
+
+      log("kickPreview → starting preview...");
       await startPreviewWithRetry();
-    }, 200);
+    }, 300);
   }, [startPreviewWithRetry]);
 
   useEffect(() => {
     Live.enableThermalProtect?.(false);
 
     return () => {
+      log("component → unmounting, full cleanup...");
+
       if (kickPreviewDebounceRef.current) {
         clearTimeout(kickPreviewDebounceRef.current);
       }
 
       previewRetryRef.current.cancel = true;
+
       try {
         if (gapTenMinTimerRef.current) clearTimeout(gapTenMinTimerRef.current);
       } catch {}
+
       (async () => {
         try {
           await Live.enableAutoRotate?.(true);
@@ -771,6 +820,8 @@ export default function LiveLikeFBScreenKey({
           await Live.release?.();
         } catch {}
         await unlockOrientation();
+
+        log("component → cleanup done");
       })();
     };
   }, [unlockOrientation]);
@@ -799,36 +850,68 @@ export default function LiveLikeFBScreenKey({
 
   useEffect(() => {
     const handler = async (nextState: AppStateStatus) => {
+      log(`AppState → ${nextState}`);
+
       if (nextState === "active") {
         previewRetryRef.current.cancel = false;
 
-        // ✅ Tăng delay từ 300ms → 1000ms
+        // Đợi app fully active
         await new Promise((r) => setTimeout(r, 1000));
 
         if (!startedPreviewRef.current) {
-          await startPreviewWithRetry();
+          log("AppState → preview not started, attempting start...");
+
+          // Multiple attempts với increasing delays
+          for (let i = 0; i < 3; i++) {
+            await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+            const success = await startPreviewWithRetry();
+            if (success) {
+              log(`AppState → preview started on attempt ${i + 1}`);
+              break;
+            }
+          }
         } else if (Platform.OS === "ios") {
-          // ✅ Thêm delay trước refresh
+          // iOS: refresh preview
           await new Promise((r) => setTimeout(r, 500));
           try {
             await Live.refreshPreview?.();
+            log("AppState → preview refreshed (iOS)");
           } catch (e) {
-            log("preview refresh failed", e);
+            log("AppState → refresh failed, restarting...", e);
+            startedPreviewRef.current = false;
+            await startPreviewWithRetry();
+          }
+        } else if (Platform.OS === "android") {
+          // Android: verify surface is still valid
+          try {
+            const state = await Live.getSurfaceState?.();
+            log("AppState → surface state:", state);
+
+            if (!state?.surfaceValid) {
+              log("AppState → surface invalid, restarting preview...");
+              startedPreviewRef.current = false;
+              await new Promise((r) => setTimeout(r, 500));
+              await startPreviewWithRetry();
+            }
+          } catch (e) {
+            log("AppState → getSurfaceState error:", e);
           }
         }
       } else {
+        // Background
         previewRetryRef.current.cancel = true;
 
-        // ✅ Thêm delay trước stop
-        await new Promise((r) => setTimeout(r, 200));
+        // Đợi trước khi stop
+        await new Promise((r) => setTimeout(r, 100));
 
         try {
           if (startedPreviewRef.current) {
             await Live.stopPreview?.();
             startedPreviewRef.current = false;
+            log("AppState → preview stopped");
           }
         } catch (e) {
-          log("stopPreview error", e);
+          log("AppState → stopPreview error:", e);
         }
       }
     };
@@ -1203,6 +1286,13 @@ export default function LiveLikeFBScreenKey({
           console.log(`✅ Loaded ${sponsorLogos.length} sponsor logos`);
         }
 
+        const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
+
+        console.log(
+          "-----------------------------",
+          safeStr(dataSource?.tournament?.image)
+        );
+
         const overlayData = {
           theme: safeStr(
             dataSource?.tournament?.overlay?.theme ||
@@ -1252,7 +1342,7 @@ export default function LiveLikeFBScreenKey({
 
           tournamentName: safeStr(dataSource?.tournament?.name),
           courtName: safeStr(dataSource?.court?.name || dataSource?.courtName),
-          tournamentLogoUrl: safeStr(dataSource?.tournament?.image),
+          tournamentLogoUrl: logoTournamentUrl,
           phaseText: safeStr(dataSource?.bracket?.name),
           roundLabel: safeStr(dataSource?.roundCode),
 
@@ -1299,6 +1389,7 @@ export default function LiveLikeFBScreenKey({
           showClock: false,
           scaleScore: 0.5,
           showTime: true,
+          overlayVersion: 2,
 
           sets: Array.isArray(dataSource?.gameScores)
             ? dataSource.gameScores.map((g: any, i: number) => ({
@@ -1399,6 +1490,35 @@ export default function LiveLikeFBScreenKey({
         setStatusText("Vui lòng chọn Dọc hoặc Ngang để bắt đầu phát.");
         return false;
       }
+
+      // ✅ THÊM: Kiểm tra surface state trước
+      if (Platform.OS === "android") {
+        try {
+          const surfaceState = await Live.getSurfaceState?.();
+          log("startForMatch → surface state:", surfaceState);
+
+          if (!surfaceState?.surfaceValid) {
+            setStatusText("Đang khởi động camera...");
+
+            // Restart preview
+            startedPreviewRef.current = false;
+            await new Promise((r) => setTimeout(r, 500));
+            const previewOk = await startPreviewWithRetry();
+
+            if (!previewOk) {
+              setStatusText("❌ Không thể khởi động camera");
+              Alert.alert(
+                "Lỗi",
+                "Không thể khởi động camera. Vui lòng thử lại."
+              );
+              return false;
+            }
+          }
+        } catch (e) {
+          log("startForMatch → getSurfaceState error (ignored):", e);
+        }
+      }
+
       setStatusText("Sân đã có trận — chuẩn bị phát…");
 
       const liveInfo = await ensureOutputsForMatch(mid);
@@ -1412,6 +1532,7 @@ export default function LiveLikeFBScreenKey({
 
       try {
         await Haptics.selectionAsync();
+
         try {
           await ScreenOrientation.lockAsync(
             orientation === "portrait"
@@ -1424,7 +1545,36 @@ export default function LiveLikeFBScreenKey({
 
         const profile = await pickAdaptiveProfile(orientation!);
         chosenProfileRef.current = profile;
-        await startNative(rtmpUrl, profile);
+
+        // ✅ Start với retry wrapper
+        let startSuccess = false;
+        let lastError: any = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            log(`startForMatch → attempt ${attempt + 1}/3`);
+            await startNative(rtmpUrl, profile);
+            startSuccess = true;
+            break;
+          } catch (e: any) {
+            lastError = e;
+            const msg = String(e?.message || e);
+
+            if (/surface|invalid/i.test(msg)) {
+              log(`startForMatch → surface error, waiting before retry...`);
+              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            } else {
+              // Not a surface error, don't retry
+              break;
+            }
+          }
+        }
+
+        if (!startSuccess) {
+          throw lastError || new Error("Failed to start stream");
+        }
+
+        // ... rest of overlay setup code ...
 
         if (Platform.OS === "android") {
           try {
@@ -1437,17 +1587,6 @@ export default function LiveLikeFBScreenKey({
           } catch (e) {
             log("overlay → failed (native)", e);
           }
-        } else if (Platform.OS === "ios") {
-          const oUrl = overlayUrlForMatch(mid);
-          if (oUrl) {
-            try {
-              // await Live.overlayLoad(oUrl, 0, 0, "CENTER", 100, 100, 0, 0);
-              // await Live.overlaySetVisible?.(true);
-              log("overlay → loaded (webview)", oUrl);
-            } catch (e) {
-              log("overlay → failed (webview)", e);
-            }
-          }
         }
 
         lastUrlRef.current = rtmpUrl;
@@ -1456,6 +1595,7 @@ export default function LiveLikeFBScreenKey({
         setMode("live");
         setStatusText("Đang LIVE…");
 
+        // Recording setup
         setTimeout(async () => {
           try {
             const support = await Live.checkRecordingSupport?.();
@@ -1476,10 +1616,6 @@ export default function LiveLikeFBScreenKey({
             log("🎥 Recording started");
           } catch (e) {
             console.log("⚠️ Recording start failed (non-critical):", e);
-            Alert.alert(
-              "Cảnh báo",
-              "Không thể bắt đầu recording. Stream vẫn tiếp tục."
-            );
           }
         }, 2000);
 
@@ -1489,6 +1625,7 @@ export default function LiveLikeFBScreenKey({
             platform: "all",
           }).unwrap?.();
         } catch {}
+
         log("startForMatch → LIVE", { matchId: mid, profile });
         return true;
       } catch (e: any) {
@@ -1505,8 +1642,179 @@ export default function LiveLikeFBScreenKey({
       orientationChosen,
       pickAdaptiveProfile,
       startNative,
+      startPreviewWithRetry,
     ]
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      log("focus → screen focused");
+      previewRetryRef.current.cancel = false;
+
+      // Delay để screen mount xong
+      const initTimer = setTimeout(() => {
+        kickPreview();
+      }, 300);
+
+      return () => {
+        log("focus → screen unfocused");
+        clearTimeout(initTimer);
+        previewRetryRef.current.cancel = true;
+
+        (async () => {
+          try {
+            if (startedPreviewRef.current) {
+              await Live.stopPreview?.();
+              startedPreviewRef.current = false;
+              log("focus-cleanup → stopPreview done");
+            }
+          } catch (e) {
+            log("focus-cleanup → stopPreview error", e);
+          }
+        })();
+      };
+    }, [kickPreview])
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const eventEmitter = new NativeEventEmitter(
+      NativeModules.FacebookLiveModule
+    );
+
+    const errorSub = eventEmitter.addListener(
+      "onConnectionFailed",
+      async (event) => {
+        const reason = String(event?.reason || "").toLowerCase();
+
+        // ✅ THÊM: Handle network disconnect
+        if (
+          reason.includes("connection") ||
+          reason.includes("network") ||
+          reason.includes("timeout")
+        ) {
+          log("🔴 Connection error detected:", reason);
+
+          // Auto-retry stream nếu vẫn có match
+          if (
+            mode === "live" &&
+            currentMatchRef.current &&
+            lastUrlRef.current
+          ) {
+            log("🔄 Attempting stream reconnect...");
+            setStatusText("Đang kết nối lại...");
+
+            await new Promise((r) => setTimeout(r, 3000));
+
+            try {
+              const profile = chosenProfileRef.current;
+              if (profile && lastUrlRef.current) {
+                await startNative(lastUrlRef.current, profile);
+                log("✅ Stream reconnected");
+                setStatusText("Đang LIVE…");
+              }
+            } catch (e) {
+              log("❌ Reconnect failed:", e);
+              setStatusText("Mất kết nối. Đang thử lại...");
+            }
+          }
+        }
+
+        if (reason.includes("surface") || reason.includes("invalid")) {
+          log("🔴 Surface error detected:", reason);
+          setSurfaceError(true);
+
+          if (recoveryAttemptsRef.current < MAX_RECOVERY_ATTEMPTS) {
+            recoveryAttemptsRef.current += 1;
+            log(
+              `🔄 Recovery attempt ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS}`
+            );
+
+            // Stop everything
+            try {
+              await Live.stopPreview?.();
+              startedPreviewRef.current = false;
+            } catch {}
+
+            // Wait for surface to stabilize
+            await new Promise((r) => setTimeout(r, 2000));
+
+            // Retry preview
+            const success = await startPreviewWithRetry();
+
+            if (success) {
+              setSurfaceError(false);
+              log("✅ Recovery successful");
+
+              // If was live, try to restart stream
+              if (mode === "live" && currentMatchRef.current) {
+                log("🔄 Restarting stream...");
+                await new Promise((r) => setTimeout(r, 1000));
+                await startForMatch(currentMatchRef.current);
+              }
+            } else {
+              log("❌ Recovery failed");
+            }
+          } else {
+            log("❌ Max recovery attempts reached");
+            Alert.alert(
+              "Lỗi Camera",
+              "Không thể khởi động camera. Vui lòng thử lại sau hoặc khởi động lại ứng dụng.",
+              [
+                {
+                  text: "Thử lại",
+                  onPress: async () => {
+                    recoveryAttemptsRef.current = 0;
+                    await startPreviewWithRetry();
+                  },
+                },
+                {
+                  text: "Quay lại",
+                  onPress: () => router.back(),
+                  style: "cancel",
+                },
+              ]
+            );
+          }
+        }
+      }
+    );
+
+    return () => errorSub.remove();
+  }, [mode, startPreviewWithRetry, startForMatch]);
+
+  // Periodic surface health check during live
+  useEffect(() => {
+    if (Platform.OS !== "android" || mode !== "live") return;
+
+    const healthCheck = setInterval(async () => {
+      try {
+        const state = await Live.getSurfaceState?.();
+
+        if (state && !state.surfaceValid && state.isStreaming) {
+          log("⚠️ Surface unhealthy during stream!");
+
+          // Attempt soft recovery - just restart preview
+          try {
+            await Live.stopPreview?.();
+            await new Promise((r) => setTimeout(r, 500));
+
+            if (await Live.getSurfaceState?.().then((s) => s?.surfaceValid)) {
+              await Live.startPreview?.();
+              log("✅ Soft recovery successful");
+            }
+          } catch (e) {
+            log("❌ Soft recovery failed:", e);
+          }
+        }
+      } catch (e) {
+        // Ignore errors - this is just a health check
+      }
+    }, 15000); // Check every 15s
+
+    return () => clearInterval(healthCheck);
+  }, [mode]);
 
   useEffect(() => {
     return () => {
@@ -1850,9 +2158,7 @@ export default function LiveLikeFBScreenKey({
         {/* Zoom + Timer + LIVE badge */}
         {(mode === "live" || mode === "stopping") && (
           <>
-            {/* ❌ BỎ: LiveTimerBar component */}
-
-            {/* ✅ LIVE badge - Góc trái */}
+            {/* LIVE badge */}
             <View
               style={[
                 styles.liveTopLeft,
@@ -1862,29 +2168,14 @@ export default function LiveLikeFBScreenKey({
               <View style={styles.livePill}>
                 <Text style={styles.livePillTxt}>LIVE</Text>
               </View>
+              {/* ✅ NATIVE TIMER VIEW: No JS re-renders */}
+              <LiveTimerView
+                style={{ width: 80, height: 32 }}
+                startTimeMs={liveStartAt || 0}
+              />
             </View>
 
-            {/* ✅ Timer badge - GIỮA TRÊN */}
-            {/* <View
-              style={[
-                styles.timerBadge,
-                {
-                  top: safeTop + 8,
-                  left: safeLeft,
-                  right: safeRight,
-                },
-              ]}
-              pointerEvents="none"
-            >
-              <View style={styles.timerBadgeContent}>
-                <Icon name="timer" size={16} color="#fff" />
-                <Text style={styles.timerBadgeText}>
-                  {formatDuration(elapsedMs)}
-                </Text>
-              </View>
-            </View> */}
-
-            {/* ✅ Zoom badge - Góc phải */}
+            {/* Zoom badge vẫn dùng zoomUI từ cha, nhưng KHÔNG còn re-render theo timer */}
             <ZoomBadge zoom={zoomUI} top={safeTop + 8} right={safeRight + 8} />
           </>
         )}
@@ -1948,121 +2239,13 @@ export default function LiveLikeFBScreenKey({
 
         {/* LIVE */}
         {mode === "live" && (
-          <>
-            <View
-              style={[
-                styles.liveTopLeft,
-                { top: safeTop + 6, left: safeLeft + 12 },
-              ]}
-            >
-              <View style={styles.livePill}>
-                <Text style={styles.livePillTxt}>LIVE</Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.liveBottomBar,
-                {
-                  bottom: 14 + safeBottom,
-                  left: 10 + safeLeft,
-                  right: 10 + safeRight,
-                },
-              ]}
-            >
-              {/* ✅ THÊM: Overlay UI Toggle */}
-              <Pressable
-                onPress={toggleOverlayUI}
-                style={[
-                  styles.bottomIconBtn,
-                  !overlayVisibleOnUI && styles.bottomIconBtnDisabled,
-                ]}
-                hitSlop={10}
-              >
-                <Icon
-                  name={overlayVisibleOnUI ? "eye" : "eye-off"}
-                  size={22}
-                  color="#fff"
-                />
-              </Pressable>
-
-              {/* ✅ THÊM: Battery Saver Toggle */}
-              <Pressable
-                onPress={toggleBatterySaver}
-                style={[
-                  styles.bottomIconBtn,
-                  batterySaverMode && styles.bottomIconBtnActive,
-                ]}
-                hitSlop={10}
-              >
-                <Icon
-                  name={batterySaverMode ? "battery-charging" : "battery"}
-                  size={22}
-                  color={batterySaverMode ? "#4ade80" : "#fff"}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={onSwitch}
-                style={styles.bottomIconBtn}
-                hitSlop={10}
-              >
-                <Icon name="camera-switch" size={22} color="#fff" />
-              </Pressable>
-
-              <Pressable
-                onPress={onToggleMic}
-                style={styles.bottomIconBtn}
-                hitSlop={10}
-              >
-                <Icon
-                  name={micMuted ? "microphone-off" : "microphone"}
-                  size={22}
-                  color="#fff"
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={onToggleTorch}
-                style={[
-                  styles.bottomIconBtn,
-                  batterySaverMode && styles.bottomIconBtnDisabled,
-                ]}
-                hitSlop={10}
-                disabled={batterySaverMode}
-              >
-                <Icon
-                  name={torchOn ? "flashlight-off" : "flashlight"}
-                  size={22}
-                  color={batterySaverMode ? "#666" : "#fff"}
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={() => setQualityMenuVisible(true)}
-                style={styles.bottomQualityBtn}
-                hitSlop={10}
-              >
-                <Icon name="cog" size={20} color="#fff" />
-                <Text style={styles.bottomQualityTxt}>
-                  {qualityChoice === "auto" && autoQualityLabel
-                    ? autoQualityLabel
-                    : currentQualityPreset.shortLabel ??
-                      currentQualityPreset.label}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.finishBtn}
-                onPress={handleFinishPress}
-                hitSlop={10}
-              >
-                <Text style={styles.finishTxt}>Finish</Text>
-              </Pressable>
-            </View>
-          </>
+          <BatterySaverOverlay
+            visible={batterySaverMode}
+            isRecording={isRecording}
+            onToggle={toggleBatterySaver}
+            startAt={liveStartAt}
+          />
         )}
-
         {/* STOPPING */}
         {mode === "stopping" && (
           <StoppingOverlay
@@ -2113,6 +2296,158 @@ export default function LiveLikeFBScreenKey({
             </View>
           </View>
         )}
+
+        {/* BOTTOM CONTROL BAR */}
+        {(mode === "live" || mode === "stopping") && (
+          <View
+            style={[
+              styles.liveBottomBar,
+              {
+                left: safeLeft + 12,
+                right: safeRight + 12,
+                bottom: safeBottom + 16,
+              },
+            ]}
+          >
+            {/* Đổi camera */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={onSwitch}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon name="camera-switch" size={22} color="#fff" />
+            </Pressable>
+
+            {/* Đèn pin */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={onToggleTorch}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                torchOn && styles.bottomIconBtnActive,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon
+                name={torchOn ? "flashlight" : "flashlight-off"}
+                size={22}
+                color="#fff"
+              />
+            </Pressable>
+
+            {/* Mic */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={onToggleMic}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                micMuted && styles.bottomIconBtnActive,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon
+                name={micMuted ? "microphone-off" : "microphone"}
+                size={22}
+                color="#fff"
+              />
+            </Pressable>
+
+            {/* Overlay preview ON/OFF (chỉ ảnh hưởng preview) */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={toggleOverlayUI}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                overlayVisibleOnUI && styles.bottomIconBtnActive,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon
+                name={overlayVisibleOnUI ? "television-play" : "television-off"}
+                size={22}
+                color="#fff"
+              />
+            </Pressable>
+            {/* ✅ THÊM: Network Stats Button */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={() => setNetworkStatsVisible(true)}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                networkStatsVisible && styles.bottomIconBtnActive,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon name="chart-line" size={22} color="#fff" />
+            </Pressable>
+            {/* Battery saver */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={toggleBatterySaver}
+              style={({ pressed }) => [
+                styles.bottomIconBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                batterySaverMode && styles.bottomIconBtnActive,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon
+                name={batterySaverMode ? "battery" : "battery-outline"}
+                size={22}
+                color="#fff"
+              />
+            </Pressable>
+
+            {/* Chọn chất lượng */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={() => setQualityMenuVisible(true)}
+              style={({ pressed }) => [
+                styles.bottomQualityBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                pressed && mode === "live" && { opacity: 0.7 },
+              ]}
+            >
+              <Icon name="video-high-definition" size={20} color="#fff" />
+              <Text style={styles.bottomQualityTxt}>
+                {qualityChoice === "auto"
+                  ? autoQualityLabel ?? "Auto"
+                  : QUALITY_PRESETS[qualityChoice]?.shortLabel ??
+                    QUALITY_PRESETS[qualityChoice].label}
+              </Text>
+            </Pressable>
+
+            {/* Nút Finish */}
+            <Pressable
+              disabled={mode !== "live"}
+              onPress={mode === "live" ? handleFinishPress : undefined}
+              style={({ pressed }) => [
+                styles.finishBtn,
+                mode !== "live" && styles.bottomIconBtnDisabled,
+                pressed && mode === "live" && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.finishTxt}>
+                {mode === "stopping" ? "Đang dừng…" : "Kết thúc"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* ✅ THÊM: Network Stats Bottom Sheet */}
+        <NetworkStatsBottomSheet
+          visible={networkStatsVisible}
+          onClose={() => setNetworkStatsVisible(false)}
+          isRecording={isRecording}
+        />
 
         {/* QUALITY MENU */}
         {qualityMenuVisible && (
@@ -2183,54 +2518,6 @@ export default function LiveLikeFBScreenKey({
               })}
             </View>
           </View>
-        )}
-
-        {/* ✅ THÊM: Battery Saver Overlay */}
-        {mode === "live" && batterySaverMode && (
-          <Pressable
-            style={styles.batterySaverOverlay}
-            onPress={toggleBatterySaver} // ✅ THÊM: Tap anywhere
-            activeOpacity={1}
-          >
-            <View style={styles.batterySaverOverlay}>
-              <View style={styles.batterySaverContent}>
-                <Icon name="battery-charging" size={48} color="#4ade80" />
-                <Text style={styles.batterySaverTitle}>
-                  Chế độ tiết kiệm pin
-                </Text>
-                <Text style={styles.batterySaverDesc}>
-                  Camera đang live bình thường{"\n"}
-                  Màn hình tắt để tiết kiệm pin
-                </Text>
-
-                <View style={styles.batterySaverStats}>
-                  <View style={styles.batterySaverStat}>
-                    <Icon name="record-circle" size={16} color="#E53935" />
-                    <Text style={styles.batterySaverStatText}>LIVE</Text>
-                  </View>
-
-                  {isRecording && (
-                    <View style={styles.batterySaverStat}>
-                      <Icon name="record" size={16} color="#dc2626" />
-                      <Text style={styles.batterySaverStatText}>REC</Text>
-                    </View>
-                  )}
-
-                  {/* ✅ SỬA: Dùng native timer */}
-                  <View style={styles.batterySaverStat}>
-                    <Icon name="timer" size={16} color="#fff" />
-                    <Text style={styles.batterySaverStatText}>
-                      {formatDuration(elapsedMs)}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.batterySaverHint}>
-                  Nhấn nút pin để tắt chế độ tiết kiệm pin
-                </Text>
-              </View>
-            </View>
-          </Pressable>
         )}
 
         {/* ORIENTATION GATE */}
@@ -2391,6 +2678,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    marginRight: 8, // ✅ Add margin for spacing
   },
   livePillTxt: { color: "#fff", fontWeight: "800", fontSize: 12 },
 

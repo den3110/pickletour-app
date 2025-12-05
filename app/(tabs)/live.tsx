@@ -4,7 +4,7 @@ import LiveMatchesScreen from "@/components/live_list/LiveMatchesScreen";
 import React from "react";
 import { View } from "react-native";
 
-export default function LiveRoute() {
+export default function LiveTab() {
   // return <FacebookLiveScreen />;
-  return <LiveMatchesScreen isBack />
+  return <LiveMatchesScreen />
 }

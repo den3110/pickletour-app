@@ -33,9 +33,9 @@ import {
   useGetUserTopQuery,
   useGetUserProfileExQuery,
 } from "@/slices/userStatsApiSlice";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import AuthGuard from "@/components/auth/AuthGuard";
-
+import { Ionicons } from "@expo/vector-icons"; // 👈 thêm dòng này
 /* =================== Consts & Utils =================== */
 const tz = "Asia/Bangkok";
 const W = Dimensions.get("window").width;
@@ -493,9 +493,20 @@ export default function UserStatsScreen() {
             paddingHorizontal: PADX,
           }}
         >
-          <Text style={styles.h1}>Thống kê cá nhân</Text>
-          <Text style={styles.h2}>{name || "User"}</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={22} color="#111827" />
+            </TouchableOpacity>
 
+            <View>
+              <Text style={styles.h1}>Thống kê cá nhân</Text>
+              <Text style={styles.h2}>{name || "User"}</Text>
+            </View>
+          </View>
           {/* Quick range */}
           <View style={styles.quickRow}>
             {[7, 14, 30, 90].map((d) => (
@@ -605,7 +616,7 @@ export default function UserStatsScreen() {
 /* =================== Styles =================== */
 const styles = StyleSheet.create({
   h1: { fontSize: 22, fontWeight: "800", color: "#000" },
-  h2: { fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 8 },
+  h2: { fontSize: 14, marginBottom: 8 },
 
   quickRow: {
     flexDirection: "row",
@@ -676,5 +687,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.08)",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 8,
+    columnGap: 6,
+  },
+  backBtn: {
+    paddingRight: 6,
+    paddingVertical: 4,
+    marginRight: 2,
+    // không background theo đúng yêu cầu
   },
 });

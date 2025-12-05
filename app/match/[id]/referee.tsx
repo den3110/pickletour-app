@@ -19,6 +19,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
 
 import { useGetMatchQuery } from "@/slices/tournamentsApiSlice";
 import RefereeJudgePanel from "@/components/match/RefereeScorePanel.native";
+import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
 
 /* ---------------- theme tokens (giống AssignCourtSheet) ---------------- */
 function useTokens() {
@@ -153,10 +154,13 @@ function HeaderRefresh({ isFetching, onPress }) {
 
 /* ---------------- page ---------------- */
 export default function RefereeScreen() {
+  
   const t = useTokens();
   const styles = useMemo(() => makeStyles(t), [t]);
 
   const params = useLocalSearchParams();
+  const {userMatch }= params
+  useUserMatchHeader(userMatch=== "true" && "user");
   const matchId = useMemo(() => String(params?.id ?? ""), [params?.id]);
   const me = useSelector((s) => s.auth?.userInfo || null);
 

@@ -30,7 +30,7 @@ import TextInput from "@/components/ui/TextInput";
 import { Chip } from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
 import type { Club } from "@/types/club.types";
-
+import { Ionicons } from "@expo/vector-icons";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal"; // 👈 NEW
 
 const { width } = Dimensions.get("window");
@@ -89,7 +89,18 @@ export default function ClubsListScreen() {
       >
         <StatusBar barStyle="light-content" />
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Câu lạc bộ</Text>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>Câu lạc bộ</Text>
+          </View>
+
           <Text style={styles.headerSubtitle}>
             Tìm và tham gia cộng đồng của bạn
           </Text>
@@ -356,5 +367,17 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
+  },
+  // 👇 thêm mới
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  backBtn: {
+    paddingRight: 8,
+    paddingVertical: 4,
+    marginRight: 4,
+    // không background theo yêu cầu
   },
 });

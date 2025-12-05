@@ -37,6 +37,7 @@ import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
+import { increaseLaunchCountAndGet, initInstallDateIfNeeded } from "@/services/ratingService";
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -592,6 +593,13 @@ export default function RootLayout() {
       }
     };
   }, [parseDeepLink, queueNavigation]);
+
+  useEffect(() => {
+    (async () => {
+      await initInstallDateIfNeeded();
+      await increaseLaunchCountAndGet();
+    })();
+  }, []);
 
   return (
     <Provider store={store}>

@@ -31,7 +31,7 @@ import {
 } from "@/slices/scheduleApiSlice";
 import { useMatchCalendar } from "@/hooks/useMatchCalendar";
 import AuthGuard from "@/components/auth/AuthGuard";
-
+import { Ionicons } from "@expo/vector-icons";
 // ===== CALENDAR LOCALE (VIETNAMESE) =====
 LocaleConfig.locales["vi"] = {
   monthNames: [
@@ -444,15 +444,29 @@ export default function MatchScheduleScreen() {
           >
             <View style={styles.headerContent}>
               <View style={styles.headerTop}>
-                <View>
-                  <Text style={styles.headerTitle}>Lịch Thi Đấu</Text>
-                  <Text style={styles.headerSubtitle}>
-                    Tháng{" "}
-                    {DateTime.fromISO(currentMonth)
-                      .setLocale("vi")
-                      .toFormat("MM yyyy")}
-                  </Text>
+                <View style={styles.headerLeft}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.back();
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="chevron-back" size={24} color="#FFF" />
+                  </TouchableOpacity>
+
+                  <View>
+                    <Text style={styles.headerTitle}>Lịch Thi Đấu</Text>
+                    <Text style={styles.headerSubtitle}>
+                      Tháng{" "}
+                      {DateTime.fromISO(currentMonth)
+                        .setLocale("vi")
+                        .toFormat("MM yyyy")}
+                    </Text>
+                  </View>
                 </View>
+
                 <View style={styles.headerActions}>
                   {/* Sync all */}
                   <TouchableOpacity
@@ -2167,5 +2181,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEF2F2",
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,23,42,0.35)",
   },
 });

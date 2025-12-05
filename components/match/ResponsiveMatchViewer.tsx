@@ -569,82 +569,80 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-      <BottomSheetModal
-        ref={sheetRef}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        onPresent={() => {
-          isDismissedRef.current = false;
-          // khi present xong, chắc chắn không còn animate
-          setTimeout(() => {
-            isAnimatingRef.current = false;
-          }, 50);
-        }}
-        onChange={(index) => {
-          if (index >= 0) {
-            isDismissedRef.current = false;
-          }
-        }}
-        onDismiss={() => {
-          isDismissedRef.current = true;
+    <BottomSheetModal
+      ref={sheetRef}
+      snapPoints={snapPoints}
+      enablePanDownToClose
+      onPresent={() => {
+        isDismissedRef.current = false;
+        // khi present xong, chắc chắn không còn animate
+        setTimeout(() => {
           isAnimatingRef.current = false;
-          onClose?.();
-        }}
-        backdropComponent={renderBackdrop}
-        topInset={topInset}
-        containerStyle={{
-          marginLeft: sideInset,
-          marginRight: sideInset,
-        }}
-        handleIndicatorStyle={{ backgroundColor: T.handle }}
-        backgroundStyle={{ backgroundColor: T.sheetBg }}
-        enableDynamicSizing={false}
-      >
-        {/* Header */}
-        <View style={[styles.header, { borderColor: T.softBorder }]}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[styles.headerTitle, { color: T.textPrimary }]}
-              numberOfLines={1}
-            >
-              {code ? `Trận đấu • ${code}` : "Trận đấu"}
-            </Text>
-            <StatusPill status={status} />
-          </View>
-          <TouchableOpacity
-            onPress={safeDismiss}
-            style={styles.closeBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        }, 50);
+      }}
+      onChange={(index) => {
+        if (index >= 0) {
+          isDismissedRef.current = false;
+        }
+      }}
+      onDismiss={() => {
+        isDismissedRef.current = true;
+        isAnimatingRef.current = false;
+        onClose?.();
+      }}
+      backdropComponent={renderBackdrop}
+      topInset={topInset}
+      containerStyle={{
+        marginLeft: sideInset,
+        marginRight: sideInset,
+      }}
+      handleIndicatorStyle={{ backgroundColor: T.handle }}
+      backgroundStyle={{ backgroundColor: T.sheetBg }}
+      enableDynamicSizing={false}
+    >
+      {/* Header */}
+      <View style={[styles.header, { borderColor: T.softBorder }]}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[styles.headerTitle, { color: T.textPrimary }]}
+            numberOfLines={1}
           >
-            <MaterialIcons name="close" size={22} color={T.textPrimary} />
-          </TouchableOpacity>
+            {code ? `Trận đấu • ${code}` : "Trận đấu"}
+          </Text>
+          <StatusPill status={status} />
         </View>
-
-        {/* Body — không đặt flex:1 cho BottomSheetScrollView */}
-        <BottomSheetScrollView
-          contentContainerStyle={{
-            paddingBottom: Math.max(insets.bottom, 16),
-            paddingHorizontal: 12,
-            gap: 12,
-            backgroundColor: T.sheetBg,
-          }}
+        <TouchableOpacity
+          onPress={safeDismiss}
+          style={styles.closeBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <MatchContent
-            m={mm}
-            isLoading={loading}
-            liveLoading={false}
-            onSaved={handleSaved}
-            // (optional) nếu MatchContent hỗ trợ theme props:
-            // textPrimary={T.textPrimary}
-            // textSecondary={T.textSecondary}
-            // tint={T.tint}
-            // softBg={T.softBg}
-            // softBorder={T.softBorder}
-          />
-        </BottomSheetScrollView>
-      </BottomSheetModal>
-    </SafeAreaView>
+          <MaterialIcons name="close" size={22} color={T.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Body — không đặt flex:1 cho BottomSheetScrollView */}
+      <BottomSheetScrollView
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 16),
+          paddingHorizontal: 12,
+          gap: 12,
+          backgroundColor: T.sheetBg,
+        }}
+      >
+        <MatchContent
+          m={mm}
+          isLoading={loading}
+          liveLoading={false}
+          onSaved={handleSaved}
+          // (optional) nếu MatchContent hỗ trợ theme props:
+          // textPrimary={T.textPrimary}
+          // textSecondary={T.textSecondary}
+          // tint={T.tint}
+          // softBg={T.softBg}
+          // softBorder={T.softBorder}
+        />
+      </BottomSheetScrollView>
+    </BottomSheetModal>
   );
 }
 

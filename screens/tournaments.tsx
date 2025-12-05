@@ -12,7 +12,9 @@ import {
   TextInput,
   useColorScheme,
   View,
-  Dimensions,
+  Keyboard,
+  Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
@@ -24,6 +26,19 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { Calendar } from "react-native-calendars";
+
+const ViewerImage = (props) => {
+  // props sẽ có: source, style, ... do lib truyền vào
+  return (
+    <ExpoImage
+      {...props}
+      // rất quan trọng để xài cache
+      cachePolicy="memory-disk"
+      contentFit="contain"
+    />
+  );
+};
 
 const BANNER_RATIO = 16 / 9;
 const SKELETON_COUNT = 4;
@@ -54,7 +69,22 @@ function formatDate(d) {
   }
 }
 
-/* ---------- Theme Tokens (Cập nhật màu Warning Orange) ---------- */
+function toDateId(d) {
+  if (!d) return null;
+  try {
+    const dt = new Date(d);
+    return dt.toISOString().slice(0, 10); // YYYY-MM-DD
+  } catch {
+    return null;
+  }
+}
+
+function fromDateId(id) {
+  if (!id) return null;
+  return new Date(id + "T00:00:00");
+}
+
+/* ---------- Theme Tokens ---------- */
 function useModernTheme() {
   const scheme = useColorScheme() || "light";
   const isDark = scheme === "dark";
@@ -74,7 +104,6 @@ function useModernTheme() {
       warning: "#f97316",
       inputBg: isDark ? "#334155" : "#f1f5f9",
     },
-    // Shadow mạnh hơn cho Card
     cardShadow: {
       shadowColor: isDark ? "#000" : "#1e293b",
       shadowOffset: { width: 0, height: 8 },
@@ -106,7 +135,7 @@ function useModernTheme() {
   };
 }
 
-/* ---------- Components ---------- */
+/* ---------- Skeleton ---------- */
 function usePulse() {
   const v = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
@@ -148,15 +177,15 @@ function SkeletonCard() {
       style={[
         styles.cardContainer,
         { backgroundColor: theme.colors.card },
-        theme.shadow,
+        theme.cardShadow,
       ]}
     >
       <SkeletonBlock
         style={{
           width: "100%",
           aspectRatio: BANNER_RATIO,
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
           borderRadius: 0,
         }}
       />
@@ -221,20 +250,19 @@ const btnBaseStyle = {
   alignItems: "center",
   justifyContent: "center",
   paddingVertical: 10,
-  paddingHorizontal: 16, // Tăng padding ngang lên lại
-  borderRadius: 30, // PILL SHAPE
+  paddingHorizontal: 16,
+  borderRadius: 30,
   minHeight: 40,
 };
 
-/* ---------- 3. NÚT BẤM ĐẸP (NEW STYLES) ---------- */
-// Nút Primary (BLUE)
+/* ---------- Buttons ---------- */
 function PrimaryBtn({ onPress, children, theme, icon }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         btnBaseStyle,
-        { backgroundColor: theme.colors.primary, marginBottom: 10 }, // Thêm margin bottom để cách nút phía dưới
+        { backgroundColor: theme.colors.primary, marginBottom: 10 },
         theme.btnShadow,
         pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
@@ -252,7 +280,6 @@ function PrimaryBtn({ onPress, children, theme, icon }) {
   );
 }
 
-// Nút Success (GREEN)
 function SuccessBtn({ onPress, children, theme, icon }) {
   return (
     <Pressable
@@ -277,7 +304,6 @@ function SuccessBtn({ onPress, children, theme, icon }) {
   );
 }
 
-// Nút Warning (ORANGE) - Dùng cho Đăng ký
 function WarningBtn({ onPress, children, theme, icon }) {
   return (
     <Pressable
@@ -302,7 +328,6 @@ function WarningBtn({ onPress, children, theme, icon }) {
   );
 }
 
-// Nút Outline (OUTLINE)
 function OutlineBtn({ onPress, children, theme, icon }) {
   return (
     <Pressable
@@ -313,7 +338,7 @@ function OutlineBtn({ onPress, children, theme, icon }) {
           backgroundColor: "transparent",
           borderWidth: 1.5,
           borderColor: theme.colors.border,
-          paddingVertical: 8.5, // Điều chỉnh bù trừ border
+          paddingVertical: 8.5,
           marginBottom: 10,
         },
         pressed && { backgroundColor: theme.colors.text + "08" },
@@ -335,17 +360,20 @@ function OutlineBtn({ onPress, children, theme, icon }) {
     </Pressable>
   );
 }
+
 /* ---------- Main Screen ---------- */
 export default function TournamentDashboardScreen({ isBack = false }) {
   const theme = useModernTheme();
-
-  // --- Logic Auth (Giữ nguyên) ---
+  const insets = useSafeAreaInsets();
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
   const me = useSelector((s) => s.auth?.userInfo || null);
   const isAdmin = !!(
     me?.isAdmin ||
     me?.role === "admin" ||
     (Array.isArray(me?.roles) && me.roles.includes("admin"))
   );
+
   const isManagerOf = (tt) => {
     if (!me?._id) return false;
     if (String(tt?.createdBy) === String(me._id)) return true;
@@ -394,14 +422,61 @@ export default function TournamentDashboardScreen({ isBack = false }) {
 
   const [preview, setPreview] = useState(null);
 
+  // --- Date range filter ---
+  const [dateModalVisible, setDateModalVisible] = useState(false);
+  const [fromDate, setFromDate] = useState(null); // Date | null
+  const [toDate, setToDate] = useState(null); // Date | null
+  const [rangeDraft, setRangeDraft] = useState({ start: null, end: null }); // 'YYYY-MM-DD'
+
+  const hasDateFilter = !!(fromDate && toDate);
+  const canApply = !!(rangeDraft.start && rangeDraft.end);
+  const isPickingStart = !rangeDraft.start;
+  const isPickingEnd = !!rangeDraft.start && !rangeDraft.end;
+
+  const stepLabel = isPickingStart
+    ? "Chọn ngày bắt đầu"
+    : isPickingEnd
+    ? "Chọn ngày kết thúc"
+    : "Đã chọn xong khoảng ngày";
+
+  const hintLabel = isPickingStart
+    ? "Chạm vào một ngày trong lịch để chọn ngày bắt đầu."
+    : isPickingEnd
+    ? "Chọn ngày kết thúc, sau đó bấm nút Áp dụng để lọc."
+    : "Kiểm tra lại khoảng ngày rồi bấm Áp dụng để lọc kết quả.";
+
+  const applyLabel = isPickingStart
+    ? "Chọn ngày bắt đầu"
+    : isPickingEnd
+    ? "Chọn ngày kết thúc"
+    : "Áp dụng";
+  const openDateModal = () => {
+    setRangeDraft({
+      start: toDateId(fromDate),
+      end: toDateId(toDate),
+    });
+    setDateModalVisible(true);
+  };
+
+  const clearDateFilter = () => {
+    setFromDate(null);
+    setToDate(null);
+  };
+
   const filtered = useMemo(() => {
     const list = Array.isArray(tournaments) ? tournaments : [];
     return list
       .filter((tt) => tt.status === tab)
-      .filter((tt) =>
-        search ? tt.name?.toLowerCase().includes(search) : true
-      );
-  }, [tournaments, tab, search]);
+      .filter((tt) => (search ? tt.name?.toLowerCase().includes(search) : true))
+      .filter((tt) => {
+        if (!fromDate && !toDate) return true;
+        if (!tt.startDate) return true;
+        const s = new Date(tt.startDate);
+        if (fromDate && s < fromDate) return false;
+        if (toDate && s > toDate) return false;
+        return true;
+      });
+  }, [tournaments, tab, search, fromDate, toDate]);
 
   const onPressCard = (tt) => router.push(`/tournament/${tt._id}`);
 
@@ -418,7 +493,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             borderWidth: theme.isDark ? 0 : 0.5,
             borderColor: theme.isDark ? "transparent" : "#e2e8f0",
           },
-          theme.shadow,
+          theme.cardShadow,
         ]}
       >
         {/* Ảnh Bìa */}
@@ -471,7 +546,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             />
           </View>
 
-          {/* Divider mờ */}
+          {/* Divider */}
           <View
             style={{
               height: 1,
@@ -481,23 +556,20 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             }}
           />
 
-          {/* KHU VỰC NÚT BẤM:
-            - Logic giữ nguyên.
-            - Style mới (Pill shape).
-            - Thêm icon minh họa cho sinh động.
-          */}
+          {/* Buttons */}
           <View
             style={{
               flexDirection: "row",
-              gap: 10,
               flexWrap: "wrap",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 10,
               marginTop: 4,
               marginBottom: -10,
             }}
           >
             {canManage(tt) ? (
               <>
-                {/* 1. Lịch đấu (BLUE) */}
                 <PrimaryBtn
                   theme={theme}
                   icon="calendar-outline"
@@ -505,7 +577,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 >
                   Lịch đấu
                 </PrimaryBtn>
-                {/* 2. Đăng ký (ORANGE) */}
+
                 <WarningBtn
                   theme={theme}
                   icon="person-add-outline"
@@ -513,15 +585,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 >
                   Đăng ký
                 </WarningBtn>
-                {/* 3. Check-in (GREEN) */}
-                <SuccessBtn
-                  theme={theme}
-                  icon="qr-code-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/checkin`)}
-                >
-                  Check-in
-                </SuccessBtn>
-                {/* 4. Sơ đồ (OUTLINE) */}
+
                 <OutlineBtn
                   theme={theme}
                   icon="git-network-outline"
@@ -537,7 +601,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               </>
             ) : tt.status === "upcoming" ? (
               <>
-                {/* Đăng ký (ORANGE) */}
                 <WarningBtn
                   theme={theme}
                   icon="person-add-outline"
@@ -560,7 +623,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               </>
             ) : tt.status === "ongoing" ? (
               <>
-                {/* Lịch đấu (BLUE) */}
                 <PrimaryBtn
                   theme={theme}
                   icon="calendar-outline"
@@ -568,7 +630,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 >
                   Lịch đấu
                 </PrimaryBtn>
-                {/* Check-in (GREEN) */}
                 <SuccessBtn
                   theme={theme}
                   icon="qr-code-outline"
@@ -576,7 +637,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 >
                   Check-in
                 </SuccessBtn>
-                {/* Sơ đồ (OUTLINE) */}
                 <OutlineBtn
                   theme={theme}
                   icon="git-network-outline"
@@ -613,128 +673,393 @@ export default function TournamentDashboardScreen({ isBack = false }) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          {isBack && (
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={10}
-              style={{ marginRight: 10 }}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={28}
-                color={theme.colors.text}
-              />
-            </Pressable>
-          )}
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Giải đấu
-          </Text>
-        </View>
-
-        {/* Search */}
-        <View
-          style={[
-            styles.searchBox,
-            {
-              backgroundColor: theme.colors.card,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <Ionicons name="search" size={20} color={theme.colors.textSec} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Tìm kiếm giải đấu..."
-            placeholderTextColor={theme.colors.textSec}
-            value={keyword}
-            onChangeText={setKeyword}
-          />
-          {keyword.length > 0 && (
-            <Pressable onPress={() => setKeyword("")}>
-              <Ionicons
-                name="close-circle"
-                size={18}
-                color={theme.colors.textSec}
-              />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Tabs */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-          {TABS.map((t) => (
-            <TabPill
-              key={t.key}
-              label={t.label}
-              active={tab === t.key}
-              onPress={() => setTab(t.key)}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        {/* Error & List */}
-        {!!error && (
-          <View
-            style={[
-              styles.errorBox,
-              { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
-            ]}
-          >
-            <Ionicons name="alert-circle" size={20} color="#ef4444" />
-            <Text style={{ color: "#b91c1c", flex: 1 }}>
-              {error?.data?.message || error?.error || "Có lỗi xảy ra"}
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.bg,
+      }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            {isBack && (
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={10}
+                style={{ marginRight: 10 }}
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={28}
+                  color={theme.colors.text}
+                />
+              </Pressable>
+            )}
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              Giải đấu
             </Text>
           </View>
-        )}
 
-        {!error && (
-          <View style={{ flex: 1 }}>
-            {isLoading || isFetching ? (
-              <FlatList
-                data={Array.from({ length: SKELETON_COUNT })}
-                keyExtractor={(_, i) => `sk-${i}`}
-                renderItem={() => <SkeletonCard />}
-                ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
-                contentContainerStyle={{ paddingBottom: 30 }}
-              />
-            ) : (
-              <FlatList
-                data={filtered}
-                keyExtractor={(item) => String(item._id)}
-                renderItem={renderItem}
-                contentContainerStyle={{ paddingBottom: 100 }}
-                ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <MaterialCommunityIcons
-                      name="trophy-broken"
-                      size={64}
-                      color={theme.colors.border}
-                    />
-                    <Text
-                      style={{
-                        color: theme.colors.textSec,
-                        marginTop: 12,
-                        fontSize: 16,
-                      }}
-                    >
-                      Không tìm thấy giải đấu nào.
-                    </Text>
-                  </View>
-                }
-              />
+          {/* Search */}
+          <View
+            style={[
+              styles.searchBox,
+              {
+                backgroundColor: theme.colors.card,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="search" size={20} color={theme.colors.textSec} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              placeholder="Tìm kiếm giải đấu..."
+              placeholderTextColor={theme.colors.textSec}
+              value={keyword}
+              onChangeText={setKeyword}
+              returnKeyType="search"
+            />
+            {keyword.length > 0 && (
+              <Pressable onPress={() => setKeyword("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={theme.colors.textSec}
+                />
+              </Pressable>
             )}
           </View>
-        )}
-      </View>
+
+          {/* Tabs + Date filter */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 16,
+              gap: 8,
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
+              {TABS.map((t) => (
+                <TabPill
+                  key={t.key}
+                  label={t.label}
+                  active={tab === t.key}
+                  onPress={() => setTab(t.key)}
+                  theme={theme}
+                />
+              ))}
+            </View>
+
+            <Pressable
+              onPress={openDateModal}
+              style={({ pressed }) => [
+                styles.dateFilterPill,
+                {
+                  backgroundColor: hasDateFilter
+                    ? theme.colors.primary + "12"
+                    : theme.colors.card,
+                  borderColor: hasDateFilter
+                    ? theme.colors.primary
+                    : theme.colors.border,
+                },
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color={
+                  hasDateFilter ? theme.colors.primary : theme.colors.textSec
+                }
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.dateFilterLabel,
+                  {
+                    color: hasDateFilter
+                      ? theme.colors.primary
+                      : theme.colors.textSec,
+                  },
+                ]}
+              >
+                {hasDateFilter
+                  ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
+                  : "Lọc theo ngày"}
+              </Text>
+
+              {hasDateFilter && (
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: theme.colors.primary,
+                    marginHorizontal: 4,
+                  }}
+                />
+              )}
+
+              {hasDateFilter && (
+                <Pressable
+                  hitSlop={8}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    clearDateFilter();
+                  }}
+                  style={{ marginLeft: 2 }}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={14}
+                    color={theme.colors.primary}
+                  />
+                </Pressable>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Error & List */}
+          {!!error && (
+            <View
+              style={[
+                styles.errorBox,
+                { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+              ]}
+            >
+              <Ionicons name="alert-circle" size={20} color="#ef4444" />
+              <Text style={{ color: "#b91c1c", flex: 1 }}>
+                {error?.data?.message || error?.error || "Có lỗi xảy ra"}
+              </Text>
+            </View>
+          )}
+
+          {!error && (
+            <View style={{ flex: 1 }}>
+              {isLoading || isFetching ? (
+                <FlatList
+                  data={Array.from({ length: SKELETON_COUNT })}
+                  keyExtractor={(_, i) => `sk-${i}`}
+                  renderItem={() => <SkeletonCard />}
+                  ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
+                  contentContainerStyle={{ paddingBottom: 30 }}
+                  showsVerticalScrollIndicator={false}
+                />
+              ) : (
+                <FlatList
+                  data={filtered}
+                  keyExtractor={(item) => String(item._id)}
+                  renderItem={renderItem}
+                  contentContainerStyle={{ paddingBottom: 100 }}
+                  ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <MaterialCommunityIcons
+                        name="trophy-broken"
+                        size={64}
+                        color={theme.colors.border}
+                      />
+                      <Text
+                        style={{
+                          color: theme.colors.textSec,
+                          marginTop: 12,
+                          fontSize: 16,
+                        }}
+                      >
+                        Không tìm thấy giải đấu nào.
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </TouchableWithoutFeedback>
+
+      {/* Date range modal */}
+      <Modal
+        visible={dateModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDateModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[styles.modalCard, { backgroundColor: theme.colors.card }]}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: theme.colors.primary,
+                textAlign: "center",
+                marginBottom: 2,
+              }}
+            >
+              {stepLabel}
+            </Text>
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: theme.colors.textSec,
+                textAlign: "center",
+                marginBottom: 8,
+              }}
+            >
+              {hintLabel}
+            </Text>
+            <Calendar
+              markingType="period"
+              onDayPress={(day) => {
+                const date = day.dateString; // 'YYYY-MM-DD'
+                setRangeDraft((prev) => {
+                  // chưa chọn hoặc đã có đủ range -> bắt đầu range mới
+                  if (!prev.start || (prev.start && prev.end)) {
+                    return { start: date, end: null };
+                  }
+
+                  // đang chọn end
+                  if (date < prev.start) {
+                    // đảo ngược nếu chọn ngày trước start
+                    return { start: date, end: prev.start };
+                  }
+
+                  if (date === prev.start) {
+                    // single-day range (start = end)
+                    return { start: date, end: date };
+                  }
+
+                  // bình thường: start < end
+                  return { start: prev.start, end: date };
+                });
+              }}
+              markedDates={(() => {
+                const { start, end } = rangeDraft;
+                if (!start && !end) return {};
+
+                const marked = {};
+
+                // đang chọn 1 đầu (chưa chọn end)
+                if (start && !end) {
+                  marked[start] = {
+                    startingDay: true,
+                    endingDay: true,
+                    color: "#0ea5e9",
+                    textColor: "#fff",
+                  };
+                  return marked;
+                }
+
+                if (start && end) {
+                  // single-day range
+                  if (start === end) {
+                    marked[start] = {
+                      startingDay: true,
+                      endingDay: true,
+                      color: "#0ea5e9",
+                      textColor: "#fff",
+                    };
+                    return marked;
+                  }
+
+                  const startDate = new Date(start);
+                  const endDate = new Date(end);
+                  const dayMs = 24 * 60 * 60 * 1000;
+
+                  for (
+                    let d = new Date(startDate);
+                    d <= endDate;
+                    d = new Date(d.getTime() + dayMs)
+                  ) {
+                    const id = d.toISOString().slice(0, 10);
+
+                    if (id === start) {
+                      marked[id] = {
+                        startingDay: true,
+                        color: "#0ea5e9",
+                        textColor: "#fff",
+                      };
+                    } else if (id === end) {
+                      marked[id] = {
+                        endingDay: true,
+                        color: "#0ea5e9",
+                        textColor: "#fff",
+                      };
+                    } else {
+                      marked[id] = {
+                        color: "#bae6fd",
+                        textColor: "#0f172a",
+                      };
+                    }
+                  }
+                }
+
+                return marked;
+              })()}
+              theme={{
+                backgroundColor: theme.colors.card,
+                calendarBackground: theme.colors.card,
+                textSectionTitleColor: theme.colors.textSec,
+                dayTextColor: theme.colors.text,
+                monthTextColor: theme.colors.text,
+                arrowColor: theme.colors.text,
+                todayTextColor: theme.colors.primary,
+              }}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <Pressable
+                onPress={() => setDateModalVisible(false)}
+                style={styles.modalTextBtn}
+              >
+                <Text
+                  style={{
+                    color: theme.colors.textSec,
+                    fontWeight: "600",
+                  }}
+                >
+                  Đóng
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={!canApply}
+                onPress={() => {
+                  if (!canApply) return;
+                  const { start, end } = rangeDraft;
+                  setFromDate(start ? fromDateId(start) : null);
+                  setToDate(end ? fromDateId(end) : null);
+                  setDateModalVisible(false);
+                }}
+                style={[
+                  styles.modalApplyBtn,
+                  {
+                    backgroundColor: canApply
+                      ? theme.colors.primary
+                      : theme.colors.text,
+                    opacity: canApply ? 1 : 0.6,
+                  },
+                ]}
+              >
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}
+                >
+                  {applyLabel}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ImageView
         images={[{ uri: normalizeUrl(preview) }]}
@@ -742,6 +1067,8 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         visible={!!preview}
         onRequestClose={() => setPreview(null)}
         swipeToCloseEnabled
+        ImageComponent={ViewerImage}
+        backgroundColor={isDark ? "#0b0b0c" : "#ffffff"}
       />
     </SafeAreaView>
   );
@@ -754,8 +1081,8 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     borderRadius: 20,
-    marginBottom: 6, // Tăng từ 2 lên 6 để shadow bottom hiện rõ hơn
-    overflow: Platform.OS === "android" ? "hidden" : "visible", // Android cần hidden cho border radius
+    marginBottom: 6,
+    overflow: Platform.OS === "android" ? "hidden" : "visible",
   },
   header: {
     flexDirection: "row",
@@ -789,10 +1116,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  cardContainer: {
-    borderRadius: 20, // Bo góc Card to hơn
-    marginBottom: 2,
-  },
   cardImage: {
     width: "100%",
     aspectRatio: BANNER_RATIO,
@@ -822,27 +1145,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   cardTitle: {
-    fontSize: 19, // To hơn 1 chút
+    fontSize: 19,
     fontWeight: "700",
     marginBottom: 4,
     lineHeight: 28,
-  },
-
-  // === NÚT BẤM PRO STYLE ===
-  btnBase: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 30, // PILL SHAPE
   },
   btnTextWhite: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 13,
   },
-
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -856,5 +1168,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 60,
+  },
+  dateFilterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: 240,
+  },
+  dateFilterLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 12,
+  },
+  modalBtnRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+    gap: 8,
+  },
+  modalTextBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalApplyBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
   },
 });

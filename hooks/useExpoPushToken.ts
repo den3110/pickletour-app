@@ -89,7 +89,7 @@ export function useExpoPushToken() {
 
       // ✅ Check nếu đang chạy trong Expo Go
       const isExpoGo = Constants.appOwnership === "expo";
-      if (isExpoGo) {
+      if (isExpoGo && Platform.OS === "android") {
         console.warn("⚠️ Push notifications require a development build. Run 'eas build --profile development --platform android'");
         return;
       }
@@ -149,9 +149,12 @@ export function useExpoPushToken() {
         const tokenData = await Notifications.getExpoPushTokenAsync({ 
           projectId 
         });
+        const tokenDeviceData= await Notifications.getDevicePushTokenAsync()
         const token = tokenData.data;
+        const tokenDevice= tokenDeviceData.data
         
         console.log("✅ Got push token:", token);
+        console.log("✅ Got push token device:", tokenDevice)
         setToken(token);
         await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
         await syncPushToken(token);

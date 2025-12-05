@@ -31,6 +31,8 @@ import LottieView from "lottie-react-native";
 import LiveMatchCard from "./LiveMatchCard";
 import { useGetLiveMatchesQuery } from "@/slices/liveApiSlice";
 import FiltersBottomSheet from "./FiltersModal";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 const LIMIT = 12;
 const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
@@ -63,7 +65,9 @@ function useThemeTokens() {
 
   // skeleton tones
   const skelBase = isDark ? "#1a1c20" : "#e9eef5";
-  const skelShine = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.55)";
+  const skelShine = isDark
+    ? "rgba(255,255,255,0.06)"
+    : "rgba(255,255,255,0.55)";
 
   return {
     scheme,
@@ -233,10 +237,28 @@ const Header = memo(function Header(props) {
     searchInputRef,
     setSearchFocused,
     onSubmitSearch,
+    isBack, // 👈 nhận props isBack
   } = props;
 
   return (
     <View style={styles.header}>
+      {/* Top row: Back + Title */}
+      <View style={styles.headerTopRow}>
+        {isBack && (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back" size={22} color={T.textPrimary} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={[styles.headerTitle, { color: T.textPrimary }]}>
+          Trận trực tiếp
+        </Text>
+      </View>
+
       {/* Search Bar */}
       <View
         style={[
@@ -376,7 +398,7 @@ const Header = memo(function Header(props) {
 });
 
 /* ============ Screen ============ */
-export default function LiveMatchesScreen() {
+export default function LiveMatchesScreen({ isBack = false }) {
   const T = useThemeTokens();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
@@ -498,6 +520,7 @@ export default function LiveMatchesScreen() {
     () => (
       <Header
         key="header"
+        isBack={isBack}
         keyword={keyword}
         setKeyword={(s) => {
           setKeyword(s);
@@ -537,7 +560,8 @@ export default function LiveMatchesScreen() {
       windowHours,
       autoRefresh,
       refreshSec,
-      // intentionally keep searchInputRef/setSearchFocused stable
+      isBack,
+      // searchInputRef, setSearchFocused cố định ref/hook nên không cần thêm
     ]
   );
 
@@ -619,7 +643,7 @@ export default function LiveMatchesScreen() {
 /* ============ styles ============ */
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: { padding: 12 },
+  listContent: { paddingHorizontal: 12 },
   header: { marginBottom: 16 },
 
   /* search */
@@ -719,5 +743,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     paddingHorizontal: 32,
+  },
+
+  // header top row + back
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  backBtn: {
+    paddingRight: 8,
+    paddingVertical: 4,
+    marginRight: 4,
+    // không background để đúng yêu cầu
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
   },
 });

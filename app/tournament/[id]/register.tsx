@@ -25,6 +25,7 @@ import {
   TouchableOpacity,
   useColorScheme,
   ScrollView,
+  BackHandler,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
 import {
@@ -911,6 +912,36 @@ export default function TournamentRegistrationScreen() {
   const listRef = useRef<FlashList<any>>(null);
   const searchInputRef = useRef<TextInput>(null);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const mainScrollOffsetRef = useRef(0);
+  // Android back: nếu đang ở màn search thì back sẽ thoát search, không thoát screen
+  useEffect(() => {
+    if (!searchModalOpen) return;
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setSearchModalOpen(false);
+      Keyboard.dismiss();
+      return true; // chặn default back
+    });
+
+    return () => sub.remove();
+  }, [searchModalOpen]);
+
+  useEffect(() => {
+    // Khi searchModalOpen từ true -> false, quay lại list chính
+    if (!searchModalOpen && listRef.current) {
+      const offset = mainScrollOffsetRef.current || 0;
+      if (offset > 0) {
+        // đợi 1 tick để FlashList mount xong rồi mới scroll
+        setTimeout(() => {
+          listRef.current?.scrollToOffset?.({
+            offset,
+            animated: false,
+          });
+        }, 0);
+      }
+    }
+  }, [searchModalOpen]);
+
   const { data: me, isLoading: meLoading, error: meErr } = useGetMeScoreQuery();
   const isLoggedIn = !!me?._id;
 
@@ -1023,7 +1054,7 @@ export default function TournamentRegistrationScreen() {
 
   useEffect(() => {
     setTake(PAGE_SIZE);
-    listRef.current?.scrollToOffset?.({ offset: 0, animated: false });
+    // KHÔNG scroll về đầu nữa để giữ nguyên vị trí list chính
   }, [debouncedQ, regs]);
 
   const canLoadMore = take < filteredRegs.length;
@@ -1455,6 +1486,11 @@ export default function TournamentRegistrationScreen() {
       settingPayment,
     ]
   );
+
+  const handleMainScroll = useCallback((e: any) => {
+    const y = e?.nativeEvent?.contentOffset?.y ?? 0;
+    mainScrollOffsetRef.current = y;
+  }, []);
 
   const isSinglesLabel = isSingles ? "Giải đơn" : "Giải đôi";
 
@@ -1899,6 +1935,122 @@ export default function TournamentRegistrationScreen() {
     [loadingMore, canLoadMore, filteredRegs.length, C.muted]
   );
 
+  const renderMainList = () => (
+    <FlashList
+      ref={listRef}
+      data={listData}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      keyExtractor={(item, i) => String(item?._id || i)}
+      renderItem={renderItem}
+      ListHeaderComponent={HeaderBlock}
+      ListFooterComponent={ListFooter}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      estimatedItemSize={220}
+      removeClippedSubviews={Platform.OS === "android"}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
+      onScroll={handleMainScroll} // ✅ lưu offset mỗi khi scroll
+      scrollEventThrottle={16} // ✅ cho onScroll mượt
+    />
+  );
+
+  const renderSearchScreen = () => (
+    <View style={{ flex: 1 }}>
+      {/* Header search + nút đóng */}
+      <View style={[styles.fullModalHeader, { borderBottomColor: C.border }]}>
+        <View style={{ flex: 1 }}>
+          <TextInput
+            ref={searchInputRef}
+            value={q}
+            onChangeText={(text) => {
+              setQ(text);
+              if (text.length === 0) {
+                // xoá hết -> thoát search screen luôn
+                setSearchModalOpen(false);
+                Keyboard.dismiss();
+              }
+            }}
+            placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
+            placeholderTextColor={C.muted}
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: C.inputBg,
+                borderColor: C.inputBorder,
+                color: C.textPrimary,
+              },
+            ]}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <TouchableOpacity
+          onPress={() => {
+            setSearchModalOpen(false); // đóng màn search, giữ nguyên q
+            Keyboard.dismiss();
+          }}
+          style={[styles.searchCloseBtn, { backgroundColor: C.ghostBg }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="close" size={20} color={C.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* List trong mode search */}
+      {regsLoading ? (
+        <View
+          style={{
+            paddingVertical: 16,
+            alignItems: "center",
+          }}
+        >
+          <ActivityIndicator />
+        </View>
+      ) : regsErr ? (
+        <View
+          style={[
+            styles.alert,
+            { borderColor: C.errBorder, backgroundColor: C.errBg },
+          ]}
+        >
+          <Text style={{ color: C.errText }}>
+            {(regsErr as any)?.data?.message ||
+              (regsErr as any)?.error ||
+              "Lỗi tải danh sách"}
+          </Text>
+        </View>
+      ) : (
+        <FlashList
+          data={listData}
+          keyExtractor={(item, i) => String(item?._id || i)}
+          renderItem={renderItem}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          estimatedItemSize={220}
+          removeClippedSubviews={Platform.OS === "android"}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          ListFooterComponent={ListFooter}
+          contentContainerStyle={{
+            paddingTop: 8,
+            paddingBottom: Math.max(16, kbHeight),
+          }}
+        />
+      )}
+    </View>
+  );
+
   if (tourLoading) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: C.pageBg }]}>
@@ -1932,143 +2084,9 @@ export default function TournamentRegistrationScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
     >
-      <FlashList
-        ref={listRef}
-        data={listData}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-        keyExtractor={(item, i) => String(item?._id || i)}
-        renderItem={renderItem}
-        ListHeaderComponent={HeaderBlock}
-        ListFooterComponent={ListFooter}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        estimatedItemSize={220}
-        removeClippedSubviews={Platform.OS === "android"}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
-      />
-
-      {/* Modal search danh sách đăng ký (full màn) */}
-      <Modal
-        visible={searchModalOpen}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => {
-          setSearchModalOpen(false);
-          Keyboard.dismiss();
-        }}
-      >
-        {(() => {
-          return (
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              style={{ flex: 1 }}
-            >
-              <View style={{ flex: 1, paddingTop: insets.top }}>
-                {/* Header search + nút đóng */}
-                <View
-                  style={[
-                    styles.fullModalHeader,
-                    { borderBottomColor: C.border },
-                  ]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      ref={searchInputRef}
-                      value={q}
-                      onChangeText={(text) => {
-                        setQ(text);
-                        if (text.length === 0) {
-                          // khi xoá hết ký tự thì đóng modal + ẩn bàn phím
-                          setSearchModalOpen(false);
-                          Keyboard.dismiss();
-                        }
-                      }}
-                      placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
-                      placeholderTextColor={C.muted}
-                      style={[
-                        styles.searchInput,
-                        {
-                          backgroundColor: C.inputBg,
-                          borderColor: C.inputBorder,
-                          color: C.textPrimary,
-                        },
-                      ]}
-                      returnKeyType="search"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSearchModalOpen(false); // đóng modal nhưng giữ nguyên q
-                      Keyboard.dismiss();
-                    }}
-                    style={[
-                      styles.searchCloseBtn,
-                      { backgroundColor: C.ghostBg },
-                    ]}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="close" size={20} color={C.textPrimary} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* List trong modal */}
-                {regsLoading ? (
-                  <View
-                    style={{
-                      paddingVertical: 16,
-                      alignItems: "center",
-                    }}
-                  >
-                    <ActivityIndicator />
-                  </View>
-                ) : regsErr ? (
-                  <View
-                    style={[
-                      styles.alert,
-                      { borderColor: C.errBorder, backgroundColor: C.errBg },
-                    ]}
-                  >
-                    <Text style={{ color: C.errText }}>
-                      {(regsErr as any)?.data?.message ||
-                        (regsErr as any)?.error ||
-                        "Lỗi tải danh sách"}
-                    </Text>
-                  </View>
-                ) : (
-                  <FlashList
-                    data={listData}
-                    keyExtractor={(item, i) => String(item?._id || i)}
-                    renderItem={renderItem}
-                    onEndReached={loadMore}
-                    onEndReachedThreshold={0.5}
-                    keyboardDismissMode="on-drag"
-                    keyboardShouldPersistTaps="handled"
-                    estimatedItemSize={220}
-                    removeClippedSubviews={Platform.OS === "android"}
-                    maxToRenderPerBatch={10}
-                    windowSize={5}
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    ListFooterComponent={ListFooter}
-                    contentContainerStyle={{
-                      paddingTop: 8,
-                      paddingBottom: Math.max(16, kbHeight),
-                    }}
-                  />
-                )}
-              </View>
-            </KeyboardAvoidingView>
-          );
-        })()}
-      </Modal>
+      {/* Nếu đang bật searchModalOpen thì hiển thị màn search full,
+          ngược lại hiển thị màn chính như trước */}
+      {searchModalOpen ? renderSearchScreen() : renderMainList()}
 
       {/* Preview ảnh */}
       <Modal
@@ -2103,9 +2121,7 @@ export default function TournamentRegistrationScreen() {
         </View>
       </Modal>
 
-      {/* Modal thay VĐV */}
       {/* Modal thay VĐV – full screen */}
-
       <Modal
         visible={replaceDlg.open}
         animationType="slide"
@@ -2121,7 +2137,7 @@ export default function TournamentRegistrationScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
                 style={{ flex: 1 }}
               >
-                <View style={{ flex: 1, paddingTop: insets.top }}>
+                <View style={{ flex: 1 }}>
                   {/* Header */}
                   <View
                     style={[
@@ -2131,9 +2147,26 @@ export default function TournamentRegistrationScreen() {
                   >
                     <TouchableOpacity
                       onPress={closeReplace}
-                      style={styles.fullModalHeaderBtn}
+                      style={[
+                        styles.fullModalHeaderBtn,
+                        { backgroundColor: C.ghostBg }, // 👈 nền nhẹ cho nút
+                      ]}
                     >
-                      <Text style={{ color: C.textPrimary }}>Đóng</Text>
+                      <Ionicons
+                        name="chevron-back"
+                        size={18}
+                        color={C.textPrimary}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text
+                        style={{
+                          color: C.textPrimary,
+                          fontWeight: "600",
+                          fontSize: 14,
+                        }}
+                      >
+                        Đóng
+                      </Text>
                     </TouchableOpacity>
 
                     <Text
@@ -2196,6 +2229,7 @@ export default function TournamentRegistrationScreen() {
           );
         })()}
       </Modal>
+
       <PublicProfileSheet
         open={profile.open}
         onClose={() => setProfile({ open: false, userId: null })}
@@ -2216,15 +2250,24 @@ export default function TournamentRegistrationScreen() {
           <View style={styles.modalBackdrop}>
             <ScrollView
               keyboardShouldPersistTaps="handled"
+              style={{ flex: 1, alignSelf: "stretch" }} // 👈 full width
               contentContainerStyle={{
                 flexGrow: 1,
                 justifyContent: "center",
+                paddingHorizontal: 16, // 👈 padding ngang ở đây
               }}
+              showsHorizontalScrollIndicator={false} // 👈 tắt thanh ngang
+              alwaysBounceHorizontal={false} // 👈 không bounce ngang
             >
               <View
                 style={[
                   styles.modalCard,
-                  { backgroundColor: C.cardBg, borderColor: C.border },
+                  {
+                    backgroundColor: C.cardBg,
+                    borderColor: C.border,
+                    alignSelf: "center",
+                    width: "100%", // 👈 bám theo width ScrollView
+                  },
                 ]}
               >
                 <Text
@@ -2259,7 +2302,14 @@ export default function TournamentRegistrationScreen() {
                   placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
                   placeholderTextColor={C.muted}
                 />
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginTop: 12,
+                    justifyContent: "flex-end",
+                  }}
+                >
                   <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
                   <PrimaryBtn
                     onPress={submitComplaint}
@@ -2377,7 +2427,14 @@ export default function TournamentRegistrationScreen() {
                 </>
               ) : null}
 
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                  marginTop: 12,
+                  justifyContent: "flex-end",
+                }}
+              >
                 {!paymentDlg.reg ||
                 !qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
                   <OutlineBtn
@@ -2566,10 +2623,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   fullModalHeaderBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    minWidth: 60,
-    alignItems: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999, // bo tròn pill
+    flexDirection: "row", // icon + text nằm ngang
   },
   searchCloseBtn: {
     width: 40,

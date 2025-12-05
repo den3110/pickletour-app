@@ -12,6 +12,7 @@ import {
   Animated,
   FlatList,
   Dimensions,
+  DeviceEventEmitter,
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
@@ -38,6 +39,8 @@ import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import ImageViewing from "react-native-image-viewing";
 import TestNotificationButton from "@/tests/TestNotifcation";
+import { useRatingPrompt } from "@/hooks/useRatingPrompt";
+import LeaderboardSection from "@/components/home/LeaderboardSection";
 /* ---------- Lottie asset ---------- */
 const BG_3D = require("@/assets/lottie/bg-3d.json");
 
@@ -129,6 +132,15 @@ const FEATURES = [
     title: "Câu lạc bộ", // 🔧 Đổi từ "Vé tham gia" thành "Câu lạc bộ"
     color: "#FDCB6E",
     link: "/clubs",
+  },
+  // 🆕 Nút Trận đấu
+  {
+    id: 9,
+    icon: "tennisball", // hoặc "tennisball-outline" nếu bạn thích
+    iconLib: "Ionicons",
+    title: "Trận đấu",
+    color: "#74B9FF",
+    link: "/match/stack", // đổi lại đúng route màn trận đấu của bạn
   },
 ];
 /* ---------- Mock Leaderboard Data ---------- */
@@ -621,13 +633,35 @@ function FeaturesGrid() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-
+  const { triggerMaybeAsk, openTest, RatingPrompt } = useRatingPrompt({
+    onNeedFeedback: () => {
+      // sau này bạn có thể mở màn góp ý
+      // router.push("/feedback");
+      console.log("User chọn Không ổn lắm -> mở màn góp ý");
+    },
+  });
   return (
     <View style={styles.featuresContainer}>
       <Text style={[styles.sectionTitle, { color: text }]}>
         Tính năng PickleTour
       </Text>
-      {__DEV__ && <TestNotificationButton />}
+      {/* {__DEV__ && (
+        <TouchableOpacity
+          style={{
+            marginTop: 16,
+            paddingVertical: 10,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: "#4B5563",
+            alignItems: "center",
+          }}
+          onPress={openTest}
+        >
+          <Text style={{ color: "#E5E7EB" }}>Test popup đánh giá (DEV)</Text>
+        </TouchableOpacity>
+      )}
+      {RatingPrompt} */}
+      {/* {__DEV__ && <TestNotificationButton />} */}
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />
@@ -999,160 +1033,6 @@ function NewsSection() {
   );
 }
 
-/* ---------- Leaderboard Card ---------- */
-function LeaderboardCard({ athlete, theme }) {
-  const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const subtext = isDark ? "#b0b0b0" : "#666666";
-
-  const borderColors = {
-    gold: ["#FFD700", "#FFA500", "#FFD700"],
-    silver: ["#C0C0C0", "#E8E8E8", "#C0C0C0"],
-    bronze: ["#CD7F32", "#E9967A", "#CD7F32"],
-  };
-
-  return (
-    <LinearGradient
-      colors={borderColors[athlete.tier]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.leaderboardCardGradient}
-    >
-      <View style={[styles.leaderboardCard, { backgroundColor: bg }]}>
-        <View style={styles.leaderboardRank}>
-          <Text style={styles.leaderboardRankText}>#{athlete.rank}</Text>
-        </View>
-
-        <Image
-          source={{ uri: normalizeUrl(athlete.avatar) }}
-          style={styles.leaderboardAvatar}
-          contentFit="cover"
-          transition={200}
-        />
-
-        <View style={styles.leaderboardInfo}>
-          <Text
-            style={[styles.leaderboardName, { color: text }]}
-            numberOfLines={1}
-          >
-            {athlete.name}
-          </Text>
-          <Text
-            style={[styles.leaderboardAchievement, { color: subtext }]}
-            numberOfLines={2}
-          >
-            {athlete.achievement}
-          </Text>
-        </View>
-      </View>
-    </LinearGradient>
-  );
-}
-
-/* ---------- Leaderboard Section ---------- */
-function LeaderboardSection() {
-  const theme = useTheme();
-  const { data, isLoading, isError } = useGetFeaturedLeaderboardQuery({
-    sinceDays: 90,
-    limit: 5,
-    minMatches: 3,
-    sportType: "2", // nếu backend của bạn có lọc theo sportType; bỏ nếu không dùng
-  });
-
-  const items = Array.isArray(data?.items) ? data.items : [];
-
-  const decorateTier = (rank) =>
-    rank === 1
-      ? "gold"
-      : rank === 2
-      ? "silver"
-      : rank === 3
-      ? "bronze"
-      : "bronze";
-  return (
-    <View style={styles.leaderboardSection}>
-      <View style={styles.leaderboardBackground}>
-        <LottieView
-          source={BG_3D}
-          autoPlay
-          speed={0.5}
-          loop
-          resizeMode="cover"
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
-        <View style={styles.leaderboardOverlay} />
-      </View>
-
-      <View style={styles.leaderboardHeaderContainer}>
-        <LinearGradient
-          colors={["#FFD700", "#FFA500"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.leaderboardHeader}
-        >
-          <Ionicons name="podium" size={28} color="#FFFFFF" />
-          <Text style={styles.leaderboardHeaderText}>
-            Bảng xếp hạng nổi bật
-          </Text>
-          <Ionicons name="podium" size={28} color="#FFFFFF" />
-        </LinearGradient>
-      </View>
-
-      <View style={styles.leaderboardCards}>
-        {isLoading && (
-          <>
-            {/* Skeleton đơn giản */}
-            <View style={[styles.leaderboardCardGradient, { opacity: 0.6 }]}>
-              <View
-                style={[
-                  styles.leaderboardCard,
-                  { backgroundColor: "#00000020" },
-                ]}
-              />
-            </View>
-            <View style={[styles.leaderboardCardGradient, { opacity: 0.6 }]}>
-              <View
-                style={[
-                  styles.leaderboardCard,
-                  { backgroundColor: "#00000020" },
-                ]}
-              />
-            </View>
-            <View style={[styles.leaderboardCardGradient, { opacity: 0.6 }]}>
-              <View
-                style={[
-                  styles.leaderboardCard,
-                  { backgroundColor: "#00000020" },
-                ]}
-              />
-            </View>
-          </>
-        )}
-
-        {!isLoading &&
-          !isError &&
-          items.map((u) => (
-            <LeaderboardCard
-              key={String(u.userId)}
-              theme={theme}
-              athlete={{
-                id: String(u.userId),
-                rank: u.rank,
-                name: u.name,
-                avatar:
-                  normalizeUrl(u.avatar) || "https://i.pravatar.cc/150?img=12",
-                achievement: u.achievement,
-                tier: decorateTier(u.rank),
-              }}
-            />
-          ))}
-      </View>
-    </View>
-  );
-}
-
 /* ---------- Contact Card - Improved ---------- */
 function ContactCard() {
   const theme = useTheme();
@@ -1261,6 +1141,21 @@ function ContactCard() {
 }
 
 export default function HomeScreen() {
+  // Trong index.tsx, tournaments.tsx, rankings.tsx, etc.
+  const scrollViewRef = React.useRef(null);
+  React.useEffect(() => {
+    const listener = DeviceEventEmitter.addListener(
+      "SCROLL_TO_TOP",
+      (tabName) => {
+        if (tabName === "index") {
+          // hoặc 'tournaments', 'rankings', etc.
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+          // hoặc flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }
+      }
+    );
+    return () => listener.remove();
+  }, []);
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
 
@@ -1344,6 +1239,7 @@ export default function HomeScreen() {
         }}
       />
       <ScrollView
+        ref={scrollViewRef}
         style={{ backgroundColor: bg }}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
