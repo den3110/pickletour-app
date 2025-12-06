@@ -28,6 +28,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useRegisterMutation } from "@/slices/usersApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
+import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice"; // 👈 NEW
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { saveUserInfo } from "@/utils/authStorage";
@@ -189,13 +190,21 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   return { uri, name, type, size };
 }
 
-function validateAll(form, avatarUrl, accepted) {
+/**
+ * validateAll
+ * @param {*} form
+ * @param {*} avatarUrl
+ * @param {*} accepted
+ * @param {boolean} requireOptional - nếu true: hành vi y hệt logic cũ (phone/gender/province bắt buộc)
+ */
+function validateAll(form, avatarUrl, accepted, requireOptional) {
   const name = (form.name || "").trim();
   const nickname = (form.nickname || "").trim();
   const phoneRaw = cleanPhone(form.phone || "");
   const email = (form.email || "").trim();
   const province = form.province || "";
   const gender = form.gender || ""; // 👈 gender từ form (label)
+  const dob = form.dob || "";
   const password = form.password || "";
   const confirmPassword = form.confirmPassword || "";
 
@@ -205,6 +214,7 @@ function validateAll(form, avatarUrl, accepted) {
     email: "",
     phone: "",
     gender: "",
+    dob: "", // 👈 thêm dob
     province: "",
     password: "",
     confirmPassword: "",
@@ -221,14 +231,40 @@ function validateAll(form, avatarUrl, accepted) {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     fields.email = "Email không hợp lệ.";
 
-  if (!phoneRaw) fields.phone = "Vui lòng nhập số điện thoại.";
-  else if (!/^0\d{9}$/.test(phoneRaw))
-    fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+  // ====== Phone ======
+  if (requireOptional) {
+    // logic cũ: bắt buộc
+    if (!phoneRaw) fields.phone = "Vui lòng nhập số điện thoại.";
+    else if (!/^0\d{9}$/.test(phoneRaw))
+      fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+  } else {
+    // không bắt buộc, nhưng nếu user có nhập thì vẫn validate format
+    if (phoneRaw && !/^0\d{9}$/.test(phoneRaw)) {
+      fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+    }
+  }
 
-  // 👇 Giới tính bắt buộc chọn
-  if (!gender) fields.gender = "Vui lòng chọn giới tính.";
+  // ====== Gender ======
+  if (requireOptional) {
+    if (!gender) fields.gender = "Vui lòng chọn giới tính.";
+  } else {
+    // optional: không set error nếu bỏ trống
+    fields.gender = "";
+  }
 
-  if (!province) fields.province = "Vui lòng chọn Tỉnh/Thành phố.";
+  // ====== DOB ======
+  if (requireOptional) {
+    if (!dob) fields.dob = "Vui lòng chọn ngày sinh.";
+  } else {
+    fields.dob = "";
+  }
+
+  // ====== Province ======
+  if (requireOptional) {
+    if (!province) fields.province = "Vui lòng chọn Tỉnh/Thành phố.";
+  } else {
+    fields.province = "";
+  }
 
   if (!password) fields.password = "Vui lòng nhập mật khẩu.";
   else if (password.length < 6)
@@ -270,6 +306,26 @@ export default function RegisterScreen() {
   const [register, { isLoading }] = useRegisterMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadAvatarMutation();
+
+  // 👇 flag cho phép bật/tắt bắt buộc các field optional (phone/gender/province)
+  // hiện tại mặc định false để phù hợp guideline Apple, sau đó sync từ server
+  const [requireOptional, setRequireOptional] = useState(true);
+
+  // 👇 Lấy config từ server: registration.requireOptionalProfileFields
+  const { data: registrationSettings } = useGetRegistrationSettingsQuery();
+
+  useEffect(() => {
+    if (
+      registrationSettings &&
+      typeof registrationSettings.requireOptionalProfileFields === "boolean"
+    ) {
+      setRequireOptional(registrationSettings.requireOptionalProfileFields);
+    }
+  }, [registrationSettings]);
+
+  // Modal cảnh báo thiếu field optional
+  const [optionalModalOpen, setOptionalModalOpen] = useState(false);
+  const [missingOptionalFields, setMissingOptionalFields] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -315,8 +371,8 @@ export default function RegisterScreen() {
   };
 
   const validation = useMemo(
-    () => validateAll(form, avatarUrl, accepted),
-    [form, avatarUrl, accepted]
+    () => validateAll(form, avatarUrl, accepted, requireOptional),
+    [form, avatarUrl, accepted, requireOptional]
   );
   const errorsList = useMemo(() => validation.messages, [validation]); // (hiện chưa dùng, giữ nguyên)
 
@@ -353,10 +409,34 @@ export default function RegisterScreen() {
 
   const onSubmit = async () => {
     setShowErrors(true);
+
+    // Nếu còn lỗi (bắt buộc thực sự: name/nickname/email/pass/confirm/terms/avatar)
     if (validation.hasErrors) {
       Alert.alert("Thiếu/Không hợp lệ", validation.messages.join("\n"));
       return;
     }
+
+    // Nếu requireOptional = false -> các field phone/gender/province là optional
+    // nhưng trước khi đăng ký, show modal nhắc user bổ sung nếu đang bỏ trống
+    if (!requireOptional) {
+      const missing = [];
+      if (!cleanPhone(form.phone || "")) {
+        missing.push("Số điện thoại");
+      }
+      if (!form.gender) {
+        missing.push("Giới tính");
+      }
+      if (!form.province) {
+        missing.push("Tỉnh/Thành phố");
+      }
+
+      if (missing.length > 0) {
+        setMissingOptionalFields(missing);
+        setOptionalModalOpen(true);
+        return;
+      }
+    }
+
     await doRegister();
   };
 
@@ -548,12 +628,12 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="phone-pad"
-              required
+              required={requireOptional} // 👈 chỉ hiện * khi requireOptional = true
               error={showErrors && !!validation.fields.phone}
               helperText={showErrors ? validation.fields.phone : ""}
             />
 
-            {/* Gender (required select) */}
+            {/* Gender */}
             <FieldSelect
               label="Giới tính"
               value={form.gender}
@@ -563,23 +643,25 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               tint={tint}
-              required
+              required={requireOptional} // 👈 chỉ hiện *
               error={showErrors && !!validation.fields.gender}
               helperText={showErrors ? validation.fields.gender : ""}
               placeholder="Chọn giới tính"
             />
 
-            {/* DOB (optional) */}
+            {/* DOB */}
             <View style={{ marginBottom: 10 }}>
               <Text style={[styles.label, { color: textSecondary }]}>
                 Ngày sinh
+                {requireOptional ? " *" : ""}
               </Text>
               <Pressable
                 onPress={openDobPicker}
                 style={({ pressed }) => [
                   styles.input,
                   {
-                    borderColor: border,
+                    borderColor:
+                      showErrors && validation.fields.dob ? danger : border,
                     flexDirection: "row",
                     alignItems: "center",
                   },
@@ -597,9 +679,14 @@ export default function RegisterScreen() {
                   {form.dob ? formatDobLabel(form.dob) : "Chọn ngày sinh"}
                 </Text>
               </Pressable>
+              {showErrors && validation.fields.dob ? (
+                <Text style={[styles.errorText, { color: danger }]}>
+                  {validation.fields.dob}
+                </Text>
+              ) : null}
             </View>
 
-            {/* Province (required select) */}
+            {/* Province */}
             <FieldSelect
               label="Tỉnh/Thành phố"
               value={form.province}
@@ -609,7 +696,7 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               tint={tint}
-              required
+              required={requireOptional} // 👈 chỉ hiện *
               error={showErrors && !!validation.fields.province}
               helperText={showErrors ? validation.fields.province : ""}
             />
@@ -726,6 +813,106 @@ export default function RegisterScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* ===== Modal thiếu field optional ===== */}
+      <Modal
+        visible={optionalModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOptionalModalOpen(false)}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              Bổ sung thông tin?
+            </Text>
+            <Text
+              style={{
+                color: textSecondary,
+                marginTop: 8,
+                lineHeight: 20,
+              }}
+            >
+              Bạn chưa nhập các trường sau:
+            </Text>
+
+            <View style={{ marginTop: 6, marginBottom: 4 }}>
+              {missingOptionalFields.map((f) => (
+                <Text
+                  key={f}
+                  style={{ color: textSecondary, lineHeight: 20 }}
+                >{`• ${f}`}</Text>
+              ))}
+            </View>
+
+            <Text
+              style={{
+                color: textSecondary,
+                fontSize: 12,
+                marginTop: 6,
+                lineHeight: 18,
+              }}
+            >
+              Các thông tin này giúp BTC giải liên hệ và xếp bảng đấu chính xác
+              hơn. Bạn có thể bỏ qua và bổ sung sau.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 14,
+                justifyContent: "center",
+              }}
+            >
+              <Pressable
+                disabled={submitDisabled}
+                onPress={() => setOptionalModalOpen(false)}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnOutline,
+                  {
+                    borderColor: border,
+                    minWidth: 110,
+                    opacity: submitDisabled ? 0.6 : pressed ? 0.95 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.btnText, { color: textPrimary }]}>
+                  Điền tiếp
+                </Text>
+              </Pressable>
+
+              <Pressable
+                disabled={submitDisabled}
+                onPress={async () => {
+                  setOptionalModalOpen(false);
+                  await doRegister();
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  {
+                    backgroundColor: tint,
+                    minWidth: 150,
+                    opacity: submitDisabled ? 0.7 : pressed ? 0.92 : 1,
+                  },
+                ]}
+              >
+                {submitDisabled ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnTextWhite}>Bỏ qua và đăng ký</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Terms Modal */}
       <TermsModal
         open={termsOpen}
@@ -802,7 +989,7 @@ export default function RegisterScreen() {
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 maximumDate={new Date()}
                 minimumDate={new Date(1900, 0, 1)}
-                locale="vi-VN" // 👈 tháng hiển thị tiếng Việt trên iOS
+                locale="vi-VN"
                 onChange={(event, selectedDate) => {
                   if (Platform.OS === "android") {
                     if (event.type === "set" && selectedDate) {
@@ -821,7 +1008,7 @@ export default function RegisterScreen() {
         </View>
       </Modal>
 
-      {/* ===== Avatar Preview Modal (Xác nhận → upload) ===== */}
+      {/* Avatar Preview Modal (Xác nhận → upload) */}
       <Modal
         visible={avatarConfirmOpen}
         transparent
@@ -935,7 +1122,7 @@ export default function RegisterScreen() {
         </View>
       </Modal>
 
-      {/* ===== Viewer phóng to avatar ===== */}
+      {/* Viewer phóng to avatar */}
       <ImageView
         images={safeAvatar ? [{ uri: normalizeUrl(safeAvatar) }] : []}
         visible={viewerOpen}
@@ -1005,7 +1192,7 @@ function FieldSelect({
   required = false,
   error = false,
   helperText = "",
-  placeholder = "Chọn tỉnh/thành", // 👈 cho phép custom placeholder (giới tính / tỉnh)
+  placeholder = "Chọn tỉnh/thành",
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1283,7 +1470,7 @@ function TermsModal({
             <Text
               style={{ color: textSecondary, fontSize: 12, marginBottom: 4 }}
             >
-              Cập nhật lần cuối: 04/09/2025
+              Cập nhật lần cuối: 06/12/2025
             </Text>
 
             <Text
@@ -1346,10 +1533,10 @@ function TermsModal({
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Dữ liệu thu thập
               </Text>
-              {"\n"}• Tài khoản: nickname, mật khẩu (được băm), email/SĐT (tuỳ
-              chọn).{"\n"}• Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới tính,
-              tỉnh/thành, CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời gian
-              đăng nhập, IP, log lỗi, thống kê sử dụng.{"\n\n"}
+              {"\n"}• Tài khoản: nickname, mật khẩu (được mã hoá), email/SĐT
+              (tuỳ chọn).{"\n"}• Hồ sơ (nếu bổ sung): họ tên, ngày sinh, giới
+              tính, tỉnh/thành, CCCD & ảnh CCCD.{"\n"}• Kỹ thuật: thiết bị, thời
+              gian đăng nhập, IP, log lỗi, thống kê sử dụng.{"\n\n"}
               <Text style={{ fontWeight: "700", color: textPrimary }}>
                 Mục đích
               </Text>
@@ -1390,7 +1577,7 @@ function TermsModal({
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
-              7) Lưu phiên (SecureStore/AsyncStorage)
+              7) Lưu phiên đăng nhập
             </Text>
             <Text
               style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
@@ -1446,7 +1633,7 @@ function TermsModal({
               style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
             >
               • Áp dụng pháp luật Việt Nam; tranh chấp ưu tiên thương lượng, sau
-              đó theo thẩm quyền.{"\n"}• Liên hệ: pickletour@gmail.com
+              đó theo thẩm quyền.{"\n"}• Liên hệ: support@pickletour.vn
             </Text>
 
             <Text

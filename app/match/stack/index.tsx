@@ -143,7 +143,7 @@ function MatchCard({ item, onPress }) {
 
   const hasScore = (item.score?.a ?? 0) > 0 || (item.score?.b ?? 0) > 0;
 
-  // 👉 chỉ cho bắt trận nếu chưa end
+  // 👉 chỉ cho bắt trận / live nếu chưa end
   const canStart = item.status !== "finished" && item.status !== "canceled";
 
   const handleStartMatch = () => {
@@ -151,6 +151,15 @@ function MatchCard({ item, onPress }) {
       pathname: `/match/${item._id}/referee`,
       params: {
         userMatch: "true", // truyền param userMatch true
+      },
+    });
+  };
+
+  const handleGoLive = () => {
+    router.push({
+      pathname: `/match/${item._id}/live-setup`,
+      params: {
+        userMatch: "true",
       },
     });
   };
@@ -207,19 +216,45 @@ function MatchCard({ item, onPress }) {
         <StatusChip status={item.status} />
 
         {canStart && (
-          <TouchableOpacity
-            onPress={handleStartMatch}
-            activeOpacity={0.85}
-            style={[
-              styles.startBtn,
-              {
-                backgroundColor: primaryColor,
-              },
-            ]}
-          >
-            <Ionicons name="play" size={14} color="#FFFFFF" />
-            <Text style={styles.startBtnText}>Bắt trận</Text>
-          </TouchableOpacity>
+          <View style={styles.footerActions}>
+            {/* 🔴 Nút Live nằm TRÊN nút Bắt trận */}
+            <TouchableOpacity
+              onPress={handleGoLive}
+              activeOpacity={0.85}
+              style={[
+                styles.liveBtn,
+                {
+                  borderColor: primaryColor,
+                },
+              ]}
+            >
+              <Ionicons name="radio" size={14} color={primaryColor} />
+              <Text
+                style={[
+                  styles.liveBtnText,
+                  {
+                    color: primaryColor,
+                  },
+                ]}
+              >
+                Live
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleStartMatch}
+              activeOpacity={0.85}
+              style={[
+                styles.startBtn,
+                {
+                  backgroundColor: primaryColor,
+                },
+              ]}
+            >
+              <Ionicons name="play" size={14} color="#FFFFFF" />
+              <Text style={styles.startBtnText}>Bắt trận</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -860,6 +895,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 10,
+  },
+
+  // 👉 nhóm nút bên phải (Live + Bắt trận xếp dọc)
+  footerActions: {
+    alignItems: "flex-end",
+  },
+
+  // 👉 nút Live
+  liveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginBottom: 6, // để nó nằm trên nút Bắt trận
+  },
+  liveBtnText: {
+    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: "700",
   },
 
   // 👉 nút Bắt trận

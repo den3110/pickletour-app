@@ -524,9 +524,7 @@ const ChatAssistant = ({ isBack = false }) => {
               });
             } else {
               await AsyncStorage.removeItem(SESSION_LIMIT_INFO_KEY);
-              await AsyncStorage.removeItem(
-                SESSION_LIMIT_BANNER_DISMISSED_KEY
-              );
+              await AsyncStorage.removeItem(SESSION_LIMIT_BANNER_DISMISSED_KEY);
             }
           }
         }
@@ -781,10 +779,10 @@ const ChatAssistant = ({ isBack = false }) => {
   const handleNavigationPress = (nav) => {
     if (!nav) return;
 
-    // nếu keyboard đang mở: chỉ tắt keyboard, KHÔNG chạy action
+    // nếu keyboard đang mở: chỉ tắt keyboard, nhưng KHÔNG return
     if (isKeyboardVisible) {
       Keyboard.dismiss();
-      return;
+      inputRef.current?.blur?.();
     }
 
     if (!nav.deepLink) {
@@ -824,8 +822,11 @@ const ChatAssistant = ({ isBack = false }) => {
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingBottom: tabBarHeight }]}
-      edges={["top"]}
+      style={[
+        styles.container,
+        { paddingBottom: tabBarHeight - (Platform?.OS === "ios" ? 0 : 40) },
+      ]}
+      edges={[Platform.OS === "ios" && "top"]}
     >
       {/* Header */}
       <LinearGradient
@@ -959,8 +960,8 @@ const ChatAssistant = ({ isBack = false }) => {
 
       {/* Input Area */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -tabBarHeight} // Trừ đi tab bar height
       >
         {isSessionLimited && !sessionLimitDismissed && (
           <View

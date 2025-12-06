@@ -2419,9 +2419,11 @@ function DateField({
     value ? new Date(value) : new Date(1990, 0, 1)
   );
   const canNativePicker = Platform.OS === "ios" || Platform.OS === "android";
+
   useEffect(() => {
     if (value) setTemp(new Date(value));
   }, [value]);
+
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={[styles.label, { color: textSecondary }]}>{label}</Text>
@@ -2444,6 +2446,7 @@ function DateField({
         </Text>
       </Pressable>
       {!!error && <Text style={styles.errText}>{error}</Text>}
+
       {open && canNativePicker && (
         <Modal
           visible={open}
@@ -2458,7 +2461,7 @@ function DateField({
                 { borderColor: border, backgroundColor: cardBg },
               ]}
             >
-              <View style={styles.modalHeader}>
+              <View className="modalHeader" style={styles.modalHeader}>
                 <Pressable
                   onPress={() => setOpen(false)}
                   style={styles.modalBtn}
@@ -2491,12 +2494,14 @@ function DateField({
                   </Text>
                 </Pressable>
               </View>
+
               <DateTimePicker
                 value={temp}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={(_, d) => d && setTemp(d)}
                 maximumDate={new Date()}
+                locale="vi-VN" // 👈 tháng hiển thị dạng tiếng Việt thay vì M1, M2
               />
             </View>
           </View>
@@ -2505,7 +2510,6 @@ function DateField({
     </View>
   );
 }
-
 function PickBox({ label, file, onPick, border, muted, textSecondary }) {
   const hasImg = !!file?.uri;
   return (

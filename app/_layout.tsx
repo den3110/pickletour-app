@@ -4,7 +4,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack, usePathname, useSegments } from "expo-router";
+import { router, Stack, usePathname, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import {
@@ -16,6 +16,7 @@ import {
   Platform,
   BackHandler,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -37,7 +38,11 @@ import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
-import { increaseLaunchCountAndGet, initInstallDateIfNeeded } from "@/services/ratingService";
+import {
+  increaseLaunchCountAndGet,
+  initInstallDateIfNeeded,
+} from "@/services/ratingService";
+import { Ionicons } from "@expo/vector-icons";
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -641,14 +646,17 @@ export default function RootLayout() {
                           options={{
                             title: "Đăng ký",
                             headerTitleAlign: "center",
-                            headerTintColor: navTheme.colors.primary,
-                            headerBackVisible: true,
-                            headerBackTitle: "Quay lại",
-                            headerBackTitleVisible: true,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -656,14 +664,17 @@ export default function RootLayout() {
                           options={{
                             title: "Quên mật khẩu",
                             headerTitleAlign: "center",
-                            headerTintColor: navTheme.colors.primary,
-                            headerBackVisible: true,
-                            headerBackTitle: "Quay lại",
-                            headerBackTitleVisible: true,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -671,27 +682,34 @@ export default function RootLayout() {
                           options={{
                             title: "Tự chấm trình",
                             headerTitleAlign: "center",
-                            headerTintColor: navTheme.colors.primary,
-                            headerBackVisible: true,
-                            headerBackTitle: "Quay lại",
-                            headerBackTitleVisible: true,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
                           name="tournament/[id]/register"
                           options={{
                             title: "Đăng ký giải đấu",
-                            headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -699,12 +717,17 @@ export default function RootLayout() {
                           options={{
                             title: "Check-in giải đấu",
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -712,12 +735,17 @@ export default function RootLayout() {
                           options={{
                             title: "Bốc thăm giải đấu",
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -725,12 +753,17 @@ export default function RootLayout() {
                           options={{
                             title: "Sơ đồ giải đấu",
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -738,12 +771,17 @@ export default function RootLayout() {
                           options={{
                             title: "Tổng quan giải đấu",
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -751,48 +789,68 @@ export default function RootLayout() {
                           options={{
                             title: "Giải đấu",
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
                           name="tournament/[id]/manage"
                           options={{
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
                           name="tournament/[id]/schedule"
                           options={{
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
                           name="tournament/[id]/referee"
                           options={{
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen
@@ -803,12 +861,17 @@ export default function RootLayout() {
                           name="contact"
                           options={{
                             headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
                         <Stack.Screen

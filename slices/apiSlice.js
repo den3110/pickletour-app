@@ -353,6 +353,7 @@ export const apiSlice = createApi({
     "FacebookPages",
     "ChatHistory",
     "Leaderboard",
+    "SystemSettings"
   ],
   endpoints: () => ({}),
 });

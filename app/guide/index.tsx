@@ -196,30 +196,27 @@ export default function GuidesScreen() {
     isError: guideError,
   } = useGetGuideFeedUrlQuery();
 
-  const fetchFeed = useCallback(
-    async ({ url, showSkeleton = false } = {}) => {
-      if (!url) return;
-      try {
-        setError("");
-        if (showSkeleton) {
-          setLoading(true);
-        }
-        const res = await fetch(url);
-        const text = await res.text();
-        const parsed = parseYouTubeFeed(text);
-        setVideos(parsed);
-      } catch (e) {
-        console.log("Fetch feed error", e);
-        setError("Không tải được danh sách video. Vui lòng thử lại.");
-      } finally {
-        if (showSkeleton) {
-          setLoading(false);
-        }
-        setRefreshing(false);
+  const fetchFeed = useCallback(async ({ url, showSkeleton = false } = {}) => {
+    if (!url) return;
+    try {
+      setError("");
+      if (showSkeleton) {
+        setLoading(true);
       }
-    },
-    []
-  );
+      const res = await fetch(url);
+      const text = await res.text();
+      const parsed = parseYouTubeFeed(text);
+      setVideos(parsed);
+    } catch (e) {
+      console.log("Fetch feed error", e);
+      setError("Không tải được danh sách video. Vui lòng thử lại.");
+    } finally {
+      if (showSkeleton) {
+        setLoading(false);
+      }
+      setRefreshing(false);
+    }
+  }, []);
 
   // Initial load: chờ API trả URL, KHÔNG dùng default
   useEffect(() => {
@@ -379,6 +376,14 @@ export default function GuidesScreen() {
         options={{
           title: "Hướng dẫn",
           headerTitleAlign: "center",
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <Ionicons name="chevron-back" size={24} />
+            </TouchableOpacity>
+          ),
           headerBackTitle: "Quay lại",
         }}
       />

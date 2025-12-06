@@ -44,6 +44,8 @@ import CCCDModal from "../CCCDModal.native";
 import { useTheme } from "@react-navigation/native";
 import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
+import MatchSettingsModal from "./MatchSettingsModal";
+
 /* ---------- Theme tokens ---------- */
 function useTokens() {
   const navTheme = useTheme?.() || {};
@@ -894,9 +896,33 @@ export default function RefereeJudgePanel({ matchId }) {
   // ===== NEW: “chờ bấm Bắt đầu” sau khi bấm BẮT GAME TIẾP =====
   const [waitingStart, setWaitingStart] = useState(false);
 
+  // override luật local (từ modal cấu hình)
+  const [bestOfOverride, setBestOfOverride] = useState(null);
+  const [winByTwoOverride, setWinByTwoOverride] = useState(null);
+
   // ====== derive ======
-  const rules = match?.rules || { bestOf: 1, pointsToWin: 11, winByTwo: true };
-  const basePointsToWin = Number(rules?.pointsToWin ?? 11);
+  // ====== derive ======
+  const matchRules = match?.rules || {};
+  const rules = {
+    bestOf: Number(
+      bestOfOverride != null
+        ? bestOfOverride
+        : matchRules.bestOf != null
+        ? matchRules.bestOf
+        : 1
+    ),
+    pointsToWin: Number(
+      matchRules.pointsToWin != null ? matchRules.pointsToWin : 11
+    ),
+    winByTwo:
+      winByTwoOverride != null
+        ? !!winByTwoOverride
+        : matchRules.winByTwo != null
+        ? !!matchRules.winByTwo
+        : true,
+  };
+
+  const basePointsToWin = Number(rules.pointsToWin || 11);
   const [ptw, setPtw] = useState(basePointsToWin);
   const [ptwBoost, setPtwBoost] = useState(false);
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
@@ -1112,9 +1138,11 @@ export default function RefereeJudgePanel({ matchId }) {
   const rightSide = leftRight.right;
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(new Date());
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
+  const [midPointCustom, setMidPointCustom] = useState(null);
 
   // Busy flags
   const [incBusy, setIncBusy] = useState(false);
@@ -1126,7 +1154,8 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // Mid-game side switch prompt
   const [midPromptOpen, setMidPromptOpen] = useState(false);
-  const midPoint = ptw ? Math.ceil(Number(ptw) / 2) : null;
+  const midPointBase = ptw ? Math.ceil(Number(ptw) / 2) : null;
+  const midPoint = midPointCustom ?? midPointBase;
   const midAskedRef = useRef({}); // { [gameIndex]: true }
 
   useEffect(() => {
@@ -1197,6 +1226,13 @@ export default function RefereeJudgePanel({ matchId }) {
   useEffect(() => {
     loadUndo();
   }, [loadUndo]);
+
+  // Khi đổi sang match khác thì reset cấu hình local
+  useEffect(() => {
+    setBestOfOverride(null);
+    setWinByTwoOverride(null);
+    setMidPointCustom(null);
+  }, [match?._id]);
 
   // ====== socket auto-refetch ======
   const socketInst = socket;
@@ -1613,12 +1649,21 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU (status !== live HOẶC waitingStart) → 0-0-2; nếu đang live → tay 1
   const toggleServeSide = () => {
+    if (!match?._id) return;
+
+    // ✅ Lưu trạng thái cũ để undo
+    const prev = {
+      side: activeSide,
+      server: activeServerNum,
+      serverId: serverUidShow,
+    };
+
     const nextSide = activeSide === "A" ? "B" : "A";
     const preStart = waitingStart || match?.status !== "live";
     const isDouble = eventType !== "single";
     const wantOrder = preStart ? (isDouble ? 2 : 1) : 1;
 
-    // ✅ Luôn lấy RIGHT COURT PLAYER = người có base=2
+    // ✅ FIX: Luôn lấy right court player (base=2)
     const baseMap = nextSide === "A" ? baseA : baseB;
     const uidRight =
       Object.entries(baseMap).find(([, base]) => Number(base) === 2)?.[0] || "";
@@ -1643,8 +1688,10 @@ export default function RefereeJudgePanel({ matchId }) {
           });
           return;
         }
+
         pushUndo({ t: "SERVE_SET", prev });
-        // Guard: restore score nếu backend reset
+
+        // 🛡️ Guard: nếu backend lỡ reset 0-0 khi đang mid-game → khôi phục điểm
         try {
           const res = await refetch();
           const m = res?.data || match;
@@ -1669,7 +1716,6 @@ export default function RefereeJudgePanel({ matchId }) {
       }
     );
   };
-
   // --- ĐỔI TAY trong cùng đội
   const toggleServerNum = useCallback(() => {
     if (!match?._id) return;
@@ -2009,126 +2055,170 @@ export default function RefereeJudgePanel({ matchId }) {
             { backgroundColor: t.colors.card, borderColor: t.colors.border },
           ]}
         >
-          <View style={[s.rowStart, { gap: 8, flexWrap: "wrap" }]}>
-            <Ripple
-              onPress={handleBack}
-              style={[s.iconBtn, { backgroundColor: t.colors.card }]}
-              rippleContainerBorderRadius={8}
-            >
-              <MaterialIcons
-                name="arrow-back"
-                size={20}
-                color={t.colors.text}
-              />
-            </Ripple>
+          <View
+            style={[
+              s.card,
+              s.topCard,
+              { backgroundColor: t.colors.card, borderColor: t.colors.border },
+            ]}
+          >
+            <View style={[s.rowBetween, { alignItems: "center" }]}>
+              <View
+                style={[
+                  s.rowStart,
+                  { gap: 8, flexWrap: "wrap", flex: 1, paddingRight: 4 },
+                ]}
+              >
+                <Ripple
+                  onPress={handleBack}
+                  style={[s.iconBtn, { backgroundColor: t.colors.card }]}
+                  rippleContainerBorderRadius={8}
+                >
+                  <MaterialIcons
+                    name="arrow-back"
+                    size={20}
+                    color={t.colors.text}
+                  />
+                </Ripple>
 
-            {/* CODE | BOx | Gx */}
-            <View
-              style={[
-                s.chip,
-                {
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  backgroundColor: t.chipInfoBg,
-                  borderColor: t.chipInfoBd,
-                },
-              ]}
-            >
-              <Text style={[s.matchCodeText, { color: t.colors.text }]}>
-                {headerText}
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", gap: 6, flexShrink: 0 }}>
-              {!isPreMatch && (
-                <>
-                  <Ripple
-                    onPress={onUndo}
-                    disabled={undoBusy || !undoStack.current.length}
-                    style={[
-                      s.btnUndoSm,
-                      (undoBusy || !undoStack.current.length) && s.btnDisabled,
-                    ]}
-                    rippleContainerBorderRadius={10}
-                  >
-                    {undoBusy ? (
-                      <ActivityIndicator size="small" />
-                    ) : (
-                      <MaterialIcons name="undo" size={16} color="#92400e" />
-                    )}
-                    <Text style={s.btnUndoSmText}>Hoàn tác</Text>
-                  </Ripple>
+                {/* CODE | BOx | Gx */}
+                <View
+                  style={[
+                    s.chip,
+                    {
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      backgroundColor: t.chipInfoBg,
+                      borderColor: t.chipInfoBd,
+                    },
+                  ]}
+                >
+                  <Text style={[s.matchCodeText, { color: t.colors.text }]}>
+                    {headerText}
+                  </Text>
+                </View>
 
+                <View style={{ flexDirection: "row", gap: 6, flexShrink: 0 }}>
+                  {!isPreMatch && (
+                    <>
+                      <Ripple
+                        onPress={onUndo}
+                        disabled={undoBusy || !undoStack.current.length}
+                        style={[
+                          s.btnUndoSm,
+                          (undoBusy || !undoStack.current.length) &&
+                            s.btnDisabled,
+                        ]}
+                        rippleContainerBorderRadius={10}
+                      >
+                        {undoBusy ? (
+                          <ActivityIndicator size="small" />
+                        ) : (
+                          <MaterialIcons
+                            name="undo"
+                            size={16}
+                            color="#92400e"
+                          />
+                        )}
+                        <Text style={s.btnUndoSmText}>Hoàn tác</Text>
+                      </Ripple>
+
+                      <Ripple
+                        onPress={swapSides}
+                        style={[
+                          s.btnSwapSm,
+                          {
+                            backgroundColor: t.chipInfo2Bg,
+                            borderColor: t.chipInfo2Bd,
+                          },
+                        ]}
+                        rippleContainerBorderRadius={10}
+                      >
+                        <MaterialIcons
+                          name="swap-horiz"
+                          size={16}
+                          color={t.colors.text}
+                        />
+                        <Text
+                          style={[s.btnSwapSmText, { color: t.chipInfo2Fg }]}
+                        >
+                          Đổi bên
+                        </Text>
+                      </Ripple>
+                    </>
+                  )}
+                </View>
+
+                {/* Toggle người giao #1/#2 */}
+                <Ripple
+                  onPress={toggleServerNum}
+                  disabled={incBusy || undoBusy}
+                  style={[
+                    s.btnOutlineSm,
+                    {
+                      width: 54,
+                      height: 36,
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: t.colors.card,
+                      borderColor: t.colors.border,
+                    },
+                    (incBusy || undoBusy) && s.btnDisabled,
+                  ]}
+                  rippleContainerBorderRadius={10}
+                >
+                  <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
+                    {activeServerNum}
+                  </Text>
+                </Ripple>
+
+                {/* Gán/Đổi sân (court) */}
+                {isPreMatch && userMatch !== "true" && (
                   <Ripple
-                    onPress={swapSides}
+                    onPress={() => setCourtOpen(true)}
                     style={[
-                      s.btnSwapSm,
+                      s.btnOutlineSm,
                       {
-                        backgroundColor: t.chipInfo2Bg,
-                        borderColor: t.chipInfo2Bd,
+                        backgroundColor: t.colors.card,
+                        borderColor: t.colors.border,
                       },
                     ]}
                     rippleContainerBorderRadius={10}
                   >
                     <MaterialIcons
-                      name="swap-horiz"
+                      name="edit-location"
                       size={16}
                       color={t.colors.text}
                     />
-                    <Text style={[s.btnSwapSmText, { color: t.chipInfo2Fg }]}>
-                      Đổi bên
+                    <Text
+                      style={[s.btnOutlineSmText, { color: t.colors.text }]}
+                    >
+                      {currentCourtId ? "Đổi sân" : "Gán sân"}
                     </Text>
                   </Ripple>
-                </>
-              )}
-            </View>
+                )}
+              </View>
 
-            {/* Toggle người giao #1/#2 */}
-            <Ripple
-              onPress={toggleServerNum}
-              disabled={incBusy || undoBusy}
-              style={[
-                s.btnOutlineSm,
-                {
-                  width: 54,
-                  height: 36,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: t.colors.card,
-                  borderColor: t.colors.border,
-                },
-                (incBusy || undoBusy) && s.btnDisabled,
-              ]}
-              rippleContainerBorderRadius={10}
-            >
-              <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
-                {activeServerNum}
-              </Text>
-            </Ripple>
-
-            {/* Gán/Đổi sân (court) */}
-            {isPreMatch && userMatch !== "true" && (
+              {/* NÚT SETTINGS GÓC PHẢI */}
               <Ripple
-                onPress={() => setCourtOpen(true)}
+                onPress={() => setSettingsOpen(true)}
+                rippleContainerBorderRadius={999}
                 style={[
-                  s.btnOutlineSm,
+                  s.iconBtn,
                   {
+                    marginLeft: 8,
                     backgroundColor: t.colors.card,
-                    borderColor: t.colors.border,
                   },
                 ]}
-                rippleContainerBorderRadius={10}
               >
                 <MaterialIcons
-                  name="edit-location"
-                  size={16}
+                  name="settings"
+                  size={20}
                   color={t.colors.text}
                 />
-                <Text style={[s.btnOutlineSmText, { color: t.colors.text }]}>
-                  {currentCourtId ? "Đổi sân" : "Gán sân"}
-                </Text>
               </Ripple>
-            )}
+            </View>
           </View>
         </View>
 
@@ -2550,6 +2640,15 @@ export default function RefereeJudgePanel({ matchId }) {
           refetch();
         }}
       />
+      <MatchSettingsModal
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        matchId={match?._id}
+        onSave={() => {
+          refetch(); // ✅ chỉ cần refetch match
+          setSettingsOpen(false); // ✅ đóng modal
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -2583,11 +2682,23 @@ const s = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
-  topCard: { padding: 10, borderWidth: 0, borderColor: "transparent" },
+  topCard: {
+    padding: 10,
+    borderWidth: 0,
+    borderColor: "transparent",
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
   bottomCard: {
     paddingVertical: 10,
     borderWidth: 0,
     borderColor: "transparent",
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
 
   scoreboardCard: { flex: 1, minHeight: 0, padding: 10 },

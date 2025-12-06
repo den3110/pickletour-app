@@ -591,7 +591,7 @@ export default function CreateUserMatchScreen() {
                       matchType === "double" && styles.modeTabTextActive,
                     ]}
                   >
-                    Giải đôi
+                    Trận đôi
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -607,7 +607,7 @@ export default function CreateUserMatchScreen() {
                       matchType === "single" && styles.modeTabTextActive,
                     ]}
                   >
-                    Giải đơn
+                    Trận đơn
                   </Text>
                 </TouchableOpacity>
               </View>

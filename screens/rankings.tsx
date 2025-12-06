@@ -1,6 +1,6 @@
 // app/screens/RankingListScreen.jsx
 // ✅ OPTIMIZED VERSION - Reduced lag, smooth scrolling, lazy image loading
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -678,7 +678,10 @@ const RankingCard = memo(
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.successBtn, { backgroundColor: HEX.green }]}
-            onPress={() => onOpenProfile(u?._id)}
+            onPress={() => {
+              // onOpenProfile(u?._id)
+              router.push(`/profile/${u?._id}`);
+            }}
           >
             <Text style={styles.successBtnText}>Hồ sơ</Text>
           </TouchableOpacity>
@@ -1159,7 +1162,13 @@ export default function RankingListScreen({ isBack = false }) {
         {/* TOP BAR */}
         <View style={[styles.topWrap, { backgroundColor: C.stickyBg }]}>
           <View style={styles.headerRow}>
-            <View style={{display: "flex", flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
               {isBack ? (
                 <Pressable
                   onPress={() => router.back()}

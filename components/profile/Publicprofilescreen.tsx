@@ -34,10 +34,12 @@ import {
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { router } from "expo-router";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
 const AVATAR_SIZE = 120;
+const isSmallDevice = SCREEN_WIDTH <= 360; // 👈 thêm: nhận diện máy nhỏ
 
 /* ---------- CONSTANTS & UTILS ---------- */
 const AVA_PLACE = "https://dummyimage.com/160x160/cccccc/ffffff&text=?";
@@ -111,7 +113,7 @@ const StatCard = ({ icon, value, label, color, gradient }) => (
     colors={gradient}
     start={{ x: 0, y: 0 }}
     end={{ x: 1, y: 1 }}
-    style={styles.statCard}
+    style={[styles.statCard, isSmallDevice && styles.statCardSmall]} // 👈 thêm responsive
   >
     <View style={styles.statIconContainer}>{icon}</View>
     <Text style={styles.statValue}>{value}</Text>
@@ -321,14 +323,19 @@ const RatingHistoryRow = ({ item, prevItem }) => {
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
 
   return (
-    <View style={styles.ratingRow}>
+    <View style={[styles.ratingRow, isSmallDevice && styles.ratingRowSmall]}>
       <View style={styles.ratingLeft}>
         <Text style={styles.ratingDate}>{fmtDate(item.scoredAt)}</Text>
         <Text style={styles.ratingScorer}>
           {item.scorer?.name || "Hệ thống"}
         </Text>
       </View>
-      <View style={styles.ratingScores}>
+      <View
+        style={[
+          styles.ratingScores,
+          isSmallDevice && styles.ratingScoresSmall,
+        ]}
+      >
         <View style={styles.ratingScoreBadge}>
           <Text style={styles.ratingScoreLabel}>Đơn</Text>
           <Text style={styles.ratingScoreValue}>{num(item.single)}</Text>
@@ -627,6 +634,13 @@ export default function PublicProfileScreen() {
               color="#FFF"
             />
           </View>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chevron-back" size={24} color="#FFF" />
+          </TouchableOpacity>
 
           {/* Share Button */}
           <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -646,7 +660,12 @@ export default function PublicProfileScreen() {
         scrollEventThrottle={16}
       >
         {/* Stats Cards */}
-        <View style={styles.statsContainer}>
+        <View
+          style={[
+            styles.statsContainer,
+            isSmallDevice && styles.statsContainerSmall,
+          ]}
+        >
           <StatCard
             icon={
               <MaterialCommunityIcons name="tennis" size={32} color="#FFF" />
@@ -1095,6 +1114,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   /* ScrollView */
   scrollView: {
@@ -1112,6 +1142,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 24,
   },
+  statsContainerSmall: {
+    flexDirection: "column", // 👈 nhỏ thì xếp dọc
+  },
   statCard: {
     flex: 1,
     padding: 16,
@@ -1124,6 +1157,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  statCardSmall: {
+    width: "100%",
+    alignSelf: "stretch",
   },
   statIconContainer: {
     marginBottom: 8,
@@ -1378,6 +1415,10 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  ratingRowSmall: {
+    flexDirection: "column", // 👈 nhỏ thì chia 2 dòng
+    alignItems: "flex-start",
+  },
   ratingLeft: {
     flex: 1,
   },
@@ -1394,6 +1435,12 @@ const styles = StyleSheet.create({
   ratingScores: {
     flexDirection: "row",
     gap: 8,
+    flexWrap: "wrap", // 👈 tránh tràn trên màn nhỏ
+  },
+  ratingScoresSmall: {
+    marginTop: 8,
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
   },
   ratingScoreBadge: {
     backgroundColor: "#F3E5F5",
@@ -1462,3 +1509,4 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 });
+

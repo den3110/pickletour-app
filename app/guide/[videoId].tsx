@@ -6,8 +6,9 @@ import {
   ActivityIndicator,
   Text,
   useWindowDimensions,
+  TouchableOpacity,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { Ionicons } from "@expo/vector-icons";
@@ -36,7 +37,7 @@ function formatDate(d) {
 
 export default function GuideVideoScreen() {
   const { videoId, title, views, likes, published } = useLocalSearchParams();
-
+  const router = useRouter();
   const vid = Array.isArray(videoId) ? videoId[0] : videoId;
   const titleStr = Array.isArray(title) ? title[0] : title;
   const viewsStr = Array.isArray(views) ? views[0] : views;
@@ -101,6 +102,14 @@ export default function GuideVideoScreen() {
           title: titleStr || "Video hướng dẫn",
           headerTitleAlign: "center",
           // Landscape: ẩn header cho cảm giác fullscreen
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <Ionicons name="chevron-back" size={24} />
+            </TouchableOpacity>
+          ),
           headerShown: !isLandscape,
         }}
       />
