@@ -1635,6 +1635,22 @@ function TermsModal({
               • Áp dụng pháp luật Việt Nam; tranh chấp ưu tiên thương lượng, sau
               đó theo thẩm quyền.{"\n"}• Liên hệ: support@pickletour.vn
             </Text>
+            <Text
+              style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
+            >
+              12) Giải đấu & Giải thưởng
+            </Text>
+            <Text
+              style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
+            >
+              • Ứng dụng có thể hiển thị thông tin về giải đấu, phần thưởng
+              và/hoặc quà tặng do ban tổ chức giải cung cấp.{"\n"}• Apple Inc.
+              không phải là nhà tài trợ và không liên quan dưới bất kỳ hình thức
+              nào đến các giải đấu, cuộc thi hoặc chương trình khuyến mãi trong
+              ứng dụng PickleTour.{"\n"}• Apple is not a sponsor and is not
+              involved in any way with the contests or sweepstakes organized
+              through the PickleTour app.
+            </Text>
 
             <Text
               style={{
