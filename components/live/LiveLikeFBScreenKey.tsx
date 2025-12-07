@@ -1137,7 +1137,7 @@ export default function LiveLikeFBScreenKey({
 
   const { data: overlayConfig, isLoading: overlayConfigLoading } =
     useGetOverlayConfigQuery(overlayParams, {
-      skip: mode !== "live" || Platform.OS !== "android",
+      skip: mode !== "live",
       pollingInterval: 0,
       refetchOnMountOrArgChange: true,
     });
@@ -1257,7 +1257,7 @@ export default function LiveLikeFBScreenKey({
 
   const updateOverlayNow = useCallback(
     throttle(async (dataSource: any) => {
-      if (!dataSource || mode !== "live" || Platform.OS !== "android") return;
+      if (!dataSource || mode !== "live") return;
 
       if (LOG) {
         console.log("overlay data source", dataSource);
@@ -1383,7 +1383,8 @@ export default function LiveLikeFBScreenKey({
 
           isDefaultDesign: false,
           overlayEnabled: true,
-          webLogoUrl,
+          webLogoUrl:
+            "https://pickletour.vn/uploads/avatars/1765084294948-1764152220888-1762020439803-photo_2025-11-02_00-50-33-1-1764152220890.jpg",
           sponsorLogos,
 
           showClock: false,
@@ -1492,31 +1493,26 @@ export default function LiveLikeFBScreenKey({
       }
 
       // ✅ THÊM: Kiểm tra surface state trước
-      if (Platform.OS === "android") {
-        try {
-          const surfaceState = await Live.getSurfaceState?.();
-          log("startForMatch → surface state:", surfaceState);
+      try {
+        const surfaceState = await Live.getSurfaceState?.();
+        log("startForMatch → surface state:", surfaceState);
 
-          if (!surfaceState?.surfaceValid) {
-            setStatusText("Đang khởi động camera...");
+        if (!surfaceState?.surfaceValid) {
+          setStatusText("Đang khởi động camera...");
 
-            // Restart preview
-            startedPreviewRef.current = false;
-            await new Promise((r) => setTimeout(r, 500));
-            const previewOk = await startPreviewWithRetry();
+          // Restart preview
+          startedPreviewRef.current = false;
+          await new Promise((r) => setTimeout(r, 500));
+          const previewOk = await startPreviewWithRetry();
 
-            if (!previewOk) {
-              setStatusText("❌ Không thể khởi động camera");
-              Alert.alert(
-                "Lỗi",
-                "Không thể khởi động camera. Vui lòng thử lại."
-              );
-              return false;
-            }
+          if (!previewOk) {
+            setStatusText("❌ Không thể khởi động camera");
+            Alert.alert("Lỗi", "Không thể khởi động camera. Vui lòng thử lại.");
+            return false;
           }
-        } catch (e) {
-          log("startForMatch → getSurfaceState error (ignored):", e);
         }
+      } catch (e) {
+        log("startForMatch → getSurfaceState error (ignored):", e);
       }
 
       setStatusText("Sân đã có trận — chuẩn bị phát…");
@@ -1574,19 +1570,15 @@ export default function LiveLikeFBScreenKey({
           throw lastError || new Error("Failed to start stream");
         }
 
-        // ... rest of overlay setup code ...
+        try {
+          const fw = profile.width;
+          const fh = profile.height;
 
-        if (Platform.OS === "android") {
-          try {
-            const fw = profile.width;
-            const fh = profile.height;
-
-            await Live.overlayLoad("", fw, fh, "tl", 100, 100, 0, 0);
-            await Live.overlaySetVisible?.(true);
-            log("overlay → loaded (native)");
-          } catch (e) {
-            log("overlay → failed (native)", e);
-          }
+          await Live.overlayLoad("", fw, fh, "tl", 100, 100, 0, 0);
+          await Live.overlaySetVisible?.(true);
+          log("overlay → loaded (native)");
+        } catch (e) {
+          log("overlay → failed (native)", e);
         }
 
         lastUrlRef.current = rtmpUrl;

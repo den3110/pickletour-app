@@ -4,7 +4,7 @@ import {
   requireNativeComponent, 
   ViewStyle, 
   StyleSheet, 
-  Platform,
+  Platform, 
   UIManager 
 } from "react-native";
 
@@ -25,26 +25,33 @@ interface NativeCountdownOverlayProps {
   style?: ViewStyle;
 }
 
-// ✅ DÙNG CÙNG CACHED COMPONENT
 const COMPONENT_NAME = "CountdownOverlayView";
+
+// ✅ SỬA: Load component cho cả Android và iOS
 let NativeCountdownOverlay: any = null;
 
-if (Platform.OS === 'android') {
-  (UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
-  const _CachedCountdownOverlay =
-    (global as any).__CountdownOverlayView ||
-    requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-  (global as any).__CountdownOverlayView = _CachedCountdownOverlay;
-  NativeCountdownOverlay = _CachedCountdownOverlay;
+try {
+  // Android cần check config view manager
+  if (Platform.OS === 'android') {
+    if ((UIManager as any).getViewManagerConfig?.(COMPONENT_NAME)) {
+      NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+    }
+  } else {
+    // iOS cứ require thẳng, nếu native chưa link nó sẽ báo lỗi đỏ (dễ debug hơn là ẩn đi)
+    NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+  }
+} catch (e) {
+  console.warn("CountdownOverlayView not found:", e);
 }
 
 function GapWarningOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
+    // Delay nhỏ để đảm bảo view native đã mount xong trước khi start animation
     const timer = setTimeout(() => {
       setIsRunning(true);
-    }, 50);
+    }, 100);
     
     return () => {
       clearTimeout(timer);
@@ -52,7 +59,8 @@ function GapWarningOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) 
     };
   }, []);
 
-  if (Platform.OS !== 'android' || !NativeCountdownOverlay) {
+  // ✅ SỬA: Bỏ điều kiện chặn iOS
+  if (!NativeCountdownOverlay) {
     return null;
   }
 
