@@ -4,8 +4,6 @@ import {
   requireNativeComponent,
   ViewStyle,
   StyleSheet,
-  Platform,
-  UIManager,
 } from "react-native";
 
 type Props = {
@@ -25,22 +23,10 @@ interface NativeCountdownOverlayProps {
 }
 
 const COMPONENT_NAME = "CountdownOverlayView";
-let NativeCountdownOverlay: any = null;
 
-// ✅ FIX 1: Load native component cho cả Android và iOS
-try {
-  if (Platform.OS === "android") {
-    // Android cần check ViewManagerConfig để tránh crash nếu module chưa link
-    if ((UIManager as any).getViewManagerConfig?.(COMPONENT_NAME)) {
-      NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-    }
-  } else {
-    // iOS: require trực tiếp
-    NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-  }
-} catch (e) {
-  console.warn("CountdownOverlayView not found:", e);
-}
+// 👉 Không check UIManager, không try/catch, không fallback RN
+const NativeCountdownOverlay =
+  requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
 
 function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   const onDoneRef = useRef(onDone);
@@ -59,12 +45,6 @@ function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
     };
   }, []);
 
-  // ✅ FIX 2: Bỏ điều kiện chặn iOS. Chỉ return null nếu không tìm thấy Native Module.
-  if (!NativeCountdownOverlay) {
-    return null;
-  }
-
-  // Wrapper callbacks để đảm bảo an toàn khi component unmount
   const handleDone = () => {
     if (!mountedRef.current) return;
     onDoneRef.current();

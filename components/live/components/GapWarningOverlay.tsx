@@ -1,11 +1,9 @@
-// components/GapWarningOverlay.tsx (Hoặc StoppingOverlay.tsx)
-import React from "react";
-import { 
-  requireNativeComponent, 
-  ViewStyle, 
-  StyleSheet, 
-  Platform, 
-  UIManager 
+// components/GapWarningOverlay.tsx
+import React, { useRef, useEffect } from "react";
+import {
+  requireNativeComponent,
+  ViewStyle,
+  StyleSheet,
 } from "react-native";
 
 type Props = {
@@ -15,7 +13,6 @@ type Props = {
   onCancel: () => void;
 };
 
-// Interface bỏ isRunning
 interface NativeCountdownOverlayProps {
   mode: "stopping" | "gap";
   durationMs: number;
@@ -26,32 +23,43 @@ interface NativeCountdownOverlayProps {
 }
 
 const COMPONENT_NAME = "CountdownOverlayView";
-let NativeCountdownOverlay: any = null;
+const NativeCountdownOverlay =
+  requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
 
-try {
-  if (Platform.OS === 'android') {
-    if ((UIManager as any).getViewManagerConfig?.(COMPONENT_NAME)) {
-      NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-    }
-  } else {
-    // iOS
-    NativeCountdownOverlay = requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-  }
-} catch (e) {
-  console.warn("CountdownOverlayView not found:", e);
-}
-
-// ✅ Component gọn nhẹ, Native tự chạy khi render
 function GapWarningOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
-  if (!NativeCountdownOverlay) return null;
+  const onDoneRef = useRef(onDone);
+  const onCancelRef = useRef(onCancel);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+    onCancelRef.current = onCancel;
+  }, [onDone, onCancel]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const handleDone = () => {
+    if (!mountedRef.current) return;
+    onDoneRef.current();
+  };
+
+  const handleCancel = () => {
+    if (!mountedRef.current) return;
+    onCancelRef.current();
+  };
 
   return (
     <NativeCountdownOverlay
-      mode="gap" // hoặc "stopping" bên file kia
+      mode="gap"
       durationMs={durationMs}
       safeBottom={safeBottom}
-      onDone={onDone}
-      onCancel={onCancel}
+      onDone={handleDone}
+      onCancel={handleCancel}
       style={styles.overlay}
     />
   );
