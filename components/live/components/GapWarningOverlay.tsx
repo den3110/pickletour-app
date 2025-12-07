@@ -1,9 +1,11 @@
 // components/GapWarningOverlay.tsx
-import React, { useRef, useEffect } from "react";
-import {
-  requireNativeComponent,
-  ViewStyle,
-  StyleSheet,
+import React, { useEffect, useState } from "react";
+import { 
+  requireNativeComponent, 
+  ViewStyle, 
+  StyleSheet, 
+  Platform,
+  UIManager 
 } from "react-native";
 
 type Props = {
@@ -17,49 +19,51 @@ interface NativeCountdownOverlayProps {
   mode: "stopping" | "gap";
   durationMs: number;
   safeBottom: number;
+  isRunning: boolean;
   onDone: () => void;
   onCancel: () => void;
   style?: ViewStyle;
 }
 
+// ✅ DÙNG CÙNG CACHED COMPONENT
 const COMPONENT_NAME = "CountdownOverlayView";
-const NativeCountdownOverlay =
-  requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+let NativeCountdownOverlay: any = null;
+
+if (Platform.OS === 'android') {
+  (UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
+  const _CachedCountdownOverlay =
+    (global as any).__CountdownOverlayView ||
+    requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+  (global as any).__CountdownOverlayView = _CachedCountdownOverlay;
+  NativeCountdownOverlay = _CachedCountdownOverlay;
+}
 
 function GapWarningOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
-  const onDoneRef = useRef(onDone);
-  const onCancelRef = useRef(onCancel);
-  const mountedRef = useRef(false);
+  const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => {
-    onDoneRef.current = onDone;
-    onCancelRef.current = onCancel;
-  }, [onDone, onCancel]);
-
-  useEffect(() => {
-    mountedRef.current = true;
+    const timer = setTimeout(() => {
+      setIsRunning(true);
+    }, 50);
+    
     return () => {
-      mountedRef.current = false;
+      clearTimeout(timer);
+      setIsRunning(false);
     };
   }, []);
 
-  const handleDone = () => {
-    if (!mountedRef.current) return;
-    onDoneRef.current();
-  };
-
-  const handleCancel = () => {
-    if (!mountedRef.current) return;
-    onCancelRef.current();
-  };
+  if (!NativeCountdownOverlay) {
+    return null;
+  }
 
   return (
     <NativeCountdownOverlay
       mode="gap"
       durationMs={durationMs}
       safeBottom={safeBottom}
-      onDone={handleDone}
-      onCancel={handleCancel}
+      isRunning={isRunning}
+      onDone={onDone}
+      onCancel={onCancel}
       style={styles.overlay}
     />
   );

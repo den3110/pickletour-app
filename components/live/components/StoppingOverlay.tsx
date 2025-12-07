@@ -4,6 +4,8 @@ import {
   requireNativeComponent,
   ViewStyle,
   StyleSheet,
+  Platform,
+  UIManager,
 } from "react-native";
 
 type Props = {
@@ -23,10 +25,16 @@ interface NativeCountdownOverlayProps {
 }
 
 const COMPONENT_NAME = "CountdownOverlayView";
+let NativeCountdownOverlay: any = null;
 
-// 👉 Không check UIManager, không try/catch, không fallback RN
-const NativeCountdownOverlay =
-  requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+if (Platform.OS === "android") {
+  (UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
+  const _CachedCountdownOverlay =
+    (global as any).__CountdownOverlayView ||
+    requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+  (global as any).__CountdownOverlayView = _CachedCountdownOverlay;
+  NativeCountdownOverlay = _CachedCountdownOverlay;
+}
 
 function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   const onDoneRef = useRef(onDone);
@@ -39,19 +47,30 @@ function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   }, [onDone, onCancel]);
 
   useEffect(() => {
+    // ✅ Log để debug
     mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
+  if (!NativeCountdownOverlay) {
+    return null;
+  }
+
+  // ✅ Wrapper callbacks để đảm bảo chỉ gọi 1 lần
   const handleDone = () => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) {
+      return;
+    }
     onDoneRef.current();
   };
 
   const handleCancel = () => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) {
+      return;
+    }
     onCancelRef.current();
   };
 
