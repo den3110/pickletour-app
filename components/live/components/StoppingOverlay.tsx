@@ -27,14 +27,12 @@ interface NativeCountdownOverlayProps {
 const COMPONENT_NAME = "CountdownOverlayView";
 let NativeCountdownOverlay: any = null;
 
-if (Platform.OS === "android") {
-  (UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
-  const _CachedCountdownOverlay =
-    (global as any).__CountdownOverlayView ||
-    requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
-  (global as any).__CountdownOverlayView = _CachedCountdownOverlay;
-  NativeCountdownOverlay = _CachedCountdownOverlay;
-}
+(UIManager as any).getViewManagerConfig?.(COMPONENT_NAME);
+const _CachedCountdownOverlay =
+  (global as any).__CountdownOverlayView ||
+  requireNativeComponent<NativeCountdownOverlayProps>(COMPONENT_NAME);
+(global as any).__CountdownOverlayView = _CachedCountdownOverlay;
+NativeCountdownOverlay = _CachedCountdownOverlay;
 
 function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   const onDoneRef = useRef(onDone);
