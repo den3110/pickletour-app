@@ -2290,7 +2290,7 @@ export default function LiveLikeFBScreenKey({
         )}
 
         {/* BOTTOM CONTROL BAR */}
-        {(mode === "live" || mode === "stopping") && (
+        {(mode === "live") && (
           <View
             style={[
               styles.liveBottomBar,

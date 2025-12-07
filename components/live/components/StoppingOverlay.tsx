@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
   UIManager,
+  View,
 } from "react-native";
 
 type Props = {
@@ -73,14 +74,27 @@ function StoppingOverlay({ durationMs, safeBottom, onDone, onCancel }: Props) {
   };
 
   return (
-    <NativeCountdownOverlay
-      mode="stopping"
-      durationMs={durationMs}
-      safeBottom={safeBottom}
-      onDone={handleDone}
-      onCancel={handleCancel}
-      style={styles.overlay}
-    />
+    <View
+      style={[
+        StyleSheet.absoluteFillObject,
+        {
+          // ✅ luôn nổi lên trên mọi thứ khác
+          zIndex: 9999,
+          elevation: Platform.OS === "android" ? 9999 : 0,
+        },
+      ]}
+      // ✅ RẤT QUAN TRỌNG: phải cho phép nhận touch
+      pointerEvents="auto"
+    >
+      <NativeCountdownOverlay
+        mode="stopping"
+        durationMs={durationMs}
+        safeBottom={safeBottom}
+        onDone={handleDone}
+        onCancel={handleCancel}
+        style={styles.overlay}
+      />
+    </View>
   );
 }
 
