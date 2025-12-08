@@ -4,10 +4,11 @@ import { TouchableOpacity } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import LiveUserMatchScreen from "@/components/live/match/live";
 
 // ✅ Đổi path này cho khớp với chỗ bạn đang để file LiveLikeFBScreenKey
 
-export default function LiveUserMatchScreen() {
+export default function UserMatchLive() {
   const theme = useTheme();
   const { id } = useLocalSearchParams();
 
@@ -25,9 +26,7 @@ export default function LiveUserMatchScreen() {
         matchId={matchId}
         bid={matchId}
         // user match không gắn sân → để courtId rỗng để skip polling theo sân
-        courtId=""
-        // user match: không auto bám theo court BE
-        autoOnLive={false}
+        autoOnLive={true}
         // khi end live → quay về list user match
         tournamentHref="/matches/stack"
         homeHref="/"
