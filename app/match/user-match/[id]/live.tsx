@@ -20,7 +20,20 @@ export default function LiveUserMatchScreen() {
   return (
     <>
       {/* ✅ Bọc lại màn live gốc */}
-      
+      <LiveUserMatchScreen
+        // tạm dùng matchId làm tid/bid cho dễ debug (nếu bên trong có log)
+        matchId={matchId}
+        bid={matchId}
+        // user match không gắn sân → để courtId rỗng để skip polling theo sân
+        courtId=""
+        // user match: không auto bám theo court BE
+        autoOnLive={false}
+        // khi end live → quay về list user match
+        tournamentHref="/matches/stack"
+        homeHref="/"
+        onFinishedGoToTournament={() => router.push("/matches/stack")}
+        onFinishedGoHome={() => router.push("/")}
+      />
     </>
   );
 }
