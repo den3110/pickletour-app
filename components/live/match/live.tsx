@@ -53,9 +53,19 @@ const RtmpPreviewView =
 (global as any).__RtmpPreviewView = RtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-const LiveTimerView = requireNativeComponent<{ startTimeMs: number }>(
-  "LiveTimerView"
-);
+// ✅ Import Native Timer View (có cache, tránh register 2 lần)
+const TIMER_COMPONENT_NAME = "LiveTimerView";
+
+// Gọi trước để RN load view config (không bắt buộc nhưng an toàn)
+(UIManager as any).getViewManagerConfig?.(TIMER_COMPONENT_NAME);
+
+const _CachedLiveTimerView =
+  (global as any).__LiveTimerView ||
+  requireNativeComponent<{ startTimeMs: number }>(TIMER_COMPONENT_NAME);
+
+(global as any).__LiveTimerView = _CachedLiveTimerView;
+
+const LiveTimerView = _CachedLiveTimerView;
 
 /* ====== HELPER: Extract Config ====== */
 const extractLiveConfig = (liveData: any) => {
