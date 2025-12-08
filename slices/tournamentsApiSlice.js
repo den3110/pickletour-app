@@ -744,6 +744,22 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
         body: { ids, video },
       }),
     }),
+
+    // ✅ 2. Thêm Mutation Update Match
+    updateMatch: builder.mutation({
+      // Nhận vào object: { matchId, bestOf, pointsToWin, ... }
+      query: ({ matchId, ...body }) => ({
+        url: `/api/matches/${matchId}/update`, // Endpoint API (VD: /matches/123)
+        method: 'PATCH', // Dùng PATCH (cập nhật 1 phần) hoặc PUT tuỳ backend của bạn
+        body: body,      // Phần dữ liệu cấu hình (rules, timeout...)
+      }),
+      
+      // ✅ Quan trọng: Báo cho Redux biết dữ liệu của matchId này đã cũ -> tự động fetch lại getMatch
+      invalidatesTags: (result, error, { matchId }) => [
+        { type: 'Match', id: matchId }
+      ],
+    }),
+
   }),
 });
 
@@ -812,4 +828,5 @@ export const {
   useVerifyManagerQuery,
   useRefereeSetBreakMutation,
   useAdminBatchSetMatchLiveUrlMutation,
+  useUpdateMatchMutation
 } = tournamentsApiSlice;

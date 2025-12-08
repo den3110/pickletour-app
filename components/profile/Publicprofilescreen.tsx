@@ -331,10 +331,7 @@ const RatingHistoryRow = ({ item, prevItem }) => {
         </Text>
       </View>
       <View
-        style={[
-          styles.ratingScores,
-          isSmallDevice && styles.ratingScoresSmall,
-        ]}
+        style={[styles.ratingScores, isSmallDevice && styles.ratingScoresSmall]}
       >
         <View style={styles.ratingScoreBadge}>
           <Text style={styles.ratingScoreLabel}>Đơn</Text>
@@ -397,6 +394,171 @@ const InfoItem = ({ label, value, copyable, onCopy }) => {
         )}
       </View>
     </View>
+  );
+};
+
+/* ---------- SKELETON COMPONENTS ---------- */
+const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
+  const animatedValue = React.useRef(new Animated.Value(0.3)).current;
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [animatedValue]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: "#E1E9EE",
+          opacity: animatedValue,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+const ProfileSkeleton = () => {
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header Skeleton */}
+      <View
+        style={{ height: HEADER_HEIGHT, alignItems: "center", paddingTop: 60 }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "100%",
+            backgroundColor: "#D1D5DB", // Giả lập màu nền gradient tối hơn chút
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+          }}
+        />
+
+        {/* Avatar Placeholder */}
+        <View style={{ marginBottom: 12, alignItems: "center" }}>
+          <SkeletonItem
+            width={AVATAR_SIZE}
+            height={AVATAR_SIZE}
+            borderRadius={AVATAR_SIZE / 2}
+            style={{ borderWidth: 4, borderColor: "white" }}
+          />
+        </View>
+
+        {/* Name & Info Placeholder */}
+        <SkeletonItem
+          width={200}
+          height={28}
+          borderRadius={8}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonItem
+          width={120}
+          height={20}
+          borderRadius={16}
+          style={{ marginBottom: 16 }}
+        />
+
+        {/* Badges */}
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <SkeletonItem width={80} height={24} borderRadius={16} />
+          <SkeletonItem width={60} height={24} borderRadius={16} />
+        </View>
+      </View>
+
+      {/* Body Content */}
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20 }}>
+        {/* Stats Cards Skeleton */}
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
+          {[1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                height: 100,
+                backgroundColor: "#FFF",
+                borderRadius: 16,
+                padding: 10,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <SkeletonItem
+                width={30}
+                height={30}
+                borderRadius={15}
+                style={{ marginBottom: 8 }}
+              />
+              <SkeletonItem width={40} height={20} borderRadius={4} />
+            </View>
+          ))}
+        </View>
+
+        {/* Tabs Skeleton */}
+        <View
+          style={{
+            flexDirection: "row",
+            marginBottom: 20,
+            backgroundColor: "#FFF",
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          <View
+            style={{
+              flex: 1,
+              height: 36,
+              backgroundColor: "#E0E0E0",
+              borderRadius: 8,
+              marginRight: 4,
+            }}
+          />
+          <View style={{ flex: 1, height: 36 }} />
+          <View style={{ flex: 1, height: 36 }} />
+        </View>
+
+        {/* List Items Skeleton (Mô phỏng info item) */}
+        <View
+          style={{
+            gap: 16,
+            backgroundColor: "#FFF",
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <View
+              key={i}
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <SkeletonItem width={80} height={16} />
+              <SkeletonItem width={120} height={16} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -530,15 +692,9 @@ export default function PublicProfileScreen() {
   });
 
   if (baseQ.isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Đang tải...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <ProfileSkeleton />;
   }
-
+  
   if (baseQ.error) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1509,4 +1665,3 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 });
-

@@ -13,10 +13,11 @@ import {
   FlatList,
   Dimensions,
   DeviceEventEmitter,
+  Easing,
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import Hero from "@/components/Hero";
 import {
   AntDesign,
@@ -32,15 +33,13 @@ import { useGetNewsQuery } from "@/slices/newsApiSlice";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
-import { useGetFeaturedLeaderboardQuery } from "@/slices/leaderboardApiSlice";
-import { useDispatch } from "react-redux";
 import { useReauthQuery } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import ImageViewing from "react-native-image-viewing";
-import TestNotificationButton from "@/tests/TestNotifcation";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
+
 /* ---------- Lottie asset ---------- */
 const BG_3D = require("@/assets/lottie/bg-3d.json");
 
@@ -48,7 +47,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.8;
 const CARD_MARGIN = 16;
 
-/* ---------- Fallback ---------- */
+/* ---------- Fallback Data ---------- */
 const FALLBACK = {
   address: "Abcd, abcd, abcd",
   phone: "012345678",
@@ -56,9 +55,6 @@ const FALLBACK = {
   support: {
     generalEmail: "support@pickletour.vn",
     generalPhone: "0123456789",
-    scoringEmail: "support@pickletour.vn",
-    scoringPhone: "0123456789",
-    salesEmail: "support@pickletour.vn",
   },
   socials: {
     facebook: "https://facebook.com",
@@ -95,11 +91,11 @@ const FEATURES = [
   },
   {
     id: 4,
-    icon: "school", // 🔁 đổi icon cho hợp “Hướng dẫn”
+    icon: "school",
     iconLib: "Ionicons",
-    title: "Hướng dẫn", // 🔁 đổi tiêu đề
+    title: "Hướng dẫn",
     color: "#FFA502",
-    link: "/guide", // 🔁 trỏ sang màn mới
+    link: "/guide",
   },
   {
     id: 5,
@@ -111,63 +107,35 @@ const FEATURES = [
   },
   {
     id: 6,
-    icon: "videocam", // 🔧 Đổi icon cho Live
+    icon: "videocam",
     iconLib: "Ionicons",
-    title: "Live", // 🔧 Đổi từ "Video" thành "Live"
+    title: "Live",
     color: "#FD79A8",
     link: "/live/home",
   },
   {
     id: 7,
-    icon: "calculator", // 🔧 Icon cho chấm điểm
+    icon: "calculator",
     iconLib: "Ionicons",
-    title: "Chấm trình", // 🔧 Đổi từ "Địa điểm" thành "Chấm điểm"
+    title: "Chấm trình",
     color: "#00B894",
     link: "/levelpoint",
   },
   {
     id: 8,
-    icon: "people-circle", // 🔧 Icon cho câu lạc bộ
+    icon: "people-circle",
     iconLib: "Ionicons",
-    title: "Câu lạc bộ", // 🔧 Đổi từ "Vé tham gia" thành "Câu lạc bộ"
+    title: "Câu lạc bộ",
     color: "#FDCB6E",
     link: "/clubs",
   },
-  // 🆕 Nút Trận đấu
   {
     id: 9,
-    icon: "tennisball", // hoặc "tennisball-outline" nếu bạn thích
+    icon: "tennisball",
     iconLib: "Ionicons",
     title: "Trận đấu",
     color: "#74B9FF",
-    link: "/match/stack", // đổi lại đúng route màn trận đấu của bạn
-  },
-];
-/* ---------- Mock Leaderboard Data ---------- */
-const LEADERBOARD_DATA = [
-  {
-    id: 1,
-    rank: 1,
-    name: "Nguyễn Văn A",
-    avatar: "https://i.pravatar.cc/150?img=12",
-    achievement: "🏆 Vô địch MB D-Joy Tour 2025",
-    tier: "gold",
-  },
-  {
-    id: 2,
-    rank: 2,
-    name: "Trần Thị B",
-    avatar: "https://i.pravatar.cc/150?img=45",
-    achievement: "🥈 Á quân Vietnam Masters",
-    tier: "silver",
-  },
-  {
-    id: 3,
-    rank: 3,
-    name: "Lê Văn C",
-    avatar: "https://i.pravatar.cc/150?img=33",
-    achievement: "🥉 Hạng 3 PPA Vietnam Cup",
-    tier: "bronze",
+    link: "/match/stack",
   },
 ];
 
@@ -198,10 +166,7 @@ function LinkText({ text, url, tint }) {
   if (!text) return <Text style={{ color: "#9aa0a6" }}>—</Text>;
   return (
     <Text
-      style={{
-        color: tint,
-        fontWeight: Platform.select({ ios: "600", android: "700" }),
-      }}
+      style={{ color: tint, fontWeight: "700" }}
       onPress={() => openURL(url)}
       suppressHighlighting
     >
@@ -213,23 +178,29 @@ function LinkText({ text, url, tint }) {
 function InfoRow({ icon, label, children, color }) {
   return (
     <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        marginVertical: 8,
-      }}
+      style={{ flexDirection: "row", alignItems: "center", marginVertical: 8 }}
     >
-      <View style={{ width: 32, alignItems: "center", marginRight: 10 }}>
+      <View style={{ width: 36, alignItems: "center", marginRight: 12 }}>
         {icon}
       </View>
       <View style={{ flex: 1 }}>
         <Text
-          style={{ fontWeight: "700", fontSize: 14, color, marginBottom: 4 }}
+          style={{
+            fontWeight: "700",
+            fontSize: 13,
+            color,
+            marginBottom: 2,
+            opacity: 0.7,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          }}
         >
           {label}
         </Text>
         {typeof children === "string" ? (
-          <Text style={{ fontSize: 15, color }}>{children}</Text>
+          <Text style={{ fontSize: 16, color, fontWeight: "500" }}>
+            {children}
+          </Text>
         ) : (
           children
         )}
@@ -241,21 +212,20 @@ function InfoRow({ icon, label, children, color }) {
 function SocialButton({ onPress, children, bg }) {
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.8}
       onPress={onPress}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       style={{
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        width: 50,
+        height: 50,
+        borderRadius: 16,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: bg,
-        shadowColor: "#000",
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
+        shadowColor: bg,
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 6,
       }}
     >
       {children}
@@ -265,42 +235,84 @@ function SocialButton({ onPress, children, bg }) {
 
 const ZALO_SRC = require("@/assets/images/icon-zalo.png");
 
-/* ---------- 🆕 Animated Gradient Button Component ---------- */
-function AnimatedGradientButton({ onPress, children, colors, style }) {
-  const animatedValue = useRef(new Animated.Value(0)).current;
+/* ---------- 🆕 ANIMATION WRAPPER (Fade In Up) ---------- */
+// Thành phần giúp các section xuất hiện mượt mà
+function FadeInSection({ delay = 0, children }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        delay,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        delay,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
   }, []);
 
-  const interpolatedColors = animatedValue.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [colors[0], colors[1], colors[0]],
-  });
+  return (
+    <Animated.View
+      style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ---------- 🆕 PRO Animated Button Component ---------- */
+function ProButton({ onPress, children, colors, style, icon }) {
+  const scaleVal = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scaleVal, { toValue: 0.96, useNativeDriver: true }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scaleVal, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={1}
       onPress={onPress}
-      style={[styles.registerButtonWrapper, style]}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[styles.proButtonContainer, style]}
     >
       <Animated.View
-        style={[styles.registerButton, { backgroundColor: interpolatedColors }]}
+        style={{ transform: [{ scale: scaleVal }], width: "100%" }}
       >
-        {children}
+        <LinearGradient
+          colors={colors || ["#FF6B6B", "#FF8E53"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.proButtonGradient}
+        >
+          <LinearGradient
+            colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 0.5 }}
+            style={styles.proButtonGloss}
+          />
+          <View style={styles.proButtonContent}>
+            {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
+            {children}
+          </View>
+        </LinearGradient>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -309,48 +321,26 @@ function AnimatedGradientButton({ onPress, children, colors, style }) {
 /* ---------- 🆕 Animated Status Chip ---------- */
 function AnimatedStatusChip() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(1)).current;
-
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.parallel([
-          Animated.timing(scaleAnim, {
-            toValue: 1.05,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacityAnim, {
-            toValue: 0.8,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacityAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ]),
+        Animated.timing(scaleAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
       ])
     ).start();
   }, []);
 
   return (
     <Animated.View
-      style={[
-        styles.statusBadgeOnImage,
-        {
-          transform: [{ scale: scaleAnim }],
-          opacity: opacityAnim,
-        },
-      ]}
+      style={[styles.statusBadgeOnImage, { transform: [{ scale: scaleAnim }] }]}
     >
       <LinearGradient
         colors={["#4ECDC4", "#45B7D1"]}
@@ -369,7 +359,6 @@ function AnimatedStatusChip() {
 function AnimatedLogo() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -385,34 +374,14 @@ function AnimatedLogo() {
         useNativeDriver: true,
       }),
     ]).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: 0,
-          duration: 3000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
-
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["-2deg", "2deg"],
-  });
 
   return (
     <Animated.View
       style={{
         opacity: fadeAnim,
-        transform: [{ scale: scaleAnim }, { rotate }],
-        marginBottom: 12,
+        transform: [{ scale: scaleAnim }],
+        marginBottom: 16,
       }}
     >
       <LinearGradient
@@ -423,28 +392,20 @@ function AnimatedLogo() {
       >
         <Text style={styles.logoText}>PickleTour</Text>
       </LinearGradient>
-
-      <View style={styles.logoGlow}>
-        <Text style={[styles.logoText, { color: "transparent" }]}>
-          PickleTour
-        </Text>
-      </View>
     </Animated.View>
   );
 }
 
-/* ---------- Athlete Island Card với thông tin thật ---------- */
+/* ---------- Athlete Island Card ---------- */
 function AthleteIsland() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
-  const goProfile = React.useCallback(() => {
-    router.push("/profile/stack");
-  }, []);
+  const goProfile = React.useCallback(() => router.push("/profile/stack"), []);
 
-  const rankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null; // CHANGED: dùng rankNo
-
-  let rankDisplay = "";
-  let rankIcon = "emoji-events";
-  let rankColor = "#FFD700";
+  // Logic Rank & Role
+  const rankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null;
+  let rankDisplay = "Chưa xếp hạng",
+    rankIcon = "star-border",
+    rankColor = "#9AA0A6";
 
   if (Number.isFinite(rankNo)) {
     if (rankNo <= 100) {
@@ -456,16 +417,8 @@ function AthleteIsland() {
       rankIcon = "military-tech";
       rankColor = "#FFA502";
     }
-  } else {
-    rankDisplay = "Chưa xếp hạng";
-    rankIcon = "star-border";
-    rankColor = "#9AA0A6";
   }
 
-  const avatarUrl =
-    normalizeUrl(userInfo?.avatar) || "https://i.pravatar.cc/150?img=12";
-  const name = userInfo?.name || "Người dùng";
-  // console.log(userInfo?.role);
   const roleUser = () => {
     switch (userInfo?.role) {
       case "user":
@@ -478,152 +431,148 @@ function AthleteIsland() {
         return "Khách";
     }
   };
-  // 🆕 Trường hợp chưa đăng nhập
-  if (!userInfo) {
-    return (
-      <View style={styles.islandContainer}>
-        <AnimatedLogo />
 
-        <View style={styles.athleteIsland}>
-          <View style={styles.avatarContainer}>
-            {/* Lottie avatar placeholder */}
-            <LottieView
-              source={require("@/assets/lottie/humans.json")}
-              autoPlay
-              loop
-              style={styles.avatar}
-              speed={0.4}
-            />
-          </View>
+  const avatarUrl =
+    normalizeUrl(userInfo?.avatar) || "https://i.pravatar.cc/150?img=12";
+  const name = userInfo?.name || "Người dùng";
 
-          <View style={styles.nameContainer}>
-            <Text style={styles.athleteName}>Bắt đầu hành trình</Text>
-            <Text style={styles.athleteTitle}>Cùng PickleTour</Text>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push("/login")}
-            style={styles.loginButton}
-          >
-            <LinearGradient
-              colors={["#4ECDC4", "#45B7D1"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.loginButtonGradient}
-            >
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  // Render
   return (
     <View style={styles.islandContainer}>
       <AnimatedLogo />
 
-      <View style={styles.athleteIsland}>
-        {/* Avatar -> Profile */}
+      {/* Premium Island Card with Drop Shadow */}
+      <View style={styles.athleteIslandWrapper}>
         <TouchableOpacity
-          style={styles.avatarContainer}
-          activeOpacity={0.85}
-          onPress={goProfile}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.9}
+          onPress={userInfo ? goProfile : () => router.push("/login")}
+          style={styles.athleteIslandContent}
         >
-          <Image
-            source={{ uri: normalizeUrl(avatarUrl) }}
-            style={styles.avatar}
-            contentFit="cover"
-            transition={200}
-          />
-          <View style={styles.avatarBorder} />
+          {/* Left: Avatar */}
+          <View style={styles.avatarContainer}>
+            {!userInfo ? (
+              <LottieView
+                source={require("@/assets/lottie/humans.json")}
+                autoPlay
+                loop
+                style={styles.avatar}
+                speed={0.4}
+              />
+            ) : (
+              <Image
+                source={{ uri: normalizeUrl(avatarUrl) }}
+                style={styles.avatar}
+                contentFit="cover"
+                transition={500}
+              />
+            )}
+            {userInfo && (
+              <View style={[styles.avatarBorder, { borderColor: rankColor }]} />
+            )}
+          </View>
+
+          {/* Center: Info */}
+          <View style={styles.nameContainer}>
+            <Text style={styles.athleteName} numberOfLines={1}>
+              {userInfo ? name : "Bắt đầu hành trình"}
+            </Text>
+            <Text style={styles.athleteTitle}>
+              {userInfo ? roleUser() : "Cùng PickleTour"}
+            </Text>
+          </View>
+
+          {/* Right: Action or Rank */}
+          {userInfo ? (
+            <LinearGradient
+              colors={[rankColor, "#FF8E53"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.rankBadge}
+            >
+              <MaterialIcons name={rankIcon} size={14} color="#FFFFFF" />
+              <Text style={styles.rankText}>{rankDisplay}</Text>
+            </LinearGradient>
+          ) : (
+            <LinearGradient
+              colors={["#4ECDC4", "#45B7D1"]}
+              style={styles.loginBadge}
+            >
+              <Text style={styles.loginButtonText}>Đăng nhập</Text>
+            </LinearGradient>
+          )}
         </TouchableOpacity>
-
-        {/* Tên -> Profile */}
-        <TouchableOpacity
-          style={styles.nameContainer}
-          activeOpacity={0.85}
-          onPress={goProfile}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.athleteName} numberOfLines={1}>
-            {name}
-          </Text>
-
-          <Text style={styles.athleteTitle}>{roleUser()}</Text>
-        </TouchableOpacity>
-
-        <LinearGradient
-          colors={[rankColor, rankColor === "#FFD700" ? "#FFA500" : "#FF6B6B"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.rankBadge}
-        >
-          <MaterialIcons name={rankIcon} size={16} color="#FFFFFF" />
-          <Text style={styles.rankText}>{rankDisplay}</Text>
-        </LinearGradient>
       </View>
     </View>
   );
 }
 
-/* ---------- Feature Item - Fixed alignment ---------- */
+/* ---------- Feature Item (Interactive) ---------- */
 function FeatureItem({ item, theme }) {
   const isDark = !!theme?.dark;
   const bg = theme?.colors?.card ?? (isDark ? "#14171c" : "#ffffff");
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const scaleVal = useRef(new Animated.Value(1)).current;
+
   const handlePress = () => {
     if (!item.link) return;
-
     if (typeof item.link === "string") {
-      // External link
-      if (item.link.startsWith("http")) {
-        openURL(item.link);
-        return;
-      }
-
-      // Internal route
-      if (item.link.startsWith("/")) {
-        router.push(item.link);
-        return;
-      }
+      item.link.startsWith("http")
+        ? openURL(item.link)
+        : router.push(item.link);
     }
   };
-  const renderIcon = () => {
-    const iconProps = { name: item.icon, size: 28, color: item.color };
 
-    switch (item.iconLib) {
-      case "Ionicons":
-        return <Ionicons {...iconProps} />;
-      case "MaterialIcons":
-        return <MaterialIcons {...iconProps} />;
-      case "FontAwesome":
-        return <FontAwesome {...iconProps} />;
-      case "FontAwesome5":
-        return <FontAwesome5 {...iconProps} />;
-      default:
-        return <Ionicons {...iconProps} />;
-    }
+  const onPressIn = () =>
+    Animated.spring(scaleVal, { toValue: 0.9, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.spring(scaleVal, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+
+  const renderIcon = () => {
+    const iconProps = { name: item.icon, size: 26, color: item.color };
+    const Lib =
+      { Ionicons, MaterialIcons, FontAwesome, FontAwesome5 }[item.iconLib] ||
+      Ionicons;
+    return <Lib {...iconProps} />;
   };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={1}
       onPress={handlePress}
-      style={[styles.featureItem, { backgroundColor: bg }]}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={{ width: "22%", marginBottom: 16 }}
     >
-      <View
-        style={[
-          styles.featureIconWrapper,
-          { backgroundColor: `${item.color}15` },
-        ]}
+      <Animated.View
+        style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
       >
-        {renderIcon()}
-      </View>
-      <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
-        {item.title}
-      </Text>
+        <View
+          style={[
+            styles.featureIconContainer,
+            {
+              backgroundColor: isDark ? "#1F2229" : "#FFF",
+              shadowColor: item.color,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.featureIconBg,
+              { backgroundColor: item.color + "15" },
+            ]}
+          >
+            {renderIcon()}
+          </View>
+        </View>
+        <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
+          {item.title}
+        </Text>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -633,35 +582,12 @@ function FeaturesGrid() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const { triggerMaybeAsk, openTest, RatingPrompt } = useRatingPrompt({
-    onNeedFeedback: () => {
-      // sau này bạn có thể mở màn góp ý
-      // router.push("/feedback");
-      console.log("User chọn Không ổn lắm -> mở màn góp ý");
-    },
-  });
+
   return (
     <View style={styles.featuresContainer}>
       <Text style={[styles.sectionTitle, { color: text }]}>
         Tính năng PickleTour
       </Text>
-      {/* {__DEV__ && (
-        <TouchableOpacity
-          style={{
-            marginTop: 16,
-            paddingVertical: 10,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: "#4B5563",
-            alignItems: "center",
-          }}
-          onPress={openTest}
-        >
-          <Text style={{ color: "#E5E7EB" }}>Test popup đánh giá (DEV)</Text>
-        </TouchableOpacity>
-      )}
-      {RatingPrompt} */}
-      {/* {__DEV__ && <TestNotificationButton />} */}
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />
@@ -678,14 +604,7 @@ function TournamentCard({ tournament, theme }) {
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const subtext = isDark ? "#b0b0b0" : "#666666";
   const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
-
-  // 🔹 Nền cho image viewer theo theme
-  const viewerBackground = isDark
-    ? "rgba(0,0,0,0.98)"
-    : "rgba(255,255,255,0.98)";
-
   const [imageVisible, setImageVisible] = useState(false);
-
   const imageUri =
     normalizeUrl(tournament.image) ||
     "https://dummyimage.com/600x400/4ECDC4/ffffff&text=Tournament";
@@ -697,28 +616,25 @@ function TournamentCard({ tournament, theme }) {
         { backgroundColor: bg, borderColor: border },
       ]}
     >
-      {/* ... phần card y như cũ ... */}
-      {/* Phần image: bấm vào chỉ mở viewer, KHÔNG điều hướng */}
       <View style={styles.tournamentImageContainer}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setImageVisible(true)}
         >
           <Image
-            source={{ uri: imageUri }}
+            source={{ uri: normalizeUrl(imageUri) }}
             style={styles.tournamentImage}
             contentFit="cover"
-            transition={200}
+            transition={500}
           />
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.7)"]}
+            colors={["transparent", "rgba(0,0,0,0.6)"]}
             style={styles.tournamentImageGradient}
           />
           <AnimatedStatusChip />
         </TouchableOpacity>
       </View>
 
-      {/* Phần info: bấm vào sẽ đi tới đăng ký */}
       <TouchableOpacity
         activeOpacity={0.95}
         onPress={() => router.push(`/tournament/${tournament._id}/register`)}
@@ -730,6 +646,7 @@ function TournamentCard({ tournament, theme }) {
           >
             {tournament.name}
           </Text>
+          <View style={styles.separator} />
 
           <View style={styles.tournamentMetaRow}>
             <View style={styles.metaItem}>
@@ -738,7 +655,6 @@ function TournamentCard({ tournament, theme }) {
                 {formatDate(tournament.startDate)}
               </Text>
             </View>
-
             <View style={styles.metaItem}>
               <Ionicons name="location" size={16} color="#FF6B6B" />
               <Text
@@ -751,30 +667,42 @@ function TournamentCard({ tournament, theme }) {
           </View>
 
           <View style={styles.registrationInfo}>
-            <Ionicons name="people" size={16} color="#FFA502" />
-            <Text style={[styles.registrationText, { color: subtext }]}>
-              {tournament.registered}/{tournament.maxPairs} đã đăng ký
-            </Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: "#FFA502",
+                }}
+              />
+              <Text style={[styles.registrationText, { color: subtext }]}>
+                {tournament.registered}/{tournament.maxPairs} vận động viên
+              </Text>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
 
       <View style={styles.tournamentActions}>
-        <AnimatedGradientButton
+        <ProButton
           onPress={() => router.push(`/tournament/${tournament._id}/register`)}
-          colors={["#FF6B6B", "#FFA502", "#FFD700"]}
+          colors={["#FF9F43", "#EE5A24"]}
+          icon={<Ionicons name="trophy-outline" size={20} color="#FFFFFF" />}
         >
-          <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
-          <Text style={styles.registerButtonText}>Đăng ký giải đấu</Text>
-        </AnimatedGradientButton>
+          <Text style={styles.proButtonText}>ĐĂNG KÝ NGAY</Text>
+        </ProButton>
       </View>
+
       <ImageViewing
         images={[{ uri: imageUri }]}
         imageIndex={0}
         visible={imageVisible}
         onRequestClose={() => setImageVisible(false)}
         swipeToCloseEnabled
-        backgroundColor={viewerBackground} // ✅ nền theo theme
+        backgroundColor={isDark ? "rgba(0,0,0,0.95)" : "rgba(255,255,255,0.95)"}
       />
     </View>
   );
@@ -785,7 +713,6 @@ function TournamentsSection() {
   const theme = useTheme();
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-
   const isDark = !!theme?.dark;
   const bgColor = theme?.colors?.background ?? (isDark ? "#0b0f14" : "#f5f7fb");
 
@@ -793,7 +720,6 @@ function TournamentsSection() {
     { sportType: "2", groupId: "0" },
     { refetchOnFocus: false }
   );
-
   const upcomingTournaments = useMemo(() => {
     if (!Array.isArray(tournaments)) return [];
     return tournaments.filter((t) => t.status === "upcoming").slice(0, 5);
@@ -801,10 +727,7 @@ function TournamentsSection() {
 
   const scrollToIndex = (index) => {
     if (flatListRef.current && upcomingTournaments.length > 0) {
-      flatListRef.current.scrollToIndex({
-        index,
-        animated: true,
-      });
+      flatListRef.current.scrollToIndex({ index, animated: true });
       setCurrentIndex(index);
     }
   };
@@ -814,7 +737,6 @@ function TournamentsSection() {
       currentIndex > 0 ? currentIndex - 1 : upcomingTournaments.length - 1;
     scrollToIndex(newIndex);
   };
-
   const handleNext = () => {
     const newIndex =
       currentIndex < upcomingTournaments.length - 1 ? currentIndex + 1 : 0;
@@ -825,6 +747,7 @@ function TournamentsSection() {
 
   return (
     <View style={styles.tournamentsSection}>
+      {/* 🛑 GIỮ NGUYÊN HEADER CŨ THEO YÊU CẦU */}
       <View style={styles.sectionHeaderWrapper}>
         <LinearGradient
           colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
@@ -838,7 +761,6 @@ function TournamentsSection() {
           </Text>
           <Ionicons name="trophy" size={24} color="#FFFFFF" />
         </LinearGradient>
-
         <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
         <View style={[styles.triangleRight, { borderRightColor: bgColor }]} />
       </View>
@@ -856,7 +778,6 @@ function TournamentsSection() {
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
-
         <TouchableOpacity
           onPress={handleNext}
           style={styles.navArrow}
@@ -893,19 +814,25 @@ function TournamentsSection() {
       />
 
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.8}
         onPress={() => router.push("/tournament/stack")}
-        style={styles.viewAllContainer}
+        style={styles.viewAllContainerNew}
       >
-        <LinearGradient
-          colors={["#4ECDC4", "#45B7D1"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.viewAllButton}
+        <View
+          style={[
+            styles.viewAllButtonNew,
+            { backgroundColor: isDark ? "#1F2229" : "#FFF" },
+          ]}
         >
-          <Text style={styles.viewAllText}>Xem tất cả giải đấu</Text>
-          <Ionicons name="arrow-forward-circle" size={24} color="#FFFFFF" />
-        </LinearGradient>
+          <Text
+            style={[styles.viewAllTextNew, { color: isDark ? "#FFF" : "#333" }]}
+          >
+            Xem tất cả giải đấu
+          </Text>
+          <View style={styles.viewAllIconCircle}>
+            <Ionicons name="arrow-forward" size={16} color="#FFF" />
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -935,14 +862,12 @@ function NewsCard({ news, theme }) {
           }}
           style={styles.newsImage}
           contentFit="cover"
-          transition={200}
+          transition={500}
         />
-
         <View style={styles.newsInfo}>
           <Text style={[styles.newsTitle, { color: text }]} numberOfLines={3}>
             {news.title}
           </Text>
-
           <View style={styles.newsMetaRow}>
             <Ionicons name="time-outline" size={14} color={subtext} />
             <Text style={[styles.newsDate, { color: subtext }]}>
@@ -951,22 +876,13 @@ function NewsCard({ news, theme }) {
           </View>
         </View>
       </TouchableOpacity>
-
       <View style={styles.newsActions}>
         <TouchableOpacity
-          activeOpacity={0.85}
           onPress={() => router.push(`/news/${news.slug}`)}
-          style={styles.detailButtonWrapper}
+          style={styles.newsDetailLink}
         >
-          <LinearGradient
-            colors={["#A29BFE", "#FD79A8"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.detailButton}
-          >
-            <Text style={styles.detailButtonText}>Chi tiết</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </LinearGradient>
+          <Text style={styles.newsDetailText}>Đọc tiếp</Text>
+          <Ionicons name="arrow-forward" size={16} color="#A29BFE" />
         </TouchableOpacity>
       </View>
     </View>
@@ -978,48 +894,34 @@ function NewsSection() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const bgColor = theme?.colors?.background ?? (isDark ? "#0b0f14" : "#f5f7fb");
-
   const { data: news, isLoading } = useGetNewsQuery(undefined, {
     refetchOnFocus: false,
   });
-
-  const topNews = useMemo(() => {
-    if (!Array.isArray(news)) return [];
-    return news.slice(0, 5);
-  }, [news]);
+  const topNews = useMemo(
+    () => (Array.isArray(news) ? news.slice(0, 5) : []),
+    [news]
+  );
 
   if (isLoading || topNews.length === 0) return null;
 
   return (
     <View style={styles.newsSection}>
       <View style={styles.newsSectionHeaderRow}>
-        <LinearGradient
-          colors={["#A29BFE", "#FD79A8"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.newsSectionHeader}
-        >
-          <Ionicons name="newspaper" size={22} color="#FFFFFF" />
-          <Text style={styles.newsSectionHeaderText}>
-            Tin tức & Sự kiện nổi bật
+        <View style={styles.newsHeaderContainer}>
+          <View style={styles.newsHeaderDecor} />
+          <Text style={[styles.newsHeaderTitle, { color: text }]}>
+            Tin tức nổi bật
           </Text>
-        </LinearGradient>
-
-        <View
-          style={[styles.triangleRightNews, { borderRightColor: bgColor }]}
-        />
-
+        </View>
         <TouchableOpacity
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           onPress={() => router.push("/news")}
-          style={styles.seeMoreButton}
+          style={styles.seeMoreButtonNew}
         >
-          <Text style={[styles.seeMoreText, { color: text }]}>Xem thêm</Text>
-          <Ionicons name="arrow-forward" size={16} color={text} />
+          <Text style={styles.seeMoreTextNew}>Xem thêm</Text>
+          <Ionicons name="chevron-forward" size={14} color="#6C5CE7" />
         </TouchableOpacity>
       </View>
-
       <FlatList
         data={topNews}
         horizontal
@@ -1033,7 +935,7 @@ function NewsSection() {
   );
 }
 
-/* ---------- Contact Card - Improved ---------- */
+/* ---------- Contact Card ---------- */
 function ContactCard() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
@@ -1057,7 +959,6 @@ function ContactCard() {
           Liên hệ & Hỗ trợ
         </Text>
       </View>
-
       {info ? (
         <>
           <InfoRow
@@ -1069,7 +970,6 @@ function ContactCard() {
           >
             <Text style={{ color: text }}>{info.address || "—"}</Text>
           </InfoRow>
-
           <InfoRow
             color={text}
             label="Điện thoại"
@@ -1081,7 +981,6 @@ function ContactCard() {
               tint={tint}
             />
           </InfoRow>
-
           <InfoRow
             color={text}
             label="Email"
@@ -1093,31 +992,28 @@ function ContactCard() {
               tint={tint}
             />
           </InfoRow>
-
           <View style={styles.socialContainer}>
             <Text style={[styles.socialLabel, { color: sub }]}>
               Kết nối với chúng tôi
             </Text>
             <View style={styles.socialButtons}>
-              {info?.socials?.facebook ? (
+              {info?.socials?.facebook && (
                 <SocialButton
                   bg="#1877F2"
                   onPress={() => openURL(info.socials.facebook)}
                 >
                   <FontAwesome name="facebook" size={24} color="#fff" />
                 </SocialButton>
-              ) : null}
-
-              {info?.socials?.youtube ? (
+              )}
+              {info?.socials?.youtube && (
                 <SocialButton
                   bg="#FF0000"
                   onPress={() => openURL(info.socials.youtube)}
                 >
                   <AntDesign name="youtube" size={24} color="#fff" />
                 </SocialButton>
-              ) : null}
-
-              {info?.socials?.zalo ? (
+              )}
+              {info?.socials?.zalo && (
                 <SocialButton
                   bg="#0068FF"
                   onPress={() => openURL(info.socials.zalo)}
@@ -1126,10 +1022,9 @@ function ContactCard() {
                     source={ZALO_SRC}
                     style={{ width: 24, height: 24 }}
                     contentFit="contain"
-                    transition={120}
                   />
                 </SocialButton>
-              ) : null}
+              )}
             </View>
           </View>
         </>
@@ -1141,33 +1036,24 @@ function ContactCard() {
 }
 
 export default function HomeScreen() {
-  // Trong index.tsx, tournaments.tsx, rankings.tsx, etc.
   const scrollViewRef = React.useRef(null);
   React.useEffect(() => {
     const listener = DeviceEventEmitter.addListener(
       "SCROLL_TO_TOP",
       (tabName) => {
-        if (tabName === "index") {
-          // hoặc 'tournaments', 'rankings', etc.
+        if (tabName === "index")
           scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-          // hoặc flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-        }
       }
     );
     return () => listener.remove();
   }, []);
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
-
-  // Có rankNo chưa?
   const hasRankNo = Number.isFinite(
     +(userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? NaN)
   );
-
-  // Gọi reauth nếu đã đăng nhập mà chưa có rankNo
   const { data: reauthData } = useReauthQuery(undefined, {
     skip: !userInfo || hasRankNo,
-    // refetchOnMountOrArgChange: true, // nếu muốn mỗi lần vào màn hình
   });
 
   useEffect(() => {
@@ -1253,30 +1139,37 @@ export default function HomeScreen() {
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
-          <AthleteIsland />
+          <FadeInSection delay={100}>
+            <AthleteIsland />
+          </FadeInSection>
         </View>
 
         <View style={{ height: 16 }} />
-
-        <FeaturesGrid />
-
-        <View style={{ height: 24 }} />
-
-        <TournamentsSection />
+        <FadeInSection delay={300}>
+          <FeaturesGrid />
+        </FadeInSection>
 
         <View style={{ height: 24 }} />
-
-        <NewsSection />
+        <FadeInSection delay={500}>
+          <TournamentsSection />
+        </FadeInSection>
 
         <View style={{ height: 24 }} />
+        <FadeInSection delay={700}>
+          <NewsSection />
+        </FadeInSection>
 
-        <LeaderboardSection />
+        <View style={{ height: 24 }} />
+        <FadeInSection delay={900}>
+          <LeaderboardSection />
+        </FadeInSection>
 
         <View style={{ height: 16 }} />
-
-        <View style={{ paddingHorizontal: 16 }}>
-          <ContactCard />
-        </View>
+        <FadeInSection delay={1100}>
+          <View style={{ paddingHorizontal: 16 }}>
+            <ContactCard />
+          </View>
+        </FadeInSection>
       </ScrollView>
     </>
   );
@@ -1286,14 +1179,13 @@ const styles = StyleSheet.create({
   hero3dWrap: {
     width: "100%",
     height: 240,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     overflow: "hidden",
     marginBottom: 8,
     justifyContent: "center",
     alignItems: "center",
   },
-
   islandContainer: {
     alignItems: "center",
     width: "100%",
@@ -1301,16 +1193,15 @@ const styles = StyleSheet.create({
   },
 
   logoGradient: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: "#4ECDC4",
     shadowOpacity: 0.5,
     shadowRadius: 15,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
-
   logoText: {
     fontSize: 32,
     fontWeight: "900",
@@ -1327,147 +1218,118 @@ const styles = StyleSheet.create({
     }),
   },
 
-  logoGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    shadowColor: "#45B7D1",
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 0 },
-  },
-
-  athleteIsland: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  /* 💎 PREMIUM ATHLETE ISLAND */
+  athleteIslandWrapper: {
     width: "100%",
     shadowColor: "#000",
     shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-    gap: 12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
   },
-
-  avatarContainer: {
-    position: "relative",
+  athleteIslandContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: "100%",
+    gap: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
   },
-
+  avatarContainer: { position: "relative" },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "transparent",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F0F0F0",
   },
-
   avatarBorder: {
     position: "absolute",
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: "#FFD700",
   },
-
-  nameContainer: {
-    flex: 1,
-    justifyContent: "center",
-  },
-
+  nameContainer: { flex: 1, justifyContent: "center" },
   athleteName: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: "800",
     color: "#111111",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-
-  athleteTitle: {
-    fontSize: 12,
-    color: "#666666",
-    fontWeight: "500",
-  },
-
+  athleteTitle: { fontSize: 13, color: "#666666", fontWeight: "600" },
   rankBadge: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 12,
     gap: 4,
-    shadowColor: "#FFD700",
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    shadowColor: "#FF8E53",
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-
-  rankText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
-
-  featuresContainer: {
+  loginBadge: {
+    paddingVertical: 8,
     paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: "#45B7D1",
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
+  rankText: { fontSize: 12, fontWeight: "700", color: "#FFFFFF" },
+  loginButtonText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 
+  featuresContainer: { paddingHorizontal: 16 },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: "800",
     marginBottom: 16,
     letterSpacing: 0.5,
   },
-
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
 
-  featureItem: {
-    width: "22%",
-    aspectRatio: 1,
-    borderRadius: 16,
-    padding: 8,
+  /* 💎 GLASS-MORPHISM FEATURE ITEM */
+  featureIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-    marginBottom: 12,
+    marginBottom: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
-
-  featureIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  featureIconBg: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
   },
-
   featureTitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
     textAlign: "center",
-    lineHeight: 13,
+    lineHeight: 14,
+    height: 28,
   },
 
-  tournamentsSection: {
-    marginBottom: 8,
-  },
-
+  tournamentsSection: { marginBottom: 8 },
+  /* OLD HEADER STYLES */
   sectionHeaderWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -1475,7 +1337,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     position: "relative",
   },
-
   sectionHeader: {
     flex: 1,
     flexDirection: "row",
@@ -1485,7 +1346,6 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 12,
   },
-
   triangleLeft: {
     position: "absolute",
     left: 0,
@@ -1500,7 +1360,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     zIndex: 1,
   },
-
   triangleRight: {
     position: "absolute",
     right: 0,
@@ -1515,21 +1374,18 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     zIndex: 1,
   },
-
   sectionHeaderText: {
     fontSize: 18,
     fontWeight: "900",
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-
   navigationContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 24,
     marginBottom: 12,
   },
-
   navArrow: {
     borderRadius: 20,
     overflow: "hidden",
@@ -1539,7 +1395,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-
   navArrowGradient: {
     width: 40,
     height: 40,
@@ -1547,41 +1402,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  tournamentsList: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
+  tournamentsList: { paddingHorizontal: 16, paddingVertical: 8 },
 
+  /* 💎 PREMIUM TOURNAMENT CARD */
   tournamentCard: {
     width: CARD_WIDTH,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 2,
+    borderWidth: 1,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   },
-
-  tournamentImageContainer: {
-    position: "relative",
-  },
-
-  tournamentImage: {
-    width: "100%",
-    height: 180,
-    backgroundColor: "#f0f0f0",
-  },
-
+  tournamentImageContainer: { position: "relative" },
+  tournamentImage: { width: "100%", height: 190, backgroundColor: "#f0f0f0" },
   tournamentImageGradient: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
+    height: 100,
   },
-
   statusBadgeOnImage: {
     position: "absolute",
     top: 12,
@@ -1591,10 +1434,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
     elevation: 5,
   },
-
   statusBadgeGradient: {
     flexDirection: "row",
     alignItems: "center",
@@ -1602,413 +1443,181 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 4,
   },
-
-  statusBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  tournamentInfo: {
-    padding: 16,
-    gap: 10,
-  },
-
+  statusBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  tournamentInfo: { padding: 18, paddingBottom: 14, gap: 10 },
   tournamentName: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     lineHeight: 24,
+    height: 48,
   },
-
-  tournamentMetaRow: {
-    gap: 8,
-  },
-
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  metaText: {
-    fontSize: 14,
-    flex: 1,
-  },
-
+  separator: { height: 1, backgroundColor: "rgba(0,0,0,0.05)", width: "100%" },
+  tournamentMetaRow: { gap: 8 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 8 },
+  metaText: { fontSize: 14, flex: 1, fontWeight: "500" },
   registrationInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(128, 128, 128, 0.2)",
+    paddingTop: 6,
   },
+  registrationText: { fontSize: 13, fontWeight: "600" },
+  tournamentActions: { padding: 12, paddingTop: 0 },
 
-  registrationText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  tournamentActions: {
-    padding: 12,
-    paddingTop: 0,
-  },
-
-  registerButtonWrapper: {
-    borderRadius: 14,
-    overflow: "hidden",
-    shadowColor: "#FF6B6B",
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-
-  registerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    gap: 8,
-  },
-
-  registerButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
-
-  viewAllContainer: {
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-
-  viewAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    gap: 10,
-    shadowColor: "#4ECDC4",
+  /* 💎 PRO BUTTON STYLES */
+  proButtonContainer: {
+    borderRadius: 18,
+    shadowColor: "#EE5A24",
     shadowOpacity: 0.3,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
   },
-
-  viewAllText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
-
-  newsSection: {
-    marginBottom: 8,
-  },
-
-  newsSectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 12,
+  proButtonGradient: {
+    borderRadius: 18,
+    padding: 1,
     position: "relative",
-  },
-
-  newsSectionHeader: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-
-  triangleRightNews: {
-    // position: "absolute",
-    // right: -80, // Vị trí bên phải, tránh nút "Xem thêm"
-    // width: 0,
-    // height: 0,
-    // borderTopWidth: 24,
-    // borderBottomWidth: 24,
-    // borderRightWidth: 20, // 🔧 Tăng từ 16 lên 20 cho rõ hơn
-    // borderStyle: "solid",
-    // backgroundColor: "transparent",
-    // borderTopColor: "transparent",
-    // borderBottomColor: "transparent",
-    // zIndex: 1,
-  },
-
-  newsSectionHeaderText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-
-  seeMoreButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-  },
-
-  seeMoreText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  newsList: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-
-  newsCard: {
-    width: CARD_WIDTH * 0.85,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-
-  newsImage: {
-    width: "100%",
-    height: 140,
-    backgroundColor: "#f0f0f0",
-  },
-
-  newsInfo: {
-    padding: 12,
-    gap: 8,
-  },
-
-  newsTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-
-  newsMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  newsDate: {
-    fontSize: 12,
-  },
-
-  newsActions: {
-    padding: 12,
-    paddingTop: 0,
-  },
-
-  detailButtonWrapper: {
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#A29BFE",
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-  },
-
-  detailButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    gap: 6,
-  },
-
-  detailButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.3,
-  },
-
-  leaderboardSection: {
-    position: "relative",
-    paddingVertical: 24,
-    marginHorizontal: 16,
-    borderRadius: 20,
     overflow: "hidden",
   },
-
-  leaderboardBackground: {
+  proButtonGloss: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    height: "50%",
+    opacity: 0.6,
   },
-
-  leaderboardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-
-  leaderboardHeaderContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  leaderboardHeader: {
+  proButtonContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 12,
-    shadowColor: "#FFD700",
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.2)",
+    borderRadius: 18,
   },
-
-  leaderboardHeaderText: {
-    fontSize: 20,
+  proButtonText: {
+    fontSize: 16,
     fontWeight: "900",
     color: "#FFFFFF",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textShadowColor: "rgba(0,0,0,0.15)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
-  leaderboardCards: {
-    gap: 16,
-    paddingHorizontal: 8,
+  /* 💎 NEW VIEW ALL BUTTON */
+  viewAllContainerNew: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
   },
-
-  leaderboardCardGradient: {
-    borderRadius: 16,
-    padding: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-
-  leaderboardCard: {
+  viewAllButtonNew: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
     gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(128,128,128,0.1)",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-
-  leaderboardRank: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 215, 0, 0.2)",
+  viewAllTextNew: { fontSize: 15, fontWeight: "700" },
+  viewAllIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#4ECDC4",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  leaderboardRankText: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#FFD700",
+  newsSection: { marginBottom: 8 },
+  newsSectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginBottom: 12,
   },
-
-  leaderboardAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#f0f0f0",
+  newsHeaderContainer: { flexDirection: "row", alignItems: "center", gap: 10 },
+  newsHeaderDecor: {
+    width: 5,
+    height: 24,
+    backgroundColor: "#6C5CE7",
+    borderRadius: 3,
   },
-
-  leaderboardInfo: {
-    flex: 1,
+  newsHeaderTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.5 },
+  seeMoreButtonNew: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(108, 92, 231, 0.08)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     gap: 4,
   },
+  seeMoreTextNew: { fontSize: 12, fontWeight: "700", color: "#6C5CE7" },
+  newsList: { paddingHorizontal: 16, paddingVertical: 8 },
 
-  leaderboardName: {
-    fontSize: 16,
-    fontWeight: "700",
+  /* 💎 PREMIUM NEWS CARD */
+  newsCard: {
+    width: CARD_WIDTH * 0.85,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
-
-  leaderboardAchievement: {
-    fontSize: 13,
-    lineHeight: 18,
+  newsImage: { width: "100%", height: 150, backgroundColor: "#f0f0f0" },
+  newsInfo: { padding: 14, gap: 8 },
+  newsTitle: { fontSize: 15, fontWeight: "700", lineHeight: 20, height: 60 },
+  newsMetaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  newsDate: { fontSize: 12, fontWeight: "500" },
+  newsActions: { padding: 14, paddingTop: 0 },
+  newsDetailLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 4,
   },
+  newsDetailText: { fontSize: 14, fontWeight: "700", color: "#A29BFE" },
 
   card: {
     borderWidth: 1,
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    elevation: 4,
   },
-
   contactHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     marginBottom: 16,
     paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(128, 128, 128, 0.1)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
   },
-
-  contactTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-
+  contactTitle: { fontSize: 20, fontWeight: "800", letterSpacing: 0.3 },
   socialContainer: {
-    marginTop: 16,
+    marginTop: 20,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: "rgba(128, 128, 128, 0.1)",
+    borderTopColor: "rgba(0,0,0,0.05)",
   },
-
-  socialLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-
-  socialButtons: {
-    flexDirection: "row",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  loginButton: {
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#4ECDC4",
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-
-  loginButtonGradient: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loginButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
+  socialLabel: { fontSize: 14, fontWeight: "600", marginBottom: 12 },
+  socialButtons: { flexDirection: "row", gap: 16, flexWrap: "wrap" },
 });

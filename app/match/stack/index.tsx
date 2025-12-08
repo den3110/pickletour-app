@@ -9,12 +9,17 @@ import {
   FlatList,
   ActivityIndicator,
   Modal,
+  Alert, // <--- Đã thêm Alert
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { useTheme, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
-import { useGetMyUserMatchesQuery } from "@/slices/userMatchesApiSlice";
+// Đảm bảo bạn đã export useDeleteUserMatchMutation từ slice này
+import {
+  useGetMyUserMatchesQuery,
+  useDeleteUserMatchMutation,
+} from "@/slices/userMatchesApiSlice";
 import { ScrollView } from "react-native-gesture-handler";
 
 /* ====== Utils ====== */
@@ -101,13 +106,11 @@ const statusMeta = {
 };
 
 function StatusChip({ status }) {
-  const meta =
-    statusMeta[status] ||
-    ({
-      label: status || "Không rõ",
-      bg: "#E5E7EB",
-      color: "#374151",
-    } as any);
+  const meta = statusMeta[status] || {
+    label: status || "Không rõ",
+    bg: "#E5E7EB",
+    color: "#374151",
+  };
 
   return (
     <View
@@ -146,6 +149,36 @@ function MatchCard({ item, onPress }) {
   // 👉 chỉ cho bắt trận / live nếu chưa end
   const canStart = item.status !== "finished" && item.status !== "canceled";
 
+  // --- LOGIC XOÁ TRẬN ---
+  const [deleteMatch, { isLoading: isDeleting }] = useDeleteUserMatchMutation();
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Xoá trận đấu",
+      "Bạn có chắc chắn muốn xoá trận đấu này không? Hành động này không thể hoàn tác.",
+      [
+        {
+          text: "Huỷ",
+          style: "cancel",
+        },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteMatch(item._id).unwrap();
+              // API Slice invalidateTags sẽ tự động refresh list
+            } catch (error) {
+              console.error("Delete match failed", error);
+              Alert.alert("Lỗi", "Không thể xoá trận đấu. Vui lòng thử lại.");
+            }
+          },
+        },
+      ]
+    );
+  };
+  // ----------------------
+
   const handleStartMatch = () => {
     router.push({
       pathname: `/match/${item._id}/referee`,
@@ -157,7 +190,7 @@ function MatchCard({ item, onPress }) {
 
   const handleGoLive = () => {
     router.push({
-      pathname: `/match/${item._id}/live-setup`,
+      pathname: `/match/user-match/${item._id}/live`,
       params: {
         userMatch: "true",
       },
@@ -168,11 +201,13 @@ function MatchCard({ item, onPress }) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
+      disabled={isDeleting} // Disable card khi đang xoá
       style={[
         styles.card,
         {
           backgroundColor: bg,
           borderColor: border,
+          opacity: isDeleting ? 0.5 : 1, // Làm mờ khi đang xoá
         },
       ]}
     >
@@ -188,12 +223,28 @@ function MatchCard({ item, onPress }) {
           ) : null}
         </View>
 
-        {item.liveSource && item.liveSource !== "NONE" ? (
-          <View style={styles.liveBadge}>
-            <Ionicons name="radio" size={14} color="#EF4444" />
-            <Text style={styles.liveBadgeText}>Đang Live</Text>
-          </View>
-        ) : null}
+        {/* Cụm Live Badge và Nút Xoá */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {item.liveSource && item.liveSource !== "NONE" ? (
+            <View style={styles.liveBadge}>
+              <Ionicons name="radio" size={14} color="#EF4444" />
+              <Text style={styles.liveBadgeText}>Live</Text>
+            </View>
+          ) : null}
+
+          {/* Nút Xoá */}
+          <TouchableOpacity
+            onPress={handleDelete}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ paddingLeft: 4 }}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <Ionicons name="trash-outline" size={20} color={sub} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.cardMetaRow}>

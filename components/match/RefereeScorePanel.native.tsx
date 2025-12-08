@@ -16,9 +16,12 @@ import {
   SafeAreaView,
   useColorScheme,
   Alert,
+  Touchable,
+  TouchableOpacity,
+  ScrollView,
 } from "react-native";
 import Ripple from "react-native-material-ripple";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -102,8 +105,15 @@ const textOf = (v) => {
     return v.name || v.label || v.title || v.message || v.error || "";
   return "";
 };
-const userIdOf = (u) =>
-  String(u?.user?._id || u?.user || u?._id || u?.id || u?.uid || "") || "";
+const userIdOf = (u) => {
+  // 1. Ưu tiên lấy ID user hệ thống (nếu có)
+  const id = u?.user?._id || u?.user || u?._id || u?.id || u?.uid;
+  if (id) return String(id);
+
+  // 2. Nếu là UserMatch (Guest/Khách) không có ID -> dùng Tên làm định danh
+  // Cần đảm bảo tên khác nhau, nếu trùng tên thì logic này vẫn rủi ro nhẹ nhưng đỡ hơn là ""
+  return u?.fullName || u?.name || u?.displayName || u?.nickName || "";
+};
 const displayNick = (u) =>
   u?.nickname || u?.nick || u?.shortName || u?.fullName || u?.name || "—";
 
@@ -428,6 +438,224 @@ function WinTargetTuner({ value, base, onToggle }) {
         <View style={s.winDigitBubble}>
           <Text style={s.winDigitText}>{ones}</Text>
         </View>
+      </View>
+    </View>
+  );
+}
+
+// Đặt cái này ở bên ngoài RefereeJudgePanel hoặc trong file riêng
+const LiveClock = memo(function LiveClock({ style }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const tmr = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(tmr);
+  }, []);
+
+  const timeString = [
+    now.getHours().toString().padStart(2, "0"),
+    now.getMinutes().toString().padStart(2, "0"),
+    now.getSeconds().toString().padStart(2, "0"),
+  ].join(":");
+
+  return <Text style={style}>{timeString}</Text>;
+});
+
+// Đặt cái này ở bên ngoài RefereeJudgePanel
+const BreakTimer = memo(function BreakTimer({ endTime, style }) {
+  const [display, setDisplay] = useState("00:00");
+
+  useEffect(() => {
+    if (!endTime) return;
+
+    const tick = () => {
+      const remaining = endTime - Date.now();
+      if (remaining <= 0) {
+        setDisplay("00:00");
+      } else {
+        const m = Math.floor(remaining / 60000)
+          .toString()
+          .padStart(2, "0");
+        const s = Math.floor((remaining % 60000) / 1000)
+          .toString()
+          .padStart(2, "0");
+        setDisplay(`${m}:${s}`);
+      }
+    };
+
+    tick(); // chạy ngay lập tức
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return <Text style={style}>{display}</Text>;
+});
+
+/* ✅ COMPONENT: TIMEOUT HEADER (Fix: Right Team Gray Direction) */
+function TimeoutHeader({
+  leftTO,
+  leftMed,
+  rightTO,
+  rightMed,
+  limitTO,
+  limitMed,
+  timeoutMinutes,
+  onTimeout,
+  onMedical,
+  disabled,
+}) {
+  const t = useTokens();
+  const isDisabled = disabled;
+
+  const leftScrollRef = useRef(null);
+  const rightScrollRef = useRef(null);
+
+  // --- Helper: Render Button ---
+  const renderBtn = (type, remaining, totalLimit, teamSideUI) => {
+    let buttons = [];
+    const limit = totalLimit || (type === "med" ? 1 : 2);
+
+    for (let i = 0; i < limit; i++) {
+      // Logic: i chạy từ 0 -> limit. 
+      // Nếu còn 2, limit 3: i=0(Active), i=1(Active), i=2(Used)
+      const isUsed = i >= remaining;
+      const isMed = type === "med";
+
+      // Màu xám đậm cho trạng thái đã dùng
+      const usedColor = "#475569";
+
+      buttons.push(
+        <Ripple
+          key={`${type}-${teamSideUI}-${i}`}
+          onPress={() =>
+            !isUsed && (isMed ? onMedical(teamSideUI) : onTimeout(teamSideUI))
+          }
+          disabled={isDisabled || isUsed}
+          rippleContainerBorderRadius={999}
+          style={{ marginHorizontal: 3 }}
+        >
+          <View
+            style={[
+              isMed ? s.winAdjustBubble : s.winDigitBubble,
+              isUsed
+                ? s.bubbleUsed
+                : isMed
+                ? s.winAdjustPlus
+                : {},
+              isDisabled && !isUsed && { opacity: 0.5 },
+            ]}
+          >
+            {isMed ? (
+              <MaterialIcons
+                name="add"
+                size={14}
+                color={isUsed ? usedColor : "#fff"}
+              />
+            ) : (
+              <Text style={[s.winDigitText, isUsed && { color: usedColor }]}>
+                {timeoutMinutes || 1}
+              </Text>
+            )}
+          </View>
+        </Ripple>
+      );
+    }
+
+    // 🔥 FIX QUAN TRỌNG Ở ĐÂY:
+    // Với đội PHẢI (right): Đảo ngược mảng để các nút "Used" (Xám) nằm bên Trái, "Active" nằm bên Phải.
+    // Kết quả: [Used] [Used] [Active] -> Đúng ý "xám từ trái qua phải"
+    if (teamSideUI === "right") {
+      return buttons.reverse();
+    }
+
+    return buttons;
+  };
+
+  // --- Scroll Hint Arrow ---
+  const ScrollBtn = ({ dir, onPress }) => (
+    <Ripple
+      onPress={onPress}
+      rippleContainerBorderRadius={999}
+      style={{
+        justifyContent: "center",
+        alignItems: "center",
+        width: 24,
+        height: 24,
+        zIndex: 20,
+      }}
+    >
+      <MaterialIcons
+        name={dir === "left" ? "chevron-left" : "chevron-right"}
+        size={22}
+        color={t.muted}
+      />
+    </Ripple>
+  );
+
+  return (
+    <View style={s.winRowAbsolute}>
+      {/* ================= TRÁI (LEFT TEAM) ================= */}
+      <View
+        style={{
+          flex: 1,
+          marginRight: 8,
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <ScrollBtn
+          dir="left"
+          onPress={() => leftScrollRef.current?.scrollTo({ x: 0, animated: true })}
+        />
+
+        <ScrollView
+          ref={leftScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onContentSizeChange={() =>
+            leftScrollRef.current?.scrollToEnd({ animated: false })
+          }
+          contentContainerStyle={{
+            alignItems: "center",
+            paddingHorizontal: 2,
+            justifyContent: "flex-end",
+            flexGrow: 1,
+          }}
+        >
+          {renderBtn("to", leftTO, limitTO, "left")}
+          {renderBtn("med", leftMed, limitMed, "left")}
+        </ScrollView>
+      </View>
+
+      {/* ================= PHẢI (RIGHT TEAM) ================= */}
+      <View
+        style={{
+          flex: 1,
+          marginLeft: 8,
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <ScrollView
+          ref={rightScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            alignItems: "center",
+            paddingHorizontal: 2,
+            justifyContent: "flex-start",
+            flexGrow: 1,
+          }}
+        >
+          {/* Thứ tự gọi hàm renderBtn vẫn giữ nguyên, logic đảo nằm bên trong hàm */}
+          {renderBtn("med", rightMed, limitMed, "right")}
+          {renderBtn("to", rightTO, limitTO, "right")}
+        </ScrollView>
+
+        <ScrollBtn
+          dir="right"
+          onPress={() => rightScrollRef.current?.scrollToEnd({ animated: true })}
+        />
       </View>
     </View>
   );
@@ -1037,33 +1265,68 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ INIT serve đầu game:
   // - double: 0-0-2 (server #2, người ở ô phải / slot 1)
   // - single: 0-0-1 (server #1)
+  // ✅ INIT serve đầu game:
+  // ✅ INIT serve đầu game:
+  // Tự động set người giao bóng chuẩn Referee View (A=2, B=1) khi tỉ số 0-0
   const initServeDoneRef = useRef({});
+
   useEffect(() => {
     if (!match?._id) return;
 
     const inited = !!initServeDoneRef.current[curIdx];
-
-    const isDouble = eventType !== "single"; // 👈 thêm dòng này
-    const wantServerNum = isDouble ? 2 : 1; // 👈 thay vì fix cứng = 2
-
     const is000 = Number(curA) === 0 && Number(curB) === 0;
+    const isUserMatch = String(userMatch) === "true";
 
-    if (!is000 || inited) return;
+    // Nếu không phải 0-0 (đang đánh dở) hoặc đã init phiên này rồi thì thôi
+    if ((!is000 && !waitingStart) || inited) return;
 
-    // Ưu tiên người đang ở Ô 1 (bên phải/chẵn), nếu thiếu thì thử Ô 2
-    const uidRight =
-      getUidAtSlotNow(activeSide, 2) || getUidAtSlotNow(activeSide, 1) || "";
-
-    const currentOrder = Number(serve?.order ?? serve?.server ?? 1);
     const currentServerId = serve?.serverId ? String(serve.serverId) : "";
 
-    const needFix =
-      currentOrder !== wantServerNum ||
-      !currentServerId ||
-      currentServerId !== String(uidRight);
+    // ⚠️ QUAN TRỌNG:
+    // - Với Match thường: Nếu DB có data rồi thì tin tưởng DB.
+    // - Với UserMatch: Kể cả DB có data, ta vẫn phải kiểm tra xem nó có đúng logic "Trọng tài" không.
+    if (!isUserMatch && currentServerId) {
+      lastServerUidRef.current = currentServerId;
+      return;
+    }
 
-    if (needFix) {
-      // ⏩ Set sớm để UI bám NGƯỜI ngay cả khi socket chưa ack
+    const isDouble = eventType !== "single";
+    const wantServerNum = isDouble ? 2 : 1;
+
+    let uidRight = "";
+
+    // 🔥 FORCE LOGIC CHO USER MATCH (0-0) - GÓC NHÌN TRỌNG TÀI
+    // Đội Trái (A): Ô Phải giao bóng nằm ở DƯỚI (Slot 2)
+    // Đội Phải (B): Ô Phải giao bóng nằm ở TRÊN (Slot 1)
+    if (isUserMatch) {
+      if (activeSide === "A") {
+        uidRight = getUidAtSlotNow("A", 2); // Tìm người ở Slot 2
+      } else {
+        uidRight = getUidAtSlotNow("B", 1); // Tìm người ở Slot 1
+      }
+
+      // Fallback: nếu slot chuẩn chưa tìm ra (do lag), lấy đại slot kia
+      if (!uidRight) {
+        uidRight =
+          getUidAtSlotNow(activeSide, activeSide === "A" ? 1 : 2) || "";
+      }
+    } else {
+      // --- LOGIC CŨ CHO MATCH GIẢI ĐẤU (Dựa vào Base DB) ---
+      const currentPlayers = activeSide === "A" ? playersA : playersB;
+      const currentBase = activeSide === "A" ? baseA : baseB;
+      const p1 = currentPlayers[0];
+      const p1Id = userIdOf(p1);
+      const p1BaseSlot = Number(currentBase[p1Id] || 1);
+      uidRight =
+        getUidAtSlotNow(activeSide, p1BaseSlot) ||
+        getUidAtSlotNow(activeSide, p1BaseSlot === 1 ? 2 : 1) ||
+        "";
+    }
+
+    // Nếu UID tính ra KHÁC với UID đang lưu trên server (hoặc server chưa có)
+    // -> Gửi lệnh SET đè lên ngay lập tức
+    if (uidRight && currentServerId !== uidRight) {
+      // Cập nhật UI tạm thời để không bị nhảy
       lastServerUidRef.current = uidRight;
 
       socket?.emit(
@@ -1071,8 +1334,8 @@ export default function RefereeJudgePanel({ matchId }) {
         {
           matchId: match._id,
           side: activeSide,
-          server: wantServerNum, // double: 2 (0-0-2), single: 1 (0-0-1)
-          serverId: uidRight, // người đang ở ô phải (slot 1)
+          server: wantServerNum,
+          serverId: uidRight,
           userMatch,
         },
         (ack) => {
@@ -1083,7 +1346,8 @@ export default function RefereeJudgePanel({ matchId }) {
           }
         }
       );
-    } else {
+    } else if (currentServerId) {
+      // Nếu đúng rồi thì thôi, đánh dấu đã init
       initServeDoneRef.current[curIdx] = true;
       lastServerUidRef.current = currentServerId;
     }
@@ -1093,15 +1357,20 @@ export default function RefereeJudgePanel({ matchId }) {
     curA,
     curB,
     activeSide,
-    getUidAtSlotNow,
     serve?.serverId,
     serve?.order,
     serve?.server,
     socket,
     refetch,
-    eventType, // 👈 nhớ thêm eventType vào deps
+    eventType,
+    playersA,
+    playersB,
+    baseA,
+    baseB,
+    getUidAtSlotNow,
+    userMatch,
+    waitingStart,
   ]);
-
   // Luôn ghi nhớ người giao hiện tại
   useEffect(() => {
     if (serverUidShow) lastServerUidRef.current = serverUidShow;
@@ -1139,7 +1408,7 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [now, setNow] = useState(new Date());
+  // const [now, setNow] = useState(new Date());
   const [cccdOpen, setCccdOpen] = useState(false);
   const [cccdUser, setCccdUser] = useState(null);
   const [midPointCustom, setMidPointCustom] = useState(null);
@@ -1158,10 +1427,10 @@ export default function RefereeJudgePanel({ matchId }) {
   const midPoint = midPointCustom ?? midPointBase;
   const midAskedRef = useRef({}); // { [gameIndex]: true }
 
-  useEffect(() => {
-    const tmr = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(tmr);
-  }, []);
+  // useEffect(() => {
+  //   const tmr = setInterval(() => setNow(new Date()), 1000);
+  //   return () => clearInterval(tmr);
+  // }, []);
 
   useEffect(() => {
     setPtw(basePointsToWin);
@@ -1242,7 +1511,7 @@ export default function RefereeJudgePanel({ matchId }) {
       const id = p?.matchId || p?.data?._id || p?._id;
       if (String(id) === String(matchId)) refetch();
     };
-    socketInst.emit("match:join", { matchId, userMatch });
+    socketInst.emit("match:join", { matchId });
     socketInst.on("match:patched", handlePatched);
     socketInst.on("score:updated", handlePatched);
     socketInst.on("status:updated", handlePatched);
@@ -1453,8 +1722,106 @@ export default function RefereeJudgePanel({ matchId }) {
     [match?._id, socket, ptw, persistPtwBoost, refetch]
   );
 
-  // ✅ chỉ cho cộng điểm khi đang live VÀ không ở trạng thái chờ bắt đầu
-  const canScoreNow = match?.status === "live" && !matchDecided && !gameLocked;
+  /* --- Cấu hình Timeout Local --- */
+  // 1. Cấu hình
+  const timeoutPerGame = match?.timeoutPerGame ?? 2;
+  const timeoutMinutes = match?.timeoutMinutes ?? 1;
+  const medicalLimit = match?.medicalTimeouts ?? 1;
+
+  // 2. State đếm số lượng còn lại
+  const [toA, setToA] = useState(timeoutPerGame);
+  const [toB, setToB] = useState(timeoutPerGame);
+  const [medA, setMedA] = useState(medicalLimit);
+  const [medB, setMedB] = useState(medicalLimit);
+
+  // 3. State quản lý trạng thái nghỉ cục bộ (Local Break)
+  // localBreak = null hoặc { type: 'timeout'|'medical', endTime: number }
+  const [localBreak, setLocalBreak] = useState(null);
+  // const [timerStr, setTimerStr] = useState("00:00");
+
+  // Reset counter khi sang game mới
+  useEffect(() => {
+    setToA(timeoutPerGame);
+    setToB(timeoutPerGame);
+    setLocalBreak(null); // Reset trạng thái nghỉ nếu sang game mới
+  }, [curIdx, timeoutPerGame]);
+
+  // 4. Timer đếm ngược (Chạy khi localBreak != null)
+  // useEffect(() => {
+  //   let interval;
+  //   if (localBreak) {
+  //     const updateTimer = () => {
+  //       const remaining = localBreak.endTime - Date.now();
+  //       if (remaining <= 0) {
+  //         setTimerStr("00:00");
+  //         // Tự động kết thúc nghỉ khi hết giờ (tuỳ chọn, ở đây mình để user bấm Tiếp tục)
+  //       } else {
+  //         // Format mm:ss (02:05)
+  //         const m = Math.floor(remaining / 60000)
+  //           .toString()
+  //           .padStart(2, "0");
+  //         const s = Math.floor((remaining % 60000) / 1000)
+  //           .toString()
+  //           .padStart(2, "0");
+  //         setTimerStr(`${m}:${s}`);
+  //       }
+  //     };
+  //     updateTimer();
+  //     interval = setInterval(updateTimer, 1000);
+  //   } else {
+  //     setTimerStr("00:00");
+  //   }
+  //   return () => clearInterval(interval);
+  // }, [localBreak]);
+
+  // 5. Hàm xử lý gọi Timeout/Y tế (Chỉ trừ số & bật local timer)
+  const handleCallTimeout = async (teamSideUI) => {
+    if (localBreak) return; // Đang nghỉ thì không bấm được
+    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+    const currentVal = teamKey === "A" ? toA : toB;
+    if (currentVal <= 0) return;
+
+    // Trừ số lượng (LOCAL STATE)
+    if (teamKey === "A") setToA((p) => p - 1);
+    else setToB((p) => p - 1);
+
+    // Kích hoạt timer cục bộ (Thời gian từ config)
+    const durationMs = timeoutMinutes * 60 * 1000;
+    setLocalBreak({
+      type: "timeout",
+      endTime: Date.now() + durationMs,
+      teamKey,
+    });
+
+    // API Call (Tùy chọn, nếu bạn vẫn muốn log lên server)
+    // socket?.emit('timeout:called', { matchId: match._id, teamKey });
+  };
+
+  const handleCallMedical = async (teamSideUI) => {
+    if (localBreak) return;
+    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+    const currentVal = teamKey === "A" ? medA : medB;
+    if (currentVal <= 0) return;
+
+    if (teamKey === "A") setMedA((p) => p - 1);
+    else setMedB((p) => p - 1);
+
+    // Y tế nghỉ 5 phút (ví dụ)
+    const durationMs = 5 * 60 * 1000;
+    setLocalBreak({
+      type: "medical",
+      endTime: Date.now() + durationMs,
+      teamKey,
+    });
+  };
+
+  const handleContinue = () => {
+    setLocalBreak(null); // Tắt màn hình nghỉ
+  };
+
+  // Điều kiện được phép cộng điểm: Match Live VÀ Không đang nghỉ (Local Break)
+  const canScoreNow =
+    match?.status === "live" && !matchDecided && !gameLocked && !localBreak;
 
   const beginOpTimeout = useCallback((kind) => {
     if (opTimeoutRef.current) clearTimeout(opTimeoutRef.current);
@@ -1648,25 +2015,36 @@ export default function RefereeJudgePanel({ matchId }) {
   };
 
   // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU (status !== live HOẶC waitingStart) → 0-0-2; nếu đang live → tay 1
+  // --- ĐỔI GIAO (SIDE OUT) ---
+  // --- ĐỔI GIAO (SIDE OUT) ---
   const toggleServeSide = () => {
     if (!match?._id) return;
 
-    // ✅ Lưu trạng thái cũ để undo
+    const nextSide = activeSide === "A" ? "B" : "A";
+
+    // LOG START
+    const targetSlot = nextSide === "A" ? 2 : 1;
+    const nextSlotsMap = nextSide === "A" ? slotsNowA : slotsNowB;
+    const teamList = nextSide === "A" ? playersA : playersB;
+    const uidFound = Object.keys(nextSlotsMap).find(
+      (uid) => Number(nextSlotsMap[uid]) === targetSlot
+    );
+    // console.log("5. User tìm thấy ở slot", targetSlot, "là:", uidFound);
+    // LOG END
+
+    // ... (giữ nguyên phần code xử lý bên dưới)
     const prev = {
       side: activeSide,
       server: activeServerNum,
       serverId: serverUidShow,
     };
 
-    const nextSide = activeSide === "A" ? "B" : "A";
     const preStart = waitingStart || match?.status !== "live";
     const isDouble = eventType !== "single";
     const wantOrder = preStart ? (isDouble ? 2 : 1) : 1;
 
-    // ✅ FIX: Luôn lấy right court player (base=2)
-    const baseMap = nextSide === "A" ? baseA : baseB;
-    const uidRight =
-      Object.entries(baseMap).find(([, base]) => Number(base) === 2)?.[0] || "";
+    // Code fix trước đó
+    const uidRight = uidFound || Object.keys(nextSlotsMap)[0] || "";
 
     lastServerUidRef.current = uidRight;
 
@@ -1680,38 +2058,14 @@ export default function RefereeJudgePanel({ matchId }) {
         userMatch,
       },
       async (ack) => {
+        // ... (giữ nguyên logic callback)
         if (!ack?.ok) {
-          Toast.show({
-            type: "error",
-            text1: "Lỗi",
-            text2: ack?.message || "Không đặt được giao bóng",
-          });
+          Toast.show({ type: "error", text1: "Lỗi 1", text2: ack?.message });
           return;
         }
-
         pushUndo({ t: "SERVE_SET", prev });
-
-        // 🛡️ Guard: nếu backend lỡ reset 0-0 khi đang mid-game → khôi phục điểm
         try {
-          const res = await refetch();
-          const m = res?.data || match;
-          const g = m?.gameScores?.[curIdx];
-          if (
-            !preStart &&
-            g &&
-            g.a === 0 &&
-            g.b === 0 &&
-            (curA !== 0 || curB !== 0)
-          ) {
-            await setGame({
-              matchId: match._id,
-              gameIndex: curIdx,
-              a: curA,
-              b: curB,
-              autoNext: false,
-            }).unwrap();
-            await refetch();
-          }
+          refetch();
         } catch {}
       }
     );
@@ -2074,8 +2428,8 @@ export default function RefereeJudgePanel({ matchId }) {
                   style={[s.iconBtn, { backgroundColor: t.colors.card }]}
                   rippleContainerBorderRadius={8}
                 >
-                  <MaterialIcons
-                    name="arrow-back"
+                  <Ionicons
+                    name="chevron-back"
                     size={20}
                     color={t.colors.text}
                   />
@@ -2201,23 +2555,26 @@ export default function RefereeJudgePanel({ matchId }) {
               </View>
 
               {/* NÚT SETTINGS GÓC PHẢI */}
-              <Ripple
+              <TouchableOpacity
                 onPress={() => setSettingsOpen(true)}
-                rippleContainerBorderRadius={999}
-                style={[
-                  s.iconBtn,
-                  {
-                    marginLeft: 8,
-                    backgroundColor: t.colors.card,
-                  },
-                ]}
+                // Bo tròn hiệu ứng gợn sóng cho khớp với View bên trong
               >
-                <MaterialIcons
-                  name="settings"
-                  size={20}
-                  color={t.colors.text}
-                />
-              </Ripple>
+                {/* View này chịu trách nhiệm hiển thị hình tròn và màu nền */}
+                <View
+                  style={[
+                    s.iconBtnSetting, // Style gốc (nếu có)
+                    {
+                      borderRadius: 20, // Bo tròn thành hình tròn
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="settings"
+                    size={20}
+                    color={t.colors.text}
+                  />
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2296,14 +2653,21 @@ export default function RefereeJudgePanel({ matchId }) {
                 ) : (
                   <>
                     {/* bình thường như cũ */}
-                    <WinTargetTuner
-                      value={ptw}
-                      base={ptwBoost ? ptw - 4 : ptw}
-                      onToggle={() => {
-                        setPointsToWinDelta(ptwBoost ? -4 : +4);
-                      }}
+                    {/* ✅ GIAO DIỆN TIMEOUT MỚI (Thay thế WinTargetTuner) */}
+                    <TimeoutHeader
+                      leftTO={leftSide === "A" ? toA : toB}
+                      leftMed={leftSide === "A" ? medA : medB}
+                      rightTO={rightSide === "A" ? toA : toB}
+                      rightMed={rightSide === "A" ? medA : medB}
+                      // 👇 Nhớ truyền 2 cái này
+                      limitTO={timeoutPerGame}
+                      limitMed={medicalLimit}
+                      // 👆
+                      timeoutMinutes={timeoutMinutes}
+                      onTimeout={handleCallTimeout}
+                      onMedical={handleCallMedical}
+                      disabled={!canScoreNow && !localBreak}
                     />
-
                     <Text style={[s.callout, { color: t.colors.text }]}>
                       {callout || "—"}
                     </Text>
@@ -2377,109 +2741,142 @@ export default function RefereeJudgePanel({ matchId }) {
           ]}
         >
           <View style={s.bottomBar}>
-            <Text
-              style={[s.clockText, s.clockAbsolute, { color: t.colors.text }]}
-            >
-              {now.getHours().toString().padStart(2, "0")}:
-              {now.getMinutes().toString().padStart(2, "0")}:
-              {now.getSeconds().toString().padStart(2, "0")}
-            </Text>
+            {localBreak ? (
+              <Text
+                style={[
+                  s.clockText, // Style gốc có fontWeight 900
+                  s.clockAbsolute,
+                  {
+                    // Màu đỏ đậm hoặc vàng đậm để rõ nét
+                    color:
+                      localBreak.type === "medical" ? "#dc2626" : "#d97706",
+                    fontSize: 20, // ✅ Tăng kích thước chữ (cũ là 16)
+                    fontWeight: "900", // ✅ Siêu đậm
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  },
+                ]}
+              >
+                {localBreak.type === "medical" ? "Nghỉ y tế" : "Timeout"}
+              </Text>
+            ) : (
+              <LiveClock
+                style={[s.clockText, s.clockAbsolute, { color: t.colors.text }]}
+              />
+            )}
 
-            <View style={[s.row, s.bottomActions]}>
-              {!isPreMatch && (
-                <>
-                  <Ripple
-                    onPress={() => inc(leftSide)}
-                    disabled={!leftEnabled}
-                    rippleContainerBorderRadius={12}
-                    style={[
-                      s.bigActionBtn,
-                      {
-                        backgroundColor: t.colors.card,
-                        borderColor: t.colors.border,
-                      },
-                      activeSide === leftSide && {
-                        backgroundColor: t.colors.primary,
-                        borderColor: t.colors.primary,
-                      },
-                      !leftEnabled && s.btnDisabled,
-                    ]}
-                  >
-                    {incBusy ? (
-                      <ActivityIndicator />
-                    ) : (
-                      <MaterialIcons
-                        name="add"
-                        size={22}
-                        color={activeSide === leftSide ? "#fff" : t.colors.text}
-                      />
-                    )}
-                    <Text
+            {localBreak ? (
+              <View style={s.breakOverlay}>
+                <BreakTimer endTime={localBreak.endTime} style={s.breakTimer} />
+
+                <Ripple
+                  onPress={handleContinue}
+                  style={s.btnContinue}
+                  rippleContainerBorderRadius={12}
+                >
+                  <Text style={s.btnContinueText}>Tiếp tục</Text>
+                  <MaterialIcons name="play-arrow" size={24} color="#fff" />
+                </Ripple>
+              </View>
+            ) : (
+              <View style={[s.row, s.bottomActions]}>
+                {!isPreMatch && (
+                  <>
+                    <Ripple
+                      onPress={() => inc(leftSide)}
+                      disabled={!leftEnabled}
+                      rippleContainerBorderRadius={12}
                       style={[
-                        s.bigActionText,
-                        { color: t.colors.text },
-                        activeSide === leftSide && s.bigActionTextActive,
+                        s.bigActionBtn,
+                        {
+                          backgroundColor: t.colors.card,
+                          borderColor: t.colors.border,
+                        },
+                        activeSide === leftSide && {
+                          backgroundColor: t.colors.primary,
+                          borderColor: t.colors.primary,
+                        },
+                        !leftEnabled && s.btnDisabled,
                       ]}
                     >
-                      Đội bên trái
-                    </Text>
-                  </Ripple>
+                      {incBusy ? (
+                        <ActivityIndicator />
+                      ) : (
+                        <MaterialIcons
+                          name="add"
+                          size={22}
+                          color={
+                            activeSide === leftSide ? "#fff" : t.colors.text
+                          }
+                        />
+                      )}
+                      <Text
+                        style={[
+                          s.bigActionText,
+                          { color: t.colors.text },
+                          activeSide === leftSide && s.bigActionTextActive,
+                        ]}
+                      >
+                        Đội bên trái
+                      </Text>
+                    </Ripple>
 
-                  {/* Nút giữa động: Đổi tay <-> Đổi giao */}
-                  <Ripple
-                    onPress={onMidPress}
-                    disabled={incBusy || undoBusy}
-                    rippleContainerBorderRadius={12}
-                    style={[
-                      s.toggleBtn,
-                      (incBusy || undoBusy) && s.btnDisabled,
-                    ]}
-                  >
-                    <MaterialIcons name={midIcon} size={22} color="#fff" />
-                    <Text style={s.toggleText}>{midLabel}</Text>
-                  </Ripple>
-
-                  <Ripple
-                    onPress={() => inc(rightSide)}
-                    disabled={!rightEnabled}
-                    rippleContainerBorderRadius={12}
-                    style={[
-                      s.bigActionBtn,
-                      {
-                        backgroundColor: t.colors.card,
-                        borderColor: t.colors.border,
-                      },
-                      activeSide === rightSide && {
-                        backgroundColor: t.colors.primary,
-                        borderColor: t.colors.primary,
-                      },
-                      !rightEnabled && s.btnDisabled,
-                    ]}
-                  >
-                    {incBusy ? (
-                      <ActivityIndicator />
-                    ) : (
-                      <MaterialIcons
-                        name="add"
-                        size={22}
-                        color={
-                          activeSide === rightSide ? "#fff" : t.colors.text
-                        }
-                      />
-                    )}
-                    <Text
+                    {/* Nút giữa động: Đổi tay <-> Đổi giao */}
+                    <Ripple
+                      onPress={onMidPress}
+                      disabled={incBusy || undoBusy}
+                      rippleContainerBorderRadius={12}
                       style={[
-                        s.bigActionText,
-                        { color: t.colors.text },
-                        activeSide === rightSide && s.bigActionTextActive,
+                        s.toggleBtn,
+                        (incBusy || undoBusy) && s.btnDisabled,
                       ]}
                     >
-                      Đội bên phải
-                    </Text>
-                  </Ripple>
-                </>
-              )}
-            </View>
+                      <MaterialIcons name={midIcon} size={22} color="#fff" />
+                      <Text style={s.toggleText}>{midLabel}</Text>
+                    </Ripple>
+
+                    <Ripple
+                      onPress={() => inc(rightSide)}
+                      disabled={!rightEnabled}
+                      rippleContainerBorderRadius={12}
+                      style={[
+                        s.bigActionBtn,
+                        {
+                          backgroundColor: t.colors.card,
+                          borderColor: t.colors.border,
+                        },
+                        activeSide === rightSide && {
+                          backgroundColor: t.colors.primary,
+                          borderColor: t.colors.primary,
+                        },
+                        !rightEnabled && s.btnDisabled,
+                      ]}
+                    >
+                      {incBusy ? (
+                        <ActivityIndicator />
+                      ) : (
+                        <MaterialIcons
+                          name="add"
+                          size={22}
+                          color={
+                            activeSide === rightSide ? "#fff" : t.colors.text
+                          }
+                        />
+                      )}
+                      <Text
+                        style={[
+                          s.bigActionText,
+                          { color: t.colors.text },
+                          activeSide === rightSide && s.bigActionTextActive,
+                        ]}
+                      >
+                        Đội bên phải
+                      </Text>
+                    </Ripple>
+                  </>
+                )}
+              </View>
+            )}
             {/* 👉 Góc phải: Bắt đầu + Bốc thăm, chỉ khi trước trận */}
             {/* 👉 Góc phải: CTA (Bắt đầu / Bắt game tiếp / Kết thúc trận) + Bốc thăm */}
             {cta && (
@@ -2720,6 +3117,12 @@ const s = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#f2f0f5",
   },
+  iconBtnSetting: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#f2f0f5",
+  },
 
   btnOutlineSm: {
     borderWidth: 1,
@@ -2901,18 +3304,15 @@ const s = StyleSheet.create({
   winRowAbsolute: {
     position: "absolute",
     top: 6,
-    left: 12,
-    right: 12,
+    left: 8,
+    right: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    zIndex: 2,
+    zIndex: 10,
+    height: 40,
   },
-  winPairRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
+
   winCenterRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -3049,5 +3449,51 @@ const s = StyleSheet.create({
     flexDirection: "row", // 👈 thêm dòng này để xếp ngang (row)
     alignItems: "center", // 👈 canh giữa theo trục dọc
     gap: 8, // 👈 (optional) khoảng cách giữa 2 nút
+  },
+  breakOverlay: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    width: "100%",
+    height: "100%",
+    // Nền trắng mờ che lên các nút bên dưới
+    backgroundColor: "rgba(255,255,255,0.95)",
+    position: "absolute",
+    zIndex: 10,
+    borderRadius: 12,
+  },
+  breakTitle: { fontSize: 14, fontWeight: "700", color: "#6b7280" },
+  breakTimer: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#ef4444",
+    fontVariant: ["tabular-nums"],
+  },
+  btnContinue: {
+    backgroundColor: "#10b981",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    shadowColor: "#10b981",
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  btnContinueText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  winPairRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4, // Giảm khoảng cách giữa các bubble lặp lại
+    flexWrap: "wrap", // Rất quan trọng nếu số lượng bubble lớn
+  },
+  // 👇 THÊM STYLE NÀY VÀO CUỐI LIST 👇
+  bubbleUsed: {
+    backgroundColor: "#e2e8f0", // Màu nền xám
+    borderColor: "#cbd5e1", // Viền xám
+    borderWidth: 1,
   },
 });

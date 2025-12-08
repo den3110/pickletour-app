@@ -240,6 +240,19 @@ export const liveStreamingApiSlice = apiSlice.injectEndpoints({
       query: (matchId) => `/api/overlay/match/${matchId}`,
       providesTags: (res, err, id) => [{ type: "Match", id }],
     }),
+
+    // ✅ THÊM ENDPOINT NÀY:
+    getUserMatchDetails: builder.query({
+      // 👇 Sửa lại đường dẫn này cho khớp với Backend của bạn
+      query: (matchId) => `/api/user-matches/${matchId}/detail`, 
+      
+      // Giữ cache trong 5 giây mặc định (hoặc tuỳ chỉnh)
+      keepUnusedDataFor: 5,
+      
+      // Tag để invalidate cache khi có update
+      providesTags: (result, error, matchId) => 
+        result ? [{ type: "UserMatch", id: matchId }] : [],
+    }),
   }),
   overrideExisting: true
 });
@@ -273,4 +286,5 @@ export const {
   useGetStreamingConfigQuery,
   useUpdateStreamingConfigMutation,
   useGetOverlaySnapshotQuery,
+  useGetUserMatchDetailsQuery,
 } = liveStreamingApiSlice;

@@ -50,6 +50,8 @@ if (__DEV__) {
   require("../dev/ws-logger");
 }
 
+console.log('Is Fabric Enabled:', global.nativeFabricUIManager ? 'YES' : 'NO');
+
 const SPLASH_FONT_FAILSAFE_MS = 1500;
 const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"

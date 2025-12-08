@@ -1220,10 +1220,14 @@ export default function LiveLikeFBScreenKey({
   const beginGapWait = useCallback(() => {
     clearGapTimers();
     gapWaitingRef.current = true;
-    setStatusText("Không còn trận — đang chờ trận mới… (tối đa 10 phút)");
-    gapTenMinTimerRef.current = setTimeout(() => {
-      setGapWarnVisible(true);
-    }, GAP_WAIT_MS);
+
+    // ✅ Đổi text, bỏ "(tối đa 10 phút)"
+    setStatusText("Không còn trận — đang chờ trận mới…");
+
+    // ❌ Không đặt timeout nữa, nên sẽ không bao giờ auto tắt
+    // gapTenMinTimerRef.current = setTimeout(() => {
+    //   setGapWarnVisible(true);
+    // }, GAP_WAIT_MS);
   }, [clearGapTimers]);
 
   const handleGapAutoStop = useCallback(async () => {
@@ -2290,7 +2294,7 @@ export default function LiveLikeFBScreenKey({
         )}
 
         {/* BOTTOM CONTROL BAR */}
-        {(mode === "live") && (
+        {mode === "live" && (
           <View
             style={[
               styles.liveBottomBar,
