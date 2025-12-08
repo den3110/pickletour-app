@@ -13,13 +13,13 @@ export default function UserMatchLive() {
   const { id } = useLocalSearchParams();
 
   // id từ route /match/[id]/live
-  const matchId =
-    typeof id === "string" ? id : Array.isArray(id) ? id[0] : "";
+  const matchId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : "";
 
   const textColor = theme?.colors?.text ?? "#111827";
 
   return (
     <>
+      <Stack.Screen options={{ headerShown: false }} />
       {/* ✅ Bọc lại màn live gốc */}
       <LiveUserMatchScreen
         // tạm dùng matchId làm tid/bid cho dễ debug (nếu bên trong có log)
