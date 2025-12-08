@@ -393,14 +393,15 @@ export default function LiveUserMatchScreen({
 
       notifyStreamStarted({ matchId, platform: "all" }).catch(() => {});
 
-      setTimeout(() => {
-        videoUploader
-          .startRecording(matchId)
-          .then(() => {
-            setIsRecording(true);
-          })
-          .catch((e) => console.log("Recording failed", e));
-      }, 1000);
+      // ❌ [DISABLE RECORDING]
+      // setTimeout(() => {
+      //   videoUploader
+      //     .startRecording(matchId)
+      //     .then(() => {
+      //       setIsRecording(true);
+      //     })
+      //     .catch((e) => console.log("Recording failed", e));
+      // }, 1000);
 
       Live.overlayLoad("", width, height, "tl", 100, 100, 0, 0).catch(() => {});
       Live.overlaySetVisible?.(true);
@@ -417,10 +418,11 @@ export default function LiveUserMatchScreen({
     setStatusText("Buổi phát đã kết thúc");
 
     try {
-      if (isRecording) {
-        await videoUploader.stopRecording();
-        setIsRecording(false);
-      }
+      // ❌ [DISABLE RECORDING]
+      // if (isRecording) {
+      //   await videoUploader.stopRecording();
+      //   setIsRecording(false);
+      // }
       await Live.stop?.();
       await Live.stopPreview?.();
       startedPreviewRef.current = false;
@@ -824,38 +826,40 @@ const styles = StyleSheet.create({
   idleText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   liveBottomBar: {
     position: "absolute",
-    backgroundColor: "rgba(0,0,0,0.8)",
-    borderRadius: 12,
-    height: 60,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 10,
+    height: 50,
+    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    justifyContent: "space-between",
+    justifyContent: "flex-start", // 👈 RẤT QUAN TRỌNG: icon gom bên trái
   },
   bottomIconBtn: {
     width: 40,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4, // 👈 chỉ gap nhỏ giữa các icon
   },
   activeBtn: { backgroundColor: "rgba(255,255,255,0.2)" },
   // ✅ Style cho nút Quality nhỏ ở dưới
   bottomQualityBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
-    height: 44,
+    paddingHorizontal: 8,
+    marginLeft: 4,
+    marginRight: 8, // 👈 nút quality nằm cùng cụm bên trái
   },
   bottomQualityTxt: { color: "#fff", fontSize: 11, marginLeft: 4 },
   finishBtn: {
+    marginLeft: "auto", // 👈 đẩy nút Kết thúc sang sát bên phải
     backgroundColor: "#fff",
     borderRadius: 8,
-    paddingHorizontal: 16,
-    height: 36,
-    justifyContent: "center",
+    paddingHorizontal: 12,
+    height: 32,
     alignItems: "center",
-    marginLeft: 8,
+    justifyContent: "center",
   },
   finishTxt: { color: "#000", fontWeight: "800", fontSize: 14 },
   endedTitle: {
