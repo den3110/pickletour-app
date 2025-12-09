@@ -510,6 +510,10 @@ export default function LiveLikeFBScreenKey({
     null
   );
 
+  // 👇👇 THÊM 2 REF NÀY ĐỂ FIX LỖI NHẢY DỮ LIỆU 👇👇
+  const socketHasDataRef = useRef(false); // Đánh dấu socket đã bắt đầu bắn tin
+  const latestValidDataRef = useRef<any>(null); // Lưu trữ dữ liệu đầy đủ gần nhất
+
   /* ==== Gap ==== */
   const [gapWarnVisible, setGapWarnVisible] = useState(false);
   const gapWaitingRef = useRef(false);
@@ -1268,170 +1272,205 @@ export default function LiveLikeFBScreenKey({
 
   const [realtimeOverlayData, setRealtimeOverlayData] = useState<any>(null);
 
-  const updateOverlayNow = useCallback(
-    throttle(async (dataSource: any) => {
-      if (!dataSource || mode !== "live") return;
+  const updateOverlayNow = useMemo(
+    () =>
+      throttle(async (incomingData: any) => {
+        if (mode !== "live" || !incomingData) return;
 
-      if (LOG) {
-        console.log("overlay data source", dataSource);
-        console.log("overlay config", overlayConfig);
-      }
+        /* --- LOGIC MERGE DỮ LIỆU --- */
+        let finalData = incomingData;
 
-      try {
-        const safeStr = (val: any, fallback = "") =>
-          val != null ? String(val) : fallback;
-        const safeNum = (val: any, fallback = 0) =>
-          typeof val === "number" ? val : fallback;
-        const safeBool = (val: any) => Boolean(val);
+        // Kiểm tra xem dữ liệu mới có thông tin đội không (hay chỉ có điểm)
+        const hasTeamInfo =
+          incomingData.pairA || incomingData.pairB || incomingData.teams;
 
-        const webLogoUrl = safeStr(
-          overlayConfig?.webLogoUrl ||
-            process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
-            dataSource?.tournament?.overlay?.logoUrl ||
-            dataSource?.bracket?.overlay?.logoUrl
-        );
+        if (hasTeamInfo) {
+          // Dữ liệu đầy đủ -> Lưu vào cache để dùng cho lần sau
+          latestValidDataRef.current = incomingData;
+        } else {
+          // Dữ liệu thiếu (chỉ có score) -> Lấy thông tin đội từ Cache đắp vào
+          if (latestValidDataRef.current) {
+            finalData = { ...latestValidDataRef.current, ...incomingData };
 
-        const sponsorLogos = Array.isArray(overlayConfig?.sponsors)
-          ? overlayConfig.sponsors.map((s: any) => s?.logoUrl).filter(Boolean)
-          : [];
-
-        if (LOG && sponsorLogos.length > 0) {
-          console.log(`✅ Loaded ${sponsorLogos.length} sponsor logos`);
+            // Đảm bảo giữ lại các object quan trọng nếu incomingData bị thiếu
+            if (!finalData.pairA)
+              finalData.pairA = latestValidDataRef.current.pairA;
+            if (!finalData.pairB)
+              finalData.pairB = latestValidDataRef.current.pairB;
+            if (!finalData.teams)
+              finalData.teams = latestValidDataRef.current.teams;
+            if (!finalData.tournament)
+              finalData.tournament = latestValidDataRef.current.tournament;
+          } else {
+            // Không có cache, dữ liệu lại thiếu -> Bỏ qua để tránh vỡ giao diện (mất height)
+            return;
+          }
         }
-
-        const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
-
-        console.log(
-          "-----------------------------",
-          safeStr(dataSource?.tournament?.image)
-        );
-
-        const overlayData = {
-          theme: safeStr(
-            dataSource?.tournament?.overlay?.theme ||
-              dataSource?.bracket?.overlay?.theme,
-            "dark"
-          ),
-          size: safeStr(
-            dataSource?.tournament?.overlay?.size ||
-              dataSource?.bracket?.overlay?.size,
-            "md"
-          ),
-          accentA: safeStr(
-            dataSource?.tournament?.overlay?.accentA ||
-              dataSource?.bracket?.overlay?.accentA,
-            "#25C2A0"
-          ),
-          accentB: safeStr(
-            dataSource?.tournament?.overlay?.accentB ||
-              dataSource?.bracket?.overlay?.accentB,
-            "#4F46E5"
-          ),
-          rounded: safeNum(
-            dataSource?.tournament?.overlay?.rounded ||
-              dataSource?.bracket?.overlay?.rounded,
-            18
-          ),
-          shadow: safeBool(
-            dataSource?.tournament?.overlay?.shadow ??
-              dataSource?.bracket?.overlay?.shadow ??
-              true
-          ),
-          showSets: safeBool(
-            dataSource?.tournament?.overlay?.showSets ??
-              dataSource?.bracket?.overlay?.showSets ??
-              true
-          ),
-          nameScale: safeNum(
-            dataSource?.tournament?.overlay?.nameScale ||
-              dataSource?.bracket?.overlay?.nameScale,
-            1.0
-          ),
-          scoreScale: safeNum(
-            dataSource?.tournament?.overlay?.scoreScale ||
-              dataSource?.bracket?.overlay?.scoreScale,
-            1.0
-          ),
-
-          tournamentName: safeStr(dataSource?.tournament?.name),
-          courtName: safeStr(dataSource?.court?.name || dataSource?.courtName),
-          tournamentLogoUrl: logoTournamentUrl,
-          phaseText: safeStr(dataSource?.bracket?.name),
-          roundLabel: safeStr(dataSource?.roundCode),
-
-          teamAName: safeStr(
-            dataSource?.teams?.A?.name ||
-              `${dataSource?.pairA?.player1?.nickname || "Team A"}`,
-            "Team A"
-          ),
-          teamBName: safeStr(
-            dataSource?.teams?.B?.name ||
-              `${dataSource?.pairB?.player1?.nickname || "Team B"}`,
-            "Team B"
-          ),
-
-          scoreA: safeNum(
-            dataSource?.gameScores?.[dataSource?.currentGame || 0]?.a,
-            0
-          ),
-          scoreB: safeNum(
-            dataSource?.gameScores?.[dataSource?.currentGame || 0]?.b,
-            0
-          ),
-
-          serveSide: safeStr(dataSource?.serve?.side, "A").toUpperCase(),
-          serveCount: Math.max(
-            1,
-            Math.min(2, safeNum(dataSource?.serve?.server, 1))
-          ),
-
-          isBreak: safeBool(dataSource?.isBreak?.active || false),
-          breakNote: safeStr(dataSource?.isBreak?.note || ""),
-          breakTeams: `${safeStr(
-            dataSource?.teams?.A?.name || "Team A"
-          )} vs ${safeStr(dataSource?.teams?.B?.name || "Team B")}`,
-          breakRound: safeStr(
-            dataSource?.roundCode || dataSource?.bracket?.name
-          ),
-
-          isDefaultDesign: false,
-          overlayEnabled: true,
-          webLogoUrl:
-            "https://pickletour.vn/uploads/avatars/1765084294948-1764152220888-1762020439803-photo_2025-11-02_00-50-33-1-1764152220890.jpg",
-          sponsorLogos,
-
-          showClock: false,
-          scaleScore: 0.5,
-          showTime: true,
-          overlayVersion: 2,
-
-          sets: Array.isArray(dataSource?.gameScores)
-            ? dataSource.gameScores.map((g: any, i: number) => ({
-                index: i + 1,
-                a: g?.a ?? null,
-                b: g?.b ?? null,
-                winner: g?.winner || "",
-                current: i === (dataSource?.currentGame || 0),
-              }))
-            : [],
-        };
+        /* --------------------------- */
 
         if (LOG) {
-          console.log("overlayUpdate → calling", {
-            ...overlayData,
-            webLogoUrl: overlayData.webLogoUrl ? "✅" : "❌",
-            sponsorLogos: `${overlayData.sponsorLogos.length} logos`,
-          });
+          console.log("overlay data source", finalData);
         }
-        await Live.overlayUpdate?.(overlayData);
-        log("overlayUpdate → OK");
-      } catch (e) {
-        log("overlayUpdate → error", e);
-      }
-    }, 2000),
+
+        try {
+          // Helper functions
+          const safeStr = (val: any, fallback = "") =>
+            val != null ? String(val) : fallback;
+          const safeNum = (val: any, fallback = 0) =>
+            typeof val === "number" ? val : fallback;
+          const safeBool = (val: any) => Boolean(val);
+
+          // Get names
+          const p1 = finalData.pairA || finalData.teams?.A;
+          const p2 = finalData.pairB || finalData.teams?.B;
+
+          // Logic lấy tên hiển thị (tương tự file kia)
+          const getNm = (p: any, def: string) => {
+            if (!p) return def;
+            if (p.name) return p.name; // structure teams.A.name
+            if (p.teamName) return p.teamName;
+            // structure pairA.player1...
+            const pl1 =
+              p.player1?.nickName ||
+              p.player1?.fullName ||
+              p.player1?.displayName ||
+              "";
+            const pl2 =
+              p.player2?.nickName ||
+              p.player2?.fullName ||
+              p.player2?.displayName ||
+              "";
+            if (p.player2)
+              return pl1 && pl2 ? `${pl1} / ${pl2}` : pl1 || pl2 || def;
+            return pl1 || def;
+          };
+
+          const teamAName = getNm(p1, "Team A");
+          const teamBName = getNm(p2, "Team B");
+
+          const currentIdx = finalData.currentGame || 0;
+          const currentScore =
+            finalData.gameScores && finalData.gameScores[currentIdx]
+              ? finalData.gameScores[currentIdx]
+              : { a: 0, b: 0 };
+
+          const webLogoUrl = safeStr(
+            overlayConfig?.webLogoUrl ||
+              process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
+              finalData?.tournament?.overlay?.logoUrl ||
+              finalData?.bracket?.overlay?.logoUrl
+          );
+
+          const sponsorLogos = Array.isArray(overlayConfig?.sponsors)
+            ? overlayConfig.sponsors.map((s: any) => s?.logoUrl).filter(Boolean)
+            : [];
+
+          const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
+
+          const overlayData = {
+            theme: safeStr(
+              finalData?.tournament?.overlay?.theme ||
+                finalData?.bracket?.overlay?.theme,
+              "dark"
+            ),
+            size: safeStr(
+              finalData?.tournament?.overlay?.size ||
+                finalData?.bracket?.overlay?.size,
+              "md"
+            ),
+            accentA: safeStr(
+              finalData?.tournament?.overlay?.accentA ||
+                finalData?.bracket?.overlay?.accentA,
+              "#25C2A0"
+            ),
+            accentB: safeStr(
+              finalData?.tournament?.overlay?.accentB ||
+                finalData?.bracket?.overlay?.accentB,
+              "#4F46E5"
+            ),
+            rounded: safeNum(
+              finalData?.tournament?.overlay?.rounded ||
+                finalData?.bracket?.overlay?.rounded,
+              18
+            ),
+            shadow: safeBool(
+              finalData?.tournament?.overlay?.shadow ??
+                finalData?.bracket?.overlay?.shadow ??
+                true
+            ),
+            showSets: safeBool(
+              finalData?.tournament?.overlay?.showSets ??
+                finalData?.bracket?.overlay?.showSets ??
+                true
+            ),
+            nameScale: safeNum(
+              finalData?.tournament?.overlay?.nameScale ||
+                finalData?.bracket?.overlay?.nameScale,
+              1.0
+            ),
+            scoreScale: safeNum(
+              finalData?.tournament?.overlay?.scoreScale ||
+                finalData?.bracket?.overlay?.scoreScale,
+              1.0
+            ),
+
+            tournamentName: safeStr(finalData?.tournament?.name),
+            courtName: safeStr(finalData?.court?.name || finalData?.courtName),
+            tournamentLogoUrl: logoTournamentUrl,
+            phaseText: safeStr(finalData?.bracket?.name),
+            roundLabel: safeStr(finalData?.roundCode),
+
+            teamAName,
+            teamBName,
+
+            scoreA: safeNum(currentScore.a, 0),
+            scoreB: safeNum(currentScore.b, 0),
+
+            serveSide: safeStr(finalData?.serve?.side, "A").toUpperCase(),
+            serveCount: Math.max(
+              1,
+              Math.min(2, safeNum(finalData?.serve?.server, 1))
+            ),
+
+            isBreak: safeBool(finalData?.isBreak?.active || false),
+            breakNote: safeStr(finalData?.isBreak?.note || ""),
+            breakTeams: `${teamAName} vs ${teamBName}`,
+            breakRound: safeStr(
+              finalData?.roundCode || finalData?.bracket?.name
+            ),
+
+            isDefaultDesign: false,
+            overlayEnabled: true,
+            webLogoUrl:
+              "https://pickletour.vn/uploads/avatars/1765084294948-1764152220888-1762020439803-photo_2025-11-02_00-50-33-1-1764152220890.jpg",
+            sponsorLogos,
+
+            showClock: false,
+            scaleScore: 0.5,
+            showTime: true,
+            overlayVersion: 2,
+
+            sets: Array.isArray(finalData?.gameScores)
+              ? finalData.gameScores.map((g: any, i: number) => ({
+                  index: i + 1,
+                  a: g?.a ?? null,
+                  b: g?.b ?? null,
+                  winner: g?.winner || "",
+                  current: i === (finalData?.currentGame || 0),
+                }))
+              : [],
+          };
+
+          await Live.overlayUpdate?.(overlayData);
+          // log("overlayUpdate → OK");
+        } catch (e) {
+          log("overlayUpdate → error", e);
+        }
+      }, 500), // 🔥 Throttle 500ms
     [mode, overlayConfig]
   );
 
+  // Effect 1: Socket Listeners
   useEffect(() => {
     if (!currentMatchId || !socket || mode !== "live") {
       return;
@@ -1440,11 +1479,9 @@ export default function LiveLikeFBScreenKey({
     log("socket → joining match room for overlay", currentMatchId);
     socket.emit("match:join", { matchId: currentMatchId });
 
-    const onMatchSnapshot = (data?: any) => {
+    const onUpdate = (data?: any) => {
       const payloadMatchId = getMatchIdFromPayload(data);
       const activeMatchId = currentMatchRef.current;
-
-      log("socket → match:snapshot received", data);
 
       if (
         !payloadMatchId ||
@@ -1455,45 +1492,34 @@ export default function LiveLikeFBScreenKey({
       }
 
       if (data) {
-        setRealtimeOverlayData(data);
+        // 🚩 Đánh dấu là Socket đã có dữ liệu, cấm API snapshot ghi đè
+        socketHasDataRef.current = true;
         updateOverlayNow(data);
       }
     };
 
-    const onScoreUpdate = (data?: any) => {
-      const payloadMatchId = getMatchIdFromPayload(data);
-      const activeMatchId = currentMatchRef.current;
-      log("socket → score:updated received", data);
-      if (
-        !payloadMatchId ||
-        !activeMatchId ||
-        payloadMatchId !== activeMatchId
-      ) {
-        return;
-      }
-      if (data) {
-        setRealtimeOverlayData(data);
-        updateOverlayNow(data);
-      }
-    };
-
-    socket.on("match:snapshot", onMatchSnapshot);
-    socket.on("score:updated", onScoreUpdate);
+    socket.on("match:snapshot", onUpdate);
+    socket.on("score:updated", onUpdate);
 
     return () => {
       log("socket → leaving match room", currentMatchId);
       socket.emit("match:leave", { matchId: currentMatchId });
-      socket.off("match:snapshot", onMatchSnapshot);
-      socket.off("score:updated", onScoreUpdate);
+      socket.off("match:snapshot", onUpdate);
+      socket.off("score:updated", onUpdate);
     };
   }, [currentMatchId, socket, mode, updateOverlayNow]);
 
+  // Effect 2: Initial API Snapshot (Chỉ chạy 1 lần đầu nếu socket chưa về)
   useEffect(() => {
-    if (!overlaySnapshot || realtimeOverlayData || mode !== "live") return;
-
-    log("overlaySnapshot → initial load from RTK");
-    updateOverlayNow(overlaySnapshot);
-  }, [overlaySnapshot, realtimeOverlayData, mode, updateOverlayNow]);
+    if (
+      mode === "live" &&
+      overlaySnapshot &&
+      !socketHasDataRef.current // 🚩 Chỉ update nếu socket chưa đè
+    ) {
+      log("overlaySnapshot → initial load from RTK");
+      updateOverlayNow(overlaySnapshot);
+    }
+  }, [overlaySnapshot, mode, updateOverlayNow]);
 
   /* ==== Start for match ==== */
   const lastAutoStartedForRef = useRef<string | null>(null);
@@ -1597,6 +1623,9 @@ export default function LiveLikeFBScreenKey({
         lastUrlRef.current = rtmpUrl;
         currentMatchRef.current = mid;
         setLiveStartAt(Date.now());
+        // 👇👇 THÊM 2 DÒNG NÀY ĐỂ RESET CACHE KHI LIVE MỚI 👇👇
+        socketHasDataRef.current = false;
+        latestValidDataRef.current = null;
         setMode("live");
         setStatusText("Đang LIVE…");
 

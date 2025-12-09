@@ -11,11 +11,9 @@ import {
   Pressable,
   StyleSheet,
   Alert,
-  Platform,
   PermissionsAndroid,
   ViewStyle,
   NativeModules,
-  AppState,
   ActivityIndicator,
   requireNativeComponent,
   UIManager,
@@ -53,18 +51,13 @@ const RtmpPreviewView =
 (global as any).__RtmpPreviewView = RtmpPreviewView;
 const Live = (NativeModules as any).FacebookLiveModule;
 
-// ✅ Import Native Timer View (có cache, tránh register 2 lần)
+// ✅ Import Native Timer View
 const TIMER_COMPONENT_NAME = "LiveTimerView";
-
-// Gọi trước để RN load view config (không bắt buộc nhưng an toàn)
 (UIManager as any).getViewManagerConfig?.(TIMER_COMPONENT_NAME);
-
 const _CachedLiveTimerView =
   (global as any).__LiveTimerView ||
   requireNativeComponent<{ startTimeMs: number }>(TIMER_COMPONENT_NAME);
-
 (global as any).__LiveTimerView = _CachedLiveTimerView;
-
 const LiveTimerView = _CachedLiveTimerView;
 
 /* ====== HELPER: Extract Config ====== */
@@ -119,7 +112,6 @@ type StreamProfile = {
   fps: number;
 };
 
-// ✅ KHÔI PHỤC: Cấu hình chất lượng
 const QUALITY_PRESETS: Record<
   QualityId,
   {
@@ -219,14 +211,12 @@ export default function LiveUserMatchScreen({
   const [batterySaverMode, setBatterySaverMode] = useState(false);
   const brightnessBeforeSaverRef = useRef<number>(1);
 
-  // ✅ KHÔI PHỤC: State cho menu chất lượng
   const [qualityMenuVisible, setQualityMenuVisible] = useState(false);
   const [qualityChoice, setQualityChoice] = useState<QualityId>("auto");
-  const qualityChoiceRef = useRef<QualityId>("auto"); // Dùng ref để access trong function async
+  const qualityChoiceRef = useRef<QualityId>("auto");
 
   // Recording
   const [isRecording, setIsRecording] = useState(false);
-  const [pendingUploads, setPendingUploads] = useState(0);
 
   // Orientation
   const [orientation, setOrientation] = useState<Orient | null>(null);
@@ -239,9 +229,14 @@ export default function LiveUserMatchScreen({
   const chosenProfileRef = useRef<StreamProfile | null>(null);
   const previewRetryRef = useRef(false);
 
+  // ✅ Refs lưu trữ dữ liệu để fix lỗi hiển thị
+  const socketHasDataRef = useRef(false);
+  const latestValidDataRef = useRef<any>(null); // Cache bản tin đầy đủ nhất
+
   /* ==== Queries ==== */
+  // ⛔️ ĐÃ TẮT POLLING: pollingInterval: 0
   const { data: matchData } = useGetUserMatchDetailsQuery(matchId, {
-    pollingInterval: mode === "live" ? 5000 : 0,
+    pollingInterval: 0,
     skip: !matchId || mode === "ended",
   });
 
@@ -251,11 +246,11 @@ export default function LiveUserMatchScreen({
 
   /* ==== Logic 1: Auto Stop ==== */
   useEffect(() => {
+    // Vẫn giữ logic check status nhưng giờ nó chỉ chạy khi matchData thay đổi (lần đầu hoặc khi refetch)
+    // Nếu muốn auto stop chính xác bằng socket, ta cần bắt sự kiện 'match:finished' từ socket
     if (matchData && mode === "live") {
       if (matchData.status === "finished") {
-        console.log(
-          "[LiveUserMatch] Match finished detected, stopping stream..."
-        );
+        console.log("Match finished detected, stopping stream...");
         handleStopDone();
       }
     }
@@ -350,7 +345,6 @@ export default function LiveUserMatchScreen({
       const rtmpUrl = config.rtmpUrl;
       lastUrlRef.current = rtmpUrl;
 
-      // ✅ KHÔI PHỤC: Logic chọn profile dựa trên QualityChoice
       const choice = qualityChoiceRef.current;
       const preset = QUALITY_PRESETS[choice];
 
@@ -360,13 +354,11 @@ export default function LiveUserMatchScreen({
       let fps = 30;
 
       if (choice === "auto") {
-        // Auto: 720p mặc định
         width = orient === "portrait" ? 720 : 1280;
         height = orient === "portrait" ? 1280 : 720;
         bitrate = 4000000;
         fps = 30;
       } else if (preset && preset.width && preset.height) {
-        // Custom Quality: Đảo chiều nếu là Portrait
         if (orient === "portrait") {
           width = Math.min(preset.width, preset.height);
           height = Math.max(preset.width, preset.height);
@@ -387,21 +379,15 @@ export default function LiveUserMatchScreen({
 
       await Live.start(rtmpUrl, profile.bitrate, width, height, profile.fps);
 
+      // ✅ Reset trạng thái dữ liệu khi bắt đầu phiên mới
+      socketHasDataRef.current = false;
+      latestValidDataRef.current = null;
+
       setLiveStartAt(Date.now());
       setMode("live");
       setStatusText("Đang LIVE...");
 
       notifyStreamStarted({ matchId, platform: "all" }).catch(() => {});
-
-      // ❌ [DISABLE RECORDING]
-      // setTimeout(() => {
-      //   videoUploader
-      //     .startRecording(matchId)
-      //     .then(() => {
-      //       setIsRecording(true);
-      //     })
-      //     .catch((e) => console.log("Recording failed", e));
-      // }, 1000);
 
       Live.overlayLoad("", width, height, "tl", 100, 100, 0, 0).catch(() => {});
       Live.overlaySetVisible?.(true);
@@ -418,11 +404,6 @@ export default function LiveUserMatchScreen({
     setStatusText("Buổi phát đã kết thúc");
 
     try {
-      // ❌ [DISABLE RECORDING]
-      // if (isRecording) {
-      //   await videoUploader.stopRecording();
-      //   setIsRecording(false);
-      // }
       await Live.stop?.();
       await Live.stopPreview?.();
       startedPreviewRef.current = false;
@@ -432,79 +413,121 @@ export default function LiveUserMatchScreen({
     }
   }, [isRecording, matchId, notifyStreamEnded]);
 
-  /* ==== Logic 6: Overlay ==== */
-  const { data: overlaySnapshot } = useGetOverlaySnapshotQuery(matchId, {
+  /* ==== Logic 6: Overlay - SOCKET ONLY (Mostly) ==== */
+
+  // Vẫn fetch 1 lần đầu để có dữ liệu khởi tạo (không polling)
+  const { data: initialSnapshot } = useGetOverlaySnapshotQuery(matchId, {
     skip: mode !== "live",
   });
 
-  const updateOverlayNow = useCallback(
-    throttle(async (data: any) => {
-      if (mode !== "live" || !data) return;
+  const updateOverlayNow = useMemo(
+    () =>
+      throttle(async (incomingData: any) => {
+        if (mode !== "live" || !incomingData) return;
 
-      try {
-        const teamA = getPairDisplayName(data.pairA, "Team A");
-        const teamB = getPairDisplayName(data.pairB, "Team B");
+        /* ✅ FIX LỖI MẤT HEIGHT / NHẢY TÊN ĐỘI:
+           Kiểm tra xem dữ liệu mới có thông tin đội (pairA, teamName...) không.
+           - Nếu CÓ: Lưu vào `latestValidDataRef` và dùng nó.
+           - Nếu KHÔNG (chỉ có điểm): Lấy thông tin đội từ `latestValidDataRef` merge vào.
+        */
 
-        const currentIdx = data.currentGame || 0;
-        const currentScore =
-          data.gameScores && data.gameScores[currentIdx]
-            ? data.gameScores[currentIdx]
-            : { a: 0, b: 0 };
+        let finalData = incomingData;
+        const hasTeamInfo =
+          incomingData.pairA || incomingData.pairB || incomingData.teamName;
 
-        const overlayData = {
-          theme: "dark",
-          size: "md",
-          tournamentName: data.title || "Giao Hữu",
-          courtName: data.courtLabel || data.location?.name || "",
-          teamAName: teamA,
-          teamBName: teamB,
-          scoreA: currentScore.a || 0,
-          scoreB: currentScore.b || 0,
-          serveSide: data.serve?.side?.toUpperCase() || "A",
-          serveCount: data.serve?.server || 1,
-          overlayEnabled: true,
-          isDefaultDesign: false,
-          // Configs
-          webLogoUrl:
-            "https://pickletour.vn/uploads/avatars/1765084294948-1764152220888-1762020439803-photo_2025-11-02_00-50-33-1-1764152220890.jpg",
-          //   sponsorLogos,
-          scaleScore: 0.5,
-          showTime: true,
-          overlayVersion: 2,
-          sets: Array.isArray(data.gameScores)
-            ? data.gameScores.map((g: any, i: number) => ({
-                index: i + 1,
-                a: g?.a ?? 0,
-                b: g?.b ?? 0,
-                current: i === currentIdx,
-              }))
-            : [],
-        };
+        if (hasTeamInfo) {
+          // Data xịn, đầy đủ -> Lưu cache
+          latestValidDataRef.current = incomingData;
+        } else {
+          // Data thiếu (chỉ có score update từ socket)
+          if (latestValidDataRef.current) {
+            // Merge thông tin cũ (tên đội, giải đấu) với điểm số mới
+            finalData = { ...latestValidDataRef.current, ...incomingData };
+          } else {
+            // Chưa có cache nào cả -> Bỏ qua để tránh hiển thị "Team A / Team B" lỗi
+            // console.log("⚠️ Bỏ qua update vì thiếu thông tin đội và không có cache");
+            return;
+          }
+        }
 
-        await Live.overlayUpdate?.(overlayData);
-      } catch (e) {
-        console.log("Overlay update failed", e);
-      }
-    }, 1000),
+        try {
+          const teamA = getPairDisplayName(finalData.pairA, "Team A");
+          const teamB = getPairDisplayName(finalData.pairB, "Team B");
+
+          const currentIdx = finalData.currentGame || 0;
+          const currentScore =
+            finalData.gameScores && finalData.gameScores[currentIdx]
+              ? finalData.gameScores[currentIdx]
+              : { a: 0, b: 0 };
+
+          const overlayData = {
+            theme: "dark",
+            size: "md",
+            tournamentName: finalData.title || "Giao Hữu",
+            courtName: finalData.courtLabel || finalData.location?.name || "",
+            teamAName: teamA,
+            teamBName: teamB,
+            scoreA: currentScore.a || 0,
+            scoreB: currentScore.b || 0,
+            serveSide: finalData.serve?.side?.toUpperCase() || "A",
+            serveCount: finalData.serve?.server || 1,
+            overlayEnabled: true,
+            isDefaultDesign: false,
+            webLogoUrl:
+              "https://pickletour.vn/uploads/avatars/1765084294948-1764152220888-1762020439803-photo_2025-11-02_00-50-33-1-1764152220890.jpg",
+            scaleScore: 0.5,
+            showTime: true,
+            overlayVersion: 2,
+            sets: Array.isArray(finalData.gameScores)
+              ? finalData.gameScores.map((g: any, i: number) => ({
+                  index: i + 1,
+                  a: g?.a ?? 0,
+                  b: g?.b ?? 0,
+                  current: i === currentIdx,
+                }))
+              : [],
+          };
+
+          await Live.overlayUpdate?.(overlayData);
+        } catch (e) {
+          console.log("Overlay update failed", e);
+        }
+      }, 500), // Throttle 500ms
     [mode]
   );
 
+  // ✅ Effect 1: Socket Listeners (Nguồn chính)
   useEffect(() => {
     if (mode !== "live" || !socket) return;
+
     socket.emit("match:join", { matchId });
+
     const onUpdate = (data: any) => {
+      console.log("⚡️ Socket Data:", data);
       const incId = data._id || data.matchId || data.id;
-      if (incId === matchId) updateOverlayNow(data);
+      if (incId === matchId) {
+        socketHasDataRef.current = true; // Đánh dấu đã có socket
+        updateOverlayNow(data);
+      }
     };
+
     socket.on("match:snapshot", onUpdate);
     socket.on("score:updated", onUpdate);
-    if (overlaySnapshot) updateOverlayNow(overlaySnapshot);
+
     return () => {
       socket.emit("match:leave", { matchId });
       socket.off("match:snapshot");
       socket.off("score:updated");
     };
-  }, [mode, socket, matchId, overlaySnapshot]);
+  }, [mode, socket, matchId, updateOverlayNow]);
+
+  // ✅ Effect 2: Initial Snapshot (Chỉ chạy 1 lần đầu nếu socket chưa kịp về)
+  useEffect(() => {
+    if (mode === "live" && initialSnapshot && !socketHasDataRef.current) {
+      // console.log("Using initial API snapshot");
+      updateOverlayNow(initialSnapshot);
+    }
+  }, [mode, initialSnapshot, updateOverlayNow]);
 
   /* ==== Hardware Toggles ==== */
   const onSwitchCamera = async () => {
@@ -529,7 +552,7 @@ export default function LiveUserMatchScreen({
     }
   };
 
-  /* ==== UI RENDER ==== */
+  /* ==== UI RENDER (Không đổi) ==== */
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
       {/* 1. PREVIEW */}
@@ -677,7 +700,6 @@ export default function LiveUserMatchScreen({
               />
             </Pressable>
 
-            {/* ✅ KHÔI PHỤC: Nút chọn Quality */}
             <Pressable
               onPress={() => setQualityMenuVisible(true)}
               style={styles.bottomQualityBtn}
@@ -729,7 +751,7 @@ export default function LiveUserMatchScreen({
           </View>
         )}
 
-        {/* ✅ KHÔI PHỤC: Quality Menu Sheet */}
+        {/* Quality Menu Sheet */}
         {qualityMenuVisible && (
           <View style={styles.qualityOverlay} pointerEvents="auto">
             <Pressable
@@ -832,7 +854,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start", // 👈 RẤT QUAN TRỌNG: icon gom bên trái
+    justifyContent: "flex-start",
   },
   bottomIconBtn: {
     width: 40,
@@ -840,20 +862,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 4, // 👈 chỉ gap nhỏ giữa các icon
+    marginRight: 4,
   },
   activeBtn: { backgroundColor: "rgba(255,255,255,0.2)" },
-  // ✅ Style cho nút Quality nhỏ ở dưới
   bottomQualityBtn: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     marginLeft: 4,
-    marginRight: 8, // 👈 nút quality nằm cùng cụm bên trái
+    marginRight: 8,
   },
   bottomQualityTxt: { color: "#fff", fontSize: 11, marginLeft: 4 },
   finishBtn: {
-    marginLeft: "auto", // 👈 đẩy nút Kết thúc sang sát bên phải
+    marginLeft: "auto",
     backgroundColor: "#fff",
     borderRadius: 8,
     paddingHorizontal: 12,
@@ -918,7 +939,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 16,
   },
-  // ✅ Style cho Quality Menu Sheet
   qualityOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.6)",
