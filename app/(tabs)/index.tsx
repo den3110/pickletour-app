@@ -137,14 +137,14 @@ const FEATURES = [
     color: "#74B9FF",
     link: "/match/stack",
   },
-  {
-    id: 10,
-    icon: "locate", // icon cho Radar / Quanh đây
-    iconLib: "Ionicons",
-    title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
-    color: "#6C5CE7",
-    link: "/radar", // màn hình radar mình vừa code
-  },
+  // {
+  //   id: 10,
+  //   icon: "locate", // icon cho Radar / Quanh đây
+  //   iconLib: "Ionicons",
+  //   title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
+  //   color: "#6C5CE7",
+  //   link: "/radar", // màn hình radar mình vừa code
+  // },
 ];
 
 /* ---------- Utils ---------- */
@@ -441,7 +441,7 @@ function AthleteIsland() {
   };
 
   const avatarUrl =
-    normalizeUrl(userInfo?.avatar) || "https://i.pravatar.cc/150?img=12";
+    normalizeUrl(userInfo?.avatar);
   const name = userInfo?.name || "Người dùng";
 
   // Render
@@ -851,7 +851,7 @@ function TournamentsSection() {
             Xem tất cả giải đấu
           </Text>
           <View style={styles.viewAllIconCircle}>
-            <Ionicons name="arrow-forward" size={16} color="#FFF" />
+            <Ionicons name="chevron-forward" size={16} color="#FFF" />
           </View>
         </View>
       </TouchableOpacity>
@@ -903,7 +903,7 @@ function NewsCard({ news, theme }) {
           style={styles.newsDetailLink}
         >
           <Text style={styles.newsDetailText}>Đọc tiếp</Text>
-          <Ionicons name="arrow-forward" size={16} color="#A29BFE" />
+          <Ionicons name="chevron-forward" size={16} color="#A29BFE" />
         </TouchableOpacity>
       </View>
     </View>

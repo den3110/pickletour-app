@@ -1,5 +1,5 @@
 // app/screens/TournamentRegistrationScreen.tsx
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -19,19 +19,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
   Linking,
   TouchableOpacity,
   useColorScheme,
   ScrollView,
   BackHandler,
+  Dimensions,
+  useWindowDimensions,
+  SafeAreaView,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import {
   useCancelRegistrationMutation,
@@ -53,188 +52,127 @@ import { Image as ExpoImage } from "expo-image";
 import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons,
+  MaterialIcons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
-/* =============== THEME =============== */
+/* =============== THEME & UTILS =============== */
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
   return useMemo(() => {
-    const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-    const pageBg = scheme === "dark" ? "#0e0f12" : "#f7f9fc";
-    const cardBg = scheme === "dark" ? "#111214" : "#fff";
-    const border = scheme === "dark" ? "#2f3136" : "#e5e7eb";
-    const textPrimary = scheme === "dark" ? "#fff" : "#111";
-    const muted = scheme === "dark" ? "#9aa0a6" : "#6b7280";
-    const chipBg = scheme === "dark" ? "#22252a" : "#eef2f7";
-    const chipFg = scheme === "dark" ? "#e5e7eb" : "#263238";
-    const inputBg = scheme === "dark" ? "#1a1c21" : "#fff";
-    const inputBorder = border;
-    const ghostBg = scheme === "dark" ? "#2a2c31" : "#eee";
-    const ghostText = textPrimary;
-    const skeleton =
-      scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-
-    const errBg = scheme === "dark" ? "#3a1f21" : "#fee2e2";
-    const errBorder = scheme === "dark" ? "#6e2a34" : "#ef4444";
-    const errText = scheme === "dark" ? "#ffb3b8" : "#991b1b";
-    const infoBg = scheme === "dark" ? "#26324a" : "#eff6ff";
-    const infoBorder = scheme === "dark" ? "#3c4f74" : "#93c5fd";
-    const infoText = scheme === "dark" ? "#cfe3ff" : "#1e3a8a";
-
+    const isDark = scheme === "dark";
     return {
       scheme,
-      tint,
-      pageBg,
-      cardBg,
-      border,
-      textPrimary,
-      muted,
-      chipBg,
-      chipFg,
-      inputBg,
-      inputBorder,
-      ghostBg,
-      ghostText,
-      skeleton,
-      errBg,
-      errBorder,
-      errText,
-      infoBg,
-      infoBorder,
-      infoText,
+      tint: isDark ? "#60a5fa" : "#2563eb",
+      pageBg: isDark ? "#0f172a" : "#f8fafc",
+      cardBg: isDark ? "#1e293b" : "#ffffff",
+      border: isDark ? "#334155" : "#e2e8f0",
+      textPrimary: isDark ? "#f8fafc" : "#0f172a",
+      textSecondary: isDark ? "#94a3b8" : "#64748b",
+      chipBg: isDark ? "#334155" : "#f1f5f9",
+      inputBg: isDark ? "#1e293b" : "#ffffff",
+      ghostBg: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+      successBg: isDark ? "rgba(34,197,94,0.15)" : "#dcfce7",
+      successText: isDark ? "#4ade80" : "#166534",
+      warningBg: isDark ? "rgba(234,179,8,0.15)" : "#fef9c3",
+      warningText: isDark ? "#facc15" : "#854d0e",
+      errorBg: isDark ? "rgba(239,68,68,0.15)" : "#fee2e2",
+      errorText: isDark ? "#f87171" : "#991b1b",
+      infoBg: isDark ? "rgba(59,130,246,0.2)" : "#eff6ff",
+      infoText: isDark ? "#93c5fd" : "#1e3a8a",
+      softBtn: isDark ? "#334155" : "#e2e8f0",
+      gradStart: isDark ? "#1e3a8a" : "#1d4ed8",
+      gradEnd: isDark ? "#172554" : "#1e40af",
+      shadow: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.3 : 0.06,
+        shadowRadius: 8,
+        elevation: 3,
+      },
     };
   }, [scheme]);
 }
 
-/* ---------------- helpers ---------------- */
 const normType = (t?: string) => {
   const s = String(t || "").toLowerCase();
   if (s === "single" || s === "singles") return "single";
-  if (s === "double" || s === "doubles") return "double";
-  return s || "double";
+  return s === "double" || s === "doubles" ? "double" : s || "double";
 };
-
-const displayName = (pl: any) => {
-  if (!pl) return "—";
-  const fn = pl.fullName || pl?.name || "";
-  const nn = pl.nickName || pl.nickname || "";
-  return nn ? `${nn}` : fn || "—";
-};
-
-const getUserId = (pl: any) => {
-  const u = pl?.user;
-  if (!u) return null;
-  if (typeof u === "string") return u.trim() || null;
-  if (typeof u === "object" && u._id) return String(u._id);
-  return null;
-};
-
+const displayName = (pl: any) =>
+  pl?.nickName || pl?.nickname || pl?.fullName || pl?.name || "—";
+const getUserId = (pl: any) => pl?.user?._id || pl?.user || null;
 const totalScoreOf = (r: any, isSingles: boolean) =>
   (r?.player1?.score || 0) + (isSingles ? 0 : r?.player2?.score || 0);
-
-const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString() : "");
-const fmtRange = (a?: string, b?: string) => {
-  const A = fmtDate(a);
-  const B = fmtDate(b);
-  if (A && B) return `${A} – ${B}`;
-  return A || B || "—";
-};
-
-const getScoreCap = (tour: any, isSingles: boolean) =>
-  Number(
-    isSingles ? tour?.singleCap ?? tour?.scoreCap ?? 0 : tour?.scoreCap ?? 0
-  );
-
-const getMaxDelta = (tour: any) =>
-  Number(
-    tour?.scoreGap ??
-      tour?.maxDelta ??
-      tour?.scoreTolerance ??
-      tour?.tolerance ??
-      0
-  );
-
-type TotalState = "success" | "warning" | "error" | "default";
-
-const decideTotalState = (total: number, cap: number, delta?: number) => {
-  const t = Number(total);
-  const c = Number(cap);
-  if (!Number.isFinite(t) || !(Number.isFinite(c) && c > 0)) {
-    return { state: "default" as TotalState, note: "" };
-  }
-  const d = Number.isFinite(delta) && Number(delta) > 0 ? Number(delta) : 0;
-  const threshold = c + d;
-  const EPS = 1e-6;
-  if (t > threshold + EPS) return { state: "error" as TotalState, note: "" };
-  if (Math.abs(t - threshold) <= EPS)
-    return { state: "warning" as TotalState, note: "" };
-  return { state: "success" as TotalState, note: "" };
-};
-
-const chipColorsByState: Record<TotalState, { bg: string; fg: string }> = {
-  success: { bg: "#e8f5e9", fg: "#2e7d32" },
-  warning: { bg: "#fef3c7", fg: "#92400e" },
-  error: { bg: "#fee2e2", fg: "#991b1b" },
-  default: { bg: "#eeeeee", fg: "#424242" },
-};
-
-const maskPhone = (phone?: string) => {
-  if (!phone) return "*******???";
-  const d = String(phone).replace(/\D/g, "");
-  const tail = d.slice(-3) || "???";
-  return "*******" + tail;
-};
-
+const fmtDate = (d?: string) =>
+  d ? new Date(d).toLocaleDateString("vi-VN") : "";
+const fmtRange = (a?: string, b?: string) =>
+  a && b ? `${fmtDate(a)} – ${fmtDate(b)}` : fmtDate(a) || "—";
 const regCodeOf = (r: any) =>
   r?.code ||
   r?.shortCode ||
   String(r?._id || "")
     .slice(-5)
     .toUpperCase();
-
+const maskPhone = (phone?: string) => {
+  if (!phone) return "*******???";
+  const d = String(phone).replace(/\D/g, "");
+  return "*******" + (d.slice(-3) || "???");
+};
 const normalizeNoAccent = (s?: string) =>
   (s || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w\s-]/g, " ")
-    .replace(/\s+/g, " ")
     .trim();
-
-const getQrProviderConfig = (tour: any) => {
-  const bank =
+const getQrProviderConfig = (tour: any) => ({
+  bank:
     tour?.bankShortName ||
     tour?.qrBank ||
-    tour?.bankCode ||
     tour?.bank ||
     process.env.EXPO_PUBLIC_QR_BANK ||
-    "";
-  const acc =
+    "",
+  acc:
     tour?.bankAccountNumber ||
     tour?.qrAccount ||
     tour?.bankAccount ||
     process.env.EXPO_PUBLIC_QR_ACC ||
-    "";
-  return { bank, acc };
-};
-
+    "",
+});
 const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
   const { bank, acc } = getQrProviderConfig(tour);
   if (!bank || !acc) return null;
-
   const code = regCodeOf(r);
-  const ph = maskPhone(r?.player1?.phone || r?.player2?.phone || mePhone || "");
   const des = normalizeNoAccent(
-    `Ma giai ${tour?._id || ""} Ma dang ky ${code} SDT ${ph}`
+    `Ma giai ${tour?._id || ""} Ma dang ky ${code}`
   );
-
   const params = new URLSearchParams({ bank, acc, des, template: "compact" });
   try {
     const amount = getFeeAmount?.(tour, r);
-    if (typeof amount === "number" && amount > 0)
-      params.set("amount", String(amount));
+    if (amount > 0) params.set("amount", String(amount));
   } catch {}
   return `https://qr.sepay.vn/img?${params.toString()}`;
+};
+const getScoreCap = (tour: any, isSingles: boolean) =>
+  Number(
+    isSingles ? tour?.singleCap ?? tour?.scoreCap ?? 0 : tour?.scoreCap ?? 0
+  );
+const getMaxDelta = (tour: any) =>
+  Number(tour?.scoreGap ?? tour?.maxDelta ?? 0);
+const decideTotalState = (total: number, cap: number, delta?: number) => {
+  const t = Number(total);
+  const c = Number(cap);
+  if (!Number.isFinite(t) || !(Number.isFinite(c) && c > 0))
+    return { state: "default", note: "" };
+  const d = Number.isFinite(delta) && Number(delta) > 0 ? Number(delta) : 0;
+  if (t > c + d + 1e-6) return { state: "error", note: "" };
+  if (Math.abs(t - (c + d)) <= 1e-6) return { state: "warning", note: "" };
+  return { state: "success", note: "" };
 };
 
 /* ===== Hook: keyboard height ===== */
@@ -257,237 +195,65 @@ function useKeyboardHeight() {
   return h;
 }
 
-/* -------- MEMOIZED ATOMS -------- */
-const Chip = memo(
-  ({ label, bg, fg }: { label: string; bg?: string; fg?: string }) => {
-    const C = useThemeColors();
-    return (
-      <View style={[styles.chip, { backgroundColor: bg ?? C.chipBg }]}>
-        <Text
-          numberOfLines={1}
-          style={[styles.chipTxt, { color: fg ?? C.chipFg }]}
-        >
-          {label}
-        </Text>
-      </View>
-    );
-  }
-);
-
-const PrimaryBtn = memo(
-  ({
-    onPress,
-    children,
-    disabled,
-  }: {
-    onPress: () => void;
-    children: React.ReactNode;
-    disabled?: boolean;
-  }) => {
-    const C = useThemeColors();
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.btn,
-          { backgroundColor: disabled ? "#9aa0a6" : C.tint },
-          pressed && !disabled && { opacity: 0.9 },
-        ]}
-      >
-        <Text style={styles.btnWhite}>{children}</Text>
-      </Pressable>
-    );
-  }
-);
-
-const OutlineBtn = memo(
-  ({
-    onPress,
-    children,
-    disabled,
-  }: {
-    onPress: () => void;
-    children: React.ReactNode;
-    disabled?: boolean;
-  }) => {
-    const C = useThemeColors();
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.btn,
-          styles.btnOutline,
-          { borderColor: disabled ? "#c7c7c7" : C.tint },
-          pressed && !disabled && { opacity: 0.95 },
-        ]}
-      >
-        <Text
-          style={{ fontWeight: "700", color: disabled ? "#9aa0a6" : C.tint }}
-        >
-          {children}
-        </Text>
-      </Pressable>
-    );
-  }
-);
-
-const PaymentChip = memo(
-  ({ status, paidAt }: { status?: string; paidAt?: string }) => {
-    const isPaid = status === "Paid";
-    const when = paidAt ? new Date(paidAt) : null;
-    const whenText = when && !isNaN(+when) ? ` • ${when.toLocaleString()}` : "";
-    return (
-      <Chip
-        label={isPaid ? `Đã thanh toán${whenText}` : "Chưa thanh toán"}
-        bg={isPaid ? "#e8f5e9" : undefined}
-        fg={isPaid ? "#2e7d32" : undefined}
-      />
-    );
-  }
-);
-
-const CheckinChip = memo(({ checkinAt }: { checkinAt?: string }) => {
+/* -------- OPTIMIZED COUNTDOWN COMPONENT -------- */
+const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
+  const [timeLeft, setTimeLeft] = useState("");
   const C = useThemeColors();
-  const ok = !!checkinAt;
-  return (
-    <Chip
-      label={
-        ok
-          ? `Đã check-in • ${new Date(checkinAt!).toLocaleString()}`
-          : "Chưa check-in"
+
+  useEffect(() => {
+    if (!deadline) return;
+    const target = new Date(deadline).getTime();
+    if (isNaN(target)) return;
+
+    const tick = () => {
+      const now = Date.now();
+      const diff = target - now;
+      if (diff <= 0) {
+        setTimeLeft("Đã kết thúc");
+        return;
       }
-      bg={ok ? "#e0f2fe" : C.chipBg}
-      fg={ok ? "#075985" : C.chipFg}
-    />
-  );
-});
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+      setTimeLeft(`${d}d ${h}h ${m}m ${s}s`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [deadline]);
 
-const StatItem = memo(({ label, value, hint }: any) => {
-  const C = useThemeColors();
+  if (!deadline || !timeLeft) return null;
+  const isEnded = timeLeft === "Đã kết thúc";
+
   return (
-    <View style={{ padding: 8 }}>
-      <Text style={{ color: C.muted, fontSize: 12 }}>{label}</Text>
+    <View
+      style={{
+        backgroundColor: isEnded ? C.errorBg : "rgba(0,0,0,0.2)",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: isEnded ? C.errorText : "rgba(255,255,255,0.3)",
+        marginLeft: 8,
+      }}
+    >
       <Text
         style={{
-          color: C.textPrimary,
-          fontWeight: "800",
-          fontSize: 18,
-          marginTop: 2,
+          color: isEnded ? C.errorText : "#fff",
+          fontSize: 12,
+          fontWeight: "700",
+          fontVariant: ["tabular-nums"],
         }}
       >
-        {String(value)}
+        {isEnded ? "Đã đóng đăng ký" : `⏱ ${timeLeft}`}
       </Text>
-      {hint ? (
-        <Text style={{ color: C.muted, fontSize: 12 }}>{hint}</Text>
-      ) : null}
     </View>
   );
 });
 
-const SelfPlayerReadonly = memo(
-  ({ me, isSingles }: { me: any; isSingles: boolean }) => {
-    const C = useThemeColors();
-    if (!me?._id) return null;
-    const display = me?.nickname || me?.name || "Tôi";
-    const scoreVal = isSingles ? me?.score?.single : me?.score?.double;
-    return (
-      <View
-        style={[
-          styles.selfCard,
-          { backgroundColor: C.cardBg, borderColor: C.border },
-        ]}
-      >
-        <Text
-          style={{ fontWeight: "700", marginBottom: 8, color: C.textPrimary }}
-        >
-          VĐV 1 (Bạn)
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <ExpoImage
-            source={{ uri: normalizeUrl(me?.avatar) || PLACE }}
-            style={{
-              width: 46,
-              height: 46,
-              borderRadius: 23,
-              backgroundColor: "#eee",
-            }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={0}
-          />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              numberOfLines={1}
-              style={{ fontWeight: "600", color: C.textPrimary }}
-            >
-              {display}
-            </Text>
-            <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
-              {me?.phone || "—"}
-            </Text>
-          </View>
-          <Chip
-            label={`Điểm ${isSingles ? "đơn" : "đôi"}: ${roundTo3(
-              Number(scoreVal ?? 0)
-            )}`}
-            bg={C.cardBg}
-            fg={C.textPrimary}
-          />
-        </View>
-      </View>
-    );
-  }
-);
-
-const ActionCell = memo(
-  ({
-    r,
-    canManage,
-    isOwner,
-    onTogglePayment,
-    onCancel,
-    onOpenComplaint,
-    onOpenPayment,
-    busy,
-  }: any) => {
-    return (
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 6,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        {canManage && (
-          <OutlineBtn
-            onPress={() => onTogglePayment(r)}
-            disabled={busy?.settingPayment}
-          >
-            {r?.payment?.status === "Paid"
-              ? "Bỏ thanh toán"
-              : "Xác nhận phí 💰"}
-          </OutlineBtn>
-        )}
-        <PrimaryBtn onPress={() => onOpenPayment(r)}>Thanh toán</PrimaryBtn>
-        <OutlineBtn onPress={() => onOpenComplaint(r)}>⚠️ Khiếu nại</OutlineBtn>
-        {(canManage || isOwner) && (
-          <OutlineBtn
-            onPress={() => onCancel(r)}
-            disabled={busy?.deletingId === r?._id}
-          >
-            🗑️ Huỷ
-          </OutlineBtn>
-        )}
-      </View>
-    );
-  }
-);
-
+/* -------- HTML PREVIEW -------- */
 const HTML_PREVIEW_MAX_HEIGHT = 260;
-
 const HtmlPreviewBlock = memo(
   ({
     title,
@@ -504,7 +270,6 @@ const HtmlPreviewBlock = memo(
 
     const hasMore = useMemo(() => {
       if (!html) return false;
-      // đo chiều dài text (bỏ tag) để đoán là dài
       const txt = String(html)
         .replace(/<[^>]+>/g, " ")
         .replace(/\s+/g, " ")
@@ -564,14 +329,12 @@ const HtmlPreviewBlock = memo(
         >
           {title}
         </Text>
-
         <View
           style={[
             styles.htmlCard,
             { backgroundColor: C.cardBg, borderColor: C.border },
           ]}
         >
-          {/* PREVIEW THU GỌN */}
           <View
             style={{
               maxHeight: HTML_PREVIEW_MAX_HEIGHT,
@@ -580,33 +343,22 @@ const HtmlPreviewBlock = memo(
             }}
           >
             <RenderHTML source={{ html }} {...(common as any)} />
-
             {hasMore && (
               <LinearGradient
                 pointerEvents="none"
                 colors={[
                   C.scheme === "dark"
-                    ? "rgba(17,18,20,0)" // trong suốt
+                    ? "rgba(17,18,20,0)"
                     : "rgba(255,255,255,0)",
                   C.scheme === "dark"
-                    ? "rgba(17,18,20,0.3)" // bắt đầu mờ dần
-                    : "rgba(255,255,255,0.4)",
-                  C.scheme === "dark"
-                    ? "rgba(17,18,20,0.7)" // mờ nhiều hơn
-                    : "rgba(255,255,255,0.85)",
-                  C.scheme === "dark"
-                    ? "rgba(17,18,20,0.95)" // gần như đục
-                    : "rgba(255,255,255,0.98)",
-                  C.scheme === "dark"
-                    ? "#111214" // màu card đúng 100%
-                    : "#ffffff",
+                    ? "rgba(17,18,20,0.8)"
+                    : "rgba(255,255,255,0.8)",
+                  C.scheme === "dark" ? "#111214" : "#ffffff",
                 ]}
-                locations={[0, 0.3, 0.6, 0.85, 1]} // điều chỉnh vị trí chuyển màu
                 style={styles.htmlFade}
               />
             )}
           </View>
-
           {hasMore && (
             <View style={{ alignItems: "center", marginTop: 4 }}>
               <TouchableOpacity
@@ -614,11 +366,7 @@ const HtmlPreviewBlock = memo(
                 onPress={() => setOpen(true)}
               >
                 <Text
-                  style={{
-                    color: C.tint,
-                    fontWeight: "600",
-                    fontSize: 13,
-                  }}
+                  style={{ color: C.tint, fontWeight: "600", fontSize: 13 }}
                 >
                   Xem thêm
                 </Text>
@@ -627,74 +375,64 @@ const HtmlPreviewBlock = memo(
           )}
         </View>
 
-        {/* MODAL FULL MÀN HÌNH */}
         <Modal
           visible={open}
           animationType="slide"
           presentationStyle="fullScreen"
           onRequestClose={() => setOpen(false)}
         >
-          {(() => {
-            return (
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: C.pageBg,
-                  paddingTop: insets.top,
-                }}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: C.pageBg,
+              paddingTop: insets.top,
+            }}
+          >
+            <View
+              style={[styles.fullHtmlHeader, { borderBottomColor: C.border }]}
+            >
+              <TouchableOpacity
+                onPress={() => setOpen(false)}
+                style={[
+                  styles.fullHtmlCloseBtn,
+                  { backgroundColor: C.ghostBg },
+                ]}
               >
-                <View
-                  style={[
-                    styles.fullHtmlHeader,
-                    { borderBottomColor: C.border },
-                  ]}
-                >
-                  <TouchableOpacity
-                    onPress={() => setOpen(false)}
-                    style={[
-                      styles.fullHtmlCloseBtn,
-                      { backgroundColor: C.ghostBg },
-                    ]}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 20,
-                        fontWeight: "800",
-                        color: C.textPrimary,
-                      }}
-                    >
-                      ✕
-                    </Text>
-                  </TouchableOpacity>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      flex: 1,
-                      textAlign: "center",
-                      fontWeight: "800",
-                      fontSize: 16,
-                      color: C.textPrimary,
-                    }}
-                  >
-                    {title}
-                  </Text>
-                  <View style={styles.fullHtmlCloseBtn} />
-                </View>
-
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{
-                    paddingHorizontal: 16,
-                    paddingBottom: 24,
-                    paddingTop: 8,
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "800",
+                    color: C.textPrimary,
                   }}
                 >
-                  <RenderHTML source={{ html }} {...(common as any)} />
-                </ScrollView>
-              </View>
-            );
-          })()}
+                  ✕
+                </Text>
+              </TouchableOpacity>
+              <Text
+                numberOfLines={1}
+                style={{
+                  flex: 1,
+                  textAlign: "center",
+                  fontWeight: "800",
+                  fontSize: 16,
+                  color: C.textPrimary,
+                }}
+              >
+                {title}
+              </Text>
+              <View style={styles.fullHtmlCloseBtn} />
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingBottom: 24,
+                paddingTop: 8,
+              }}
+            >
+              <RenderHTML source={{ html }} {...(common as any)} />
+            </ScrollView>
+          </View>
         </Modal>
       </>
     );
@@ -705,14 +443,10 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
   const { width } = useWindowDimensions();
   const GAP = 12;
   const twoCols = width >= 820;
-
   if (!tour?.contactHtml && !tour?.contentHtml) return null;
-
   const colWidth = twoCols
     ? Math.floor((width - 16 * 2 - GAP) / 2)
     : width - 16 * 2;
-
-  // trừ padding card ~20
   const contentWidth = Math.max(colWidth - 20, 200);
 
   return (
@@ -737,7 +471,6 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
             />
           </View>
         )}
-
         {!!tour?.contentHtml && (
           <View style={{ width: twoCols ? colWidth : "100%" }}>
             <HtmlPreviewBlock
@@ -752,7 +485,58 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
   );
 });
 
-/* ===== MEMOIZED RegItem ===== */
+/* -------- STAT CARD -------- */
+const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
+  const C = useThemeColors();
+  let bgIcon = C.infoBg;
+  let iconColor = C.tint;
+
+  if (color === "green") {
+    bgIcon = C.successBg;
+    iconColor = C.successText;
+  } else if (color === "orange") {
+    bgIcon = C.warningBg;
+    iconColor = C.warningText;
+  } else if (color === "red") {
+    bgIcon = C.errorBg;
+    iconColor = C.errorText;
+  }
+
+  return (
+    <View
+      style={[
+        styles.statCard,
+        { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow },
+      ]}
+    >
+      <View style={[styles.statIconBox, { backgroundColor: bgIcon }]}>
+        {React.cloneElement(icon, { size: 18, color: iconColor })}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            color: C.textSecondary,
+            fontSize: 10,
+            fontWeight: "700",
+            textTransform: "uppercase",
+            marginBottom: 2,
+          }}
+        >
+          {label}
+        </Text>
+        <Text style={{ color: C.textPrimary, fontWeight: "800", fontSize: 15 }}>
+          {String(value)}
+        </Text>
+        {hint ? (
+          <Text style={{ color: C.textSecondary, fontSize: 10, marginTop: 2 }}>
+            {hint}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+});
+
 const RegItem = memo(function RegItem({
   r,
   index,
@@ -768,204 +552,324 @@ const RegItem = memo(function RegItem({
   onCancel,
   onOpenComplaint,
   onOpenPayment,
-  cancelingId,
-  settingPayment,
+  busy,
 }: any) {
   const C = useThemeColors();
   const total = totalScoreOf(r, isSingles);
-  const { state } = decideTotalState(total, cap, delta);
-  const { bg, fg } = chipColorsByState[state];
   const players = [r?.player1, r?.player2].filter(Boolean);
   const code = regCodeOf(r);
+  const isPaid = r.payment?.status === "Paid";
+  const { state } = decideTotalState(total, cap, delta);
+  const totalColor =
+    state === "error"
+      ? C.errorText
+      : state === "warning"
+      ? C.warningText
+      : C.textPrimary;
 
   return (
     <View
       style={[
-        styles.card,
-        {
-          marginHorizontal: 16,
-          marginTop: 8,
-          backgroundColor: C.cardBg,
-          borderColor: C.border,
-        },
+        styles.regCard,
+        { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow },
       ]}
     >
-      <View style={styles.cardTopRow}>
-        <Chip label={`Mã đăng ký: ${code}`} />
-        <Text style={{ color: C.muted, fontSize: 12 }}>#{index + 1}</Text>
+      {/* Header Card */}
+      <View
+        style={[
+          styles.regHeader,
+          { borderBottomColor: C.border, backgroundColor: C.pageBg },
+        ]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={[styles.rankBadge, { backgroundColor: C.tint }]}>
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>
+              {index + 1}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontWeight: "700",
+              color: C.textPrimary,
+              fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+            }}
+          >
+            #{code}
+          </Text>
+          {!!r.checkinAt && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: C.infoBg,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}
+            >
+              <Ionicons name="checkmark-done" size={10} color={C.infoText} />
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: C.infoText,
+                  fontWeight: "700",
+                  marginLeft: 2,
+                }}
+              >
+                Check-in
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons
+            name={isPaid ? "checkmark-circle" : "time"}
+            size={14}
+            color={isPaid ? C.successText : C.warningText}
+          />
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: isPaid ? C.successText : C.warningText,
+            }}
+          >
+            {isPaid ? "Đã Thanh toán" : "Chưa Thanh toán"}
+          </Text>
+        </View>
       </View>
 
-      {players.map((pl: any, idx: number) => (
-        <View
-          key={`${pl?.phone || pl?.fullName || idx}`}
-          style={{ marginTop: 10 }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Pressable
-              onPress={() => onPreview(pl?.avatar || PLACE, displayName(pl))}
+      {/* Body Card */}
+      <View style={{ padding: 12 }}>
+        {players.map((pl: any, idx: number) => (
+          <View
+            key={idx}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: idx < players.length - 1 ? 12 : 0,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => onPreview(pl?.avatar, displayName(pl))}
             >
               <ExpoImage
                 source={{ uri: normalizeUrl(pl?.avatar) || PLACE }}
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: "#eee",
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: C.pageBg,
+                  borderWidth: 1,
+                  borderColor: C.border,
                 }}
                 contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={0}
               />
-            </Pressable>
+              {canManage && (
+                <TouchableOpacity
+                  style={[
+                    styles.miniEditBtn,
+                    { backgroundColor: C.tint, borderColor: C.cardBg },
+                  ]}
+                  onPress={() => onOpenReplace(r, idx === 0 ? "p1" : "p2")}
+                >
+                  <MaterialIcons name="edit" size={8} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
 
-            <Pressable
+            <TouchableOpacity
               onPress={() => onOpenProfile(pl)}
-              style={{ flex: 1, minWidth: 0 }}
+              style={{ flex: 1 }}
             >
-              <Text
-                numberOfLines={1}
-                style={{ fontWeight: "600", color: C.textPrimary }}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                {displayName(pl)}
-              </Text>
-              <Text numberOfLines={1} style={{ color: C.muted, fontSize: 12 }}>
-                {pl?.phone || ""}
-              </Text>
-            </Pressable>
-
-            <Chip
-              label={`Điểm: ${roundTo3(pl?.score) ?? 0}`}
-              bg={C.cardBg}
-              fg={C.textPrimary}
-            />
-            {canManage && (
-              <OutlineBtn
-                onPress={() => onOpenReplace(r, idx === 0 ? "p1" : "p2")}
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontWeight: "700",
+                    color: C.textPrimary,
+                    fontSize: 14,
+                  }}
+                >
+                  {displayName(pl)}
+                </Text>
+                {pl?.cccdStatus === "verified" && (
+                  <MaterialIcons name="verified" size={14} color={C.tint} />
+                )}
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 2,
+                }}
               >
-                Thay VĐV
-              </OutlineBtn>
-            )}
+                <Text style={{ color: C.textSecondary, fontSize: 11 }}>
+                  {maskPhone(pl?.phone)}
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: C.chipBg,
+                    paddingHorizontal: 6,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "700",
+                      color: C.textPrimary,
+                    }}
+                  >
+                    {roundTo3(pl?.score)}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
           </View>
-        </View>
-      ))}
+        ))}
 
-      {!isSingles && !r.player2 && canManage && (
-        <View style={{ marginTop: 8 }}>
-          <OutlineBtn onPress={() => onOpenReplace(r, "p2")}>
-            Thêm VĐV 2
-          </OutlineBtn>
-        </View>
-      )}
-
-      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
-        {new Date(r.createdAt).toLocaleString()}
-      </Text>
-
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 8,
-          marginTop: 8,
-          flexWrap: "wrap",
-        }}
-      >
-        <PaymentChip status={r.payment?.status} paidAt={r.payment?.paidAt} />
-        <CheckinChip checkinAt={r.checkinAt} />
+        {!isSingles && !r.player2 && canManage && (
+          <TouchableOpacity
+            style={[styles.addPlayerBtn, { borderColor: C.border }]}
+            onPress={() => onOpenReplace(r, "p2")}
+          >
+            <Ionicons name="add" size={16} color={C.textSecondary} />
+            <Text
+              style={{
+                fontSize: 12,
+                color: C.textSecondary,
+                fontWeight: "600",
+              }}
+            >
+              Thêm VĐV 2
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* Footer Info & Actions */}
       <View
         style={{
           flexDirection: "row",
-          gap: 6,
+          justifyContent: "space-between",
           alignItems: "center",
-          marginTop: 8,
+          paddingHorizontal: 12,
+          paddingBottom: 12,
+          borderTopWidth: 1,
+          borderTopColor: C.pageBg,
+          paddingTop: 10,
         }}
       >
-        <Text style={{ fontWeight: "600", color: C.textPrimary }}>
-          Tổng điểm:
-        </Text>
-        <Chip label={`${roundTo3(total)}`} bg={bg} fg={fg} />
-      </View>
+        {/* Total Score */}
+        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+          <Text style={{ fontSize: 11, color: C.textSecondary }}>Tổng:</Text>
+          <Text style={{ fontSize: 16, fontWeight: "800", color: totalColor }}>
+            {roundTo3(total)}
+          </Text>
+          {cap > 0 && (
+            <Text style={{ fontSize: 11, color: C.textSecondary }}>
+              / {cap}
+            </Text>
+          )}
+        </View>
 
-      <View style={{ marginTop: 10 }}>
-        <ActionCell
-          r={r}
-          canManage={canManage}
-          isOwner={isOwner}
-          onTogglePayment={onTogglePayment}
-          onCancel={onCancel}
-          onOpenComplaint={onOpenComplaint}
-          onOpenPayment={onOpenPayment}
-          busy={{ settingPayment, deletingId: cancelingId }}
-        />
+        {/* Action Buttons Group (Reordered) */}
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.btnActionSmall, { backgroundColor: C.infoBg }]}
+            onPress={() => onOpenPayment(r)}
+          >
+            <Ionicons name="qr-code-outline" size={14} color={C.infoText} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: C.infoText,
+                marginLeft: 4,
+              }}
+            >
+              Thanh toán
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btnActionSmall, { backgroundColor: C.warningBg }]}
+            onPress={() => onOpenComplaint(r)}
+          >
+            <Ionicons name="warning-outline" size={14} color={C.warningText} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: C.warningText,
+                marginLeft: 4,
+              }}
+            >
+              Khiếu nại
+            </Text>
+          </TouchableOpacity>
+
+          {canManage && (
+            <TouchableOpacity
+              onPress={() => onTogglePayment(r)}
+              disabled={busy?.settingPayment}
+              style={[styles.iconActionBtn, { backgroundColor: C.pageBg }]}
+            >
+              <FontAwesome5
+                name="coins"
+                size={14}
+                color={isPaid ? C.textSecondary : C.successText}
+              />
+            </TouchableOpacity>
+          )}
+
+          {(canManage || isOwner) && (
+            <TouchableOpacity
+              onPress={() => onCancel(r)}
+              disabled={busy?.deletingId === r._id}
+              style={[styles.iconActionBtn, { backgroundColor: C.errorBg }]}
+            >
+              {busy?.deletingId === r._id ? (
+                <ActivityIndicator size="small" color={C.errorText} />
+              ) : (
+                <Ionicons name="trash-outline" size={16} color={C.errorText} />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
 });
 
-/* ===================== Screen ===================== */
+/* ===================== MAIN SCREEN ===================== */
 export default function TournamentRegistrationScreen() {
   const C = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<any>>(null);
-  const searchInputRef = useRef<TextInput>(null);
-  const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const mainScrollOffsetRef = useRef(0);
-  // Android back: nếu đang ở màn search thì back sẽ thoát search, không thoát screen
-  useEffect(() => {
-    if (!searchModalOpen) return;
 
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      setSearchModalOpen(false);
-      Keyboard.dismiss();
-      return true; // chặn default back
-    });
-
-    return () => sub.remove();
-  }, [searchModalOpen]);
-
-  useEffect(() => {
-    // Khi searchModalOpen từ true -> false, quay lại list chính
-    if (!searchModalOpen && listRef.current) {
-      const offset = mainScrollOffsetRef.current || 0;
-      if (offset > 0) {
-        // đợi 1 tick để FlashList mount xong rồi mới scroll
-        setTimeout(() => {
-          listRef.current?.scrollToOffset?.({
-            offset,
-            animated: false,
-          });
-        }, 0);
-      }
-    }
-  }, [searchModalOpen]);
-
-  const { data: me, isLoading: meLoading, error: meErr } = useGetMeScoreQuery();
+  // Data Fetching
+  const { data: me, isLoading: meLoading } = useGetMeScoreQuery();
   const isLoggedIn = !!me?._id;
-
-  const {
-    data: tour,
-    isLoading: tourLoading,
-    error: tourErr,
-  } = useGetTournamentQuery(id);
+  const { data: tour, isLoading: tourLoading } = useGetTournamentQuery(id);
   const {
     data: regs = [],
     isLoading: regsLoading,
-    error: regsErr,
     refetch: refetchRegs,
   } = useGetRegistrationsQuery(id);
+  const { data: myInvites = [], refetch: refetchInvites } =
+    useListMyRegInvitesQuery(undefined, { skip: !isLoggedIn });
 
-  const {
-    data: myInvites = [],
-    error: invitesErr,
-    refetch: refetchInvites,
-  } = useListMyRegInvitesQuery(undefined, { skip: !isLoggedIn });
-
+  // Mutations
   const [createInvite, { isLoading: saving }] = useCreateRegInviteMutation();
-  const [respondInvite, { isLoading: responding }] =
-    useRespondRegInviteMutation();
+  const [respondInvite] = useRespondRegInviteMutation();
   const [cancelReg] = useCancelRegistrationMutation();
   const [setPaymentStatus, { isLoading: settingPayment }] =
     useManagerSetRegPaymentStatusMutation();
@@ -975,11 +879,15 @@ export default function TournamentRegistrationScreen() {
   const [createComplaint, { isLoading: sendingComplaint }] =
     useCreateComplaintMutation();
 
+  // Local State
   const [p1Admin, setP1Admin] = useState<any>(null);
   const [p2, setP2] = useState<any>(null);
   const [msg, setMsg] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
+  // Dialogs
   const [imgPreview, setImgPreview] = useState({
     open: false,
     src: "",
@@ -991,7 +899,6 @@ export default function TournamentRegistrationScreen() {
     slot: "p1" as "p1" | "p2",
   });
   const [newPlayer, setNewPlayer] = useState<any>(null);
-  const [profile, setProfile] = useState({ open: false, userId: null as any });
   const [complaintDlg, setComplaintDlg] = useState({
     open: false,
     reg: null as any,
@@ -1001,228 +908,73 @@ export default function TournamentRegistrationScreen() {
     open: false,
     reg: null as any,
   });
+  const [profile, setProfile] = useState({ open: false, userId: null as any });
 
-  const PAGE_SIZE = 15;
-  const [q, setQ] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
-  const [take, setTake] = useState(PAGE_SIZE);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const kbHeight = useKeyboardHeight();
-
-  useEffect(() => {
-    if ((me as any)?._id && !p1Admin) setP1Admin(me);
-  }, [me, p1Admin]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
-    if (searchModalOpen) {
-      const t = setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 150);
-      return () => clearTimeout(t);
-    }
-  }, [searchModalOpen]);
-
-  const matchStr = useCallback(
-    (s?: string) =>
-      (s || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, ""),
-    []
-  );
-
-  const filteredRegs = useMemo(() => {
-    if (!debouncedQ) return regs;
-    const qn = matchStr(debouncedQ);
-    return regs.filter((r: any) => {
-      const code = regCodeOf(r);
-      const p1 = r?.player1 || {};
-      const p2 = r?.player2 || {};
-      const text = `${displayName(p1)} ${p1?.phone || ""} ${displayName(p2)} ${
-        p2?.phone || ""
-      } ${code}`.toLowerCase();
-      return matchStr(text).includes(qn);
-    });
-  }, [regs, debouncedQ, matchStr]);
-
-  useEffect(() => {
-    setTake(PAGE_SIZE);
-    // KHÔNG scroll về đầu nữa để giữ nguyên vị trí list chính
-  }, [debouncedQ, regs]);
-
-  const canLoadMore = take < filteredRegs.length;
-  const listData = useMemo(
-    () => filteredRegs.slice(0, take),
-    [filteredRegs, take]
-  );
-
-  const loadMore = useCallback(() => {
-    if (!canLoadMore || loadingMore) return;
-    setLoadingMore(true);
-    setTimeout(() => {
-      setTake((t) => Math.min(t + PAGE_SIZE, filteredRegs.length));
-      setLoadingMore(false);
-    }, 100);
-  }, [canLoadMore, loadingMore, filteredRegs.length]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        refetchRegs(),
-        isLoggedIn ? refetchInvites() : Promise.resolve(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refetchRegs, refetchInvites, isLoggedIn]);
-
-  const evType = useMemo(() => normType(tour?.eventType), [tour]);
+  // Computed
+  const evType = normType(tour?.eventType);
   const isSingles = evType === "single";
   const isDoubles = evType === "double";
+  const cap = getScoreCap(tour, isSingles);
+  const delta = getMaxDelta(tour);
+  const regTotal = regs?.length ?? 0;
+  const paidCount = regs.filter(
+    (r: any) => r?.payment?.status === "Paid"
+  ).length;
 
   const isManager = useMemo(() => {
     if (!isLoggedIn || !tour) return false;
-    if (String(tour?.createdBy) === String(me._id)) return true;
-    if (Array.isArray(tour?.managers)) {
-      return tour?.managers.some(
-        (m: any) => String(m?.user ?? m) === String(me._id)
-      );
-    }
-    return !!tour?.isManager;
+    if (String(tour?.createdBy) === String(me?._id)) return true;
+    return tour?.managers?.some(
+      (m: any) => String(m?.user ?? m) === String(me._id)
+    );
   }, [isLoggedIn, me, tour]);
-
-  const isAdmin = useMemo(
-    () =>
-      !!(
-        me?.isAdmin ||
-        me?.role === "admin" ||
-        (Array.isArray(me?.roles) && me.roles.includes("admin"))
-      ),
-    [me]
-  );
-
+  const isAdmin = !!(me?.isAdmin || me?.role === "admin");
   const canManage = isLoggedIn && (isManager || isAdmin);
 
   const pendingInvitesHere = useMemo(() => {
     if (!isLoggedIn) return [];
-    return (myInvites || []).filter(
+    return myInvites.filter(
       (it: any) => String(it?.tournament?._id || it?.tournament) === String(id)
     );
   }, [myInvites, id, isLoggedIn]);
 
-  const regTotal = regs?.length ?? 0;
-  const paidCount = useMemo(
-    () => regs.filter((r: any) => r?.payment?.status === "Paid").length,
-    [regs]
-  );
+  const filteredRegs = useMemo(() => {
+    if (!searchQ.trim()) return regs;
+    const q = normalizeNoAccent(searchQ.toLowerCase());
+    return regs.filter((r: any) => {
+      const txt = `${displayName(r.player1)} ${r.player1?.phone} ${displayName(
+        r.player2
+      )} ${r.player2?.phone} ${regCodeOf(r)}`;
+      return normalizeNoAccent(txt.toLowerCase()).includes(q);
+    });
+  }, [regs, searchQ]);
 
-  const cap = useMemo(() => getScoreCap(tour, isSingles), [tour, isSingles]);
-  const delta = useMemo(() => getMaxDelta(tour), [tour]);
+  // Handlers
+  const handleRefresh = useCallback(() => {
+    refetchRegs();
+    if (isLoggedIn) refetchInvites();
+  }, [refetchRegs, refetchInvites, isLoggedIn]);
 
-  const submit = useCallback(async () => {
-    if (!isLoggedIn)
-      return Alert.alert(
-        "Thông báo",
-        "Vui lòng đăng nhập để đăng ký giải đấu."
-      );
-
-    let player1Id: string | null = null;
-    if (isAdmin) {
-      if (!p1Admin?._id) {
-        return Alert.alert("Thiếu thông tin", "Vui lòng chọn VĐV 1.");
-      }
-      player1Id = String(p1Admin._id);
-    } else {
-      if (!me?._id) {
-        return Alert.alert(
-          "Thiếu thông tin",
-          "Không xác định được VĐV 1 (bạn)."
-        );
-      }
-      player1Id = String(me._id);
-    }
-
-    if (isDoubles && !p2)
-      return Alert.alert("Thiếu thông tin", "Giải đôi cần 2 VĐV");
-
-    if (
-      isDoubles &&
-      isAdmin &&
-      p1Admin?._id &&
-      p2?._id &&
-      String(p1Admin._id) === String(p2._id)
-    ) {
-      return Alert.alert(
-        "Không hợp lệ",
-        "VĐV 1 và VĐV 2 không được trùng nhau."
-      );
-    }
+  const handleSubmit = useCallback(async () => {
+    if (!isLoggedIn) return Alert.alert("Thông báo", "Vui lòng đăng nhập.");
+    const p1Id = isAdmin ? p1Admin?._id : me?._id;
+    if (!p1Id) return Alert.alert("Lỗi", "Thiếu thông tin VĐV 1");
+    if (isDoubles && !p2?._id) return Alert.alert("Lỗi", "Thiếu VĐV 2");
 
     try {
-      const payload: any = {
+      await createInvite({
         tourId: id,
         message: msg,
-        player1Id,
-        ...(isDoubles && p2?._id ? { player2Id: p2._id } : {}),
-      };
-
-      const res = await createInvite(payload).unwrap();
-      const mode = res?.mode ?? (res?.registration ? "direct" : "invite");
-
-      if (
-        mode === "direct_by_admin" ||
-        mode === "direct_by_kyc" ||
-        mode === "direct"
-      ) {
-        Alert.alert("Thành công", res?.message ?? "Đã tạo đăng ký");
-        if (isAdmin) setP1Admin(null);
-        setP2(null);
-        setMsg("");
-        await refetchRegs();
-        listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
-        return;
-      }
-
-      Alert.alert(
-        "Thành công",
-        isSingles ? "Đã gửi lời mời (giải đơn)" : "Đã gửi lời mời (giải đôi)"
-      );
+        player1Id: String(p1Id),
+        player2Id: p2?._id,
+      }).unwrap();
+      Alert.alert("Thành công", "Đã gửi đăng ký/lời mời");
       if (isAdmin) setP1Admin(null);
       setP2(null);
       setMsg("");
-      await Promise.all([
-        isLoggedIn ? refetchInvites() : Promise.resolve(),
-        refetchRegs(),
-      ]);
-      listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
-    } catch (err: any) {
-      if (parseInt(err?.status) === 412) {
-        const msg412 =
-          err?.data?.message ||
-          (isDoubles
-            ? "Đồng đội cần KYC (xác minh CCCD)."
-            : "Bạn cần KYC (xác minh CCCD).");
-        Alert.alert("Cần xác minh CCCD", msg412, [
-          {
-            text: "Xác minh ngay",
-            onPress: () => router.push(`/(tabs)/profile`),
-          },
-          { text: "Để sau", style: "cancel" },
-        ]);
-      } else {
-        Alert.alert(
-          "Lỗi",
-          err?.data?.message || err?.error || "Gửi lời mời thất bại"
-        );
-      }
+      handleRefresh();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Đăng ký thất bại");
     }
   }, [
     isLoggedIn,
@@ -1234,119 +986,36 @@ export default function TournamentRegistrationScreen() {
     id,
     msg,
     createInvite,
-    isSingles,
-    refetchRegs,
-    refetchInvites,
-    router,
+    handleRefresh,
   ]);
 
-  const handleCancel = useCallback(
+  const onCancelReg = useCallback(
     (r: any) => {
-      if (!isLoggedIn)
-        return Alert.alert(
-          "Thông báo",
-          "Vui lòng đăng nhập để đăng ký giải đấu."
-        );
-      if (!canManage && r?.payment?.status === "Paid") {
-        return Alert.alert(
-          "Không thể huỷ",
-          "Đã nộp lệ phí, vui lòng liên hệ BTC để hỗ trợ."
-        );
-      }
-      if (!canManage) {
-        const isOwner = me && String(r?.createdBy) === String(me?._id);
-        if (!isOwner)
-          return Alert.alert(
-            "Không có quyền",
-            "Bạn không thể huỷ đăng ký này."
-          );
-      }
-      const extraWarn =
-        r?.payment?.status === "Paid"
-          ? "\n⚠️ Cặp này đã nộp lệ phí. Hãy đảm bảo hoàn tiền/offline theo quy trình trước khi xoá."
-          : "";
-      Alert.alert(
-        "Xác nhận",
-        `Bạn chắc chắn muốn huỷ cặp đăng ký này?${extraWarn}`,
-        [
-          { text: "Không", style: "cancel" },
-          {
-            text: "Có, huỷ",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setCancelingId(r._id);
-                if (canManage) await adminDeleteReg(r._id).unwrap();
-                else await cancelReg(r._id).unwrap();
-                Alert.alert("Thành công", "Đã huỷ đăng ký");
-                refetchRegs();
-              } catch (e: any) {
-                Alert.alert(
-                  "Lỗi",
-                  e?.data?.message || e?.error || "Huỷ đăng ký thất bại"
-                );
-              } finally {
-                setCancelingId(null);
-              }
-            },
+      Alert.alert("Xác nhận", "Huỷ đăng ký này?", [
+        { text: "Không", style: "cancel" },
+        {
+          text: "Huỷ",
+          style: "destructive",
+          onPress: async () => {
+            setCancelingId(r._id);
+            try {
+              if (canManage) await adminDeleteReg(r._id).unwrap();
+              else await cancelReg(r._id).unwrap();
+              Alert.alert("Thành công", "Đã huỷ");
+              handleRefresh();
+            } catch (e) {
+              Alert.alert("Lỗi", "Huỷ thất bại");
+            } finally {
+              setCancelingId(null);
+            }
           },
-        ]
-      );
+        },
+      ]);
     },
-    [isLoggedIn, canManage, me, adminDeleteReg, cancelReg, refetchRegs]
+    [canManage, adminDeleteReg, cancelReg, handleRefresh]
   );
 
-  const handleInviteRespond = useCallback(
-    async (inviteId: string, action: "accept" | "decline") => {
-      if (!isLoggedIn)
-        return Alert.alert(
-          "Thông báo",
-          "Vui lòng đăng nhập để phản hồi lời mời."
-        );
-      try {
-        await respondInvite({ inviteId, action }).unwrap();
-        Alert.alert(
-          "OK",
-          action === "accept" ? "Đã chấp nhận lời mời" : "Đã từ chối"
-        );
-        await Promise.all([refetchInvites(), refetchRegs()]);
-      } catch (e: any) {
-        Alert.alert(
-          "Lỗi",
-          e?.data?.message || e?.error || "Không thể gửi phản hồi"
-        );
-      }
-    },
-    [isLoggedIn, respondInvite, refetchInvites, refetchRegs]
-  );
-
-  const togglePayment = useCallback(
-    async (r: any) => {
-      if (!canManage)
-        return Alert.alert(
-          "Thông báo",
-          "Bạn không có quyền cập nhật thanh toán."
-        );
-      const next = r?.payment?.status === "Paid" ? "Unpaid" : "Paid";
-      try {
-        await setPaymentStatus({ regId: r._id, status: next }).unwrap();
-        Alert.alert(
-          "OK",
-          next === "Paid"
-            ? "Đã xác nhận đã thanh toán"
-            : "Đã chuyển về chưa thanh toán"
-        );
-        refetchRegs();
-      } catch (e: any) {
-        Alert.alert(
-          "Lỗi",
-          e?.data?.message || e?.error || "Cập nhật thanh toán thất bại"
-        );
-      }
-    },
-    [canManage, setPaymentStatus, refetchRegs]
-  );
-
+  // Dialog Handlers
   const openPreview = useCallback(
     (src?: string, name?: string) =>
       setImgPreview({
@@ -1360,12 +1029,12 @@ export default function TournamentRegistrationScreen() {
     () => setImgPreview({ open: false, src: "", name: "" }),
     []
   );
-
   const openReplace = useCallback(
     (reg: any, slot: "p1" | "p2") => {
-      if (!canManage) return;
-      setReplaceDlg({ open: true, reg, slot });
-      setNewPlayer(null);
+      if (canManage) {
+        setReplaceDlg({ open: true, reg, slot });
+        setNewPlayer(null);
+      }
     },
     [canManage]
   );
@@ -1373,10 +1042,29 @@ export default function TournamentRegistrationScreen() {
     () => setReplaceDlg({ open: false, reg: null as any, slot: "p1" }),
     []
   );
+  const openProfileByPlayer = useCallback((pl: any) => {
+    const u = getUserId(pl);
+    if (u) setProfile({ open: true, userId: u });
+  }, []);
+  const openComplaint = useCallback(
+    (reg: any) => setComplaintDlg({ open: true, reg, text: "" }),
+    []
+  );
+  const handleCloseComplaint = useCallback(
+    () => setComplaintDlg({ open: false, reg: null as any, text: "" }),
+    []
+  );
+  const openPayment = useCallback(
+    (reg: any) => setPaymentDlg({ open: true, reg }),
+    []
+  );
+  const closePayment = useCallback(
+    () => setPaymentDlg({ open: false, reg: null as any }),
+    []
+  );
+
   const submitReplace = useCallback(async () => {
-    if (!replaceDlg?.reg?._id)
-      return Alert.alert("Thiếu thông tin", "Chọn cặp cần thay.");
-    if (!newPlayer?._id) return Alert.alert("Thiếu thông tin", "Chọn VĐV mới");
+    if (!newPlayer?._id) return Alert.alert("Lỗi", "Chọn VĐV mới");
     try {
       await replacePlayer({
         regId: replaceDlg.reg._id,
@@ -1387,1183 +1075,1055 @@ export default function TournamentRegistrationScreen() {
       closeReplace();
       refetchRegs();
     } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || e?.error || "Không thể thay VĐV");
+      Alert.alert("Lỗi", e?.data?.message || "Lỗi thay người");
     }
   }, [replaceDlg, newPlayer, replacePlayer, closeReplace, refetchRegs]);
 
-  const openProfileByPlayer = useCallback((pl: any) => {
-    const uid = getUserId(pl);
-    if (uid) setProfile({ open: true, userId: uid });
-    else Alert.alert("Thông báo", "Không tìm thấy userId của VĐV này.");
-  }, []);
-
-  const openComplaint = useCallback(
-    (reg: any) => setComplaintDlg({ open: true, reg, text: "" }),
-    []
-  );
-  const closeComplaint = useCallback(
-    () => setComplaintDlg({ open: false, reg: null as any, text: "" }),
-    []
-  );
   const submitComplaint = useCallback(async () => {
-    const regId = complaintDlg?.reg?._id;
-    const content = complaintDlg.text?.trim();
-    if (!content)
-      return Alert.alert("Thiếu nội dung", "Vui lòng nhập nội dung khiếu nại.");
-    if (!regId)
-      return Alert.alert("Lỗi", "Không tìm thấy mã đăng ký để gửi khiếu nại.");
-    if (!isLoggedIn)
-      return Alert.alert("Thông báo", "Vui lòng đăng nhập để gửi khiếu nại.");
+    if (!complaintDlg.text.trim()) return Alert.alert("Lỗi", "Nhập nội dung");
     try {
-      await createComplaint({ tournamentId: id, regId, content }).unwrap();
-      Alert.alert("Thành công", "Đã gửi khiếu nại. BTC sẽ phản hồi sớm.");
-      closeComplaint();
-    } catch (e: any) {
-      Alert.alert(
-        "Lỗi",
-        e?.data?.message || e?.error || "Gửi khiếu nại thất bại"
-      );
+      await createComplaint({
+        tournamentId: id,
+        regId: complaintDlg.reg._id,
+        content: complaintDlg.text,
+      }).unwrap();
+      Alert.alert("Thành công", "Đã gửi khiếu nại");
+      handleCloseComplaint();
+    } catch (e) {
+      Alert.alert("Lỗi", "Gửi thất bại");
     }
-  }, [complaintDlg, isLoggedIn, createComplaint, id, closeComplaint]);
+  }, [complaintDlg, createComplaint, id, handleCloseComplaint]);
 
-  const openPayment = useCallback(
-    (reg: any) => setPaymentDlg({ open: true, reg }),
-    []
-  );
-  const closePayment = useCallback(
-    () => setPaymentDlg({ open: false, reg: null as any }),
-    []
-  );
-
-  const onGoDraw = useCallback(
-    () => router.push(`/tournament/${id}/draw`),
-    [router, id]
-  );
-  const onGoManage = useCallback(
-    () => router.push(`/tournament/${id}/manage`),
-    [router, id]
-  );
-
-  const renderItem = useCallback(
-    ({ item: r, index }: any) => {
-      const isOwner = isLoggedIn && String(r?.createdBy) === String(me?._id);
-      return (
-        <RegItem
-          r={r}
-          index={index}
-          isSingles={isSingles}
-          canManage={canManage}
-          cap={cap}
-          delta={delta}
-          isOwner={isOwner}
-          onPreview={openPreview}
-          onOpenProfile={openProfileByPlayer}
-          onOpenReplace={openReplace}
-          onTogglePayment={togglePayment}
-          onCancel={handleCancel}
-          onOpenComplaint={openComplaint}
-          onOpenPayment={openPayment}
-          cancelingId={cancelingId}
-          settingPayment={settingPayment}
-        />
-      );
+  const onTogglePayment = useCallback(
+    async (r: any) => {
+      if (!canManage) return;
+      try {
+        const next = r?.payment?.status === "Paid" ? "Unpaid" : "Paid";
+        await setPaymentStatus({ regId: r._id, status: next }).unwrap();
+        const msg =
+          next === "Paid"
+            ? "Đã đánh dấu thanh toán cho cặp này"
+            : "Đã đánh dấu chưa thanh toán cho cặp này";
+        Alert.alert("Thành công", msg);
+        refetchRegs();
+      } catch (e) {
+        Alert.alert("Lỗi", "Cập nhật thất bại");
+      }
     },
-    [
-      isLoggedIn,
-      me,
-      isSingles,
-      canManage,
-      cap,
-      delta,
-      openPreview,
-      openProfileByPlayer,
-      openReplace,
-      togglePayment,
-      handleCancel,
-      openComplaint,
-      openPayment,
-      cancelingId,
-      settingPayment,
-    ]
+    [canManage, setPaymentStatus, refetchRegs]
   );
 
-  const handleMainScroll = useCallback((e: any) => {
-    const y = e?.nativeEvent?.contentOffset?.y ?? 0;
-    mainScrollOffsetRef.current = y;
-  }, []);
-
-  const isSinglesLabel = isSingles ? "Giải đơn" : "Giải đôi";
-
-  const HeaderBlock = (
-    <View style={{ padding: 16, paddingBottom: 8 }}>
-      <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          Đăng ký giải đấu
-        </Text>
-        <Chip
-          label={isSinglesLabel}
-          bg={isSingles ? undefined : "#dbeafe"}
-          fg={isSingles ? undefined : "#1e3a8a"}
-        />
-      </View>
-
-      <View
-        style={[
-          styles.sectionCard,
-          { backgroundColor: C.cardBg, borderColor: C.border },
-        ]}
-      >
-        <Text
-          style={[styles.tourName, { color: C.textPrimary }]}
-          numberOfLines={1}
+  // -- HEADER COMPONENT (Memoized) --
+  const HeaderComponent = useMemo(
+    () => (
+      <View>
+        <LinearGradient
+          colors={[C.gradStart, C.gradEnd]}
+          style={[styles.headerHero, { paddingTop: insets.top + 10 }]}
         >
-          {tour?.name}
-        </Text>
-        <Text style={[styles.muted, { color: C.muted }]}>
-          {tour?.location || "—"}
-        </Text>
-        <Text style={[styles.muted, { color: C.muted }]}>
-          {fmtRange(tour?.startDate, tour?.endDate)}
-        </Text>
+          <View style={styles.headerTopRow}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.badgeGlass}>
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
+                >
+                  {isSingles ? "GIẢI ĐƠN" : "GIẢI ĐÔI"}
+                </Text>
+              </View>
+              <TournamentCountdown deadline={tour?.registrationDeadline} />
+            </View>
+          </View>
 
-        <View style={{ height: 8 }} />
-        <View style={styles.statsGrid}>
-          <StatItem
-            label={isDoubles ? "Giới hạn tổng điểm (đội)" : "Giới hạn điểm/VĐV"}
-            value={
-              isDoubles
-                ? tour?.scoreCap ?? 0
-                : tour?.singleCap ?? tour?.scoreCap ?? 0
-            }
-            hint={isDoubles ? "Giới hạn điểm (đôi)" : "Giới hạn điểm (đơn)"}
-          />
-          <StatItem
-            label="Giới hạn điểm mỗi VĐV"
-            value={tour?.singleCap ?? 0}
-            hint="Giới hạn điểm (đơn)"
-          />
-          <StatItem
-            label={isSingles ? "Số VĐV đã đăng ký" : "Số đội đã đăng ký"}
-            value={regTotal}
-          />
-          <StatItem
-            label={isSingles ? "Số VĐV đã nộp lệ phí" : "Số đội đã nộp lệ phí"}
-            value={paidCount}
-          />
+          <Text style={styles.tourNameHero}>{tour?.name}</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 8,
+              opacity: 0.9,
+              gap: 12,
+            }}
+          >
+            {tour?.location && (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="location" size={14} color="#fff" />
+                <Text
+                  style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+                >
+                  {tour.location}
+                </Text>
+              </View>
+            )}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
+              <Ionicons name="calendar" size={14} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                {fmtRange(tour?.startDate, tour?.endDate)}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Stats Overlap */}
+        <View style={styles.statsContainer}>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {/* Sửa: điểm 0 hiển thị "Không giới hạn" */}
+            <View style={{ flex: 1 }}>
+              <StatCard
+                icon={<Ionicons name="trophy" />}
+                label="Điểm tối đa"
+                value={cap > 0 ? cap : "Không giới hạn"}
+                color="orange"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <StatCard
+                icon={<Ionicons name="people" />}
+                label="Đã đăng ký"
+                value={regTotal}
+                color="blue"
+              />
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+            <View style={{ flex: 1 }}>
+              <StatCard
+                icon={<FontAwesome5 name="money-bill-wave" />}
+                label="Đã thanh toán"
+                value={`${paidCount}/${regTotal}`}
+                color="green"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <StatCard
+                icon={<MaterialCommunityIcons name="list-status" />}
+                label="Chờ TT"
+                value={regTotal - paidCount}
+                color="default"
+              />
+            </View>
+          </View>
         </View>
 
-        <HtmlCols tour={tour} />
-      </View>
-
-      {meLoading
-        ? null
-        : !isLoggedIn && (
+        <View
+          style={{ paddingHorizontal: 16, marginTop: 16, paddingBottom: 16 }}
+        >
+          {isLoggedIn && pendingInvitesHere.length > 0 && (
             <View
               style={[
-                styles.alert,
-                { borderColor: C.infoBorder, backgroundColor: C.infoBg },
+                styles.sectionCard,
+                {
+                  backgroundColor: C.cardBg,
+                  borderColor: C.border,
+                  marginBottom: 16,
+                },
               ]}
             >
-              <Text style={{ color: C.infoText }}>
-                Bạn chưa đăng nhập. Hãy đăng nhập để thực hiện đăng ký giải đấu.
+              <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>
+                Lời mời đang chờ ({pendingInvitesHere.length})
               </Text>
+              {pendingInvitesHere.map((inv: any) => (
+                <View
+                  key={inv._id}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: C.border,
+                  }}
+                >
+                  <Text
+                    style={{ fontWeight: "600", color: C.textPrimary, flex: 1 }}
+                  >
+                    {inv.tournament?.name}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        respondInvite({ inviteId: inv._id, action: "accept" })
+                      }
+                      style={[
+                        styles.btnSmall,
+                        { backgroundColor: C.successBg },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: C.successText,
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        Nhận
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        respondInvite({ inviteId: inv._id, action: "decline" })
+                      }
+                      style={[styles.btnSmall, { backgroundColor: C.errorBg }]}
+                    >
+                      <Text
+                        style={{
+                          color: C.errorText,
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        Từ chối
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
           )}
 
-      {isLoggedIn && pendingInvitesHere.length > 0 && (
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: C.cardBg, borderColor: C.border },
-          ]}
-        >
-          <Text
-            style={{
-              fontWeight: "800",
-              marginBottom: 8,
-              color: C.textPrimary,
-            }}
+          <HtmlCols tour={tour} />
+
+          <View
+            style={[
+              styles.formCard,
+              { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow, marginTop: 16 },
+            ]}
           >
-            Lời mời đang chờ xác nhận
-          </Text>
-          {invitesErr ? (
             <View
-              style={[
-                styles.alert,
-                { borderColor: C.errBorder, backgroundColor: C.errBg },
-              ]}
-            >
-              <Text style={{ color: C.errText }}>
-                {(invitesErr as any)?.data?.message ||
-                  (invitesErr as any)?.error ||
-                  "Không tải được lời mời"}
-              </Text>
-            </View>
-          ) : null}
-
-          {pendingInvitesHere.map((inv: any) => {
-            const { confirmations = {}, eventType } = inv || {};
-            const isSingle = eventType === "single";
-            const chip = (v: any) =>
-              v === "accepted" ? (
-                <Chip label="Đã chấp nhận" bg="#e8f5e9" fg="#166534" />
-              ) : v === "declined" ? (
-                <Chip label="Từ chối" bg="#fee2e2" fg="#991b1b" />
-              ) : (
-                <Chip label="Chờ xác nhận" />
-              );
-            return (
-              <View
-                key={inv._id}
-                style={{
-                  borderWidth: 1,
-                  borderStyle: "dashed",
-                  borderColor: C.border,
-                  borderRadius: 12,
-                  padding: 10,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontWeight: "700", color: C.textPrimary }}>
-                  {inv.tournament?.name}
-                </Text>
-                <Text style={{ color: C.muted, marginBottom: 8 }}>
-                  {isSingle ? "Giải đơn" : "Giải đôi"} •{" "}
-                  {inv.tournament?.startDate
-                    ? new Date(inv.tournament?.startDate).toLocaleDateString()
-                    : ""}
-                </Text>
-
-                <View
-                  style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}
-                >
-                  <Chip label="P1" bg={C.cardBg} fg={C.textPrimary} />
-                  {chip(confirmations?.p1)}
-                  {!isSingle && (
-                    <>
-                      <Chip label="P2" bg={C.cardBg} fg={C.textPrimary} />
-                      {chip(confirmations?.p2)}
-                    </>
-                  )}
-                </View>
-
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-                  <OutlineBtn
-                    disabled={responding}
-                    onPress={() => handleInviteRespond(inv._id, "decline")}
-                  >
-                    Từ chối
-                  </OutlineBtn>
-                  <PrimaryBtn
-                    disabled={responding}
-                    onPress={() => handleInviteRespond(inv._id, "accept")}
-                  >
-                    Chấp nhận
-                  </PrimaryBtn>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      <View
-        style={[
-          styles.sectionCard,
-          { backgroundColor: C.cardBg, borderColor: C.border },
-        ]}
-      >
-        <Text
-          style={{
-            fontWeight: "800",
-            fontSize: 16,
-            marginBottom: 8,
-            color: C.textPrimary,
-          }}
-        >
-          {isAdmin ? "Tạo đăng ký (admin)" : "Gửi lời mời đăng ký"}
-        </Text>
-
-        {meLoading ? (
-          <View style={{ paddingVertical: 6 }}>
-            <ActivityIndicator />
-          </View>
-        ) : meErr ? (
-          <View
-            style={[
-              styles.alert,
-              { borderColor: C.errBorder, backgroundColor: C.errBg },
-            ]}
-          >
-            <Text style={{ color: C.errText }}>
-              {(meErr.status === 403 &&
-                "Bạn chưa đăng nhập. Không có thông tin") ||
-                (meErr as any)?.data?.message ||
-                (meErr as any)?.error ||
-                "Không tải được thông tin của bạn"}
-            </Text>
-          </View>
-        ) : isLoggedIn ? (
-          isAdmin ? (
-            <>
-              <View style={{ marginTop: 8 }}>
-                <PlayerSelector
-                  label="VĐV 1"
-                  eventType={tour?.eventType}
-                  onChange={setP1Admin}
-                />
-              </View>
-              {isDoubles && (
-                <View style={{ marginTop: 12 }}>
-                  <PlayerSelector
-                    label="VĐV 2"
-                    eventType={tour?.eventType}
-                    onChange={setP2}
-                  />
-                </View>
-              )}
-            </>
-          ) : (
-            <>
-              <SelfPlayerReadonly me={me} isSingles={isSingles} />
-              {isDoubles && (
-                <View style={{ marginTop: 12 }}>
-                  <PlayerSelector
-                    label="VĐV 2"
-                    eventType={tour?.eventType}
-                    onChange={setP2}
-                  />
-                </View>
-              )}
-            </>
-          )
-        ) : (
-          <View
-            style={[
-              styles.alert,
-              { borderColor: C.infoBorder, backgroundColor: C.infoBg },
-            ]}
-          >
-            <Text style={{ color: C.infoText }}>
-              Bạn chưa đăng nhập. Hãy đăng nhập để đăng ký.
-            </Text>
-          </View>
-        )}
-
-        <Text style={[styles.label, { color: C.textPrimary }]}>Lời nhắn</Text>
-        <TextInput
-          value={msg}
-          onChangeText={setMsg}
-          multiline
-          numberOfLines={3}
-          style={[
-            styles.textarea,
-            {
-              backgroundColor: C.inputBg,
-              borderColor: C.inputBorder,
-              color: C.textPrimary,
-            },
-          ]}
-          placeholder="Ghi chú cho BTC…"
-          placeholderTextColor={C.muted}
-        />
-
-        <Text style={{ color: C.muted, fontSize: 12 }}>
-          {isAdmin
-            ? "Quyền admin: tạo đăng ký và duyệt ngay, không cần xác nhận từ VĐV."
-            : isSingles
-            ? "Giải đơn: VĐV 1 luôn là bạn; cần KYC (đã xác minh) để đăng ký."
-            : "Giải đôi: VĐV 1 luôn là bạn; CẢ HAI VĐV cần KYC (đã xác minh)."}
-        </Text>
-
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
-          <PrimaryBtn
-            onPress={submit}
-            disabled={
-              saving ||
-              meLoading ||
-              !isLoggedIn ||
-              (isAdmin ? !p1Admin || (isDoubles && !p2) : isDoubles && !p2)
-            }
-          >
-            {isAdmin
-              ? saving
-                ? "Đang tạo…"
-                : "Tạo đăng ký"
-              : saving
-              ? "Đang gửi…"
-              : "Gửi lời mời"}
-          </PrimaryBtn>
-          <OutlineBtn onPress={() => router.push(`/tournament/${id}/checkin`)}>
-            Check-in
-          </OutlineBtn>
-          <OutlineBtn onPress={() => router.push(`/tournament/${id}/bracket`)}>
-            Sơ đồ
-          </OutlineBtn>
-        </View>
-      </View>
-
-      {canManage && (
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: C.cardBg, borderColor: C.border },
-          ]}
-        >
-          <Text
-            style={[styles.title, { marginBottom: 10, color: C.textPrimary }]}
-          >
-            Quản lý giải đấu
-          </Text>
-
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={[
-                styles.btn,
-                { backgroundColor: C.tint, borderColor: C.tint },
-              ]}
-              onPress={onGoDraw}
-            >
-              <Text style={[styles.btnText, { color: "#fff" }]}>Bốc thăm</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.btn, styles.btnOutline, { borderColor: C.tint }]}
-              onPress={onGoManage}
-            >
-              <Text style={[styles.btnText, { color: C.tint }]}>
-                Quản lý giải
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      <View style={{ marginTop: 4 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text
-            style={{ fontSize: 18, fontWeight: "800", color: C.textPrimary }}
-          >
-            Danh sách đăng ký ({regTotal})
-          </Text>
-          <Chip
-            label={`Kết quả: ${filteredRegs.length}`}
-            bg="#eef2ff"
-            fg="#3730a3"
-          />
-        </View>
-
-        <View style={styles.searchWrap}>
-          <Pressable
-            onPress={() => setSearchModalOpen(true)}
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: C.inputBg,
-                borderColor: C.inputBorder,
+              style={{
                 flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "space-between",
-              },
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                color: q ? C.textPrimary : C.muted,
+                gap: 8,
+                marginBottom: 16,
               }}
             >
-              {q || "Tìm theo VĐV, SĐT, mã ĐK…"}
-            </Text>
-            <Ionicons name="search" size={18} color={C.muted} />
-          </Pressable>
-        </View>
-
-        {regsLoading ? (
-          <View style={{ paddingVertical: 16, alignItems: "center" }}>
-            <ActivityIndicator />
-          </View>
-        ) : regsErr ? (
-          <View
-            style={[
-              styles.alert,
-              { borderColor: C.errBorder, backgroundColor: C.errBg },
-            ]}
-          >
-            <Text style={{ color: C.errText }}>
-              {(regsErr as any)?.data?.message ||
-                (regsErr as any)?.error ||
-                "Lỗi tải danh sách"}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {regsLoading ? (
-        <View style={{ paddingVertical: 16, alignItems: "center" }}>
-          <ActivityIndicator />
-        </View>
-      ) : regsErr ? (
-        <View
-          style={[
-            styles.alert,
-            { borderColor: C.errBorder, backgroundColor: C.errBg },
-          ]}
-        >
-          <Text style={{ color: C.errText }}>
-            {(regsErr as any)?.data?.message ||
-              (regsErr as any)?.error ||
-              "Lỗi tải danh sách"}
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-
-  const ListFooter = useMemo(
-    () => (
-      <View style={{ padding: 16, alignItems: "center" }}>
-        {loadingMore && <ActivityIndicator />}
-        {!loadingMore && !canLoadMore && filteredRegs.length > 0 && (
-          <Text style={{ color: C.muted, fontSize: 12 }}>
-            — Đã hết dữ liệu —
-          </Text>
-        )}
-      </View>
-    ),
-    [loadingMore, canLoadMore, filteredRegs.length, C.muted]
-  );
-
-  const renderMainList = () => (
-    <FlashList
-      ref={listRef}
-      data={listData}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-      keyExtractor={(item, i) => String(item?._id || i)}
-      renderItem={renderItem}
-      ListHeaderComponent={HeaderBlock}
-      ListFooterComponent={ListFooter}
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.5}
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      estimatedItemSize={220}
-      removeClippedSubviews={Platform.OS === "android"}
-      maxToRenderPerBatch={10}
-      windowSize={5}
-      contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
-      onScroll={handleMainScroll} // ✅ lưu offset mỗi khi scroll
-      scrollEventThrottle={16} // ✅ cho onScroll mượt
-    />
-  );
-
-  const renderSearchScreen = () => (
-    <View style={{ flex: 1 }}>
-      {/* Header search + nút đóng */}
-      <View style={[styles.fullModalHeader, { borderBottomColor: C.border }]}>
-        <View style={{ flex: 1 }}>
-          <TextInput
-            ref={searchInputRef}
-            value={q}
-            onChangeText={(text) => {
-              setQ(text);
-              if (text.length === 0) {
-                // xoá hết -> thoát search screen luôn
-                setSearchModalOpen(false);
-                Keyboard.dismiss();
-              }
-            }}
-            placeholder="Tìm theo VĐV, SĐT, mã ĐK…"
-            placeholderTextColor={C.muted}
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: C.inputBg,
-                borderColor: C.inputBorder,
-                color: C.textPrimary,
-              },
-            ]}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        <TouchableOpacity
-          onPress={() => {
-            setSearchModalOpen(false); // đóng màn search, giữ nguyên q
-            Keyboard.dismiss();
-          }}
-          style={[styles.searchCloseBtn, { backgroundColor: C.ghostBg }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="close" size={20} color={C.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* List trong mode search */}
-      {regsLoading ? (
-        <View
-          style={{
-            paddingVertical: 16,
-            alignItems: "center",
-          }}
-        >
-          <ActivityIndicator />
-        </View>
-      ) : regsErr ? (
-        <View
-          style={[
-            styles.alert,
-            { borderColor: C.errBorder, backgroundColor: C.errBg },
-          ]}
-        >
-          <Text style={{ color: C.errText }}>
-            {(regsErr as any)?.data?.message ||
-              (regsErr as any)?.error ||
-              "Lỗi tải danh sách"}
-          </Text>
-        </View>
-      ) : (
-        <FlashList
-          data={listData}
-          keyExtractor={(item, i) => String(item?._id || i)}
-          renderItem={renderItem}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
-          estimatedItemSize={220}
-          removeClippedSubviews={Platform.OS === "android"}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          ListFooterComponent={ListFooter}
-          contentContainerStyle={{
-            paddingTop: 8,
-            paddingBottom: Math.max(16, kbHeight),
-          }}
-        />
-      )}
-    </View>
-  );
-
-  if (tourLoading) {
-    return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.pageBg }]}>
-        <ActivityIndicator />
-      </SafeAreaView>
-    );
-  }
-  if (tourErr) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: C.pageBg }]}>
-        <View
-          style={[
-            styles.alert,
-            { borderColor: C.errBorder, backgroundColor: C.errBg },
-          ]}
-        >
-          <Text style={{ color: C.errText }}>
-            {(tourErr as any)?.data?.message ||
-              (tourErr as any)?.error ||
-              "Lỗi tải giải đấu"}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  if (!tour) return null;
-
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: C.pageBg }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
-    >
-      {/* Nếu đang bật searchModalOpen thì hiển thị màn search full,
-          ngược lại hiển thị màn chính như trước */}
-      {searchModalOpen ? renderSearchScreen() : renderMainList()}
-
-      {/* Preview ảnh */}
-      <Modal
-        visible={imgPreview.open}
-        transparent
-        animationType="fade"
-        onRequestClose={closePreview}
-      >
-        <View style={styles.modalBackdrop}>
-          <Pressable style={{ flex: 1 }} onPress={closePreview} />
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: C.cardBg, borderColor: C.border },
-            ]}
-          >
-            <ExpoImage
-              source={{ uri: normalizeUrl(imgPreview.src) || PLACE }}
-              style={{
-                width: "100%",
-                height: 360,
-                borderRadius: 12,
-                backgroundColor: C.pageBg,
-              }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-            <PrimaryBtn onPress={closePreview}>Đóng</PrimaryBtn>
-          </View>
-          <Pressable style={{ flex: 1 }} onPress={closePreview} />
-        </View>
-      </Modal>
-
-      {/* Modal thay VĐV – full screen */}
-      <Modal
-        visible={replaceDlg.open}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={closeReplace}
-      >
-        {(() => {
-          return (
-            <SafeAreaView
-              style={[styles.fullModalContainer, { backgroundColor: C.pageBg }]}
-            >
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-                style={{ flex: 1 }}
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  backgroundColor: C.tint,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <View style={{ flex: 1 }}>
-                  {/* Header */}
+                <Ionicons name="tennisball" size={18} color="#fff" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "800",
+                  color: C.textPrimary,
+                }}
+              >
+                {isAdmin ? "Tạo đăng ký (Admin)" : "Đăng ký thi đấu"}
+              </Text>
+            </View>
+
+            {isLoggedIn ? (
+              <>
+                {isAdmin ? (
+                  <PlayerSelector
+                    label="VĐV 1"
+                    eventType={tour?.eventType}
+                    onChange={setP1Admin}
+                    value={p1Admin}
+                  />
+                ) : (
                   <View
-                    style={[
-                      styles.fullModalHeader,
-                      { borderBottomColor: C.border },
-                    ]}
+                    style={{
+                      padding: 10,
+                      backgroundColor: C.pageBg,
+                      borderRadius: 8,
+                      marginBottom: 12,
+                    }}
                   >
-                    <TouchableOpacity
-                      onPress={closeReplace}
-                      style={[
-                        styles.fullModalHeaderBtn,
-                        { backgroundColor: C.ghostBg }, // 👈 nền nhẹ cho nút
-                      ]}
-                    >
-                      <Ionicons
-                        name="chevron-back"
-                        size={18}
-                        color={C.textPrimary}
-                        style={{ marginRight: 4 }}
-                      />
-                      <Text
-                        style={{
-                          color: C.textPrimary,
-                          fontWeight: "600",
-                          fontSize: 14,
-                        }}
-                      >
-                        Đóng
-                      </Text>
-                    </TouchableOpacity>
-
-                    <Text
-                      style={{
-                        fontWeight: "800",
-                        fontSize: 16,
-                        color: C.textPrimary,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {replaceDlg.slot === "p2"
-                        ? "Thay/Thêm VĐV 2"
-                        : "Thay VĐV 1"}
+                    <Text style={{ fontWeight: "700", color: C.textPrimary }}>
+                      Bạn (VĐV 1): {displayName(me)}
                     </Text>
-
-                    {/* dummy để canh giữa tiêu đề */}
-                    <View style={styles.fullModalHeaderBtn} />
-                  </View>
-
-                  {/* Body */}
-                  <ScrollView
-                    keyboardShouldPersistTaps="handled"
-                    contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-                  >
-                    <PlayerSelector
-                      label="Chọn VĐV mới"
-                      eventType={tour?.eventType}
-                      onChange={setNewPlayer}
-                    />
-
                     <Text
                       style={{
-                        color: C.muted,
                         fontSize: 12,
-                        marginTop: 6,
+                        color: C.textSecondary,
+                        marginTop: 2,
                       }}
                     >
-                      Lưu ý: thao tác này cập nhật trực tiếp cặp đăng ký.
+                      Điểm:{" "}
+                      {roundTo3(
+                        isSingles ? me?.score?.single : me?.score?.double
+                      )}
                     </Text>
-
+                  </View>
+                )}
+                {isDoubles && (
+                  <View style={{ marginTop: 12 }}>
+                    <PlayerSelector
+                      label="VĐV 2 (Partner)"
+                      eventType={tour?.eventType}
+                      onChange={setP2}
+                      value={p2}
+                    />
+                  </View>
+                )}
+                <TextInput
+                  placeholder="Lời nhắn cho BTC..."
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: C.inputBg,
+                      borderColor: C.border,
+                      color: C.textPrimary,
+                      marginTop: 12,
+                    },
+                  ]}
+                  placeholderTextColor={C.textSecondary}
+                  value={msg}
+                  onChangeText={setMsg}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.btnPrimary,
+                    {
+                      backgroundColor: saving ? C.textSecondary : C.tint,
+                      marginTop: 16,
+                    },
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
                     <View
                       style={{
                         flexDirection: "row",
-                        gap: 8,
-                        marginTop: 16,
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      <OutlineBtn onPress={closeReplace}>Huỷ</OutlineBtn>
-                      <PrimaryBtn
-                        onPress={submitReplace}
-                        disabled={replacing || !newPlayer?._id}
-                      >
-                        {replacing ? "Đang lưu…" : "Lưu thay đổi"}
-                      </PrimaryBtn>
+                      <Ionicons name="paper-plane" size={16} color="#fff" />
+                      <Text style={{ color: "#fff", fontWeight: "700" }}>
+                        Gửi đăng ký
+                      </Text>
                     </View>
-                  </ScrollView>
-                </View>
-              </KeyboardAvoidingView>
-            </SafeAreaView>
-          );
-        })()}
-      </Modal>
-
-      <PublicProfileSheet
-        open={profile.open}
-        onClose={() => setProfile({ open: false, userId: null })}
-        userId={profile.userId}
-      />
-
-      {/* Modal Khiếu nại */}
-      <Modal
-        visible={complaintDlg.open}
-        transparent
-        animationType="slide"
-        onRequestClose={closeComplaint}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalBackdrop}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              style={{ flex: 1, alignSelf: "stretch" }} // 👈 full width
-              contentContainerStyle={{
-                flexGrow: 1,
-                justifyContent: "center",
-                paddingHorizontal: 16, // 👈 padding ngang ở đây
-              }}
-              showsHorizontalScrollIndicator={false} // 👈 tắt thanh ngang
-              alwaysBounceHorizontal={false} // 👈 không bounce ngang
-            >
-              <View
-                style={[
-                  styles.modalCard,
-                  {
-                    backgroundColor: C.cardBg,
-                    borderColor: C.border,
-                    alignSelf: "center",
-                    width: "100%", // 👈 bám theo width ScrollView
-                  },
-                ]}
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text
+                style={{
+                  color: C.textSecondary,
+                  fontStyle: "italic",
+                  textAlign: "center",
+                }}
               >
+                Đăng nhập để đăng ký
+              </Text>
+            )}
+          </View>
+
+          {/* Manager Buttons (Bỏ Checkin, dùng soft background) */}
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+            {canManage && (
+              <TouchableOpacity
+                style={[
+                  styles.btnSoft,
+                  { backgroundColor: C.softBtn, flex: 1 },
+                ]}
+                onPress={() => router.push(`/tournament/${id}/manage`)}
+              >
+                <Ionicons
+                  name="settings-sharp"
+                  size={16}
+                  color={C.textPrimary}
+                />
                 <Text
                   style={{
-                    fontWeight: "800",
-                    fontSize: 16,
-                    marginBottom: 8,
+                    fontWeight: "700",
                     color: C.textPrimary,
+                    fontSize: 13,
                   }}
                 >
-                  Khiếu nại đăng ký
+                  Quản lý
                 </Text>
-                <Text style={{ color: C.textPrimary, marginBottom: 6 }}>
-                  Vui lòng mô tả chi tiết vấn đề. BTC sẽ tiếp nhận và phản hồi.
-                </Text>
-                <TextInput
-                  value={complaintDlg.text}
-                  onChangeText={(t) =>
-                    setComplaintDlg((s) => ({ ...s, text: t }))
-                  }
-                  multiline
-                  numberOfLines={5}
-                  style={[
-                    styles.textarea,
-                    {
-                      minHeight: 120,
-                      backgroundColor: C.inputBg,
-                      borderColor: C.inputBorder,
-                      color: C.textPrimary,
-                    },
-                  ]}
-                  placeholder="Ví dụ: sai thông tin VĐV, sai điểm trình, muốn đổi khung giờ…"
-                  placeholderTextColor={C.muted}
-                />
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 8,
-                    marginTop: 12,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <OutlineBtn onPress={closeComplaint}>Đóng</OutlineBtn>
-                  <PrimaryBtn
-                    onPress={submitComplaint}
-                    disabled={sendingComplaint || !complaintDlg.text.trim()}
-                  >
-                    {sendingComplaint ? "Đang gửi…" : "Gửi khiếu nại"}
-                  </PrimaryBtn>
-                </View>
-              </View>
-            </ScrollView>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.btnSoft, { backgroundColor: C.softBtn, flex: 1 }]}
+              onPress={() => router.push(`/tournament/${id}/bracket`)}
+            >
+              <MaterialCommunityIcons
+                name="tournament"
+                size={16}
+                color={C.textPrimary}
+              />
+              <Text
+                style={{
+                  fontWeight: "700",
+                  color: C.textPrimary,
+                  fontSize: 13,
+                }}
+              >
+                Sơ đồ
+              </Text>
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
-      {/* Modal Thanh toán QR */}
-      <Modal
-        visible={paymentDlg.open}
-        transparent
-        animationType="slide"
-        onRequestClose={closePayment}
-      >
-        <View style={styles.modalBackdrop}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginTop: 24,
+              marginBottom: 8,
+            }}
           >
             <View
-              style={[
-                styles.modalCard,
-                { backgroundColor: C.cardBg, borderColor: C.border },
-              ]}
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
               <Text
                 style={{
+                  fontSize: 18,
                   fontWeight: "800",
+                  color: C.textPrimary,
+                }}
+              >
+                Danh sách
+              </Text>
+              <View
+                style={{
+                  backgroundColor: C.chipBg,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color: C.textPrimary,
+                  }}
+                >
+                  {filteredRegs.length}
+                </Text>
+              </View>
+            </View>
+            {/* Nút tìm kiếm chuyển sang phải */}
+            <TouchableOpacity
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: C.softBtn,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onPress={() => setSearchOpen(true)}
+            >
+              <Ionicons name="search" size={20} color={C.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    ),
+    [
+      tour,
+      C,
+      insets.top,
+      cap,
+      regTotal,
+      paidCount,
+      isLoggedIn,
+      pendingInvitesHere,
+      isAdmin,
+      p1Admin,
+      p2,
+      msg,
+      saving,
+      canManage,
+      id,
+      filteredRegs.length,
+      me,
+      isSingles,
+      isDoubles,
+      searchQ,
+    ]
+  );
+
+  // Search Screen as View overlay
+  const renderSearchScreen = () => (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: C.pageBg, zIndex: 10 },
+      ]}
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* {searchOpen && <Stack.Screen options={{ headerShown: false }} />} */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            padding: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: C.border,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setSearchOpen(false)}
+            style={{ padding: 8 }}
+          >
+            <Ionicons name="chevron-back" size={24} color={C.textPrimary} />
+          </TouchableOpacity>
+          <TextInput
+            autoFocus
+            placeholder="Tìm kiếm..."
+            style={{
+              flex: 1,
+              fontSize: 16,
+              color: C.textPrimary,
+              paddingHorizontal: 10,
+            }}
+            placeholderTextColor={C.textSecondary}
+            value={searchQ}
+            onChangeText={setSearchQ}
+          />
+          {searchQ.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQ("")}>
+              <Ionicons name="close-circle" size={20} color={C.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <FlashList
+          data={filteredRegs}
+          estimatedItemSize={150}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          renderItem={({ item, index }) => (
+            <RegItem
+              r={item}
+              index={index}
+              isSingles={isSingles}
+              canManage={canManage}
+              cap={cap}
+              delta={delta}
+              isOwner={item.createdBy === me?._id}
+              onPreview={openPreview}
+              onOpenProfile={openProfileByPlayer}
+              onOpenReplace={openReplace}
+              onTogglePayment={onTogglePayment}
+              onCancel={onCancelReg}
+              onOpenComplaint={openComplaint}
+              onOpenPayment={openPayment}
+              busy={{ settingPayment, deletingId: cancelingId }}
+            />
+          )}
+        />
+      </SafeAreaView>
+    </View>
+  );
+
+  if (tourLoading)
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: C.pageBg,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ActivityIndicator size="large" color={C.tint} />
+      </View>
+    );
+  if (!tour)
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: C.pageBg,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: C.textSecondary }}>Không tìm thấy giải đấu</Text>
+      </View>
+    );
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: searchOpen ? false : true,
+          title: "Đăng ký giải đấu",
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+              }}
+            >
+              <Ionicons name="chevron-back" size={24} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+        {/* Main List */}
+        <FlashList
+          ref={listRef}
+          data={filteredRegs}
+          estimatedItemSize={180}
+          keyboardShouldPersistTaps="handled" // Cho phép bấm vào dropdown form ngay cả khi phím đang mở
+          keyboardDismissMode="on-drag"
+          renderItem={({ item, index }) => (
+            <RegItem
+              r={item}
+              index={index}
+              isSingles={isSingles}
+              canManage={canManage}
+              cap={cap}
+              delta={delta}
+              isOwner={item.createdBy === me?._id}
+              onPreview={openPreview}
+              onOpenProfile={openProfileByPlayer}
+              onOpenReplace={openReplace}
+              onTogglePayment={onTogglePayment}
+              onCancel={onCancelReg}
+              onOpenComplaint={openComplaint}
+              onOpenPayment={openPayment}
+              busy={{ settingPayment, deletingId: cancelingId }}
+            />
+          )}
+          ListHeaderComponent={HeaderComponent}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          refreshing={regsLoading}
+          onRefresh={handleRefresh}
+        />
+
+        {/* Search Overlay */}
+        {searchOpen && renderSearchScreen()}
+
+        {/* MODALS (Đặt ở đây để luôn đè lên trên Search View) */}
+        <Modal
+          visible={imgPreview.open}
+          transparent
+          onRequestClose={closePreview}
+          animationType="fade"
+        >
+          <View style={styles.modalBackdrop}>
+            <ExpoImage
+              source={{ uri: normalizeUrl(imgPreview.src) }}
+              style={{
+                width: "90%",
+                height: 400,
+                borderRadius: 12,
+                backgroundColor: "#000",
+              }}
+              contentFit="contain"
+            />
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                padding: 12,
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: 20,
+              }}
+              onPress={closePreview}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={replaceDlg.open}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={closeReplace}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1, backgroundColor: C.pageBg }}
+          >
+            <View
+              style={{
+                padding: 16,
+                borderBottomWidth: 1,
+                borderColor: C.border,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontWeight: "700",
                   fontSize: 16,
-                  marginBottom: 8,
+                  color: C.textPrimary,
+                }}
+              >
+                Thay đổi VĐV
+              </Text>
+              <TouchableOpacity onPress={closeReplace}>
+                <Text style={{ color: C.tint, fontWeight: "600" }}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 16 }}>
+              <PlayerSelector
+                label="Chọn VĐV mới"
+                eventType={tour?.eventType}
+                onChange={setNewPlayer}
+                value={newPlayer}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.btnPrimary,
+                  {
+                    backgroundColor:
+                      replacing || !newPlayer ? C.textSecondary : C.tint,
+                    marginTop: 24,
+                  },
+                ]}
+                disabled={replacing || !newPlayer}
+                onPress={submitReplace}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  {replacing ? "Đang lưu..." : "Lưu thay đổi"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        <PublicProfileSheet
+          open={profile.open}
+          userId={profile.userId}
+          onClose={() => setProfile({ open: false, userId: null })}
+        />
+
+        <Modal
+          visible={paymentDlg.open}
+          transparent
+          animationType="slide"
+          onRequestClose={closePayment}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalCard, { backgroundColor: C.cardBg }]}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "800",
+                  textAlign: "center",
+                  marginBottom: 16,
                   color: C.textPrimary,
                 }}
               >
                 Thanh toán lệ phí
               </Text>
-              {paymentDlg.reg ? (
-                <>
-                  {(() => {
-                    const code = regCodeOf(paymentDlg.reg);
-                    const ph = maskPhone(
-                      paymentDlg.reg?.player1?.phone ||
-                        paymentDlg.reg?.player2?.phone ||
-                        me?.phone ||
-                        ""
-                    );
-                    return (
-                      <Text style={{ color: C.textPrimary, marginBottom: 8 }}>
-                        Quét QR để thanh toán cho mã đăng ký{" "}
-                        <Text style={{ fontWeight: "800" }}>{code}</Text>.{"\n"}
-                        SĐT xác nhận: {ph}.
-                      </Text>
-                    );
-                  })()}
-                  {(() => {
-                    const url = qrImgUrlFor(tour, paymentDlg.reg, me?.phone);
-                    if (!url) {
-                      return (
-                        <View
-                          style={[
-                            styles.alert,
-                            {
-                              borderColor: C.infoBorder,
-                              backgroundColor: C.infoBg,
-                            },
-                          ]}
-                        >
-                          <Text style={{ color: C.infoText }}>
-                            Chưa có QR thanh toán. Dùng mục{" "}
-                            <Text style={{ fontWeight: "800" }}>Khiếu nại</Text>{" "}
-                            để liên hệ BTC.
-                          </Text>
-                        </View>
-                      );
-                    }
-                    return (
-                      <>
-                        <View
-                          style={{
-                            alignItems: "center",
-                            marginVertical: 8,
-                          }}
-                        >
-                          <ExpoImage
-                            source={{ uri: normalizeUrl(url) }}
-                            style={{
-                              width: 260,
-                              height: 260,
-                              borderRadius: 12,
-                              backgroundColor: C.ghostBg,
-                            }}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                            transition={0}
-                          />
-                        </View>
-                        <Text
-                          style={{
-                            color: C.muted,
-                            fontSize: 12,
-                            textAlign: "center",
-                          }}
-                        >
-                          Quét mã QR để thanh toán phí đăng ký giải đấu.
-                        </Text>
-                      </>
-                    );
-                  })()}
-                </>
-              ) : null}
+              {paymentDlg.reg && (
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ marginBottom: 12, color: C.textSecondary }}>
+                    Mã ĐK:{" "}
+                    <Text style={{ fontWeight: "bold", color: C.textPrimary }}>
+                      {regCodeOf(paymentDlg.reg)}
+                    </Text>
+                  </Text>
+                  {qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
+                    <ExpoImage
+                      source={{
+                        uri: qrImgUrlFor(tour, paymentDlg.reg, me?.phone)!,
+                      }}
+                      style={{ width: 220, height: 220 }}
+                    />
+                  ) : (
+                    <Text>Chưa cấu hình QR</Text>
+                  )}
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: C.textSecondary,
+                      marginTop: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    Quét mã trên để thanh toán. Nội dung chuyển khoản đã được
+                    tạo tự động.
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.btnPrimary,
+                  { marginTop: 20, backgroundColor: C.tint },
+                ]}
+                onPress={closePayment}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
+        <Modal
+          visible={complaintDlg.open}
+          transparent
+          animationType="slide"
+          onRequestClose={handleCloseComplaint}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1, justifyContent: "flex-end" }}
+          >
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: C.cardBg,
+                  padding: 20,
+                  margin: 0,
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "700",
+                  marginBottom: 12,
+                  color: C.textPrimary,
+                }}
+              >
+                Gửi khiếu nại
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: C.inputBg,
+                    color: C.textPrimary,
+                    minHeight: 80,
+                  },
+                ]}
+                multiline
+                placeholder="Nhập nội dung..."
+                placeholderTextColor={C.textSecondary}
+                value={complaintDlg.text}
+                onChangeText={(t) =>
+                  setComplaintDlg({ ...complaintDlg, text: t })
+                }
+              />
               <View
                 style={{
                   flexDirection: "row",
-                  gap: 8,
-                  marginTop: 12,
+                  gap: 10,
+                  marginTop: 16,
                   justifyContent: "flex-end",
                 }}
               >
-                {!paymentDlg.reg ||
-                !qrImgUrlFor(tour, paymentDlg.reg, me?.phone) ? (
-                  <OutlineBtn
-                    onPress={() =>
-                      setComplaintDlg({
-                        open: true,
-                        reg: paymentDlg.reg,
-                        text: "",
-                      })
-                    }
+                <TouchableOpacity onPress={handleCloseComplaint}>
+                  <Text
+                    style={{
+                      color: C.textSecondary,
+                      fontWeight: "600",
+                      padding: 10,
+                    }}
                   >
-                    ⚠️ Khiếu nại
-                  </OutlineBtn>
-                ) : null}
-                <PrimaryBtn onPress={closePayment}>Đóng</PrimaryBtn>
+                    Huỷ
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={submitComplaint}
+                  style={{
+                    backgroundColor: C.tint,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Gửi</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </ScrollView>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </Modal>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  headerRow: {
+  // Hero
+  headerHero: { paddingHorizontal: 16, paddingBottom: 40 },
+  headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
-  },
-  title: { fontSize: 20, fontWeight: "800" },
-
-  sectionCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
     marginBottom: 12,
   },
-  tourName: { fontSize: 18, fontWeight: "800" },
-  muted: {},
-
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    columnGap: 12,
-    rowGap: 6,
-    marginTop: 6,
-  },
-
-  label: { marginTop: 12, marginBottom: 6, fontWeight: "700" },
-  textarea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 72,
-    textAlignVertical: "top",
-  },
-
-  searchWrap: { marginTop: 10, position: "relative" },
-  searchInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  clearBtn: {
-    position: "absolute",
-    right: 10,
-    top: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-
-  card: {
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-
-  chip: {
+  badgeGlass: {
+    backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    alignSelf: "flex-start",
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
-  chipTxt: { fontSize: 12, fontWeight: "700" },
-
-  btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+  tourNameHero: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#fff",
+    lineHeight: 30,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  searchBtnHeader: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
-  },
-  btnOutline: { borderWidth: 1, backgroundColor: "transparent" },
-  btnWhite: { color: "#fff", fontWeight: "700" },
-  btnText: { fontWeight: "700" },
-
-  alert: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
   },
-  modalCard: {
-    width: "100%",
-    maxWidth: 560,
+
+  // Stats
+  statsContainer: { marginTop: -30, paddingHorizontal: 16 },
+  statCard: {
+    flexDirection: "row",
+    padding: 12,
     borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
+    alignItems: "center",
+    gap: 12,
+  },
+  statIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
+  // Sections
+  sectionCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    padding: 12,
+    backgroundColor: "rgba(0,0,0,0.03)",
+  },
+  formCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
+
+  // Reg Item Card
+  regCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: 16,
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  regHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rankBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  miniEditBtn: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+  },
+  addPlayerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: 10,
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    marginTop: 8,
+  },
+
+  // Buttons
+  btnPrimary: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnOutline: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  btnSmall: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  btnSoft: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  btnActionSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  iconActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  input: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+
+  // Modals
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: { width: "100%", borderRadius: 24, padding: 24 },
+
+  // HTML Preview
   htmlCard: {
     borderWidth: 1,
     borderRadius: 12,
@@ -2574,46 +2134,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-
-  htmlFade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 100,
-  },
-
-  htmlMoreBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-
-  fullHtmlContainer: {
-    flex: 1,
-  },
+  htmlFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 100 },
+  htmlMoreBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   fullHtmlHeader: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
   },
   fullHtmlCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20, // tròn 50%
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  selfCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-  },
-  row: { flexDirection: "row", gap: 8 },
-  fullModalContainer: {
-    flex: 1,
-  },
+  // Full Screen Modal (Replace)
+  fullModalContainer: { flex: 1 },
   fullModalHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -2628,15 +2167,83 @@ const styles = StyleSheet.create({
     minWidth: 72,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 999, // bo tròn pill
-    flexDirection: "row", // icon + text nằm ngang
+    borderRadius: 999,
+    flexDirection: "row",
   },
   searchCloseBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20, // tròn 50%
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 8,
   },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+
+  // Legacy
+  card: {
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+  chipTxt: { fontSize: 12, fontWeight: "700" },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  btnWhite: { color: "#fff", fontWeight: "700" },
+  btnText: { fontWeight: "700" },
+  alert: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  selfCard: { borderWidth: 1, borderRadius: 12, padding: 10 },
+  row: { flexDirection: "row", gap: 8 },
+  title: { fontSize: 20, fontWeight: "800" },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  tourName: { fontSize: 18, fontWeight: "800" },
+  muted: {},
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 12,
+    rowGap: 6,
+    marginTop: 6,
+  },
+  label: { marginTop: 12, marginBottom: 6, fontWeight: "700" },
+  textarea: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 72,
+    textAlignVertical: "top",
+  },
+  searchWrap: { marginTop: 10, position: "relative" },
 });

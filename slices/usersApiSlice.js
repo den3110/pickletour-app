@@ -133,6 +133,23 @@ export const userApiSlice = apiSlice.injectEndpoints({
         { type: "Achievements", id },
       ],
     }),
+    getKycCheckData: builder.query({
+      query: (userId) => ({
+        url: `/api/users/kyc/status/${userId}`,
+        method: "GET",
+      }),
+      keepUnusedDataFor: 0, // Không cache để luôn lấy data mới nhất khi vào màn hình
+    }),
+    // Update trạng thái
+    updateKycStatus: builder.mutation({
+      query: ({ userId, status }) => ({
+        url: `/api/users/kyc/status/${userId}`,
+        method: "PUT",
+        body: { status },
+      }),
+      // Invalidate tag User để màn hình Profile tự cập nhật lại badge
+      invalidatesTags: ["User"], 
+    }),
   }),
 });
 
@@ -156,5 +173,7 @@ export const {
   useDeleteRatingHistoryMutation,
   useGetUserAchievementsQuery,
   useIssueOsAuthTokenMutation,
-  useReauthQuery
+  useReauthQuery,
+  useGetKycCheckDataQuery,
+  useUpdateKycStatusMutation
 } = userApiSlice;

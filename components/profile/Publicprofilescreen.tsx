@@ -11,14 +11,18 @@ import {
   Clipboard,
   Alert,
   ActivityIndicator,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSelector } from "react-redux";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@react-navigation/native";
 
-// Icons
+import ImageViewing from "react-native-image-viewing";
+
 import {
   Ionicons,
   MaterialCommunityIcons,
@@ -31,11 +35,10 @@ import {
   useGetMatchHistoryQuery,
   useDeleteRatingHistoryMutation,
 } from "@/slices/usersApiSlice";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
-import { router } from "expo-router";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
 const AVATAR_SIZE = 120;
 const isSmallDevice = SCREEN_WIDTH <= 360;
@@ -73,6 +76,24 @@ const getGenderInfo = (g) => {
   return { label: "Khác", color: "#9E9E9E" };
 };
 
+// 🟢 Helper lấy thông tin trạng thái KYC
+const getKycStatusMeta = (status) => {
+  switch (status) {
+    case "verified":
+      return {
+        label: "Đã xác thực",
+        color: "#4CAF50",
+        icon: "checkmark-circle",
+      }; // Xanh lá
+    case "pending":
+      return { label: "Chờ duyệt", color: "#FF9800", icon: "time" }; // Cam
+    case "rejected":
+      return { label: "Bị từ chối", color: "#F44336", icon: "alert-circle" }; // Đỏ
+    default:
+      return null;
+  }
+};
+
 const calcAge = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -105,7 +126,7 @@ const hasData = (v) => {
 
 /* ---------- SUB-COMPONENTS ---------- */
 
-const StatCard = ({ icon, value, label, color, gradient }) => (
+const StatCard = ({ icon, value, label, gradient }) => (
   <LinearGradient
     colors={gradient}
     start={{ x: 0, y: 0 }}
@@ -118,14 +139,24 @@ const StatCard = ({ icon, value, label, color, gradient }) => (
   </LinearGradient>
 );
 
-const InfoBadge = ({ icon, text, color = "#666" }) => (
-  <View style={[styles.badge, { borderColor: color }]}>
+const InfoBadge = ({ icon, text, color = "#666", bgColor }) => (
+  <View
+    style={[
+      styles.badge,
+      {
+        borderColor: bgColor ? "transparent" : color,
+        backgroundColor: bgColor || "transparent",
+      },
+    ]}
+  >
     {icon}
-    <Text style={[styles.badgeText, { color }]}>{text}</Text>
+    <Text style={[styles.badgeText, { color: bgColor ? "#FFF" : color }]}>
+      {text}
+    </Text>
   </View>
 );
 
-const MatchCard = ({ match, userId, onPress }) => {
+const MatchCard = ({ match, userId, onPress, colors }) => {
   const winnerA = match.winner === "A";
   const winnerB = match.winner === "B";
   const myInA = match.team1?.some((p) => (p._id || p.id) === userId);
@@ -138,7 +169,9 @@ const MatchCard = ({ match, userId, onPress }) => {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.matchCardContainer}>
+      <View
+        style={[styles.matchCardContainer, { backgroundColor: colors.card }]}
+      >
         <View style={styles.matchHeader}>
           <View
             style={[
@@ -149,39 +182,58 @@ const MatchCard = ({ match, userId, onPress }) => {
             <Text style={styles.resultText}>{isMyWin ? "THẮNG" : "THUA"}</Text>
           </View>
           <View style={styles.matchHeaderRight}>
-            <Text style={styles.matchDate} numberOfLines={1}>
+            <Text style={[styles.matchDate, { color: colors.subText }]}>
               {fmtDT(match.dateTime)}
             </Text>
-            <Text style={styles.tournamentName} numberOfLines={1}>
+            <Text style={[styles.tournamentName, { color: colors.text }]}>
               {match.tournament?.name || "Giao hữu"}
             </Text>
           </View>
         </View>
 
         <View style={styles.teamsVerticalContainer}>
-          <View style={styles.teamSection}>
+          <View
+            style={[styles.teamSection, { backgroundColor: colors.bgMuted }]}
+          >
             <View style={styles.teamPlayers}>
               {match.team1?.map((p, i) => (
-                <PlayerRowCompact key={i} player={p} highlight={winnerA} />
+                <PlayerRowCompact
+                  key={i}
+                  player={p}
+                  highlight={winnerA}
+                  colors={colors}
+                />
               ))}
             </View>
           </View>
           <View style={styles.scoreDisplayContainer}>
-            <Text style={styles.scoreDisplayText}>
+            <Text style={[styles.scoreDisplayText, { color: colors.text }]}>
               {match.scoreText || "VS"}
             </Text>
           </View>
-          <View style={styles.teamSection}>
+          <View
+            style={[styles.teamSection, { backgroundColor: colors.bgMuted }]}
+          >
             <View style={styles.teamPlayers}>
               {match.team2?.map((p, i) => (
-                <PlayerRowCompact key={i} player={p} highlight={winnerB} />
+                <PlayerRowCompact
+                  key={i}
+                  player={p}
+                  highlight={winnerB}
+                  colors={colors}
+                />
               ))}
             </View>
           </View>
         </View>
 
         {match.video && (
-          <TouchableOpacity style={styles.videoButton}>
+          <TouchableOpacity
+            style={[
+              styles.videoButton,
+              { borderTopColor: colors.border || "#F0F0F0" },
+            ]}
+          >
             <Ionicons name="play-circle" size={18} color="#FF3B30" />
             <Text style={styles.videoText}>Video</Text>
           </TouchableOpacity>
@@ -191,7 +243,7 @@ const MatchCard = ({ match, userId, onPress }) => {
   );
 };
 
-const PlayerRowCompact = ({ player, highlight }) => {
+const PlayerRowCompact = ({ player, highlight, colors }) => {
   const up = (player?.delta ?? 0) > 0;
   const name =
     player?.user?.nickname ||
@@ -204,7 +256,7 @@ const PlayerRowCompact = ({ player, highlight }) => {
     <View style={styles.playerRowCompact}>
       <Image
         source={{ uri: normalizeUrl(player?.avatar) || AVA_PLACE }}
-        style={styles.playerAvatarCompact}
+        style={[styles.playerAvatarCompact, { borderColor: colors.card }]}
         contentFit="cover"
         cachePolicy="memory-disk"
         transition={150}
@@ -213,7 +265,8 @@ const PlayerRowCompact = ({ player, highlight }) => {
         <Text
           style={[
             styles.playerNameCompact,
-            highlight && styles.playerNameHighlight,
+            { color: colors.text },
+            highlight && { color: colors.primary, fontWeight: "700" },
           ]}
           numberOfLines={1}
         >
@@ -221,7 +274,9 @@ const PlayerRowCompact = ({ player, highlight }) => {
         </Text>
         {player?.postScore !== undefined && player?.postScore !== null && (
           <View style={styles.scoreChangeCompact}>
-            <Text style={styles.scoreChangeTextCompact}>
+            <Text
+              style={[styles.scoreChangeTextCompact, { color: colors.subText }]}
+            >
               {num(player.preScore)} → {num(player.postScore)}
             </Text>
             {Number.isFinite(+player.delta) && player.delta !== 0 && (
@@ -248,12 +303,19 @@ const RatingHistoryRow = ({
   isAdmin,
   isDeleting,
   onDelete,
+  colors,
 }) => {
   const singleDelta = prevItem ? item.single - prevItem.single : 0;
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
 
   return (
-    <View style={[styles.ratingRow, isSmallDevice && styles.ratingRowSmall]}>
+    <View
+      style={[
+        styles.ratingRow,
+        { backgroundColor: colors.card },
+        isSmallDevice && styles.ratingRowSmall,
+      ]}
+    >
       {isAdmin && (
         <TouchableOpacity
           style={styles.deleteItemButton}
@@ -270,15 +332,19 @@ const RatingHistoryRow = ({
       )}
 
       <View style={styles.ratingLeft}>
-        <Text style={styles.ratingDate}>{fmtDate(item.scoredAt)}</Text>
-        <Text style={styles.ratingScorer}>
+        <Text style={[styles.ratingDate, { color: colors.text }]}>
+          {fmtDate(item.scoredAt)}
+        </Text>
+        <Text style={[styles.ratingScorer, { color: colors.subText }]}>
           {item.scorer?.name || "Hệ thống"}
         </Text>
       </View>
       <View
         style={[styles.ratingScores, isSmallDevice && styles.ratingScoresSmall]}
       >
-        <View style={styles.ratingScoreBadge}>
+        <View
+          style={[styles.ratingScoreBadge, { backgroundColor: colors.bgMuted }]}
+        >
           <Text style={styles.ratingScoreLabel}>Đơn</Text>
           <Text style={styles.ratingScoreValue}>{num(item.single)}</Text>
           {singleDelta !== 0 && (
@@ -293,7 +359,12 @@ const RatingHistoryRow = ({
             </Text>
           )}
         </View>
-        <View style={[styles.ratingScoreBadge, { backgroundColor: "#E3F2FD" }]}>
+        <View
+          style={[
+            styles.ratingScoreBadge,
+            { backgroundColor: colors.isDark ? "#1A2733" : "#E3F2FD" },
+          ]}
+        >
           <Text style={[styles.ratingScoreLabel, { color: "#1976D2" }]}>
             Đôi
           </Text>
@@ -317,15 +388,18 @@ const RatingHistoryRow = ({
   );
 };
 
-const InfoItem = ({ label, value, copyable, onCopy }) => {
+const InfoItem = ({ label, value, copyable, onCopy, colors }) => {
   const display =
     value === null || value === undefined || value === "" ? "—" : value;
 
   return (
     <View style={styles.infoItem}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoLabel, { color: colors.subText }]}>{label}</Text>
       <View style={styles.infoValueContainer}>
-        <Text style={styles.infoValue} numberOfLines={2}>
+        <Text
+          style={[styles.infoValue, { color: colors.text }]}
+          numberOfLines={2}
+        >
           {display}
         </Text>
         {copyable && display !== "—" && (
@@ -333,7 +407,7 @@ const InfoItem = ({ label, value, copyable, onCopy }) => {
             onPress={() => onCopy(display, label)}
             style={styles.copyButton}
           >
-            <Ionicons name="copy-outline" size={16} color="#666" />
+            <Ionicons name="copy-outline" size={16} color={colors.subText} />
           </TouchableOpacity>
         )}
       </View>
@@ -342,7 +416,13 @@ const InfoItem = ({ label, value, copyable, onCopy }) => {
 };
 
 /* ---------- SKELETON COMPONENTS ---------- */
-const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
+const SkeletonItem = ({
+  width,
+  height,
+  borderRadius = 4,
+  style,
+  baseColor,
+}) => {
   const animatedValue = React.useRef(new Animated.Value(0.3)).current;
 
   React.useEffect(() => {
@@ -371,7 +451,7 @@ const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
           width,
           height,
           borderRadius,
-          backgroundColor: "#E1E9EE",
+          backgroundColor: baseColor || "#E1E9EE",
           opacity: animatedValue,
         },
         style,
@@ -380,9 +460,16 @@ const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
   );
 };
 
-const ProfileSkeleton = () => {
+const ProfileSkeleton = ({ isDark }) => {
+  const skelColor = isDark ? "#333" : "#E1E9EE";
+  const bgColor = isDark ? "#121212" : "#F5F7FA";
+  const cardColor = isDark ? "#1E1E1E" : "#FFF";
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: bgColor }]}
+      edges={["top"]}
+    >
       <View
         style={{ height: HEADER_HEIGHT, alignItems: "center", paddingTop: 60 }}
       >
@@ -393,7 +480,7 @@ const ProfileSkeleton = () => {
             left: 0,
             right: 0,
             height: "100%",
-            backgroundColor: "#D1D5DB",
+            backgroundColor: isDark ? "#2C2C2E" : "#D1D5DB",
             borderBottomLeftRadius: 24,
             borderBottomRightRadius: 24,
           }}
@@ -403,25 +490,24 @@ const ProfileSkeleton = () => {
             width={AVATAR_SIZE}
             height={AVATAR_SIZE}
             borderRadius={AVATAR_SIZE / 2}
-            style={{ borderWidth: 4, borderColor: "white" }}
+            baseColor={skelColor}
+            style={{ borderWidth: 4, borderColor: cardColor }}
           />
         </View>
         <SkeletonItem
           width={200}
           height={28}
           borderRadius={8}
+          baseColor={skelColor}
           style={{ marginBottom: 8 }}
         />
         <SkeletonItem
           width={120}
           height={20}
           borderRadius={16}
+          baseColor={skelColor}
           style={{ marginBottom: 16 }}
         />
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <SkeletonItem width={80} height={24} borderRadius={16} />
-          <SkeletonItem width={60} height={24} borderRadius={16} />
-        </View>
       </View>
       <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20 }}>
         <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
@@ -431,7 +517,7 @@ const ProfileSkeleton = () => {
               style={{
                 flex: 1,
                 height: 100,
-                backgroundColor: "#FFF",
+                backgroundColor: cardColor,
                 borderRadius: 16,
                 padding: 10,
                 justifyContent: "center",
@@ -442,9 +528,15 @@ const ProfileSkeleton = () => {
                 width={30}
                 height={30}
                 borderRadius={15}
+                baseColor={skelColor}
                 style={{ marginBottom: 8 }}
               />
-              <SkeletonItem width={40} height={20} borderRadius={4} />
+              <SkeletonItem
+                width={40}
+                height={20}
+                borderRadius={4}
+                baseColor={skelColor}
+              />
             </View>
           ))}
         </View>
@@ -455,11 +547,31 @@ const ProfileSkeleton = () => {
 
 /* ---------- MAIN COMPONENT ---------- */
 export default function PublicProfileScreen() {
+  const theme = useTheme();
+  const isDark = theme.dark;
+
+  // 🟢 Theme Colors
+  const colors = {
+    isDark,
+    primary: theme.colors.primary || "#6366F1",
+    bg: isDark ? "#121212" : "#F5F7FA",
+    card: isDark ? "#1E1E1E" : "#FFFFFF",
+    text: isDark ? "#FFFFFF" : "#333333",
+    subText: isDark ? "#A0A0A0" : "#666666",
+    border: isDark ? "#333333" : "#E0E0E0",
+    bgMuted: isDark ? "#2C2C2E" : "#F8F9FA",
+    tabActive: "#6366F1",
+    tabInactive: isDark ? "#A0A0A0" : "#666666",
+  };
+
   const params = useLocalSearchParams();
   const { id } = params;
   const [activeTab, setActiveTab] = useState(0);
   const scrollY = new Animated.Value(0);
   const scrollViewRef = React.useRef(null);
+
+  const [isImageViewVisible, setIsImageViewVisible] = useState(false);
+  const [isAvatarLoading, setIsAvatarLoading] = useState(false);
 
   // Queries
   const baseQ = useGetPublicProfileQuery(id);
@@ -489,7 +601,13 @@ export default function PublicProfileScreen() {
     (Array.isArray(userInfo?.roles) && userInfo.roles.includes("admin"));
   const canSeeSensitive = isSelf || isAdminViewer;
 
-  // Latest ratings
+  // 🟢 2. Tính toán trạng thái KYC & Logic hiển thị nút
+  const kycStatusMeta = getKycStatusMeta(base?.cccdStatus);
+  const showKycCheckButton =
+    isAdminViewer &&
+    ["pending", "verified", "rejected"].includes(base?.cccdStatus);
+
+  // Latest ratings (Logic giữ nguyên)
   const latestSingle = useMemo(() => {
     if (ratingRaw.length) {
       const v = Number(ratingRaw[0]?.single);
@@ -561,13 +679,16 @@ export default function PublicProfileScreen() {
     Alert.alert("Đã sao chép", `${label}: ${value}`);
   };
 
-  // 👇 HÀM ĐIỀU HƯỚNG SANG TRANG CHI TIẾT MATCH
   const handleMatchPress = (matchId) => {
-    // Điều hướng tới: /match/{matchId}/home
     router.push(`/match/${matchId}/home`);
   };
 
-  // Hàm xoá history
+  const handleCheckKyc = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Điều hướng tới màn soi KYC
+    router.push(`/user/${uid}/kyc`);
+  };
+
   const handleDeleteHistory = (h) => {
     if (!isAdminViewer) return;
     const historyId = h?._id ?? h?.id;
@@ -600,13 +721,7 @@ export default function PublicProfileScreen() {
               );
               Alert.alert("Thành công", "Đã xoá một mục lịch sử điểm trình.");
             } catch (e) {
-              Alert.alert(
-                "Lỗi",
-                e?.data?.message ||
-                  e?.error ||
-                  e?.message ||
-                  "Xoá thất bại. Vui lòng thử lại."
-              );
+              Alert.alert("Lỗi", "Xoá thất bại. Vui lòng thử lại.");
             } finally {
               setDeletingId(null);
             }
@@ -616,7 +731,6 @@ export default function PublicProfileScreen() {
     );
   };
 
-  // Derived data
   const genderInfo = getGenderInfo(base?.gender);
   const handLabel = getHandLabel(
     base?.playHand || base?.hand || base?.handedness || base?.dominantHand
@@ -641,15 +755,15 @@ export default function PublicProfileScreen() {
   });
 
   if (baseQ.isLoading) {
-    return <ProfileSkeleton />;
+    return <ProfileSkeleton isDark={isDark} />;
   }
 
   if (baseQ.error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={64} color="#F44336" />
-          <Text style={styles.errorText}>
+          <Text style={[styles.errorText, { color: colors.subText }]}>
             Không tìm thấy người dùng hoặc có lỗi xảy ra
           </Text>
         </View>
@@ -662,17 +776,17 @@ export default function PublicProfileScreen() {
     hasData(base?.email) ||
     hasData(base?.address || base?.street);
 
+  const avatarUrl = normalizeUrl(base?.avatar) || AVA_PLACE;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      edges={["top"]}
+    >
+      <StatusBar barStyle="light-content" />
+
       {/* Animated Header */}
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerOpacity,
-          },
-        ]}
-      >
+      <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
         <LinearGradient
           colors={["#6366F1", "#8B5CF6", "#EC4899"]}
           start={{ x: 0, y: 0 }}
@@ -685,20 +799,34 @@ export default function PublicProfileScreen() {
           <Animated.View
             style={[
               styles.avatarContainer,
-              {
-                transform: [{ scale: avatarScale }],
-              },
+              { transform: [{ scale: avatarScale }] },
             ]}
           >
-            <Image
-              source={{ uri: normalizeUrl(base?.avatar) || AVA_PLACE }}
-              style={styles.avatar}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={150}
-            />
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => setIsImageViewVisible(true)}
+              style={[styles.avatarWrapper, { borderColor: colors.card }]}
+            >
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatar}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
+                onLoadStart={() => setIsAvatarLoading(true)}
+                onLoad={() => setIsAvatarLoading(false)}
+              />
+              {isAvatarLoading && (
+                <View style={styles.avatarLoadingOverlay}>
+                  <ActivityIndicator size="small" color="#FFF" />
+                </View>
+              )}
+            </TouchableOpacity>
+
             {base?.isAdmin && (
-              <View style={styles.verifiedBadge}>
+              <View
+                style={[styles.verifiedBadge, { borderColor: colors.card }]}
+              >
                 <Ionicons name="shield-checkmark" size={20} color="#FFF" />
               </View>
             )}
@@ -713,6 +841,7 @@ export default function PublicProfileScreen() {
             </Text>
           </View>
 
+          {/* 🟢 5. CONTAINER NÀY ĐÃ CẬP NHẬT WRAP & CENTER */}
           <View style={styles.quickInfoContainer}>
             {hasData(base?.province) && (
               <InfoBadge
@@ -734,7 +863,35 @@ export default function PublicProfileScreen() {
               text={genderInfo.label}
               color="#FFF"
             />
+
+            {/* 🟢 3. Chip trạng thái KYC */}
+            {kycStatusMeta && (
+              <InfoBadge
+                icon={
+                  <Ionicons name={kycStatusMeta.icon} size={14} color="#FFF" />
+                }
+                text={kycStatusMeta.label}
+                bgColor={kycStatusMeta.color}
+              />
+            )}
+
+            {/* 🟢 4. Nút Xem KYC (Chỉ hiện khi cần thiết) */}
+            {showKycCheckButton && (
+              <TouchableOpacity
+                onPress={handleCheckKyc}
+                style={styles.adminKycButton}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name="card-account-details-outline"
+                  size={14}
+                  color="#FFF"
+                />
+                <Text style={styles.adminKycText}>Xem KYC</Text>
+              </TouchableOpacity>
+            )}
           </View>
+
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -772,28 +929,25 @@ export default function PublicProfileScreen() {
             }
             value={totalMatches}
             label="Tổng trận"
-            color="#6366F1"
             gradient={["#6366F1", "#8B5CF6"]}
           />
           <StatCard
             icon={<FontAwesome5 name="trophy" size={28} color="#FFF" />}
             value={`${wins} (${winRate}%)`}
             label="Chiến thắng"
-            color="#F59E0B"
             gradient={["#F59E0B", "#EF4444"]}
           />
           <StatCard
             icon={<Ionicons name="trending-up" size={32} color="#FFF" />}
             value={`${num(latestSingle)} / ${num(latestDouble)}`}
             label="Điểm Đơn/Đôi"
-            color="#10B981"
             gradient={["#10B981", "#059669"]}
           />
         </View>
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <View style={styles.tabWrapper}>
+          <View style={[styles.tabWrapper, { backgroundColor: colors.card }]}>
             {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình"].map((tab, index) => (
               <TouchableOpacity
                 key={index}
@@ -807,6 +961,7 @@ export default function PublicProfileScreen() {
                 <Text
                   style={[
                     styles.tabText,
+                    { color: colors.tabInactive },
                     activeTab === index && styles.tabTextActive,
                   ]}
                   numberOfLines={1}
@@ -823,19 +978,24 @@ export default function PublicProfileScreen() {
           {/* Tab 0: Profile Details */}
           {activeTab === 0 && (
             <View style={styles.profileTab}>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Giới thiệu</Text>
-                <Text style={styles.bioText}>
+              <View style={[styles.section, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Giới thiệu
+                </Text>
+                <Text style={[styles.bioText, { color: colors.subText }]}>
                   {base?.bio || "Chưa có thông tin."}
                 </Text>
               </View>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
+              <View style={[styles.section, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Thông tin cơ bản
+                </Text>
                 <View style={styles.infoGrid}>
                   {hasData(base?.name || base?.fullName) && (
                     <InfoItem
                       label="Họ và tên"
                       value={base?.name || base?.fullName}
+                      colors={colors}
                     />
                   )}
                   {hasData(base?.nickname) && (
@@ -844,46 +1004,87 @@ export default function PublicProfileScreen() {
                       value={base?.nickname}
                       copyable
                       onCopy={handleCopy}
+                      colors={colors}
                     />
                   )}
                   {hasData(genderInfo.label) && (
-                    <InfoItem label="Giới tính" value={genderInfo.label} />
+                    <InfoItem
+                      label="Giới tính"
+                      value={genderInfo.label}
+                      colors={colors}
+                    />
                   )}
                   {hasData(base?.province) && (
-                    <InfoItem label="Tỉnh thành" value={base?.province} />
+                    <InfoItem
+                      label="Tỉnh thành"
+                      value={base?.province}
+                      colors={colors}
+                    />
                   )}
                   {hasData(dob) && (
-                    <InfoItem label="Ngày sinh" value={fmtDate(dob)} />
+                    <InfoItem
+                      label="Ngày sinh"
+                      value={fmtDate(dob)}
+                      colors={colors}
+                    />
                   )}
                   {hasData(calcAge(dob)) && (
-                    <InfoItem label="Tuổi" value={`${calcAge(dob)} tuổi`} />
+                    <InfoItem
+                      label="Tuổi"
+                      value={`${calcAge(dob)} tuổi`}
+                      colors={colors}
+                    />
                   )}
                   {hasData(handLabel) && (
-                    <InfoItem label="Tay thuận" value={handLabel} />
+                    <InfoItem
+                      label="Tay thuận"
+                      value={handLabel}
+                      colors={colors}
+                    />
                   )}
                 </View>
               </View>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Thông tin thi đấu</Text>
+              <View style={[styles.section, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Thông tin thi đấu
+                </Text>
                 <View style={styles.infoGrid}>
                   {hasData(clubName) && (
-                    <InfoItem label="CLB chính" value={clubName} />
+                    <InfoItem
+                      label="CLB chính"
+                      value={clubName}
+                      colors={colors}
+                    />
                   )}
-                  <InfoItem label="Điểm đơn" value={num(latestSingle)} />
-                  <InfoItem label="Điểm đôi" value={num(latestDouble)} />
+                  <InfoItem
+                    label="Điểm đơn"
+                    value={num(latestSingle)}
+                    colors={colors}
+                  />
+                  <InfoItem
+                    label="Điểm đôi"
+                    value={num(latestDouble)}
+                    colors={colors}
+                  />
                   <InfoItem
                     label="Tổng trận"
                     value={`${totalMatches || 0} trận`}
+                    colors={colors}
                   />
                   <InfoItem
                     label="Thắng / Tỷ lệ"
                     value={`${wins || 0} (${winRate}%)`}
+                    colors={colors}
                   />
                 </View>
               </View>
               {canSeeSensitive && hasContactBlock && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
+                <View
+                  style={[styles.section, { backgroundColor: colors.card }]}
+                >
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    Thông tin liên hệ
+                  </Text>
                   <View style={styles.infoGrid}>
                     {hasData(base?.phone) && (
                       <InfoItem
@@ -891,6 +1092,7 @@ export default function PublicProfileScreen() {
                         value={base?.phone}
                         copyable
                         onCopy={handleCopy}
+                        colors={colors}
                       />
                     )}
                     {hasData(base?.email) && (
@@ -899,12 +1101,14 @@ export default function PublicProfileScreen() {
                         value={base?.email}
                         copyable
                         onCopy={handleCopy}
+                        colors={colors}
                       />
                     )}
                     {hasData(base?.address || base?.street) && (
                       <InfoItem
                         label="Địa chỉ"
                         value={base?.address || base?.street}
+                        colors={colors}
                       />
                     )}
                   </View>
@@ -921,9 +1125,11 @@ export default function PublicProfileScreen() {
                   <MaterialCommunityIcons
                     name="tennis-ball"
                     size={64}
-                    color="#E0E0E0"
+                    color={isDark ? "#333" : "#E0E0E0"}
                   />
-                  <Text style={styles.emptyText}>Chưa có dữ liệu trận đấu</Text>
+                  <Text style={[styles.emptyText, { color: colors.subText }]}>
+                    Chưa có dữ liệu trận đấu
+                  </Text>
                 </View>
               ) : (
                 <>
@@ -932,7 +1138,7 @@ export default function PublicProfileScreen() {
                       key={match._id}
                       match={match}
                       userId={uid}
-                      // 👇 Thêm sự kiện onPress vào đây
+                      colors={colors}
                       onPress={() =>
                         handleMatchPress(match._id || match.id || match.code)
                       }
@@ -943,6 +1149,7 @@ export default function PublicProfileScreen() {
                       <TouchableOpacity
                         style={[
                           styles.pageButton,
+                          { backgroundColor: colors.card },
                           pageMatch === 1 && styles.pageButtonDisabled,
                         ]}
                         onPress={() => {
@@ -954,15 +1161,20 @@ export default function PublicProfileScreen() {
                         }}
                         disabled={pageMatch === 1}
                       >
-                        <Ionicons name="chevron-back" size={20} color="#666" />
+                        <Ionicons
+                          name="chevron-back"
+                          size={20}
+                          color={colors.subText}
+                        />
                       </TouchableOpacity>
-                      <Text style={styles.pageText}>
+                      <Text style={[styles.pageText, { color: colors.text }]}>
                         {pageMatch} /{" "}
                         {Math.ceil(matchRaw.length / matchPerPage)}
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.pageButton,
+                          { backgroundColor: colors.card },
                           pageMatch >=
                             Math.ceil(matchRaw.length / matchPerPage) &&
                             styles.pageButtonDisabled,
@@ -986,7 +1198,7 @@ export default function PublicProfileScreen() {
                         <Ionicons
                           name="chevron-forward"
                           size={20}
-                          color="#666"
+                          color={colors.subText}
                         />
                       </TouchableOpacity>
                     </View>
@@ -1001,8 +1213,14 @@ export default function PublicProfileScreen() {
             <View style={styles.ratingTab}>
               {ratePaged.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="stats-chart" size={64} color="#E0E0E0" />
-                  <Text style={styles.emptyText}>Chưa có lịch sử điểm</Text>
+                  <Ionicons
+                    name="stats-chart"
+                    size={64}
+                    color={isDark ? "#333" : "#E0E0E0"}
+                  />
+                  <Text style={[styles.emptyText, { color: colors.subText }]}>
+                    Chưa có lịch sử điểm
+                  </Text>
                 </View>
               ) : (
                 <>
@@ -1017,6 +1235,7 @@ export default function PublicProfileScreen() {
                         item={item}
                         prevItem={prevItem}
                         isAdmin={isAdminViewer}
+                        colors={colors}
                         isDeleting={
                           deleting && deletingId === (item._id || item.id)
                         }
@@ -1029,6 +1248,7 @@ export default function PublicProfileScreen() {
                       <TouchableOpacity
                         style={[
                           styles.pageButton,
+                          { backgroundColor: colors.card },
                           pageRate === 1 && styles.pageButtonDisabled,
                         ]}
                         onPress={() => {
@@ -1040,14 +1260,19 @@ export default function PublicProfileScreen() {
                         }}
                         disabled={pageRate === 1}
                       >
-                        <Ionicons name="chevron-back" size={20} color="#666" />
+                        <Ionicons
+                          name="chevron-back"
+                          size={20}
+                          color={colors.subText}
+                        />
                       </TouchableOpacity>
-                      <Text style={styles.pageText}>
+                      <Text style={[styles.pageText, { color: colors.text }]}>
                         {pageRate} / {Math.ceil(ratingRaw.length / ratePerPage)}
                       </Text>
                       <TouchableOpacity
                         style={[
                           styles.pageButton,
+                          { backgroundColor: colors.card },
                           pageRate >=
                             Math.ceil(ratingRaw.length / ratePerPage) &&
                             styles.pageButtonDisabled,
@@ -1071,7 +1296,7 @@ export default function PublicProfileScreen() {
                         <Ionicons
                           name="chevron-forward"
                           size={20}
-                          color="#666"
+                          color={colors.subText}
                         />
                       </TouchableOpacity>
                     </View>
@@ -1082,6 +1307,31 @@ export default function PublicProfileScreen() {
           )}
         </View>
       </Animated.ScrollView>
+
+      {/* 🟢 6. Image Viewer với Theme Support */}
+      <ImageViewing
+        images={[{ uri: avatarUrl }]}
+        imageIndex={0}
+        visible={isImageViewVisible}
+        onRequestClose={() => setIsImageViewVisible(false)}
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
+        // 🟢 Nền đen cho Dark Mode, Trắng cho Light Mode (hoặc đen luôn nếu muốn)
+        backgroundColor={isDark ? "#000000" : "#FFFFFF"}
+        FooterComponent={() => (
+          <View style={{ padding: 20, alignItems: "center", marginBottom: 20 }}>
+            <Text
+              style={{
+                color: isDark ? "#FFF" : "#333",
+                fontSize: 16,
+                fontWeight: "600",
+              }}
+            >
+              {base?.name || "Ảnh đại diện"}
+            </Text>
+          </View>
+        )}
+      />
     </SafeAreaView>
   );
 }
@@ -1090,7 +1340,6 @@ export default function PublicProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
   },
   loadingContainer: {
     flex: 1,
@@ -1110,7 +1359,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
     marginTop: 16,
   },
@@ -1150,12 +1398,23 @@ const styles = StyleSheet.create({
     position: "relative",
     marginBottom: 12,
   },
-  avatar: {
+  avatarWrapper: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
     borderWidth: 4,
-    borderColor: "#FFF",
+    overflow: "hidden",
+    position: "relative",
+  },
+  avatar: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   verifiedBadge: {
     position: "absolute",
@@ -1168,7 +1427,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#FFF",
+    zIndex: 5,
   },
   userName: {
     fontSize: 24,
@@ -1190,7 +1449,11 @@ const styles = StyleSheet.create({
   },
   quickInfoContainer: {
     flexDirection: "row",
+    flexWrap: "wrap", // 🟢 Cho phép xuống dòng
+    justifyContent: "center", // 🟢 Căn giữa
     gap: 8,
+    alignItems: "center",
+    maxWidth: "90%",
   },
   badge: {
     flexDirection: "row",
@@ -1204,6 +1467,24 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  adminKycButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F59E0B",
+    gap: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  adminKycText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFF",
   },
   shareButton: {
     position: "absolute",
@@ -1281,7 +1562,6 @@ const styles = StyleSheet.create({
   },
   tabWrapper: {
     flexDirection: "row",
-    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 4,
     shadowColor: "#000",
@@ -1303,7 +1583,6 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#666",
   },
   tabTextActive: {
     color: "#FFF",
@@ -1315,7 +1594,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   section: {
-    backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 20,
     shadowColor: "#000",
@@ -1327,12 +1605,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 16,
   },
   bioText: {
     fontSize: 14,
-    color: "#666",
     lineHeight: 22,
   },
   infoGrid: {
@@ -1343,7 +1619,6 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: "#999",
     fontWeight: "600",
     textTransform: "uppercase",
   },
@@ -1354,7 +1629,6 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 15,
-    color: "#333",
     fontWeight: "500",
     flex: 1,
   },
@@ -1370,7 +1644,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   matchCardContainer: {
-    backgroundColor: "#FFF",
     padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -1402,20 +1675,17 @@ const styles = StyleSheet.create({
   },
   matchDate: {
     fontSize: 11,
-    color: "#999",
     marginBottom: 2,
   },
   tournamentName: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#333",
   },
   teamsVerticalContainer: {
     gap: 12,
   },
   teamSection: {
     borderRadius: 12,
-    backgroundColor: "#F8F9FA",
     padding: 12,
   },
   teamPlayers: {
@@ -1428,7 +1698,6 @@ const styles = StyleSheet.create({
   scoreDisplayText: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#333",
     letterSpacing: 2,
   },
   videoButton: {
@@ -1439,7 +1708,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
   },
   videoText: {
     fontSize: 12,
@@ -1456,7 +1724,6 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: "#FFF",
   },
   playerInfoCompact: {
     flex: 1,
@@ -1465,11 +1732,6 @@ const styles = StyleSheet.create({
   playerNameCompact: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#333",
-  },
-  playerNameHighlight: {
-    fontWeight: "700",
-    color: "#1976D2",
   },
   scoreChangeCompact: {
     flexDirection: "row",
@@ -1479,7 +1741,6 @@ const styles = StyleSheet.create({
   },
   scoreChangeTextCompact: {
     fontSize: 11,
-    color: "#666",
   },
   deltaTextCompact: {
     fontSize: 10,
@@ -1492,7 +1753,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#FFF",
     padding: 16,
     borderRadius: 12,
     shadowColor: "#000",
@@ -1522,12 +1782,10 @@ const styles = StyleSheet.create({
   ratingDate: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 4,
   },
   ratingScorer: {
     fontSize: 12,
-    color: "#999",
   },
   ratingScores: {
     flexDirection: "row",
@@ -1540,7 +1798,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   ratingScoreBadge: {
-    backgroundColor: "#F3E5F5",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -1570,7 +1827,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#999",
     marginTop: 16,
   },
   pagination: {
@@ -1584,7 +1840,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -1599,6 +1854,5 @@ const styles = StyleSheet.create({
   pageText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#666",
   },
 });

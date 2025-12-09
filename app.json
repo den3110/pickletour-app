@@ -80,12 +80,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsVersion": "11.13.4"
-        }
-      ],
+      ["@rnmapbox/maps"],
       [
         "expo-calendar",
         {
