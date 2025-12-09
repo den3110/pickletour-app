@@ -137,6 +137,14 @@ const FEATURES = [
     color: "#74B9FF",
     link: "/match/stack",
   },
+  {
+    id: 10,
+    icon: "locate", // icon cho Radar / Quanh đây
+    iconLib: "Ionicons",
+    title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
+    color: "#6C5CE7",
+    link: "/radar", // màn hình radar mình vừa code
+  },
 ];
 
 /* ---------- Utils ---------- */
@@ -578,10 +586,18 @@ function FeatureItem({ item, theme }) {
 }
 
 /* ---------- Features Grid ---------- */
+/* ---------- Features Grid ---------- */
 function FeaturesGrid() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+
+  // --- FIX LOGIC CĂN HÀNG ---
+  const NUM_COLUMNS = 4;
+  // Tính xem hàng cuối còn thiếu bao nhiêu item để đủ 4
+  const remainder = FEATURES.length % NUM_COLUMNS;
+  const emptySlots = remainder === 0 ? 0 : NUM_COLUMNS - remainder;
+  // --------------------------
 
   return (
     <View style={styles.featuresContainer}>
@@ -591,6 +607,11 @@ function FeaturesGrid() {
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />
+        ))}
+
+        {/* Render các View rỗng có cùng chiều rộng (22%) để đẩy item về bên trái */}
+        {Array.from({ length: emptySlots }).map((_, index) => (
+          <View key={`empty-${index}`} style={{ width: "22%" }} />
         ))}
       </View>
     </View>

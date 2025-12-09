@@ -1,9 +1,8 @@
 /* eslint-disable react/prop-types */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
@@ -11,16 +10,15 @@ import {
   Share,
   Clipboard,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-// Note: LinearGradient only used for header and stat cards now
-import { BlurView } from "expo-blur";
 import { useSelector } from "react-redux";
 import * as Haptics from "expo-haptics";
 
-// Icons - sử dụng expo vector icons
+// Icons
 import {
   Ionicons,
   MaterialCommunityIcons,
@@ -31,6 +29,7 @@ import {
   useGetPublicProfileQuery,
   useGetRatingHistoryQuery,
   useGetMatchHistoryQuery,
+  useDeleteRatingHistoryMutation,
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -39,13 +38,12 @@ import { router } from "expo-router";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
 const AVATAR_SIZE = 120;
-const isSmallDevice = SCREEN_WIDTH <= 360; // 👈 thêm: nhận diện máy nhỏ
+const isSmallDevice = SCREEN_WIDTH <= 360;
 
 /* ---------- CONSTANTS & UTILS ---------- */
 const AVA_PLACE = "https://dummyimage.com/160x160/cccccc/ffffff&text=?";
 const tz = { timeZone: "Asia/Bangkok" };
 
-// Formatters
 const fmtDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString("vi-VN", tz) : "—";
 
@@ -107,13 +105,12 @@ const hasData = (v) => {
 
 /* ---------- SUB-COMPONENTS ---------- */
 
-// Modern Stat Card
 const StatCard = ({ icon, value, label, color, gradient }) => (
   <LinearGradient
     colors={gradient}
     start={{ x: 0, y: 0 }}
     end={{ x: 1, y: 1 }}
-    style={[styles.statCard, isSmallDevice && styles.statCardSmall]} // 👈 thêm responsive
+    style={[styles.statCard, isSmallDevice && styles.statCardSmall]}
   >
     <View style={styles.statIconContainer}>{icon}</View>
     <Text style={styles.statValue}>{value}</Text>
@@ -121,7 +118,6 @@ const StatCard = ({ icon, value, label, color, gradient }) => (
   </LinearGradient>
 );
 
-// Info Badge
 const InfoBadge = ({ icon, text, color = "#666" }) => (
   <View style={[styles.badge, { borderColor: color }]}>
     {icon}
@@ -129,7 +125,6 @@ const InfoBadge = ({ icon, text, color = "#666" }) => (
   </View>
 );
 
-// Match Card
 const MatchCard = ({ match, userId, onPress }) => {
   const winnerA = match.winner === "A";
   const winnerB = match.winner === "B";
@@ -144,7 +139,6 @@ const MatchCard = ({ match, userId, onPress }) => {
       activeOpacity={0.7}
     >
       <View style={styles.matchCardContainer}>
-        {/* Header: Result Badge + Date + Tournament */}
         <View style={styles.matchHeader}>
           <View
             style={[
@@ -164,9 +158,7 @@ const MatchCard = ({ match, userId, onPress }) => {
           </View>
         </View>
 
-        {/* Teams & Score - Vertical Layout */}
         <View style={styles.teamsVerticalContainer}>
-          {/* Team 1 */}
           <View style={styles.teamSection}>
             <View style={styles.teamPlayers}>
               {match.team1?.map((p, i) => (
@@ -174,15 +166,11 @@ const MatchCard = ({ match, userId, onPress }) => {
               ))}
             </View>
           </View>
-
-          {/* Score Display */}
           <View style={styles.scoreDisplayContainer}>
             <Text style={styles.scoreDisplayText}>
               {match.scoreText || "VS"}
             </Text>
           </View>
-
-          {/* Team 2 */}
           <View style={styles.teamSection}>
             <View style={styles.teamPlayers}>
               {match.team2?.map((p, i) => (
@@ -192,7 +180,6 @@ const MatchCard = ({ match, userId, onPress }) => {
           </View>
         </View>
 
-        {/* Video Button */}
         {match.video && (
           <TouchableOpacity style={styles.videoButton}>
             <Ionicons name="play-circle" size={18} color="#FF3B30" />
@@ -204,10 +191,8 @@ const MatchCard = ({ match, userId, onPress }) => {
   );
 };
 
-// Compact Player Row for Match Card
 const PlayerRowCompact = ({ player, highlight }) => {
   const up = (player?.delta ?? 0) > 0;
-  const down = (player?.delta ?? 0) < 0;
   const name =
     player?.user?.nickname ||
     player?.user?.fullName ||
@@ -257,73 +242,33 @@ const PlayerRowCompact = ({ player, highlight }) => {
   );
 };
 
-// Player Row
-const PlayerRow = ({ player, highlight, isWinSide }) => {
-  const up = (player?.delta ?? 0) > 0;
-  const down = (player?.delta ?? 0) < 0;
-  const name =
-    player?.user?.nickname ||
-    player?.user?.fullName ||
-    player?.nickname ||
-    player?.fullName ||
-    "N/A";
-
-  return (
-    <View style={styles.playerRow}>
-      <Image
-        source={{ uri: normalizeUrl(player?.avatar) || AVA_PLACE }}
-        style={styles.playerAvatar}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        transition={150}
-      />
-      <View style={styles.playerInfo}>
-        <Text
-          style={[
-            styles.playerName,
-            highlight && styles.playerNameHighlight,
-            { color: isWinSide ? "#FFF" : "#333" },
-          ]}
-          numberOfLines={1}
-        >
-          {name}
-        </Text>
-        {player?.postScore !== undefined && player?.postScore !== null && (
-          <View style={styles.scoreChange}>
-            <Text
-              style={[
-                styles.scoreChangeText,
-                { color: isWinSide ? "rgba(255,255,255,0.8)" : "#666" },
-              ]}
-            >
-              {num(player.preScore)} → {num(player.postScore)}
-            </Text>
-            {Number.isFinite(+player.delta) && player.delta !== 0 && (
-              <Text
-                style={[
-                  styles.deltaText,
-                  { color: up ? "#4CAF50" : "#F44336" },
-                ]}
-              >
-                {up ? "+" : ""}
-                {numFloat(player.delta)}
-              </Text>
-            )}
-          </View>
-        )}
-      </View>
-    </View>
-  );
-};
-
-// Rating History Row
-const RatingHistoryRow = ({ item, prevItem }) => {
-  // Calculate delta from previous record
+const RatingHistoryRow = ({
+  item,
+  prevItem,
+  isAdmin,
+  isDeleting,
+  onDelete,
+}) => {
   const singleDelta = prevItem ? item.single - prevItem.single : 0;
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
 
   return (
     <View style={[styles.ratingRow, isSmallDevice && styles.ratingRowSmall]}>
+      {isAdmin && (
+        <TouchableOpacity
+          style={styles.deleteItemButton}
+          onPress={onDelete}
+          disabled={isDeleting}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {isDeleting ? (
+            <ActivityIndicator size="small" color="#FF3B30" />
+          ) : (
+            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+          )}
+        </TouchableOpacity>
+      )}
+
       <View style={styles.ratingLeft}>
         <Text style={styles.ratingDate}>{fmtDate(item.scoredAt)}</Text>
         <Text style={styles.ratingScorer}>
@@ -372,7 +317,6 @@ const RatingHistoryRow = ({ item, prevItem }) => {
   );
 };
 
-// Info Item for Profile Tab
 const InfoItem = ({ label, value, copyable, onCopy }) => {
   const display =
     value === null || value === undefined || value === "" ? "—" : value;
@@ -439,7 +383,6 @@ const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
 const ProfileSkeleton = () => {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header Skeleton */}
       <View
         style={{ height: HEADER_HEIGHT, alignItems: "center", paddingTop: 60 }}
       >
@@ -450,13 +393,11 @@ const ProfileSkeleton = () => {
             left: 0,
             right: 0,
             height: "100%",
-            backgroundColor: "#D1D5DB", // Giả lập màu nền gradient tối hơn chút
+            backgroundColor: "#D1D5DB",
             borderBottomLeftRadius: 24,
             borderBottomRightRadius: 24,
           }}
         />
-
-        {/* Avatar Placeholder */}
         <View style={{ marginBottom: 12, alignItems: "center" }}>
           <SkeletonItem
             width={AVATAR_SIZE}
@@ -465,8 +406,6 @@ const ProfileSkeleton = () => {
             style={{ borderWidth: 4, borderColor: "white" }}
           />
         </View>
-
-        {/* Name & Info Placeholder */}
         <SkeletonItem
           width={200}
           height={28}
@@ -479,17 +418,12 @@ const ProfileSkeleton = () => {
           borderRadius={16}
           style={{ marginBottom: 16 }}
         />
-
-        {/* Badges */}
         <View style={{ flexDirection: "row", gap: 8 }}>
           <SkeletonItem width={80} height={24} borderRadius={16} />
           <SkeletonItem width={60} height={24} borderRadius={16} />
         </View>
       </View>
-
-      {/* Body Content */}
       <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20 }}>
-        {/* Stats Cards Skeleton */}
         <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
           {[1, 2, 3].map((i) => (
             <View
@@ -514,49 +448,6 @@ const ProfileSkeleton = () => {
             </View>
           ))}
         </View>
-
-        {/* Tabs Skeleton */}
-        <View
-          style={{
-            flexDirection: "row",
-            marginBottom: 20,
-            backgroundColor: "#FFF",
-            borderRadius: 12,
-            padding: 4,
-          }}
-        >
-          <View
-            style={{
-              flex: 1,
-              height: 36,
-              backgroundColor: "#E0E0E0",
-              borderRadius: 8,
-              marginRight: 4,
-            }}
-          />
-          <View style={{ flex: 1, height: 36 }} />
-          <View style={{ flex: 1, height: 36 }} />
-        </View>
-
-        {/* List Items Skeleton (Mô phỏng info item) */}
-        <View
-          style={{
-            gap: 16,
-            backgroundColor: "#FFF",
-            borderRadius: 16,
-            padding: 20,
-          }}
-        >
-          {[1, 2, 3, 4].map((i) => (
-            <View
-              key={i}
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
-              <SkeletonItem width={80} height={16} />
-              <SkeletonItem width={120} height={16} />
-            </View>
-          ))}
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -574,6 +465,10 @@ export default function PublicProfileScreen() {
   const baseQ = useGetPublicProfileQuery(id);
   const rateQ = useGetRatingHistoryQuery(id);
   const matchQ = useGetMatchHistoryQuery(id);
+
+  const [deleteHistory, { isLoading: deleting }] =
+    useDeleteRatingHistoryMutation();
+  const [deletingId, setDeletingId] = useState(null);
 
   const base = baseQ.data || {};
   const ratingRaw = Array.isArray(rateQ.data?.history)
@@ -666,6 +561,61 @@ export default function PublicProfileScreen() {
     Alert.alert("Đã sao chép", `${label}: ${value}`);
   };
 
+  // 👇 HÀM ĐIỀU HƯỚNG SANG TRANG CHI TIẾT MATCH
+  const handleMatchPress = (matchId) => {
+    // Điều hướng tới: /match/{matchId}/home
+    router.push(`/match/${matchId}/home`);
+  };
+
+  // Hàm xoá history
+  const handleDeleteHistory = (h) => {
+    if (!isAdminViewer) return;
+    const historyId = h?._id ?? h?.id;
+    const targetUid = h?.user?._id || id;
+
+    if (!historyId || !targetUid) {
+      Alert.alert("Lỗi", "Thiếu ID, không thể xoá.");
+      return;
+    }
+
+    Alert.alert(
+      "Xoá chấm trình?",
+      "Bạn có chắc chắn muốn xoá mục lịch sử điểm trình này? Hành động không thể hoàn tác.",
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeletingId(historyId);
+              await deleteHistory({
+                userId: String(targetUid),
+                historyId: String(historyId),
+              }).unwrap();
+              setPageRate(1);
+              await rateQ.refetch?.();
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success
+              );
+              Alert.alert("Thành công", "Đã xoá một mục lịch sử điểm trình.");
+            } catch (e) {
+              Alert.alert(
+                "Lỗi",
+                e?.data?.message ||
+                  e?.error ||
+                  e?.message ||
+                  "Xoá thất bại. Vui lòng thử lại."
+              );
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Derived data
   const genderInfo = getGenderInfo(base?.gender);
   const handLabel = getHandLabel(
@@ -678,7 +628,6 @@ export default function PublicProfileScreen() {
     base?.primaryClub?.name ||
     base?.club?.name;
 
-  // Animated header
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, HEADER_HEIGHT - 100],
     outputRange: [1, 0],
@@ -694,7 +643,7 @@ export default function PublicProfileScreen() {
   if (baseQ.isLoading) {
     return <ProfileSkeleton />;
   }
-  
+
   if (baseQ.error) {
     return (
       <SafeAreaView style={styles.container}>
@@ -730,11 +679,9 @@ export default function PublicProfileScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
         >
-          {/* Decorative circles */}
           <View style={styles.headerCircle1} />
           <View style={styles.headerCircle2} />
 
-          {/* Avatar */}
           <Animated.View
             style={[
               styles.avatarContainer,
@@ -757,7 +704,6 @@ export default function PublicProfileScreen() {
             )}
           </Animated.View>
 
-          {/* Name & Info */}
           <Text style={styles.userName}>
             {base?.name || base?.fullName || "Người dùng"}
           </Text>
@@ -767,7 +713,6 @@ export default function PublicProfileScreen() {
             </Text>
           </View>
 
-          {/* Quick Info Badges */}
           <View style={styles.quickInfoContainer}>
             {hasData(base?.province) && (
               <InfoBadge
@@ -798,7 +743,6 @@ export default function PublicProfileScreen() {
             <Ionicons name="chevron-back" size={24} color="#FFF" />
           </TouchableOpacity>
 
-          {/* Share Button */}
           <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
             <Ionicons name="share-social" size={20} color="#FFF" />
           </TouchableOpacity>
@@ -857,7 +801,6 @@ export default function PublicProfileScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setActiveTab(index);
-                  // Scroll to top when changing tab
                   scrollViewRef.current?.scrollTo({ y: 0, animated: true });
                 }}
               >
@@ -880,15 +823,12 @@ export default function PublicProfileScreen() {
           {/* Tab 0: Profile Details */}
           {activeTab === 0 && (
             <View style={styles.profileTab}>
-              {/* Bio */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Giới thiệu</Text>
                 <Text style={styles.bioText}>
                   {base?.bio || "Chưa có thông tin."}
                 </Text>
               </View>
-
-              {/* Basic Info */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
                 <View style={styles.infoGrid}>
@@ -923,8 +863,6 @@ export default function PublicProfileScreen() {
                   )}
                 </View>
               </View>
-
-              {/* Competition Info */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Thông tin thi đấu</Text>
                 <View style={styles.infoGrid}>
@@ -943,8 +881,6 @@ export default function PublicProfileScreen() {
                   />
                 </View>
               </View>
-
-              {/* Contact Info (if permitted) */}
               {canSeeSensitive && hasContactBlock && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
@@ -992,7 +928,15 @@ export default function PublicProfileScreen() {
               ) : (
                 <>
                   {matchPaged.map((match) => (
-                    <MatchCard key={match._id} match={match} userId={uid} />
+                    <MatchCard
+                      key={match._id}
+                      match={match}
+                      userId={uid}
+                      // 👇 Thêm sự kiện onPress vào đây
+                      onPress={() =>
+                        handleMatchPress(match._id || match.id || match.code)
+                      }
+                    />
                   ))}
                   {matchRaw.length > matchPerPage && (
                     <View style={styles.pagination}>
@@ -1063,7 +1007,6 @@ export default function PublicProfileScreen() {
               ) : (
                 <>
                   {ratePaged.map((item, index) => {
-                    // Get previous item for delta calculation
                     const prevItem =
                       index < ratePaged.length - 1
                         ? ratePaged[index + 1]
@@ -1073,6 +1016,11 @@ export default function PublicProfileScreen() {
                         key={item._id || item.id}
                         item={item}
                         prevItem={prevItem}
+                        isAdmin={isAdminViewer}
+                        isDeleting={
+                          deleting && deletingId === (item._id || item.id)
+                        }
+                        onDelete={() => handleDeleteHistory(item)}
                       />
                     );
                   })}
@@ -1166,8 +1114,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 16,
   },
-
-  /* Header */
   header: {
     position: "absolute",
     top: 0,
@@ -1281,8 +1227,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  /* ScrollView */
   scrollView: {
     flex: 1,
   },
@@ -1290,8 +1234,6 @@ const styles = StyleSheet.create({
     paddingTop: HEADER_HEIGHT + 20,
     paddingBottom: 40,
   },
-
-  /* Stats */
   statsContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -1299,7 +1241,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statsContainerSmall: {
-    flexDirection: "column", // 👈 nhỏ thì xếp dọc
+    flexDirection: "column",
   },
   statCard: {
     flex: 1,
@@ -1333,8 +1275,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
   },
-
-  /* Tabs */
   tabContainer: {
     marginBottom: 20,
     paddingHorizontal: 16,
@@ -1368,13 +1308,9 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: "#FFF",
   },
-
-  /* Tab Content */
   tabContent: {
     paddingHorizontal: 16,
   },
-
-  /* Profile Tab */
   profileTab: {
     gap: 20,
   },
@@ -1425,8 +1361,6 @@ const styles = StyleSheet.create({
   copyButton: {
     padding: 4,
   },
-
-  /* Match Tab */
   matchTab: {
     gap: 16,
   },
@@ -1512,8 +1446,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FF3B30",
   },
-
-  /* Player Row Compact (for Match Cards) */
   playerRowCompact: {
     flexDirection: "row",
     alignItems: "center",
@@ -1553,8 +1485,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-
-  /* Rating Tab */
   ratingTab: {
     gap: 12,
   },
@@ -1570,13 +1500,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    position: "relative",
   },
   ratingRowSmall: {
-    flexDirection: "column", // 👈 nhỏ thì chia 2 dòng
+    flexDirection: "column",
     alignItems: "flex-start",
+  },
+  deleteItemButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,59,48,0.1)",
   },
   ratingLeft: {
     flex: 1,
+    paddingRight: 32,
   },
   ratingDate: {
     fontSize: 14,
@@ -1591,7 +1532,7 @@ const styles = StyleSheet.create({
   ratingScores: {
     flexDirection: "row",
     gap: 8,
-    flexWrap: "wrap", // 👈 tránh tràn trên màn nhỏ
+    flexWrap: "wrap",
   },
   ratingScoresSmall: {
     marginTop: 8,
@@ -1622,8 +1563,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-
-  /* Empty State */
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -1634,8 +1573,6 @@ const styles = StyleSheet.create({
     color: "#999",
     marginTop: 16,
   },
-
-  /* Pagination */
   pagination: {
     flexDirection: "row",
     justifyContent: "center",

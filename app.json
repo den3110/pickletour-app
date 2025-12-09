@@ -81,6 +81,12 @@
     },
     "plugins": [
       [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "11.13.4"
+        }
+      ],
+      [
         "expo-calendar",
         {
           "calendarPermission": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn."

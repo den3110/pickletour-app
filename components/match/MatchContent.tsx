@@ -43,52 +43,53 @@ import { useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
 
 /* =====================================
- * THEME TOKENS (giống phong cách Hero)
+ * THEME TOKENS (Modernized)
  * ===================================== */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
 
   return useMemo(() => {
-    const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-    const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-    const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
+    const isDark = scheme === "dark";
+    // Modern colors palette
+    const tint = isDark ? "#60a5fa" : "#2563eb"; // Blue 500/600 modernized
+    const textPrimary = isDark ? "#f8fafc" : "#1e293b"; // Slate 50/800
+    const textSecondary = isDark ? "#94a3b8" : "#64748b"; // Slate 400/500
 
-    const pageBg = scheme === "dark" ? "#0b0c0f" : "#f6f7fb";
+    const pageBg = isDark ? "#0f172a" : "#f8fafc"; // Slate 900 / 50
+    const cardBg = isDark ? "#1e293b" : "#ffffff";
+    const cardBorder = isDark ? "#334155" : "#e2e8f0"; // Subtle border
 
-    const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
-    const cardBorder = scheme === "dark" ? "#3a3b40" : "#e5e7eb";
-
-    const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
-    const softBg2 = scheme === "dark" ? "#17181c" : "#f8fafc";
-    const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
+    const softBg = isDark ? "#334155" : "#f1f5f9";
+    const softBg2 = isDark ? "#0f172a" : "#f8fafc";
+    const softBorder = isDark ? "#475569" : "#cbd5e1";
 
     const banner = {
       live: {
-        bg: scheme === "dark" ? "rgba(124,192,255,0.18)" : "#e3f2fd",
-        text: scheme === "dark" ? "#d7ebff" : "#0f172a",
+        bg: isDark ? "rgba(14, 165, 233, 0.2)" : "#e0f2fe", // Sky
+        text: isDark ? "#7dd3fc" : "#0284c7",
       },
       info: {
-        bg: scheme === "dark" ? "rgba(148,163,184,0.18)" : "#f1f5f9",
-        text: scheme === "dark" ? "#e2e8f0" : "#0f172a",
+        bg: isDark ? "rgba(100, 116, 139, 0.2)" : "#f1f5f9", // Slate
+        text: isDark ? "#cbd5e1" : "#475569",
       },
     };
 
     const chip = {
-      bg: scheme === "dark" ? "rgba(199,210,254,0.16)" : "#eef2ff",
-      bd: scheme === "dark" ? "#6366f1" : "#c7d2fe",
-      text: scheme === "dark" ? "#e0e7ff" : "#3730a3",
+      bg: isDark ? "rgba(99, 102, 241, 0.15)" : "#eef2ff", // Indigo
+      bd: isDark ? "#6366f1" : "#c7d2fe",
+      text: isDark ? "#a5b4fc" : "#4338ca",
     };
 
     const success = {
-      bgSoft: scheme === "dark" ? "rgba(16,185,129,0.18)" : "#ecfdf5",
-      bdSoft: scheme === "dark" ? "#34d399" : "#a7f3d0",
-      text: scheme === "dark" ? "#a7f3d0" : "#065f46",
+      bgSoft: isDark ? "rgba(34, 197, 94, 0.15)" : "#dcfce7",
+      bdSoft: isDark ? "#22c55e" : "#86efac",
+      text: isDark ? "#4ade80" : "#166534",
     };
 
     const danger = {
-      bgSoft: scheme === "dark" ? "rgba(248,113,113,0.16)" : "#fff1f2",
-      bdSoft: scheme === "dark" ? "#f87171" : "#fecaca",
-      text: scheme === "dark" ? "#fecaca" : "#b91c1c",
+      bgSoft: isDark ? "rgba(239, 68, 68, 0.15)" : "#fee2e2",
+      bdSoft: isDark ? "#ef4444" : "#fca5a5",
+      text: isDark ? "#f87171" : "#991b1b",
     };
 
     return {
@@ -106,12 +107,19 @@ function useThemeTokens() {
       chip,
       success,
       danger,
+      // Shadow style chung
+      shadow: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.3 : 0.05,
+        shadowRadius: 12,
+        elevation: 3,
+      },
     };
   }, [scheme]);
 }
 
-/* =============== OVERLAY helpers =============== */
-
+/* =============== OVERLAY helpers (Giữ nguyên logic) =============== */
 const sid = (x) => {
   if (!x) return "";
   const v = x?._id ?? x?.id ?? x;
@@ -248,64 +256,6 @@ export const seedLabel = (seed) => {
   }
 };
 
-// ——— Parse V/T từ mã trận hiện tại (Vx-Ty) ———
-const parseVT = (m) => {
-  const tryStrings = [
-    m?.code,
-    m?.name,
-    m?.label,
-    m?.displayCode,
-    m?.displayName,
-    m?.matchCode,
-    m?.slotCode,
-    m?.bracketCode,
-    m?.bracketLabel,
-    m?.meta?.code,
-    m?.meta?.label,
-  ];
-  let v = null,
-    t = null;
-  for (const s of tryStrings) {
-    if (typeof s === "string") {
-      const k = s.match(/\bV(\d+)-T(\d+)\b/i);
-      if (k) {
-        v = parseInt(k[1], 10);
-        t = parseInt(k[2], 10);
-        break;
-      }
-    }
-  }
-  if (v == null) {
-    const cand = [m?.v, m?.V, m?.roundV, m?.meta?.v];
-    for (const c of cand) {
-      const n = Number(c);
-      if (Number.isFinite(n)) {
-        v = n;
-        break;
-      }
-    }
-  }
-  if (t == null) {
-    const cand = [
-      m?.t,
-      m?.T,
-      m?.order,
-      m?.matchOrder,
-      m?.meta?.t,
-      m?.meta?.order,
-    ];
-    for (const c of cand) {
-      const n = Number(c);
-      if (Number.isFinite(n)) {
-        t = n >= 1 ? n : n + 1;
-        break;
-      }
-    }
-  }
-  return { v, t };
-};
-
-// ---- NEW: depLabel theo chuẩn web: W/L-V{round}-T{order+1} ----
 const _num = (v) => (Number.isFinite(Number(v)) ? Number(v) : NaN);
 const _inferWL = (prev) => {
   const t = String(
@@ -329,7 +279,6 @@ export const depLabel = (prev) => {
   return `${wl}-V${r}-T${t}`;
 };
 
-/* ====================== current V helpers (label fix) ====================== */
 function extractCurrentV(m) {
   const tryStrings = [
     m?.code,
@@ -372,19 +321,19 @@ function smartDepLabel(m, prevDep) {
 function formatStatus(status) {
   switch (status) {
     case "scheduled":
-      return "Chưa diễn ra";
+      return "Sắp diễn ra";
     case "live":
       return "Đang diễn ra";
     case "assigned":
       return "Chuẩn bị";
     case "finished":
-      return "Đã diễn ra";
+      return "Đã kết thúc";
     default:
-      return "Chưa diễn ra";
+      return "Chưa đấu";
   }
 }
 
-/* ---------- PlayerLink ---------- */
+/* ---------- PlayerLink (Styling Upgraded) ---------- */
 const PlayerLink = memo(
   ({ person, onOpen, align = "left", serving = false }) => {
     const T = useThemeTokens();
@@ -402,33 +351,32 @@ const PlayerLink = memo(
     }, [uid, onOpen]);
 
     return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          justifyContent: align === "right" ? "flex-end" : "flex-start",
-        }}
+      <TouchableOpacity
+        onPress={handlePress}
+        style={[
+          styles.playerLinkContainer,
+          align === "right" && { flexDirection: "row-reverse" },
+        ]}
       >
+        {serving && (
+          <MaterialIcons name="sports-tennis" size={16} color={T.tint} />
+        )}
         <Text
-          onPress={handlePress}
           style={[
             styles.linkText,
-            { color: T.tint },
+            { color: T.textPrimary }, // Dùng textPrimary để dễ đọc hơn
             align === "right" && { textAlign: "right" },
           ]}
+          numberOfLines={1}
         >
           {nameWithNick(person)}
         </Text>
-        {serving && (
-          <MaterialIcons name="sports-tennis" size={14} color={T.tint} />
-        )}
-      </View>
+      </TouchableOpacity>
     );
   }
 );
 
-/* ---------- Hooks: chống nháy ---------- */
+/* ---------- Hooks: chống nháy (Giữ nguyên) ---------- */
 function useDelayedFlag(flag, ms = 250) {
   const [show, setShow] = useState(false);
   useEffect(() => {
@@ -440,7 +388,7 @@ function useDelayedFlag(flag, ms = 250) {
   return show;
 }
 
-/* ---------- LOCK: chỉ cập nhật đúng match đang mở ---------- */
+/* ---------- LOCK: chỉ cập nhật đúng match đang mở (Giữ nguyên) ---------- */
 function useLockedMatch(m, { loading }) {
   const [lockedId, setLockedId] = useState(() => (m?._id ? String(m._id) : ""));
   const [view, setView] = useState(() => (m?._id ? m : null));
@@ -466,7 +414,7 @@ function useLockedMatch(m, { loading }) {
   return { lockedId, view, setView, waiting };
 }
 
-/* ---------- Time helpers ---------- */
+/* ---------- Time helpers (Giữ nguyên) ---------- */
 function ts(x) {
   if (!x) return 0;
   const d = typeof x === "number" ? new Date(x) : new Date(String(x));
@@ -536,7 +484,7 @@ function countGamesWon(gameScores) {
   return { A, B };
 }
 
-/* ---------- Streams ---------- */
+/* ---------- Streams (Giữ nguyên) ---------- */
 function safeURL(url) {
   try {
     return new URL(url);
@@ -750,7 +698,7 @@ const AspectBox = memo(({ ratio = 16 / 9, children }) => {
     <View
       style={[
         styles.aspectBox,
-        { aspectRatio: ratio, backgroundColor: T.cardBg },
+        { aspectRatio: ratio, backgroundColor: "#000" },
       ]}
     >
       {children}
@@ -809,58 +757,88 @@ const StreamPlayer = memo(({ stream }) => {
   }
 });
 
-/* ---------- Banner trạng thái ---------- */
-const StatusBanner = memo(({ status, hasStreams }) => {
+/* ---------- Banner trạng thái (Styled) ---------- */
+/* ---------- Banner trạng thái (Có nút thu gọn) ---------- */
+const StatusBanner = memo(({ status, hasStreams, expanded, onToggle }) => {
   const T = useThemeTokens();
+
+  // Chỉ hiện nút thu gọn nếu trận đang LIVE và có Stream
+  const canToggle = status === "live" && hasStreams;
+
   const text =
     status === "live"
       ? hasStreams
-        ? "Trận đang live — bạn có thể mở liên kết hoặc xem trong nền."
-        : "Trận đang live — chưa có link."
+        ? expanded
+          ? "Trận đang live. Bạn có thể xem trực tiếp bên dưới."
+          : "Trận đang live (Bấm để xem video)."
+        : "Trận đang live — chưa có link phát."
       : status === "finished"
-      ? hasStreams
-        ? "Trận đã diễn ra — bạn có thể mở liên kết hoặc xem lại trong nền."
-        : "Trận đã diễn ra. Chưa có liên kết video."
-      : hasStreams
-      ? "Trận chưa diễn ra — đã có liên kết sẵn."
-      : "Trận chưa diễn ra. Chưa có liên kết video.";
+      ? "Trận đấu đã kết thúc."
+      : "Trận đấu chưa bắt đầu.";
 
   const sty = status === "live" ? T.banner.live : T.banner.info;
+  const icon =
+    status === "live"
+      ? "fiber-manual-record"
+      : status === "finished"
+      ? "flag"
+      : "schedule";
 
   return (
-    <View style={[styles.banner, { backgroundColor: sty.bg }]}>
-      <Text style={[styles.bannerText, { color: sty.text }]}>▶ {text}</Text>
-    </View>
+    <TouchableOpacity
+      disabled={!canToggle}
+      onPress={onToggle}
+      activeOpacity={0.7}
+      style={[
+        styles.bannerContainer,
+        { backgroundColor: sty.bg },
+        // Nếu thu gọn thì bo tròn đều, nếu mở rộng thì có thể style khác (ở đây giữ nguyên cho đẹp)
+      ]}
+    >
+      <MaterialIcons name={icon} size={18} color={sty.text} />
+
+      <Text style={[styles.bannerText, { color: sty.text }]}>{text}</Text>
+
+      {/* Nút mũi tên thu gọn/mở rộng */}
+      {canToggle && (
+        <MaterialIcons
+          name={expanded ? "expand-less" : "expand-more"}
+          size={24}
+          color={sty.text}
+        />
+      )}
+    </TouchableOpacity>
   );
 });
 
-/* ---------- Segmented Control: Status ---------- */
+/* ---------- Segmented Control: Status (Pill Style) ---------- */
 const SegmentedStatus = memo(({ value, onChange, disabled }) => {
   const T = useThemeTokens();
   const items = useMemo(
     () => [
-      { key: "scheduled", label: "Scheduled" },
+      { key: "scheduled", label: "Chưa đấu" },
       { key: "live", label: "Live" },
-      { key: "finished", label: "Finished" },
+      { key: "finished", label: "Kết thúc" },
     ],
     []
   );
 
   return (
-    <View
-      style={[
-        styles.segment,
-        { backgroundColor: T.softBg, borderColor: T.softBorder },
-      ]}
-    >
+    <View style={[styles.segmentContainer, { backgroundColor: T.softBg }]}>
       {items.map((it) => {
         const active = value === it.key;
         return (
           <TouchableOpacity
             key={it.key}
             style={[
-              styles.segmentItem,
-              active && { backgroundColor: T.tint },
+              styles.segmentBtn,
+              active && [
+                styles.segmentBtnActive,
+                {
+                  backgroundColor: T.cardBg,
+                  shadowColor: T.shadow.shadowColor,
+                },
+              ],
               disabled && { opacity: 0.6 },
             ]}
             onPress={() => !disabled && value !== it.key && onChange?.(it.key)}
@@ -868,9 +846,9 @@ const SegmentedStatus = memo(({ value, onChange, disabled }) => {
           >
             <Text
               style={[
-                styles.segmentLabel,
-                { color: T.textPrimary },
-                active && styles.segmentLabelActive,
+                styles.segmentText,
+                { color: active ? T.tint : T.textSecondary },
+                active && { fontWeight: "700" },
               ]}
             >
               {it.label}
@@ -882,38 +860,36 @@ const SegmentedStatus = memo(({ value, onChange, disabled }) => {
   );
 });
 
-/* ---------- Nút có icon trái ---------- */
+/* ---------- Nút có icon (Modern) ---------- */
 const AdminBtn = memo(
-  ({ style, textStyle, icon, label, onPress, disabled }) => {
+  ({ style, textStyle, icon, label, onPress, disabled, variant = "soft" }) => {
     const T = useThemeTokens();
+    // soft: bg nhạt + text đậm
+    // primary: bg tint + text trắng
+    const bg = variant === "primary" ? T.tint : T.softBg;
+    const fg = variant === "primary" ? "#fff" : T.textPrimary;
+
     return (
       <TouchableOpacity
         style={[
-          styles.btn,
-          { backgroundColor: T.cardBg, borderColor: T.softBorder },
+          styles.modernBtn,
+          { backgroundColor: bg },
+          disabled && { opacity: 0.6 },
           style,
         ]}
         onPress={onPress}
         disabled={disabled}
       >
-        <View style={styles.btnContent}>
-          {!!icon && (
-            <MaterialIcons
-              name={icon}
-              size={18}
-              style={[styles.btnIcon, { color: T.textPrimary }, textStyle]}
-            />
-          )}
-          <Text style={[styles.btnText, { color: T.textPrimary }, textStyle]}>
-            {label}
-          </Text>
-        </View>
+        {!!icon && <MaterialIcons name={icon} size={18} color={fg} />}
+        <Text style={[styles.modernBtnText, { color: fg }, textStyle]}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   }
 );
 
-/* ============== LIVE UTILS (destinations + studio url) ============== */
+/* ============== LIVE UTILS (Giữ nguyên logic) ============== */
 const encodeB64Json = (obj) => {
   try {
     return Buffer.from(JSON.stringify(obj), "utf8").toString("base64");
@@ -1066,61 +1042,6 @@ const buildStudioParams = (baseOrigin, data, match, overlayUrl) => {
   return params;
 };
 
-function buildStudioUrlMobile(baseUrl, data, match, baseOrigin) {
-  let base = baseUrl || "/live/studio";
-  const origin = baseOrigin || "https://pickletour.vn";
-  if (typeof base === "string" && /^https?:\/\//i.test(base)) {
-    try {
-      const parsed = new URL(base);
-      base = parsed.pathname + (parsed.search || "");
-    } catch {}
-  }
-  const u = new URL(base, origin);
-  if (match?._id) u.searchParams.set("matchId", String(match._id));
-  const dests = extractDestinations(data, match);
-  if (dests.length) {
-    const minimal = dests.map((d) => ({
-      platform: d.platform,
-      server_url: d.server_url || d.secure_stream_url || "",
-      stream_key: d.stream_key || "",
-      secure_stream_url: d.secure_stream_url || "",
-    }));
-    const d64 = encodeB64Json(minimal);
-    if (d64) u.searchParams.set("d64", d64);
-
-    const fb = dests.find((d) => d.platform === "facebook");
-    if (fb) {
-      let fbKey = fb.stream_key;
-      if (!fbKey && fb.secure_stream_url)
-        fbKey = splitRtmpUrl(fb.secure_stream_url).stream_key;
-      if (fbKey) u.searchParams.set("key", fbKey);
-    }
-    const yt = dests.find((d) => d.platform === "youtube");
-    if (yt && (yt.server_url || yt.stream_key || yt.secure_stream_url)) {
-      const y =
-        yt.server_url && yt.stream_key
-          ? yt
-          : splitRtmpUrl(yt.secure_stream_url);
-      const ysrv = yt.server_url || y.server_url;
-      const ykey = yt.stream_key || y.stream_key;
-      if (ysrv) u.searchParams.set("yt_server", ysrv);
-      if (ykey) u.searchParams.set("yt", ykey);
-    }
-    const tt = dests.find((d) => d.platform === "tiktok");
-    if (tt && (tt.server_url || tt.stream_key || tt.secure_stream_url)) {
-      const t =
-        tt.server_url && tt.stream_key
-          ? tt
-          : splitRtmpUrl(tt.secure_stream_url);
-      const tsrv = tt.server_url || t.server_url;
-      const tkey = tt.stream_key || t.stream_key;
-      if (tsrv) u.searchParams.set("tt_server", tsrv);
-      if (tkey) u.searchParams.set("tt", tkey);
-    }
-  }
-  return u.toString();
-}
-
 /* ---------- BottomSheet: LIVE info ---------- */
 const LineBox = memo(({ label, value, hidden, onCopy, onOpen }) => {
   const T = useThemeTokens();
@@ -1135,42 +1056,49 @@ const LineBox = memo(({ label, value, hidden, onCopy, onOpen }) => {
   }, [onOpen, value]);
 
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={{ fontSize: 12, color: T.textSecondary }}>{label}</Text>
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <View
-          style={[
-            styles.overlayBox,
-            { flex: 1, backgroundColor: T.softBg2, borderColor: T.softBorder },
-          ]}
+    <View style={{ gap: 4 }}>
+      <Text
+        style={{
+          fontSize: 11,
+          color: T.textSecondary,
+          fontWeight: "600",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: T.softBg2, borderColor: T.softBorder },
+        ]}
+      >
+        <Text
+          style={[styles.monoText, { color: T.textPrimary, flex: 1 }]}
+          numberOfLines={1}
         >
-          <Text
-            style={[styles.monoText, { color: T.textPrimary }]}
-            numberOfLines={1}
-          >
-            {hidden ? "••••••••••••" : value}
-          </Text>
+          {hidden ? "••••••••••••" : value}
+        </Text>
+        <View style={{ flexDirection: "row" }}>
+          {onCopy && (
+            <TouchableOpacity style={styles.iconBtn} onPress={handleCopy}>
+              <MaterialIcons
+                name="content-copy"
+                size={18}
+                color={T.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+          {onOpen && (
+            <TouchableOpacity style={styles.iconBtn} onPress={handleOpen}>
+              <MaterialIcons
+                name="open-in-new"
+                size={18}
+                color={T.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
         </View>
-        {onCopy && (
-          <TouchableOpacity
-            style={[styles.btn, { borderColor: T.softBorder }]}
-            onPress={handleCopy}
-          >
-            <MaterialIcons
-              name="content-copy"
-              size={18}
-              color={T.textPrimary}
-            />
-          </TouchableOpacity>
-        )}
-        {onOpen && (
-          <TouchableOpacity
-            style={[styles.btn, { borderColor: T.softBorder }]}
-            onPress={handleOpen}
-          >
-            <MaterialIcons name="open-in-new" size={18} color={T.textPrimary} />
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -1187,15 +1115,16 @@ const DestinationCard = memo(({ d, onCopy }) => {
   return (
     <View
       style={{
-        padding: 10,
-        borderRadius: 10,
+        padding: 12,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: T.cardBorder,
+        backgroundColor: T.cardBg,
         gap: 8,
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <MaterialIcons name="live-tv" size={18} color={T.textPrimary} />
+        <MaterialIcons name="live-tv" size={18} color={T.tint} />
         <Text style={{ fontWeight: "700", color: T.textPrimary }}>
           {(d.platform || "").toUpperCase()} {d.id ? `#${d.id}` : ""}
         </Text>
@@ -1249,7 +1178,7 @@ const LiveInfoSheet = memo(
 
       setTimeout(() => {
         router.push({ pathname: studioPath, params: studioParams });
-      }, 100); // ✅ tăng delay để tránh giật
+      }, 100);
     }, [router, studioPath, studioParams, onClose, ref]);
 
     const renderBackdrop = useCallback(
@@ -1298,13 +1227,16 @@ const LiveInfoSheet = memo(
         onDismiss={onClose}
         enableDynamicSizing={false}
         animateOnMount
+        backgroundStyle={{ backgroundColor: T.pageBg }}
       >
         <BottomSheetScrollView
-          contentContainerStyle={{ padding: 14, gap: 12 }}
+          contentContainerStyle={{ padding: 16, gap: 16 }}
           removeClippedSubviews
           showsVerticalScrollIndicator={false}
         >
-          <Text style={{ fontWeight: "800", color: T.textPrimary }}>
+          <Text
+            style={{ fontWeight: "800", color: T.textPrimary, fontSize: 18 }}
+          >
             LIVE Outputs (#{match?.code || String(match?._id || "").slice(-5)})
           </Text>
 
@@ -1334,7 +1266,7 @@ const LiveInfoSheet = memo(
             )}
           </View>
 
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: 12 }}>
             <Text style={{ fontWeight: "700", color: T.textPrimary }}>
               Overlay & Studio
             </Text>
@@ -1346,50 +1278,28 @@ const LiveInfoSheet = memo(
                 onOpen={handleOpenOverlay}
               />
             )}
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  { borderColor: T.softBorder, backgroundColor: T.cardBg },
-                ]}
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <AdminBtn
+                label="Open Studio"
                 onPress={closeSheetsThenGoStudio}
-              >
-                <Text
-                  style={[
-                    styles.btnText,
-                    { color: T.textPrimary, fontWeight: "700" },
-                  ]}
-                >
-                  Open Studio
-                </Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
               {primaryLink && (
-                <TouchableOpacity
-                  style={[
-                    styles.btn,
-                    { borderColor: T.softBorder, backgroundColor: T.cardBg },
-                  ]}
+                <AdminBtn
+                  label="Open Live"
                   onPress={handleOpenPrimaryLink}
-                >
-                  <Text
-                    style={[
-                      styles.btnText,
-                      { color: T.textPrimary, fontWeight: "700" },
-                    ]}
-                  >
-                    Open Live
-                  </Text>
-                </TouchableOpacity>
+                  style={{ flex: 1 }}
+                />
               )}
             </View>
           </View>
 
           {!!destinations.length && (
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 12 }}>
               <Text style={{ fontWeight: "700", color: T.textPrimary }}>
                 Destinations
               </Text>
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: 12 }}>
                 {destinations.map((d, i) => (
                   <DestinationCard
                     key={`${d.platform}-${d.id || i}`}
@@ -1401,14 +1311,14 @@ const LiveInfoSheet = memo(
             </View>
           )}
 
-          <View style={{ height: 8 }} />
+          <View style={{ height: 24 }} />
         </BottomSheetScrollView>
       </BottomSheetModal>
     );
   })
 );
 
-/* ---------- Thanh công cụ quản trị ---------- */
+/* ---------- Thanh công cụ quản trị (Redesigned) ---------- */
 const AdminToolbar = memo(
   ({
     status,
@@ -1426,8 +1336,8 @@ const AdminToolbar = memo(
     const confirmWinner = useCallback(
       (side) => {
         Alert.alert(
-          "Xác nhận",
-          `Kết thúc trận và đặt đội ${side} thắng?`,
+          "Kết thúc trận đấu",
+          `Xác nhận đội ${side} chiến thắng?`,
           [
             { text: "Huỷ" },
             {
@@ -1445,110 +1355,103 @@ const AdminToolbar = memo(
     return (
       <View
         style={[
-          styles.adminCard,
-          { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+          styles.card,
+          {
+            backgroundColor: T.cardBg,
+            borderColor: T.tint,
+            borderWidth: 1,
+            marginTop: 16,
+            ...T.shadow,
+          },
         ]}
       >
-        <View style={styles.adminHeader}>
-          <Text style={[styles.adminTitle, { color: T.textPrimary }]}>
-            QUẢN TRỊ TRẬN
-          </Text>
-          <Text style={[styles.adminSub, { color: T.textSecondary }]}>
-            Chỉnh sửa tỉ số • Đặt đội thắng • Đổi trạng thái
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="admin-panel-settings" size={20} color={T.tint} />
+          <Text style={[styles.cardHeaderTitle, { color: T.textPrimary }]}>
+            QUẢN TRỊ TRẬN ĐẤU
           </Text>
         </View>
 
-        <View style={styles.adminRow}>
-          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
-            Trạng thái
-          </Text>
-          <SegmentedStatus
-            value={status}
-            onChange={(s) => onSetStatus?.(s)}
-            disabled={busy}
-          />
-        </View>
-
-        <View style={styles.adminRow}>
-          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
-            Tỉ số
-          </Text>
-          {!editMode ? (
-            <AdminBtn
-              icon="edit"
-              label="Chỉnh sửa tỉ số"
-              onPress={onEnterEdit}
+        <View style={{ gap: 16 }}>
+          <View>
+            <Text style={[styles.sectionLabel, { color: T.textSecondary }]}>
+              TRẠNG THÁI
+            </Text>
+            <SegmentedStatus
+              value={status}
+              onChange={(s) => onSetStatus?.(s)}
               disabled={busy}
             />
-          ) : (
-            <View style={styles.rowWrap}>
+          </View>
+
+          <View>
+            <Text style={[styles.sectionLabel, { color: T.textSecondary }]}>
+              TỈ SỐ & SETS
+            </Text>
+            {!editMode ? (
               <AdminBtn
-                icon="save"
-                label="Lưu tỉ số"
-                onPress={onSave}
-                disabled={busy}
-                style={[
-                  styles.btnPrimary,
-                  { backgroundColor: T.tint, borderColor: T.tint },
-                ]}
-                textStyle={[styles.btnPrimaryText]}
-              />
-              <AdminBtn
-                icon="undo"
-                label="Hoàn tác"
-                onPress={onReset}
+                icon="edit"
+                label="Chỉnh sửa tỉ số"
+                onPress={onEnterEdit}
                 disabled={busy}
               />
+            ) : (
+              <View style={{ gap: 8 }}>
+                <View style={styles.grid2}>
+                  <AdminBtn
+                    icon="save"
+                    label="Lưu"
+                    onPress={onSave}
+                    disabled={busy}
+                    variant="primary"
+                  />
+                  <AdminBtn
+                    icon="close"
+                    label="Hủy"
+                    onPress={onExitEdit}
+                    disabled={busy}
+                  />
+                </View>
+                <View style={styles.grid2}>
+                  <AdminBtn
+                    icon="add"
+                    label="Thêm Set"
+                    onPress={onAddSet}
+                    disabled={busy}
+                  />
+                  <AdminBtn
+                    icon="undo"
+                    label="Reset"
+                    onPress={onReset}
+                    disabled={busy}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
+          <View>
+            <Text style={[styles.sectionLabel, { color: T.textSecondary }]}>
+              KẾT QUẢ
+            </Text>
+            <View style={styles.grid2}>
               <AdminBtn
-                icon="add"
-                label="Thêm set"
-                onPress={onAddSet}
+                icon="emoji-events"
+                label="Đội A Thắng"
+                onPress={() => confirmWinner("A")}
                 disabled={busy}
+                style={{ backgroundColor: T.success.bgSoft }}
+                textStyle={{ color: T.success.text }}
               />
               <AdminBtn
-                icon="close"
-                label="Thoát sửa"
-                onPress={onExitEdit}
+                icon="emoji-events"
+                label="Đội B Thắng"
+                onPress={() => confirmWinner("B")}
                 disabled={busy}
-                style={styles.btnGhost}
+                style={{ backgroundColor: T.success.bgSoft }}
+                textStyle={{ color: T.success.text }}
               />
             </View>
-          )}
-        </View>
-
-        <View style={styles.adminRow}>
-          <Text style={[styles.rowLabel, { color: T.textSecondary }]}>
-            Kết quả
-          </Text>
-          <View style={styles.rowWrap}>
-            <AdminBtn
-              icon="emoji-events"
-              label="Đặt A thắng"
-              onPress={() => confirmWinner("A")}
-              disabled={busy}
-              style={[
-                styles.btnSuccessOutline,
-                {
-                  backgroundColor: T.success.bgSoft,
-                  borderColor: T.success.bdSoft,
-                },
-              ]}
-              textStyle={{ color: T.success.text, fontWeight: "700" }}
-            />
-            <AdminBtn
-              icon="emoji-events"
-              label="Đặt B thắng"
-              onPress={() => confirmWinner("B")}
-              disabled={busy}
-              style={[
-                styles.btnSuccessOutline,
-                {
-                  backgroundColor: T.success.bgSoft,
-                  borderColor: T.success.bdSoft,
-                },
-              ]}
-              textStyle={{ color: T.success.text, fontWeight: "700" }}
-            />
           </View>
         </View>
       </View>
@@ -1595,11 +1498,141 @@ function amRefereeOfThisMatch(me, m) {
   return ids.has(String(my));
 }
 
+/* ---------- BottomSheet: MATCH RULES (Luật thi đấu) ---------- */
+const RuleRow = memo(({ icon, label, value }) => {
+  const T = useThemeTokens();
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: T.softBg, // Đường kẻ mờ
+        gap: 12,
+      }}
+    >
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: T.softBg,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <MaterialIcons name={icon} size={20} color={T.tint} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>
+          {label}
+        </Text>
+        <Text style={{ fontSize: 14, fontWeight: "600", color: T.textPrimary }}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+const MatchRulesSheet = memo(
+  forwardRef(function MatchRulesSheet({ match, timeLabel, status }, ref) {
+    const T = useThemeTokens();
+    const snapPoints = useMemo(() => ["50%"], []);
+    const r = match?.rules || {};
+
+    const renderBackdrop = useCallback(
+      (props) => (
+        <BottomSheetBackdrop
+          {...props}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          opacity={0.5}
+        />
+      ),
+      []
+    );
+
+    return (
+      <BottomSheetModal
+        ref={ref}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ backgroundColor: T.pageBg }}
+      >
+        <BottomSheetScrollView contentContainerStyle={{ padding: 16 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "800",
+              color: T.textPrimary,
+              marginBottom: 16,
+              textAlign: "center",
+            }}
+          >
+            Thông tin trận đấu
+          </Text>
+
+          {/* Danh sách thông tin với Icon */}
+          <View>
+            <RuleRow
+              icon="schedule"
+              label="Thời gian"
+              value={timeLabel || "Chưa xác định"}
+            />
+            <RuleRow
+              icon="layers" // Icon thể hiện các set đấu
+              label="Thể thức (Best Of)"
+              value={`Đấu ${r.bestOf ?? 3} thắng ${Math.ceil(
+                (r.bestOf ?? 3) / 2
+              )}`}
+            />
+            <RuleRow
+              icon="sports-score"
+              label="Điểm thắng mỗi set"
+              value={`${r.pointsToWin ?? 11} điểm`}
+            />
+            <RuleRow
+              icon="exposure-plus-2" // Icon +2
+              label="Luật cách biệt"
+              value={
+                r.winByTwo
+                  ? "Phải thắng cách biệt 2 điểm"
+                  : "Sudden Death (Điểm vàng)"
+              }
+            />
+            {match?.liveBy?.name && (
+              <RuleRow
+                icon="sports" // Icon cái còi hoặc trọng tài
+                label="Trọng tài điều khiển"
+                value={match.liveBy.name}
+              />
+            )}
+            <RuleRow
+              icon="info-outline"
+              label="Trạng thái"
+              value={formatStatus(status)}
+            />
+          </View>
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    );
+  })
+);
+
 /* ===================== Component chính (Native) ===================== */
 function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const T = useThemeTokens();
   const socket = useSocket();
+  // 1. Khai báo Ref
+  const rulesSheetRef = useRef(null);
 
+  // 2. Hàm mở Sheet
+  const handleOpenRules = useCallback(() => {
+    rulesSheetRef.current?.present();
+  }, []);
   const { userInfo } = useSelector((s) => s.auth || {});
   const roleStr = String(userInfo?.role || "").toLowerCase();
   const roles = useMemo(
@@ -1632,6 +1665,10 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileUserId, setProfileUserId] = useState(null);
+  const [isLiveExpanded, setLiveExpanded] = useState(true);
+  const toggleLiveSection = useCallback(() => {
+    setLiveExpanded((prev) => !prev);
+  }, []);
   const openProfile = useCallback((uid) => {
     if (!uid) return;
     const norm = uid?._id || uid?.id || uid?.userId || uid?.uid || uid || null;
@@ -1990,6 +2027,33 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     if (status !== "finished") return `Giờ đấu: ${formatClock(displayTime)}`;
     return `Bắt đầu: ${formatClock(displayTime)}`;
   }, [displayTime, status]);
+  // 1. Logic tạo nội dung chi tiết
+  const showMatchRules = useCallback(() => {
+    const r = merged?.rules || {};
+
+    // Tạo danh sách các thông tin chi tiết
+    const lines = [
+      `🕒 Thời gian: ${timeLabel || "Chưa có"}`,
+      `🏆 Thể thức: Best of ${r.bestOf ?? 3} (Đấu ${
+        r.bestOf ?? 3
+      } thắng ${Math.ceil((r.bestOf ?? 3) / 2)})`,
+      `🎯 Điểm thắng: ${r.pointsToWin ?? 11} điểm`,
+      `⚖️ Luật cách biệt: ${
+        r.winByTwo
+          ? "Phải thắng cách biệt 2 điểm (+2)"
+          : "Không áp dụng (Sudden Death)"
+      }`,
+      merged?.liveBy?.name ? `👮 Trọng tài: ${merged.liveBy.name}` : null,
+      `🚩 Trạng thái: ${formatStatus(status)}`,
+    ].filter(Boolean); // Lọc bỏ dòng null
+
+    // Hiển thị Alert
+    Alert.alert(
+      "Chi tiết trận đấu",
+      lines.join("\n\n"), // Xuống dòng cho dễ đọc
+      [{ text: "Đóng", style: "cancel" }]
+    );
+  }, [merged, timeLabel, status]);
 
   const overlayBase = useMemo(
     () => resolveWebBase(merged?.tournament, merged?.overlay),
@@ -2286,7 +2350,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   if (showSpinner) {
     return (
       <View style={styles.centerBox}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color={T.tint} />
       </View>
     );
   }
@@ -2295,7 +2359,12 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       <View
         style={[
           styles.card,
-          { padding: 12, backgroundColor: T.cardBg, borderColor: T.cardBorder },
+          {
+            padding: 16,
+            backgroundColor: T.cardBg,
+            borderColor: T.cardBorder,
+            ...T.shadow,
+          },
         ]}
       >
         <Text
@@ -2311,62 +2380,47 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   return (
     <>
       <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { backgroundColor: "transparent" },
-        ]}
+        contentContainerStyle={[styles.container, { paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews
       >
-        <StatusBanner status={status} hasStreams={streams.length > 0} />
+        <StatusBanner
+          status={status}
+          hasStreams={streams.length > 0}
+          expanded={isLiveExpanded}
+          onToggle={toggleLiveSection}
+        />
 
-        {activeStream && (
-          <View style={{ gap: 8 }}>
-            <View style={styles.rowWrap}>
-              {activeStream.canEmbed && (
-                <TouchableOpacity
-                  style={[
-                    styles.btn,
-                    { borderColor: T.softBorder, backgroundColor: T.cardBg },
-                    showPlayer && {
-                      backgroundColor: T.tint,
-                      borderColor: T.tint,
-                    },
-                    styles.btnFluid,
-                  ]}
-                  onPress={togglePlayer}
-                  disabled={busy}
-                >
-                  <Text
-                    style={[
-                      styles.btnText,
-                      {
-                        color: showPlayer ? "#fff" : T.textPrimary,
-                        fontWeight: "700",
-                      },
-                    ]}
+        {activeStream && isLiveExpanded && (
+          <View
+            style={[styles.cardNoPad, { backgroundColor: "#000", ...T.shadow }]}
+          >
+            {activeStream.canEmbed ? (
+              <>
+                <StreamPlayer stream={activeStream} />
+                {showPlayer && (
+                  <TouchableOpacity
+                    style={styles.streamLinkBtn}
+                    onPress={handleOpenActiveStream}
                   >
-                    ▶ {showPlayer ? "Thu gọn video" : "Xem video trong nền"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  styles.btnFluid,
-                  { backgroundColor: T.cardBg, borderColor: T.softBorder },
-                ]}
-                onPress={handleOpenActiveStream}
-                disabled={busy}
-              >
-                <Text style={[styles.btnText, { color: T.textPrimary }]}>
-                  Mở link trực tiếp ↗
+                    <Text style={styles.streamLinkText}>
+                      Mở bằng ứng dụng ngoài ↗
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <View style={{ padding: 16, alignItems: "center", gap: 12 }}>
+                <Text style={{ color: "#fff" }}>
+                  Video không hỗ trợ phát trực tiếp trong ứng dụng.
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {showPlayer && activeStream.canEmbed && (
-              <StreamPlayer stream={activeStream} />
+                <TouchableOpacity
+                  style={[styles.btn, { backgroundColor: "#fff" }]}
+                  onPress={handleOpenActiveStream}
+                >
+                  <Text style={{ fontWeight: "700" }}>Mở Link Gốc</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -2375,118 +2429,112 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           <View
             style={[
               styles.card,
-              { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+              {
+                backgroundColor: T.cardBg,
+                borderColor: T.cardBorder,
+                ...T.shadow,
+              },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: T.textPrimary }]}>
-              Overlay tỉ số trực tiếp
-            </Text>
-            <View style={styles.rowWrap}>
-              <View
-                style={[
-                  styles.overlayBox,
-                  {
-                    flexGrow: 1,
-                    minWidth: 220,
-                    backgroundColor: T.softBg2,
-                    borderColor: T.softBorder,
-                  },
-                ]}
+            <View style={styles.cardHeader}>
+              <MaterialIcons name="layers" size={20} color={T.textPrimary} />
+              <Text style={[styles.cardHeaderTitle, { color: T.textPrimary }]}>
+                OVERLAY TỈ SỐ
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.inputRow,
+                { backgroundColor: T.softBg2, borderColor: T.softBorder },
+              ]}
+            >
+              <Text
+                style={[styles.monoText, { color: T.textSecondary, flex: 1 }]}
+                numberOfLines={1}
               >
-                <Text
-                  style={[styles.monoText, { color: T.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {overlayUrl}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  styles.btnFluid,
-                  { backgroundColor: T.cardBg, borderColor: T.softBorder },
-                ]}
-                onPress={handleCopyOverlay}
-              >
-                <Text style={[styles.btnText, { color: T.textPrimary }]}>
-                  Copy link
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  styles.btnFluid,
-                  { backgroundColor: T.tint, borderColor: T.tint },
-                ]}
-                onPress={handleOpenOverlay}
-              >
-                <Text style={styles.btnPrimaryText}>Mở overlay</Text>
+                {overlayUrl}
+              </Text>
+              <TouchableOpacity onPress={handleCopyOverlay}>
+                <MaterialIcons name="content-copy" size={20} color={T.tint} />
               </TouchableOpacity>
             </View>
-            <Text style={[styles.caption, { color: T.textSecondary }]}>
-              Mẹo: dán link này vào OBS/StreamYard (Browser Source) để hiển thị
-              tỉ số.
-            </Text>
 
-            {canManage && (
-              <View style={[styles.rowWrap, { marginTop: 10 }]}>
+            <View style={styles.grid2}>
+              <AdminBtn
+                icon="open-in-new"
+                label="Mở Overlay"
+                onPress={handleOpenOverlay}
+              />
+              {canManage && (
                 <AdminBtn
                   icon="live-tv"
-                  label={creatingLive ? "Đang tạo LIVE…" : "Tạo LIVE"}
+                  label={creatingLive ? "Đang tạo..." : "Tạo LIVE"}
                   onPress={handleCreateLive}
                   disabled={creatingLive}
-                  style={{ minWidth: 140 }}
-                  textStyle={{ fontWeight: "700" }}
+                  variant="primary"
                 />
-                <AdminBtn
-                  icon="info-outline"
-                  label="Mở thông tin LIVE"
-                  onPress={handleOpenLiveInfo}
-                  style={{ minWidth: 160 }}
-                />
-              </View>
+              )}
+            </View>
+            {canManage && (
+              <TouchableOpacity
+                style={{ alignSelf: "center", marginTop: 8 }}
+                onPress={handleOpenLiveInfo}
+              >
+                <Text
+                  style={{
+                    color: T.textSecondary,
+                    fontSize: 12,
+                    textDecorationLine: "underline",
+                  }}
+                >
+                  Xem thông tin Server/Key
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
 
+        {/* SCORE CARD (MAIN) */}
         <View
           style={[
             styles.card,
-            { backgroundColor: T.cardBg, borderColor: T.cardBorder },
+            {
+              backgroundColor: T.cardBg,
+              borderColor: T.cardBorder,
+              ...T.shadow,
+            },
           ]}
         >
-          <Text style={[styles.cardTitle, { color: T.textPrimary }]}>
-            Điểm số
-          </Text>
+          <View style={styles.scoreHeader}>
+            <Text style={[styles.cardLabel, { color: T.textSecondary }]}>
+              TỈ SỐ TRẬN ĐẤU
+            </Text>
+            <Chip label={formatStatus(status)} />
+          </View>
 
-          <View style={[styles.row, { alignItems: "flex-start" }]}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={[styles.muted, { color: T.textSecondary }]}>
-                Đội A
-              </Text>
+          <View style={styles.matchupContainer}>
+            {/* TEAM A */}
+            <View style={styles.teamColumn}>
               {merged?.pairA ? (
-                <View style={styles.teamWrap}>
+                <View style={styles.avatarsColumn}>
                   <PlayerLink
                     person={merged.pairA?.player1}
                     onOpen={openProfile}
                     serving={!!serveFlags.a1}
                   />
-                  {!isSingle && merged.pairA?.player2 && (
-                    <>
-                      <Text style={[styles.andText, { color: T.textPrimary }]}>
-                        {" "}
-                        &{" "}
-                      </Text>
-                      <PlayerLink
-                        person={merged.pairA.player2}
-                        onOpen={openProfile}
-                        serving={!!serveFlags.a2}
-                      />
-                    </>
+                  {!isSingle && (
+                    <PlayerLink
+                      person={merged.pairA?.player2}
+                      onOpen={openProfile}
+                      serving={!!serveFlags.a2}
+                    />
                   )}
                 </View>
               ) : (
-                <Text style={[styles.teamText, { color: T.textPrimary }]}>
+                <Text
+                  style={[styles.placeholderTeam, { color: T.textPrimary }]}
+                >
                   {merged?.previousA
                     ? smartDepLabel(merged, merged.previousA)
                     : seedLabel(merged?.seedA)}
@@ -2494,64 +2542,43 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               )}
             </View>
 
-            <View style={{ minWidth: 140, alignItems: "center" }}>
-              {status === "live" && (
-                <Text style={[styles.mutedSmall, { color: T.textSecondary }]}>
-                  Ván hiện tại
-                </Text>
-              )}
+            {/* BIG SCORE */}
+            <View style={styles.scoreColumn}>
               <Text style={[styles.bigScore, { color: T.textPrimary }]}>
-                {lastGameScore(shownGameScores).a ?? 0} –{" "}
+                {lastGameScore(shownGameScores).a ?? 0} -{" "}
                 {lastGameScore(shownGameScores).b ?? 0}
               </Text>
-              <Text style={[styles.muted, { color: T.textSecondary }]}>
-                Sets: {countGamesWon(shownGameScores).A} –{" "}
-                {countGamesWon(shownGameScores).B}
+              <Text style={[styles.setScore, { color: T.textSecondary }]}>
+                Sets: {setsA} - {setsB}
               </Text>
             </View>
 
-            <View style={{ flex: 1, paddingLeft: 8 }}>
-              <Text
-                style={[
-                  styles.muted,
-                  { textAlign: "right", color: T.textSecondary },
-                ]}
-              >
-                Đội B
-              </Text>
+            {/* TEAM B */}
+            <View style={styles.teamColumn}>
               {merged?.pairB ? (
-                <View style={styles.teamWrapRight}>
+                <View
+                  style={[styles.avatarsColumn, { alignItems: "flex-end" }]}
+                >
                   <PlayerLink
                     person={merged.pairB?.player1}
                     onOpen={openProfile}
                     align="right"
                     serving={!!serveFlags.b1}
                   />
-                  {!isSingle && merged.pairB?.player2 && (
-                    <>
-                      <Text
-                        style={[
-                          styles.andText,
-                          { textAlign: "right", color: T.textPrimary },
-                        ]}
-                      >
-                        {" "}
-                        &{" "}
-                      </Text>
-                      <PlayerLink
-                        person={merged.pairB.player2}
-                        onOpen={openProfile}
-                        align="right"
-                        serving={!!serveFlags.b2}
-                      />
-                    </>
+                  {!isSingle && (
+                    <PlayerLink
+                      person={merged.pairB?.player2}
+                      onOpen={openProfile}
+                      align="right"
+                      serving={!!serveFlags.b2}
+                    />
                   )}
                 </View>
               ) : (
                 <Text
                   style={[
-                    styles.teamText,
-                    { textAlign: "right", color: T.textPrimary },
+                    styles.placeholderTeam,
+                    { color: T.textPrimary, textAlign: "right" },
                   ]}
                 >
                   {merged?.previousB
@@ -2562,165 +2589,162 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             </View>
           </View>
 
-          {!!(editMode ? editScores?.length : shownGameScores?.length) && (
-            <View style={{ marginTop: 12 }}>
-              <View
-                style={[
-                  styles.tableRow,
-                  {
-                    backgroundColor: T.softBg2,
-                    borderBottomColor: T.cardBorder,
-                  },
-                ]}
-              >
+          {/* GAME SCORES TABLE */}
+          {(editMode || shownGameScores.length > 0) && (
+            <View
+              style={[
+                styles.scoreTable,
+                { backgroundColor: T.softBg2, borderColor: T.softBorder },
+              ]}
+            >
+              <View style={styles.tableHeader}>
                 <Text
-                  style={[
-                    styles.tableCell,
-                    { flex: 1, color: T.textSecondary },
-                  ]}
+                  style={[styles.th, { color: T.textSecondary, flex: 0.5 }]}
                 >
-                  Set
+                  SET
                 </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.centerCell,
-                    { color: T.textSecondary },
-                  ]}
-                >
-                  A
+                <Text style={[styles.th, { color: T.textSecondary }]}>
+                  TEAM A
                 </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.centerCell,
-                    { color: T.textSecondary },
-                  ]}
-                >
-                  B
+                <Text style={[styles.th, { color: T.textSecondary }]}>
+                  TEAM B
                 </Text>
-                {canManage && editMode && (
-                  <Text style={[styles.tableCell, styles.centerCell]} />
-                )}
+                {canManage && editMode && <View style={{ width: 40 }} />}
               </View>
+
               {(editMode ? editScores : shownGameScores).map((g, idx) => (
                 <View
                   key={idx}
-                  style={[styles.tableRow, { borderBottomColor: T.cardBorder }]}
+                  style={[styles.tableRow, { borderTopColor: T.softBorder }]}
                 >
                   <Text
-                    style={[
-                      styles.tableCell,
-                      { flex: 1, color: T.textPrimary },
-                    ]}
+                    style={[styles.td, { color: T.textSecondary, flex: 0.5 }]}
                   >
                     {idx + 1}
                   </Text>
-                  <View style={[styles.tableCell, styles.centerCell]}>
+
+                  <View style={styles.tdCenter}>
                     {canManage && editMode ? (
                       <TextInput
                         style={[
-                          styles.inputScore,
+                          styles.scoreInput,
                           {
-                            borderColor: T.softBorder,
                             color: T.textPrimary,
                             backgroundColor: T.cardBg,
+                            borderColor: T.softBorder,
                           },
                         ]}
-                        placeholderTextColor={T.textSecondary}
-                        keyboardType="number-pad"
                         value={String(g?.a ?? 0)}
-                        onChangeText={(t) => setCell(idx, "a", t)}
+                        keyboardType="numeric"
+                        onChangeText={(v) => setCell(idx, "a", v)}
                         maxLength={2}
                       />
                     ) : (
-                      <Text style={{ color: T.textPrimary }}>{g?.a ?? 0}</Text>
+                      <Text
+                        style={[styles.scoreCellText, { color: T.textPrimary }]}
+                      >
+                        {g?.a ?? 0}
+                      </Text>
                     )}
                   </View>
-                  <View style={[styles.tableCell, styles.centerCell]}>
+
+                  <View style={styles.tdCenter}>
                     {canManage && editMode ? (
                       <TextInput
                         style={[
-                          styles.inputScore,
+                          styles.scoreInput,
                           {
-                            borderColor: T.softBorder,
                             color: T.textPrimary,
                             backgroundColor: T.cardBg,
+                            borderColor: T.softBorder,
                           },
                         ]}
-                        placeholderTextColor={T.textSecondary}
-                        keyboardType="number-pad"
                         value={String(g?.b ?? 0)}
-                        onChangeText={(t) => setCell(idx, "b", t)}
+                        keyboardType="numeric"
+                        onChangeText={(v) => setCell(idx, "b", v)}
                         maxLength={2}
                       />
                     ) : (
-                      <Text style={{ color: T.textPrimary }}>{g?.b ?? 0}</Text>
+                      <Text
+                        style={[styles.scoreCellText, { color: T.textPrimary }]}
+                      >
+                        {g?.b ?? 0}
+                      </Text>
                     )}
                   </View>
+
                   {canManage && editMode && (
-                    <View style={[styles.tableCell, styles.centerCell]}>
-                      <TouchableOpacity
-                        style={[
-                          styles.btnXS,
-                          {
-                            backgroundColor: T.danger.bgSoft,
-                            borderColor: T.danger.bdSoft,
-                          },
-                        ]}
-                        onPress={() => removeSet(idx)}
-                        disabled={busy}
-                      >
-                        <Text
-                          style={{
-                            color: T.danger.text,
-                            fontWeight: "700",
-                            fontSize: 12,
-                          }}
-                        >
-                          Xoá
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => removeSet(idx)}
+                    >
+                      <MaterialIcons
+                        name="delete-outline"
+                        size={20}
+                        color={T.danger.text}
+                      />
+                    </TouchableOpacity>
                   )}
                 </View>
               ))}
             </View>
           )}
 
-          <View style={styles.chipsWrap}>
-            {timeLabel && <Chip label={timeLabel} />}
-            <Chip label={`BO: ${merged?.rules?.bestOf ?? 3}`} />
-            <Chip label={`Điểm thắng: ${merged?.rules?.pointsToWin ?? 11}`} />
-            {merged?.rules?.winByTwo && <Chip label="Phải chênh 2" />}
-            {merged?.liveBy?.name && (
-              <Chip label={`Trọng tài: ${merged.liveBy.name}`} />
-            )}
-            <Chip label={`Trạng thái: ${formatStatus(status)}`} />
-          </View>
-
-          {canManage && (
-            <AdminToolbar
-              status={status}
-              editMode={editMode}
-              busy={busy}
-              onEnterEdit={enterEdit}
-              onSave={handleSaveScores}
-              onReset={resetEdits}
-              onAddSet={addSet}
-              onExitEdit={exitEdit}
-              onSetStatus={handleSetStatus}
-              onSetWinner={handleSetWinner}
+          {/* META CHIPS */}
+          {/* META CHIPS */}
+          <View style={styles.metaContainer}>
+            {timeLabel && <Chip label={timeLabel} onPress={handleOpenRules} />}
+            <Chip
+              label={`BO${merged?.rules?.bestOf ?? 3}`}
+              onPress={handleOpenRules}
             />
-          )}
+            <Chip
+              label={`Win: ${merged?.rules?.pointsToWin ?? 11}`}
+              onPress={handleOpenRules}
+            />
+
+            {merged?.liveBy?.name && (
+              <Chip
+                label={`Trọng tài: ${merged.liveBy.name}`}
+                onPress={handleOpenRules}
+              />
+            )}
+            {merged?.rules?.winByTwo && (
+              <Chip label="+2" onPress={handleOpenRules} />
+            )}
+          </View>
         </View>
 
+        {/* ADMIN TOOLBAR */}
+        {canManage && (
+          <AdminToolbar
+            status={status}
+            editMode={editMode}
+            busy={busy}
+            onEnterEdit={enterEdit}
+            onSave={handleSaveScores}
+            onReset={resetEdits}
+            onAddSet={addSet}
+            onExitEdit={exitEdit}
+            onSetStatus={handleSetStatus}
+            onSetWinner={handleSetWinner}
+          />
+        )}
+
+        <View style={{ height: 40 }} />
         <PublicProfileDialog
           open={profileOpen}
           onClose={closeProfile}
           userId={profileUserId}
         />
       </ScrollView>
+
+      <MatchRulesSheet
+        ref={rulesSheetRef}
+        match={merged}
+        timeLabel={timeLabel}
+        status={status}
+      />
 
       {canManage && (
         <LiveInfoSheet
@@ -2735,21 +2759,297 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   );
 }
 
-/* ---------- Chip nhỏ (themed) ---------- */
-const Chip = memo(({ label }) => {
+/* ---------- Chip Component ---------- */
+/* ---------- Chip Component (Updated) ---------- */
+const Chip = memo(({ label, onPress }) => {
   const T = useThemeTokens();
+  // Nếu có onPress thì dùng TouchableOpacity, không thì dùng View thường
+  const Wrapper = onPress ? TouchableOpacity : View;
+
   return (
-    <View
+    <Wrapper
+      onPress={onPress}
+      activeOpacity={0.7}
       style={[
         styles.chip,
         { backgroundColor: T.chip.bg, borderColor: T.chip.bd },
       ]}
     >
       <Text style={[styles.chipText, { color: T.chip.text }]}>{label}</Text>
-    </View>
+    </Wrapper>
   );
 });
 
+/* ---------- Styling System (New & Improved) ---------- */
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    gap: 16,
+  },
+  centerBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Banner
+  bannerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  // Card Generic
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  cardNoPad: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  cardHeaderTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  cardLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  // Score Section
+  scoreHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  matchupContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  teamColumn: {
+    flex: 1,
+    gap: 8,
+  },
+  avatarsColumn: {
+    gap: 8,
+  },
+  scoreColumn: {
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  bigScore: {
+    fontSize: 42,
+    fontWeight: "800",
+    lineHeight: 48,
+    fontVariant: ["tabular-nums"],
+  },
+  setScore: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  placeholderTeam: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.7,
+  },
+
+  // Player Link
+  playerLinkContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  // Score Table
+  scoreTable: {
+    marginTop: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  tableHeader: {
+    flexDirection: "row",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderTopWidth: 1,
+  },
+  th: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  td: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  tdCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  scoreCellText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  scoreInput: {
+    width: 44,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "700",
+    padding: 0,
+  },
+
+  // Meta Chips
+  metaContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 16,
+    justifyContent: "center",
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  // Inputs & Helpers
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 10,
+  },
+  monoText: {
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 12,
+  },
+
+  // Stream
+  aspectBox: {
+    width: "100%",
+  },
+  streamLinkBtn: {
+    padding: 12,
+    alignItems: "flex-end",
+    backgroundColor: "#111",
+  },
+  streamLinkText: {
+    color: "#bbb",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // Admin Controls
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  grid2: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modernBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  modernBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  // Segment
+  segmentContainer: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 12,
+  },
+  segmentBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  segmentBtnActive: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  iconBtn: {
+    padding: 4,
+  },
+  // Button styles cũ (giữ lại cho tương thích nếu cần)
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnFluid: { minWidth: 100, flex: 1 },
+  btnText: { fontWeight: "600" },
+  btnPrimaryText: { color: "#fff", fontWeight: "700" },
+  errorText: { fontWeight: "600", textAlign: "center" },
+});
+
+/* ---------- Logic Comparators (Giữ nguyên) ---------- */
 function makePropSignature(m) {
   if (!m) return "";
   const r = m.rules || {};
@@ -2766,180 +3066,8 @@ function makePropSignature(m) {
     last?.b ?? 0,
   ].join("|");
 }
-
 export default React.memo(MatchContent, (prev, next) => {
   if (prev.isLoading !== next.isLoading) return false;
   if (prev.liveLoading !== next.liveLoading) return false;
   return makePropSignature(prev.m) === makePropSignature(next.m);
-});
-
-/* ---------- Styles (layout + base only) ---------- */
-const styles = StyleSheet.create({
-  container: {
-    gap: 12,
-  },
-  centerBox: {
-    paddingVertical: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkText: {
-    fontWeight: "600",
-    flexShrink: 0,
-  },
-  andText: {
-    fontWeight: "700",
-  },
-  teamWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-  },
-  teamWrapRight: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    justifyContent: "flex-end",
-  },
-  banner: {
-    padding: 12,
-    borderRadius: 8,
-  },
-  bannerText: {},
-  card: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-    gap: 8,
-  },
-  cardTitle: { fontWeight: "700", fontSize: 16, marginBottom: 4 },
-  monoText: {
-    fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
-  },
-  overlayBox: {
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    justifyContent: "center",
-  },
-  caption: { fontSize: 12 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rowWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  btn: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  btnFluid: {
-    minWidth: 140,
-  },
-  btnText: { textAlign: "center" },
-  btnPrimary: {},
-  btnPrimaryText: { color: "#fff", fontWeight: "700", textAlign: "center" },
-  btnXS: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  muted: {},
-  mutedSmall: { fontSize: 12 },
-  teamText: { fontSize: 16, fontWeight: "700" },
-  bigScore: { fontSize: 28, fontWeight: "800" },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    alignItems: "center",
-  },
-  tableCell: { flex: 1, fontSize: 14 },
-  centerCell: { alignItems: "center" },
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 12 },
-  aspectBox: {
-    width: "100%",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  errorText: { fontWeight: "600" },
-  inputScore: {
-    width: 56,
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 8,
-    textAlign: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-
-  adminCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    gap: 12,
-    marginTop: 12,
-  },
-  adminHeader: {
-    gap: 2,
-  },
-  adminTitle: {
-    fontSize: 12,
-    letterSpacing: 1,
-    fontWeight: "800",
-  },
-  adminSub: {
-    fontSize: 12,
-  },
-  adminRow: {
-    gap: 8,
-  },
-  rowLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  segment: {
-    flexDirection: "row",
-    borderRadius: 999,
-    padding: 4,
-    gap: 4,
-    borderWidth: 1,
-  },
-  segmentItem: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    alignItems: "center",
-  },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  segmentLabelActive: {
-    color: "#fff",
-    fontWeight: "800",
-  },
-
-  btnContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  btnIcon: {},
-  btnSuccessOutline: {},
-  btnGhost: {},
 });

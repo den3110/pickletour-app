@@ -48,7 +48,8 @@ import { useTheme } from "@react-navigation/native";
 import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
 import MatchSettingsModal from "./MatchSettingsModal";
-
+// ✅ THÊM: Import Speech
+import * as Speech from "expo-speech";
 /* ---------- Theme tokens ---------- */
 function useTokens() {
   const navTheme = useTheme?.() || {};
@@ -516,7 +517,7 @@ function TimeoutHeader({
     const limit = totalLimit || (type === "med" ? 1 : 2);
 
     for (let i = 0; i < limit; i++) {
-      // Logic: i chạy từ 0 -> limit. 
+      // Logic: i chạy từ 0 -> limit.
       // Nếu còn 2, limit 3: i=0(Active), i=1(Active), i=2(Used)
       const isUsed = i >= remaining;
       const isMed = type === "med";
@@ -537,11 +538,7 @@ function TimeoutHeader({
           <View
             style={[
               isMed ? s.winAdjustBubble : s.winDigitBubble,
-              isUsed
-                ? s.bubbleUsed
-                : isMed
-                ? s.winAdjustPlus
-                : {},
+              isUsed ? s.bubbleUsed : isMed ? s.winAdjustPlus : {},
               isDisabled && !isUsed && { opacity: 0.5 },
             ]}
           >
@@ -605,7 +602,9 @@ function TimeoutHeader({
       >
         <ScrollBtn
           dir="left"
-          onPress={() => leftScrollRef.current?.scrollTo({ x: 0, animated: true })}
+          onPress={() =>
+            leftScrollRef.current?.scrollTo({ x: 0, animated: true })
+          }
         />
 
         <ScrollView
@@ -654,7 +653,9 @@ function TimeoutHeader({
 
         <ScrollBtn
           dir="right"
-          onPress={() => rightScrollRef.current?.scrollToEnd({ animated: true })}
+          onPress={() =>
+            rightScrollRef.current?.scrollToEnd({ animated: true })
+          }
         />
       </View>
     </View>
@@ -1427,6 +1428,50 @@ export default function RefereeJudgePanel({ matchId }) {
   const midPoint = midPointCustom ?? midPointBase;
   const midAskedRef = useRef({}); // { [gameIndex]: true }
 
+  // ✅ THÊM: State quản lý bật/tắt giọng nói
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+
+  // ✅ THÊM: Hàm xử lý đọc điểm chuẩn Pickleball
+  useEffect(() => {
+    // Chỉ đọc khi: Đã bật voice, Match đang Live, và không phải lúc mới load chưa có dữ liệu
+    if (!voiceEnabled || match?.status !== "live") return;
+
+    // Logic xác định điểm để đọc (Luôn đọc điểm đội GIAO BÓNG trước)
+    const serverScore = activeSide === "A" ? curA : curB;
+    const receiverScore = activeSide === "A" ? curB : curA;
+
+    // Kiểm tra đánh đơn hay đôi
+    const isSingle = eventType === "single";
+
+    let textToSpeak = "";
+
+    if (isSingle) {
+      // Đánh đơn: "10 - 8"
+      textToSpeak = `${serverScore} , ${receiverScore}`;
+    } else {
+      // Đánh đôi: "10 - 8 - 2"
+      textToSpeak = `${serverScore} , ${receiverScore} , ${activeServerNum}`;
+    }
+
+    // Nếu vừa bấm bắt đầu trận (0-0-2 hoặc 0-0-1) cũng cần đọc
+    // Ngắt câu cũ nếu đang đọc dở để đọc câu mới ngay
+    Speech.stop();
+
+    // Đọc (tốc độ 1.1 cho gọn, ngôn ngữ tuỳ chỉnh hoặc để tự động)
+    Speech.speak(textToSpeak, {
+      rate: 1.0,
+      pitch: 1.0,
+      // language: 'vi-VN' // Nếu muốn ép tiếng Việt, hoặc để trống nó tự nhận theo máy
+    });
+  }, [
+    voiceEnabled,
+    match?.status,
+    curA,
+    curB,
+    activeSide,
+    activeServerNum,
+    eventType,
+  ]);
   // useEffect(() => {
   //   const tmr = setInterval(() => setNow(new Date()), 1000);
   //   return () => clearInterval(tmr);
@@ -2553,7 +2598,41 @@ export default function RefereeJudgePanel({ matchId }) {
                   </Ripple>
                 )}
               </View>
-
+              <TouchableOpacity
+                onPress={() => {
+                  const nextState = !voiceEnabled;
+                  setVoiceEnabled(nextState);
+                  // Feedback nhẹ cho người dùng biết
+                  if (nextState) {
+                    Speech.speak("Voice on");
+                  } else {
+                    Speech.stop();
+                  }
+                }}
+                style={{ marginRight: 8 }} // Cách nút settings một chút
+              >
+                <View
+                  style={[
+                    s.iconBtnSetting,
+                    {
+                      borderRadius: 20,
+                      backgroundColor: voiceEnabled
+                        ? t.colors.primary
+                        : "#f2f0f5", // Đổi màu khi bật
+                      borderWidth: 1,
+                      borderColor: voiceEnabled
+                        ? t.colors.primary
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={voiceEnabled ? "volume-up" : "volume-off"}
+                    size={20}
+                    color={voiceEnabled ? "#fff" : t.colors.text}
+                  />
+                </View>
+              </TouchableOpacity>
               {/* NÚT SETTINGS GÓC PHẢI */}
               <TouchableOpacity
                 onPress={() => setSettingsOpen(true)}

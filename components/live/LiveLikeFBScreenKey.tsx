@@ -2303,7 +2303,7 @@ export default function LiveLikeFBScreenKey({
 
         {/* ENDED */}
         {mode === "ended" && (
-          <View style={styles.overlay}>
+          <View style={[styles.overlay, {top: safeTop, right: safeRight, left: safeLeft, bottom: safeBottom}]}>
             <Text style={styles.endedTitle}>
               Đã kết thúc buổi phát trực tiếp
             </Text>
