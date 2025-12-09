@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "18",
+      "buildNumber": "19",
       "associatedDomains": [
         "applinks:pickletour.vn",
         "applinks:www.pickletour.vn"
@@ -80,7 +80,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      ["@rnmapbox/maps"],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsVersion": "10.2.9"
+        }
+      ],
       [
         "expo-calendar",
         {
