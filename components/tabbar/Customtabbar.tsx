@@ -4,7 +4,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
-  Dimensions,
+  useWindowDimensions, // <--- 1. Thêm import này
 } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, {
@@ -17,10 +17,9 @@ import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
 
-// Không cần dùng useSafeAreaInsets cho tính toán chiều cao trên Android nữa để tránh bị đẩy cao
-// import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Bỏ dòng khai báo SCREEN_WIDTH ở ngoài này đi nhé
+// const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TAB_BAR_HEIGHT = 65;
 const FLOATING_BUTTON_SIZE = 60;
 const CURVE_WIDTH = 100;
@@ -36,9 +35,9 @@ export function CustomTabBar({
   navigation,
   isDark,
 }: CustomTabBarProps) {
-  // 🔧 FIX ANDROID:
-  // Trên iOS: Cần đệm 20px cho thanh vuốt về Home.
-  // Trên Android: Đặt là 0 hoặc nhỏ (ví dụ 4) để TabBar sát đáy, không bị nav bar đẩy lên.
+  // 2. Lấy chiều rộng màn hình động tại đây
+  const { width: screenWidth } = useWindowDimensions();
+
   const extraPaddingBottom = Platform.OS === "ios" ? 20 : 0;
 
   const visibleRoutes = state.routes.filter((route) => {
@@ -50,6 +49,7 @@ export function CustomTabBar({
     (route) => route.name === "rankings"
   );
 
+  // ... (Phần renderTabButton giữ nguyên không đổi) ...
   const renderTabButton = (route: any, visibleIndex: number) => {
     const { options } = descriptors[route.key];
     const originalIndex = state.routes.findIndex((r) => r.key === route.key);
@@ -94,17 +94,15 @@ export function CustomTabBar({
       });
     };
 
-    // Nút giữa (Floating) - Chỉ render placeholder ở đây
     if (visibleIndex === floatingButtonIndex) {
       return (
         <View
           key={route.key}
-          style={[styles.floatingContainer, { height: TAB_BAR_HEIGHT }]} // Giữ chỗ đúng bằng chiều cao chuẩn
+          style={[styles.floatingContainer, { height: TAB_BAR_HEIGHT }]}
         />
       );
     }
 
-    // Tab thường
     return (
       <TouchableOpacity
         key={route.key}
@@ -147,19 +145,40 @@ export function CustomTabBar({
 
   const bgColor = "transparent";
 
+  // 3. Tính toán lại đường dẫn SVG dựa trên screenWidth mới
+  const svgPath = `
+    M 0,${CURVE_HEIGHT + 10}
+    L 0,${CURVE_HEIGHT}
+    L ${(screenWidth - CURVE_WIDTH) / 2},${CURVE_HEIGHT}
+    Q ${(screenWidth - CURVE_WIDTH) / 2},0 ${
+    screenWidth / 2 - FLOATING_BUTTON_SIZE / 2 - 10
+  },0
+    L ${screenWidth / 2 + FLOATING_BUTTON_SIZE / 2 + 10},0
+    Q ${(screenWidth + CURVE_WIDTH) / 2},0 ${
+    (screenWidth + CURVE_WIDTH) / 2
+  },${CURVE_HEIGHT}
+    L ${screenWidth},${CURVE_HEIGHT}
+    L ${screenWidth},${CURVE_HEIGHT + 10}
+    Z
+  `;
+
   return (
     <View
       style={[
         styles.wrapper,
         {
-          // Chiều cao tổng = 65 (Tab) + 20 (Curve) + Padding đáy (0 ở Android)
           height: TAB_BAR_HEIGHT + CURVE_HEIGHT + extraPaddingBottom,
           bottom: 0,
         },
       ]}
     >
-      {/* Floating Button (Absolute - nằm đè lên trên cùng) */}
-      <View style={styles.floatingButtonAbsolute}>
+      {/* Floating Button (Absolute) - Cập nhật vị trí left theo screenWidth */}
+      <View
+        style={[
+          styles.floatingButtonAbsolute,
+          { left: screenWidth / 2 - FLOATING_BUTTON_SIZE / 2 }, // <--- Cập nhật ở đây
+        ]}
+      >
         {visibleRoutes.map((route, visibleIndex) => {
           if (visibleIndex === floatingButtonIndex) {
             const { options } = descriptors[route.key];
@@ -225,26 +244,12 @@ export function CustomTabBar({
         {/* Đường cong Svg */}
         <View style={styles.curveWrapper}>
           <Svg
-            width={SCREEN_WIDTH}
+            width={screenWidth} // <--- Cập nhật width ở đây
             height={CURVE_HEIGHT + 10}
             style={styles.curveSvg}
           >
             <Path
-              d={`
-                M 0,${CURVE_HEIGHT + 10}
-                L 0,${CURVE_HEIGHT}
-                L ${(SCREEN_WIDTH - CURVE_WIDTH) / 2},${CURVE_HEIGHT}
-                Q ${(SCREEN_WIDTH - CURVE_WIDTH) / 2},0 ${
-                SCREEN_WIDTH / 2 - FLOATING_BUTTON_SIZE / 2 - 10
-              },0
-                L ${SCREEN_WIDTH / 2 + FLOATING_BUTTON_SIZE / 2 + 10},0
-                Q ${(SCREEN_WIDTH + CURVE_WIDTH) / 2},0 ${
-                (SCREEN_WIDTH + CURVE_WIDTH) / 2
-              },${CURVE_HEIGHT}
-                L ${SCREEN_WIDTH},${CURVE_HEIGHT}
-                L ${SCREEN_WIDTH},${CURVE_HEIGHT + 10}
-                Z
-              `}
+              d={svgPath} // <--- Sử dụng path đã tính toán lại ở trên
               fill={bgColor}
             />
           </Svg>
@@ -263,12 +268,7 @@ export function CustomTabBar({
                 backgroundColor: isDark
                   ? "rgba(28, 28, 30, 0.85)"
                   : "rgba(255, 255, 255, 0.85)",
-
-                // Chiều cao background = 65 + padding (để phủ kín đáy)
                 height: TAB_BAR_HEIGHT + extraPaddingBottom,
-
-                // 🔧 QUAN TRỌNG: Không dùng paddingBottom cho content nữa
-                // để tránh đẩy icon lên trên
                 paddingBottom: 0,
               },
             ]}
@@ -292,9 +292,10 @@ const styles = StyleSheet.create({
   floatingButtonAbsolute: {
     position: "absolute",
     top: 0,
-    left: SCREEN_WIDTH / 2 - FLOATING_BUTTON_SIZE / 2,
+    // left: SCREEN_WIDTH ...  <-- Xóa dòng left tĩnh này trong style đi vì đã set inline ở trên
     zIndex: 999,
   },
+  // ... (Các style khác giữ nguyên) ...
   absoluteFloatingTouch: {
     width: FLOATING_BUTTON_SIZE,
     height: FLOATING_BUTTON_SIZE,
@@ -354,15 +355,12 @@ const styles = StyleSheet.create({
   },
   tabBarContent: {
     flexDirection: "row",
-    // 🔧 Căn chỉnh icon lên phía trên (top) của vùng chứa
     alignItems: "flex-start",
     borderTopWidth: 0.5,
     borderTopColor: "rgba(0, 0, 0, 0.1)",
   },
   tabButton: {
     flex: 1,
-    // 🔧 Set cứng chiều cao nút bằng đúng 65px
-    // Việc này đảm bảo icon luôn nằm giữa vùng 65px chuẩn, bất kể padding bên dưới dài bao nhiêu
     height: TAB_BAR_HEIGHT,
     justifyContent: "center",
     alignItems: "center",
@@ -383,53 +381,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  floatingButton: {
-    width: FLOATING_BUTTON_SIZE,
-    height: FLOATING_BUTTON_SIZE,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  outerRing: {
-    position: "absolute",
-    width: FLOATING_BUTTON_SIZE + 12,
-    height: FLOATING_BUTTON_SIZE + 12,
-    borderRadius: (FLOATING_BUTTON_SIZE + 12) / 2,
-    borderWidth: 3,
-  },
-  floatingButtonInner: {
-    width: FLOATING_BUTTON_SIZE,
-    height: FLOATING_BUTTON_SIZE,
-    borderRadius: FLOATING_BUTTON_SIZE / 2,
-    justifyContent: "center",
-    alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 12,
-      },
-    }),
-  },
-  activeDotSmall: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  activeDotInner: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
   },
 });
