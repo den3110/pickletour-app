@@ -18,6 +18,7 @@ import {
   Keyboard,
   PanResponder,
   Image,
+  useColorScheme, // 🔹 Import thêm hook này
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -44,6 +45,38 @@ const CHATBOT_ICON = require("@/assets/images/icon-chatbot.png");
 const SESSION_LIMIT_INFO_KEY = "pikora_chat_session_limit_info";
 const SESSION_LIMIT_BANNER_DISMISSED_KEY =
   "pikora_chat_session_limit_banner_dismissed";
+
+// 🔹 CẤU HÌNH MÀU SẮC CHO THEME
+const THEME_COLORS = {
+  light: {
+    background: "#ffffff",
+    text: "#1a1a1a",
+    subText: "#666666",
+    botBubbleBg: "#ffffff",
+    inputBg: "#f7f8fc",
+    inputBorder: "#e8eaf0",
+    divider: "#f0f0f0",
+    menuBg: "#ffffff",
+    shadow: "#000",
+    placeholder: "#a0a0a0",
+    quickReplyBg: ["#f7f8fc", "#eef1f8"],
+    messageAreaGradient: ["#f8f9fd", "#ffffff"],
+  },
+  dark: {
+    background: "#121212",
+    text: "#ffffff",
+    subText: "#aaaaaa",
+    botBubbleBg: "#1e1e1e",
+    inputBg: "#2c2c2c",
+    inputBorder: "#444444",
+    divider: "#333333",
+    menuBg: "#1e1e1e",
+    shadow: "#000",
+    placeholder: "#666666",
+    quickReplyBg: ["#1e1e1e", "#2a2a2a"],
+    messageAreaGradient: ["#121212", "#121212"], // Dark mode để nền phẳng hoặc gradient tối nhẹ
+  },
+};
 
 // ==================== SUB COMPONENTS ====================
 
@@ -181,6 +214,7 @@ const MessageBubble = ({
   meta,
   navigation,
   onPressNavigation,
+  theme, // 🔹 Nhận theme prop
 }) => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -234,7 +268,7 @@ const MessageBubble = ({
           end={{ x: 1, y: 1 }}
           style={styles.avatarGradient}
         >
-          <View style={styles.avatarInner}>
+          <View style={[styles.avatarInner, { backgroundColor: theme.background }]}>
             <Image
               source={CHATBOT_ICON}
               style={styles.avatarImage}
@@ -255,8 +289,10 @@ const MessageBubble = ({
             <Text style={styles.userMessageText}>{message}</Text>
           </LinearGradient>
         ) : (
-          <View style={styles.botBubble}>
-            <Text style={styles.botMessageText}>{message}</Text>
+          <View style={[styles.botBubble, { backgroundColor: theme.botBubbleBg }]}>
+            <Text style={[styles.botMessageText, { color: theme.text }]}>
+              {message}
+            </Text>
 
             {meta?.source && (
               <Text style={styles.metaText}>
@@ -303,7 +339,7 @@ const MessageBubble = ({
 };
 
 // Quick Reply Button
-const QuickReplyButton = ({ icon, text, onPress }) => {
+const QuickReplyButton = ({ icon, text, onPress, theme }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -330,11 +366,13 @@ const QuickReplyButton = ({ icon, text, onPress }) => {
         activeOpacity={1}
       >
         <LinearGradient
-          colors={["#f7f8fc", "#eef1f8"]}
-          style={styles.quickReplyButton}
+          colors={theme.quickReplyBg}
+          style={[styles.quickReplyButton, { borderColor: theme.inputBorder }]}
         >
           <Ionicons name={icon} size={18} color="#667eea" />
-          <Text style={styles.quickReplyText}>{text}</Text>
+          <Text style={[styles.quickReplyText, { color: theme.text }]}>
+            {text}
+          </Text>
         </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
@@ -342,7 +380,7 @@ const QuickReplyButton = ({ icon, text, onPress }) => {
 };
 
 // Empty State
-const EmptyState = () => {
+const EmptyState = ({ theme }) => {
   const bounceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -384,25 +422,25 @@ const EmptyState = () => {
         </LinearGradient>
       </Animated.View>
 
-      <Text style={styles.emptyStateTitle}>
+      <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
         Xin chào! Tôi là Pikora - trợ lý ảo của PickleTour
       </Text>
-      <Text style={styles.emptyStateSubtitle}>
+      <Text style={[styles.emptyStateSubtitle, { color: theme.subText }]}>
         Hỏi tôi bất cứ điều gì về giải đấu, lịch thi đấu, hoặc luật chơi
       </Text>
 
       <View style={styles.suggestionsContainer}>
         <Text style={styles.suggestionsTitle}>Gợi ý câu hỏi:</Text>
         <View style={styles.suggestionsList}>
-          <View style={styles.suggestionChip}>
+          <View style={[styles.suggestionChip, { backgroundColor: theme.inputBg }]}>
             <Ionicons name="trophy-outline" size={14} color="#667eea" />
             <Text style={styles.suggestionText}>Giải đấu sắp tới</Text>
           </View>
-          <View style={styles.suggestionChip}>
+          <View style={[styles.suggestionChip, { backgroundColor: theme.inputBg }]}>
             <Ionicons name="calendar-outline" size={14} color="#667eea" />
             <Text style={styles.suggestionText}>Lịch thi đấu của tôi</Text>
           </View>
-          <View style={styles.suggestionChip}>
+          <View style={[styles.suggestionChip, { backgroundColor: theme.inputBg }]}>
             <Ionicons name="help-circle-outline" size={14} color="#667eea" />
             <Text style={styles.suggestionText}>Luật pickleball</Text>
           </View>
@@ -436,6 +474,11 @@ const formatTimeAmPmFromISO = (iso) => {
 // ==================== MAIN COMPONENT ====================
 
 const ChatAssistant = ({ isBack = false }) => {
+  // 🔹 Detect theme
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = THEME_COLORS[isDark ? "dark" : "light"];
+
   const [messages, setMessages] = useState([]); // {id, message, isUser, timestamp, meta, navigation}
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -824,7 +867,10 @@ const ChatAssistant = ({ isBack = false }) => {
     <SafeAreaView
       style={[
         styles.container,
-        { paddingBottom: tabBarHeight - (Platform?.OS === "ios" ? 0 : 40) },
+        {
+          paddingBottom: tabBarHeight - (Platform?.OS === "ios" ? 0 : 40),
+          backgroundColor: theme.background, // 🔹 Áp dụng màu nền chính
+        },
       ]}
       edges={[Platform.OS === "ios" && "top"]}
     >
@@ -879,9 +925,9 @@ const ChatAssistant = ({ isBack = false }) => {
       </LinearGradient>
 
       {/* Messages Area */}
-      <View style={styles.messagesContainer}>
+      <View style={[styles.messagesContainer, { backgroundColor: theme.background }]}>
         <LinearGradient
-          colors={["#f8f9fd", "#ffffff"]}
+          colors={theme.messageAreaGradient} // 🔹 Gradient đổi theo theme
           style={styles.messagesGradient}
         >
           <ScrollView
@@ -900,12 +946,12 @@ const ChatAssistant = ({ isBack = false }) => {
                 }}
               >
                 <ActivityIndicator size="small" color="#667eea" />
-                <Text style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
+                <Text style={{ marginTop: 8, color: theme.subText, fontSize: 13 }}>
                   Đang tải hội thoại...
                 </Text>
               </View>
             ) : messages.length === 0 ? (
-              <EmptyState />
+              <EmptyState theme={theme} />
             ) : (
               <>
                 {messages.map((msg) => (
@@ -917,6 +963,7 @@ const ChatAssistant = ({ isBack = false }) => {
                     meta={msg.meta}
                     navigation={msg.navigation}
                     onPressNavigation={handleNavigationPress}
+                    theme={theme} // 🔹 Truyền theme
                   />
                 ))}
                 {(isTyping || isSending) && <TypingIndicator />}
@@ -927,7 +974,7 @@ const ChatAssistant = ({ isBack = false }) => {
 
         {/* Quick Replies */}
         {messages.length === 0 && !isInitialLoading && (
-          <View style={styles.quickRepliesContainer}>
+          <View style={[styles.quickRepliesContainer, { borderTopColor: theme.divider }]}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -937,21 +984,25 @@ const ChatAssistant = ({ isBack = false }) => {
                 icon="trophy-outline"
                 text="Giải đấu"
                 onPress={() => handleQuickReply("Các giải đấu sắp tới")}
+                theme={theme}
               />
               <QuickReplyButton
                 icon="calendar-outline"
                 text="Lịch thi đấu"
                 onPress={() => handleQuickReply("Lịch thi đấu của tôi")}
+                theme={theme}
               />
               <QuickReplyButton
                 icon="help-circle-outline"
                 text="Luật chơi"
                 onPress={() => handleQuickReply("Luật pickleball cơ bản")}
+                theme={theme}
               />
               <QuickReplyButton
                 icon="stats-chart-outline"
                 text="Xếp hạng"
                 onPress={() => handleQuickReply("Xếp hạng của tôi")}
+                theme={theme}
               />
             </ScrollView>
           </View>
@@ -971,6 +1022,7 @@ const ChatAssistant = ({ isBack = false }) => {
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
+              backgroundColor: theme.background,
             }}
           >
             <View style={{ flex: 1, paddingRight: 8 }}>
@@ -998,23 +1050,26 @@ const ChatAssistant = ({ isBack = false }) => {
               )}
             </View>
             <TouchableOpacity onPress={handleDismissSessionBanner}>
-              <Ionicons name="close" size={18} color="#9ca3af" />
+              <Ionicons name="close" size={18} color={theme.subText} />
             </TouchableOpacity>
           </View>
         )}
         <BlurView
           intensity={95}
-          tint="light"
-          style={styles.inputContainer}
+          tint={isDark ? "dark" : "light"} // 🔹 Đổi tint theo theme
+          style={[styles.inputContainer, { borderTopColor: theme.divider }]}
           {...panResponder.panHandlers}
         >
           <View style={styles.inputWrapper}>
-            <View style={styles.textInputContainer}>
+            <View style={[styles.textInputContainer, { 
+                backgroundColor: theme.inputBg, 
+                borderColor: theme.inputBorder 
+              }]}>
               <TextInput
                 ref={inputRef}
-                style={styles.textInput}
+                style={[styles.textInput, { color: theme.text }]}
                 placeholder="Nhập câu hỏi của bạn..."
-                placeholderTextColor="#a0a0a0"
+                placeholderTextColor={theme.placeholder}
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
@@ -1034,7 +1089,7 @@ const ChatAssistant = ({ isBack = false }) => {
                 colors={
                   inputText.trim() && !isSending
                     ? ["#667eea", "#764ba2"]
-                    : ["#e0e0e0", "#d0d0d0"]
+                    : isDark ? ["#444", "#444"] : ["#e0e0e0", "#d0d0d0"]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -1067,8 +1122,8 @@ const ChatAssistant = ({ isBack = false }) => {
             style={StyleSheet.absoluteFillObject}
             onPress={() => setIsMenuVisible(false)}
           />
-          <View style={styles.menuModal}>
-            <Text style={styles.menuTitle}>Tùy chọn</Text>
+          <View style={[styles.menuModal, { backgroundColor: theme.menuBg, shadowColor: theme.shadow }]}>
+            <Text style={[styles.menuTitle, { color: theme.subText }]}>Tùy chọn</Text>
 
             <TouchableOpacity style={styles.menuItem} onPress={handleClearChat}>
               <Ionicons
@@ -1086,10 +1141,10 @@ const ChatAssistant = ({ isBack = false }) => {
               <Ionicons
                 name="chatbox-ellipses-outline"
                 size={18}
-                color="#555"
+                color={theme.subText}
                 style={styles.menuItemIcon}
               />
-              <Text style={styles.menuItemText}>Gửi feedback</Text>
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Gửi feedback</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1103,7 +1158,7 @@ const ChatAssistant = ({ isBack = false }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    // Background color is handled dynamically
   },
 
   // Header Styles
@@ -1128,10 +1183,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  backButtonPlaceholder: {
-    width: 40,
-    height: 40,
   },
   headerCenter: {
     flex: 1,
@@ -1262,7 +1313,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   botBubble: {
-    backgroundColor: "#fff",
+    // backgroundColor handled dynamically
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
@@ -1282,7 +1333,7 @@ const styles = StyleSheet.create({
   },
   botMessageText: {
     fontSize: 15,
-    color: "#1a1a1a",
+    // color handled dynamically
     fontWeight: "400",
     lineHeight: 20,
   },
@@ -1378,13 +1429,11 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#1a1a1a",
     textAlign: "center",
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: 15,
-    color: "#666",
     textAlign: "center",
     lineHeight: 22,
   },
@@ -1408,7 +1457,7 @@ const styles = StyleSheet.create({
   suggestionChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f7f8fc",
+    // backgroundColor handled dynamically
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
@@ -1424,7 +1473,7 @@ const styles = StyleSheet.create({
   quickRepliesContainer: {
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    // borderTopColor handled dynamically
   },
   quickRepliesScroll: {
     paddingHorizontal: 16,
@@ -1438,7 +1487,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 8,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    // borderColor handled dynamically
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1447,14 +1496,13 @@ const styles = StyleSheet.create({
   },
   quickReplyText: {
     fontSize: 14,
-    color: "#333",
     fontWeight: "600",
   },
 
   // Input Area
   inputContainer: {
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    // borderTopColor handled dynamically
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 12 : 16,
     paddingHorizontal: 16,
@@ -1466,10 +1514,10 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     flex: 1,
-    backgroundColor: "#f7f8fc",
+    // backgroundColor handled dynamically
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#e8eaf0",
+    // borderColor handled dynamically
     paddingHorizontal: 16,
     paddingVertical: 10,
     minHeight: 44,
@@ -1477,7 +1525,6 @@ const styles = StyleSheet.create({
   },
   textInput: {
     fontSize: 15,
-    color: "#1a1a1a",
     lineHeight: 20,
   },
   sendButton: {
@@ -1509,11 +1556,11 @@ const styles = StyleSheet.create({
   },
   menuModal: {
     width: 230,
-    backgroundColor: "#fff",
+    // backgroundColor handled dynamically
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 8,
-    shadowColor: "#000",
+    // shadowColor handled dynamically
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1522,7 +1569,6 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#777",
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginBottom: 4,
@@ -1542,7 +1588,7 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 14,
-    color: "#222",
+    // color handled dynamically
   },
   menuItemTextDanger: {
     color: "#e53935",

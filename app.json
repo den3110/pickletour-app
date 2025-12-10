@@ -87,6 +87,12 @@
       //     "RNMapboxMapsVersion": "11.8.0" // Updated from 11.4.0
       //   }
       // ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+        }
+      ],
       ["@rnmapbox/maps"],
       [
         "expo-calendar",

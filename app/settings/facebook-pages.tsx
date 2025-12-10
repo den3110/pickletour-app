@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
+  useColorScheme, // 🔹 Import hook
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,11 +22,46 @@ import {
   useDeleteFacebookPageMutation,
 } from "@/slices/facebookApiSlice";
 import { Stack, useRouter } from "expo-router";
-import { useTheme } from "@react-navigation/native";
 import { normalizeUrl } from "@/utils/normalizeUri";
 
+// 🔹 CẤU HÌNH MÀU SẮC
+const THEME_COLORS = {
+  light: {
+    background: "#f9fafb",
+    cardBg: "#ffffff",
+    text: "#111827",
+    subText: "#6b7280",
+    border: "#e5e7eb",
+    infoBg: "#dbeafe",
+    infoText: "#1e40af",
+    headerBg: "#ffffff",
+    headerTint: "#000000",
+    loadingBg: "#ffffff",
+    modalHeaderBorder: "#e5e7eb",
+    iconDefault: "#d1d5db",
+  },
+  dark: {
+    background: "#111827",
+    cardBg: "#1f2937",
+    text: "#f9fafb",
+    subText: "#9ca3af",
+    border: "#374151",
+    infoBg: "#1e3a8a", // Xanh đậm hơn
+    infoText: "#bfdbfe", // Chữ sáng hơn
+    headerBg: "#1f2937",
+    headerTint: "#ffffff",
+    loadingBg: "#1f2937",
+    modalHeaderBorder: "#374151",
+    iconDefault: "#4b5563",
+  },
+};
+
 const FacebookLiveSettingsScreen = () => {
-  const theme = useTheme();
+  // 🔹 Detect theme
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = THEME_COLORS[isDark ? "dark" : "light"];
+
   const router = useRouter();
   const [showWebView, setShowWebView] = useState(false);
   const [authUrl, setAuthUrl] = useState("");
@@ -143,7 +179,7 @@ const FacebookLiveSettingsScreen = () => {
 
     return (
       <>
-        <View style={styles.pageItem}>
+        <View style={[styles.pageItem, { backgroundColor: theme.cardBg }]}>
           <Image
             source={{ uri: avatarUri }}
             style={styles.pageAvatar}
@@ -153,7 +189,7 @@ const FacebookLiveSettingsScreen = () => {
 
           <View style={styles.pageInfo}>
             <View style={styles.pageNameRow}>
-              <Text style={styles.pageName} numberOfLines={1}>
+              <Text style={[styles.pageName, { color: theme.text }]} numberOfLines={1}>
                 {item.pageName}
               </Text>
               {isDefault && (
@@ -162,7 +198,7 @@ const FacebookLiveSettingsScreen = () => {
                 </View>
               )}
             </View>
-            <Text style={styles.pageCategory} numberOfLines={1}>
+            <Text style={[styles.pageCategory, { color: theme.subText }]} numberOfLines={1}>
               {item.pageCategory ? `${item.pageCategory} • ` : ""}
               ID: {item.pageId}
             </Text>
@@ -177,7 +213,7 @@ const FacebookLiveSettingsScreen = () => {
               <Ionicons
                 name={isDefault ? "star" : "star-outline"}
                 size={24}
-                color={isDefault ? "#f59e0b" : "#6b7280"}
+                color={isDefault ? "#f59e0b" : theme.subText}
               />
             </TouchableOpacity>
 
@@ -198,7 +234,9 @@ const FacebookLiveSettingsScreen = () => {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
-          <Text style={styles.loadingText}>Đang tải danh sách fanpage...</Text>
+          <Text style={[styles.loadingText, { color: theme.subText }]}>
+            Đang tải danh sách fanpage...
+          </Text>
         </View>
       );
     }
@@ -217,9 +255,11 @@ const FacebookLiveSettingsScreen = () => {
 
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="logo-facebook" size={64} color="#d1d5db" />
-        <Text style={styles.emptyText}>Chưa có fanpage nào</Text>
-        <Text style={styles.emptySubtext}>
+        <Ionicons name="logo-facebook" size={64} color={theme.iconDefault} />
+        <Text style={[styles.emptyText, { color: theme.text }]}>
+          Chưa có fanpage nào
+        </Text>
+        <Text style={[styles.emptySubtext, { color: theme.subText }]}>
           Bấm &quot;Kết nối Facebook&quot; để bắt đầu
         </Text>
       </View>
@@ -227,26 +267,31 @@ const FacebookLiveSettingsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
           title: "Thiết lập LIVE",
           headerTitleAlign: "center",
+          headerStyle: { backgroundColor: theme.headerBg }, // 🔹 Header bg
+          headerTintColor: theme.headerTint, // 🔹 Header text/icon color
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
               style={{ paddingHorizontal: 8, paddingVertical: 4 }}
             >
-              <Ionicons name="chevron-back" size={24} />
+              <Ionicons name="chevron-back" size={24} color={theme.headerTint} />
             </TouchableOpacity>
           ),
         }}
       />
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[
+          styles.header, 
+          { backgroundColor: theme.cardBg, borderBottomColor: theme.border }
+        ]}>
         <View style={styles.headerInfo}>
-          <Text style={styles.title}>Facebook Live</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: theme.text }]}>Facebook Live</Text>
+          <Text style={[styles.subtitle, { color: theme.subText }]}>
             Kết nối Facebook để livestream match trực tiếp
           </Text>
         </View>
@@ -273,9 +318,9 @@ const FacebookLiveSettingsScreen = () => {
       </View>
 
       {/* Info */}
-      <View style={styles.infoBox}>
-        <Ionicons name="information-circle" size={20} color="#3b82f6" />
-        <Text style={styles.infoText}>
+      <View style={[styles.infoBox, { backgroundColor: theme.infoBg }]}>
+        <Ionicons name="information-circle" size={20} color={isDark ? "#3b82f6" : "#3b82f6"} />
+        <Text style={[styles.infoText, { color: theme.infoText }]}>
           Bấm &quot;Kết nối Facebook&quot; để cấp quyền quản lý livestream trên
           fanpage của bạn.
         </Text>
@@ -302,14 +347,17 @@ const FacebookLiveSettingsScreen = () => {
         animationType="slide"
         onRequestClose={handleCloseWebView}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Kết nối Facebook</Text>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <View style={[
+              styles.modalHeader, 
+              { backgroundColor: theme.headerBg, borderBottomColor: theme.modalHeaderBorder }
+            ]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Kết nối Facebook</Text>
             <TouchableOpacity
               onPress={handleCloseWebView}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={28} color="#111827" />
+              <Ionicons name="close" size={28} color={theme.text} />
             </TouchableOpacity>
           </View>
 
@@ -319,9 +367,9 @@ const FacebookLiveSettingsScreen = () => {
               onNavigationStateChange={handleWebViewNavigationStateChange}
               startInLoadingState
               renderLoading={() => (
-                <View style={styles.webViewLoading}>
+                <View style={[styles.webViewLoading, { backgroundColor: theme.loadingBg }]}>
                   <ActivityIndicator size="large" color="#1877f2" />
-                  <Text style={styles.webViewLoadingText}>
+                  <Text style={[styles.webViewLoadingText, { color: theme.subText }]}>
                     Đang tải Facebook...
                   </Text>
                 </View>
@@ -342,13 +390,12 @@ const FacebookLiveSettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    // bg handled by theme
   },
   header: {
-    backgroundColor: "#fff",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    // bg and border handled by theme
   },
   headerInfo: {
     marginBottom: 12,
@@ -356,12 +403,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111827",
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: "#6b7280",
     lineHeight: 20,
   },
   connectButton: {
@@ -384,7 +429,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   infoBox: {
-    backgroundColor: "#dbeafe",
     margin: 16,
     padding: 12,
     borderRadius: 8,
@@ -395,7 +439,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
-    color: "#1e40af",
     lineHeight: 20,
   },
   loadingContainer: {
@@ -407,7 +450,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#6b7280",
   },
   errorContainer: {
     flex: 1,
@@ -443,19 +485,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: "600",
-    color: "#374151",
   },
   emptySubtext: {
     marginTop: 4,
     fontSize: 14,
-    color: "#6b7280",
     textAlign: "center",
   },
   listContent: {
     padding: 16,
   },
   pageItem: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
@@ -485,7 +524,6 @@ const styles = StyleSheet.create({
   pageName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
     marginRight: 8,
     flex: 1,
   },
@@ -504,7 +542,6 @@ const styles = StyleSheet.create({
   },
   pageCategory: {
     fontSize: 14,
-    color: "#6b7280",
   },
   pageActions: {
     flexDirection: "row",
@@ -519,7 +556,6 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   modalHeader: {
     flexDirection: "row",
@@ -528,13 +564,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    backgroundColor: "#fff",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#111827",
   },
   closeButton: {
     padding: 4,
@@ -547,12 +580,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
   webViewLoadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#6b7280",
   },
 });
 
