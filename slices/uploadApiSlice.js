@@ -89,8 +89,23 @@ export const uploadApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["User"],
       extraOptions: { skip404Redirect: true },
     }),
+    uploadRealAvatar: builder.mutation({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("avatar", file);
+
+        return {
+          url: "/api/upload/user/avatar",
+          method: "POST",
+          body: formData,
+        };
+      },
+    }),
   }),
 });
 
-export const { useUploadAvatarMutation, useUploadCccdMutation } =
-  uploadApiSlice;
+export const {
+  useUploadAvatarMutation,
+  useUploadCccdMutation,
+  useUploadRealAvatarMutation,
+} = uploadApiSlice;

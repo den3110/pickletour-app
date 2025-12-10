@@ -27,7 +27,7 @@ import { useDispatch, useSelector } from "react-redux";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useRegisterMutation } from "@/slices/usersApiSlice";
-import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
+import { useUploadRealAvatarMutation } from "@/slices/uploadApiSlice";
 import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice"; // 👈 NEW
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -305,7 +305,7 @@ export default function RegisterScreen() {
 
   const [register, { isLoading }] = useRegisterMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
-    useUploadAvatarMutation();
+    useUploadRealAvatarMutation();
 
   // 👇 flag cho phép bật/tắt bắt buộc các field optional (phone/gender/province)
   // hiện tại mặc định false để phù hợp guideline Apple, sau đó sync từ server

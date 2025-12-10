@@ -44,7 +44,7 @@ import {
 
 import { logout as logoutAction } from "@/slices/authSlice";
 import {
-  useUploadAvatarMutation,
+  useUploadRealAvatarMutation,
   useUploadCccdMutation,
 } from "@/slices/uploadApiSlice";
 import {
@@ -335,7 +335,7 @@ export default function ProfileScreen({ isBack = false }) {
   const [deleteMe] = useDeleteMeMutation();
   const [uploadCccd, { isLoading: upLoad }] = useUploadCccdMutation();
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
-    useUploadAvatarMutation();
+    useUploadRealAvatarMutation();
 
   // ===== Redirect rules =====
   const [authReady, setAuthReady] = useState(false);

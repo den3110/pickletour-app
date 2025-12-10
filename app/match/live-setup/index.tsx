@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
-  Image,
   Pressable,
 } from "react-native";
 import { Stack, router } from "expo-router";
@@ -17,9 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme, useFocusEffect } from "@react-navigation/native";
 import * as Device from "expo-device";
+import { Image } from "expo-image";
 
 // chỉnh lại path nếu khác
 import { useGetFacebookPagesQuery } from "@/slices/facebookApiSlice";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const RESOLUTION_PRESETS = [
   { id: "1080p30", label: "1080p 30fps", minGB: 6 },
@@ -315,8 +316,10 @@ export default function UserMatchLiveSetupScreen() {
                       >
                         {p.pagePicture ? (
                           <Image
-                            source={{ uri: p.pagePicture }}
+                            source={{ uri: normalizeUrl(p.pagePicture) }}
                             style={styles.pageAvatar}
+                            contentFit="cover"
+                            transition={100}
                           />
                         ) : (
                           <View style={styles.pageAvatarFallback}>

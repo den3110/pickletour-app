@@ -34,7 +34,7 @@ import {
   useGetRatingHistoryQuery,
   useGetMatchHistoryQuery,
   useDeleteRatingHistoryMutation,
-  useGetUserAchievementsQuery, // <--- 1. Import thêm cái này
+  useGetUserAchievementsQuery,
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -67,7 +67,6 @@ const num = (v, digits = 3) =>
 const numFloat = (v, digits = 3) =>
   Number.isFinite(+v) ? Number(v).toFixed(digits) : "—";
 
-// ... (Giữ nguyên các hàm helper cũ: getGenderInfo, getKycStatusMeta, calcAge, getHandLabel, hasData)
 const getGenderInfo = (g) => {
   if (g === null || g === undefined) return { label: "Khác", color: "#9E9E9E" };
   const s = String(g).toLowerCase().trim();
@@ -125,8 +124,29 @@ const hasData = (v) => {
   return true;
 };
 
+// 🟢 NEW: Helper lấy điểm SC (copy từ component cũ)
+function getSPC(base) {
+  const s = base?.spc;
+  if (!s || typeof s !== "object") return null;
+  const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const m = s.meta || {};
+  return {
+    single: toNum(s.single),
+    double: toNum(s.double),
+    meta: {
+      sportId: m.sportId ?? null,
+      description: m.description ?? null,
+      scoredAt: m.scoredAt ?? null,
+      joinDate: m.joinDate ?? null,
+      source: m.source ?? null,
+    },
+  };
+}
+
 /* ---------- SUB-COMPONENTS ---------- */
-// ... (Giữ nguyên StatCard, InfoBadge, MatchCard, PlayerRowCompact, RatingHistoryRow, InfoItem, SkeletonItem, ProfileSkeleton)
 
 const StatCard = ({ icon, value, label, gradient }) => (
   <LinearGradient
@@ -141,7 +161,8 @@ const StatCard = ({ icon, value, label, gradient }) => (
   </LinearGradient>
 );
 
-const InfoBadge = ({ icon, text, color = "#666", bgColor }) => (
+// 🟢 UPDATED: Thêm prop textColor để custom màu chữ
+const InfoBadge = ({ icon, text, color = "#666", bgColor, textColor }) => (
   <View
     style={[
       styles.badge,
@@ -152,17 +173,18 @@ const InfoBadge = ({ icon, text, color = "#666", bgColor }) => (
     ]}
   >
     {icon}
-    <Text style={[styles.badgeText, { color: bgColor ? "#FFF" : color }]}>
+    <Text
+      style={[
+        styles.badgeText,
+        { color: textColor ? textColor : bgColor ? "#FFF" : color },
+      ]}
+    >
       {text}
     </Text>
   </View>
 );
 
-// ... (Các component MatchCard, PlayerRowCompact, RatingHistoryRow, InfoItem giữ nguyên như cũ)
-// Để tiết kiệm không gian, mình ẩn nội dung MatchCard, RatingHistoryRow... trong block này
-// nhưng bạn hãy giữ nguyên code của chúng như file bạn gửi nhé.
 const MatchCard = ({ match, userId, onPress, colors }) => {
-  // Logic cũ
   const winnerA = match.winner === "A";
   const winnerB = match.winner === "B";
   const myInA = match.team1?.some((p) => (p._id || p.id) === userId);
@@ -247,8 +269,8 @@ const MatchCard = ({ match, userId, onPress, colors }) => {
   );
 };
 
+// 🟢 UPDATED: Thêm logic hiển thị Chip SC ở đây
 const PlayerRowCompact = ({ player, highlight, colors }) => {
-  // Logic cũ
   const up = (player?.delta ?? 0) > 0;
   const name =
     player?.user?.nickname ||
@@ -256,6 +278,16 @@ const PlayerRowCompact = ({ player, highlight, colors }) => {
     player?.nickname ||
     player?.fullName ||
     "N/A";
+
+  // Lấy điểm SC
+  const spcObj = player?.spc || player?.user?.spc || {};
+  const scS = Number.isFinite(Number(spcObj.single))
+    ? Number(spcObj.single)
+    : null;
+  const scD = Number.isFinite(Number(spcObj.double))
+    ? Number(spcObj.double)
+    : null;
+
   return (
     <View style={styles.playerRowCompact}>
       <Image
@@ -276,26 +308,52 @@ const PlayerRowCompact = ({ player, highlight, colors }) => {
         >
           {name}
         </Text>
-        {player?.postScore !== undefined && player?.postScore !== null && (
-          <View style={styles.scoreChangeCompact}>
-            <Text
-              style={[styles.scoreChangeTextCompact, { color: colors.subText }]}
-            >
-              {num(player.preScore)} → {num(player.postScore)}
-            </Text>
-            {Number.isFinite(+player.delta) && player.delta !== 0 && (
+        {/* Hàng chứa điểm cũ/mới và chip SC */}
+        <View style={styles.playerStatsRow}>
+          {player?.postScore !== undefined && player?.postScore !== null && (
+            <View style={styles.scoreChangeCompact}>
               <Text
                 style={[
-                  styles.deltaTextCompact,
-                  { color: up ? "#4CAF50" : "#F44336" },
+                  styles.scoreChangeTextCompact,
+                  { color: colors.subText },
                 ]}
               >
-                {up ? "+" : ""}
-                {numFloat(player.delta)}
+                {num(player.preScore)} → {num(player.postScore)}
               </Text>
-            )}
-          </View>
-        )}
+              {Number.isFinite(+player.delta) && player.delta !== 0 && (
+                <Text
+                  style={[
+                    styles.deltaTextCompact,
+                    { color: up ? "#4CAF50" : "#F44336" },
+                  ]}
+                >
+                  {up ? "+" : ""}
+                  {numFloat(player.delta)}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* CHIP SC */}
+          {(scS !== null || scD !== null) && (
+            <View style={styles.scChipsRow}>
+              {scS !== null && (
+                <View style={[styles.scChip, { backgroundColor: "#dcfce7" }]}>
+                  <Text style={[styles.scChipTxt, { color: "#166534" }]}>
+                    S: {num(scS)}
+                  </Text>
+                </View>
+              )}
+              {scD !== null && (
+                <View style={[styles.scChip, { backgroundColor: "#fef9c3" }]}>
+                  <Text style={[styles.scChipTxt, { color: "#854d0e" }]}>
+                    D: {num(scD)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -309,7 +367,6 @@ const RatingHistoryRow = ({
   onDelete,
   colors,
 }) => {
-  // Logic cũ
   const singleDelta = prevItem ? item.single - prevItem.single : 0;
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
   return (
@@ -392,7 +449,6 @@ const RatingHistoryRow = ({
 };
 
 const InfoItem = ({ label, value, copyable, onCopy, colors }) => {
-  // Logic cũ
   const display =
     value === null || value === undefined || value === "" ? "—" : value;
   return (
@@ -418,7 +474,6 @@ const InfoItem = ({ label, value, copyable, onCopy, colors }) => {
   );
 };
 
-// ... (Giữ nguyên SkeletonItem, ProfileSkeleton)
 const SkeletonItem = ({
   width,
   height,
@@ -462,7 +517,6 @@ const SkeletonItem = ({
 };
 
 const ProfileSkeleton = ({ isDark }) => {
-  // ... logic cũ
   const skelColor = isDark ? "#333" : "#E1E9EE";
   const bgColor = isDark ? "#121212" : "#F5F7FA";
   const cardColor = isDark ? "#1E1E1E" : "#FFF";
@@ -546,8 +600,7 @@ const ProfileSkeleton = ({ isDark }) => {
   );
 };
 
-/* ---------- 🟢 NEW ACHIEVEMENTS COMPONENTS ---------- */
-// Helper hiển thị badge top
+/* ---------- ACHIEVEMENTS COMPONENTS ---------- */
 const getTopStyle = (k) => {
   if (!Number.isFinite(k) || k > 8) {
     return { bg: "#F3F4F6", fg: "#374151" };
@@ -741,7 +794,6 @@ export default function PublicProfileScreen() {
   const baseQ = useGetPublicProfileQuery(id);
   const rateQ = useGetRatingHistoryQuery(id);
   const matchQ = useGetMatchHistoryQuery(id);
-  // 🟢 2. Gọi Query thành tích
   const achQ = useGetUserAchievementsQuery(id);
 
   const [deleteHistory, { isLoading: deleting }] =
@@ -756,7 +808,9 @@ export default function PublicProfileScreen() {
     ? matchQ.data
     : matchQ.data?.items || [];
 
-  // ... (Logic Auth viewer, KYC, Latest ratings, Derived stats, Handlers giữ nguyên)
+  // 🟢 NEW: Lấy thông tin SC
+  const sc = getSPC(base);
+
   const { userInfo } = useSelector((state) => state.auth || {});
   const baseId = base?._id || "";
   const viewerId = userInfo?._id || userInfo?.id;
@@ -849,7 +903,6 @@ export default function PublicProfileScreen() {
   };
 
   const handleDeleteHistory = (h) => {
-    // ... logic xóa (giữ nguyên)
     if (!isAdminViewer) return;
     const historyId = h?._id ?? h?.id;
     const targetUid = h?.user?._id || id;
@@ -1030,6 +1083,22 @@ export default function PublicProfileScreen() {
               />
             )}
 
+            {/* 🟢 NEW: Hiển thị SC Chips trên Header */}
+            {sc?.single != null && (
+              <InfoBadge
+                text={`SC Đơn: ${num(sc.single)}`}
+                bgColor="#dcfce7"
+                textColor="#166534"
+              />
+            )}
+            {sc?.double != null && (
+              <InfoBadge
+                text={`SC Đôi: ${num(sc.double)}`}
+                bgColor="#fef9c3"
+                textColor="#854d0e"
+              />
+            )}
+
             {showKycCheckButton && (
               <TouchableOpacity
                 onPress={handleCheckKyc}
@@ -1099,7 +1168,7 @@ export default function PublicProfileScreen() {
           />
         </View>
 
-        {/* 🟢 3. Tab Navigation (Thêm tab Thành tích) */}
+        {/* Tab Navigation */}
         <View style={styles.tabContainer}>
           <View style={[styles.tabWrapper, { backgroundColor: colors.card }]}>
             {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình", "Thành tích"].map(
@@ -1234,6 +1303,61 @@ export default function PublicProfileScreen() {
                   />
                 </View>
               </View>
+
+              {/* 🟢 NEW: Section Sport Connect Info */}
+              {sc && (
+                <View
+                  style={[styles.section, { backgroundColor: colors.card }]}
+                >
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                    Thông tin Sport Connect
+                  </Text>
+                  <View style={styles.infoGrid}>
+                    {sc.single != null && (
+                      <InfoItem
+                        label="Điểm đơn (SC)"
+                        value={num(sc.single)}
+                        colors={colors}
+                      />
+                    )}
+                    {sc.double != null && (
+                      <InfoItem
+                        label="Điểm đôi (SC)"
+                        value={num(sc.double)}
+                        colors={colors}
+                      />
+                    )}
+                    <InfoItem
+                      label="Mô tả"
+                      value={sc.meta.description}
+                      colors={colors}
+                    />
+                    <InfoItem
+                      label="Cập nhật"
+                      value={fmtDT(sc.meta.scoredAt)}
+                      colors={colors}
+                    />
+                    <InfoItem
+                      label="Tham gia"
+                      value={fmtDT(sc.meta.joinDate)}
+                      colors={colors}
+                    />
+                    <InfoItem
+                      label="Nguồn"
+                      value={sc.meta.source}
+                      colors={colors}
+                    />
+                    {sc.meta.sportId && (
+                      <InfoItem
+                        label="SportID"
+                        value={String(sc.meta.sportId)}
+                        colors={colors}
+                      />
+                    )}
+                  </View>
+                </View>
+              )}
+
               {canSeeSensitive && hasContactBlock && (
                 <View
                   style={[styles.section, { backgroundColor: colors.card }]}
@@ -1462,7 +1586,7 @@ export default function PublicProfileScreen() {
             </View>
           )}
 
-          {/* 🟢 4. Tab 3: Achievements Tab */}
+          {/* Tab 3: Achievements Tab */}
           {activeTab === 3 && (
             <AchievementsTab
               data={achQ.data}
@@ -1510,7 +1634,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // ... (Giữ nguyên các styles cũ)
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { fontSize: 16, color: "#666", marginTop: 12 },
   errorContainer: {
@@ -1575,7 +1698,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     zIndex: 5,
   },
-  userName: { fontSize: 24, fontWeight: "800", color: "#FFF", marginBottom: 8 },
+  userName: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFF",
+    marginBottom: 8,
+  },
   nicknameContainer: {
     backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 16,
@@ -1773,12 +1901,34 @@ const styles = StyleSheet.create({
   },
   playerInfoCompact: { flex: 1, minWidth: 0 },
   playerNameCompact: { fontSize: 13, fontWeight: "500" },
+
+  // 🟢 NEW Styles cho PlayerRowCompact
+  playerStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+    flexWrap: "wrap",
+  },
   scoreChangeCompact: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 2,
   },
+  scChipsRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  scChip: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  scChipTxt: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
   scoreChangeTextCompact: { fontSize: 11 },
   deltaTextCompact: { fontSize: 10, fontWeight: "700" },
   ratingTab: { gap: 12 },
@@ -1862,7 +2012,6 @@ const styles = StyleSheet.create({
   pageButtonDisabled: { opacity: 0.3 },
   pageText: { fontSize: 14, fontWeight: "600" },
 
-  // 🟢 5. Style mới cho Achievements Tab
   achTabContainer: {
     gap: 16,
   },

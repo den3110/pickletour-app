@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   Alert,
   ActivityIndicator,
   Modal,
@@ -14,7 +13,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
-
+import { Image } from "expo-image";
 import {
   useGetFacebookLoginUrlMutation,
   useGetFacebookPagesQuery,
@@ -23,6 +22,7 @@ import {
 } from "@/slices/facebookApiSlice";
 import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const FacebookLiveSettingsScreen = () => {
   const theme = useTheme();
@@ -136,14 +136,19 @@ const FacebookLiveSettingsScreen = () => {
   const renderPage = ({ item }) => {
     const isDefault = Boolean(item.isDefault);
 
+    // ✅ Bọc URL vào normalizeUrl
+    const avatarUri = normalizeUrl(
+      item.pagePicture || "https://via.placeholder.com/50"
+    );
+
     return (
       <>
         <View style={styles.pageItem}>
           <Image
-            source={{
-              uri: item.pagePicture || "https://via.placeholder.com/50",
-            }}
+            source={{ uri: avatarUri }}
             style={styles.pageAvatar}
+            contentFit="cover" // ✅ expo-image prop
+            transition={100} // ✅ fade nhẹ cho mượt
           />
 
           <View style={styles.pageInfo}>
@@ -188,7 +193,6 @@ const FacebookLiveSettingsScreen = () => {
       </>
     );
   };
-
   const renderEmptyList = () => {
     if (isLoading) {
       return (
