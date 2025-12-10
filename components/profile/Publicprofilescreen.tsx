@@ -34,6 +34,7 @@ import {
   useGetRatingHistoryQuery,
   useGetMatchHistoryQuery,
   useDeleteRatingHistoryMutation,
+  useGetUserAchievementsQuery, // <--- 1. Import thêm cái này
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -66,6 +67,7 @@ const num = (v, digits = 3) =>
 const numFloat = (v, digits = 3) =>
   Number.isFinite(+v) ? Number(v).toFixed(digits) : "—";
 
+// ... (Giữ nguyên các hàm helper cũ: getGenderInfo, getKycStatusMeta, calcAge, getHandLabel, hasData)
 const getGenderInfo = (g) => {
   if (g === null || g === undefined) return { label: "Khác", color: "#9E9E9E" };
   const s = String(g).toLowerCase().trim();
@@ -76,7 +78,6 @@ const getGenderInfo = (g) => {
   return { label: "Khác", color: "#9E9E9E" };
 };
 
-// 🟢 Helper lấy thông tin trạng thái KYC
 const getKycStatusMeta = (status) => {
   switch (status) {
     case "verified":
@@ -84,11 +85,11 @@ const getKycStatusMeta = (status) => {
         label: "Đã xác thực",
         color: "#4CAF50",
         icon: "checkmark-circle",
-      }; // Xanh lá
+      };
     case "pending":
-      return { label: "Chờ duyệt", color: "#FF9800", icon: "time" }; // Cam
+      return { label: "Chờ duyệt", color: "#FF9800", icon: "time" };
     case "rejected":
-      return { label: "Bị từ chối", color: "#F44336", icon: "alert-circle" }; // Đỏ
+      return { label: "Bị từ chối", color: "#F44336", icon: "alert-circle" };
     default:
       return null;
   }
@@ -125,6 +126,7 @@ const hasData = (v) => {
 };
 
 /* ---------- SUB-COMPONENTS ---------- */
+// ... (Giữ nguyên StatCard, InfoBadge, MatchCard, PlayerRowCompact, RatingHistoryRow, InfoItem, SkeletonItem, ProfileSkeleton)
 
 const StatCard = ({ icon, value, label, gradient }) => (
   <LinearGradient
@@ -156,7 +158,11 @@ const InfoBadge = ({ icon, text, color = "#666", bgColor }) => (
   </View>
 );
 
+// ... (Các component MatchCard, PlayerRowCompact, RatingHistoryRow, InfoItem giữ nguyên như cũ)
+// Để tiết kiệm không gian, mình ẩn nội dung MatchCard, RatingHistoryRow... trong block này
+// nhưng bạn hãy giữ nguyên code của chúng như file bạn gửi nhé.
 const MatchCard = ({ match, userId, onPress, colors }) => {
+  // Logic cũ
   const winnerA = match.winner === "A";
   const winnerB = match.winner === "B";
   const myInA = match.team1?.some((p) => (p._id || p.id) === userId);
@@ -190,7 +196,6 @@ const MatchCard = ({ match, userId, onPress, colors }) => {
             </Text>
           </View>
         </View>
-
         <View style={styles.teamsVerticalContainer}>
           <View
             style={[styles.teamSection, { backgroundColor: colors.bgMuted }]}
@@ -226,7 +231,6 @@ const MatchCard = ({ match, userId, onPress, colors }) => {
             </View>
           </View>
         </View>
-
         {match.video && (
           <TouchableOpacity
             style={[
@@ -244,6 +248,7 @@ const MatchCard = ({ match, userId, onPress, colors }) => {
 };
 
 const PlayerRowCompact = ({ player, highlight, colors }) => {
+  // Logic cũ
   const up = (player?.delta ?? 0) > 0;
   const name =
     player?.user?.nickname ||
@@ -251,7 +256,6 @@ const PlayerRowCompact = ({ player, highlight, colors }) => {
     player?.nickname ||
     player?.fullName ||
     "N/A";
-
   return (
     <View style={styles.playerRowCompact}>
       <Image
@@ -305,9 +309,9 @@ const RatingHistoryRow = ({
   onDelete,
   colors,
 }) => {
+  // Logic cũ
   const singleDelta = prevItem ? item.single - prevItem.single : 0;
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
-
   return (
     <View
       style={[
@@ -330,7 +334,6 @@ const RatingHistoryRow = ({
           )}
         </TouchableOpacity>
       )}
-
       <View style={styles.ratingLeft}>
         <Text style={[styles.ratingDate, { color: colors.text }]}>
           {fmtDate(item.scoredAt)}
@@ -389,9 +392,9 @@ const RatingHistoryRow = ({
 };
 
 const InfoItem = ({ label, value, copyable, onCopy, colors }) => {
+  // Logic cũ
   const display =
     value === null || value === undefined || value === "" ? "—" : value;
-
   return (
     <View style={styles.infoItem}>
       <Text style={[styles.infoLabel, { color: colors.subText }]}>{label}</Text>
@@ -415,7 +418,7 @@ const InfoItem = ({ label, value, copyable, onCopy, colors }) => {
   );
 };
 
-/* ---------- SKELETON COMPONENTS ---------- */
+// ... (Giữ nguyên SkeletonItem, ProfileSkeleton)
 const SkeletonItem = ({
   width,
   height,
@@ -424,7 +427,6 @@ const SkeletonItem = ({
   baseColor,
 }) => {
   const animatedValue = React.useRef(new Animated.Value(0.3)).current;
-
   React.useEffect(() => {
     const animation = Animated.loop(
       Animated.sequence([
@@ -443,7 +445,6 @@ const SkeletonItem = ({
     animation.start();
     return () => animation.stop();
   }, [animatedValue]);
-
   return (
     <Animated.View
       style={[
@@ -461,10 +462,10 @@ const SkeletonItem = ({
 };
 
 const ProfileSkeleton = ({ isDark }) => {
+  // ... logic cũ
   const skelColor = isDark ? "#333" : "#E1E9EE";
   const bgColor = isDark ? "#121212" : "#F5F7FA";
   const cardColor = isDark ? "#1E1E1E" : "#FFF";
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: bgColor }]}
@@ -545,12 +546,175 @@ const ProfileSkeleton = ({ isDark }) => {
   );
 };
 
+/* ---------- 🟢 NEW ACHIEVEMENTS COMPONENTS ---------- */
+// Helper hiển thị badge top
+const getTopStyle = (k) => {
+  if (!Number.isFinite(k) || k > 8) {
+    return { bg: "#F3F4F6", fg: "#374151" };
+  }
+  if (k === 1) return { bg: "#DCFCE7", fg: "#166534" };
+  if (k === 2) return { bg: "#FEF9C3", fg: "#854D0E" };
+  if (k <= 4) return { bg: "#E0E7FF", fg: "#3730A3" };
+  return { bg: "#E0F2FE", fg: "#075985" };
+};
+
+const fmtRate = (v) => (Number.isFinite(v) ? `${v.toFixed(1)}%` : "—");
+
+const KpiCard = ({ title, value, sub, colors }) => (
+  <View
+    style={[
+      styles.kpiCard,
+      { backgroundColor: colors.card, borderColor: colors.border },
+    ]}
+  >
+    <Text style={[styles.kpiTitle, { color: colors.text }]} numberOfLines={1}>
+      {title}
+    </Text>
+    <Text style={[styles.kpiValue, { color: colors.primary }]}>{value}</Text>
+    {sub ? (
+      <Text
+        style={[styles.kpiSub, { color: colors.subText }]}
+        numberOfLines={1}
+      >
+        {sub}
+      </Text>
+    ) : null}
+  </View>
+);
+
+const AchievementRow = ({ data, colors }) => {
+  const { bg, fg } = getTopStyle(data?.topK);
+  return (
+    <View
+      style={[
+        styles.achRowCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.achRowTitle, { color: colors.text }]}>
+        {data.tournamentName}
+      </Text>
+
+      <View style={styles.achRowLine}>
+        <Text style={[styles.achRowLabel, { color: colors.subText }]}>
+          Bracket
+        </Text>
+        <Text style={{ color: colors.text, fontWeight: "700" }}>
+          {data.bracketName}
+        </Text>
+      </View>
+
+      <View style={styles.achRowLine}>
+        <Text style={[styles.achRowLabel, { color: colors.subText }]}>Top</Text>
+        <View style={[styles.achChip, { backgroundColor: bg }]}>
+          <Text style={[styles.achChipText, { color: fg }]}>
+            {data.positionLabel || (data.topK ? `Top ${data.topK}` : "—")}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.achRowLine}>
+        <Text style={[styles.achRowLabel, { color: colors.subText }]}>
+          W/L/WR
+        </Text>
+        <Text style={{ color: colors.text }}>
+          {data.stats?.wins ?? 0}/{data.stats?.losses ?? 0} •{" "}
+          {Number.isFinite(data.stats?.winRate)
+            ? `${data.stats.winRate.toFixed(1)}%`
+            : "—"}
+        </Text>
+      </View>
+
+      <View style={styles.achRowLine}>
+        <Text style={[styles.achRowLabel, { color: colors.subText }]}>
+          Cuối cùng
+        </Text>
+        <Text style={{ color: colors.text }}>
+          {data.lastMatchAt ? fmtDate(data.lastMatchAt) : "—"}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+const AchievementsTab = ({ data, loading, error, colors }) => {
+  if (loading)
+    return (
+      <View style={styles.centerBox}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  if (error)
+    return (
+      <View style={styles.centerBox}>
+        <Text style={{ color: colors.subText }}>
+          Không thể tải dữ liệu thành tích
+        </Text>
+      </View>
+    );
+
+  const sum = data?.summary || {};
+  const perT = Array.isArray(data?.perTournament) ? data.perTournament : [];
+
+  return (
+    <View style={styles.achTabContainer}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Thống kê tổng quan
+      </Text>
+      <View style={styles.kpiGrid}>
+        <KpiCard
+          title="Trận đấu"
+          value={sum.totalPlayed ?? 0}
+          sub={`${sum.wins ?? 0} Thắng - ${sum.losses ?? 0} Thua`}
+          colors={colors}
+        />
+        <KpiCard
+          title="Tỉ lệ thắng"
+          value={fmtRate(sum.winRate)}
+          sub={`Chuỗi thắng dài nhất: ${sum.longestWinStreak ?? 0}`}
+          colors={colors}
+        />
+        <KpiCard
+          title="Danh hiệu"
+          value={sum.titles ?? 0}
+          sub={`Thành tích tốt nhất: ${sum.careerBestLabel ?? "—"}`}
+          colors={colors}
+        />
+        <KpiCard
+          title="Streak hiện tại"
+          value={sum.currentStreak ?? 0}
+          sub="Trận thắng/thua liên tiếp"
+          colors={colors}
+        />
+      </View>
+
+      <View style={{ height: 16 }} />
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+        Thành tích theo giải
+      </Text>
+      {!perT.length ? (
+        <Text
+          style={{ color: colors.subText, textAlign: "center", marginTop: 12 }}
+        >
+          Chưa có dữ liệu giải đấu
+        </Text>
+      ) : (
+        <View style={{ gap: 12 }}>
+          {perT.map((item, idx) => (
+            <AchievementRow key={idx} data={item} colors={colors} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
 /* ---------- MAIN COMPONENT ---------- */
 export default function PublicProfileScreen() {
   const theme = useTheme();
   const isDark = theme.dark;
 
-  // 🟢 Theme Colors
+  // Theme Colors
   const colors = {
     isDark,
     primary: theme.colors.primary || "#6366F1",
@@ -577,6 +741,8 @@ export default function PublicProfileScreen() {
   const baseQ = useGetPublicProfileQuery(id);
   const rateQ = useGetRatingHistoryQuery(id);
   const matchQ = useGetMatchHistoryQuery(id);
+  // 🟢 2. Gọi Query thành tích
+  const achQ = useGetUserAchievementsQuery(id);
 
   const [deleteHistory, { isLoading: deleting }] =
     useDeleteRatingHistoryMutation();
@@ -590,7 +756,7 @@ export default function PublicProfileScreen() {
     ? matchQ.data
     : matchQ.data?.items || [];
 
-  // Auth viewer
+  // ... (Logic Auth viewer, KYC, Latest ratings, Derived stats, Handlers giữ nguyên)
   const { userInfo } = useSelector((state) => state.auth || {});
   const baseId = base?._id || "";
   const viewerId = userInfo?._id || userInfo?.id;
@@ -600,14 +766,11 @@ export default function PublicProfileScreen() {
     userInfo?.role === "admin" ||
     (Array.isArray(userInfo?.roles) && userInfo.roles.includes("admin"));
   const canSeeSensitive = isSelf || isAdminViewer;
-
-  // 🟢 2. Tính toán trạng thái KYC & Logic hiển thị nút
   const kycStatusMeta = getKycStatusMeta(base?.cccdStatus);
   const showKycCheckButton =
     isAdminViewer &&
     ["pending", "verified", "rejected"].includes(base?.cccdStatus);
 
-  // Latest ratings (Logic giữ nguyên)
   const latestSingle = useMemo(() => {
     if (ratingRaw.length) {
       const v = Number(ratingRaw[0]?.single);
@@ -629,7 +792,6 @@ export default function PublicProfileScreen() {
     return Number.isFinite(v2) ? v2 : NaN;
   }, [ratingRaw, base]);
 
-  // Derived stats
   const uid = base?._id || id;
   const { totalMatches, wins, winRate } = useMemo(() => {
     let total = 0;
@@ -645,7 +807,6 @@ export default function PublicProfileScreen() {
     return { totalMatches: total, wins: w, winRate: rate };
   }, [matchRaw, uid]);
 
-  // Pagination
   const [pageMatch, setPageMatch] = useState(1);
   const matchPerPage = 5;
   const matchPaged = matchRaw.slice(
@@ -660,7 +821,6 @@ export default function PublicProfileScreen() {
     pageRate * ratePerPage
   );
 
-  // Handlers
   const handleShare = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -685,20 +845,18 @@ export default function PublicProfileScreen() {
 
   const handleCheckKyc = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Điều hướng tới màn soi KYC
     router.push(`/user/${uid}/kyc`);
   };
 
   const handleDeleteHistory = (h) => {
+    // ... logic xóa (giữ nguyên)
     if (!isAdminViewer) return;
     const historyId = h?._id ?? h?.id;
     const targetUid = h?.user?._id || id;
-
     if (!historyId || !targetUid) {
       Alert.alert("Lỗi", "Thiếu ID, không thể xoá.");
       return;
     }
-
     Alert.alert(
       "Xoá chấm trình?",
       "Bạn có chắc chắn muốn xoá mục lịch sử điểm trình này? Hành động không thể hoàn tác.",
@@ -775,7 +933,6 @@ export default function PublicProfileScreen() {
     hasData(base?.phone) ||
     hasData(base?.email) ||
     hasData(base?.address || base?.street);
-
   const avatarUrl = normalizeUrl(base?.avatar) || AVA_PLACE;
 
   return (
@@ -841,7 +998,6 @@ export default function PublicProfileScreen() {
             </Text>
           </View>
 
-          {/* 🟢 5. CONTAINER NÀY ĐÃ CẬP NHẬT WRAP & CENTER */}
           <View style={styles.quickInfoContainer}>
             {hasData(base?.province) && (
               <InfoBadge
@@ -864,7 +1020,6 @@ export default function PublicProfileScreen() {
               color="#FFF"
             />
 
-            {/* 🟢 3. Chip trạng thái KYC */}
             {kycStatusMeta && (
               <InfoBadge
                 icon={
@@ -875,7 +1030,6 @@ export default function PublicProfileScreen() {
               />
             )}
 
-            {/* 🟢 4. Nút Xem KYC (Chỉ hiện khi cần thiết) */}
             {showKycCheckButton && (
               <TouchableOpacity
                 onPress={handleCheckKyc}
@@ -945,31 +1099,33 @@ export default function PublicProfileScreen() {
           />
         </View>
 
-        {/* Tab Navigation */}
+        {/* 🟢 3. Tab Navigation (Thêm tab Thành tích) */}
         <View style={styles.tabContainer}>
           <View style={[styles.tabWrapper, { backgroundColor: colors.card }]}>
-            {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình"].map((tab, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.tab, activeTab === index && styles.tabActive]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setActiveTab(index);
-                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                }}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: colors.tabInactive },
-                    activeTab === index && styles.tabTextActive,
-                  ]}
-                  numberOfLines={1}
+            {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình", "Thành tích"].map(
+              (tab, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.tab, activeTab === index && styles.tabActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setActiveTab(index);
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                  }}
                 >
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: colors.tabInactive },
+                      activeTab === index && styles.tabTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {tab}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
           </View>
         </View>
 
@@ -1305,10 +1461,19 @@ export default function PublicProfileScreen() {
               )}
             </View>
           )}
+
+          {/* 🟢 4. Tab 3: Achievements Tab */}
+          {activeTab === 3 && (
+            <AchievementsTab
+              data={achQ.data}
+              loading={achQ.isLoading}
+              error={achQ.error}
+              colors={colors}
+            />
+          )}
         </View>
       </Animated.ScrollView>
 
-      {/* 🟢 6. Image Viewer với Theme Support */}
       <ImageViewing
         images={[{ uri: avatarUrl }]}
         imageIndex={0}
@@ -1316,7 +1481,6 @@ export default function PublicProfileScreen() {
         onRequestClose={() => setIsImageViewVisible(false)}
         swipeToCloseEnabled
         doubleTapToZoomEnabled
-        // 🟢 Nền đen cho Dark Mode, Trắng cho Light Mode (hoặc đen luôn nếu muốn)
         backgroundColor={isDark ? "#000000" : "#FFFFFF"}
         FooterComponent={() => (
           <View style={{ padding: 20, alignItems: "center", marginBottom: 20 }}>
@@ -1341,34 +1505,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
+  centerBox: {
+    padding: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    fontSize: 16,
-    color: "#666",
-    marginTop: 12,
-  },
+  // ... (Giữ nguyên các styles cũ)
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { fontSize: 16, color: "#666", marginTop: 12 },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
-  errorText: {
-    fontSize: 16,
-    textAlign: "center",
-    marginTop: 16,
-  },
-  header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
+  errorText: { fontSize: 16, textAlign: "center", marginTop: 16 },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 },
   headerGradient: {
     height: HEADER_HEIGHT,
     paddingTop: 60,
@@ -1394,10 +1546,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
-  avatarContainer: {
-    position: "relative",
-    marginBottom: 12,
-  },
+  avatarContainer: { position: "relative", marginBottom: 12 },
   avatarWrapper: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -1406,10 +1555,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
-  avatar: {
-    width: "100%",
-    height: "100%",
-  },
+  avatar: { width: "100%", height: "100%" },
   avatarLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1429,12 +1575,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     zIndex: 5,
   },
-  userName: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#FFF",
-    marginBottom: 8,
-  },
+  userName: { fontSize: 24, fontWeight: "800", color: "#FFF", marginBottom: 8 },
   nicknameContainer: {
     backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 16,
@@ -1442,15 +1583,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
   },
-  userNickname: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#FFF",
-  },
+  userNickname: { fontSize: 15, fontWeight: "600", color: "#FFF" },
   quickInfoContainer: {
     flexDirection: "row",
-    flexWrap: "wrap", // 🟢 Cho phép xuống dòng
-    justifyContent: "center", // 🟢 Căn giữa
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: 8,
     alignItems: "center",
     maxWidth: "90%",
@@ -1464,10 +1601,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  badgeText: { fontSize: 12, fontWeight: "600" },
   adminKycButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1481,11 +1615,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  adminKycText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#FFF",
-  },
+  adminKycText: { fontSize: 12, fontWeight: "700", color: "#FFF" },
   shareButton: {
     position: "absolute",
     top: 60,
@@ -1508,22 +1638,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: HEADER_HEIGHT + 20,
-    paddingBottom: 40,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingTop: HEADER_HEIGHT + 20, paddingBottom: 40 },
   statsContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
     gap: 12,
     marginBottom: 24,
   },
-  statsContainerSmall: {
-    flexDirection: "column",
-  },
+  statsContainerSmall: { flexDirection: "column" },
   statCard: {
     flex: 1,
     padding: 16,
@@ -1537,13 +1660,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  statCardSmall: {
-    width: "100%",
-    alignSelf: "stretch",
-  },
-  statIconContainer: {
-    marginBottom: 8,
-  },
+  statCardSmall: { width: "100%", alignSelf: "stretch" },
+  statIconContainer: { marginBottom: 8 },
   statValue: {
     fontSize: 20,
     fontWeight: "800",
@@ -1556,10 +1674,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
   },
-  tabContainer: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
-  },
+  tabContainer: { marginBottom: 20, paddingHorizontal: 16 },
   tabWrapper: {
     flexDirection: "row",
     borderRadius: 12,
@@ -1577,22 +1692,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabActive: {
-    backgroundColor: "#6366F1",
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  tabTextActive: {
-    color: "#FFF",
-  },
-  tabContent: {
-    paddingHorizontal: 16,
-  },
-  profileTab: {
-    gap: 20,
-  },
+  tabActive: { backgroundColor: "#6366F1" },
+  tabText: { fontSize: 13, fontWeight: "600" },
+  tabTextActive: { color: "#FFF" },
+  tabContent: { paddingHorizontal: 16 },
+  profileTab: { gap: 20 },
   section: {
     borderRadius: 16,
     padding: 20,
@@ -1602,47 +1706,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  bioText: {
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  infoGrid: {
-    gap: 16,
-  },
-  infoItem: {
-    gap: 4,
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
+  sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 16 },
+  bioText: { fontSize: 14, lineHeight: 22 },
+  infoGrid: { gap: 16 },
+  infoItem: { gap: 4 },
+  infoLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
   infoValueContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: "500",
-    flex: 1,
-  },
-  copyButton: {
-    padding: 4,
-  },
-  matchTab: {
-    gap: 16,
-  },
-  matchCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 12,
-  },
+  infoValue: { fontSize: 15, fontWeight: "500", flex: 1 },
+  copyButton: { padding: 4 },
+  matchTab: { gap: 16 },
+  matchCard: { borderRadius: 16, overflow: "hidden", marginBottom: 12 },
   matchCardContainer: {
     padding: 16,
     shadowColor: "#000",
@@ -1669,37 +1746,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 12,
   },
-  matchHeaderRight: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
-  matchDate: {
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  tournamentName: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  teamsVerticalContainer: {
-    gap: 12,
-  },
-  teamSection: {
-    borderRadius: 12,
-    padding: 12,
-  },
-  teamPlayers: {
-    gap: 8,
-  },
-  scoreDisplayContainer: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  scoreDisplayText: {
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
+  matchHeaderRight: { flex: 1, alignItems: "flex-end" },
+  matchDate: { fontSize: 11, marginBottom: 2 },
+  tournamentName: { fontSize: 13, fontWeight: "600" },
+  teamsVerticalContainer: { gap: 12 },
+  teamSection: { borderRadius: 12, padding: 12 },
+  teamPlayers: { gap: 8 },
+  scoreDisplayContainer: { alignItems: "center", paddingVertical: 8 },
+  scoreDisplayText: { fontSize: 20, fontWeight: "900", letterSpacing: 2 },
   videoButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1709,46 +1763,25 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderTopWidth: 1,
   },
-  videoText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#FF3B30",
-  },
-  playerRowCompact: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+  videoText: { fontSize: 12, fontWeight: "600", color: "#FF3B30" },
+  playerRowCompact: { flexDirection: "row", alignItems: "center", gap: 10 },
   playerAvatarCompact: {
     width: 32,
     height: 32,
     borderRadius: 16,
     borderWidth: 2,
   },
-  playerInfoCompact: {
-    flex: 1,
-    minWidth: 0,
-  },
-  playerNameCompact: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  playerInfoCompact: { flex: 1, minWidth: 0 },
+  playerNameCompact: { fontSize: 13, fontWeight: "500" },
   scoreChangeCompact: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginTop: 2,
   },
-  scoreChangeTextCompact: {
-    fontSize: 11,
-  },
-  deltaTextCompact: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  ratingTab: {
-    gap: 12,
-  },
+  scoreChangeTextCompact: { fontSize: 11 },
+  deltaTextCompact: { fontSize: 10, fontWeight: "700" },
+  ratingTab: { gap: 12 },
   ratingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1762,10 +1795,7 @@ const styles = StyleSheet.create({
     elevation: 1,
     position: "relative",
   },
-  ratingRowSmall: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-  },
+  ratingRowSmall: { flexDirection: "column", alignItems: "flex-start" },
   deleteItemButton: {
     position: "absolute",
     top: 10,
@@ -1775,23 +1805,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "rgba(255,59,48,0.1)",
   },
-  ratingLeft: {
-    flex: 1,
-    paddingRight: 32,
-  },
-  ratingDate: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  ratingScorer: {
-    fontSize: 12,
-  },
-  ratingScores: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
+  ratingLeft: { flex: 1, paddingRight: 32 },
+  ratingDate: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  ratingScorer: { fontSize: 12 },
+  ratingScores: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   ratingScoresSmall: {
     marginTop: 8,
     alignSelf: "stretch",
@@ -1816,19 +1833,13 @@ const styles = StyleSheet.create({
     color: "#9C27B0",
     marginBottom: 2,
   },
-  ratingDelta: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
+  ratingDelta: { fontSize: 10, fontWeight: "700" },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
   },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 16,
-  },
+  emptyText: { fontSize: 16, marginTop: 16 },
   pagination: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1848,11 +1859,63 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  pageButtonDisabled: {
-    opacity: 0.3,
+  pageButtonDisabled: { opacity: 0.3 },
+  pageText: { fontSize: 14, fontWeight: "600" },
+
+  // 🟢 5. Style mới cho Achievements Tab
+  achTabContainer: {
+    gap: 16,
   },
-  pageText: {
-    fontSize: 14,
-    fontWeight: "600",
+  kpiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  kpiCard: {
+    width: "48%",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 4,
+  },
+  kpiTitle: {
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  kpiValue: {
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  kpiSub: {
+    fontSize: 11,
+  },
+  achRowCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  achRowTitle: {
+    fontWeight: "700",
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  achRowLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  achRowLabel: {
+    width: 80,
+    fontSize: 12,
+  },
+  achChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  achChipText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

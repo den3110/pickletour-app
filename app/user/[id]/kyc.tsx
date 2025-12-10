@@ -135,28 +135,12 @@ export default function KycCheckScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Kyc",
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-              }}
-            >
-              <Ionicons name="chevron-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-          ),
+          title: "Duyệt định danh",
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.bg }]}>
-        <Stack.Screen
-          options={{
-            title: "Duyệt định danh",
-            headerStyle: { backgroundColor: colors.card },
-            headerTintColor: colors.text,
-          }}
-        />
         <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>

@@ -28,6 +28,7 @@ import {
   Dimensions,
   useWindowDimensions,
   SafeAreaView,
+  Animated, // <--- Đã thêm Animated
 } from "react-native";
 import RenderHTML from "react-native-render-html";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,6 +63,7 @@ import {
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
 /* =============== THEME & UTILS =============== */
+// ... (Giữ nguyên phần Theme & Utils cũ)
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
   return useMemo(() => {
@@ -88,6 +90,7 @@ function useThemeColors() {
       softBtn: isDark ? "#334155" : "#e2e8f0",
       gradStart: isDark ? "#1e3a8a" : "#1d4ed8",
       gradEnd: isDark ? "#172554" : "#1e40af",
+      skeleton: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", // Màu cho skeleton
       shadow: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -99,6 +102,7 @@ function useThemeColors() {
   }, [scheme]);
 }
 
+// ... (Giữ nguyên các hàm utils: normType, displayName, v.v...)
 const normType = (t?: string) => {
   const s = String(t || "").toLowerCase();
   if (s === "single" || s === "singles") return "single";
@@ -195,7 +199,142 @@ function useKeyboardHeight() {
   return h;
 }
 
+/* ================== SKELETON COMPONENTS ================== */
+const SkeletonItem = ({
+  width,
+  height,
+  style,
+  borderRadius = 4,
+}: {
+  width?: number | string;
+  height?: number;
+  style?: any;
+  borderRadius?: number;
+}) => {
+  const C = useThemeColors();
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          opacity,
+          backgroundColor: C.skeleton,
+          borderRadius,
+          width,
+          height,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+const TournamentSkeleton = () => {
+  const C = useThemeColors();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+      {/* Header Skeleton */}
+      <View style={{ height: 200 + insets.top, backgroundColor: C.gradStart }}>
+        <View style={{ marginTop: insets.top + 20, paddingHorizontal: 16 }}>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <SkeletonItem
+              width={100}
+              height={24}
+              borderRadius={20}
+              style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+            />
+          </View>
+          <SkeletonItem
+            width="80%"
+            height={30}
+            style={{ marginTop: 16, backgroundColor: "rgba(255,255,255,0.2)" }}
+          />
+          <SkeletonItem
+            width="50%"
+            height={20}
+            style={{ marginTop: 10, backgroundColor: "rgba(255,255,255,0.2)" }}
+          />
+        </View>
+      </View>
+
+      {/* Stats Skeleton Overlap */}
+      <View style={{ marginTop: -40, paddingHorizontal: 16 }}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <SkeletonItem style={{ flex: 1 }} height={70} borderRadius={16} />
+          <SkeletonItem style={{ flex: 1 }} height={70} borderRadius={16} />
+        </View>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+          <SkeletonItem style={{ flex: 1 }} height={70} borderRadius={16} />
+          <SkeletonItem style={{ flex: 1 }} height={70} borderRadius={16} />
+        </View>
+      </View>
+
+      {/* List Items Skeleton */}
+      <View style={{ padding: 16, gap: 16 }}>
+        {[1, 2, 3].map((i) => (
+          <View
+            key={i}
+            style={{
+              height: 120,
+              backgroundColor: C.cardBg,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: C.border,
+              padding: 12,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <SkeletonItem width={60} height={20} />
+              <SkeletonItem width={80} height={20} />
+            </View>
+            <View
+              style={{ flexDirection: "row", gap: 12, alignItems: "center" }}
+            >
+              <SkeletonItem width={40} height={40} borderRadius={20} />
+              <View style={{ gap: 6 }}>
+                <SkeletonItem width={150} height={16} />
+                <SkeletonItem width={100} height={12} />
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 /* -------- OPTIMIZED COUNTDOWN COMPONENT -------- */
+// ... (Giữ nguyên component TournamentCountdown)
 const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
   const [timeLeft, setTimeLeft] = useState("");
   const C = useThemeColors();
@@ -252,7 +391,7 @@ const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
   );
 });
 
-/* -------- HTML PREVIEW -------- */
+// ... (Giữ nguyên HtmlPreviewBlock, HtmlCols, StatCard, RegItem)
 const HTML_PREVIEW_MAX_HEIGHT = 260;
 const HtmlPreviewBlock = memo(
   ({
@@ -485,7 +624,6 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
   );
 });
 
-/* -------- STAT CARD -------- */
 const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
   const C = useThemeColors();
   let bgIcon = C.infoBg;
@@ -1016,6 +1154,7 @@ export default function TournamentRegistrationScreen() {
   );
 
   // Dialog Handlers
+  // ... (Giữ nguyên các hàm dialog handlers: openPreview, openReplace, v.v...)
   const openPreview = useCallback(
     (src?: string, name?: string) =>
       setImgPreview({
@@ -1114,6 +1253,7 @@ export default function TournamentRegistrationScreen() {
   );
 
   // -- HEADER COMPONENT (Memoized) --
+  // -- HEADER COMPONENT (Memoized) --
   const HeaderComponent = useMemo(
     () => (
       <View>
@@ -1121,6 +1261,7 @@ export default function TournamentRegistrationScreen() {
           colors={[C.gradStart, C.gradEnd]}
           style={[styles.headerHero, { paddingTop: insets.top + 10 }]}
         >
+          {/* Header Top: Badge & Countdown */}
           <View style={styles.headerTopRow}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={styles.badgeGlass}>
@@ -1134,28 +1275,50 @@ export default function TournamentRegistrationScreen() {
             </View>
           </View>
 
+          {/* Tournament Name */}
           <Text style={styles.tourNameHero}>{tour?.name}</Text>
+
+          {/* Location & Date Row */}
           <View
             style={{
               flexDirection: "row",
-              alignItems: "center",
+              alignItems: "flex-start", // Căn lề trên để đẹp hơn khi text xuống dòng
               marginTop: 8,
               opacity: 0.9,
               gap: 12,
             }}
           >
+            {/* Địa chỉ: flex: 1 để tự xuống dòng nếu dài */}
             {tour?.location && (
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start", // Icon căn theo dòng đầu của text
+                  gap: 4,
+                  flex: 1,
+                }}
               >
-                <Ionicons name="location" size={14} color="#fff" />
+                <Ionicons
+                  name="location"
+                  size={14}
+                  color="#fff"
+                  style={{ marginTop: 2 }}
+                />
                 <Text
-                  style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+                  style={{
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: "600",
+                    lineHeight: 18, // Tăng khoảng cách dòng chút cho dễ đọc
+                  }}
+                  // Bỏ numberOfLines để text tự tràn xuống dòng
                 >
                   {tour.location}
                 </Text>
               </View>
             )}
+
+            {/* Ngày tháng: Giữ nguyên kích thước */}
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
@@ -1170,7 +1333,6 @@ export default function TournamentRegistrationScreen() {
         {/* Stats Overlap */}
         <View style={styles.statsContainer}>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            {/* Sửa: điểm 0 hiển thị "Không giới hạn" */}
             <View style={{ flex: 1 }}>
               <StatCard
                 icon={<Ionicons name="trophy" />}
@@ -1208,9 +1370,11 @@ export default function TournamentRegistrationScreen() {
           </View>
         </View>
 
+        {/* Action Section & List Header */}
         <View
           style={{ paddingHorizontal: 16, marginTop: 16, paddingBottom: 16 }}
         >
+          {/* Pending Invites */}
           {isLoggedIn && pendingInvitesHere.length > 0 && (
             <View
               style={[
@@ -1238,7 +1402,11 @@ export default function TournamentRegistrationScreen() {
                   }}
                 >
                   <Text
-                    style={{ fontWeight: "600", color: C.textPrimary, flex: 1 }}
+                    style={{
+                      fontWeight: "600",
+                      color: C.textPrimary,
+                      flex: 1,
+                    }}
                   >
                     {inv.tournament?.name}
                   </Text>
@@ -1284,12 +1452,19 @@ export default function TournamentRegistrationScreen() {
             </View>
           )}
 
+          {/* HTML Columns (Content/Contact) */}
           <HtmlCols tour={tour} />
 
+          {/* Registration Form */}
           <View
             style={[
               styles.formCard,
-              { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow, marginTop: 16 },
+              {
+                backgroundColor: C.cardBg,
+                borderColor: C.border,
+                ...C.shadow,
+                marginTop: 16,
+              },
             ]}
           >
             <View
@@ -1425,7 +1600,7 @@ export default function TournamentRegistrationScreen() {
             )}
           </View>
 
-          {/* Manager Buttons (Bỏ Checkin, dùng soft background) */}
+          {/* Manager Buttons */}
           <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
             {canManage && (
               <TouchableOpacity
@@ -1472,6 +1647,7 @@ export default function TournamentRegistrationScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* List Count & Search Button */}
           <View
             style={{
               flexDirection: "row",
@@ -1512,7 +1688,7 @@ export default function TournamentRegistrationScreen() {
                 </Text>
               </View>
             </View>
-            {/* Nút tìm kiếm chuyển sang phải */}
+
             <TouchableOpacity
               style={{
                 width: 36,
@@ -1554,7 +1730,7 @@ export default function TournamentRegistrationScreen() {
     ]
   );
 
-  // Search Screen as View overlay
+  // Search Screen as View overlay (Giữ nguyên)
   const renderSearchScreen = () => (
     <View
       style={[
@@ -1563,7 +1739,6 @@ export default function TournamentRegistrationScreen() {
       ]}
     >
       <SafeAreaView style={{ flex: 1 }}>
-        {/* {searchOpen && <Stack.Screen options={{ headerShown: false }} />} */}
         <View
           style={{
             flexDirection: "row",
@@ -1627,19 +1802,9 @@ export default function TournamentRegistrationScreen() {
     </View>
   );
 
-  if (tourLoading)
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: C.pageBg,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <ActivityIndicator size="large" color={C.tint} />
-      </View>
-    );
+  // === SỬA ĐỔI CHỖ NÀY: Thay Spinner bằng Skeleton Screen ===
+  if (tourLoading) return <TournamentSkeleton />;
+
   if (!tour)
     return (
       <View
@@ -1679,7 +1844,7 @@ export default function TournamentRegistrationScreen() {
           ref={listRef}
           data={filteredRegs}
           estimatedItemSize={180}
-          keyboardShouldPersistTaps="handled" // Cho phép bấm vào dropdown form ngay cả khi phím đang mở
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           renderItem={({ item, index }) => (
             <RegItem
@@ -1709,7 +1874,9 @@ export default function TournamentRegistrationScreen() {
         {/* Search Overlay */}
         {searchOpen && renderSearchScreen()}
 
-        {/* MODALS (Đặt ở đây để luôn đè lên trên Search View) */}
+        {/* MODALS (Giữ nguyên) */}
+        {/* ... (Các Modal Preview, Replace, Profile, Payment, Complaint giữ nguyên) ... */}
+        {/* Copy toàn bộ phần Modal phía dưới vào đây nếu cần, nhưng logic không thay đổi */}
         <Modal
           visible={imgPreview.open}
           transparent
@@ -1959,6 +2126,7 @@ export default function TournamentRegistrationScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ... (Giữ nguyên styles cũ)
   // Hero
   headerHero: { paddingHorizontal: 16, paddingBottom: 40 },
   headerTopRow: {

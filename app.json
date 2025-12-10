@@ -87,6 +87,7 @@
       //     "RNMapboxMapsVersion": "11.8.0" // Updated from 11.4.0
       //   }
       // ],
+      ["@rnmapbox/maps"],
       [
         "expo-calendar",
         {

@@ -50,7 +50,7 @@ if (__DEV__) {
   require("../dev/ws-logger");
 }
 
-console.log('Is Fabric Enabled:', global.nativeFabricUIManager ? 'YES' : 'NO');
+console.log("Is Fabric Enabled:", global.nativeFabricUIManager ? "YES" : "NO");
 
 const SPLASH_FONT_FAILSAFE_MS = 1500;
 const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
@@ -697,7 +697,7 @@ export default function RootLayout() {
                             ),
                           }}
                         />
-                        
+
                         <Stack.Screen
                           name="tournament/[id]/checkin"
                           options={{
@@ -715,6 +715,23 @@ export default function RootLayout() {
                               </TouchableOpacity>
                             ),
                           }}
+                        />
+                        <Stack.Screen
+                          options={{
+                            title: "Duyệt định danh",
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
+                          }}
+                          name="user/[id]/kyc"
                         />
                         <Stack.Screen
                           name="tournament/[id]/draw"
