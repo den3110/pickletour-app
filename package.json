@@ -23,7 +23,6 @@
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
     "@reduxjs/toolkit": "^2.8.2",
-    "@rnmapbox/maps": "10.1.30",
     "@shopify/flash-list": "2.0.2",
     "@shopify/react-native-skia": "2.2.12",
     "add": "^2.0.6",
