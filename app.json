@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour",
     "slug": "pickletour-app",
-    "version": "1.0.15",
+    "version": "1.0.17",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "pickletourapp",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "19",
+      "buildNumber": "20",
       "associatedDomains": [
         "applinks:pickletour.vn",
         "applinks:www.pickletour.vn"
