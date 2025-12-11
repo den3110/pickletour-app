@@ -1270,7 +1270,6 @@ export default function LiveLikeFBScreenKey({
     }
   );
 
-
   const updateOverlayNow = useMemo(
     () =>
       throttle(async (incomingData: any) => {
@@ -1468,6 +1467,31 @@ export default function LiveLikeFBScreenKey({
       }, 500), // 🔥 Throttle 500ms
     [mode, overlayConfig]
   );
+
+  // ✅ Khi overlayConfig load xong, re-push overlay 1 lần để lấy logo giải + sponsors
+  useEffect(() => {
+    // Chỉ làm khi đang live
+    if (mode !== "live") return;
+    if (!overlayConfig) return;
+
+    // Ưu tiên data đầy đủ nhất hiện có:
+    // 1) Cache từ socket / lần update gần nhất
+    // 2) Snapshot từ RTK
+    // 3) matchObj từ courtData (fallback cuối)
+    const baseData = latestValidDataRef.current || overlaySnapshot || matchObj;
+
+    if (!baseData) {
+      // Chưa có gì để vẽ overlay → đợi socket/snapshot sau
+      return;
+    }
+
+    log("overlayConfig → re-push overlay with tournament logo & sponsors", {
+      hasCache: !!latestValidDataRef.current,
+      hasSnapshot: !!overlaySnapshot,
+    });
+
+    updateOverlayNow(baseData);
+  }, [overlayConfig, mode, overlaySnapshot, matchObj, updateOverlayNow]);
 
   // Effect 1: Socket Listeners
   useEffect(() => {
@@ -2302,7 +2326,17 @@ export default function LiveLikeFBScreenKey({
 
         {/* ENDED */}
         {mode === "ended" && (
-          <View style={[styles.overlay, {top: safeTop, right: safeRight, left: safeLeft, bottom: safeBottom}]}>
+          <View
+            style={[
+              styles.overlay,
+              {
+                top: safeTop,
+                right: safeRight,
+                left: safeLeft,
+                bottom: safeBottom,
+              },
+            ]}
+          >
             <Text style={styles.endedTitle}>
               Đã kết thúc buổi phát trực tiếp
             </Text>
