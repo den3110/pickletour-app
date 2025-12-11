@@ -734,6 +734,23 @@ export default function RootLayout() {
                           name="user/[id]/kyc"
                         />
                         <Stack.Screen
+                          options={{
+                            title: "Chấm trình",
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
+                          }}
+                          name="user/[id]/grade"
+                        />
+                        <Stack.Screen
                           name="tournament/[id]/draw"
                           options={{
                             title: "Bốc thăm giải đấu",

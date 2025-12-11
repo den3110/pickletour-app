@@ -12,8 +12,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Animated,
@@ -47,9 +45,7 @@ type ClubCreateModalProps = {
   initial?: any;
 };
 
-// ====== Options ======
-const SPORT_OPTIONS = ["pickleball"];
-
+// ... (Giữ nguyên phần OPTIONS và Helpers ở trên, không thay đổi) ...
 const VISIBILITY_OPTIONS = ["public", "private", "hidden"] as const;
 const VISIBILITY_LABELS: Record<string, string> = {
   public: "Công khai",
@@ -57,51 +53,26 @@ const VISIBILITY_LABELS: Record<string, string> = {
   hidden: "Ẩn (không hiển thị)",
 };
 const VISIBILITY_HINTS: Record<string, string> = {
-  public:
-    "Ai cũng tìm thấy & xem trang CLB. Quyền tham gia phụ thuộc chính sách gia nhập.",
-  private:
-    "Người lạ không xem được chi tiết (chỉ thấy giới thiệu cơ bản). Thành viên xem đầy đủ.",
-  hidden:
-    "CLB không xuất hiện trong tìm kiếm/danh sách. Chỉ người được mời mới biết & tham gia.",
+  public: "Ai cũng tìm thấy & xem trang CLB.",
+  private: "Người lạ chỉ thấy thông tin cơ bản.",
+  hidden: "Không hiển thị khi tìm kiếm.",
 };
-
 const JOIN_POLICY_OPTIONS = ["open", "approval", "invite_only"] as const;
 const JOIN_POLICY_LABELS: Record<string, string> = {
-  open: "Tự do (không cần duyệt)",
+  open: "Tự do",
   approval: "Duyệt tham gia",
   invite_only: "Chỉ mời",
 };
 const JOIN_POLICY_HINTS: Record<string, string> = {
-  open: "Bất kỳ ai cũng có thể vào CLB ngay.",
-  approval: "Người xin gia nhập sẽ chờ quản trị duyệt.",
-  invite_only: "Chỉ thành viên quản trị mời trực tiếp.",
+  open: "Bất kỳ ai cũng có thể vào ngay.",
+  approval: "Cần admin duyệt.",
+  invite_only: "Chỉ admin mới mời được.",
 };
-
 const MEMBER_VIS_OPTIONS = [
-  { value: "admins", label: "Chỉ quản trị (Owner/Admin)" },
-  { value: "members", label: "Thành viên CLB" },
+  { value: "admins", label: "Chỉ quản trị" },
+  { value: "members", label: "Thành viên" },
   { value: "public", label: "Mọi người" },
 ] as const;
-
-// ====== Helpers ======
-function extractErrorMessage(err: any) {
-  if (!err) return "Đã xảy ra lỗi không xác định";
-  if (typeof err === "string") return err;
-  if ((err as any)?.data?.message) return (err as any).data.message;
-  if (
-    Array.isArray((err as any)?.data?.errors) &&
-    (err as any).data.errors.length > 0
-  ) {
-    return (err as any).data.errors.map((e: any) => e.message || e).join(", ");
-  }
-  if ((err as any)?.error) return (err as any).error;
-  if ((err as any)?.message) return (err as any).message;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return "Đã xảy ra lỗi";
-  }
-}
 
 function getAllowedJoinPolicies(visibility: string) {
   if (visibility === "hidden") return ["invite_only"] as const;
@@ -116,21 +87,18 @@ function getAllowedMemberVis(visibility: string) {
 }
 
 const pickUrl = (res: any) =>
-  res?.url ||
-  res?.secure_url ||
-  res?.data?.url ||
-  res?.Location ||
-  res?.path ||
-  "";
+  res?.url || res?.secure_url || res?.data?.url || res?.path || "";
 
-// ==== Parallax / Collapse constants ====
-const COVER_MAX = 200; // chiều cao cover khi ở đỉnh
-const COVER_MIN = 84; // chiều cao cover khi thu gọn
-const OVER_PULL = -60; // kéo vượt lên trên sẽ nở thêm
-const COLLAPSE = COVER_MAX - COVER_MIN;
+function extractErrorMessage(err: any) {
+  if (!err) return "Lỗi không xác định";
+  return (
+    (err as any)?.data?.message || (err as any)?.message || "Đã xảy ra lỗi"
+  );
+}
 
-const LOGO_MAX = 72;
-const LOGO_MIN = 44;
+// ================= CONFIG CHIỀU CAO =================
+const HEADER_MAX_HEIGHT = 300; // ✅ Cao hơn để thoáng (theo yêu cầu)
+// HEADER_MIN_HEIGHT sẽ được tính dynamic theo tai thỏ (inset.top)
 
 export default function ClubCreateModal({
   visible,
@@ -139,7 +107,14 @@ export default function ClubCreateModal({
   initial,
 }: ClubCreateModalProps) {
   const insets = useSafeAreaInsets();
-  const topPad = insets.top || RNStatusBar.currentHeight || 0;
+  // Tính toán vùng an toàn phía trên:
+  // Nếu có tai thỏ (insets.top > 20), ta cộng thêm chút padding cho thoáng
+  const topPad = Math.max(insets.top, RNStatusBar.currentHeight || 20);
+
+  // Chiều cao khi thu gọn = Padding trên + Chiều cao Navbar (khoảng 60px)
+  const HEADER_MIN_HEIGHT = topPad + 60;
+  const SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+
   const isEdit = !!initial?._id;
   const [focusField, setFocusField] = useState<string | null>(null);
   const [form, setForm] = useState<any>(() => ({
@@ -207,21 +182,18 @@ export default function ClubCreateModal({
   const pickImage = async (field: "logoUrl" | "coverUrl") => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
-
     const rs = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
       allowsMultipleSelection: false,
     });
     if (rs.canceled || !rs.assets?.[0]) return;
-
     const asset = rs.assets[0];
     const file: any = {
       uri: asset.uri,
       name: (asset as any).fileName || `${field}-${Date.now()}.jpg`,
       type: asset.mimeType || "image/jpeg",
     };
-
     try {
       const res: any = await uploadAvatar(file).unwrap();
       const url = pickUrl(res);
@@ -235,12 +207,10 @@ export default function ClubCreateModal({
   const onSubmit = async () => {
     if (!canSubmit || uploading) return;
     const body = { ...form };
-
     try {
       const res: any = isEdit
         ? await updateClub({ id: initial._id, ...body }).unwrap()
         : await createClub(body).unwrap();
-
       onCreated?.(res);
       onClose?.(true);
     } catch (err) {
@@ -248,52 +218,73 @@ export default function ClubCreateModal({
     }
   };
 
-  // ==== Keyboard avoid + auto-scroll ====
-  const scrollRef = useRef<Animated.ScrollView | null>(null);
-  const ensureVisible = useCallback(() => {
-    requestAnimationFrame(() => {
-      // @ts-ignore getNode cho các phiên bản RN cũ của Animated.ScrollView
-      scrollRef.current?.getNode?.()?.scrollToEnd?.({ animated: true });
-    });
-  }, []);
-
   // ==== Province picker ====
   const [showProvincePicker, setShowProvincePicker] = useState(false);
 
-  // ==== Parallax / collapse on scroll ====
+  // ==========================================
+  // ==== 🚀 ANIMATION LOGIC (UPDATED) ====
+  // ==========================================
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const coverHeight = scrollY.interpolate({
-    inputRange: [OVER_PULL, 0, COLLAPSE],
-    outputRange: [COVER_MAX - OVER_PULL, COVER_MAX, COVER_MIN],
+  // 1. Header dịch chuyển lên trên
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE],
+    outputRange: [0, -SCROLL_DISTANCE],
     extrapolate: "clamp",
   });
 
-  const logoSize = scrollY.interpolate({
-    inputRange: [OVER_PULL, 0, COLLAPSE],
-    outputRange: [LOGO_MAX + 10, LOGO_MAX, LOGO_MIN],
+  // 2. Navbar dịch chuyển xuống dưới để GHIM lại
+  const navbarTranslateY = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE],
+    outputRange: [0, SCROLL_DISTANCE],
     extrapolate: "clamp",
   });
 
-  const logoBottom = scrollY.interpolate({
-    inputRange: [0, COLLAPSE],
-    outputRange: [-28, 8],
+  // 3. Logo Fade Out: ✅ NÉ NAVBAR
+  // Khi scroll được 80% quãng đường, logo sẽ mờ dần về 0 để không đè chữ
+  const logoOpacity = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE * 0.6, SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
     extrapolate: "clamp",
   });
 
+  // 4. Logo Scale nhẹ
+  const logoScale = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE],
+    outputRange: [1, 0.8],
+    extrapolate: "clamp",
+  });
+
+  // 5. Parallax Cover
+  const coverTranslateY = scrollY.interpolate({
+    inputRange: [0, SCROLL_DISTANCE],
+    outputRange: [0, SCROLL_DISTANCE * 0.5],
+    extrapolate: "clamp",
+  });
+  const coverScale = scrollY.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [2, 1],
+    extrapolate: "clamp",
+  });
+
+  // 6. Bo góc
   const headerRadius = scrollY.interpolate({
-    inputRange: [0, COLLAPSE],
-    outputRange: [22, 16],
+    inputRange: [0, SCROLL_DISTANCE],
+    outputRange: [24, 0],
     extrapolate: "clamp",
   });
 
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false } // animate height/size => false
+    { useNativeDriver: true }
   );
 
-  // ==== Anti-jitter: header absolute + đo chiều cao thật ====
-  const [headerH, setHeaderH] = useState<number>(COVER_MAX + 120);
+  // Keyboard scroll helper
+  const scrollRef = useRef<Animated.ScrollView | null>(null);
+  const ensureVisible = useCallback(() => {
+    // @ts-ignore
+    scrollRef.current?.getNode?.()?.scrollToEnd?.({ animated: true });
+  }, []);
 
   return (
     <Modal
@@ -303,34 +294,87 @@ export default function ClubCreateModal({
       onRequestClose={() => onClose?.(false)}
     >
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <SafeAreaView style={styles.modalRoot}>
-        {/* Header absolute để tránh reflow khi co/giãn */}
+      <View style={styles.modalRoot}>
+        {/* === ANIMATED HEADER === */}
         <Animated.View
-          pointerEvents="box-none"
-          onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
           style={[
-            styles.header,
+            styles.headerContainer,
             {
+              height: HEADER_MAX_HEIGHT,
+              transform: [{ translateY: headerTranslateY }],
               borderBottomLeftRadius: headerRadius,
               borderBottomRightRadius: headerRadius,
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 10,
             },
           ]}
         >
+          {/* Background Gradient */}
           <LinearGradient
             colors={["#667eea", "#764ba2"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
-            pointerEvents="none"
           />
-          <View
-            style={[styles.headerBar, { paddingTop: topPad + 4 }]}
-            pointerEvents="auto"
+
+          {/* Cover Image Parallax */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [
+                  { translateY: coverTranslateY },
+                  { scale: coverScale },
+                ],
+              },
+            ]}
+          >
+            {form.coverUrl ? (
+              <Image
+                source={{ uri: normalizeUrl(form.coverUrl) }}
+                style={styles.coverImg}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.coverPlaceholder}>
+                <MaterialCommunityIcons
+                  name="image-plus"
+                  size={40}
+                  color="#ffffff80"
+                />
+                <Text style={styles.coverHelp}>Ảnh bìa (16:9)</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => pickImage("coverUrl")}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+
+          {/* Mask loading */}
+          {uploading && (
+            <View style={styles.uploadMask}>
+              <View
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.6)",
+                  padding: 12,
+                  borderRadius: 10,
+                }}
+              >
+                <Text style={{ color: "#fff" }}>Đang tải...</Text>
+              </View>
+            </View>
+          )}
+
+          {/* NAVBAR: Buttons & Title (Fixed) */}
+          <Animated.View
+            style={[
+              styles.navBar,
+              {
+                height: HEADER_MIN_HEIGHT,
+                paddingTop: topPad, // ✅ Né tai thỏ
+                transform: [{ translateY: navbarTranslateY }],
+              },
+            ]}
+            pointerEvents="box-none"
           >
             <TouchableOpacity
               onPress={() => onClose?.(false)}
@@ -338,128 +382,79 @@ export default function ClubCreateModal({
             >
               <MaterialCommunityIcons name="close" size={24} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>
+
+            <Text style={styles.headerTitle} numberOfLines={1}>
               {isEdit ? "Sửa CLB" : "Tạo CLB"}
             </Text>
+
             <TouchableOpacity
               onPress={onSubmit}
               disabled={!canSubmit || creating || updating || uploading}
               style={[
                 styles.iconBtn,
-                {
-                  opacity:
-                    !canSubmit || creating || updating || uploading ? 0.5 : 1,
-                },
+                { opacity: !canSubmit || uploading ? 0.5 : 1 },
               ]}
-              accessibilityRole="button"
-              accessibilityLabel={isEdit ? "Lưu" : "Tạo CLB"}
-              accessibilityHint="Lưu thông tin câu lạc bộ"
             >
               <MaterialCommunityIcons
                 name="content-save"
-                size={22}
+                size={24}
                 color="#fff"
               />
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
-          {/* Cover + Logo block (animated height) */}
-          <View style={styles.coverBlock} pointerEvents="box-none">
-            <Animated.View style={[styles.coverWrap, { height: coverHeight }]}>
-              {form.coverUrl ? (
+          {/* LOGO: ✅ Fade out khi scroll để né Navbar */}
+          <Animated.View
+            style={[
+              styles.logoWrap,
+              {
+                opacity: logoOpacity, // Mờ dần
+                transform: [{ scale: logoScale }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => pickImage("logoUrl")}
+              activeOpacity={0.9}
+              style={{ flex: 1 }}
+            >
+              {form.logoUrl ? (
                 <Image
-                  source={{ uri: normalizeUrl(form.coverUrl) }}
-                  style={styles.coverImg}
+                  source={{ uri: normalizeUrl(form.logoUrl) }}
+                  style={styles.logoImg}
                   contentFit="cover"
                 />
               ) : (
-                <View style={styles.coverPlaceholder}>
+                <View style={styles.logoPlaceholder}>
                   <MaterialCommunityIcons
-                    name="image-plus"
-                    size={26}
-                    color="#ffffffb3"
+                    name="camera-plus"
+                    size={24}
+                    color="#fff"
                   />
-                  <Text style={styles.coverHelp}>
-                    Chạm để chọn ảnh bìa (16:9)
-                  </Text>
                 </View>
               )}
-              {uploading && (
-                <View style={styles.uploadMask}>
-                  <ActivityIndicator size="small" color="#fff" />
-                </View>
-              )}
-
-              {/* Tap overlay để chọn ảnh bìa */}
-              <TouchableOpacity
-                onPress={() => pickImage("coverUrl")}
-                activeOpacity={0.9}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="auto"
-              />
-            </Animated.View>
-
-            {/* Logo (animated size/position) */}
-            <Animated.View
-              style={[
-                styles.logoWrap,
-                {
-                  width: logoSize,
-                  height: logoSize,
-                  bottom: logoBottom,
-                  borderRadius: 999,
-                },
-              ]}
-              pointerEvents="auto"
-            >
-              <TouchableOpacity
-                onPress={() => pickImage("logoUrl")}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.9}
-                style={{ flex: 1 }}
-              >
-                {form.logoUrl ? (
-                  <Image
-                    source={{ uri: normalizeUrl(form.logoUrl) }}
-                    style={styles.logoImg}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={styles.logoPlaceholder}>
-                    <MaterialCommunityIcons
-                      name="camera-plus"
-                      size={20}
-                      color="#ffffffd0"
-                    />
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
 
-        {/* Body */}
+        {/* === BODY CONTENT === */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={topPad}
         >
           <Animated.ScrollView
             ref={scrollRef as any}
             onScroll={onScroll}
-            // Vuốt để ẩn keyboard & không chặn scroll
-            keyboardDismissMode={
-              Platform.OS === "ios" ? "interactive" : "on-drag"
-            }
-            onTouchStart={Keyboard.dismiss}
-            keyboardShouldPersistTaps="always"
             scrollEventThrottle={16}
-            contentContainerStyle={[styles.body, { paddingTop: headerH + 8 }]}
+            contentContainerStyle={{
+              paddingTop: HEADER_MAX_HEIGHT + 20, // Đẩy nội dung xuống dưới Header
+              paddingHorizontal: 16,
+              paddingBottom: 40,
+            }}
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews={false}
-            contentInset={{ bottom: 24 }}
-            contentInsetAdjustmentBehavior="always"
           >
+            {/* ... Form inputs ... */}
             <TextInput
               placeholder="Tên CLB *"
               value={form.name}
@@ -491,7 +486,7 @@ export default function ClubCreateModal({
               ]}
             />
 
-            {/* Visibility */}
+            {/* Configs */}
             <FieldLabel
               title="Hiển thị"
               subtitle={VISIBILITY_HINTS[form.visibility]}
@@ -508,7 +503,6 @@ export default function ClubCreateModal({
               ))}
             </View>
 
-            {/* Join policy */}
             <FieldLabel
               title="Chính sách gia nhập"
               subtitle={JOIN_POLICY_HINTS[form.joinPolicy]}
@@ -529,8 +523,7 @@ export default function ClubCreateModal({
               ))}
             </View>
 
-            {/* Member list visibility */}
-            <FieldLabel title="Ai được xem danh sách thành viên" />
+            <FieldLabel title="Ai được xem thành viên" />
             <View style={styles.rowWrap}>
               {MEMBER_VIS_OPTIONS.map((opt) => (
                 <Chip
@@ -540,21 +533,15 @@ export default function ClubCreateModal({
                   selected={form.memberVisibility === opt.value}
                   onPress={() =>
                     allowedMemberVis.includes(opt.value as any) &&
-                    setForm((f: any) => ({
-                      ...f,
-                      memberVisibility: opt.value,
-                    }))
+                    setForm((f: any) => ({ ...f, memberVisibility: opt.value }))
                   }
                   style={styles.chip}
                 />
               ))}
             </View>
 
-            {/* Show roles */}
             <View style={[styles.rowBetween, { marginBottom: 14 }]}>
-              <Text style={styles.fieldTitle}>
-                Hiện nhãn Admin/Owner cho thành viên
-              </Text>
+              <Text style={styles.fieldTitle}>Hiện nhãn Admin/Owner</Text>
               <TouchableOpacity
                 onPress={() =>
                   setForm((f: any) => ({
@@ -576,10 +563,8 @@ export default function ClubCreateModal({
               </TouchableOpacity>
             </View>
 
-            {/* Location */}
+            {/* Address */}
             <FieldLabel title="Địa chỉ" />
-
-            {/* Province selector */}
             <TouchableOpacity
               onPress={() => setShowProvincePicker(true)}
               activeOpacity={0.8}
@@ -602,20 +587,11 @@ export default function ClubCreateModal({
                 />
               </View>
             </TouchableOpacity>
-
             <TextInput
-              placeholder="Quận/Huyện (VD: Quận 1, TP. Thủ Đức)"
+              placeholder="Quận/Huyện"
               value={form.city}
               onChangeText={(v: string) =>
                 setForm((f: any) => ({ ...f, city: v }))
-              }
-              returnKeyType="done"
-              rightIcon={
-                <MaterialCommunityIcons
-                  name="city-variant-outline"
-                  size={18}
-                  color="#999"
-                />
               }
               onFocus={() => {
                 setFocusField("city");
@@ -628,10 +604,8 @@ export default function ClubCreateModal({
                 { marginBottom: 12 },
               ]}
             />
-
-            {/* Short code */}
             <TextInput
-              placeholder="Mã ngắn (VD: PBC, HN-PB…)"
+              placeholder="Mã ngắn (VD: PBC)"
               value={form.shortCode}
               onChangeText={(v: string) =>
                 setForm((f: any) => ({ ...f, shortCode: v }))
@@ -642,14 +616,12 @@ export default function ClubCreateModal({
               }}
               onBlur={() => setFocusField(null)}
               autoCapitalize="characters"
-              returnKeyType="done"
               containerStyle={[
                 styles.inputContainer,
                 focusField === "shortCode" && styles.inputFocus,
               ]}
             />
 
-            {/* Save */}
             <Button
               title={isEdit ? "Lưu" : "Tạo CLB"}
               label={isEdit ? "Lưu" : "Tạo CLB"}
@@ -660,7 +632,7 @@ export default function ClubCreateModal({
           </Animated.ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Province picker bottom sheet */}
+        {/* Modal Province (Giữ nguyên) */}
         <Modal
           visible={showProvincePicker}
           transparent
@@ -673,15 +645,12 @@ export default function ClubCreateModal({
               onPress={() => setShowProvincePicker(false)}
             />
             <View style={styles.sheetCard}>
-              <View className="sheetHandle" style={styles.sheetHandle} />
+              <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>Chọn Tỉnh/Thành</Text>
               <Animated.ScrollView
                 contentContainerStyle={{ paddingBottom: 12 }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
               >
                 <TouchableOpacity
-                  key="__none__"
                   style={styles.sheetItem}
                   onPress={() => {
                     setForm((f: any) => ({ ...f, province: "" }));
@@ -690,45 +659,41 @@ export default function ClubCreateModal({
                 >
                   <Text style={styles.sheetItemText}>— Chọn —</Text>
                 </TouchableOpacity>
-
-                {VN_PROVINCES.map((p) => {
-                  const active = form.province === p;
-                  return (
-                    <TouchableOpacity
-                      key={p}
+                {VN_PROVINCES.map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.sheetItem,
+                      form.province === p && styles.sheetItemActive,
+                    ]}
+                    onPress={() => {
+                      setForm((f: any) => ({ ...f, province: p }));
+                      setShowProvincePicker(false);
+                      ensureVisible();
+                    }}
+                  >
+                    <Text
                       style={[
-                        styles.sheetItem,
-                        active && styles.sheetItemActive,
+                        styles.sheetItemText,
+                        form.province === p && styles.sheetItemTextActive,
                       ]}
-                      onPress={() => {
-                        setForm((f: any) => ({ ...f, province: p }));
-                        setShowProvincePicker(false);
-                        requestAnimationFrame(ensureVisible);
-                      }}
                     >
-                      <Text
-                        style={[
-                          styles.sheetItemText,
-                          active && styles.sheetItemTextActive,
-                        ]}
-                      >
-                        {p}
-                      </Text>
-                      {active ? (
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={18}
-                          color="#667eea"
-                        />
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
+                      {p}
+                    </Text>
+                    {form.province === p && (
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={18}
+                        color="#667eea"
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
               </Animated.ScrollView>
             </View>
           </View>
         </Modal>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -745,76 +710,89 @@ function FieldLabel({ title, subtitle }: { title: string; subtitle?: string }) {
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, backgroundColor: "#f6f7fb" },
 
-  header: {
-    paddingBottom: 14,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
+  headerContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     overflow: "hidden",
+    zIndex: 10,
+    backgroundColor: "#667eea",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  headerBar: {
-    paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: 10,
+
+  navBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  iconBtn: { padding: 8 },
-
-  coverBlock: {
     paddingHorizontal: 12,
-    marginBottom: 44,
-    position: "relative",
+    zIndex: 20, // Cao hơn cover
   },
-  coverWrap: {
-    width: "100%",
-    borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#ffffff30",
+
+  headerTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  coverImg: { width: "100%", height: "100%" },
-  coverPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
-  coverHelp: { color: "#fff", marginTop: 6 },
-  uploadMask: {
-    position: "absolute",
-    inset: 0,
-    backgroundColor: "#0006",
+
+  iconBtn: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.2)", // Nền mờ cho nút để không bị chìm
+  },
+
+  coverImg: { width: "100%", height: "100%" },
+  coverPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  coverHelp: { color: "#fff", marginTop: 8, fontWeight: "500" },
+  uploadMask: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 15,
   },
 
   logoWrap: {
     position: "absolute",
     left: 20,
-    overflow: "hidden",
-    borderWidth: 2,
+    bottom: 20, // Neo ở đáy header
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
     borderColor: "#fff",
-    backgroundColor: "#ffffff40",
-    zIndex: 5,
-    elevation: 5,
+    backgroundColor: "#e0e7ff",
+    zIndex: 25,
+    overflow: "hidden",
+    // Shadow cho logo
     shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 4,
+    elevation: 5,
   },
   logoImg: { width: "100%", height: "100%" },
-  logoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
-  logoBadge: {
-    position: "absolute",
-    left: 6,
-    right: 6,
-    bottom: 6,
-    backgroundColor: "#0007",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+  logoPlaceholder: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#667eea",
   },
-  logoBadgeText: { color: "#fff", fontSize: 10, fontWeight: "600" },
 
-  body: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 40 },
-
+  // ... (Các styles khác giữ nguyên) ...
   fieldTitle: {
     fontSize: 14,
     fontWeight: "700",
@@ -845,8 +823,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   switchDotOn: { alignSelf: "flex-end" },
-
-  /* Select-like input for province */
   selectInput: {
     height: 48,
     borderRadius: 12,
@@ -865,8 +841,6 @@ const styles = StyleSheet.create({
   },
   selectPlaceholder: { color: "#999" },
   selectValue: { color: "#111", fontWeight: "600" },
-
-  /* Bottom sheet */
   sheetRoot: { flex: 1, justifyContent: "flex-end" },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "#0008" },
   sheetCard: {
@@ -904,8 +878,6 @@ const styles = StyleSheet.create({
   sheetItemActive: { backgroundColor: "#eef2ff" },
   sheetItemText: { fontSize: 14, color: "#111" },
   sheetItemTextActive: { color: "#4f46e5", fontWeight: "700" },
-
-  // Input block (nổi hơn cả khi chưa focus)
   inputContainer: {
     backgroundColor: "#fff",
     borderRadius: 12,

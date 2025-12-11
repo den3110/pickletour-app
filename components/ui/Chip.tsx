@@ -7,12 +7,13 @@ import {
   Text,
   StyleSheet,
   ViewStyle,
-  Image,
   Modal as RNModal,
   View as ModalView,
   TouchableWithoutFeedback,
   SafeAreaView,
 } from "react-native";
+import { Image } from "expo-image";
+
 interface ChipProps {
   label: string;
   selected?: boolean;
@@ -92,14 +93,17 @@ interface AvatarProps {
 }
 
 export function Avatar({ source, size = 40, style }: AvatarProps) {
+  const uri = source?.uri ? normalizeUrl(source.uri) : undefined;
+
   return (
     <Image
-      source={source?.uri ? (source) : require("../../assets/images/icon.png")}
+      source={uri ? { uri } : require("../../assets/images/icon.png")}
       style={[
         avatarStyles.avatar,
         { width: size, height: size, borderRadius: size / 2 },
         style,
       ]}
+      contentFit="cover"
     />
   );
 }

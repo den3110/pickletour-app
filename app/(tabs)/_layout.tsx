@@ -1,8 +1,9 @@
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform, Image, DeviceEventEmitter } from "react-native";
+import { Platform, DeviceEventEmitter } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
+import { Image } from "expo-image";
 
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
@@ -201,7 +202,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 🤖 Trợ lý AI - Tab 6 (dùng ảnh bot) */}
+      {/* 🤖 Trợ lý AI - Tab 6 (dùng expo-image cho ảnh bot) */}
       <Tabs.Screen
         name="chat"
         listeners={({ navigation }) => ({
@@ -219,9 +220,9 @@ export default function TabLayout() {
               style={{
                 width: size + 4,
                 height: size + 4,
-                resizeMode: "contain",
                 opacity: focused ? 1 : 0.7,
               }}
+              contentFit="contain"
             />
           ),
         }}

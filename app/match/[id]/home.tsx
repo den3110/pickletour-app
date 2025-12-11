@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { skipToken } from "@reduxjs/toolkit/query";
 import Toast from "react-native-toast-message";
 
@@ -175,7 +175,7 @@ export default function MatchHomePage() {
               hitSlop={12}
               style={{ paddingHorizontal: 6, paddingVertical: 4 }}
             >
-              <MaterialIcons name="arrow-back" size={22} color={T.text} />
+              <Ionicons name="chevron-back" size={22} color={T.text} />
             </Pressable>
           ),
           headerRight: () => (

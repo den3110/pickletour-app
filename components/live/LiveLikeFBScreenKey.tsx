@@ -1270,7 +1270,6 @@ export default function LiveLikeFBScreenKey({
     }
   );
 
-  const [realtimeOverlayData, setRealtimeOverlayData] = useState<any>(null);
 
   const updateOverlayNow = useMemo(
     () =>
@@ -1354,12 +1353,12 @@ export default function LiveLikeFBScreenKey({
               ? finalData.gameScores[currentIdx]
               : { a: 0, b: 0 };
 
-          const webLogoUrl = safeStr(
-            overlayConfig?.webLogoUrl ||
-              process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
-              finalData?.tournament?.overlay?.logoUrl ||
-              finalData?.bracket?.overlay?.logoUrl
-          );
+          // const webLogoUrl = safeStr(
+          //   overlayConfig?.webLogoUrl ||
+          //     process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
+          //     finalData?.tournament?.overlay?.logoUrl ||
+          //     finalData?.bracket?.overlay?.logoUrl
+          // );
 
           const sponsorLogos = Array.isArray(overlayConfig?.sponsors)
             ? overlayConfig.sponsors.map((s: any) => s?.logoUrl).filter(Boolean)
@@ -1507,7 +1506,7 @@ export default function LiveLikeFBScreenKey({
       socket.off("match:snapshot", onUpdate);
       socket.off("score:updated", onUpdate);
     };
-  }, [currentMatchId, socket, mode, updateOverlayNow]);
+  }, [currentMatchId, socket, mode, updateOverlayNow, overlayConfig]);
 
   // Effect 2: Initial API Snapshot (Chỉ chạy 1 lần đầu nếu socket chưa về)
   useEffect(() => {
@@ -1519,7 +1518,7 @@ export default function LiveLikeFBScreenKey({
       log("overlaySnapshot → initial load from RTK");
       updateOverlayNow(overlaySnapshot);
     }
-  }, [overlaySnapshot, mode, updateOverlayNow]);
+  }, [overlaySnapshot, mode, updateOverlayNow, overlayConfig]);
 
   /* ==== Start for match ==== */
   const lastAutoStartedForRef = useRef<string | null>(null);

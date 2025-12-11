@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -24,11 +23,10 @@ import {
   TouchableOpacity,
   useColorScheme,
   ScrollView,
-  BackHandler,
-  Dimensions,
   useWindowDimensions,
   SafeAreaView,
-  Animated, // <--- Đã thêm Animated
+  Animated,
+  StatusBar,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,9 +45,8 @@ import {
 } from "@/slices/tournamentsApiSlice";
 import { useGetMeScoreQuery } from "@/slices/usersApiSlice";
 import PlayerSelector from "@/components/PlayerSelector";
-import PublicProfileSheet from "@/components/PublicProfileDialog";
 import { normalizeUrl } from "@/utils/normalizeUri";
-import { Image as ExpoImage } from "expo-image";
+import { Image as ExpoImage } from "expo-image"; // <--- Dùng Expo Image
 import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
 import { LinearGradient } from "expo-linear-gradient";
@@ -59,11 +56,11 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
+import ImageView from "react-native-image-viewing";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
 /* =============== THEME & UTILS =============== */
-// ... (Giữ nguyên phần Theme & Utils cũ)
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
   return useMemo(() => {
@@ -90,7 +87,11 @@ function useThemeColors() {
       softBtn: isDark ? "#334155" : "#e2e8f0",
       gradStart: isDark ? "#1e3a8a" : "#1d4ed8",
       gradEnd: isDark ? "#172554" : "#1e40af",
-      skeleton: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", // Màu cho skeleton
+      skeleton: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+      // Theme cho Image Viewer
+      imageViewBg: isDark ? "#000000" : "#ffffff",
+      imageViewText: isDark ? "#ffffff" : "#000000",
+      imageViewCloseBtn: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)",
       shadow: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -102,7 +103,7 @@ function useThemeColors() {
   }, [scheme]);
 }
 
-// ... (Giữ nguyên các hàm utils: normType, displayName, v.v...)
+// ... (Các hàm utils giữ nguyên)
 const normType = (t?: string) => {
   const s = String(t || "").toLowerCase();
   if (s === "single" || s === "singles") return "single";
@@ -334,7 +335,6 @@ const TournamentSkeleton = () => {
 };
 
 /* -------- OPTIMIZED COUNTDOWN COMPONENT -------- */
-// ... (Giữ nguyên component TournamentCountdown)
 const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
   const [timeLeft, setTimeLeft] = useState("");
   const C = useThemeColors();
@@ -391,7 +391,7 @@ const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
   );
 });
 
-// ... (Giữ nguyên HtmlPreviewBlock, HtmlCols, StatCard, RegItem)
+// ... (HtmlPreviewBlock, HtmlCols, StatCard)
 const HTML_PREVIEW_MAX_HEIGHT = 260;
 const HtmlPreviewBlock = memo(
   ({
@@ -515,6 +515,7 @@ const HtmlPreviewBlock = memo(
         </View>
 
         <Modal
+          visible={open}
           visible={open}
           animationType="slide"
           presentationStyle="fullScreen"
@@ -890,12 +891,11 @@ const RegItem = memo(function RegItem({
         )}
       </View>
 
-      {/* Footer Info & Actions */}
+      {/* Footer Info & Actions (Tách 2 dòng) */}
       <View
         style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column",
+          gap: 12,
           paddingHorizontal: 12,
           paddingBottom: 12,
           borderTopWidth: 1,
@@ -903,7 +903,7 @@ const RegItem = memo(function RegItem({
           paddingTop: 10,
         }}
       >
-        {/* Total Score */}
+        {/* Dòng 1: Tổng điểm */}
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
           <Text style={{ fontSize: 11, color: C.textSecondary }}>Tổng:</Text>
           <Text style={{ fontSize: 16, fontWeight: "800", color: totalColor }}>
@@ -916,8 +916,15 @@ const RegItem = memo(function RegItem({
           )}
         </View>
 
-        {/* Action Buttons Group (Reordered) */}
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        {/* Dòng 2: Nút bấm */}
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
           <TouchableOpacity
             style={[styles.btnActionSmall, { backgroundColor: C.infoBg }]}
             onPress={() => onOpenPayment(r)}
@@ -956,7 +963,14 @@ const RegItem = memo(function RegItem({
             <TouchableOpacity
               onPress={() => onTogglePayment(r)}
               disabled={busy?.settingPayment}
-              style={[styles.iconActionBtn, { backgroundColor: C.pageBg }]}
+              style={[
+                styles.iconActionBtn,
+                {
+                  backgroundColor: C.pageBg,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                },
+              ]}
             >
               <FontAwesome5
                 name="coins"
@@ -984,6 +998,53 @@ const RegItem = memo(function RegItem({
     </View>
   );
 });
+
+/* ===================== CUSTOM EXPO IMAGE COMPONENT ===================== */
+const CustomExpoImage = (props: any) => {
+  // State cục bộ để theo dõi trạng thái loading của từng ảnh
+  const [isLoading, setIsLoading] = useState(true);
+
+  return (
+    // Container bao bọc, cần position relative để chứa skeleton absolute bên trong
+    <View
+      style={[
+        props.style,
+        {
+          position: "relative",
+          justifyContent: "center",
+          alignItems: "center",
+        },
+      ]}
+    >
+      <ExpoImage
+        {...props}
+        // Sử dụng StyleSheet.absoluteFill để ảnh tràn container cha
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        transition={200}
+        // Bắt đầu tải -> hiện skeleton
+        onLoadStart={() => setIsLoading(true)}
+        // Tải xong hoặc lỗi -> ẩn skeleton
+        onLoad={() => setIsLoading(false)}
+        onError={() => setIsLoading(false)}
+      />
+
+      {/* Lớp phủ Skeleton khi đang loading */}
+      {isLoading && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { justifyContent: "center", alignItems: "center", zIndex: 1 },
+          ]}
+        >
+          {/* Một hộp skeleton hình chữ nhật đại diện cho ảnh đang tải */}
+          {/* Bạn có thể điều chỉnh width/height tùy ý, ví dụ 80% 50% */}
+          <SkeletonItem width="90%" height="60%" borderRadius={12} />
+        </View>
+      )}
+    </View>
+  );
+};
 
 /* ===================== MAIN SCREEN ===================== */
 export default function TournamentRegistrationScreen() {
@@ -1025,12 +1086,13 @@ export default function TournamentRegistrationScreen() {
   const [searchQ, setSearchQ] = useState("");
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
-  // Dialogs
+  // Image Viewer State
   const [imgPreview, setImgPreview] = useState({
     open: false,
     src: "",
     name: "",
   });
+
   const [replaceDlg, setReplaceDlg] = useState({
     open: false,
     reg: null as any,
@@ -1046,9 +1108,8 @@ export default function TournamentRegistrationScreen() {
     open: false,
     reg: null as any,
   });
-  const [profile, setProfile] = useState({ open: false, userId: null as any });
 
-  // Computed
+  // Computed & Handlers
   const evType = normType(tour?.eventType);
   const isSingles = evType === "single";
   const isDoubles = evType === "double";
@@ -1087,7 +1148,6 @@ export default function TournamentRegistrationScreen() {
     });
   }, [regs, searchQ]);
 
-  // Handlers
   const handleRefresh = useCallback(() => {
     refetchRegs();
     if (isLoggedIn) refetchInvites();
@@ -1154,16 +1214,13 @@ export default function TournamentRegistrationScreen() {
   );
 
   // Dialog Handlers
-  // ... (Giữ nguyên các hàm dialog handlers: openPreview, openReplace, v.v...)
-  const openPreview = useCallback(
-    (src?: string, name?: string) =>
-      setImgPreview({
-        open: true,
-        src: normalizeUrl(src) || PLACE,
-        name: name || "",
-      }),
-    []
-  );
+  const openPreview = useCallback((src?: string, name?: string) => {
+    setImgPreview({
+      open: true,
+      src: normalizeUrl(src) || PLACE,
+      name: name || "",
+    });
+  }, []);
   const closePreview = useCallback(
     () => setImgPreview({ open: false, src: "", name: "" }),
     []
@@ -1181,10 +1238,19 @@ export default function TournamentRegistrationScreen() {
     () => setReplaceDlg({ open: false, reg: null as any, slot: "p1" }),
     []
   );
-  const openProfileByPlayer = useCallback((pl: any) => {
-    const u = getUserId(pl);
-    if (u) setProfile({ open: true, userId: u });
-  }, []);
+
+  const openProfileByPlayer = useCallback(
+    (pl: any) => {
+      const u = getUserId(pl);
+      if (u) {
+        router.push(`/profile/${u}`);
+      } else {
+        Alert.alert("Thông báo", "VĐV này chưa liên kết tài khoản.");
+      }
+    },
+    [router]
+  );
+
   const openComplaint = useCallback(
     (reg: any) => setComplaintDlg({ open: true, reg, text: "" }),
     []
@@ -1253,7 +1319,6 @@ export default function TournamentRegistrationScreen() {
   );
 
   // -- HEADER COMPONENT (Memoized) --
-  // -- HEADER COMPONENT (Memoized) --
   const HeaderComponent = useMemo(
     () => (
       <View>
@@ -1282,18 +1347,17 @@ export default function TournamentRegistrationScreen() {
           <View
             style={{
               flexDirection: "row",
-              alignItems: "flex-start", // Căn lề trên để đẹp hơn khi text xuống dòng
+              alignItems: "flex-start",
               marginTop: 8,
               opacity: 0.9,
               gap: 12,
             }}
           >
-            {/* Địa chỉ: flex: 1 để tự xuống dòng nếu dài */}
             {tour?.location && (
               <View
                 style={{
                   flexDirection: "row",
-                  alignItems: "flex-start", // Icon căn theo dòng đầu của text
+                  alignItems: "flex-start",
                   gap: 4,
                   flex: 1,
                 }}
@@ -1309,16 +1373,14 @@ export default function TournamentRegistrationScreen() {
                     color: "#fff",
                     fontSize: 12,
                     fontWeight: "600",
-                    lineHeight: 18, // Tăng khoảng cách dòng chút cho dễ đọc
+                    lineHeight: 18,
                   }}
-                  // Bỏ numberOfLines để text tự tràn xuống dòng
                 >
                   {tour.location}
                 </Text>
               </View>
             )}
 
-            {/* Ngày tháng: Giữ nguyên kích thước */}
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
@@ -1362,7 +1424,7 @@ export default function TournamentRegistrationScreen() {
             <View style={{ flex: 1 }}>
               <StatCard
                 icon={<MaterialCommunityIcons name="list-status" />}
-                label="Chờ TT"
+                label="Chờ thanh toán"
                 value={regTotal - paidCount}
                 color="default"
               />
@@ -1730,7 +1792,7 @@ export default function TournamentRegistrationScreen() {
     ]
   );
 
-  // Search Screen as View overlay (Giữ nguyên)
+  // Search Screen as View overlay
   const renderSearchScreen = () => (
     <View
       style={[
@@ -1802,7 +1864,6 @@ export default function TournamentRegistrationScreen() {
     </View>
   );
 
-  // === SỬA ĐỔI CHỖ NÀY: Thay Spinner bằng Skeleton Screen ===
   if (tourLoading) return <TournamentSkeleton />;
 
   if (!tour)
@@ -1874,39 +1935,70 @@ export default function TournamentRegistrationScreen() {
         {/* Search Overlay */}
         {searchOpen && renderSearchScreen()}
 
-        {/* MODALS (Giữ nguyên) */}
-        {/* ... (Các Modal Preview, Replace, Profile, Payment, Complaint giữ nguyên) ... */}
-        {/* Copy toàn bộ phần Modal phía dưới vào đây nếu cần, nhưng logic không thay đổi */}
-        <Modal
+        {/* MODALS */}
+
+        {/* === IMAGE VIEWER LIBRARY === */}
+        <ImageView
+          images={[{ uri: imgPreview.src }]}
+          imageIndex={0}
           visible={imgPreview.open}
-          transparent
           onRequestClose={closePreview}
-          animationType="fade"
-        >
-          <View style={styles.modalBackdrop}>
-            <ExpoImage
-              source={{ uri: normalizeUrl(imgPreview.src) }}
+          // Dùng Custom Component bọc ExpoImage
+          ImageComponent={CustomExpoImage}
+          // Nền thay đổi theo theme
+          backgroundColor={C.imageViewBg}
+          // Nút Close ở Header
+          HeaderComponent={({ imageIndex }) => (
+            <SafeAreaView
               style={{
-                width: "90%",
-                height: 400,
-                borderRadius: 12,
-                backgroundColor: "#000",
+                width: "100%",
+                alignItems: "flex-end",
+                zIndex: 10,
               }}
-              contentFit="contain"
-            />
-            <TouchableOpacity
-              style={{
-                marginTop: 20,
-                padding: 12,
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: 20,
-              }}
-              onPress={closePreview}
             >
-              <Ionicons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </Modal>
+              <TouchableOpacity
+                style={{
+                  padding: 10,
+                  marginTop: Platform.OS === "android" ? 10 : 0,
+                  backgroundColor: C.imageViewCloseBtn,
+                  borderRadius: 20,
+                  marginRight: 16,
+                }}
+                onPress={closePreview}
+              >
+                <Ionicons
+                  name="close"
+                  size={26}
+                  color={C.imageViewText} // Icon màu tương phản
+                />
+              </TouchableOpacity>
+            </SafeAreaView>
+          )}
+          // Caption Name ở Footer
+          FooterComponent={({ imageIndex }) =>
+            imgPreview.name ? (
+              <SafeAreaView>
+                <View
+                  style={{
+                    padding: 16,
+                    alignItems: "center",
+                    backgroundColor: "rgba(0,0,0,0.5)", // Vẫn giữ nền mờ để text dễ đọc
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#fff", // Text luôn trắng vì nền mờ đen
+                      fontWeight: "bold",
+                      fontSize: 16,
+                    }}
+                  >
+                    {imgPreview.name}
+                  </Text>
+                </View>
+              </SafeAreaView>
+            ) : undefined
+          }
+        />
 
         <Modal
           visible={replaceDlg.open}
@@ -1967,12 +2059,6 @@ export default function TournamentRegistrationScreen() {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-
-        <PublicProfileSheet
-          open={profile.open}
-          userId={profile.userId}
-          onClose={() => setProfile({ open: false, userId: null })}
-        />
 
         <Modal
           visible={paymentDlg.open}

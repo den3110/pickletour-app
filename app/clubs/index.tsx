@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// screens/ClubsListScreen.tsx (UPDATED)
+// screens/ClubsListScreen.tsx (UPDATED WITH SKELETON)
 // ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import {
@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
-  ActivityIndicator,
+  // ActivityIndicator, // ❌ Bỏ cái này đi vì ko dùng nữa
 } from "react-native";
 import { Text } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,7 +21,10 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   useSharedValue,
-} from "react-native-reanimated";
+  withRepeat,
+  withTiming,
+  withSequence,
+} from "react-native-reanimated"; // 🆕 Thêm withRepeat, withTiming, withSequence
 import { Stack, useRouter } from "expo-router";
 import { useListClubsQuery } from "@/slices/clubsApiSlice";
 import ClubCard from "@/components/clubs/ClubCard";
@@ -31,11 +34,48 @@ import { Chip } from "@/components/ui/Chip";
 import Button from "@/components/ui/Button";
 import type { Club } from "@/types/club.types";
 import { Ionicons } from "@expo/vector-icons";
-import ClubCreateModal from "@/components/clubs/ClubCreateModal"; // 👈 NEW
+import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 
 const { width } = Dimensions.get("window");
 
 const SPORT_OPTIONS: string[] = [];
+
+// 🆕 COMPONENT SKELETON MỚI
+const ClubSkeleton = () => {
+  const opacity = useSharedValue(0.5);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 800 }),
+        withTiming(0.5, { duration: 800 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.skeletonCard, animatedStyle]}>
+      {/* Ảnh cover giả */}
+      <View style={styles.skeletonCover} />
+      {/* Nội dung bên dưới */}
+      <View style={{ padding: 12 }}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonLine} />
+        <View style={[styles.skeletonLine, { width: "60%" }]} />
+        <View style={styles.skeletonTagsRow}>
+          <View style={styles.skeletonChip} />
+          <View style={styles.skeletonChip} />
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
 
 export default function ClubsListScreen() {
   const router = useRouter();
@@ -45,12 +85,10 @@ export default function ClubsListScreen() {
   const [province, setProvince] = useState("");
   const [tab, setTab] = useState<"all" | "mine">("all");
 
-  // NEW: full-screen create modal
   const [openCreate, setOpenCreate] = useState(false);
 
   const scrollY = useSharedValue(0);
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery.trim());
@@ -106,7 +144,6 @@ export default function ClubsListScreen() {
           </Text>
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <TextInput
             placeholder="Tìm kiếm câu lạc bộ..."
@@ -119,7 +156,6 @@ export default function ClubsListScreen() {
           />
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tab, tab === "all" && styles.tabActive]}
@@ -143,7 +179,6 @@ export default function ClubsListScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Filter Chips */}
         <View style={styles.filterContainer}>
           <ScrollView
             horizontal
@@ -178,11 +213,13 @@ export default function ClubsListScreen() {
   );
 
   const renderEmpty = () => {
+    // 🆕 SỬA LOGIC: Render Skeleton list khi loading
     if (isLoading) {
       return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải...</Text>
+        <View style={{ gap: 16 }}>
+          {[1, 2, 3, 4, 5].map((item) => (
+            <ClubSkeleton key={item} />
+          ))}
         </View>
       );
     }
@@ -204,7 +241,7 @@ export default function ClubsListScreen() {
             ? "Thử thay đổi bộ lọc"
             : "Chưa có CLB nào được tạo"
         }
-        onAction={() => setOpenCreate(true)} // 👈 OPEN MODAL (was route)
+        onAction={() => setOpenCreate(true)}
         actionText="Tạo CLB"
       />
     );
@@ -239,10 +276,9 @@ export default function ClubsListScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        {/* FAB */}
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => setOpenCreate(true)} // 👈 OPEN MODAL (was route)
+          onPress={() => setOpenCreate(true)}
           activeOpacity={0.8}
         >
           <LinearGradient
@@ -253,7 +289,6 @@ export default function ClubsListScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Fullscreen Create Modal */}
         <ClubCreateModal
           visible={openCreate}
           onClose={(changed) => {
@@ -261,7 +296,6 @@ export default function ClubsListScreen() {
             if (changed) refetch();
           }}
           onCreated={(club) => {
-            // optional: jump into the newly created club
             if (club?._id) {
               router.push(`/clubs/${club._id}`);
             }
@@ -338,6 +372,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 20,
   },
+  // BỎ loadingContainer cũ đi cũng được vì giờ dùng Skeleton
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -368,7 +403,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // 👇 thêm mới
   headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -378,6 +412,48 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 4,
     marginRight: 4,
-    // không background theo yêu cầu
+  },
+
+  /* 🆕 SKELETON STYLES */
+  skeletonCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  skeletonCover: {
+    height: 140,
+    backgroundColor: "#e1e4e8",
+    width: "100%",
+  },
+  skeletonTitle: {
+    height: 20,
+    backgroundColor: "#e1e4e8",
+    width: "70%",
+    borderRadius: 4,
+    marginBottom: 10,
+  },
+  skeletonLine: {
+    height: 14,
+    backgroundColor: "#e1e4e8",
+    width: "90%",
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  skeletonTagsRow: {
+    flexDirection: "row",
+    marginTop: 10,
+    gap: 8,
+  },
+  skeletonChip: {
+    width: 60,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#e1e4e8",
   },
 });

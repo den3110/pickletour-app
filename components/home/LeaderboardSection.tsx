@@ -127,7 +127,7 @@ function LeaderboardCard({ athlete, theme }) {
                 {athlete.winRate || 0}%
               </Text>
               <Text style={[styles.statLabel, { color: subtext }]}>
-                Win Rate
+                Tỷ lệ thắng
               </Text>
             </View>
 

@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   StatusBar,
+  Animated, // ✅ Import Animated
 } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router, Stack } from "expo-router";
@@ -19,6 +19,164 @@ import {
   useUpdateKycStatusMutation,
 } from "@/slices/usersApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+
+// ✅ 1. Component Skeleton Item (Hiệu ứng thở - Pulse)
+const SkeletonItem = ({ width, height, borderRadius = 4, style, colors }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  // Màu nền của Skeleton tuỳ theo dark/light mode
+  const skeletonColor = colors.border;
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: width,
+          height: height,
+          borderRadius: borderRadius,
+          backgroundColor: skeletonColor,
+          opacity: opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// ✅ 2. Layout Skeleton mô phỏng màn hình thật
+const KycLoadingSkeleton = ({ colors }) => {
+  return (
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        {/* Card Skeleton */}
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          {/* Label Họ tên */}
+          <SkeletonItem width={60} height={14} colors={colors} />
+          {/* Value Họ tên */}
+          <SkeletonItem
+            width={180}
+            height={20}
+            style={{ marginTop: 8 }}
+            colors={colors}
+          />
+
+          <View style={{ height: 16 }} />
+
+          {/* Label CCCD */}
+          <SkeletonItem width={100} height={14} colors={colors} />
+          {/* Value CCCD (To) */}
+          <SkeletonItem
+            width={220}
+            height={32}
+            style={{ marginTop: 8 }}
+            colors={colors}
+          />
+
+          {/* Badge Status */}
+          <SkeletonItem
+            width={140}
+            height={36}
+            borderRadius={8}
+            style={{ marginTop: 16 }}
+            colors={colors}
+          />
+        </View>
+
+        {/* Title Image */}
+        <SkeletonItem
+          width={150}
+          height={20}
+          style={{ marginBottom: 12 }}
+          colors={colors}
+        />
+
+        {/* Image Grid Skeleton */}
+        <View style={styles.imageGrid}>
+          {/* Front Image */}
+          <View
+            style={[
+              styles.imageWrapper,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View
+              style={{
+                padding: 20,
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+              }}
+            >
+              <SkeletonItem
+                width="100%"
+                height="100%"
+                borderRadius={8}
+                colors={colors}
+                style={{ opacity: 0.1 }}
+              />
+            </View>
+          </View>
+          {/* Back Image */}
+          <View
+            style={[
+              styles.imageWrapper,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View
+              style={{
+                padding: 20,
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+              }}
+            >
+              <SkeletonItem
+                width="100%"
+                height="100%"
+                borderRadius={8}
+                colors={colors}
+                style={{ opacity: 0.1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
+// ✅ 3. Wrapper cho ImageViewing
+const CustomImageComponent = (props) => {
+  return (
+    <Image
+      {...props}
+      style={{ width: "100%", height: "100%" }}
+      contentFit="contain"
+      cachePolicy="memory-disk"
+      transition={200}
+    />
+  );
+};
 
 export default function KycCheckScreen() {
   const { id } = useLocalSearchParams();
@@ -81,42 +239,37 @@ export default function KycCheckScreen() {
     );
   };
 
-  // --- Helper lấy thông tin hiển thị trạng thái ---
   const getStatusInfo = (status) => {
     switch (status) {
       case "verified":
-        return {
-          label: "Đã xác thực",
-          bg: "#E8F5E9",
-          color: "#2E7D32",
-        };
+        return { label: "Đã xác thực", bg: "#E8F5E9", color: "#2E7D32" };
       case "rejected":
-        return {
-          label: "Bị từ chối",
-          bg: "#FFEBEE",
-          color: "#C62828",
-        };
+        return { label: "Bị từ chối", bg: "#FFEBEE", color: "#C62828" };
       case "pending":
-        return {
-          label: "Đang chờ duyệt",
-          bg: "#FFF3E0",
-          color: "#EF6C00",
-        };
+        return { label: "Đang chờ duyệt", bg: "#FFF3E0", color: "#EF6C00" };
       case "unverified":
       default:
         return {
           label: "Chưa xác thực",
-          bg: isDark ? "#333" : "#EEEEEE", // Màu xám cho chưa xác thực
+          bg: isDark ? "#333" : "#EEEEEE",
           color: isDark ? "#CCC" : "#757575",
         };
     }
   };
 
+  // ✅ Thay thế ActivityIndicator bằng Skeleton Layout
   if (isLoading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color="#6366F1" />
-      </View>
+      <>
+        <Stack.Screen
+          options={{
+            title: "Duyệt định danh",
+            headerStyle: { backgroundColor: colors.card },
+            headerTintColor: colors.text,
+          }}
+        />
+        <KycLoadingSkeleton colors={colors} />
+      </>
     );
   }
 
@@ -128,7 +281,6 @@ export default function KycCheckScreen() {
     );
   }
 
-  // Lấy info trạng thái hiện tại
   const statusMeta = getStatusInfo(data.cccdStatus);
 
   return (
@@ -161,7 +313,6 @@ export default function KycCheckScreen() {
               {data.cccd || "Chưa nhập"}
             </Text>
 
-            {/* Badge hiển thị trạng thái đã Việt hóa */}
             <View
               style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}
             >
@@ -196,6 +347,7 @@ export default function KycCheckScreen() {
                   source={{ uri: frontImg }}
                   style={styles.image}
                   contentFit="contain"
+                  cachePolicy="memory-disk"
                 />
               ) : (
                 <View style={styles.noImage}>
@@ -225,6 +377,7 @@ export default function KycCheckScreen() {
                   source={{ uri: backImg }}
                   style={styles.image}
                   contentFit="contain"
+                  cachePolicy="memory-disk"
                 />
               ) : (
                 <View style={styles.noImage}>
@@ -285,13 +438,13 @@ export default function KycCheckScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Image Viewer */}
         <ImageViewing
           images={images}
           imageIndex={currentImageIndex}
           visible={isViewerOpen}
           onRequestClose={() => setIsViewerOpen(false)}
           backgroundColor={isDark ? "#000" : "#FFF"}
+          ImageComponent={CustomImageComponent}
         />
       </View>
     </>

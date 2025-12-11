@@ -29,11 +29,7 @@ import { Calendar } from "react-native-calendars";
 
 const ViewerImage = (props) => {
   return (
-    <ExpoImage
-      {...props}
-      cachePolicy="memory-disk"
-      contentFit="contain"
-    />
+    <ExpoImage {...props} cachePolicy="memory-disk" contentFit="contain" />
   );
 };
 
@@ -570,9 +566,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 <PrimaryBtn
                   theme={theme}
                   icon="calendar-outline"
-                  onPress={() =>
-                    router.push(`/tournament/${tt._id}/schedule`)
-                  }
+                  onPress={() => router.push(`/tournament/${tt._id}/schedule`)}
                 >
                   Lịch đấu
                 </PrimaryBtn>
@@ -580,9 +574,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 <WarningBtn
                   theme={theme}
                   icon="person-add-outline"
-                  onPress={() =>
-                    router.push(`/tournament/${tt._id}/register`)
-                  }
+                  onPress={() => router.push(`/tournament/${tt._id}/register`)}
                 >
                   Đăng ký
                 </WarningBtn>
@@ -605,9 +597,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 <WarningBtn
                   theme={theme}
                   icon="person-add-outline"
-                  onPress={() =>
-                    router.push(`/tournament/${tt._id}/register`)
-                  }
+                  onPress={() => router.push(`/tournament/${tt._id}/register`)}
                 >
                   Đăng ký
                 </WarningBtn>
@@ -629,18 +619,14 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 <PrimaryBtn
                   theme={theme}
                   icon="calendar-outline"
-                  onPress={() =>
-                    router.push(`/tournament/${tt._id}/schedule`)
-                  }
+                  onPress={() => router.push(`/tournament/${tt._id}/schedule`)}
                 >
                   Lịch đấu
                 </PrimaryBtn>
                 <SuccessBtn
                   theme={theme}
                   icon="qr-code-outline"
-                  onPress={() =>
-                    router.push(`/tournament/${tt._id}/checkin`)
-                  }
+                  onPress={() => router.push(`/tournament/${tt._id}/checkin`)}
                 >
                   Check-in
                 </SuccessBtn>
@@ -679,169 +665,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
     );
   };
 
-  // ✅ Header component để đưa vào FlatList
-  const ListHeader = () => (
-    <View style={{ marginBottom: 10 }}>
-      {/* Header Title */}
-      <View style={styles.header}>
-        {isBack && (
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={10}
-            style={{ marginRight: 10 }}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={28}
-              color={theme.colors.text}
-            />
-          </Pressable>
-        )}
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Giải đấu
-        </Text>
-      </View>
-
-      {/* Search */}
-      <View
-        style={[
-          styles.searchBox,
-          {
-            backgroundColor: theme.colors.card,
-            borderColor: theme.colors.border,
-          },
-        ]}
-      >
-        <Ionicons name="search" size={20} color={theme.colors.textSec} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.colors.text }]}
-          placeholder="Tìm kiếm giải đấu..."
-          placeholderTextColor={theme.colors.textSec}
-          value={keyword}
-          onChangeText={setKeyword}
-          returnKeyType="search"
-        />
-        {keyword.length > 0 && (
-          <Pressable onPress={() => setKeyword("")}>
-            <Ionicons
-              name="close-circle"
-              size={18}
-              color={theme.colors.textSec}
-            />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Tabs + Date filter */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 6,
-          gap: 8,
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-        }}
-      >
-        <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
-          {TABS.map((t) => (
-            <TabPill
-              key={t.key}
-              label={t.label}
-              active={tab === t.key}
-              onPress={() => setTab(t.key)}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        <Pressable
-          onPress={openDateModal}
-          style={({ pressed }) => [
-            styles.dateFilterPill,
-            {
-              backgroundColor: hasDateFilter
-                ? theme.colors.primary + "12"
-                : theme.colors.card,
-              borderColor: hasDateFilter
-                ? theme.colors.primary
-                : theme.colors.border,
-            },
-            pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-          ]}
-        >
-          <Ionicons
-            name="calendar-outline"
-            size={14}
-            color={
-              hasDateFilter ? theme.colors.primary : theme.colors.textSec
-            }
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.dateFilterLabel,
-              {
-                color: hasDateFilter
-                  ? theme.colors.primary
-                  : theme.colors.textSec,
-              },
-            ]}
-          >
-            {hasDateFilter
-              ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
-              : "Lọc theo ngày"}
-          </Text>
-
-          {hasDateFilter && (
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: theme.colors.primary,
-                marginHorizontal: 4,
-              }}
-            />
-          )}
-
-          {hasDateFilter && (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                clearDateFilter();
-              }}
-              style={{ marginLeft: 2 }}
-            >
-              <Ionicons
-                name="close-circle"
-                size={14}
-                color={theme.colors.primary}
-              />
-            </Pressable>
-          )}
-        </Pressable>
-      </View>
-
-      {/* Error Message if any */}
-      {!!error && (
-        <View
-          style={[
-            styles.errorBox,
-            { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
-          ]}
-        >
-          <Ionicons name="alert-circle" size={20} color="#ef4444" />
-          <Text style={{ color: "#b91c1c", flex: 1 }}>
-            {error?.data?.message || error?.error || "Có lỗi xảy ra"}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
   return (
     <SafeAreaView
       style={{
@@ -853,7 +676,176 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         {/* ✅ FlatList bọc tất cả (kể cả Header) */}
         {isLoading || isFetching ? (
           <FlatList
-            ListHeaderComponent={ListHeader}
+            // ✅ FIX 1: Truyền trực tiếp JSX vào ListHeaderComponent để không bị unmount/mount lại khi state thay đổi
+            ListHeaderComponent={
+              <View style={{ marginBottom: 10 }}>
+                {/* Header Title */}
+                <View style={styles.header}>
+                  {isBack && (
+                    <Pressable
+                      onPress={() => router.back()}
+                      hitSlop={10}
+                      style={{ marginRight: 10 }}
+                    >
+                      <Ionicons
+                        name="chevron-back"
+                        size={28}
+                        color={theme.colors.text}
+                      />
+                    </Pressable>
+                  )}
+                  <Text
+                    style={[styles.headerTitle, { color: theme.colors.text }]}
+                  >
+                    Giải đấu
+                  </Text>
+                </View>
+
+                {/* Search */}
+                <View
+                  style={[
+                    styles.searchBox,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="search"
+                    size={20}
+                    color={theme.colors.textSec}
+                  />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.colors.text }]}
+                    placeholder="Tìm kiếm giải đấu..."
+                    placeholderTextColor={theme.colors.textSec}
+                    value={keyword}
+                    onChangeText={setKeyword}
+                    returnKeyType="search"
+                  />
+                  {keyword.length > 0 && (
+                    <Pressable onPress={() => setKeyword("")}>
+                      <Ionicons
+                        name="close-circle"
+                        size={18}
+                        color={theme.colors.textSec}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Tabs + Date filter */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 6,
+                    gap: 8,
+                    flexWrap: "wrap",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
+                    {TABS.map((t) => (
+                      <TabPill
+                        key={t.key}
+                        label={t.label}
+                        active={tab === t.key}
+                        onPress={() => setTab(t.key)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+
+                  <Pressable
+                    onPress={openDateModal}
+                    style={({ pressed }) => [
+                      styles.dateFilterPill,
+                      {
+                        backgroundColor: hasDateFilter
+                          ? theme.colors.primary + "12"
+                          : theme.colors.card,
+                        borderColor: hasDateFilter
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      },
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+                    ]}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={14}
+                      color={
+                        hasDateFilter
+                          ? theme.colors.primary
+                          : theme.colors.textSec
+                      }
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.dateFilterLabel,
+                        {
+                          color: hasDateFilter
+                            ? theme.colors.primary
+                            : theme.colors.textSec,
+                        },
+                      ]}
+                    >
+                      {hasDateFilter
+                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
+                        : "Lọc theo ngày"}
+                    </Text>
+
+                    {hasDateFilter && (
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: theme.colors.primary,
+                          marginHorizontal: 4,
+                        }}
+                      />
+                    )}
+
+                    {hasDateFilter && (
+                      <Pressable
+                        hitSlop={8}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          clearDateFilter();
+                        }}
+                        style={{ marginLeft: 2 }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={14}
+                          color={theme.colors.primary}
+                        />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* Error Message if any */}
+                {!!error && (
+                  <View
+                    style={[
+                      styles.errorBox,
+                      { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+                    ]}
+                  >
+                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                    <Text style={{ color: "#b91c1c", flex: 1 }}>
+                      {error?.data?.message || error?.error || "Có lỗi xảy ra"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            }
             data={Array.from({ length: SKELETON_COUNT })}
             keyExtractor={(_, i) => `sk-${i}`}
             renderItem={() => <SkeletonCard />}
@@ -861,11 +853,181 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             contentContainerStyle={{ paddingBottom: 30 }}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
+            // ✅ FIX 2: Cho phép bấm nút khi bàn phím đang mở
             keyboardShouldPersistTaps="handled"
           />
         ) : (
           <FlatList
-            ListHeaderComponent={ListHeader}
+            // ✅ FIX 1: (Áp dụng tương tự cho list chính)
+            ListHeaderComponent={
+              <View style={{ marginBottom: 10 }}>
+                {/* Header Title */}
+                <View style={styles.header}>
+                  {isBack && (
+                    <Pressable
+                      onPress={() => router.back()}
+                      hitSlop={10}
+                      style={{ marginRight: 10 }}
+                    >
+                      <Ionicons
+                        name="chevron-back"
+                        size={28}
+                        color={theme.colors.text}
+                      />
+                    </Pressable>
+                  )}
+                  <Text
+                    style={[styles.headerTitle, { color: theme.colors.text }]}
+                  >
+                    Giải đấu
+                  </Text>
+                </View>
+
+                {/* Search */}
+                <View
+                  style={[
+                    styles.searchBox,
+                    {
+                      backgroundColor: theme.colors.card,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="search"
+                    size={20}
+                    color={theme.colors.textSec}
+                  />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.colors.text }]}
+                    placeholder="Tìm kiếm giải đấu..."
+                    placeholderTextColor={theme.colors.textSec}
+                    value={keyword}
+                    onChangeText={setKeyword}
+                    returnKeyType="search"
+                  />
+                  {keyword.length > 0 && (
+                    <Pressable onPress={() => setKeyword("")}>
+                      <Ionicons
+                        name="close-circle"
+                        size={18}
+                        color={theme.colors.textSec}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Tabs + Date filter */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 6,
+                    gap: 8,
+                    flexWrap: "wrap",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
+                    {TABS.map((t) => (
+                      <TabPill
+                        key={t.key}
+                        label={t.label}
+                        active={tab === t.key}
+                        onPress={() => setTab(t.key)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+
+                  <Pressable
+                    onPress={openDateModal}
+                    style={({ pressed }) => [
+                      styles.dateFilterPill,
+                      {
+                        backgroundColor: hasDateFilter
+                          ? theme.colors.primary + "12"
+                          : theme.colors.card,
+                        borderColor: hasDateFilter
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      },
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+                    ]}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={14}
+                      color={
+                        hasDateFilter
+                          ? theme.colors.primary
+                          : theme.colors.textSec
+                      }
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.dateFilterLabel,
+                        {
+                          color: hasDateFilter
+                            ? theme.colors.primary
+                            : theme.colors.textSec,
+                        },
+                      ]}
+                    >
+                      {hasDateFilter
+                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
+                        : "Lọc theo ngày"}
+                    </Text>
+
+                    {hasDateFilter && (
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: theme.colors.primary,
+                          marginHorizontal: 4,
+                        }}
+                      />
+                    )}
+
+                    {hasDateFilter && (
+                      <Pressable
+                        hitSlop={8}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          clearDateFilter();
+                        }}
+                        style={{ marginLeft: 2 }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={14}
+                          color={theme.colors.primary}
+                        />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* Error Message if any */}
+                {!!error && (
+                  <View
+                    style={[
+                      styles.errorBox,
+                      { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+                    ]}
+                  >
+                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                    <Text style={{ color: "#b91c1c", flex: 1 }}>
+                      {error?.data?.message || error?.error || "Có lỗi xảy ra"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            }
             data={filtered}
             keyExtractor={(item) => String(item._id)}
             renderItem={renderItem}
@@ -875,6 +1037,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             onRefresh={onRefresh}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
+            // ✅ FIX 2: Cho phép bấm nút khi bàn phím đang mở
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyState}>

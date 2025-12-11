@@ -8,7 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,119 +21,244 @@ import {
 } from "react-native";
 import { useSelector } from "react-redux";
 
-/* ===== DUPR helpers ===== */
-// ✅ hạ sàn xuống 1.6
+/* ===== DUPR LOGIC ===== */
 const DUPR_MIN = 1.6;
 const DUPR_MAX = 8.0;
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
 const round3 = (n) => Number((Number(n) || 0).toFixed(3));
 const normalizeDupr = (n) => round3(clamp(n, DUPR_MIN, DUPR_MAX));
-// từ raw 0–10 → ra điểm trong dải 1.6–8.0 (dải rộng 6.4)
 const duprFromRaw = (raw0to10) =>
   round3(DUPR_MIN + clamp(raw0to10, 0, 10) * ((DUPR_MAX - DUPR_MIN) / 10));
 
-/* ===== THEME TOKENS (đồng bộ với các màn trước) ===== */
+/* ===== THEME TOKENS ===== */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#cbd5e1" : "#475569";
-
-  const canvasBg = scheme === "dark" ? "#0b0c10" : "#f7f9fc";
-  const cardBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const border = scheme === "dark" ? "#2f3339" : "#e4e8ef";
-  const softBg = scheme === "dark" ? "#1a1c22" : "#f2f4f8";
-
-  const chipBg = scheme === "dark" ? "#1e293b" : "#eef2f7";
-  const chipFg = scheme === "dark" ? "#cbd5e1" : "#263238";
-
-  const success = scheme === "dark" ? "#22c55e" : "#16a34a";
-  const danger = "#ef4444";
-
-  const inputBg = scheme === "dark" ? "#0f1115" : "#ffffff";
+  const isDark = scheme === "dark";
 
   return {
-    scheme,
-    tint,
-    textPrimary,
-    textSecondary,
-    canvasBg,
-    cardBg,
-    border,
-    softBg,
-    chipBg,
-    chipFg,
-    success,
-    danger,
-    inputBg,
+    isDark,
+    bg: isDark ? "#0f172a" : "#f8fafc",
+    card: isDark ? "#1e293b" : "#ffffff",
+    text: isDark ? "#f1f5f9" : "#0f172a",
+    subText: isDark ? "#94a3b8" : "#64748b",
+    border: isDark ? "#334155" : "#e2e8f0",
+    primary: "#3b82f6",
+    primaryLight: isDark ? "rgba(59, 130, 246, 0.2)" : "#eff6ff",
+    success: "#10b981",
+    successLight: isDark ? "rgba(16, 185, 129, 0.2)" : "#ecfdf5",
+    chipBg: isDark ? "#334155" : "#e2e8f0",
+    skeleton: isDark ? "#334155" : "#cbd5e1", // Màu cho skeleton
   };
 }
 
-/* Rubric (đã hạ mốc đầu xuống 1.6 cho khớp sàn) */
+/* ===== SKELETON COMPONENTS ===== */
+const SkeletonBlock = ({ style, theme }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        { backgroundColor: theme.skeleton, opacity, borderRadius: 8 },
+        style,
+      ]}
+    />
+  );
+};
+
+const LevelPointSkeleton = ({ theme }) => {
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      <View style={{ padding: 20 }}>
+        {/* Header Skeleton */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 30,
+          }}
+        >
+          <View>
+            <SkeletonBlock
+              theme={theme}
+              style={{ width: 150, height: 32, marginBottom: 8 }}
+            />
+            <SkeletonBlock theme={theme} style={{ width: 220, height: 16 }} />
+          </View>
+          <SkeletonBlock
+            theme={theme}
+            style={{ width: 100, height: 28, borderRadius: 20 }}
+          />
+        </View>
+
+        {/* Inputs Skeleton */}
+        <View style={styles.statsGrid}>
+          <View
+            style={[
+              styles.statCard,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                height: 160,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            ]}
+          >
+            <SkeletonBlock
+              theme={theme}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                marginBottom: 10,
+              }}
+            />
+            <SkeletonBlock
+              theme={theme}
+              style={{ width: 80, height: 14, marginBottom: 10 }}
+            />
+            <SkeletonBlock theme={theme} style={{ width: 60, height: 30 }} />
+          </View>
+          <View
+            style={[
+              styles.statCard,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                height: 160,
+                alignItems: "center",
+                justifyContent: "center",
+              },
+            ]}
+          >
+            <SkeletonBlock
+              theme={theme}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                marginBottom: 10,
+              }}
+            />
+            <SkeletonBlock
+              theme={theme}
+              style={{ width: 80, height: 14, marginBottom: 10 }}
+            />
+            <SkeletonBlock theme={theme} style={{ width: 60, height: 30 }} />
+          </View>
+        </View>
+
+        {/* Buttons Skeleton */}
+        <View style={styles.btnRow}>
+          <SkeletonBlock
+            theme={theme}
+            style={{ width: 80, height: 50, borderRadius: 14 }}
+          />
+          <SkeletonBlock
+            theme={theme}
+            style={{ flex: 1, height: 50, borderRadius: 14 }}
+          />
+        </View>
+
+        {/* Rubric Skeleton */}
+        <View style={{ marginTop: 30 }}>
+          <SkeletonBlock
+            theme={theme}
+            style={{ width: 180, height: 16, marginBottom: 12 }}
+          />
+          <View
+            style={{
+              borderRadius: 16,
+              overflow: "hidden",
+              backgroundColor: theme.card,
+            }}
+          >
+            {[1, 2, 3, 4, 5].map((i) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: "row",
+                  padding: 12,
+                  marginBottom: 2,
+                  alignItems: "center",
+                }}
+              >
+                <SkeletonBlock
+                  theme={theme}
+                  style={{ width: 30, height: 20, marginRight: 15 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <SkeletonBlock
+                    theme={theme}
+                    style={{ width: "40%", height: 14, marginBottom: 6 }}
+                  />
+                  <SkeletonBlock
+                    theme={theme}
+                    style={{ width: "90%", height: 12 }}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+/* ===== RUBRIC DATA ===== */
 const RUBRIC = [
   {
     level: 1.6,
     label: "New / Recreational",
-    bullets: [
-      "Mới chơi, thao tác còn chậm",
-      "Giao bóng chưa ổn định",
-      "Đứng vị trí còn lúng túng",
-    ],
+    desc: "Mới chơi, thao tác còn chậm. Giao bóng chưa ổn định.",
   },
   {
     level: 2.0,
     label: "Beginner",
-    bullets: [
-      "Giao bóng bắt đầu đều",
-      "Đánh bóng dễ/giữa sân",
-      "Chưa kiểm soát được tempo",
-    ],
+    desc: "Giao bóng bắt đầu đều. Đánh bóng dễ. Chưa kiểm soát tempo.",
   },
   {
     level: 2.5,
     label: "Lower Intermediate",
-    bullets: ["Giao & trả ổn định", "Rally ngắn", "Bắt đầu dink (lỗi)"],
+    desc: "Giao & trả ổn định. Rally ngắn. Bắt đầu dink (còn lỗi).",
   },
   {
     level: 3.0,
     label: "Intermediate",
-    bullets: [
-      "Giao chắc",
-      "Dink có kiểm soát",
-      "Bắt đầu third shot",
-      "Phối hợp cơ bản",
-    ],
+    desc: "Giao chắc. Dink có kiểm soát. Bắt đầu Third shot.",
   },
   {
     level: 4.0,
-    label: "Advanced Intermediate",
-    bullets: [
-      "Ít lỗi unforced",
-      "Third shot hiệu quả",
-      "Dink ổn định",
-      "Vị trí hợp lý",
-    ],
+    label: "Adv. Intermediate",
+    desc: "Ít lỗi unforced. Third shot hiệu quả. Dink ổn định.",
   },
   {
     level: 4.5,
     label: "Advanced",
-    bullets: [
-      "Rất ít lỗi",
-      "Dink chiến thuật",
-      "Volley ổn định",
-      "Đọc trận tốt",
-    ],
+    desc: "Rất ít lỗi. Dink chiến thuật. Volley ổn định. Đọc trận tốt.",
   },
   {
     level: 5.0,
     label: "Pro (5.0+)",
-    bullets: [
-      "Thi đấu cao cấp",
-      "Hầu như không lỗi",
-      "Phối hợp cực tốt",
-      "Chiến thuật linh hoạt",
-    ],
+    desc: "Thi đấu cao cấp. Hầu như không lỗi. Chiến thuật linh hoạt.",
   },
 ];
 
@@ -152,152 +277,167 @@ const nearestRubricLevel = (val) => {
   return best;
 };
 
-// chỉ cho số + 1 dấu chấm, tự chuyển , -> .
-const sanitizeDecimalInput = (s) => {
-  if (typeof s !== "string") s = String(s ?? "");
-  let v = s.replace(",", ".").replace(/[^\d.]/g, "");
-  v = v.replace(/(\..*)\./g, "$1");
-  return v;
-};
+/* ===== COMPONENTS ===== */
 
-/* ======= Small atoms (theme-aware) ======= */
-const Pill = ({ label, bg, fg }) => (
-  <View style={[styles.pill, { backgroundColor: bg }]}>
-    <Text style={[styles.pillText, { color: fg }]} numberOfLines={1}>
-      {label}
-    </Text>
-  </View>
-);
+// 1. Status Badge
+const StatusBadge = ({ loading, error, text, theme }) => {
+  if (!text && !loading && !error) return null;
 
-const Legend = React.memo(({ palette }) => (
-  <View style={styles.legendRow}>
-    <Pill label="Xanh lam = ĐƠN (Single)" bg={palette.tint} fg="#fff" />
-    <Pill label="Xanh lục = ĐÔI (Double)" bg={palette.success} fg="#fff" />
-  </View>
-));
+  let bg = theme.chipBg;
+  let color = theme.subText;
+  let label = text;
 
-/* Viền trái cho rubric – RN: vẽ 1–2 sọc đứng ở cạnh trái */
-function RubricItem({ r, activeSingle, activeDouble, palette, scheme }) {
-  const anyActive = activeSingle || activeDouble;
-  const activeBg =
-    scheme === "dark" ? "rgba(124,192,255,0.12)" : "rgba(10,132,255,0.10)";
+  if (loading) {
+    label = "Đang đồng bộ...";
+  } else if (error) {
+    bg = theme.isDark ? "#450a0a" : "#fee2e2";
+    color = "#ef4444";
+    label = "Lỗi tải dữ liệu cũ";
+  } else {
+    // Success state (Auto-filled)
+    bg = theme.isDark ? "rgba(16, 185, 129, 0.2)" : "#dcfce7";
+    color = theme.isDark ? "#34d399" : "#166534";
+  }
+
   return (
-    <View
-      style={[
-        styles.rubricItem,
-        {
-          backgroundColor: anyActive ? activeBg : "transparent",
-          borderColor: palette.border,
-        },
-      ]}
-    >
-      {activeSingle && (
-        <View
-          style={[styles.stripe, { left: 0, backgroundColor: palette.tint }]}
+    <View style={[styles.badgeContainer, { backgroundColor: bg }]}>
+      {loading && (
+        <ActivityIndicator
+          size="small"
+          color={color}
+          style={{ marginRight: 6 }}
         />
       )}
-      {activeDouble && (
-        <View
-          style={[
-            styles.stripe,
-            { left: activeSingle ? 4 : 0, backgroundColor: palette.success },
-          ]}
-        />
-      )}
-      <Text style={[styles.rubricTitle, { color: palette.textPrimary }]}>
-        Mức {r.level} ({r.label})
-      </Text>
-      <Text style={[styles.rubricBullets, { color: palette.textSecondary }]}>
-        {"• " + r.bullets.join("\n• ")}
-      </Text>
+      <Text style={[styles.badgeText, { color }]}>{label}</Text>
     </View>
   );
-}
+};
 
-/* InputCard tách riêng + memo để không remount → giữ focus */
-const InputCard = React.memo(function InputCard({
+// 2. Stat Card
+const StatCard = ({
   label,
   value,
   setValue,
-  color, // "primary" | "success"
-  didPrefillRef,
-  initializing,
-  palette,
-}) {
-  const borderColor = color === "primary" ? palette.tint : palette.success;
-  const hint =
-    color === "primary"
-      ? "Viền xanh lam = ĐƠN (Single)"
-      : "Viền xanh lục = ĐÔI (Double)";
-
-  const valid =
-    value === ""
-      ? true
-      : (() => {
-          const n = parseFloat(value);
-          return !Number.isNaN(n) && n >= DUPR_MIN && n <= DUPR_MAX;
-        })();
-
+  color,
+  bgLight,
+  icon,
+  theme,
+  onBlur,
+}) => {
+  const inputRef = useRef(null);
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={1}
+      onPress={() => inputRef.current?.focus()}
       style={[
-        styles.inputCard,
-        { borderColor, backgroundColor: palette.softBg },
+        styles.statCard,
+        { backgroundColor: theme.card, borderColor: theme.border },
       ]}
     >
-      <Text style={[styles.inputLabel, { color: palette.textPrimary }]}>
-        {label}
-      </Text>
+      <View style={[styles.iconCircle, { backgroundColor: bgLight }]}>
+        <Text style={{ fontSize: 18 }}>{icon}</Text>
+      </View>
+      <Text style={[styles.statLabel, { color: theme.subText }]}>{label}</Text>
       <TextInput
-        style={[
-          styles.textInput,
-          {
-            borderColor: valid ? palette.border : palette.danger,
-            backgroundColor: palette.inputBg,
-            color: palette.textPrimary,
-          },
-        ]}
-        placeholderTextColor={palette.textSecondary}
-        keyboardType="decimal-pad"
+        ref={inputRef}
+        style={[styles.bigInput, { color: color }]}
         value={value}
-        onChangeText={(t) => {
-          if (!didPrefillRef.current) didPrefillRef.current = true;
-          setValue(sanitizeDecimalInput(t));
-        }}
-        onBlur={() => {
-          if (value === "") return;
-          const n = parseFloat(value);
-          if (Number.isNaN(n)) return;
-          setValue(String(normalizeDupr(n)));
-        }}
-        placeholder={initializing ? "" : "vd. 3.25"}
-        returnKeyType="done"
-        blurOnSubmit
+        onChangeText={setValue}
+        onBlur={onBlur}
+        keyboardType="decimal-pad"
+        placeholder="0.0"
+        placeholderTextColor={theme.border}
+        selectTextOnFocus
+        maxLength={5}
       />
-      <Text style={[styles.helperText, { color: palette.textSecondary }]}>
-        {valid
-          ? `Dải hợp lệ ${DUPR_MIN.toFixed(3)}–${DUPR_MAX.toFixed(3)}`
-          : `Nhập ${DUPR_MIN.toFixed(3)}–${DUPR_MAX.toFixed(3)}`}
-      </Text>
-      <Text style={[styles.captionText, { color: palette.textSecondary }]}>
-        {hint}
-      </Text>
-    </View>
+      <View
+        style={{
+          height: 4,
+          width: 30,
+          backgroundColor: color,
+          borderRadius: 2,
+          marginTop: 4,
+        }}
+      />
+    </TouchableOpacity>
   );
-});
+};
 
-/* ======= Component chính ======= */
+// 3. Rubric Item
+const RubricItem = ({ item, activeSingle, activeDouble, theme }) => {
+  const isActive = activeSingle || activeDouble;
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: isActive ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isActive]);
+
+  const bgColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["transparent", theme.card],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.rubricRow,
+        {
+          backgroundColor: bgColor,
+          borderColor: isActive ? theme.border : "transparent",
+          borderWidth: isActive ? 1 : 0,
+        },
+      ]}
+    >
+      <View style={{ width: 40, alignItems: "center", paddingTop: 2 }}>
+        <Text
+          style={[
+            styles.levelNumber,
+            {
+              color: isActive ? theme.text : theme.subText,
+              fontWeight: isActive ? "800" : "600",
+            },
+          ]}
+        >
+          {item.level.toFixed(1)}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 3, marginTop: 4 }}>
+          {activeSingle && (
+            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+          )}
+          {activeDouble && (
+            <View style={[styles.dot, { backgroundColor: theme.success }]} />
+          )}
+        </View>
+      </View>
+      <View style={{ flex: 1, paddingLeft: 10 }}>
+        <Text
+          style={[
+            styles.rubricTitle,
+            { color: isActive ? theme.text : theme.subText },
+          ]}
+        >
+          {item.label}
+        </Text>
+        <Text style={[styles.rubricDesc, { color: theme.subText }]}>
+          {item.desc}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+};
+
+/* ===== MAIN SCREEN ===== */
 export default function LevelPointScreen({ userId: userIdProp }) {
   const T = useThemeTokens();
-
   const authedId = useSelector((s) => s?.auth?.userInfo?._id);
   const userId = userIdProp || authedId;
 
-  // Giữ string để nhập mượt, không tự blur
   const [singleInput, setSingleInput] = useState("");
   const [doubleInput, setDoubleInput] = useState("");
-
-  // Chặn auto-fill ghi đè khi user đã gõ
   const didPrefillRef = useRef(false);
 
   const [createAssessment, { isLoading: saving }] =
@@ -305,284 +445,201 @@ export default function LevelPointScreen({ userId: userIdProp }) {
   const {
     data: latest,
     isLoading: loadingLatest,
-    isFetching: fetchingLatest,
     error: latestError,
   } = useGetLatestAssessmentQuery(userId);
 
-  const initializing = loadingLatest || fetchingLatest;
-
-  // Prefill CHỈ 1 LẦN, CHỈ KHI CHƯA GÕ
+  // === LOGIC PREFILL ===
   useEffect(() => {
     if (!latest || didPrefillRef.current) return;
-    const bothEmpty = singleInput === "" && doubleInput === "";
-    if (!bothEmpty) return;
+    if (singleInput !== "" || doubleInput !== "") return;
 
-    // nếu BE đã lưu đúng thang DUPR thì normalize và set thẳng
-    if (
-      typeof latest?.singleLevel === "number" &&
-      typeof latest?.doubleLevel === "number"
-    ) {
+    if (typeof latest?.singleLevel === "number") {
       setSingleInput(String(normalizeDupr(latest.singleLevel)));
       setDoubleInput(String(normalizeDupr(latest.doubleLevel)));
       didPrefillRef.current = true;
-      return;
-    }
-    // nếu BE vẫn trả kiểu 0–10 thì map sang dải 1.6–8.0
-    if (
-      typeof latest?.singleScore === "number" &&
-      typeof latest?.doubleScore === "number"
-    ) {
+    } else if (typeof latest?.singleScore === "number") {
       setSingleInput(String(duprFromRaw(latest.singleScore)));
       setDoubleInput(String(duprFromRaw(latest.doubleScore)));
       didPrefillRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest]);
 
-  // Parse khi cần
+  // === TẠO TEXT TRẠNG THÁI ===
+  const statusText = useMemo(() => {
+    if (latest?._id) {
+      const dateStr = latest.scoredAt
+        ? new Date(latest.scoredAt).toLocaleDateString("vi-VN")
+        : "";
+      return `Đã tự điền từ ngày gần nhất ${dateStr}`;
+    }
+    return null;
+  }, [latest]);
+
+  const handleBlur = (val, setVal) => {
+    if (val === "") return;
+    const n = parseFloat(val);
+    if (!Number.isNaN(n)) setVal(String(normalizeDupr(n)));
+  };
+
   const parseOrNull = (s) => (s === "" ? null : normalizeDupr(parseFloat(s)));
   const singleVal = useMemo(() => parseOrNull(singleInput), [singleInput]);
   const doubleVal = useMemo(() => parseOrNull(doubleInput), [doubleInput]);
 
-  const singleValid =
-    singleVal != null &&
-    !Number.isNaN(singleVal) &&
-    singleVal >= DUPR_MIN &&
-    singleVal <= DUPR_MAX;
-  const doubleValid =
-    doubleVal != null &&
-    !Number.isNaN(doubleVal) &&
-    doubleVal >= DUPR_MIN &&
-    doubleVal <= DUPR_MAX;
+  const nearestSingle = nearestRubricLevel(singleVal);
+  const nearestDouble = nearestRubricLevel(doubleVal);
 
-  const nearestSingle = singleValid ? nearestRubricLevel(singleVal) : null;
-  const nearestDouble = doubleValid ? nearestRubricLevel(doubleVal) : null;
-
-  const latestChipText = (() => {
-    if (!userId) return null;
-    if (initializing) return "Đang tải lần chấm gần nhất…";
-    if (latestError) return "Không tải được lần chấm gần nhất";
-    if (latest?._id) {
-      const when = latest?.scoredAt
-        ? " • " + new Date(latest.scoredAt).toLocaleDateString()
-        : "";
-      return `Đã tự điền từ lần gần nhất${when}`;
-    }
-    return null;
-  })();
+  const handleReset = () => {
+    setSingleInput("");
+    setDoubleInput("");
+    didPrefillRef.current = false;
+  };
 
   const handleSubmit = async () => {
-    if (!userId) {
-      Alert.alert("Lỗi", "Thiếu userId.");
-      return;
-    }
-    if (!singleValid || !doubleValid) {
-      Alert.alert(
-        "Thiếu/không hợp lệ",
-        `Vui lòng nhập Đơn & Đôi trong dải ${DUPR_MIN.toFixed(
-          3
-        )}–${DUPR_MAX.toFixed(3)}.`
-      );
+    if (!userId) return Alert.alert("Lỗi", "Thiếu userId.");
+    const sV = parseFloat(singleInput);
+    const dV = parseFloat(doubleInput);
+    if (
+      isNaN(sV) ||
+      sV < DUPR_MIN ||
+      sV > DUPR_MAX ||
+      isNaN(dV) ||
+      dV < DUPR_MIN ||
+      dV > DUPR_MAX
+    ) {
+      Alert.alert("Chưa hợp lệ", `Điểm phải từ ${DUPR_MIN} đến ${DUPR_MAX}`);
       return;
     }
     try {
       await createAssessment({
         userId,
-        singleLevel: singleVal,
-        doubleLevel: doubleVal,
-        note: "self-eval (2 fields)",
+        singleLevel: sV,
+        doubleLevel: dV,
+        note: "Updated from App",
       }).unwrap();
-      Alert.alert("Thành công", "Đã lưu đánh giá & cập nhật ranking!");
+      Alert.alert("Thành công", "Đã cập nhật trình độ!");
     } catch (err) {
-      const msg =
-        err?.data?.message ||
-        err?.error ||
-        "Lỗi không xác định khi lưu đánh giá.";
-      Alert.alert("Lỗi", String(msg));
+      Alert.alert("Lỗi", "Không lưu được đánh giá.");
     }
   };
 
-  const isWide = Dimensions.get("window").width >= 640;
-
-  const disabledBg = T.scheme === "dark" ? "#334155" : "#9aa0a6";
+  /* ===== RETURN VIEW OR SKELETON ===== */
+  // Kiểm tra loading ở đây
+  if (loadingLatest) {
+    return (
+      <AuthGuard>
+        <LevelPointSkeleton theme={T} />
+      </AuthGuard>
+    );
+  }
 
   return (
     <AuthGuard>
-      <View style={{ flex: 1, backgroundColor: T.canvasBg }}>
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScrollView
-            contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
           >
-            {/* Header */}
-            <View style={styles.headerRow}>
-              <Text style={[styles.title, { color: T.textPrimary }]}>
-                Bảng tự đánh giá trình Pickleball
-              </Text>
-              {!!latestChipText && (
-                <Pill
-                  label={latestChipText}
-                  bg={latestError ? "#fee2e2" : T.chipBg}
-                  fg={latestError ? "#991b1b" : T.chipFg}
+            {/* Header & Status */}
+            <View style={{ marginBottom: 20 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                }}
+              >
+                <View>
+                  <Text style={[styles.headerTitle, { color: T.text }]}>
+                    Chấm trình
+                  </Text>
+                  <Text style={[styles.headerSubtitle, { color: T.subText }]}>
+                    Chấm điểm level Pickleball của bạn
+                  </Text>
+                </View>
+                <StatusBadge
+                  loading={loadingLatest}
+                  error={latestError}
+                  text={statusText}
+                  theme={T}
                 />
-              )}
+              </View>
             </View>
 
-            {/* (tuỳ chọn) Legend */}
-            {/* <Legend palette={{ tint: T.tint, success: T.success }} /> */}
-
             {/* Inputs */}
-            <View
-              style={[
-                styles.card,
-                {
-                  padding: 12,
-                  borderColor: T.border,
-                  backgroundColor: T.cardBg,
-                },
-              ]}
-            >
-              <View
+            <View style={styles.statsGrid}>
+              <StatCard
+                label="Điểm ĐƠN"
+                icon="👤"
+                value={singleInput}
+                setValue={setSingleInput}
+                color={T.primary}
+                bgLight={T.primaryLight}
+                theme={T}
+                onBlur={() => handleBlur(singleInput, setSingleInput)}
+              />
+              <StatCard
+                label="điểm ĐÔI"
+                icon="👥"
+                value={doubleInput}
+                setValue={setDoubleInput}
+                color={T.success}
+                bgLight={T.successLight}
+                theme={T}
+                onBlur={() => handleBlur(doubleInput, setDoubleInput)}
+              />
+            </View>
+
+            {/* Buttons Row */}
+            <View style={styles.btnRow}>
+              <TouchableOpacity
+                onPress={handleReset}
+                style={[styles.resetBtn, { borderColor: T.border }]}
+              >
+                <Text style={{ color: T.subText, fontWeight: "600" }}>
+                  Đặt lại
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={saving}
                 style={[
-                  styles.inputRow,
-                  { flexDirection: isWide ? "row" : "column" },
+                  styles.mainButton,
+                  { backgroundColor: T.text, opacity: saving ? 0.7 : 1 },
                 ]}
               >
-                <InputCard
-                  label="Trình ĐƠN (Single)"
-                  value={singleInput}
-                  setValue={setSingleInput}
-                  color="primary"
-                  didPrefillRef={didPrefillRef}
-                  initializing={initializing}
-                  palette={{
-                    tint: T.tint,
-                    success: T.success,
-                    border: T.border,
-                    danger: T.danger,
-                    softBg: T.softBg,
-                    inputBg: T.inputBg,
-                    textPrimary: T.textPrimary,
-                    textSecondary: T.textSecondary,
-                  }}
-                />
-                <InputCard
-                  label="Trình ĐÔI (Double)"
-                  value={doubleInput}
-                  setValue={setDoubleInput}
-                  color="success"
-                  didPrefillRef={didPrefillRef}
-                  initializing={initializing}
-                  palette={{
-                    tint: T.tint,
-                    success: T.success,
-                    border: T.border,
-                    danger: T.danger,
-                    softBg: T.softBg,
-                    inputBg: T.inputBg,
-                    textPrimary: T.textPrimary,
-                    textSecondary: T.textSecondary,
-                  }}
-                />
-              </View>
-
-              {/* Chips & Actions */}
-              <View
-                style={[
-                  styles.actionsRow,
-                  { flexDirection: isWide ? "row" : "column" },
-                ]}
-              >
-                <View
-                  style={[styles.inlineRow, { marginBottom: isWide ? 0 : 8 }]}
-                >
-                  {singleValid && (
-                    <Pill
-                      label={`Đơn: ${singleVal?.toFixed(3)}`}
-                      bg={T.scheme === "dark" ? "#1e3a8a33" : "#dbeafe"}
-                      fg={T.scheme === "dark" ? "#bfdbfe" : "#1e3a8a"}
-                    />
-                  )}
-                  {doubleValid && (
-                    <Pill
-                      label={`Đôi: ${doubleVal?.toFixed(3)}`}
-                      bg={T.scheme === "dark" ? "#052e1633" : "#dcfce7"}
-                      fg={T.scheme === "dark" ? "#86efac" : "#166534"}
-                    />
-                  )}
-                </View>
-
-                <View style={[styles.inlineRow]}>
-                  <TouchableOpacity
-                    onPress={handleSubmit}
-                    disabled={saving || !userId}
-                    style={[
-                      styles.primaryBtn,
-                      { backgroundColor: T.tint },
-                      (saving || !userId) && { backgroundColor: disabledBg },
-                    ]}
-                    activeOpacity={0.9}
-                  >
-                    {saving ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.primaryBtnText}>Cập nhật</Text>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSingleInput("");
-                      setDoubleInput("");
-                      didPrefillRef.current = false;
-                    }}
-                    style={[styles.secondaryBtn, { borderColor: T.tint }]}
-                    activeOpacity={0.9}
-                  >
-                    <Text style={[styles.secondaryBtnText, { color: T.tint }]}>
-                      Đặt lại
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <Text style={[styles.captionText, { color: T.textSecondary }]}>
-                Màu sắc: <Text style={{ fontWeight: "700" }}>xanh lam</Text> =
-                ĐƠN (Single),{" "}
-                <Text style={{ fontWeight: "700" }}>xanh lục</Text> = ĐÔI
-                (Double). Nhập số trong dải {DUPR_MIN.toFixed(3)}–
-                {DUPR_MAX.toFixed(3)}.
-              </Text>
+                {saving ? (
+                  <ActivityIndicator color={T.bg} />
+                ) : (
+                  <Text style={[styles.mainBtnText, { color: T.bg }]}>
+                    CẬP NHẬT
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
 
             {/* Rubric */}
-            <View
-              style={[
-                styles.card,
-                { borderColor: T.border, backgroundColor: T.cardBg },
-              ]}
-            >
-              <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-                📝 Bảng tự đánh giá trình độ Pickleball (tham khảo DUPR)
+            <View style={{ marginTop: 30 }}>
+              <Text style={[styles.sectionTitle, { color: T.text }]}>
+                THAM CHIẾU KỸ NĂNG
               </Text>
-              <View style={{ gap: 10 }}>
-                {RUBRIC.map((r) => (
+              <View
+                style={[
+                  styles.rubricContainer,
+                  { backgroundColor: T.isDark ? "#ffffff05" : "#ffffff80" },
+                ]}
+              >
+                {RUBRIC.map((item) => (
                   <RubricItem
-                    key={r.level}
-                    r={r}
-                    activeSingle={nearestSingle === r.level}
-                    activeDouble={nearestDouble === r.level}
-                    palette={{
-                      tint: T.tint,
-                      success: T.success,
-                      border: T.border,
-                      textPrimary: T.textPrimary,
-                      textSecondary: T.textSecondary,
-                    }}
-                    scheme={T.scheme}
+                    key={item.level}
+                    item={item}
+                    theme={T}
+                    activeSingle={nearestSingle === item.level}
+                    activeDouble={nearestDouble === item.level}
                   />
                 ))}
               </View>
@@ -594,119 +651,96 @@ export default function LevelPointScreen({ userId: userIdProp }) {
   );
 }
 
-/* ======= styles ======= */
+/* ===== STYLES ===== */
 const styles = StyleSheet.create({
-  headerRow: {
+  headerTitle: { fontSize: 26, fontWeight: "800" },
+  headerSubtitle: { fontSize: 14, marginTop: 2 },
+
+  // Badge mới
+  badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    rowGap: 8,
-    marginBottom: 12,
-  },
-  title: { fontSize: 20, fontWeight: "700" },
-
-  card: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-
-  inputRow: { gap: 12 },
-
-  inputCard: {
-    flex: 1,
-    borderWidth: 2,
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 0,
-  },
-  inputLabel: {
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  textInput: {
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 16,
-  },
-  helperText: {
-    marginTop: 6,
-    fontSize: 12,
-  },
-  captionText: { marginTop: 6, fontSize: 12 },
-
-  inlineRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-
-  actionsRow: {
-    marginTop: 12,
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-
-  primaryBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    minWidth: 120,
-    alignItems: "center",
-  },
-  primaryBtnText: { color: "#fff", fontWeight: "700" },
-
-  secondaryBtn: {
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  secondaryBtnText: { fontWeight: "700" },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-
-  // Legend / Pill
-  legendRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 8,
-  },
-  pill: {
-    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    alignSelf: "flex-start",
+    borderRadius: 20,
+    maxWidth: "50%",
   },
-  pillText: { fontSize: 12, fontWeight: "600" },
+  badgeText: { fontSize: 11, fontWeight: "600", flexShrink: 1 },
+
+  statsGrid: { flexDirection: "row", gap: 12, marginBottom: 20 },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  statLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
+  bigInput: {
+    fontSize: 28,
+    fontWeight: "800",
+    textAlign: "center",
+    padding: 0,
+    marginVertical: 4,
+  },
+
+  // Buttons
+  btnRow: { flexDirection: "row", gap: 12 },
+  resetBtn: {
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 50,
+  },
+  mainButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mainBtnText: { fontSize: 15, fontWeight: "700" },
 
   // Rubric
-  rubricItem: {
-    position: "relative",
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingLeft: 14, // chừa chỗ cho stripe
-  },
-  stripe: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: 4,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-  },
-  rubricTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 13,
     fontWeight: "700",
-    marginBottom: 4,
+    letterSpacing: 1,
+    marginBottom: 12,
+    opacity: 0.7,
   },
-  rubricBullets: { lineHeight: 20 },
+  rubricContainer: { borderRadius: 16, overflow: "hidden" },
+  rubricRow: {
+    flexDirection: "row",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 2,
+  },
+  levelNumber: {
+    fontSize: 15,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  dot: { width: 5, height: 5, borderRadius: 2.5 },
+  rubricTitle: { fontSize: 14, fontWeight: "600", marginBottom: 2 },
+  rubricDesc: { fontSize: 12, lineHeight: 16 },
 });

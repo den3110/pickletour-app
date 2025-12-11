@@ -6,7 +6,6 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,

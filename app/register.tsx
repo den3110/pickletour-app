@@ -135,12 +135,15 @@ function cleanPhone(v) {
 }
 
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
+  // 1. Mở thư viện ảnh + Bật chế độ CROP (allowsEditing: true)
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.9,
-    allowsEditing: false,
+    allowsEditing: true, // 👈 Bật tính năng sửa ảnh
+    aspect: [1, 1], // 👈 Khóa tỉ lệ vuông (Facebook style)
+    quality: 1, // Lấy chất lượng gốc sau khi crop để xử lý resize sau
     exif: false,
   });
+
   if (res.canceled) return null;
 
   let asset = res.assets?.[0];
@@ -149,47 +152,39 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   let uri = asset.uri;
   // Lấy tên + phần mở rộng an toàn
   let name =
-    asset.fileName || uri.split(/[\\/]/).pop() || `image_${Date.now()}.jpg`;
+    asset.fileName || uri.split(/[\\/]/).pop() || `avatar_${Date.now()}.jpg`;
 
-  let ext = (name.split(".").pop() || "").toLowerCase();
-  let type =
-    asset.mimeType ||
-    (ext === "png"
-      ? "image/png"
-      : ext === "webp"
-      ? "image/webp"
-      : "image/jpeg");
+  // 2. Luôn xử lý qua ImageManipulator để:
+  // - Chuyển mọi định dạng (PNG, HEIC, WEBP) về JPG
+  // - Resize về kích thước chuẩn (ví dụ 1080px) để nhẹ server
+  const actions = [{ resize: { width: 1080 } }]; // Resize ảnh về chiều rộng 1080px (giữ tỉ lệ)
 
-  // Chuyển HEIC/HEIF → JPEG
-  const isHeic = /heic|heif$/i.test(ext) || /heic|heif/i.test(type || "");
-  if (isHeic) {
-    const out = await ImageManipulator.manipulateAsync(uri, [], {
-      compress: 0.9,
-      format: ImageManipulator.SaveFormat.JPEG,
-    });
-    uri = out.uri;
-    name = name.replace(/\.(heic|heif)$/i, ".jpg");
-    type = "image/jpeg";
-    ext = "jpg";
+  const out = await ImageManipulator.manipulateAsync(uri, actions, {
+    compress: 0.8, // Nén nhẹ xuống 80% chất lượng
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  uri = out.uri;
+  // Đảm bảo đuôi file là .jpg
+  if (
+    !name.toLowerCase().endsWith(".jpg") &&
+    !name.toLowerCase().endsWith(".jpeg")
+  ) {
+    name = name.split(".")[0] + ".jpg";
   }
+  const type = "image/jpeg";
 
-  // Kiểm tra size
+  // 3. Kiểm tra size lần cuối
   const info = await FileSystem.getInfoAsync(uri, { size: true });
   const size = info.size || 0;
-  if (size > maxBytes) {
-    Alert.alert("Ảnh quá lớn", "Ảnh không được vượt quá 10MB.");
-    return null;
-  }
 
-  // Bảo đảm có đuôi hợp lệ
-  if (!/\.(png|jpe?g|webp)$/i.test(name)) {
-    const suf = /png/i.test(type) ? "png" : /webp/i.test(type) ? "webp" : "jpg";
-    if (!name.includes(".")) name = `${name}.${suf}`;
+  if (size > maxBytes) {
+    Alert.alert("Ảnh quá lớn", "Vui lòng chọn ảnh nhỏ hơn 10MB.");
+    return null;
   }
 
   return { uri, name, type, size };
 }
-
 /**
  * validateAll
  * @param {*} form
