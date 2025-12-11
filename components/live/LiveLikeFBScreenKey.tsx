@@ -1358,7 +1358,9 @@ export default function LiveLikeFBScreenKey({
             : [];
 
           const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
-
+          const stageName = safeStr(
+            finalData?.stageName || finalData?.bracket?.name || ""
+          );
           const overlayData = {
             theme: safeStr(
               finalData?.tournament?.overlay?.theme ||
@@ -1409,6 +1411,8 @@ export default function LiveLikeFBScreenKey({
             tournamentName: safeStr(finalData?.tournament?.name),
             courtName: safeStr(finalData?.court?.name || finalData?.courtName),
             tournamentLogoUrl: logoTournamentUrl,
+            // ✅ truyền thẳng stageName riêng cho native
+            stageName,
             phaseText: safeStr(finalData?.bracket?.name),
             roundLabel: safeStr(finalData?.roundCode),
 
