@@ -147,7 +147,7 @@ const getMatchIdFromPayload = (data: any): string | null => {
 };
 
 /* ====== DEBUG ====== */
-const LOG = true;
+const LOG = false;
 const log = (...args: any[]) =>
   LOG && console.log("[LiveUserMatch]", new Date().toISOString(), ...args);
 
