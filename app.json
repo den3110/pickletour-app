@@ -90,7 +90,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+          "locationWhenInUsePermission": "Cho phép PickleTour dùng vị trí của bạn để tìm người chơi và sân gần nhất.",
+          "locationAlwaysAndWhenInUsePermission": "Cho phép PickleTour cập nhật vị trí của bạn để gợi ý hoạt động quanh bạn."
         }
       ],
       ["@rnmapbox/maps"],

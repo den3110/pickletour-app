@@ -147,7 +147,7 @@ const getMatchIdFromPayload = (data: any): string | null => {
 };
 
 /* ====== DEBUG ====== */
-const LOG = false;
+const LOG = true;
 const log = (...args: any[]) =>
   LOG && console.log("[LiveUserMatch]", new Date().toISOString(), ...args);
 
@@ -1158,6 +1158,7 @@ export default function LiveLikeFBUserMatchScreen({
           facebook: parsed.facebook,
         };
       } catch (e) {
+        alert(e?.data?.message || "Không thể tạo live session.");
         log("createLiveSession → FAILED", e);
         return null;
       }
@@ -1428,6 +1429,7 @@ export default function LiveLikeFBUserMatchScreen({
           }
         }
       } catch (e) {
+        console.log(e)
         log("startForMatch → getSurfaceState error (ignored):", e);
       }
 
@@ -1435,6 +1437,7 @@ export default function LiveLikeFBUserMatchScreen({
 
       const liveInfo = await ensureOutputsForMatch(mid);
       if (!liveInfo) {
+        
         setStatusText("❌ Backend chưa trả RTMP cho trận này.");
         Alert.alert("Không thể phát", "Chưa có RTMPS URL từ server.");
         return false;
