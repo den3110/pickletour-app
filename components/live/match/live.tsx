@@ -2107,7 +2107,8 @@ export default function LiveLikeFBUserMatchScreen({
                 onPress={() => {
                   if (onFinishedGoToTournament)
                     return onFinishedGoToTournament();
-                  router.push(tournamentHref ?? "/tournament");
+                  router.push("/match/stack");
+
                 }}
               >
                 <Text style={styles.endedBtnTxt}>Về danh sách trận đấu</Text>
