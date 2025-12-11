@@ -1275,36 +1275,37 @@ export default function LiveLikeFBScreenKey({
       throttle(async (incomingData: any) => {
         if (mode !== "live" || !incomingData) return;
 
-        /* --- LOGIC MERGE DỮ LIỆU --- */
+        /* --- LOGIC MERGE DỮ LIỆU (ĐÃ FIX) --- */
         let finalData = incomingData;
 
         // Kiểm tra xem dữ liệu mới có thông tin đội không (hay chỉ có điểm)
         const hasTeamInfo =
-          incomingData.pairA || incomingData.pairB || incomingData.teams;
+          incomingData?.pairA ||
+          incomingData?.pairB ||
+          incomingData?.teams ||
+          incomingData?.teamA ||
+          incomingData?.teamB;
 
         if (hasTeamInfo) {
           // Dữ liệu đầy đủ -> Lưu vào cache để dùng cho lần sau
           latestValidDataRef.current = incomingData;
-        } else {
-          // Dữ liệu thiếu (chỉ có score) -> Lấy thông tin đội từ Cache đắp vào
-          if (latestValidDataRef.current) {
-            finalData = { ...latestValidDataRef.current, ...incomingData };
+        } else if (latestValidDataRef.current) {
+          // Dữ liệu thiếu (chỉ có score) -> Dùng cache để đắp thêm info đội
+          finalData = { ...latestValidDataRef.current, ...incomingData };
 
-            // Đảm bảo giữ lại các object quan trọng nếu incomingData bị thiếu
-            if (!finalData.pairA)
-              finalData.pairA = latestValidDataRef.current.pairA;
-            if (!finalData.pairB)
-              finalData.pairB = latestValidDataRef.current.pairB;
-            if (!finalData.teams)
-              finalData.teams = latestValidDataRef.current.teams;
-            if (!finalData.tournament)
-              finalData.tournament = latestValidDataRef.current.tournament;
-          } else {
-            // Không có cache, dữ liệu lại thiếu -> Bỏ qua để tránh vỡ giao diện (mất height)
-            return;
-          }
+          // Đảm bảo giữ lại các object quan trọng nếu incomingData bị thiếu
+          if (!finalData.pairA)
+            finalData.pairA = latestValidDataRef.current.pairA;
+          if (!finalData.pairB)
+            finalData.pairB = latestValidDataRef.current.pairB;
+          if (!finalData.teams)
+            finalData.teams = latestValidDataRef.current.teams;
+          if (!finalData.tournament)
+            finalData.tournament = latestValidDataRef.current.tournament;
+        } else {
+          // ❗ LẦN ĐẦU, CHƯA CÓ CACHE → vẫn dùng incomingData, KHÔNG return nữa
+          finalData = incomingData;
         }
-        /* --------------------------- */
 
         if (LOG) {
           console.log("overlay data source", finalData);
@@ -1322,7 +1323,7 @@ export default function LiveLikeFBScreenKey({
           const p1 = finalData.pairA || finalData.teams?.A;
           const p2 = finalData.pairB || finalData.teams?.B;
 
-          // Logic lấy tên hiển thị (tương tự file kia)
+          // Logic lấy tên hiển thị
           const getNm = (p: any, def: string) => {
             if (!p) return def;
             if (p.name) return p.name; // structure teams.A.name
@@ -1351,13 +1352,6 @@ export default function LiveLikeFBScreenKey({
             finalData.gameScores && finalData.gameScores[currentIdx]
               ? finalData.gameScores[currentIdx]
               : { a: 0, b: 0 };
-
-          // const webLogoUrl = safeStr(
-          //   overlayConfig?.webLogoUrl ||
-          //     process.env.EXPO_PUBLIC_WEB_LOGO_URL ||
-          //     finalData?.tournament?.overlay?.logoUrl ||
-          //     finalData?.bracket?.overlay?.logoUrl
-          // );
 
           const sponsorLogos = Array.isArray(overlayConfig?.sponsors)
             ? overlayConfig.sponsors.map((s: any) => s?.logoUrl).filter(Boolean)
