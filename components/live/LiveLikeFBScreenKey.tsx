@@ -513,6 +513,8 @@ export default function LiveLikeFBScreenKey({
   // 👇👇 THÊM 2 REF NÀY ĐỂ FIX LỖI NHẢY DỮ LIỆU 👇👇
   const socketHasDataRef = useRef(false); // Đánh dấu socket đã bắt đầu bắn tin
   const latestValidDataRef = useRef<any>(null); // Lưu trữ dữ liệu đầy đủ gần nhất
+  // ✅ THÊM: stageName cache (socket thiếu thì dùng cái cũ)
+  const stageNameCacheRef = useRef<string>("");
 
   /* ==== Gap ==== */
   const [gapWarnVisible, setGapWarnVisible] = useState(false);
@@ -1286,14 +1288,27 @@ export default function LiveLikeFBScreenKey({
           incomingData?.teamA ||
           incomingData?.teamB;
 
+        const getStageName = (d: any) => {
+          const s = safeStr(
+            d?.stageName || d?.stage?.name || d?.stage?.title,
+            ""
+          );
+          return s.trim();
+        };
+
         if (hasTeamInfo) {
-          // Dữ liệu đầy đủ -> Lưu vào cache để dùng cho lần sau
-          latestValidDataRef.current = incomingData;
+          // ✅ merge vào cache, không overwrite stageName rỗng
+          const prev = latestValidDataRef.current;
+          latestValidDataRef.current = { ...(prev || {}), ...incomingData };
+
+          const incomingStage = getStageName(incomingData);
+          const prevStage = getStageName(prev);
+          if (!incomingStage && prevStage) {
+            latestValidDataRef.current.stageName = prev.stageName;
+          }
         } else if (latestValidDataRef.current) {
-          // Dữ liệu thiếu (chỉ có score) -> Dùng cache để đắp thêm info đội
           finalData = { ...latestValidDataRef.current, ...incomingData };
 
-          // Đảm bảo giữ lại các object quan trọng nếu incomingData bị thiếu
           if (!finalData.pairA)
             finalData.pairA = latestValidDataRef.current.pairA;
           if (!finalData.pairB)
@@ -1302,6 +1317,14 @@ export default function LiveLikeFBScreenKey({
             finalData.teams = latestValidDataRef.current.teams;
           if (!finalData.tournament)
             finalData.tournament = latestValidDataRef.current.tournament;
+
+          // ✅ stageName: nếu incoming thiếu → giữ từ cache
+          if (
+            !getStageName(finalData) &&
+            getStageName(latestValidDataRef.current)
+          ) {
+            finalData.stageName = latestValidDataRef.current.stageName;
+          }
         } else {
           // ❗ LẦN ĐẦU, CHƯA CÓ CACHE → vẫn dùng incomingData, KHÔNG return nữa
           finalData = incomingData;
@@ -1358,9 +1381,11 @@ export default function LiveLikeFBScreenKey({
             : [];
 
           const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
-          const stageName = safeStr(
-            finalData?.stageName
-          );
+          const stageName =
+            getStageName(finalData) ||
+            getStageName(latestValidDataRef.current) ||
+            safeStr(finalData?.bracket?.name, "");
+
           const overlayData = {
             theme: safeStr(
               finalData?.tournament?.overlay?.theme ||
@@ -1647,6 +1672,8 @@ export default function LiveLikeFBScreenKey({
         // 👇👇 THÊM 2 DÒNG NÀY ĐỂ RESET CACHE KHI LIVE MỚI 👇👇
         socketHasDataRef.current = false;
         latestValidDataRef.current = null;
+        // ✅ reset stageName cache cho match mới
+        stageNameCacheRef.current = "";
         setMode("live");
         setStatusText("Đang LIVE…");
 
@@ -2522,7 +2549,10 @@ export default function LiveLikeFBScreenKey({
               onPress={() => setQualityMenuVisible(false)}
             />
             <View
-              style={[styles.qualitySheet, { paddingBottom: safeBottom + 16, paddingLeft: safeLeft }]}
+              style={[
+                styles.qualitySheet,
+                { paddingBottom: safeBottom + 16, paddingLeft: safeLeft },
+              ]}
             >
               <Text style={styles.qualityTitle}>Chất lượng video</Text>
               <Text style={styles.qualitySubtitle}>
