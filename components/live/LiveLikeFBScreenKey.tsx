@@ -1287,7 +1287,8 @@ export default function LiveLikeFBScreenKey({
           incomingData?.teams ||
           incomingData?.teamA ||
           incomingData?.teamB;
-
+        const safeStr = (val: any, fallback = "") =>
+          val != null ? String(val) : fallback;
         const getStageName = (d: any) => {
           const s = safeStr(
             d?.stageName || d?.stage?.name || d?.stage?.title,
