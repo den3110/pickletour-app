@@ -270,7 +270,7 @@ const FacebookLiveSettingsScreen = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
-          title: "Thiết lập LIVE",
+          title: "Thiết lập page LIVE",
           headerTitleAlign: "center",
           headerStyle: { backgroundColor: theme.headerBg }, // 🔹 Header bg
           headerTintColor: theme.headerTint, // 🔹 Header text/icon color

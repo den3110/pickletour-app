@@ -15,13 +15,43 @@ export const courtsApiSlice = apiSlice.injectEndpoints({
     adminGetCourtLiveConfig: builder.query({
       query: (courtId) => ({ url: `/api/admin/courts/${courtId}/live-config` }),
     }),
-
     adminSetCourtLiveConfig: builder.mutation({
-      query: ({ courtId, enabled, videoUrl, overrideExisting }) => ({
-        url: `/api/admin/courts/${courtId}/live-config`,
-        method: "PATCH",
-        body: { enabled, videoUrl, overrideExisting },
-      }),
+      query: ({
+        courtId,
+        enabled,
+        videoUrl,
+        overrideExisting,
+        // mới (đã rename)
+        advancedSettingEnabled,
+        pageMode,
+        pageConnectionId,
+        advancedSetting,
+      }) => {
+        const body = {
+          enabled,
+          videoUrl,
+          overrideExisting,
+          advancedSettingEnabled,
+          pageMode,
+          advancedSetting,
+        };
+
+        // chỉ gửi pageConnectionId khi dùng Page tự chọn
+        if (pageMode === "custom" && pageConnectionId) {
+          body.pageConnectionId = pageConnectionId;
+        }
+
+        // dọn key undefined cho sạch payload
+        Object.keys(body).forEach((k) => {
+          if (body[k] === undefined) delete body[k];
+        });
+
+        return {
+          url: `/api/admin/courts/${courtId}/live-config`,
+          method: "PATCH",
+          body,
+        };
+      },
     }),
 
     adminBulkSetCourtLiveConfig: builder.mutation({

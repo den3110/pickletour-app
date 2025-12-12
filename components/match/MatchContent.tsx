@@ -2783,7 +2783,7 @@ const Chip = memo(({ label, onPress }) => {
 /* ---------- Styling System (New & Improved) ---------- */
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    padding: 6,
     gap: 16,
   },
   centerBox: {

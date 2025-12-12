@@ -17,6 +17,9 @@ import {
   View,
   Platform,
   useWindowDimensions,
+  Switch,
+  Modal,
+  FlatList,
 } from "react-native";
 import {
   BottomSheetModal,
@@ -27,6 +30,7 @@ import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { Image } from "expo-image";
 
 /* RTK hooks */
 import {
@@ -35,6 +39,7 @@ import {
   useAdminBulkSetCourtLiveConfigMutation,
 } from "@/slices/courtsApiSlice";
 import { useAdminListMatchesByTournamentQuery } from "@/slices/tournamentsApiSlice";
+import { useGetFacebookPagesQuery } from "@/slices/facebookApiSlice";
 
 /* ---------- helpers ---------- */
 const isMongoId = (s) => typeof s === "string" && /^[a-f0-9]{24}$/i.test(s);
@@ -154,59 +159,65 @@ function BtnOutline({ onPress, children, tint, danger }) {
   );
 }
 
-/* ---------- ToggleButton ---------- */
+/* ---------- ToggleButton: dùng Switch mặc định ---------- */
 function ToggleButton({ value, onChange, colors }) {
-  const active = !!value;
+  const v = !!value;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ pressed: active }}
-      onPress={() => onChange?.(!active)}
-      android_ripple={{ color: "#00000010", borderless: false }}
-      style={({ pressed }) => [
-        styles.toggleBtn,
-        {
-          borderColor: active ? colors.primary : colors.border,
-          backgroundColor: active ? colors.primary : "transparent",
-          opacity: pressed ? 0.9 : 1,
-        },
-      ]}
-    >
-      <MaterialIcons
-        name={active ? "toggle-on" : "toggle-off"}
-        size={18}
-        color={active ? "#fff" : colors.text}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={styles.toggleLabel}>{active ? "Đang bật" : "Đang tắt"}</Text>
-    </Pressable>
+    <Switch
+      value={v}
+      onValueChange={onChange}
+      trackColor={{ false: colors.border, true: colors.primary }}
+      thumbColor={
+        Platform.OS === "android" ? (v ? colors.primary : "#f4f3f4") : undefined
+      }
+    />
   );
 }
+
+/* ---------- build advancedSetting payload ---------- */
+const buildAdvancedSettingPayload = (cfg) => {
+  const enabled = !!cfg?.advancedSettingEnabled;
+  const mode = cfg?.pageMode || "default"; // "default" (system page) | "custom" (user page)
+  if (!enabled) return null;
+
+  const out = { mode };
+  if (mode === "custom" && cfg?.pageConnectionId) {
+    out.pageConnectionId = cfg.pageConnectionId;
+  }
+  return out;
+};
 
 /* ================== SHEET (TOÀN GIẢI) ================== */
 export default function LiveSetupSheet({
   open,
   onClose,
   tournamentId,
-  bracketId, // không dùng trong mode toàn giải, giữ để tương thích
-  bracketName: bracketNameProp, // không dùng
+  bracketId, // giữ để tương thích
+  bracketName: bracketNameProp, // giữ để tương thích
   tournamentName,
-  buildCourtLiveUrl, // optional: (tid, bid, court) => string
+  buildCourtLiveUrl,
 }) {
   const sheetRef = useRef(null);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenWidth < 380;
 
   const snapPoints = useMemo(() => ["92%"], []);
+  const pageModalMaxHeight = useMemo(
+    () => Math.max(200, screenHeight - insets.top - 32),
+    [screenHeight, insets.top]
+  );
+
+  const [pagePickerCourtId, setPagePickerCourtId] = useState(null);
+  const [pageModalVisible, setPageModalVisible] = useState(false);
 
   useEffect(() => {
     if (open) sheetRef.current?.present();
     else sheetRef.current?.dismiss();
   }, [open]);
 
-  /* 1) Courts — TOÀN GIẢI */
+  /* Courts */
   const {
     data: courtsResp,
     isLoading: courtsLoading,
@@ -217,31 +228,72 @@ export default function LiveSetupSheet({
     { skip: !open }
   );
 
+  /* Facebook Pages của user */
+  const {
+    data: fbPagesResp,
+    isLoading: fbPagesLoading,
+    isError: fbPagesErr,
+  } = useGetFacebookPagesQuery(undefined, { skip: !open });
+
+  const fbPages = useMemo(() => {
+    if (!fbPagesResp) return [];
+    if (Array.isArray(fbPagesResp)) return fbPagesResp;
+    if (Array.isArray(fbPagesResp.items)) return fbPagesResp.items;
+    if (Array.isArray(fbPagesResp.pages)) return fbPagesResp.pages;
+    return [];
+  }, [fbPagesResp]);
+
   const courts = useMemo(() => {
     const items = Array.isArray(courtsResp)
       ? courtsResp
       : Array.isArray(courtsResp?.items)
       ? courtsResp.items
       : [];
-    return items.map((c) => ({
-      ...c,
-      _id: String(c._id),
-      displayLabel:
-        c.name ||
-        c.label ||
-        c.code ||
-        (Number.isFinite(c.number)
-          ? `Sân ${c.number}`
-          : `Sân #${String(c._id).slice(-4)}`),
-      liveConfig: {
-        enabled: !!c?.liveConfig?.enabled,
-        videoUrl: (c?.liveConfig?.videoUrl || "").trim(),
-        overrideExisting: !!c?.liveConfig?.overrideExisting,
-      },
-    }));
+
+    return items.map((c) => {
+      const lc = c?.liveConfig || {};
+
+      const advancedSettingEnabledFromNew = lc.advancedSettingEnabled;
+      const advancedSettingEnabledFromOld = lc.advancedRandomEnabled;
+
+      const pageModeFromNew = lc.pageMode;
+      const pageModeFromOld = lc.randomPageMode;
+
+      const pageConnectionIdFromNew = lc.pageConnectionId;
+      const pageConnectionIdFromOld = lc.randomPageConnectionId;
+
+      const pageConnectionNameFromNew = lc.pageConnectionName;
+      const pageConnectionNameFromOld = lc.randomPageConnectionName;
+
+      return {
+        ...c,
+        _id: String(c._id),
+        displayLabel:
+          c.name ||
+          c.label ||
+          c.code ||
+          (Number.isFinite(c.number)
+            ? `Sân ${c.number}`
+            : `Sân #${String(c._id).slice(-4)}`),
+        liveConfig: {
+          enabled: !!lc.enabled,
+          videoUrl: (lc.videoUrl || "").trim(),
+          overrideExisting: !!lc.overrideExisting,
+          advancedSettingEnabled:
+            typeof advancedSettingEnabledFromNew === "boolean"
+              ? advancedSettingEnabledFromNew
+              : !!advancedSettingEnabledFromOld,
+          pageMode: pageModeFromNew || pageModeFromOld || "default",
+          pageConnectionId:
+            pageConnectionIdFromNew || pageConnectionIdFromOld || null,
+          pageConnectionName:
+            pageConnectionNameFromNew || pageConnectionNameFromOld || "",
+        },
+      };
+    });
   }, [courtsResp]);
 
-  /* 2) Matches — TOÀN GIẢI */
+  /* Matches */
   const {
     data: matchPage,
     isLoading: matchesLoading,
@@ -280,7 +332,6 @@ export default function LiveSetupSheet({
     return map;
   }, [courts, matchesAll]);
 
-  /* 🔁 MỖI LẦN MỞ: refetch courts + matches */
   useEffect(() => {
     if (open && tournamentId) {
       refetchCourts?.();
@@ -288,7 +339,7 @@ export default function LiveSetupSheet({
     }
   }, [open, tournamentId, refetchCourts, refetchMatches]);
 
-  /* 3) Form state */
+  /* Form state */
   const [form, setForm] = useState({});
   const [overrideExisting, setOverrideExisting] = useState(false);
   const [busy, setBusy] = useState(new Set());
@@ -301,6 +352,10 @@ export default function LiveSetupSheet({
       next[c._id] = {
         enabled: !!c.liveConfig.enabled,
         videoUrl: c.liveConfig.videoUrl || "",
+        advancedSettingEnabled: !!c.liveConfig.advancedSettingEnabled,
+        pageMode: c.liveConfig.pageMode || "default",
+        pageConnectionId: c.liveConfig.pageConnectionId || null,
+        pageConnectionName: c.liveConfig.pageConnectionName || "",
       };
     }
     setForm(next);
@@ -308,7 +363,6 @@ export default function LiveSetupSheet({
     initialFormRef.current = next;
   }, [open, courts]);
 
-  /* 4) Mutations */
   const [setCourtCfg, { isLoading: saving }] =
     useAdminSetCourtLiveConfigMutation();
   const [bulkSetCourtCfg, { isLoading: bulkSaving }] =
@@ -319,16 +373,30 @@ export default function LiveSetupSheet({
   };
 
   const saveCourt = async (courtId) => {
-    const v = form[courtId] || { enabled: false, videoUrl: "" };
+    const v = form[courtId] || {
+      enabled: false,
+      videoUrl: "",
+      advancedSettingEnabled: false,
+      pageMode: "default",
+      pageConnectionId: null,
+      pageConnectionName: "",
+    };
     const work = new Set(busy);
     work.add(courtId);
     setBusy(work);
+
+    const advancedSetting = buildAdvancedSettingPayload(v);
+
     try {
       await setCourtCfg({
         courtId,
         enabled: !!v.enabled,
         videoUrl: (v.videoUrl || "").trim(),
         overrideExisting,
+        advancedSettingEnabled: !!v.advancedSettingEnabled,
+        pageMode: v.pageMode || "default",
+        pageConnectionId: v.pageMode === "custom" ? v.pageConnectionId : null,
+        advancedSetting,
       }).unwrap();
       RNAlert.alert("Thành công", "Đã lưu cấu hình LIVE cho sân.");
       await refetchCourts?.();
@@ -337,6 +405,12 @@ export default function LiveSetupSheet({
         [courtId]: {
           enabled: !!v.enabled,
           videoUrl: (v.videoUrl || "").trim(),
+          advancedSettingEnabled: !!v.advancedSettingEnabled,
+          pageMode: v.pageMode || "default",
+          pageConnectionId:
+            v.pageMode === "custom" ? v.pageConnectionId || null : null,
+          pageConnectionName:
+            v.pageMode === "custom" ? v.pageConnectionName || "" : "",
         },
       };
     } catch (e) {
@@ -351,21 +425,46 @@ export default function LiveSetupSheet({
   const saveAll = async () => {
     const items = courts
       .map((c) => {
-        const cur = form[c._id] || { enabled: false, videoUrl: "" };
+        const cur = form[c._id] || {
+          enabled: false,
+          videoUrl: "",
+          advancedSettingEnabled: false,
+          pageMode: "default",
+          pageConnectionId: null,
+          pageConnectionName: "",
+        };
         const prev = initialFormRef.current[c._id] || {
           enabled: false,
           videoUrl: "",
+          advancedSettingEnabled: false,
+          pageMode: "default",
+          pageConnectionId: null,
+          pageConnectionName: "",
         };
+
         const changed =
           !!cur.enabled !== !!prev.enabled ||
           String((cur.videoUrl || "").trim()) !==
-            String((prev.videoUrl || "").trim());
+            String((prev.videoUrl || "").trim()) ||
+          !!cur.advancedSettingEnabled !== !!prev.advancedSettingEnabled ||
+          String(cur.pageMode || "default") !==
+            String(prev.pageMode || "default") ||
+          String(cur.pageConnectionId || "") !==
+            String(prev.pageConnectionId || "");
         if (!changed) return null;
+
+        const advancedSetting = buildAdvancedSettingPayload(cur);
+
         return {
           courtId: c._id,
           enabled: !!cur.enabled,
           videoUrl: (cur.videoUrl || "").trim(),
           overrideExisting: !!overrideExisting,
+          advancedSettingEnabled: !!cur.advancedSettingEnabled,
+          pageMode: cur.pageMode || "default",
+          pageConnectionId:
+            cur.pageMode === "custom" ? cur.pageConnectionId || null : null,
+          advancedSetting,
         };
       })
       .filter(Boolean);
@@ -383,9 +482,15 @@ export default function LiveSetupSheet({
       );
       const newSnap = { ...initialFormRef.current };
       for (const it of items) {
+        const prev = initialFormRef.current[it.courtId] || {};
         newSnap[it.courtId] = {
+          ...prev,
           enabled: it.enabled,
           videoUrl: it.videoUrl,
+          advancedSettingEnabled: !!it.advancedSettingEnabled,
+          pageMode: it.pageMode || "default",
+          pageConnectionId:
+            it.pageMode === "custom" ? it.pageConnectionId || null : null,
         };
       }
       initialFormRef.current = newSnap;
@@ -416,7 +521,10 @@ export default function LiveSetupSheet({
       }
 
       const qs = buildQuery(baseParams);
-      const href = Platform.OS=== "android" ? `/live/studio_court_android?${qs}` : `/live/studio_court_ios?${qs}`;
+      const href =
+        Platform.OS === "android"
+          ? `/live/studio_court_android?${qs}`
+          : `/live/studio_court_ios?${qs}`;
 
       try {
         const finalUrl = buildCourtLiveUrl
@@ -433,13 +541,87 @@ export default function LiveSetupSheet({
 
   const loadingAny = courtsLoading || matchesLoading;
 
+  /* map để biết Page nào đã được sân nào dùng (mode = custom) */
+  const usedPageMap = useMemo(() => {
+    const map = new Map(); // pid -> [courtId...]
+    for (const c of courts) {
+      const v = form[c._id];
+      if (v && v.pageMode === "custom" && v.pageConnectionId) {
+        const pid = String(v.pageConnectionId);
+        const arr = map.get(pid) || [];
+        arr.push(String(c._id));
+        map.set(pid, arr);
+      }
+    }
+    return map;
+  }, [courts, form]);
+
+  const courtLabelById = useMemo(() => {
+    const map = new Map();
+    for (const c of courts) {
+      map.set(String(c._id), c.displayLabel);
+    }
+    return map;
+  }, [courts]);
+
+  /* Page picker helpers (Modal) */
+  const openPagePicker = useCallback((courtId) => {
+    setPagePickerCourtId(courtId);
+    setPageModalVisible(true);
+  }, []);
+
+  const closePagePicker = useCallback(() => {
+    setPageModalVisible(false);
+    setPagePickerCourtId(null);
+  }, []);
+
+  const handlePickPage = useCallback(
+    (page) => {
+      if (!pagePickerCourtId) return;
+      const pid = String(page._id || page.id || page.pageId);
+      const pname = page.pageName || page.name || pid;
+      onChangeCourtField(pagePickerCourtId, {
+        pageConnectionId: pid,
+        pageConnectionName: pname,
+      });
+      closePagePicker();
+    },
+    [pagePickerCourtId, closePagePicker]
+  );
+
+  const goToFacebookPageSettings = useCallback(() => {
+    router.push("/setttings/facebook-page");
+    sheetRef.current?.dismiss();
+  }, []);
+
   /* ---- render 1 court row ---- */
   const renderCourt = ({ item: c }) => {
     const cMatches = matchesByCourtId.get(c._id) || [];
     const cnt = countByStatus(cMatches);
     const sample = mostCommonUrl(cMatches);
-    const v = form[c._id] || { enabled: false, videoUrl: "" };
+    const v = form[c._id] || {
+      enabled: false,
+      videoUrl: "",
+      advancedSettingEnabled: false,
+      pageMode: "default",
+      pageConnectionId: null,
+      pageConnectionName: "",
+    };
     const isBusy = busy.has(c._id);
+
+    const advancedOn = !!v.advancedSettingEnabled;
+    const pageMode = v.pageMode || "default";
+    const currentPageName =
+      v.pageConnectionName ||
+      (() => {
+        if (!v.pageConnectionId) return "";
+        const found = fbPages.find(
+          (p) =>
+            String(p._id || p.id || p.pageId) === String(v.pageConnectionId)
+        );
+        return found?.pageName || found?.name || "";
+      })() ||
+      "";
 
     return (
       <View
@@ -451,7 +633,7 @@ export default function LiveSetupSheet({
           },
         ]}
       >
-        {/* HEADER ROW: tên sân + stats + actions, xếp theo cột để khỏi tràn */}
+        {/* HEADER */}
         <View style={styles.rowHeader}>
           <View style={styles.rowTitleWrap}>
             <View style={styles.rowTitleLeft}>
@@ -509,8 +691,9 @@ export default function LiveSetupSheet({
           </View>
         </View>
 
-        {/* BODY: toggle + input, xếp dọc cho gọn */}
+        {/* BODY */}
         <View style={styles.rowBody}>
+          {/* LIVE mặc định cho sân */}
           <View style={styles.fieldLine}>
             <View style={{ flex: 1, marginRight: 8 }}>
               <Text
@@ -572,6 +755,216 @@ export default function LiveSetupSheet({
               />
             </View>
           </View>
+
+          {/* CẤU HÌNH NÂNG CAO (đặt dưới cùng) */}
+          <View style={[styles.fieldLine, { marginTop: 10 }]}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontWeight: "600",
+                  fontSize: 13,
+                }}
+                numberOfLines={2}
+              >
+                Cấu hình nâng cao
+              </Text>
+              <Text
+                style={{
+                  color: "#94a3b8",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+                numberOfLines={2}
+              >
+                Chọn nguồn Facebook Page để LIVE (Page hệ thống hoặc Page của
+                bạn).
+              </Text>
+            </View>
+
+            <View style={styles.advancedSwitchRow}>
+              <Switch
+                value={advancedOn}
+                onValueChange={(val) =>
+                  onChangeCourtField(c._id, {
+                    advancedSettingEnabled: val,
+                  })
+                }
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={
+                  Platform.OS === "android"
+                    ? advancedOn
+                      ? colors.primary
+                      : "#f4f3f4"
+                    : undefined
+                }
+              />
+            </View>
+          </View>
+
+          {advancedOn && (
+            <View
+              style={[
+                styles.advancedBox,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: colors.text,
+                  marginBottom: 4,
+                }}
+              >
+                Chọn kiểu Live Page
+              </Text>
+
+              {/* Option 1: Live theo Page hệ thống */}
+              <Pressable
+                onPress={() =>
+                  onChangeCourtField(c._id, {
+                    advancedSettingEnabled: true,
+                    pageMode: "default",
+                    // chuyển sang page hệ thống thì clear page user
+                    pageConnectionId: null,
+                    pageConnectionName: "",
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.radioRow,
+                  pressed && { opacity: 0.9 },
+                ]}
+              >
+                <MaterialIcons
+                  name={
+                    pageMode === "default"
+                      ? "radio-button-checked"
+                      : "radio-button-unchecked"
+                  }
+                  size={18}
+                  color={pageMode === "default" ? colors.primary : "#9ca3af"}
+                />
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: colors.text,
+                    }}
+                  >
+                    LIVE theo Page hệ thống
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#9ca3af",
+                      marginTop: 2,
+                    }}
+                  >
+                    Dùng Page hệ thống để LIVE video cho các trận của sân này.
+                  </Text>
+                </View>
+              </Pressable>
+
+              {/* Option 2: Live theo Page tự chọn */}
+              <Pressable
+                onPress={() =>
+                  onChangeCourtField(c._id, {
+                    advancedSettingEnabled: true,
+                    pageMode: "custom",
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.radioRow,
+                  { marginTop: 6 },
+                  pressed && { opacity: 0.9 },
+                ]}
+              >
+                <MaterialIcons
+                  name={
+                    pageMode === "custom"
+                      ? "radio-button-checked"
+                      : "radio-button-unchecked"
+                  }
+                  size={18}
+                  color={pageMode === "custom" ? colors.primary : "#9ca3af"}
+                />
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: colors.text,
+                    }}
+                  >
+                    LIVE theo Page tự chọn
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#9ca3af",
+                      marginTop: 2,
+                    }}
+                    numberOfLines={2}
+                  >
+                    Lấy Page trong hệ thống Page của người dùng để LIVE cho sân
+                    này.
+                  </Text>
+                </View>
+              </Pressable>
+
+              {pageMode === "custom" && (
+                <View style={{ marginTop: 8, marginLeft: 26, gap: 6 }}>
+                  {fbPagesLoading ? (
+                    <View style={styles.center}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                  ) : fbPagesErr ? (
+                    <Text style={{ fontSize: 11, color: "#f97316" }}>
+                      Không tải được danh sách Page. Vào Cài đặt để kiểm tra lại
+                      kết nối.
+                    </Text>
+                  ) : fbPages.length === 0 ? (
+                    <>
+                      <Text style={{ fontSize: 11, color: "#f97316" }}>
+                        Chưa có Facebook Page nào được kết nối.
+                      </Text>
+                      <BtnOutline
+                        onPress={goToFacebookPageSettings}
+                        tint={colors.primary}
+                      >
+                        Mở cài đặt Page
+                      </BtnOutline>
+                    </>
+                  ) : (
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: colors.text,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {currentPageName
+                          ? `Đang dùng Page: ${currentPageName}`
+                          : "Chưa chọn Page cụ thể."}
+                      </Text>
+                      <BtnOutline
+                        onPress={() => openPagePicker(c._id)}
+                        tint={colors.primary}
+                      >
+                        Chọn Page
+                      </BtnOutline>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -675,37 +1068,237 @@ export default function LiveSetupSheet({
     </>
   );
 
+  const currentPickerForm =
+    pagePickerCourtId && form[pagePickerCourtId]
+      ? form[pagePickerCourtId]
+      : null;
+
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      snapPoints={snapPoints}
-      onDismiss={onClose}
-      backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
-      )}
-      handleIndicatorStyle={{ backgroundColor: colors.border }}
-      backgroundStyle={{
-        backgroundColor: colors.card,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-      }}
-    >
-      <BottomSheetFlatList
-        data={courts}
-        keyExtractor={(c) => c._id}
-        renderItem={renderCourt}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
-        contentContainerStyle={{
-          paddingHorizontal: 12,
-          paddingBottom: Math.max(16, insets.bottom + 4),
+    <>
+      {/* SHEET CHÍNH */}
+      <BottomSheetModal
+        topInset={insets.top}
+        ref={sheetRef}
+        snapPoints={snapPoints}
+        onDismiss={onClose}
+        backdropComponent={(p) => (
+          <BottomSheetBackdrop
+            {...p}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+          />
+        )}
+        handleIndicatorStyle={{ backgroundColor: colors.border }}
+        backgroundStyle={{
+          backgroundColor: colors.card,
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
         }}
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled
-        removeClippedSubviews={false}
-      />
-    </BottomSheetModal>
+      >
+        <BottomSheetFlatList
+          data={courts}
+          keyExtractor={(c) => c._id}
+          renderItem={renderCourt}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={ListEmpty}
+          contentContainerStyle={{
+            paddingHorizontal: 12,
+            paddingBottom: Math.max(16, insets.bottom + 4),
+          }}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          removeClippedSubviews={false}
+        />
+      </BottomSheetModal>
+
+      {/* MODAL CHỌN PAGE (thay cho BottomSheet) */}
+      <Modal
+        visible={pageModalVisible && !!pagePickerCourtId}
+        animationType="slide"
+        transparent
+        onRequestClose={closePagePicker}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.card,
+                maxHeight: pageModalMaxHeight,
+                paddingBottom: Math.max(12, insets.bottom),
+              },
+            ]}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 4,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "700",
+                  color: colors.text,
+                }}
+              >
+                Chọn Facebook Page
+              </Text>
+              <Pressable
+                onPress={closePagePicker}
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                  },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={{ fontSize: 12, color: "#9ca3af" }}>Đóng</Text>
+              </Pressable>
+            </View>
+
+            {fbPagesLoading ? (
+              <View style={[styles.center, { paddingVertical: 20 }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : fbPagesErr ? (
+              <View style={styles.alertBox}>
+                <Text style={{ color: "#ef4444", fontSize: 12 }}>
+                  Không tải được danh sách Page. Thử lại hoặc vào Cài đặt Page.
+                </Text>
+              </View>
+            ) : fbPages.length === 0 ? (
+              <View style={styles.alertBox}>
+                <Text
+                  style={{ color: "#f97316", fontSize: 12, marginBottom: 8 }}
+                >
+                  Chưa có Facebook Page nào được kết nối.
+                </Text>
+                <BtnOutline
+                  onPress={goToFacebookPageSettings}
+                  tint={colors.primary}
+                >
+                  Mở cài đặt Page
+                </BtnOutline>
+              </View>
+            ) : (
+              <FlatList
+                data={fbPages}
+                keyExtractor={(p) => String(p._id || p.id || p.pageId)}
+                ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item: p }) => {
+                  const pic =
+                    p.pagePicture ||
+                    p.picture?.data?.url ||
+                    p.raw?.picture?.data?.url;
+                  const pid = String(p._id || p.id || p.pageId);
+
+                  const isActive =
+                    !!currentPickerForm?.pageConnectionId &&
+                    String(currentPickerForm.pageConnectionId) === pid;
+
+                  const usedCourtIds = usedPageMap.get(pid) || [];
+                  const isUsedByOtherCourt =
+                    !isActive &&
+                    usedCourtIds.some(
+                      (id) => String(id) !== String(pagePickerCourtId)
+                    );
+                  const firstOtherId = usedCourtIds.find(
+                    (id) => String(id) !== String(pagePickerCourtId)
+                  );
+                  const usedCourtLabel = firstOtherId
+                    ? courtLabelById.get(String(firstOtherId)) || ""
+                    : "";
+
+                  return (
+                    <Pressable
+                      disabled={isUsedByOtherCourt}
+                      onPress={() => handlePickPage(p)}
+                      style={({ pressed }) => [
+                        styles.pageRow,
+                        {
+                          borderColor: isActive
+                            ? colors.primary
+                            : colors.border,
+                          backgroundColor: isActive
+                            ? colors.background
+                            : colors.card,
+                          opacity: pressed && !isUsedByOtherCourt ? 0.9 : 1,
+                        },
+                        isUsedByOtherCourt && { opacity: 0.55 },
+                      ]}
+                    >
+                      <View style={styles.pageAvatarWrap}>
+                        {pic ? (
+                          <Image
+                            source={{ uri: pic }}
+                            style={styles.pageAvatar}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <MaterialIcons
+                            name="facebook"
+                            size={18}
+                            color="#60a5fa"
+                          />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "600",
+                            color: colors.text,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {p.pageName || p.name || "(Không tên)"}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#9ca3af",
+                            marginTop: 1,
+                          }}
+                          numberOfLines={1}
+                        >
+                          ID: {p.pageId || pid}
+                        </Text>
+                        {isUsedByOtherCourt && (
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              color: "#f97316",
+                              marginTop: 2,
+                            }}
+                            numberOfLines={1}
+                          >
+                            Đã dùng cho {usedCourtLabel || "một sân khác"}
+                          </Text>
+                        )}
+                      </View>
+                      {isActive && (
+                        <MaterialIcons
+                          name="check-circle"
+                          size={18}
+                          color={colors.primary}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -798,6 +1391,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 10,
   },
 
   /* INPUT */
@@ -846,18 +1440,32 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  /* TOGGLE */
-  toggleBtn: {
+  /* SWITCH / ADVANCED */
+  advancedSwitchRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
   },
-  toggleLabel: {
-    fontWeight: "700",
-    fontSize: 12,
+  advancedBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+    gap: 4,
+  },
+  radioRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  /* PAGE ROW */
+  pageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
 
   /* MISC */
@@ -869,5 +1477,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fde68a",
     backgroundColor: "#fffbeb",
+  },
+
+  /* PAGE AVATAR */
+  pageAvatarWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#64748b",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    overflow: "hidden",
+  },
+  pageAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+  },
+
+  /* MODAL */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(15,23,42,0.6)",
+  },
+  modalContent: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
 });

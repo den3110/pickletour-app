@@ -39,7 +39,7 @@ const SKELETON_COUNT = 4;
 // --- Constants ---
 const TABS = [
   { key: "upcoming", label: "Sắp diễn ra" },
-  { key: "ongoing", label: "Đang đấu" },
+  { key: "ongoing", label: "Đang diễn ra" },
   { key: "finished", label: "Đã kết thúc" },
 ];
 
@@ -623,13 +623,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 >
                   Lịch đấu
                 </PrimaryBtn>
-                <SuccessBtn
-                  theme={theme}
-                  icon="qr-code-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/checkin`)}
-                >
-                  Check-in
-                </SuccessBtn>
+                
                 <OutlineBtn
                   theme={theme}
                   icon="git-network-outline"
