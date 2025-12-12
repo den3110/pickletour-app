@@ -1359,7 +1359,7 @@ export default function LiveLikeFBScreenKey({
 
           const logoTournamentUrl = overlayConfig?.tournamentImageUrl;
           const stageName = safeStr(
-            finalData?.stageName || finalData?.bracket?.name || ""
+            finalData?.stageName
           );
           const overlayData = {
             theme: safeStr(
@@ -2522,7 +2522,7 @@ export default function LiveLikeFBScreenKey({
               onPress={() => setQualityMenuVisible(false)}
             />
             <View
-              style={[styles.qualitySheet, { paddingBottom: safeBottom + 16 }]}
+              style={[styles.qualitySheet, { paddingBottom: safeBottom + 16, paddingLeft: safeLeft }]}
             >
               <Text style={styles.qualityTitle}>Chất lượng video</Text>
               <Text style={styles.qualitySubtitle}>
