@@ -43,7 +43,7 @@ import {
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
-import * as Clarity from "@microsoft/react-native-clarity";
+
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -145,8 +145,8 @@ const isExpoGo = Constants.appOwnership === "expo";
 export default function RootLayout() {
   const segments = useSegments();
 
-  // ✅ Microsoft Clarity (mobile)
   const clarityInitRef = React.useRef(false);
+  const clarityModRef = React.useRef<any>(null);
 
   // Initialize analytics
   useEffect(() => {
@@ -612,7 +612,6 @@ export default function RootLayout() {
     })();
   }, []);
 
-  // Init Clarity (chỉ chạy trên build dev client / release, không chạy Expo Go)
   React.useEffect(() => {
     if (isExpoGo) return;
     if (clarityInitRef.current) return;
@@ -622,23 +621,30 @@ export default function RootLayout() {
 
     clarityInitRef.current = true;
 
-    try {
-      Clarity.initialize(projectId, {
-        // Bật log khi debug (tuỳ bạn bật/tắt)
-        // logLevel: __DEV__ ? Clarity.LogLevel.Verbose : Clarity.LogLevel.None,
-      });
-    } catch (e) {
-      if (__DEV__) console.warn("Clarity init failed:", e);
-    }
+    (async () => {
+      try {
+        const mod = await import("@microsoft/react-native-clarity");
+        clarityModRef.current = mod;
+
+        // init
+        mod.initialize(projectId, {
+          // logLevel: __DEV__ ? mod.LogLevel.Verbose : mod.LogLevel.None,
+        });
+      } catch (e) {
+        if (__DEV__) console.warn("Clarity init failed:", e);
+      }
+    })();
   }, []);
 
-  // Track screen changes -> Clarity
   React.useEffect(() => {
     if (isExpoGo) return;
 
+    const mod = clarityModRef.current;
+    if (!mod?.setCurrentScreenName) return;
+
     const screenName = segments.join("/") || "(tabs)";
     try {
-      Clarity.setCurrentScreenName(screenName);
+      mod.setCurrentScreenName(screenName);
     } catch {}
   }, [segments]);
 
