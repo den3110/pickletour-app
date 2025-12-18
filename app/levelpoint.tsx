@@ -24,6 +24,35 @@ import { useSelector } from "react-redux";
 /* ===== DUPR LOGIC ===== */
 const DUPR_MIN = 1.6;
 const DUPR_MAX = 8.0;
+
+const toDotDecimal = (s = "") => String(s).replace(",", ".");
+
+const parseDecimal = (s = "") => {
+  const n = Number(toDotDecimal(String(s).trim()));
+  return Number.isFinite(n) ? n : NaN;
+};
+
+const sanitizeDuprTextInput = (next = "") => {
+  let s = toDotDecimal(next);
+
+  // chỉ cho digits + dấu .
+  s = s.replace(/[^\d.]/g, "");
+
+  // giữ 1 dấu . duy nhất
+  const firstDot = s.indexOf(".");
+  if (firstDot !== -1) {
+    s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  // tối đa 3 chữ số thập phân (vì bạn đang round3)
+  const parts = s.split(".");
+  if (parts.length === 2) {
+    s = parts[0] + "." + parts[1].slice(0, 3);
+  }
+
+  return s;
+};
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n) || 0));
 const round3 = (n) => Number((Number(n) || 0).toFixed(3));
 const normalizeDupr = (n) => round3(clamp(n, DUPR_MIN, DUPR_MAX));
@@ -342,7 +371,7 @@ const StatCard = ({
         ref={inputRef}
         style={[styles.bigInput, { color: color }]}
         value={value}
-        onChangeText={setValue}
+        onChangeText={(t) => setValue(sanitizeDuprTextInput(t))}
         onBlur={onBlur}
         keyboardType="decimal-pad"
         placeholder="0.0"
@@ -477,11 +506,16 @@ export default function LevelPointScreen({ userId: userIdProp }) {
 
   const handleBlur = (val, setVal) => {
     if (val === "") return;
-    const n = parseFloat(val);
+    const n = parseDecimal(val);
     if (!Number.isNaN(n)) setVal(String(normalizeDupr(n)));
   };
 
-  const parseOrNull = (s) => (s === "" ? null : normalizeDupr(parseFloat(s)));
+  const parseOrNull = (s) => {
+    if (s === "") return null;
+    const n = parseDecimal(s);
+    if (Number.isNaN(n)) return null;
+    return normalizeDupr(n);
+  };
   const singleVal = useMemo(() => parseOrNull(singleInput), [singleInput]);
   const doubleVal = useMemo(() => parseOrNull(doubleInput), [doubleInput]);
 
@@ -496,8 +530,10 @@ export default function LevelPointScreen({ userId: userIdProp }) {
 
   const handleSubmit = async () => {
     if (!userId) return Alert.alert("Lỗi", "Thiếu userId.");
-    const sV = parseFloat(singleInput);
-    const dV = parseFloat(doubleInput);
+
+    const sV = parseDecimal(singleInput);
+    const dV = parseDecimal(doubleInput);
+
     if (
       isNaN(sV) ||
       sV < DUPR_MIN ||
@@ -509,6 +545,7 @@ export default function LevelPointScreen({ userId: userIdProp }) {
       Alert.alert("Chưa hợp lệ", `Điểm phải từ ${DUPR_MIN} đến ${DUPR_MAX}`);
       return;
     }
+
     try {
       await createAssessment({
         userId,

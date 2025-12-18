@@ -160,7 +160,10 @@ const getCurrentSlotOfUser = ({
   return currentSlotFromBase(Number(base), ts);
 };
 
-/* ⚠️ Giữ icon người giao THEO NGƯỜI; riêng 0-0-2 ưu tiên người đã biết (lastServerUid), nếu chưa có thì mới lấy người ở ô 1 */
+const preStartRightSlotForSide = (side) => (side === "A" ? 2 : 1);
+
+/* ✅ Luôn ưu tiên theo USER (serverId / lastServerUid)
+   ✅ Chỉ fallback theo slot khi chưa có gì */
 const computeServerUid = ({
   serve,
   isStartOfGame,
@@ -171,15 +174,21 @@ const computeServerUid = ({
 }) => {
   const sId = serve?.serverId ? String(serve.serverId) : "";
   if (sId) return sId;
+
+  // ✅ nếu đã nhớ người giao gần nhất → bám theo người
+  if (lastServerUid) return lastServerUid;
+
+  // ✅ fallback cuối cùng: chỉ dùng khi 0-0-2 và chưa biết serverId
   if (isStartOfGame && activeServerNum === 2) {
-    const rightUid =
-      getUidAtSlotNow?.(activeSide, 2) ||
-      getUidAtSlotNow?.(activeSide, 1) ||
-      "";
-    return lastServerUid || rightUid || "";
+    const rightSlot = preStartRightSlotForSide(activeSide);
+    return (
+      getUidAtSlotNow?.(activeSide, rightSlot) ||
+      getUidAtSlotNow?.(activeSide, rightSlot === 1 ? 2 : 1) ||
+      ""
+    );
   }
 
-  return lastServerUid || "";
+  return "";
 };
 
 /* ======= memo child components ======= */
@@ -1239,30 +1248,21 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // Nhớ người giao gần nhất để icon không “nhảy theo ô”
   const lastServerUidRef = useRef("");
-
+  const startServer2Ref = useRef({ gameIndex: -1, side: "", uid: "" });
   // Đầu game (0-0-2) icon phải nằm ở ô phải/even
   const isStartOfGame = Number(curA) === 0 && Number(curB) === 0;
 
-  // ✅ TÍNH NGƯỜI GIAO “THEO NGƯỜI” (không theo ô)
-  const serverUidShow = useMemo(
-    () =>
-      computeServerUid({
-        serve,
-        isStartOfGame,
-        activeServerNum,
-        activeSide,
-        getUidAtSlotNow,
-        lastServerUid: lastServerUidRef.current,
-      }),
-    [
-      serve?.serverId,
-      isStartOfGame,
-      activeServerNum,
-      activeSide,
-      getUidAtSlotNow,
-    ]
-  );
+  const pinnedStart2 =
+    startServer2Ref.current.gameIndex === curIdx &&
+    startServer2Ref.current.side === activeSide
+      ? startServer2Ref.current.uid
+      : "";
 
+  const serverUidShow =
+    (serve?.serverId ? String(serve.serverId) : "") ||
+    (activeServerNum === 2 ? pinnedStart2 : "") ||
+    lastServerUidRef.current ||
+    "";
   // ✅ INIT serve đầu game:
   // - double: 0-0-2 (server #2, người ở ô phải / slot 1)
   // - single: 0-0-1 (server #1)
@@ -1372,6 +1372,34 @@ export default function RefereeJudgePanel({ matchId }) {
     userMatch,
     waitingStart,
   ]);
+
+  useEffect(() => {
+    const is000 = Number(curA) === 0 && Number(curB) === 0;
+    if (!is000) return;
+    if (activeServerNum !== 2) return;
+
+    const rightSlot = activeSide === "A" ? 2 : 1; // ✅ Referee view
+    const uid =
+      (serve?.serverId ? String(serve.serverId) : "") ||
+      lastServerUidRef.current ||
+      getUidAtSlotNow?.(activeSide, rightSlot) ||
+      getUidAtSlotNow?.(activeSide, rightSlot === 1 ? 2 : 1) ||
+      "";
+
+    if (uid) {
+      startServer2Ref.current = { gameIndex: curIdx, side: activeSide, uid };
+      lastServerUidRef.current = uid; // ✅ pin luôn để các chỗ khác dùng
+    }
+  }, [
+    curIdx,
+    curA,
+    curB,
+    activeSide,
+    activeServerNum,
+    serve?.serverId,
+    getUidAtSlotNow,
+  ]);
+
   // Luôn ghi nhớ người giao hiện tại
   useEffect(() => {
     if (serverUidShow) lastServerUidRef.current = serverUidShow;

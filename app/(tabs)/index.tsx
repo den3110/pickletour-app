@@ -137,8 +137,16 @@ const FEATURES = [
     color: "#74B9FF",
     link: "/match/stack",
   },
+  {
+    id: 10,
+    icon: "chatbox-ellipses",
+    iconLib: "Ionicons",
+    title: "Hỗ trợ / Góp ý",
+    color: "#2ECC71",
+    link: "/support",
+  },
   // {
-  //   id: 10,
+  //   id: 11,
   //   icon: "locate", // icon cho Radar / Quanh đây
   //   iconLib: "Ionicons",
   //   title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
@@ -440,8 +448,7 @@ function AthleteIsland() {
     }
   };
 
-  const avatarUrl =
-    normalizeUrl(userInfo?.avatar);
+  const avatarUrl = normalizeUrl(userInfo?.avatar);
   const name = userInfo?.name || "Người dùng";
 
   // Render

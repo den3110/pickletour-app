@@ -1,5 +1,5 @@
 // app/user/[id]/grade.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -37,6 +37,7 @@ export default function GradeUserScreen() {
   const [gradeDoubles, setGradeDoubles] = useState(
     currentDouble ? String(currentDouble) : ""
   );
+  const [notes, setNotes] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
   // --- Theme Colors ---
@@ -49,6 +50,7 @@ export default function GradeUserScreen() {
     border: isDark ? "#333333" : "#E0E0E0",
     primary: "#0a84ff",
     danger: "#ff3b30",
+    divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
   };
 
   const normalizeDecimalInput = (v) =>
@@ -79,13 +81,16 @@ export default function GradeUserScreen() {
       return;
     }
 
+    const notesTrimmed = typeof notes === "string" ? notes.trim() : "";
+    const notesPayload = notesTrimmed ? notesTrimmed : undefined;
+
     try {
       await createEvaluation({
         targetUser: id,
         province: province || "",
         source: "live",
         overall: { singles, doubles },
-        notes: undefined,
+        notes: notesPayload,
       }).unwrap();
 
       Alert.alert("Thành công", "Đã gửi phiếu chấm trình thành công!", [
@@ -119,7 +124,7 @@ export default function GradeUserScreen() {
               {province ? `Khu vực: ${province}` : "Chưa cập nhật khu vực"}
             </Text>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
             {/* Input Đơn */}
             <View style={styles.inputGroup}>
@@ -165,6 +170,33 @@ export default function GradeUserScreen() {
               />
             </View>
 
+            {/* Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.subText }]}>
+                Ghi chú
+              </Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="VD: Đánh giá kỹ thuật, thái độ, điểm mạnh/yếu..."
+                placeholderTextColor={colors.subText}
+                multiline
+                textAlignVertical="top"
+                maxLength={500}
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+              />
+              <Text style={[styles.noteHint, { color: colors.subText }]}>
+                {notes?.length || 0}/500
+              </Text>
+            </View>
+
             {/* Error Message */}
             {errorMsg ? (
               <View style={styles.errorContainer}>
@@ -181,7 +213,11 @@ export default function GradeUserScreen() {
             {/* Buttons */}
             <View style={styles.btnGroup}>
               <TouchableOpacity
-                style={[styles.btn, styles.btnCancel]}
+                style={[
+                  styles.btn,
+                  styles.btnCancel,
+                  { borderColor: colors.border },
+                ]}
                 onPress={() => router.back()}
               >
                 <Text style={{ color: colors.subText, fontWeight: "600" }}>
@@ -190,7 +226,11 @@ export default function GradeUserScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.btn, styles.btnSubmit, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.btn,
+                  styles.btnSubmit,
+                  { backgroundColor: colors.primary },
+                ]}
                 onPress={handleSubmit}
                 disabled={creating}
               >
@@ -211,12 +251,8 @@ export default function GradeUserScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
+  container: { flex: 1 },
+  content: { padding: 16 },
   card: {
     borderRadius: 16,
     padding: 20,
@@ -236,13 +272,9 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#eee", // Default light
     marginBottom: 20,
-    opacity: 0.1,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
+  inputGroup: { marginBottom: 16 },
   label: {
     fontSize: 13,
     marginBottom: 8,
@@ -254,6 +286,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
+  },
+  textArea: {
+    minHeight: 110,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    fontSize: 15,
+  },
+  noteHint: {
+    marginTop: 6,
+    fontSize: 12,
+    alignSelf: "flex-end",
   },
   errorContainer: {
     flexDirection: "row",
@@ -278,7 +324,6 @@ const styles = StyleSheet.create({
   btnCancel: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#ccc", // Just a default fallback
   },
   btnSubmit: {
     shadowColor: "#000",

@@ -150,6 +150,21 @@ export const userApiSlice = apiSlice.injectEndpoints({
       // Invalidate tag User để màn hình Profile tự cập nhật lại badge
       invalidatesTags: ["User"], 
     }),
+    verifyRegisterOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/register/verify-otp",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    resendRegisterOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/register/resend-otp",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -175,5 +190,7 @@ export const {
   useIssueOsAuthTokenMutation,
   useReauthQuery,
   useGetKycCheckDataQuery,
-  useUpdateKycStatusMutation
+  useUpdateKycStatusMutation,
+  useVerifyRegisterOtpMutation,
+  useResendRegisterOtpMutation
 } = userApiSlice;

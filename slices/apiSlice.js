@@ -355,6 +355,7 @@ export const apiSlice = createApi({
     "Leaderboard",
     "SystemSettings",
     "UserMatch",
+    "SupportTicket"
   ],
   endpoints: () => ({}),
 });

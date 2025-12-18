@@ -124,6 +124,48 @@ const calcAge = (u) => {
 const genderLabel = (g) =>
   g === "male" ? "Nam" : g === "female" ? "Nữ" : "Khác";
 
+const medalLabel = (m) =>
+  m === "gold"
+    ? "Nhà vô địch"
+    : m === "silver"
+    ? "Á quân"
+    : m === "bronze"
+    ? "Đồng hạng 3"
+    : "";
+
+const getMedalColors = (medal) => {
+  switch (medal) {
+    case "gold":
+      return {
+        border: COLORS.gold,
+        text: COLORS.gold,
+        glow1: "rgba(245,158,11,.45)",
+        glow2: "rgba(245,158,11,.25)",
+      };
+    case "silver":
+      return {
+        border: COLORS.silver,
+        text: COLORS.silver,
+        glow1: "rgba(192,192,192,.35)",
+        glow2: "rgba(192,192,192,.22)",
+      };
+    case "bronze":
+      return {
+        border: COLORS.bronze,
+        text: COLORS.bronze,
+        glow1: "rgba(205,127,50,.35)",
+        glow2: "rgba(205,127,50,.22)",
+      };
+    default:
+      return {
+        border: "#bbb",
+        text: "#555",
+        glow1: "rgba(0,0,0,0)",
+        glow2: "rgba(0,0,0,0)",
+      };
+  }
+};
+
 const canGradeUser = (me, targetProvince) => {
   if (me?.role === "admin") return true;
   if (!me?.evaluator?.enabled) return false;
@@ -194,7 +236,6 @@ const ScoreBlock = memo(({ label, score, color, theme }) => (
   </View>
 ));
 
-/* ================= Skeletons ================= */
 /* ================= Skeletons ================= */
 const SkeletonCard = memo(() => {
   const theme = useThemeColors();
@@ -288,6 +329,218 @@ const SkeletonCard = memo(() => {
     </View>
   );
 });
+
+const FlameCard = memo(({ medal, theme, children }) => {
+  if (!medal) {
+    return (
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            borderWidth: 1,
+            shadowColor: theme.shadow,
+          },
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+
+  return (
+    <FlameCardAnimated medal={medal} theme={theme}>
+      {children}
+    </FlameCardAnimated>
+  );
+});
+
+const FlameCardAnimated = memo(({ medal, theme, children }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  const { border, glow1, glow2 } = getMedalColors(medal);
+
+  const op1 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.18, 0.35],
+  });
+  const op2 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.1, 0.25],
+  });
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.015],
+  });
+
+  return (
+    <View style={styles.flameCardWrap}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.cardFlameGlow,
+          { backgroundColor: glow1, opacity: op1, transform: [{ scale }] },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.cardFlameGlow, { backgroundColor: glow2, opacity: op2 }]}
+      />
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderColor: border,
+            borderWidth: 1.5,
+            shadowColor: theme.shadow,
+          },
+        ]}
+      >
+        {children}
+      </View>
+    </View>
+  );
+});
+
+const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
+  // không podium -> không animate
+  if (!medal) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+        <View
+          style={[
+            styles.avatarRingPlain,
+            { borderColor: theme.border, backgroundColor: theme.card },
+          ]}
+        >
+          <ExpoImage
+            source={normalizeUrl(uri) || PLACE}
+            style={styles.avatarImg}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <FlameAvatarAnimated
+      uri={uri}
+      medal={medal}
+      theme={theme}
+      onPress={onPress}
+    />
+  );
+});
+
+const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 1100,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  const { border, glow1, glow2 } = getMedalColors(medal);
+
+  const scale1 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+  const scale2 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.02, 1.1],
+  });
+  const op1 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.75],
+  });
+  const op2 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 0.45],
+  });
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.flameAvatarWrap}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flameGlow,
+            {
+              backgroundColor: glow1,
+              opacity: op1,
+              transform: [{ scale: scale1 }],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flameGlow,
+            {
+              backgroundColor: glow2,
+              opacity: op2,
+              transform: [{ scale: scale2 }],
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.avatarRing,
+            { borderColor: border, backgroundColor: theme.card },
+          ]}
+        >
+          <ExpoImage
+            source={normalizeUrl(uri) || PLACE}
+            style={styles.avatarImg}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 /* ================= Ranking Card (VIP Optimized) ================= */
 const RankingCard = memo(
   ({
@@ -332,29 +585,18 @@ const RankingCard = memo(
     const verifyChip = getVerifyChip(effectiveStatus, r?.tierColor);
 
     return (
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.card,
-            borderColor: podium ? COLORS[podium.medal] : theme.border,
-            borderWidth: podium ? 1.5 : 1,
-            shadowColor: theme.shadow,
-          },
-        ]}
-      >
-        {/* Header */}
+      <FlameCard medal={podium?.medal} theme={theme}>
         <View style={styles.cardHeader}>
           <TouchableOpacity
             onPress={() => onOpenZoom(avatarSrc)}
             activeOpacity={0.8}
           >
             <View style={styles.avatarContainer}>
-              <ExpoImage
-                source={normalizeUrl(avatarSrc)}
-                style={styles.avatar}
-                contentFit="cover"
-                cachePolicy="memory-disk"
+              <FlameAvatar
+                uri={avatarSrc}
+                medal={podium?.medal}
+                theme={theme}
+                onPress={() => onOpenZoom(avatarSrc)}
               />
               {podium && (
                 <View
@@ -374,8 +616,6 @@ const RankingCard = memo(
             >
               {u?.nickname || "---"}
             </Text>
-
-            {/* Chip Verify Text (Màu Xanh lá nếu verified) */}
             <View
               style={{
                 flexDirection: "row",
@@ -402,29 +642,32 @@ const RankingCard = memo(
             {podium ? (
               <TouchableOpacity
                 onPress={() => onGoToTournament(podium.picked)}
+                activeOpacity={0.85}
                 style={[
-                  styles.medalBadge,
+                  styles.medalPill,
                   {
-                    backgroundColor: COLORS[podium.medal] + "15",
                     borderColor: COLORS[podium.medal],
+                    backgroundColor: theme.card,
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name="medal"
-                  size={14}
-                  color={COLORS[podium.medal]}
-                />
-                <Text
-                  style={[
-                    styles.medalText,
-                    { color: COLORS[podium.medal], flex: 1 },
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {podium.label}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <MaterialCommunityIcons
+                    name="medal"
+                    size={16}
+                    color={COLORS[podium.medal]}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text
+                    style={[
+                      styles.medalPillText,
+                      { color: COLORS[podium.medal] },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {podium.label}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ) : u?.province ? (
               <Text style={[styles.provinceText, { color: theme.subText }]}>
@@ -516,7 +759,7 @@ const RankingCard = memo(
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </FlameCard>
     );
   },
   // Custom Compare
@@ -661,22 +904,26 @@ export default function RankingListScreen({ isBack = false }) {
     const src = data?.podiums30d || {};
     const rank = { gold: 3, silver: 2, bronze: 1 };
     const out = {};
+
     for (const [uid, arr] of Object.entries(src)) {
       if (!Array.isArray(arr) || !arr.length) continue;
+
       const picked = [...arr].sort((a, b) => {
         const r = (rank[b.medal] || 0) - (rank[a.medal] || 0);
         if (r) return r;
-        return (
-          new Date(b.finishedAt || 0).getTime() -
-          new Date(a.finishedAt || 0).getTime()
-        );
+        const tb = new Date(b.finishedAt || 0).getTime();
+        const ta = new Date(a.finishedAt || 0).getTime();
+        return tb - ta;
       })[0];
-      out[String(uid)] = {
-        medal: picked.medal,
-        label: `Top 1 - ${picked.tournamentName}`,
-        picked,
-      };
+
+      const plusN = Math.max(0, arr.length - 1);
+      const title = `${medalLabel(picked.medal)} – ${
+        picked.tournamentName || "Giải đấu"
+      }${plusN > 0 ? ` (+${plusN} giải khác)` : ""}`;
+
+      out[String(uid)] = { medal: picked.medal, label: title, picked };
     }
+
     return out;
   }, [data?.podiums30d]);
 
@@ -1020,4 +1267,55 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   actionText: { fontSize: 13, fontWeight: "600" },
+  medalPill: {
+    width: "100%",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  medalPillText: {
+    fontSize: 12,
+    fontWeight: "800",
+    flex: 1,
+  },
+  flameCardWrap: { position: "relative" },
+  cardFlameGlow: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: 12, // chừa chút vì card có marginBottom
+    borderRadius: 28,
+  },
+
+  flameAvatarWrap: {
+    width: 68,
+    height: 68,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flameGlow: {
+    position: "absolute",
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+  },
+
+  avatarRing: {
+    padding: 2,
+    borderWidth: 2,
+    borderRadius: 34,
+  },
+  avatarRingPlain: {
+    padding: 2,
+    borderWidth: 1,
+    borderRadius: 34,
+  },
+  avatarImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
 });

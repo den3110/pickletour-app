@@ -373,7 +373,6 @@ export default function RegisterScreen() {
 
   const doRegister = async () => {
     try {
-      // 👇 Map label → enum trong model
       let genderCode = "unspecified";
       if (form.gender === "Nam") genderCode = "male";
       else if (form.gender === "Nữ") genderCode = "female";
@@ -384,18 +383,34 @@ export default function RegisterScreen() {
         nickname: (form.nickname || "").trim(),
         email: (form.email || "").trim(),
         phone: cleanPhone(form.phone || ""),
-        gender: genderCode, // 👈 gửi đúng với schema: male/female/other/unspecified
+        gender: genderCode,
         dob: form.dob || undefined,
         province: form.province,
         password: form.password,
-        avatar: avatarUrl, // gửi kèm avatar đã upload
+        avatar: avatarUrl,
       };
 
       const res = await register(cleaned).unwrap();
+
+      // ✅ NEW: nếu backend yêu cầu OTP
+      if (res?.otpRequired) {
+        router.push({
+          pathname: "/verify-otp",
+          params: {
+            registerToken: res.registerToken,
+            phoneMasked: res.phoneMasked || "",
+            // DEV test nhanh (tuỳ backend có trả devOtp hay không)
+            devOtp: res.devOtp || "",
+          },
+        });
+        return;
+      }
+
+      // ✅ flow cũ: đăng ký xong đăng nhập luôn
       dispatch(setCredentials(res));
       await saveUserInfo(res);
 
-      router.replace("/(tabs)/profile");
+      router.replace("/(tabs)"); // hoặc "/(tabs)/home" tuỳ app bạn
     } catch (err) {
       const raw = err?.data?.message || err?.error || "Đăng ký thất bại";
       Alert.alert("Lỗi", raw);

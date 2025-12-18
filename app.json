@@ -31,7 +31,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -70,7 +72,10 @@
               "scheme": "pickletour"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -80,13 +85,28 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      // [
-      //   "@rnmapbox/maps",
-      //   {
-      //     "RNMapboxMapsImpl": "mapbox",
-      //     "RNMapboxMapsVersion": "11.8.0" // Updated from 11.4.0
-      //   }
-      // ],
+      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/crashlytics",
+        {
+          "android": {
+             "uploadDebugSymbols": true
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "useAndroidX": true,
+            "enableProguardInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.google.firebase.** { *; } -keep class com.crashlytics.** { *; }"
+          },
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
       [
         "expo-location",
         {

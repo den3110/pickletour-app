@@ -43,6 +43,7 @@ import {
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clarity from "@microsoft/react-native-clarity";
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -143,6 +144,9 @@ const isExpoGo = Constants.appOwnership === "expo";
 
 export default function RootLayout() {
   const segments = useSegments();
+
+  // ✅ Microsoft Clarity (mobile)
+  const clarityInitRef = React.useRef(false);
 
   // Initialize analytics
   useEffect(() => {
@@ -607,6 +611,36 @@ export default function RootLayout() {
       await increaseLaunchCountAndGet();
     })();
   }, []);
+
+  // Init Clarity (chỉ chạy trên build dev client / release, không chạy Expo Go)
+  React.useEffect(() => {
+    if (isExpoGo) return;
+    if (clarityInitRef.current) return;
+
+    const projectId = process.env.EXPO_PUBLIC_CLARITY_PROJECT_ID;
+    if (!projectId) return;
+
+    clarityInitRef.current = true;
+
+    try {
+      Clarity.initialize(projectId, {
+        // Bật log khi debug (tuỳ bạn bật/tắt)
+        // logLevel: __DEV__ ? Clarity.LogLevel.Verbose : Clarity.LogLevel.None,
+      });
+    } catch (e) {
+      if (__DEV__) console.warn("Clarity init failed:", e);
+    }
+  }, []);
+
+  // Track screen changes -> Clarity
+  React.useEffect(() => {
+    if (isExpoGo) return;
+
+    const screenName = segments.join("/") || "(tabs)";
+    try {
+      Clarity.setCurrentScreenName(screenName);
+    } catch {}
+  }, [segments]);
 
   return (
     <Provider store={store}>

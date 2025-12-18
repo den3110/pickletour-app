@@ -369,6 +369,17 @@ const RatingHistoryRow = ({
 }) => {
   const singleDelta = prevItem ? item.single - prevItem.single : 0;
   const doubleDelta = prevItem ? item.double - prevItem.double : 0;
+
+  // ✅ notes (hỗ trợ nhiều key để khỏi lệch BE)
+  const noteText =
+    item?.notes ??
+    item?.note ??
+    item?.remark ??
+    item?.comment ??
+    item?.meta?.notes ??
+    item?.meta?.note ??
+    "";
+
   return (
     <View
       style={[
@@ -391,14 +402,27 @@ const RatingHistoryRow = ({
           )}
         </TouchableOpacity>
       )}
+
       <View style={styles.ratingLeft}>
         <Text style={[styles.ratingDate, { color: colors.text }]}>
           {fmtDate(item.scoredAt)}
         </Text>
+
         <Text style={[styles.ratingScorer, { color: colors.subText }]}>
           {item.scorer?.name || "Hệ thống"}
         </Text>
+
+        {/* ✅ NEW: Notes */}
+        {hasData(noteText) && (
+          <Text
+            style={[styles.ratingNote, { color: colors.subText }]}
+            numberOfLines={4}
+          >
+            Ghi chú: {String(noteText)}
+          </Text>
+        )}
       </View>
+
       <View
         style={[styles.ratingScores, isSmallDevice && styles.ratingScoresSmall]}
       >
@@ -407,6 +431,7 @@ const RatingHistoryRow = ({
         >
           <Text style={styles.ratingScoreLabel}>Đơn</Text>
           <Text style={styles.ratingScoreValue}>{num(item.single)}</Text>
+
           {singleDelta !== 0 && (
             <Text
               style={[
@@ -419,6 +444,7 @@ const RatingHistoryRow = ({
             </Text>
           )}
         </View>
+
         <View
           style={[
             styles.ratingScoreBadge,
@@ -431,6 +457,7 @@ const RatingHistoryRow = ({
           <Text style={[styles.ratingScoreValue, { color: "#1976D2" }]}>
             {num(item.double)}
           </Text>
+
           {doubleDelta !== 0 && (
             <Text
               style={[
@@ -2066,5 +2093,10 @@ const styles = StyleSheet.create({
   achChipText: {
     fontSize: 11,
     fontWeight: "700",
+  },
+  ratingNote: {
+    fontSize: 12,
+    marginTop: 6,
+    lineHeight: 16,
   },
 });
