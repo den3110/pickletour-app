@@ -124,7 +124,7 @@ export default function SupportNewScreen() {
 
       Alert.alert(
         "Đã gửi",
-        "Mình đã tạo yêu cầu hỗ trợ. Bạn có thể xem phản hồi trong hộp thư.",
+        "Đã tạo yêu cầu hỗ trợ. Bạn có thể xem phản hồi trong hộp thư.",
         [
           {
             text: "OK",

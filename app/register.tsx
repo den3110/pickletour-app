@@ -15,6 +15,7 @@ import {
   Keyboard,
   FlatList,
   ActivityIndicator,
+  TouchableWithoutFeedback, // Thêm cái này để xử lý backdrop
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -28,7 +29,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useRegisterMutation } from "@/slices/usersApiSlice";
 import { useUploadRealAvatarMutation } from "@/slices/uploadApiSlice";
-import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice"; // 👈 NEW
+import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { saveUserInfo } from "@/utils/authStorage";
@@ -102,7 +103,6 @@ const PROVINCES = [
   "Yên Bái",
 ];
 
-// 👇 Label hiển thị, sẽ map sang enum trong model: male / female / other
 const GENDERS = ["Nam", "Nữ", "Khác"];
 
 function formatDobLabel(dobStr) {
@@ -135,12 +135,11 @@ function cleanPhone(v) {
 }
 
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
-  // 1. Mở thư viện ảnh + Bật chế độ CROP (allowsEditing: true)
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true, // 👈 Bật tính năng sửa ảnh
-    aspect: [1, 1], // 👈 Khóa tỉ lệ vuông (Facebook style)
-    quality: 1, // Lấy chất lượng gốc sau khi crop để xử lý resize sau
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 1,
     exif: false,
   });
 
@@ -150,22 +149,17 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   if (!asset?.uri) return null;
 
   let uri = asset.uri;
-  // Lấy tên + phần mở rộng an toàn
   let name =
     asset.fileName || uri.split(/[\\/]/).pop() || `avatar_${Date.now()}.jpg`;
 
-  // 2. Luôn xử lý qua ImageManipulator để:
-  // - Chuyển mọi định dạng (PNG, HEIC, WEBP) về JPG
-  // - Resize về kích thước chuẩn (ví dụ 1080px) để nhẹ server
-  const actions = [{ resize: { width: 1080 } }]; // Resize ảnh về chiều rộng 1080px (giữ tỉ lệ)
+  const actions = [{ resize: { width: 1080 } }];
 
   const out = await ImageManipulator.manipulateAsync(uri, actions, {
-    compress: 0.8, // Nén nhẹ xuống 80% chất lượng
+    compress: 0.8,
     format: ImageManipulator.SaveFormat.JPEG,
   });
 
   uri = out.uri;
-  // Đảm bảo đuôi file là .jpg
   if (
     !name.toLowerCase().endsWith(".jpg") &&
     !name.toLowerCase().endsWith(".jpeg")
@@ -174,7 +168,6 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   }
   const type = "image/jpeg";
 
-  // 3. Kiểm tra size lần cuối
   const info = await FileSystem.getInfoAsync(uri, { size: true });
   const size = info.size || 0;
 
@@ -185,20 +178,14 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
 
   return { uri, name, type, size };
 }
-/**
- * validateAll
- * @param {*} form
- * @param {*} avatarUrl
- * @param {*} accepted
- * @param {boolean} requireOptional - nếu true: hành vi y hệt logic cũ (phone/gender/province bắt buộc)
- */
+
 function validateAll(form, avatarUrl, accepted, requireOptional) {
   const name = (form.name || "").trim();
   const nickname = (form.nickname || "").trim();
   const phoneRaw = cleanPhone(form.phone || "");
   const email = (form.email || "").trim();
   const province = form.province || "";
-  const gender = form.gender || ""; // 👈 gender từ form (label)
+  const gender = form.gender || "";
   const dob = form.dob || "";
   const password = form.password || "";
   const confirmPassword = form.confirmPassword || "";
@@ -209,7 +196,7 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
     email: "",
     phone: "",
     gender: "",
-    dob: "", // 👈 thêm dob
+    dob: "",
     province: "",
     password: "",
     confirmPassword: "",
@@ -226,35 +213,28 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     fields.email = "Email không hợp lệ.";
 
-  // ====== Phone ======
   if (requireOptional) {
-    // logic cũ: bắt buộc
     if (!phoneRaw) fields.phone = "Vui lòng nhập số điện thoại.";
     else if (!/^0\d{9}$/.test(phoneRaw))
       fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
   } else {
-    // không bắt buộc, nhưng nếu user có nhập thì vẫn validate format
     if (phoneRaw && !/^0\d{9}$/.test(phoneRaw)) {
       fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
     }
   }
 
-  // ====== Gender ======
   if (requireOptional) {
     if (!gender) fields.gender = "Vui lòng chọn giới tính.";
   } else {
-    // optional: không set error nếu bỏ trống
     fields.gender = "";
   }
 
-  // ====== DOB ======
   if (requireOptional) {
     if (!dob) fields.dob = "Vui lòng chọn ngày sinh.";
   } else {
     fields.dob = "";
   }
 
-  // ====== Province ======
   if (requireOptional) {
     if (!province) fields.province = "Vui lòng chọn Tỉnh/Thành phố.";
   } else {
@@ -294,7 +274,16 @@ export default function RegisterScreen() {
   const textSecondary = isDark ? "#c9c9c9" : "#444";
   const border = isDark ? "#2e2f33" : "#dfe3ea";
   const danger = "#e53935";
+  // 👇 1. Tạo Ref cho ScrollView
+  const scrollRef = useRef(null);
 
+  // 👇 2. Viết hàm xử lý khi bấm vào ô mật khẩu
+  const handleFocusPassword = () => {
+    // Đợi 100ms để bàn phím kịp hiện lên, sau đó cuộn xuống đáy
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
 
@@ -302,11 +291,7 @@ export default function RegisterScreen() {
   const [uploadAvatar, { isLoading: uploadingAvatar }] =
     useUploadRealAvatarMutation();
 
-  // 👇 flag cho phép bật/tắt bắt buộc các field optional (phone/gender/province)
-  // hiện tại mặc định false để phù hợp guideline Apple, sau đó sync từ server
   const [requireOptional, setRequireOptional] = useState(true);
-
-  // 👇 Lấy config từ server: registration.requireOptionalProfileFields
   const { data: registrationSettings } = useGetRegistrationSettingsQuery();
 
   useEffect(() => {
@@ -318,7 +303,6 @@ export default function RegisterScreen() {
     }
   }, [registrationSettings]);
 
-  // Modal cảnh báo thiếu field optional
   const [optionalModalOpen, setOptionalModalOpen] = useState(false);
   const [missingOptionalFields, setMissingOptionalFields] = useState([]);
 
@@ -327,8 +311,8 @@ export default function RegisterScreen() {
     nickname: "",
     email: "",
     phone: "",
-    gender: "", // 👈 thêm gender vào form
-    dob: "", // 👈 ngày sinh dạng "YYYY-MM-DD"
+    gender: "",
+    dob: "",
     province: "",
     password: "",
     confirmPassword: "",
@@ -338,20 +322,28 @@ export default function RegisterScreen() {
   const [accepted, setAccepted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
 
-  // ===== Avatar (giống profile): preview modal -> upload -> lưu URL
-  const [avatarUrl, setAvatarUrl] = useState(""); // URL remote sau upload
-  const [avatarTemp, setAvatarTemp] = useState(null); // file tạm trước khi upload
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarTemp, setAvatarTemp] = useState(null);
   const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
-  const [viewerOpen, setViewerOpen] = useState(false); // phóng to ảnh
+  const [viewerOpen, setViewerOpen] = useState(false);
 
-  // DOB picker
+  // States for Modals
   const [dobPickerOpen, setDobPickerOpen] = useState(false);
   const [dobDraft, setDobDraft] = useState(null);
+  const [provincePickerOpen, setProvincePickerOpen] = useState(false); // New
+  const [genderPickerOpen, setGenderPickerOpen] = useState(false); // New
 
   const [showErrors, setShowErrors] = useState(false);
 
+  // --- Handlers cho việc mở Picker an toàn với bàn phím ---
+  const handleOpenPicker = (setter) => {
+    Keyboard.dismiss(); // Tắt bàn phím ngay lập tức
+    setter(true); // Mở modal
+  };
+
   const openDobPicker = () => {
+    Keyboard.dismiss();
     const existing = parseDobString(form.dob);
     setDobDraft(existing || new Date(2000, 0, 1));
     setDobPickerOpen(true);
@@ -369,7 +361,6 @@ export default function RegisterScreen() {
     () => validateAll(form, avatarUrl, accepted, requireOptional),
     [form, avatarUrl, accepted, requireOptional]
   );
-  const errorsList = useMemo(() => validation.messages, [validation]); // (hiện chưa dùng, giữ nguyên)
 
   const doRegister = async () => {
     try {
@@ -392,25 +383,21 @@ export default function RegisterScreen() {
 
       const res = await register(cleaned).unwrap();
 
-      // ✅ NEW: nếu backend yêu cầu OTP
       if (res?.otpRequired) {
         router.push({
           pathname: "/verify-otp",
           params: {
             registerToken: res.registerToken,
             phoneMasked: res.phoneMasked || "",
-            // DEV test nhanh (tuỳ backend có trả devOtp hay không)
             devOtp: res.devOtp || "",
           },
         });
         return;
       }
 
-      // ✅ flow cũ: đăng ký xong đăng nhập luôn
       dispatch(setCredentials(res));
       await saveUserInfo(res);
-
-      router.replace("/(tabs)"); // hoặc "/(tabs)/home" tuỳ app bạn
+      router.replace("/(tabs)");
     } catch (err) {
       const raw = err?.data?.message || err?.error || "Đăng ký thất bại";
       Alert.alert("Lỗi", raw);
@@ -419,26 +406,16 @@ export default function RegisterScreen() {
 
   const onSubmit = async () => {
     setShowErrors(true);
-
-    // Nếu còn lỗi (bắt buộc thực sự: name/nickname/email/pass/confirm/terms/avatar)
     if (validation.hasErrors) {
       Alert.alert("Thiếu/Không hợp lệ", validation.messages.join("\n"));
       return;
     }
 
-    // Nếu requireOptional = false -> các field phone/gender/province là optional
-    // nhưng trước khi đăng ký, show modal nhắc user bổ sung nếu đang bỏ trống
     if (!requireOptional) {
       const missing = [];
-      if (!cleanPhone(form.phone || "")) {
-        missing.push("Số điện thoại");
-      }
-      if (!form.gender) {
-        missing.push("Giới tính");
-      }
-      if (!form.province) {
-        missing.push("Tỉnh/Thành phố");
-      }
+      if (!cleanPhone(form.phone || "")) missing.push("Số điện thoại");
+      if (!form.gender) missing.push("Giới tính");
+      if (!form.province) missing.push("Tỉnh/Thành phố");
 
       if (missing.length > 0) {
         setMissingOptionalFields(missing);
@@ -453,7 +430,6 @@ export default function RegisterScreen() {
   const submitDisabled = isLoading || uploadingAvatar || avatarSaving;
   const shouldRedirect = !!userInfo;
 
-  // safe avatar uri (tránh null → lỗi handler)
   const safeAvatar = (() => {
     const u = normalizeUrl(avatarUrl || "");
     return u ? String(u).replace(/\\/g, "/") : undefined;
@@ -470,14 +446,19 @@ export default function RegisterScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        {/* QUAN TRỌNG: keyboardShouldPersistTaps="handled" để bấm được nút khi phím đang hiện */}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           <View
             style={[
               styles.card,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
-            {/* Avatar (giống profile) */}
+            {/* ... Phần Avatar giữ nguyên ... */}
             <View
               style={{
                 flexDirection: "row",
@@ -486,6 +467,7 @@ export default function RegisterScreen() {
                 marginBottom: 8,
               }}
             >
+              {/* (Giữ nguyên code Avatar như cũ) */}
               <Pressable
                 onPress={() => safeAvatar && setViewerOpen(true)}
                 style={({ pressed }) => [{ opacity: pressed ? 0.97 : 1 }]}
@@ -532,8 +514,8 @@ export default function RegisterScreen() {
                   onPress={async () => {
                     const f = await pickImage();
                     if (!f) return;
-                    setAvatarTemp(f); // giữ file để xem trước
-                    setAvatarConfirmOpen(true); // mở modal xác nhận
+                    setAvatarTemp(f);
+                    setAvatarConfirmOpen(true);
                   }}
                   style={({ pressed }) => [
                     styles.btn,
@@ -572,7 +554,6 @@ export default function RegisterScreen() {
                     </Text>
                   </View>
                 </Pressable>
-
                 {!!safeAvatar && (
                   <Pressable
                     onPress={() => setAvatarUrl("")}
@@ -638,79 +619,54 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="phone-pad"
-              required={requireOptional} // 👈 chỉ hiện * khi requireOptional = true
+              required={requireOptional}
               error={showErrors && !!validation.fields.phone}
               helperText={showErrors ? validation.fields.phone : ""}
             />
 
-            {/* Gender */}
-            <FieldSelect
+            {/* Gender - Thay đổi thành SelectTrigger */}
+            <SelectTrigger
               label="Giới tính"
               value={form.gender}
-              onSelect={(val) => handleChange("gender", val)}
-              options={GENDERS}
+              placeholder="Chọn giới tính"
+              onPress={() => handleOpenPicker(setGenderPickerOpen)}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
-              tint={tint}
-              required={requireOptional} // 👈 chỉ hiện *
+              required={requireOptional}
               error={showErrors && !!validation.fields.gender}
               helperText={showErrors ? validation.fields.gender : ""}
-              placeholder="Chọn giới tính"
             />
 
-            {/* DOB */}
-            <View style={{ marginBottom: 10 }}>
-              <Text style={[styles.label, { color: textSecondary }]}>
-                Ngày sinh
-                {requireOptional ? " *" : ""}
-              </Text>
-              <Pressable
-                onPress={openDobPicker}
-                style={({ pressed }) => [
-                  styles.input,
-                  {
-                    borderColor:
-                      showErrors && validation.fields.dob ? danger : border,
-                    flexDirection: "row",
-                    alignItems: "center",
-                  },
-                  pressed && { opacity: 0.95 },
-                ]}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: form.dob ? textPrimary : "#9aa0a6",
-                    flex: 1,
-                    fontSize: 16,
-                  }}
-                >
-                  {form.dob ? formatDobLabel(form.dob) : "Chọn ngày sinh"}
-                </Text>
-              </Pressable>
-              {showErrors && validation.fields.dob ? (
-                <Text style={[styles.errorText, { color: danger }]}>
-                  {validation.fields.dob}
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Province */}
-            <FieldSelect
-              label="Tỉnh/Thành phố"
-              value={form.province}
-              onSelect={(val) => handleChange("province", val)}
-              options={PROVINCES}
+            {/* DOB - Giữ nguyên logic, chỉ chỉnh style trigger */}
+            <SelectTrigger
+              label="Ngày sinh"
+              value={form.dob ? formatDobLabel(form.dob) : ""}
+              placeholder="Chọn ngày sinh"
+              onPress={openDobPicker}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
-              tint={tint}
-              required={requireOptional} // 👈 chỉ hiện *
+              required={requireOptional}
+              error={showErrors && !!validation.fields.dob}
+              helperText={showErrors ? validation.fields.dob : ""}
+            />
+
+            {/* Province - Thay đổi thành SelectTrigger */}
+            <SelectTrigger
+              label="Tỉnh/Thành phố"
+              value={form.province}
+              placeholder="Chọn tỉnh/thành"
+              onPress={() => handleOpenPicker(setProvincePickerOpen)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              required={requireOptional}
               error={showErrors && !!validation.fields.province}
               helperText={showErrors ? validation.fields.province : ""}
             />
 
+            {/* Password */}
             <Field
               label="Mật khẩu"
               value={form.password}
@@ -722,6 +678,7 @@ export default function RegisterScreen() {
               required
               error={showErrors && !!validation.fields.password}
               helperText={showErrors ? validation.fields.password : ""}
+              onFocus={handleFocusPassword} // <--- Thêm dòng này
             />
             <Field
               label="Xác nhận mật khẩu"
@@ -734,6 +691,7 @@ export default function RegisterScreen() {
               required
               error={showErrors && !!validation.fields.confirmPassword}
               helperText={showErrors ? validation.fields.confirmPassword : ""}
+              onFocus={handleFocusPassword} // <--- Thêm dòng này
             />
 
             {/* Terms */}
@@ -806,7 +764,7 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
 
-            {/* Link to Login */}
+            {/* Login Link */}
             <View style={{ alignItems: "center", marginTop: 6 }}>
               <Text style={{ color: textSecondary }}>
                 Đã có tài khoản?{" "}
@@ -823,13 +781,16 @@ export default function RegisterScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ===== Modal thiếu field optional ===== */}
+      {/* --- CÁC MODAL --- */}
+
+      {/* 1. Modal thiếu info (giữ nguyên) */}
       <Modal
         visible={optionalModalOpen}
         transparent
         animationType="fade"
         onRequestClose={() => setOptionalModalOpen(false)}
       >
+        {/* (Giữ nguyên nội dung modal này như cũ) */}
         <View style={styles.modalBackdropCenter}>
           <View
             style={[
@@ -841,15 +802,10 @@ export default function RegisterScreen() {
               Bổ sung thông tin?
             </Text>
             <Text
-              style={{
-                color: textSecondary,
-                marginTop: 8,
-                lineHeight: 20,
-              }}
+              style={{ color: textSecondary, marginTop: 8, lineHeight: 20 }}
             >
               Bạn chưa nhập các trường sau:
             </Text>
-
             <View style={{ marginTop: 6, marginBottom: 4 }}>
               {missingOptionalFields.map((f) => (
                 <Text
@@ -858,7 +814,6 @@ export default function RegisterScreen() {
                 >{`• ${f}`}</Text>
               ))}
             </View>
-
             <Text
               style={{
                 color: textSecondary,
@@ -870,7 +825,6 @@ export default function RegisterScreen() {
               Các thông tin này giúp BTC giải liên hệ và xếp bảng đấu chính xác
               hơn. Bạn có thể bỏ qua và bổ sung sau.
             </Text>
-
             <View
               style={{
                 flexDirection: "row",
@@ -896,7 +850,6 @@ export default function RegisterScreen() {
                   Điền tiếp
                 </Text>
               </Pressable>
-
               <Pressable
                 disabled={submitDisabled}
                 onPress={async () => {
@@ -923,7 +876,7 @@ export default function RegisterScreen() {
         </View>
       </Modal>
 
-      {/* Terms Modal */}
+      {/* 2. Terms Modal (giữ nguyên) */}
       <TermsModal
         open={termsOpen}
         onClose={() => setTermsOpen(false)}
@@ -938,7 +891,7 @@ export default function RegisterScreen() {
         tint={tint}
       />
 
-      {/* DOB Picker Modal */}
+      {/* 3. DOB Picker Modal (giữ nguyên style cũ) */}
       <Modal
         visible={dobPickerOpen}
         animationType="slide"
@@ -946,13 +899,14 @@ export default function RegisterScreen() {
         onRequestClose={() => setDobPickerOpen(false)}
       >
         <View style={styles.modalBackdrop}>
+          {/* Backdrop click to close */}
+          <TouchableWithoutFeedback onPress={() => setDobPickerOpen(false)}>
+            <View style={{ flex: 1 }} />
+          </TouchableWithoutFeedback>
           <View
             style={[
               styles.modalCard,
-              {
-                backgroundColor: cardBg,
-                borderColor: border,
-              },
+              { backgroundColor: cardBg, borderColor: border },
             ]}
           >
             <View
@@ -974,9 +928,7 @@ export default function RegisterScreen() {
               </Text>
               <Pressable
                 onPress={() => {
-                  if (dobDraft) {
-                    commitDob(dobDraft);
-                  }
+                  if (dobDraft) commitDob(dobDraft);
                   setDobPickerOpen(false);
                 }}
                 style={styles.modalBtn}
@@ -984,13 +936,7 @@ export default function RegisterScreen() {
                 <Text style={[styles.modalBtnText, { color: tint }]}>Xong</Text>
               </Pressable>
             </View>
-
-            <View
-              style={{
-                padding: 12,
-                alignItems: "center",
-              }}
-            >
+            <View style={{ padding: 12, alignItems: "center" }}>
               <DateTimePicker
                 value={
                   dobDraft || parseDobString(form.dob) || new Date(2000, 0, 1)
@@ -1002,14 +948,11 @@ export default function RegisterScreen() {
                 locale="vi-VN"
                 onChange={(event, selectedDate) => {
                   if (Platform.OS === "android") {
-                    if (event.type === "set" && selectedDate) {
+                    if (event.type === "set" && selectedDate)
                       commitDob(selectedDate);
-                    }
                     setDobPickerOpen(false);
                   } else {
-                    if (selectedDate) {
-                      setDobDraft(selectedDate);
-                    }
+                    if (selectedDate) setDobDraft(selectedDate);
                   }
                 }}
               />
@@ -1018,13 +961,46 @@ export default function RegisterScreen() {
         </View>
       </Modal>
 
-      {/* Avatar Preview Modal (Xác nhận → upload) */}
+      {/* 4. NEW: Province Picker (Tái sử dụng style của DOB Picker) */}
+      <BottomOptionPicker
+        visible={provincePickerOpen}
+        title="Chọn Tỉnh / Thành phố"
+        options={PROVINCES}
+        selected={form.province}
+        onClose={() => setProvincePickerOpen(false)}
+        onSelect={(val) => {
+          handleChange("province", val);
+        }}
+        cardBg={cardBg}
+        border={border}
+        textPrimary={textPrimary}
+        tint={tint}
+      />
+
+      {/* 5. NEW: Gender Picker (Tái sử dụng style của DOB Picker) */}
+      <BottomOptionPicker
+        visible={genderPickerOpen}
+        title="Chọn Giới tính"
+        options={GENDERS}
+        selected={form.gender}
+        onClose={() => setGenderPickerOpen(false)}
+        onSelect={(val) => {
+          handleChange("gender", val);
+        }}
+        cardBg={cardBg}
+        border={border}
+        textPrimary={textPrimary}
+        tint={tint}
+      />
+
+      {/* 6. Avatar Confirm (giữ nguyên) */}
       <Modal
         visible={avatarConfirmOpen}
         transparent
         animationType="fade"
         onRequestClose={() => !avatarSaving && setAvatarConfirmOpen(false)}
       >
+        {/* (Giữ nguyên nội dung) */}
         <View style={styles.modalBackdropCenter}>
           <View
             style={[
@@ -1035,7 +1011,6 @@ export default function RegisterScreen() {
             <Text style={[styles.modalTitle, { color: textPrimary }]}>
               Xác nhận ảnh đại diện
             </Text>
-
             {!!avatarTemp?.uri && (
               <ExpoImage
                 source={{ uri: avatarTemp.uri }}
@@ -1050,7 +1025,6 @@ export default function RegisterScreen() {
                 transition={100}
               />
             )}
-
             <Text
               style={{
                 marginTop: 10,
@@ -1061,7 +1035,6 @@ export default function RegisterScreen() {
             >
               Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm "Xác nhận".
             </Text>
-
             <View
               style={{
                 flexDirection: "row",
@@ -1090,7 +1063,6 @@ export default function RegisterScreen() {
                   Huỷ
                 </Text>
               </Pressable>
-
               <Pressable
                 disabled={avatarSaving || !avatarTemp}
                 onPress={async () => {
@@ -1132,7 +1104,6 @@ export default function RegisterScreen() {
         </View>
       </Modal>
 
-      {/* Viewer phóng to avatar */}
       <ImageView
         images={safeAvatar ? [{ uri: normalizeUrl(safeAvatar) }] : []}
         visible={viewerOpen}
@@ -1143,20 +1114,20 @@ export default function RegisterScreen() {
   );
 }
 
-/* ==================== Subcomponents ==================== */
-function Field({
+/* ==================== Subcomponents (Mới & Cũ) ==================== */
+
+// Component trigger đơn giản (chỉ hiển thị box input)
+function SelectTrigger({
   label,
   value,
-  onChangeText,
-  keyboardType = "default",
-  secureTextEntry = false,
-  maxLength,
-  required = false,
+  onPress,
+  placeholder,
   border,
   textPrimary,
   textSecondary,
-  error = false,
-  helperText = "",
+  required,
+  error,
+  helperText,
 }) {
   const danger = "#e53935";
   return (
@@ -1165,131 +1136,8 @@ function Field({
         {label}
         {required ? " *" : ""}
       </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={label}
-        placeholderTextColor="#9aa0a6"
-        style={[
-          styles.input,
-          {
-            borderColor: error ? danger : border,
-            color: textPrimary,
-          },
-        ]}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        maxLength={maxLength}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      {error ? (
-        <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function FieldSelect({
-  label,
-  value,
-  onSelect,
-  options = [],
-  border,
-  textPrimary,
-  textSecondary,
-  tint = "#0a84ff",
-  required = false,
-  error = false,
-  helperText = "",
-  placeholder = "Chọn tỉnh/thành",
-}) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [kbHeight, setKbHeight] = useState(0);
-  const searchRef = useRef(null);
-  const danger = "#e53935";
-
-  const unaccentVN = (s = "") =>
-    s
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/Đ/g, "D");
-  const norm = (s = "") =>
-    unaccentVN(s).toLowerCase().replace(/\s+/g, " ").trim();
-
-  const filtered = useMemo(() => {
-    const nq = norm(q);
-    if (!nq) return options;
-    return options.filter((name) => norm(name).includes(nq));
-  }, [q, options]);
-
-  useEffect(() => {
-    const onShow = (e) => setKbHeight(e.endCoordinates?.height ?? 0);
-    const onHide = () => setKbHeight(0);
-    const s1 =
-      Platform.OS === "ios"
-        ? Keyboard.addListener("keyboardWillShow", onShow)
-        : Keyboard.addListener("keyboardDidShow", onShow);
-    const s2 =
-      Platform.OS === "ios"
-        ? Keyboard.addListener("keyboardWillHide", onHide)
-        : Keyboard.addListener("keyboardDidHide", onHide);
-    return () => {
-      s1.remove();
-      s2.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (open) setTimeout(() => searchRef.current?.focus(), 50);
-    else setQ("");
-  }, [open]);
-
-  const handleSelect = (name) => {
-    onSelect(name);
-    setOpen(false);
-    setQ("");
-    Keyboard.dismiss();
-  };
-
-  const renderItem = ({ item: name }) => {
-    const selected = name === value;
-    return (
       <Pressable
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={() => handleSelect(name)}
-        onPress={() => handleSelect(name)}
-        style={({ pressed }) => [
-          {
-            paddingVertical: 12,
-            paddingHorizontal: 16,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          },
-          pressed && { backgroundColor: "#f2f4f7" },
-        ]}
-      >
-        <Text style={{ color: textPrimary, fontSize: 16 }}>{name}</Text>
-        {selected ? (
-          <Text style={{ color: tint, fontWeight: "700" }}>✓</Text>
-        ) : null}
-      </Pressable>
-    );
-  };
-
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={[styles.label, { color: textSecondary }]}>
-        {label}
-        {required ? " *" : ""}
-      </Text>
-
-      {/* Trigger */}
-      <Pressable
-        onPress={() => setOpen(true)}
+        onPress={onPress}
         style={({ pressed }) => [
           styles.input,
           {
@@ -1315,99 +1163,199 @@ function FieldSelect({
       {error ? (
         <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
       ) : null}
-
-      {/* Modal */}
-      <Modal
-        visible={open}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setOpen(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.select({ ios: "padding", android: "height" })}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
-          style={styles.modalBackdrop}
-        >
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: "#fff",
-                borderColor: border,
-                paddingBottom: 0,
-                maxHeight: "85%",
-              },
-            ]}
-          >
-            {/* Header */}
-            <View
-              style={[
-                styles.modalHeader,
-                { borderBottomWidth: 1, borderColor: border },
-              ]}
-            >
-              <Pressable onPress={() => setOpen(false)} style={styles.modalBtn}>
-                <Text style={[styles.modalBtnText, { color: textPrimary }]}>
-                  Đóng
-                </Text>
-              </Pressable>
-              <Text style={[styles.modalTitle, { color: textPrimary }]}>
-                {`Chọn ${label}`}
-              </Text>
-              <View style={styles.modalBtn}>
-                <Text style={[styles.modalBtnText, { color: "transparent" }]}>
-                  .
-                </Text>
-              </View>
-            </View>
-
-            {/* Search */}
-            <View
-              style={{
-                paddingHorizontal: 14,
-                paddingTop: 10,
-                paddingBottom: 6,
-              }}
-            >
-              <TextInput
-                ref={searchRef}
-                placeholder={`Tìm ${label.toLowerCase()}…`}
-                placeholderTextColor="#9aa0a6"
-                value={q}
-                onChangeText={setQ}
-                autoCapitalize="none"
-                returnKeyType="search"
-                blurOnSubmit={false}
-                style={[
-                  styles.input,
-                  {
-                    borderColor: border,
-                    color: textPrimary,
-                    paddingVertical: 10,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* List */}
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => item}
-              renderItem={renderItem}
-              keyboardShouldPersistTaps="always"
-              keyboardDismissMode="none"
-              initialNumToRender={20}
-              windowSize={8}
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ paddingBottom: Math.max(16, kbHeight) }}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
 
+// NEW: Bottom Picker chung cho Tỉnh & Giới tính (Giao diện giống DatePicker)
+function BottomOptionPicker({
+  visible,
+  title,
+  options,
+  selected,
+  onClose,
+  onSelect,
+  cardBg,
+  border,
+  textPrimary,
+  tint,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalBackdrop}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={{ flex: 1 }} />
+        </TouchableWithoutFeedback>
+        <View
+          style={[
+            styles.modalCard,
+            { backgroundColor: cardBg, borderColor: border, maxHeight: "50%" },
+          ]}
+        >
+          {/* Header giống DatePicker */}
+          <View
+            style={[
+              styles.modalHeader,
+              { borderBottomWidth: 1, borderColor: border },
+            ]}
+          >
+            {/* Nút Đóng */}
+            <Pressable onPress={onClose} style={styles.modalBtn}>
+              <Text style={[styles.modalBtnText, { color: textPrimary }]}>
+                Đóng
+              </Text>
+            </Pressable>
+
+            <Text style={[styles.modalTitle, { color: textPrimary }]}>
+              {title}
+            </Text>
+
+            {/* Dummy view để cân title ra giữa */}
+            <View style={styles.modalBtn}>
+              <Text style={[styles.modalBtnText, { color: "transparent" }]}>
+                Đóng
+              </Text>
+            </View>
+          </View>
+
+          {/* Content List */}
+          <FlatList
+            data={options}
+            keyExtractor={(item) => item}
+            renderItem={({ item }) => {
+              const isSelected = item === selected;
+              return (
+                <Pressable
+                  onPress={() => {
+                    onSelect(item);
+                    onClose();
+                  }} // Chọn xong tự đóng
+                  style={({ pressed }) => [
+                    {
+                      padding: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: border,
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      backgroundColor: pressed
+                        ? cardBg === "#ffffff"
+                          ? "#f5f5f5"
+                          : "#222"
+                        : "transparent",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      color: isSelected ? tint : textPrimary,
+                      fontWeight: isSelected ? "700" : "400",
+                    }}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// Field Input thường (Giữ nguyên)
+// Thay thế function Field cũ bằng đoạn này:
+function Field({
+  label,
+  value,
+  onChangeText,
+  keyboardType = "default",
+  secureTextEntry = false, // Đây là giá trị mặc định từ cha truyền xuống
+  maxLength,
+  required = false,
+  border,
+  textPrimary,
+  textSecondary,
+  error = false,
+  helperText = "",
+  ...props
+}) {
+  const danger = "#e53935";
+
+  // State để quản lý việc ẩn/hiện mật khẩu
+  // Nếu field này không phải password (secureTextEntry=false) thì luôn hiện (isVisible=true)
+  const [isVisible, setIsVisible] = useState(!secureTextEntry);
+
+  const toggleVisibility = () => {
+    setIsVisible(!isVisible);
+  };
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={[styles.label, { color: textSecondary }]}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
+
+      {/* Container chứa Input và Icon */}
+      <View style={{ justifyContent: "center" }}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={label}
+          placeholderTextColor="#9aa0a6"
+          style={[
+            styles.input,
+            {
+              borderColor: error ? danger : border,
+              color: textPrimary,
+              // Nếu là password field thì thêm padding bên phải để tránh chữ đè lên icon
+              paddingRight: secureTextEntry ? 45 : 14,
+            },
+          ]}
+          keyboardType={keyboardType}
+          // Logic: Nếu là field bảo mật (secureTextEntry=true) VÀ đang muốn ẩn (!isVisible) -> thì ẩn
+          secureTextEntry={secureTextEntry && !isVisible}
+          maxLength={maxLength}
+          autoCapitalize="none"
+          autoCorrect={false}
+          {...props}
+        />
+
+        {/* Chỉ hiện icon con mắt nếu props secureTextEntry được truyền vào là true */}
+        {secureTextEntry && (
+          <Pressable
+            onPress={toggleVisibility}
+            style={{
+              position: "absolute",
+              right: 12,
+              padding: 4, // Tăng vùng bấm cho dễ
+            }}
+            hitSlop={10} // Tăng vùng cảm ứng xung quanh
+          >
+            <MaterialIcons
+              name={isVisible ? "visibility" : "visibility-off"}
+              size={22}
+              color="#9aa0a6"
+            />
+          </Pressable>
+        )}
+      </View>
+
+      {error ? (
+        <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+// Terms Modal (Giữ nguyên nội dung text)
 function TermsModal({
   open,
   onClose,
@@ -1432,11 +1380,10 @@ function TermsModal({
             {
               backgroundColor: cardBg,
               borderColor: border,
-              maxHeight: "90%", // FIXED: Thêm maxHeight để tránh tràn màn hình
+              maxHeight: "90%",
             },
           ]}
         >
-          {/* FIXED: Thêm borderBottom cho header */}
           <View
             style={[
               styles.modalHeader,
@@ -1468,7 +1415,6 @@ function TermsModal({
             </Pressable>
           </View>
 
-          {/* FIXED: Dùng contentContainerStyle thay vì style để padding hoạt động đúng */}
           <ScrollView
             showsVerticalScrollIndicator={true}
             contentContainerStyle={{
@@ -1679,7 +1625,6 @@ function TermsModal({
     </Modal>
   );
 }
-
 /* ==================== Styles ==================== */
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, padding: 16 },
@@ -1723,7 +1668,6 @@ const styles = StyleSheet.create({
   btnTextWhite: { color: "#fff", fontWeight: "700" },
   btnOutline: { borderWidth: 1 },
   btnTextOnly: { backgroundColor: "transparent" },
-
   checkboxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   checkboxBox: {
     width: 22,
@@ -1734,9 +1678,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxTick: { color: "#fff", fontWeight: "900", lineHeight: 18 },
-
   errorText: { fontSize: 12, marginTop: 6 },
 
+  // Modal styles
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",

@@ -44,7 +44,6 @@ import {
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
 
-
 // app/_layout.tsx
 if (__DEV__) {
   require("../dev/reactotron");
@@ -956,6 +955,24 @@ export default function RootLayout() {
                           name="login"
                           options={{
                             headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="reset-password"
+                          options={{
+                            title: "Đặt lại mật khẩu",
+                            headerTitleAlign: "center",
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
                           }}
                         />
 

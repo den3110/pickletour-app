@@ -168,9 +168,12 @@ export default function LoginScreen() {
                 styles.scroll,
                 {
                   // ⬅️ SỬA: Chỉ padding khi keyboard KHÔNG hiện
-                  paddingBottom: keyboardVisible
-                    ? 16
-                    : BOTTOM_ACTIONS_H + insets.bottom + 16,
+                  paddingBottom:
+                    Platform.OS === "ios"
+                      ? 0
+                      : keyboardVisible
+                      ? 16
+                      : BOTTOM_ACTIONS_H + insets.bottom + 16,
                 },
               ]}
               keyboardShouldPersistTaps="handled"
@@ -283,7 +286,8 @@ export default function LoginScreen() {
         </KeyboardAvoidingView>
 
         {/* ⬅️ SỬA: Chỉ hiện 2 nút khi keyboard KHÔNG hiện */}
-        {!keyboardVisible && (
+        {((!keyboardVisible && Platform.OS === "android") ||
+          Platform.OS === "ios") && (
           <View
             style={[
               styles.bottomActions,
