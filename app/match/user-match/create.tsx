@@ -97,11 +97,15 @@ function SelectionModal({
 }) {
   return (
     <Modal visible={visible} animationType="slide" transparent={true}>
-      <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
+      <View
+        style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}
+      >
         <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
           {/* Header */}
           <View style={[styles.modalHeader, { borderColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {title}
+            </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -110,9 +114,7 @@ function SelectionModal({
           {/* List Item */}
           <FlatList
             data={data}
-            keyExtractor={(item, index) =>
-              `${getProvinceId(item) || index}`
-            }
+            keyExtractor={(item, index) => `${getProvinceId(item) || index}`}
             style={{ maxHeight: 400 }}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -142,7 +144,9 @@ function SelectionModal({
                     </Text>
                   </>
                 ) : (
-                  <Text style={{ color: colors.textSub }}>Không có dữ liệu</Text>
+                  <Text style={{ color: colors.textSub }}>
+                    Không có dữ liệu
+                  </Text>
                 )}
               </View>
             }
@@ -177,7 +181,9 @@ function PlayerAvatar({ player, colors }) {
   return (
     <View style={[styles.avatar, { backgroundColor: colors.cardSub }]}>
       {shouldShowFallback ? (
-        <Text style={[styles.avatarText, { color: colors.primary }]}>{fallbackText}</Text>
+        <Text style={[styles.avatarText, { color: colors.primary }]}>
+          {fallbackText}
+        </Text>
       ) : (
         <Image
           source={{ uri: avatarUri }}
@@ -191,28 +197,44 @@ function PlayerAvatar({ player, colors }) {
 }
 
 /* ======= MODAL CHỌN VĐV ======= */
+/* ======= MODAL CHỌN VĐV (có thêm nhập tên thủ công) ======= */
 function PlayerSelectModal({ visible, onClose, onSelect, colors }) {
+  const [tab, setTab] = useState("list"); // "list" | "manual"
   const [search, setSearch] = useState("");
+  const [manualName, setManualName] = useState("");
+
   const searchInputRef = useRef(null);
+  const manualInputRef = useRef(null);
 
   useEffect(() => {
     if (!visible) {
+      setTab("list");
       setSearch("");
+      setManualName("");
     }
   }, [visible]);
 
   const { data, isLoading } = useSearchUserMatchPlayersQuery(
     { search: search.trim(), limit: 50 },
     {
-      skip: !visible || !search.trim(),
+      skip: !visible || tab !== "list" || !search.trim(),
     }
   );
 
   const players = data?.items || [];
 
   const handleClose = () => {
+    setTab("list");
     setSearch("");
+    setManualName("");
     onClose && onClose();
+  };
+
+  const handleUseManual = () => {
+    const name = manualName.trim();
+    if (!name) return;
+    onSelect?.({ displayName: name }); // không có id => coi như VĐV nhập tay
+    handleClose();
   };
 
   return (
@@ -222,12 +244,18 @@ function PlayerSelectModal({ visible, onClose, onSelect, colors }) {
       presentationStyle="pageSheet"
       onShow={() => {
         setTimeout(() => {
-          searchInputRef.current?.focus();
+          if (tab === "manual") manualInputRef.current?.focus();
+          else searchInputRef.current?.focus();
         }, 80);
       }}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.card }}>
-        <StatusBar barStyle={colors.text === '#F3F4F6' ? 'light-content' : 'dark-content'} />
+        <StatusBar
+          barStyle={
+            colors.text === "#F3F4F6" ? "light-content" : "dark-content"
+          }
+        />
+
         <View style={[styles.fullModalHeader, { borderColor: colors.border }]}>
           <TouchableOpacity onPress={handleClose}>
             <Ionicons name="close" size={28} color={colors.text} />
@@ -238,81 +266,199 @@ function PlayerSelectModal({ visible, onClose, onSelect, colors }) {
           <View style={{ width: 28 }} />
         </View>
 
-        <View style={styles.searchContainer}>
-          <View style={[styles.searchBox, { backgroundColor: colors.inputBg }]}>
-            <Ionicons name="search" size={20} color={colors.textSub} />
-            <TextInput
-              ref={searchInputRef}
-              style={[styles.searchInput, { color: colors.text }]}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Tìm tên, nickname, email..."
-              placeholderTextColor={colors.placeholder}
-              autoFocus={false}
-              returnKeyType="search"
-            />
-            {!!search && (
-              <TouchableOpacity
-                onPress={() => setSearch("")}
-                style={styles.clearSearchBtn}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={18}
-                  color={colors.textSub}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Tabs */}
+        <View style={[styles.psTabsWrap, { backgroundColor: colors.inputBg }]}>
+          <TouchableOpacity
+            onPress={() => {
+              setTab("list");
+              setTimeout(() => searchInputRef.current?.focus(), 60);
+            }}
+            style={[
+              styles.psTabBtn,
+              tab === "list" && { backgroundColor: colors.primary },
+            ]}
+          >
+            <Text
+              style={[
+                styles.psTabText,
+                { color: tab === "list" ? "#fff" : colors.textSub },
+              ]}
+            >
+              Chọn từ danh sách
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setTab("manual");
+              setTimeout(() => manualInputRef.current?.focus(), 60);
+            }}
+            style={[
+              styles.psTabBtn,
+              tab === "manual" && { backgroundColor: colors.primary },
+            ]}
+          >
+            <Text
+              style={[
+                styles.psTabText,
+                { color: tab === "manual" ? "#fff" : colors.textSub },
+              ]}
+            >
+              Nhập tên
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            style={{ marginTop: 20 }}
-          />
-        ) : (
-          <FlatList
-            data={players}
-            keyExtractor={(item) => String(item.userId || item._id || item.id)}
-            contentContainerStyle={{ padding: 16 }}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => {
-              const displayName =
-                item.displayName || item.nickname || item.name || "Không tên";
-              const subText = item.email || item.province || "";
-
-              return (
+        {/* Manual tab */}
+        {tab === "manual" ? (
+          <View style={{ padding: 16 }}>
+            <View
+              style={[styles.searchBox, { backgroundColor: colors.inputBg }]}
+            >
+              <Ionicons
+                name="create-outline"
+                size={20}
+                color={colors.textSub}
+              />
+              <TextInput
+                ref={manualInputRef}
+                style={[styles.searchInput, { color: colors.text }]}
+                value={manualName}
+                onChangeText={setManualName}
+                placeholder="Nhập tên vận động viên..."
+                placeholderTextColor={colors.placeholder}
+                returnKeyType="done"
+                onSubmitEditing={handleUseManual}
+              />
+              {!!manualName && (
                 <TouchableOpacity
-                  style={[styles.playerItem, { borderColor: colors.border }]}
-                  onPress={() => onSelect(item)}
+                  onPress={() => setManualName("")}
+                  style={styles.clearSearchBtn}
                 >
-                  <PlayerAvatar player={item} colors={colors} />
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.playerName, { color: colors.text }]}>
-                      {displayName}
-                    </Text>
-                    {subText ? (
-                      <Text style={[styles.playerEmail, { color: colors.textSub }]}>
-                        {subText}
-                      </Text>
-                    ) : null}
-                  </View>
+                  <Ionicons
+                    name="close-circle"
+                    size={18}
+                    color={colors.textSub}
+                  />
                 </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={{ padding: 20, alignItems: "center" }}>
-                <Text style={{ color: colors.textSub }}>
-                  {search.trim()
-                    ? "Không tìm thấy vận động viên phù hợp"
-                    : "Nhập từ khoá để bắt đầu tìm kiếm"}
-                </Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={handleUseManual}
+              disabled={!manualName.trim()}
+              style={[
+                styles.psUseManualBtn,
+                { backgroundColor: colors.primary },
+                !manualName.trim() && { opacity: 0.5 },
+              ]}
+            >
+              <Text style={styles.psUseManualText}>Dùng tên này</Text>
+            </TouchableOpacity>
+
+            <Text
+              style={{ marginTop: 10, color: colors.textSub, fontSize: 13 }}
+            >
+              *VĐV nhập tay sẽ không phải user hệ thống, chỉ lưu theo tên.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* List tab */}
+            <View style={styles.searchContainer}>
+              <View
+                style={[styles.searchBox, { backgroundColor: colors.inputBg }]}
+              >
+                <Ionicons name="search" size={20} color={colors.textSub} />
+                <TextInput
+                  ref={searchInputRef}
+                  style={[styles.searchInput, { color: colors.text }]}
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Tìm tên, nickname, email..."
+                  placeholderTextColor={colors.placeholder}
+                  autoFocus={false}
+                  returnKeyType="search"
+                />
+                {!!search && (
+                  <TouchableOpacity
+                    onPress={() => setSearch("")}
+                    style={styles.clearSearchBtn}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={colors.textSub}
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
-            }
-          />
+            </View>
+
+            {isLoading ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                style={{ marginTop: 20 }}
+              />
+            ) : (
+              <FlatList
+                data={players}
+                keyExtractor={(item) =>
+                  String(item.userId || item._id || item.id)
+                }
+                contentContainerStyle={{ padding: 16 }}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => {
+                  const displayName =
+                    item.displayName ||
+                    item.nickname ||
+                    item.name ||
+                    "Không tên";
+                  const subText = item.email || item.province || "";
+
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.playerItem,
+                        { borderColor: colors.border },
+                      ]}
+                      onPress={() => onSelect(item)}
+                    >
+                      <PlayerAvatar player={item} colors={colors} />
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[styles.playerName, { color: colors.text }]}
+                        >
+                          {displayName}
+                        </Text>
+                        {subText ? (
+                          <Text
+                            style={[
+                              styles.playerEmail,
+                              { color: colors.textSub },
+                            ]}
+                          >
+                            {subText}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <View style={{ padding: 20, alignItems: "center" }}>
+                    <Text style={{ color: colors.textSub }}>
+                      {search.trim()
+                        ? "Không tìm thấy vận động viên phù hợp"
+                        : "Nhập từ khoá để bắt đầu tìm kiếm"}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </>
         )}
       </SafeAreaView>
     </Modal>
@@ -322,7 +468,7 @@ function PlayerSelectModal({ visible, onClose, onSelect, colors }) {
 /* ======= 3. MAIN SCREEN ======= */
 export default function CreateUserMatchScreen() {
   const headerHeight = useHeaderHeight();
-  
+
   // --- THEME SETUP ---
   const systemScheme = useColorScheme();
   const theme = systemScheme === "dark" ? "dark" : "light";
@@ -357,7 +503,8 @@ export default function CreateUserMatchScreen() {
 
   const [activeSlot, setActiveSlot] = useState(null);
   const [playerModalVisible, setPlayerModalVisible] = useState(false);
-  const [createUserMatch, { isLoading: isCreating }] = useCreateUserMatchMutation();
+  const [createUserMatch, { isLoading: isCreating }] =
+    useCreateUserMatchMutation();
 
   useEffect(() => {
     fetchProvinces();
@@ -424,17 +571,19 @@ export default function CreateUserMatchScreen() {
   };
 
   const handleSelectPlayer = (p) => {
-    const displayName =
-      p.displayName || p.nickname || p.name || "Vận động viên";
-    const minimal = {
-      id: p.userId || p._id || p.id,
-      displayName,
-    };
+    const displayName = String(
+      p?.displayName || p?.nickname || p?.name || "Vận động viên"
+    ).trim();
+
+    const id = p?.userId || p?._id || p?.id || null;
+
+    const minimal = { id, displayName };
 
     if (activeSlot === "A1") setPlayerA1(minimal);
     if (activeSlot === "A2") setPlayerA2(minimal);
     if (activeSlot === "B1") setPlayerB1(minimal);
     if (activeSlot === "B2") setPlayerB2(minimal);
+
     setPlayerModalVisible(false);
   };
 
@@ -463,14 +612,17 @@ export default function CreateUserMatchScreen() {
       const districtName = district ? getRowName(district) : "";
 
       const participants = [];
-      const addP = (p, side, order) =>
-        p &&
-        participants.push({
-          user: p.id,
+      const addP = (p, side, order) => {
+        if (!p) return;
+        const row = {
           displayName: p.displayName,
           side,
           order,
-        });
+        };
+        // chỉ gửi user nếu có id (tránh ObjectId error)
+        if (p.id) row.user = p.id;
+        participants.push(row);
+      };
 
       addP(playerA1, "A", 1);
       if (matchType === "double") addP(playerA2, "A", 2);
@@ -481,7 +633,9 @@ export default function CreateUserMatchScreen() {
         title: "Trận đấu tự do",
         note,
         sportType: "pickleball",
-        locationName: `${provinceName}${districtName ? " - " + districtName : ""}`,
+        locationName: `${provinceName}${
+          districtName ? " - " + districtName : ""
+        }`,
         locationAddress: address,
         scheduledAt: matchDate.toISOString(),
         participants,
@@ -508,8 +662,13 @@ export default function CreateUserMatchScreen() {
   const districtLabel = district ? getRowName(district) : "Chọn...";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["bottom"]}>
-      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={["bottom"]}
+    >
+      <StatusBar
+        barStyle={theme === "dark" ? "light-content" : "dark-content"}
+      />
       <Stack.Screen
         options={{
           headerTitle: "Tạo trận đấu",
@@ -542,7 +701,10 @@ export default function CreateUserMatchScreen() {
             {/* 1. Thời gian */}
             <SectionBlock title="Thời gian" colors={colors}>
               <TouchableOpacity
-                style={[styles.selectInput, { backgroundColor: colors.card, borderColor: colors.border }]}
+                style={[
+                  styles.selectInput,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
                 onPress={handleShowPicker}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -572,11 +734,15 @@ export default function CreateUserMatchScreen() {
 
             {/* 2. Tỉ số & VĐV */}
             <SectionBlock title="Tỉ số & VĐV" colors={colors}>
-              <View style={[styles.modeTabs, { backgroundColor: colors.inputBg }]}>
+              <View
+                style={[styles.modeTabs, { backgroundColor: colors.inputBg }]}
+              >
                 <TouchableOpacity
                   style={[
                     styles.modeTab,
-                    matchType === "double" && { backgroundColor: colors.primary },
+                    matchType === "double" && {
+                      backgroundColor: colors.primary,
+                    },
                   ]}
                   onPress={() => setMatchType("double")}
                 >
@@ -593,7 +759,9 @@ export default function CreateUserMatchScreen() {
                 <TouchableOpacity
                   style={[
                     styles.modeTab,
-                    matchType === "single" && { backgroundColor: colors.primary },
+                    matchType === "single" && {
+                      backgroundColor: colors.primary,
+                    },
                   ]}
                   onPress={() => setMatchType("single")}
                 >
@@ -682,39 +850,84 @@ export default function CreateUserMatchScreen() {
 
             {/* 3. Địa điểm */}
             <SectionBlock title="Địa điểm thi đấu" colors={colors}>
-              <View style={{ flexDirection: "row", gap: IS_SMALL_SCREEN ? 8 : 12 }}>
+              <View
+                style={{ flexDirection: "row", gap: IS_SMALL_SCREEN ? 8 : 12 }}
+              >
                 <TouchableOpacity
-                  style={[styles.selectInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={[
+                    styles.selectInput,
+                    {
+                      flex: 1,
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
                   onPress={() => setShowProvinceModal(true)}
                 >
-                  <View style={{flex: 1}}>
-                    <Text style={[styles.labelSmall, { color: colors.textSub }]}>Tỉnh/Thành</Text>
-                    <Text style={[styles.inputText, { color: colors.text }]} numberOfLines={1}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.labelSmall, { color: colors.textSub }]}
+                    >
+                      Tỉnh/Thành
+                    </Text>
+                    <Text
+                      style={[styles.inputText, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       {provinceLabel}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-down" size={16} color={colors.textSub} />
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color={colors.textSub}
+                  />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.selectInput,
-                    { flex: 1, opacity: province ? 1 : 0.5, backgroundColor: colors.card, borderColor: colors.border },
+                    {
+                      flex: 1,
+                      opacity: province ? 1 : 0.5,
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
                   ]}
                   onPress={() => province && setShowDistrictModal(true)}
                   disabled={!province}
                 >
-                  <View style={{flex: 1}}>
-                    <Text style={[styles.labelSmall, { color: colors.textSub }]}>Quận/Huyện</Text>
-                    <Text style={[styles.inputText, { color: colors.text }]} numberOfLines={1}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.labelSmall, { color: colors.textSub }]}
+                    >
+                      Quận/Huyện
+                    </Text>
+                    <Text
+                      style={[styles.inputText, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       {districtLabel}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-down" size={16} color={colors.textSub} />
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color={colors.textSub}
+                  />
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.inputContainer, { marginTop: 12, backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    marginTop: 12,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <TextInput
                   style={[styles.textInput, { color: colors.text }]}
                   placeholder="Số nhà, tên sân, đường..."
@@ -727,11 +940,20 @@ export default function CreateUserMatchScreen() {
 
             {/* 4. Ghi chú */}
             <SectionBlock title="Ghi chú" colors={colors}>
-              <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
                 <TextInput
                   style={[
                     styles.textInput,
-                    { minHeight: 80, textAlignVertical: "top", color: colors.text },
+                    {
+                      minHeight: 80,
+                      textAlignVertical: "top",
+                      color: colors.text,
+                    },
                   ]}
                   placeholder="Nhập ghi chú trận đấu..."
                   placeholderTextColor={colors.placeholder}
@@ -744,32 +966,55 @@ export default function CreateUserMatchScreen() {
           </ScrollView>
 
           {/* Bottom Buttons */}
-          <View style={[styles.bottomBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.bottomBar,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
             <TouchableOpacity
-              style={[styles.btnDraft, { backgroundColor: colors.inputBg }, isCreating && styles.btnDisabled]}
+              style={[
+                styles.btnDraft,
+                { backgroundColor: colors.inputBg },
+                isCreating && styles.btnDisabled,
+              ]}
               onPress={() => handleSubmit("draft")}
               disabled={isCreating}
             >
-              <Text style={[styles.btnDraftText, { color: colors.primary }]}>{IS_SMALL_SCREEN ? "Nháp" : "Lưu nháp"}</Text>
+              <Text style={[styles.btnDraftText, { color: colors.primary }]}>
+                {IS_SMALL_SCREEN ? "Nháp" : "Lưu nháp"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.btnCreate, { backgroundColor: colors.card, borderColor: colors.primary }, isCreating && styles.btnDisabled]}
+              style={[
+                styles.btnCreate,
+                { backgroundColor: colors.card, borderColor: colors.primary },
+                isCreating && styles.btnDisabled,
+              ]}
               onPress={() => handleSubmit("normal")}
               disabled={isCreating}
             >
-              <Text style={[styles.btnCreateText, { color: colors.primary }]}>Tạo</Text>
+              <Text style={[styles.btnCreateText, { color: colors.primary }]}>
+                Tạo
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.btnPrimary, { backgroundColor: colors.primary }, isCreating && styles.btnDisabled]}
+              style={[
+                styles.btnPrimary,
+                { backgroundColor: colors.primary },
+                isCreating && styles.btnDisabled,
+              ]}
               onPress={() => handleSubmit("live")}
               disabled={isCreating}
             >
               {isCreating ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.btnPrimaryText}>{IS_SMALL_SCREEN ? "Live ngay" : "Tạo & Live Ngay"}</Text>
+                <Text style={styles.btnPrimaryText}>
+                  {IS_SMALL_SCREEN ? "Live ngay" : "Tạo & Live Ngay"}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -779,7 +1024,12 @@ export default function CreateUserMatchScreen() {
         {Platform.OS === "ios" && showDatePicker && (
           <Modal transparent animationType="fade">
             <View style={styles.iosDatePickerOverlay}>
-              <View style={[styles.iosDatePickerContainer, { backgroundColor: colors.card }]}>
+              <View
+                style={[
+                  styles.iosDatePickerContainer,
+                  { backgroundColor: colors.card },
+                ]}
+              >
                 <DateTimePicker
                   value={matchDate}
                   mode="datetime"
@@ -791,9 +1041,14 @@ export default function CreateUserMatchScreen() {
                 />
                 <TouchableOpacity
                   onPress={() => setShowDatePicker(false)}
-                  style={[styles.iosConfirmBtn, { backgroundColor: colors.primary }]}
+                  style={[
+                    styles.iosConfirmBtn,
+                    { backgroundColor: colors.primary },
+                  ]}
                 >
-                  <Text style={{ color: "#FFF", fontWeight: "bold" }}>Xong</Text>
+                  <Text style={{ color: "#FFF", fontWeight: "bold" }}>
+                    Xong
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -871,14 +1126,22 @@ const PlayerBox = ({ value, placeholder, onPress, colors }) => (
   >
     {value ? (
       <Text
-        style={{ fontWeight: "600", color: colors.text, fontSize: FONT_SIZE_NORMAL - 2 }}
+        style={{
+          fontWeight: "600",
+          color: colors.text,
+          fontSize: FONT_SIZE_NORMAL - 2,
+        }}
         numberOfLines={1}
       >
         {value.displayName}
       </Text>
     ) : (
       <Text
-        style={{ color: colors.textSub, fontSize: FONT_SIZE_NORMAL - 2, fontStyle: "italic" }}
+        style={{
+          color: colors.textSub,
+          fontSize: FONT_SIZE_NORMAL - 2,
+          fontStyle: "italic",
+        }}
       >
         {placeholder}
       </Text>
@@ -979,7 +1242,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 4,
   },
-  vsMid: { width: IS_SMALL_SCREEN ? 30 : 40, justifyContent: "center", alignItems: "center" },
+  vsMid: {
+    width: IS_SMALL_SCREEN ? 30 : 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   vsText: {
     fontWeight: "900",
     color: "#E5E7EB",
@@ -998,14 +1265,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 0 : SPACING, // SafeAreaView sẽ lo phần bottom
+    paddingBottom: Platform.OS === "ios" ? 0 : SPACING, // SafeAreaView sẽ lo phần bottom
   },
   btnDraft: {
     flex: 1,
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   btnDraftText: { fontWeight: "700", fontSize: 13 },
   btnCreate: {
@@ -1014,7 +1281,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   btnCreateText: { fontWeight: "700", fontSize: 13 },
   btnPrimary: {
@@ -1022,7 +1289,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   btnPrimaryText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
   btnDisabled: { opacity: 0.6 },
@@ -1110,4 +1377,34 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, marginLeft: 8, fontSize: 15 },
   clearSearchBtn: { paddingLeft: 4, paddingVertical: 4 },
+  psTabsWrap: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 999,
+    padding: 4,
+    gap: 4,
+  },
+  psTabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  psTabText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  psUseManualBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  psUseManualText: {
+    color: "#fff",
+    fontWeight: "800",
+  },
 });
