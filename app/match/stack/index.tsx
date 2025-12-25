@@ -9,13 +9,12 @@ import {
   FlatList,
   ActivityIndicator,
   Modal,
-  Alert, // <--- Đã thêm Alert
+  Alert,
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { useTheme, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
-// Đảm bảo bạn đã export useDeleteUserMatchMutation từ slice này
 import {
   useGetMyUserMatchesQuery,
   useDeleteUserMatchMutation,
@@ -144,10 +143,13 @@ function MatchCard({ item, onPress }) {
   const border = theme?.colors?.border ?? (isDark ? "#374151" : "#E5E7EB");
   const primaryColor = theme?.colors?.primary ?? "#2563EB";
 
-  const hasScore = (item.score?.a ?? 0) > 0 || (item.score?.b ?? 0) > 0;
+  const scoreAValue = item.score?.a ?? 0;
+  const scoreBValue = item.score?.b ?? 0;
+  const hasScore = scoreAValue > 0 || scoreBValue > 0;
 
   // 👉 chỉ cho bắt trận / live nếu chưa end
   const canStart = item.status !== "finished" && item.status !== "canceled";
+  const isFinished = item.status === "finished";
 
   // --- LOGIC XOÁ TRẬN ---
   const [deleteMatch, { isLoading: isDeleting }] = useDeleteUserMatchMutation();
@@ -157,17 +159,14 @@ function MatchCard({ item, onPress }) {
       "Xoá trận đấu",
       "Bạn có chắc chắn muốn xoá trận đấu này không? Hành động này không thể hoàn tác.",
       [
-        {
-          text: "Huỷ",
-          style: "cancel",
-        },
+        { text: "Huỷ", style: "cancel" },
         {
           text: "Xoá",
           style: "destructive",
           onPress: async () => {
             try {
               await deleteMatch(item._id).unwrap();
-              // API Slice invalidateTags sẽ tự động refresh list
+              // invalidateTags tự refresh list
             } catch (error) {
               console.error("Delete match failed", error);
               Alert.alert("Lỗi", "Không thể xoá trận đấu. Vui lòng thử lại.");
@@ -182,32 +181,44 @@ function MatchCard({ item, onPress }) {
   const handleStartMatch = () => {
     router.push({
       pathname: `/match/${item._id}/referee`,
-      params: {
-        userMatch: "true", // truyền param userMatch true
-      },
+      params: { userMatch: "true" },
     });
   };
 
   const handleGoLive = () => {
     router.push({
       pathname: `/match/user-match/${item._id}/live`,
-      params: {
-        userMatch: "true",
-      },
+      params: { userMatch: "true" },
     });
+  };
+
+  // ✅ Nút xem tỉ số (chỉ trận finished)
+  const handleViewScore = () => {
+    if (!hasScore) {
+      Alert.alert("Tỉ số trận đấu", "Trận này chưa có tỉ số được ghi lại.", [
+        { text: "Đóng" },
+      ]);
+      return;
+    }
+
+    Alert.alert(
+      "Tỉ số trận đấu",
+      `Tỉ số cuối: ${scoreAValue} - ${scoreBValue}`,
+      [{ text: "Đóng" }]
+    );
   };
 
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      disabled={isDeleting} // Disable card khi đang xoá
+      disabled={isDeleting}
       style={[
         styles.card,
         {
           backgroundColor: bg,
           borderColor: border,
-          opacity: isDeleting ? 0.5 : 1, // Làm mờ khi đang xoá
+          opacity: isDeleting ? 0.5 : 1,
         },
       ]}
     >
@@ -258,7 +269,7 @@ function MatchCard({ item, onPress }) {
         <View style={styles.cardMetaRow}>
           <Ionicons name="tennisball-outline" size={14} color={sub} />
           <Text style={[styles.metaText, { color: sub }]}>
-            Tỉ số: {item.score?.a ?? 0} - {item.score?.b ?? 0}
+            Tỉ số: {scoreAValue} - {scoreBValue}
           </Text>
         </View>
       )}
@@ -266,28 +277,16 @@ function MatchCard({ item, onPress }) {
       <View style={styles.cardFooterRow}>
         <StatusChip status={item.status} />
 
-        {canStart && (
+        {canStart ? (
           <View style={styles.footerActions}>
             {/* 🔴 Nút Live nằm TRÊN nút Bắt trận */}
             <TouchableOpacity
               onPress={handleGoLive}
               activeOpacity={0.85}
-              style={[
-                styles.liveBtn,
-                {
-                  borderColor: primaryColor,
-                },
-              ]}
+              style={[styles.liveBtn, { borderColor: primaryColor }]}
             >
               <Ionicons name="radio" size={14} color={primaryColor} />
-              <Text
-                style={[
-                  styles.liveBtnText,
-                  {
-                    color: primaryColor,
-                  },
-                ]}
-              >
+              <Text style={[styles.liveBtnText, { color: primaryColor }]}>
                 Live
               </Text>
             </TouchableOpacity>
@@ -295,18 +294,24 @@ function MatchCard({ item, onPress }) {
             <TouchableOpacity
               onPress={handleStartMatch}
               activeOpacity={0.85}
-              style={[
-                styles.startBtn,
-                {
-                  backgroundColor: primaryColor,
-                },
-              ]}
+              style={[styles.startBtn, { backgroundColor: primaryColor }]}
             >
               <Ionicons name="play" size={14} color="#FFFFFF" />
               <Text style={styles.startBtnText}>Bắt trận</Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : isFinished ? (
+          <TouchableOpacity
+            onPress={handleStartMatch}
+            activeOpacity={0.85}
+            style={[styles.viewScoreBtn, { borderColor: primaryColor }]}
+          >
+            <Ionicons name="eye-outline" size={14} color={primaryColor} />
+            <Text style={[styles.viewScoreText, { color: primaryColor }]}>
+              Xem tỉ số
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -353,7 +358,7 @@ export default function MatchesStackScreen() {
 
   const { from, to } = useMemo(
     () => computeRange(rangeKey, fromDate, toDate),
-    [rangeKey, fromDate, toDate, refreshKey] // 🔥 thêm refreshKey
+    [rangeKey, fromDate, toDate, refreshKey]
   );
 
   const { data, isLoading, isFetching } = useGetMyUserMatchesQuery(
@@ -361,7 +366,7 @@ export default function MatchesStackScreen() {
       search: search.trim(),
       from,
       to,
-      refreshKey, // 🔥 đưa vào để mỗi lần đổi key là 1 queryArg mới
+      refreshKey,
     },
     {
       refetchOnFocus: false,
@@ -382,16 +387,13 @@ export default function MatchesStackScreen() {
   useFocusEffect(
     useCallback(() => {
       if (hasFocusedOnceRef.current) {
-        // Đã từng focus trước đó -> màn này được back lại
         handleRefresh();
       } else {
-        // Lần đầu vào màn hình
         hasFocusedOnceRef.current = true;
       }
     }, [handleRefresh])
   );
 
-  // Loading chỉ cho lần load đầu (route vào), các lần refetch do focus chỉ dùng isFetching
   const showInitialLoading = isLoading;
 
   return (
@@ -440,6 +442,7 @@ export default function MatchesStackScreen() {
                   Live
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={() => router.push("/match/user-match/create")}
                 style={{
@@ -459,6 +462,7 @@ export default function MatchesStackScreen() {
           ),
         }}
       />
+
       <View style={[styles.container, { backgroundColor: bg }]}>
         {/* Search */}
         <View style={styles.searchContainer}>
@@ -482,14 +486,9 @@ export default function MatchesStackScreen() {
               onChangeText={setSearch}
               placeholder="Tìm theo tiêu đề, địa điểm..."
               placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-              style={[
-                styles.searchInput,
-                {
-                  color: text,
-                },
-              ]}
+              style={[styles.searchInput, { color: text }]}
               returnKeyType="search"
-              onSubmitEditing={handleRefresh} // 🔥 enter là refresh luôn
+              onSubmitEditing={handleRefresh}
             />
           </View>
         </View>
@@ -511,10 +510,9 @@ export default function MatchesStackScreen() {
                   key={opt.key}
                   onPress={() => {
                     setRangeKey(opt.key);
-                    // bỏ custom khi chọn preset
                     setFromDate(null);
                     setToDate(null);
-                    handleRefresh(); // đổi preset cũng refetch luôn
+                    handleRefresh();
                   }}
                   activeOpacity={0.8}
                 >
@@ -530,9 +528,7 @@ export default function MatchesStackScreen() {
                     <Text
                       style={[
                         styles.rangeChipText,
-                        {
-                          color: selected ? "#FFFFFF" : text,
-                        },
+                        { color: selected ? "#FFFFFF" : text },
                       ]}
                     >
                       {opt.label}
@@ -542,7 +538,7 @@ export default function MatchesStackScreen() {
               );
             })}
 
-            {/* 👉 Chip "Khoảng ngày" cạnh nút 90 ngày */}
+            {/* Chip "Khoảng ngày" */}
             <TouchableOpacity
               onPress={() => {
                 setRangeKey("custom");
@@ -613,8 +609,7 @@ export default function MatchesStackScreen() {
               <MatchCard
                 item={item}
                 onPress={() => {
-                  // Sau này bạn có thể push sang màn chi tiết:
-                  // router.push(`/matches/${item._id}`);
+                  // nếu sau này muốn mở detail thì push ở đây
                 }}
               />
             )}
@@ -636,9 +631,8 @@ export default function MatchesStackScreen() {
                 </Text>
               </View>
             }
-            // pull-to-refresh vẫn dùng refreshing/isFetching bình thường
             refreshing={isFetching && !isLoading}
-            onRefresh={handleRefresh} // 🔥 kéo xuống là tăng refreshKey
+            onRefresh={handleRefresh}
           />
         )}
       </View>
@@ -651,14 +645,7 @@ export default function MatchesStackScreen() {
         onRequestClose={() => setDateModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: cardBg,
-              },
-            ]}
-          >
+          <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text
               style={{
                 fontSize: 13,
@@ -687,23 +674,18 @@ export default function MatchesStackScreen() {
               onDayPress={(day) => {
                 const date = day.dateString; // 'YYYY-MM-DD'
                 setRangeDraft((prev) => {
-                  // chưa chọn hoặc đã có đủ range -> bắt đầu range mới
                   if (!prev.start || (prev.start && prev.end)) {
                     return { start: date, end: null };
                   }
 
-                  // đang chọn end
                   if (date < prev.start) {
-                    // đảo nếu chọn ngày trước start
                     return { start: date, end: prev.start };
                   }
 
                   if (date === prev.start) {
-                    // single-day range
                     return { start: date, end: date };
                   }
 
-                  // bình thường: start < end
                   return { start: prev.start, end: date };
                 });
               }}
@@ -782,15 +764,9 @@ export default function MatchesStackScreen() {
                 onPress={() => setDateModalVisible(false)}
                 style={styles.modalTextBtn}
               >
-                <Text
-                  style={{
-                    color: textSec,
-                    fontWeight: "600",
-                  }}
-                >
-                  Đóng
-                </Text>
+                <Text style={{ color: textSec, fontWeight: "600" }}>Đóng</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 disabled={!canApply}
                 onPress={() => {
@@ -800,7 +776,7 @@ export default function MatchesStackScreen() {
                   setToDate(end ? fromDateId(end) : null);
                   setRangeKey("custom");
                   setDateModalVisible(false);
-                  handleRefresh(); // chọn xong khoảng ngày thì refetch luôn
+                  handleRefresh();
                 }}
                 style={[
                   styles.modalApplyBtn,
@@ -961,7 +937,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
-    marginBottom: 6, // để nó nằm trên nút Bắt trận
+    marginBottom: 6,
   },
   liveBtnText: {
     marginLeft: 4,
@@ -982,6 +958,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+
+  // ✅ nút xem tỉ số (trận finished)
+  viewScoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  viewScoreText: {
+    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: "800",
   },
 
   // loading / empty

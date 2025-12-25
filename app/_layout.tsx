@@ -755,6 +755,25 @@ export default function RootLayout() {
                             ),
                           }}
                         />
+
+                        <Stack.Screen
+                          name="tournament/[id]/register"
+                          options={{
+                            title: "Đăng ký giải đấu",
+                            headerTitleAlign: "center",
+                            headerLeft: () => (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                              >
+                                <Ionicons name="chevron-back" size={24} />
+                              </TouchableOpacity>
+                            ),
+                          }}
+                        />
                         <Stack.Screen
                           options={{
                             title: "Duyệt định danh",

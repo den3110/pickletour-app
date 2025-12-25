@@ -588,12 +588,8 @@ export default function CreateUserMatchScreen() {
   };
 
   const handleSubmit = async (mode) => {
-    try {
-      if (!province) {
-        Keyboard.dismiss();
-        alert("Vui lòng chọn Tỉnh/Thành phố");
-        return;
-      }
+    try { 
+      // ✅ CHỈ BẮT BUỘC VĐV khi normal/live
       if (mode === "normal" || mode === "live") {
         if (matchType === "double") {
           if (!playerA1 || !playerA2 || !playerB1 || !playerB2) {
@@ -608,8 +604,12 @@ export default function CreateUserMatchScreen() {
         }
       }
 
-      const provinceName = getRowName(province);
+      // location TUỲ CHỌN
+      const provinceName = province ? getRowName(province) : "";
       const districtName = district ? getRowName(district) : "";
+      const locName = provinceName
+        ? `${provinceName}${districtName ? " - " + districtName : ""}`
+        : "";
 
       const participants = [];
       const addP = (p, side, order) => {
@@ -619,8 +619,7 @@ export default function CreateUserMatchScreen() {
           side,
           order,
         };
-        // chỉ gửi user nếu có id (tránh ObjectId error)
-        if (p.id) row.user = p.id;
+        if (p.id) row.user = p.id; // chỉ gửi user nếu có id
         participants.push(row);
       };
 
@@ -633,13 +632,14 @@ export default function CreateUserMatchScreen() {
         title: "Trận đấu tự do",
         note,
         sportType: "pickleball",
-        locationName: `${provinceName}${
-          districtName ? " - " + districtName : ""
-        }`,
-        locationAddress: address,
         scheduledAt: matchDate.toISOString(),
         participants,
       };
+
+      // ✅ chỉ set location nếu có dữ liệu
+      const addr = String(address || "").trim();
+      if (locName) payload.locationName = locName;
+      if (addr) payload.locationAddress = addr;
 
       if (scoreA > 0 || scoreB > 0) payload.score = { a: scoreA, b: scoreB };
 
