@@ -48,6 +48,9 @@ import { useTheme } from "@react-navigation/native";
 import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
 import MatchSettingsModal from "./MatchSettingsModal";
+import { useVoiceCommands } from "@/hooks/useVoiceCommands";
+
+const VOICE_API_URL = "https://pickletour.vn/api/api/voice/parse";
 // ✅ THÊM: Import Speech
 import * as Speech from "expo-speech";
 /* ---------- Theme tokens ---------- */
@@ -1508,6 +1511,49 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ THÊM: State quản lý bật/tắt giọng nói
   const [voiceEnabled, setVoiceEnabled] = useState(false);
 
+  // Voice Commands (điều khiển bằng giọng nói)
+  const [voiceCommandEnabled, setVoiceCommandEnabled] = useState(false);
+
+  const handleVoiceCommand = useCallback(
+    (cmd) => {
+      switch (cmd.action) {
+        case "INC_POINT":
+          if (canScoreNow && !incBusy && !undoBusy) inc(activeSide);
+          break;
+        case "SIDE_OUT":
+          if (!incBusy && !undoBusy) toggleServeSide();
+          break;
+        case "TOGGLE_SERVER":
+          if (!incBusy && !undoBusy) toggleServerNum();
+          break;
+        case "SWAP_SIDES":
+          if (!incBusy && !undoBusy) swapSides();
+          break;
+        case "UNDO":
+          if (!undoBusy && undoStack.current.length) onUndo();
+          break;
+        case "TIMEOUT":
+          if (canScoreNow)
+            handleCallTimeout(activeSide === leftSide ? "left" : "right");
+          break;
+        case "CONTINUE":
+          if (localBreak) handleContinue();
+          break;
+      }
+    },
+    [canScoreNow, incBusy, undoBusy, activeSide, leftSide, localBreak]
+  );
+
+  const {
+    isListening: isVoiceListening,
+    isProcessing: isVoiceProcessing,
+    transcript: voiceTranscript,
+  } = useVoiceCommands({
+    enabled: voiceCommandEnabled && match?.status === "live",
+    onCommand: handleVoiceCommand,
+    apiUrl: VOICE_API_URL,
+  });
+
   // ✅ THÊM: Hàm xử lý đọc điểm chuẩn Pickleball
   useEffect(() => {
     // Chỉ đọc khi: Đã bật voice, Match đang Live, và không phải lúc mới load chưa có dữ liệu
@@ -2678,6 +2724,50 @@ export default function RefereeJudgePanel({ matchId }) {
                   </Ripple>
                 )}
               </View>
+              {/* Nút Voice Commands */}
+              <TouchableOpacity
+                onPress={() => {
+                  const next = !voiceCommandEnabled;
+                  setVoiceCommandEnabled(next);
+                  Toast.show({
+                    type: next ? "success" : "info",
+                    text1: next
+                      ? "🎤 Voice Commands ON"
+                      : "🔇 Voice Commands OFF",
+                    text2: next ? 'Nói: "điểm", "đổi", "lại"...' : undefined,
+                    visibilityTime: 2000,
+                  });
+                }}
+                style={{ marginRight: 8 }}
+              >
+                <View
+                  style={[
+                    s.iconBtnSetting,
+                    {
+                      borderRadius: 20,
+                      backgroundColor: voiceCommandEnabled
+                        ? isVoiceListening
+                          ? t.colors.primary
+                          : "#f59e0b"
+                        : "#f2f0f5",
+                    },
+                  ]}
+                >
+                  {isVoiceProcessing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialIcons
+                      name={
+                        voiceCommandEnabled
+                          ? "keyboard-voice"
+                          : "voice-over-off"
+                      }
+                      size={20}
+                      color={voiceCommandEnabled ? "#fff" : t.colors.text}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
                   const nextState = !voiceEnabled;

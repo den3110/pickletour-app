@@ -615,7 +615,7 @@ export default function RootLayout() {
     if (isExpoGo) return;
     if (clarityInitRef.current) return;
 
-    const projectId = process.env.EXPO_PUBLIC_CLARITY_PROJECT_ID;
+    const projectId = process.env.EXPO_PUBLIC_CLARITY_REACT_NATIVE_PROJECT_ID;
     if (!projectId) return;
 
     clarityInitRef.current = true;
@@ -627,8 +627,9 @@ export default function RootLayout() {
 
         // init
         mod.initialize(projectId, {
-          // logLevel: __DEV__ ? mod.LogLevel.Verbose : mod.LogLevel.None,
+          logLevel: mod.LogLevel.None,
         });
+        console.log("initialized clarity")
       } catch (e) {
         if (__DEV__) console.warn("Clarity init failed:", e);
       }
