@@ -1,6 +1,9 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { AppState, Platform, PermissionsAndroid, Alert } from "react-native";
-import Voice from "@react-native-voice/voice";
+import { AppState, Platform } from "react-native";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
 
@@ -9,7 +12,7 @@ const CONFIG = {
   // Timing
   DEBOUNCE_MS: 800,
   API_TIMEOUT_MS: 5000,
-  RESTART_DELAY_MS: 150,
+  RESTART_DELAY_MS: 300,
   MAX_RESTART_ATTEMPTS: 5,
   RESTART_BACKOFF_MS: 1000,
 
@@ -232,43 +235,18 @@ async function callAPIWithRetry(
   } catch (err) {
     clearTimeout(timeoutId);
 
-    // Abort = timeout
     if (err.name === "AbortError") {
       log.warn("API timeout");
     } else {
       log.warn("API error:", err.message);
     }
 
-    // Retry
     if (retries > 0) {
       await sleep(CONFIG.API_RETRY_DELAY_MS);
       return callAPIWithRetry(apiUrl, transcript, retries - 1);
     }
 
     return null;
-  }
-}
-
-// ============ PERMISSION ============
-async function requestMicPermission() {
-  try {
-    if (Platform.OS === "android") {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        {
-          title: "Quyền Microphone",
-          message: "Cần quyền mic để điều khiển bằng giọng nói",
-          buttonPositive: "Đồng ý",
-          buttonNegative: "Từ chối",
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    }
-    // iOS: permission requested automatically
-    return true;
-  } catch (err) {
-    log.error("Permission error:", err);
-    return false;
   }
 }
 
@@ -327,13 +305,11 @@ export function useVoiceCommands({
     async (text) => {
       if (!text || !isMountedRef.current) return;
 
-      // Nếu đang processing, queue lại
       if (processingRef.current) {
         pendingTranscriptRef.current = text;
         return;
       }
 
-      // Debounce
       const now = Date.now();
       if (now - lastCommandTimeRef.current < CONFIG.DEBOUNCE_MS) {
         log.info("Debounced");
@@ -416,7 +392,6 @@ export function useVoiceCommands({
           updateStatus("listening");
         }
 
-        // Process pending
         if (pendingTranscriptRef.current) {
           const pending = pendingTranscriptRef.current;
           pendingTranscriptRef.current = null;
@@ -433,7 +408,6 @@ export function useVoiceCommands({
 
     clearRestartTimeout();
 
-    // Backoff nếu restart nhiều lần liên tục
     const backoff = Math.min(
       CONFIG.RESTART_DELAY_MS +
         restartAttemptsRef.current * CONFIG.RESTART_BACKOFF_MS,
@@ -444,10 +418,12 @@ export function useVoiceCommands({
       if (!isActiveRef.current || !isMountedRef.current) return;
 
       try {
-        const isRecognizing = await Voice.isRecognizing();
-        if (isRecognizing) return;
+        ExpoSpeechRecognitionModule.start({
+          lang: language,
+          interimResults: true,
+          continuous: true,
+        });
 
-        await Voice.start(language);
         restartAttemptsRef.current = 0;
         log.info("🔄 Restarted");
       } catch (err) {
@@ -469,79 +445,53 @@ export function useVoiceCommands({
     }, backoff);
   }, [enabled, language, clearRestartTimeout, updateStatus, onError]);
 
-  // ===== VOICE EVENT HANDLERS =====
-  const handleSpeechStart = useCallback(() => {
-    log.info("🎤 Speech started");
-    safeSetState(setTranscript, "");
-  }, [safeSetState]);
+  // ===== SPEECH RECOGNITION EVENTS =====
+  useSpeechRecognitionEvent("start", () => {
+    log.info("🎤 Started");
+    updateStatus("listening");
+  });
 
-  const handleSpeechEnd = useCallback(() => {
-    log.info("🔇 Speech ended");
-    restartListening();
-  }, [restartListening]);
-
-  const handleSpeechResults = useCallback(
-    (e) => {
-      const text = e.value?.[0] || "";
-      safeSetState(setTranscript, text);
-      if (text) processTranscript(text);
-    },
-    [processTranscript, safeSetState]
-  );
-
-  const handleSpeechPartialResults = useCallback(
-    (e) => {
-      const text = e.value?.[0] || "";
-      if (text) safeSetState(setTranscript, text);
-    },
-    [safeSetState]
-  );
-
-  const handleSpeechError = useCallback(
-    (e) => {
-      const code = String(e.error?.code || e.error || "");
-      const ignoreCodes = [
-        "7",
-        "6",
-        "5",
-        "recognition_fail",
-        "no-speech",
-        "client",
-      ];
-
-      if (ignoreCodes.some((c) => code.includes(c))) {
-        log.info("No speech, restarting...");
-        restartListening();
-        return;
-      }
-
-      log.error("Error:", e.error);
-      onError?.(e.error);
+  useSpeechRecognitionEvent("end", () => {
+    log.info("🔇 Ended");
+    if (isActiveRef.current && isMountedRef.current) {
       restartListening();
-    },
-    [restartListening, onError]
-  );
+    }
+  });
 
-  // ===== SETUP VOICE EVENTS =====
-  useEffect(() => {
-    Voice.onSpeechStart = handleSpeechStart;
-    Voice.onSpeechEnd = handleSpeechEnd;
-    Voice.onSpeechResults = handleSpeechResults;
-    Voice.onSpeechPartialResults = handleSpeechPartialResults;
-    Voice.onSpeechError = handleSpeechError;
+  useSpeechRecognitionEvent("result", (event) => {
+    const result = event.results[event.resultIndex];
+    if (result) {
+      const text = result[0]?.transcript || "";
+      safeSetState(setTranscript, text);
 
-    return () => {
-      Voice.destroy()
-        .then(Voice.removeAllListeners)
-        .catch(() => {});
-    };
-  }, [
-    handleSpeechStart,
-    handleSpeechEnd,
-    handleSpeechResults,
-    handleSpeechPartialResults,
-    handleSpeechError,
-  ]);
+      // Process khi có kết quả final
+      if (result.isFinal && text) {
+        processTranscript(text);
+      }
+    }
+  });
+
+  useSpeechRecognitionEvent("error", (event) => {
+    const errorType = event.error;
+
+    // Các lỗi có thể bỏ qua và restart
+    const ignorableErrors = [
+      "no-speech",
+      "aborted",
+      "network",
+      "audio-capture",
+    ];
+
+    if (ignorableErrors.includes(errorType)) {
+      log.info(`Ignorable error: ${errorType}, restarting...`);
+      restartListening();
+      return;
+    }
+
+    log.error("Error:", errorType, event.message);
+    onError?.({ code: errorType, message: event.message });
+    restartListening();
+  });
 
   // ===== NETWORK LISTENER =====
   useEffect(() => {
@@ -562,7 +512,6 @@ export function useVoiceCommands({
         const prevState = appStateRef.current;
         appStateRef.current = nextState;
 
-        // App từ background → foreground
         if (prevState.match(/inactive|background/) && nextState === "active") {
           log.info("App active, restarting voice...");
           if (enabled && isActiveRef.current) {
@@ -570,12 +519,11 @@ export function useVoiceCommands({
           }
         }
 
-        // App đi vào background
         if (nextState.match(/inactive|background/)) {
           log.info("App background, stopping voice...");
           clearRestartTimeout();
           try {
-            await Voice.stop();
+            ExpoSpeechRecognitionModule.abort();
           } catch {}
         }
       }
@@ -591,71 +539,57 @@ export function useVoiceCommands({
     log.info("Starting...");
     updateStatus("starting");
 
-    // Check permission
-    if (permissionGranted === null) {
-      const granted = await requestMicPermission();
-      safeSetState(setPermissionGranted, granted);
+    // Request permission
+    try {
+      const result =
+        await ExpoSpeechRecognitionModule.requestPermissionsAsync();
 
-      if (!granted) {
+      if (!result.granted) {
         log.error("Permission denied");
+        safeSetState(setPermissionGranted, false);
         updateStatus("error");
         onError?.({
           code: "PERMISSION_DENIED",
-          message: "Không có quyền microphone",
+          message: "Không có quyền microphone hoặc speech recognition",
         });
         return;
       }
-    } else if (!permissionGranted) {
+
+      safeSetState(setPermissionGranted, true);
+    } catch (err) {
+      log.error("Permission error:", err);
       updateStatus("error");
-      onError?.({
-        code: "PERMISSION_DENIED",
-        message: "Không có quyền microphone",
-      });
+      onError?.(err);
       return;
     }
 
     try {
-      // Cleanup trước
-      try {
-        await Voice.destroy();
-      } catch {}
-
-      const isRecognizing = await Voice.isRecognizing();
-      if (isRecognizing) {
-        log.info("Already recognizing");
-        isActiveRef.current = true;
-        updateStatus("listening");
-        return;
-      }
-
       isActiveRef.current = true;
       restartAttemptsRef.current = 0;
 
-      await Voice.start(language);
+      ExpoSpeechRecognitionModule.start({
+        lang: language,
+        interimResults: true,
+        continuous: true, // Continuous mode để tránh beep và auto-restart
+        // Android specific - dùng web_search model cho accuracy tốt hơn với single words
+        androidIntentOptions: {
+          EXTRA_LANGUAGE_MODEL: "web_search",
+        },
+      });
 
       log.info("🟢 Started", apiUrl ? "(+API)" : "");
-      updateStatus("listening");
     } catch (err) {
       log.error("Start error:", err);
       updateStatus("error");
       onError?.(err);
 
-      // Retry sau 1s
       setTimeout(() => {
         if (enabled && isMountedRef.current) {
           startListening();
         }
       }, 1000);
     }
-  }, [
-    enabled,
-    language,
-    apiUrl,
-    permissionGranted,
-    updateStatus,
-    onError,
-    safeSetState,
-  ]);
+  }, [enabled, language, apiUrl, updateStatus, onError, safeSetState]);
 
   // ===== STOP LISTENING =====
   const stopListening = useCallback(async () => {
@@ -665,11 +599,7 @@ export function useVoiceCommands({
     clearRestartTimeout();
 
     try {
-      await Voice.stop();
-    } catch {}
-
-    try {
-      await Voice.destroy();
+      ExpoSpeechRecognitionModule.abort();
     } catch {}
 
     safeSetState(setTranscript, "");
@@ -695,7 +625,9 @@ export function useVoiceCommands({
       isMountedRef.current = false;
       isActiveRef.current = false;
       clearRestartTimeout();
-      Voice.destroy().catch(() => {});
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {}
     };
   }, [clearRestartTimeout]);
 
@@ -717,4 +649,3 @@ export function useVoiceCommands({
     stop: stopListening,
   };
 }
-
