@@ -629,7 +629,7 @@ export default function RootLayout() {
         mod.initialize(projectId, {
           logLevel: mod.LogLevel.None,
         });
-        console.log("initialized clarity")
+        console.log("initialized clarity");
       } catch (e) {
         if (__DEV__) console.warn("Clarity init failed:", e);
       }
@@ -973,6 +973,18 @@ export default function RootLayout() {
                         />
                         <Stack.Screen
                           name="login"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="radar/index"
+                          options={{
+                            headerShown: false,
+                          }}
+                        />
+                         <Stack.Screen
+                          name="clubs/[id]/index"
                           options={{
                             headerShown: false,
                           }}

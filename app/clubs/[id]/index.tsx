@@ -145,7 +145,6 @@ export default function ClubDetailPageRN() {
   if (isLoading) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Stack.Screen options={{ headerShown: false }} />
         {/* Lottie BG while loading */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LottieView
@@ -168,7 +167,6 @@ export default function ClubDetailPageRN() {
   if (!club?._id) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Stack.Screen options={{ headerShown: false }} />
         {/* Lottie BG */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LottieView
@@ -232,7 +230,6 @@ export default function ClubDetailPageRN() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <StatusBar barStyle="dark-content" />
-      <Stack.Screen options={{ headerShown: false }} />
 
       <View style={{ flex: 1 }}>
         {/* ===== LOTTIE BACKGROUND (toàn trang) ===== */}

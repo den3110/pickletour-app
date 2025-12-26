@@ -145,14 +145,14 @@ const FEATURES = [
     color: "#2ECC71",
     link: "/support",
   },
-  // {
-  //   id: 11,
-  //   icon: "locate", // icon cho Radar / Quanh đây
-  //   iconLib: "Ionicons",
-  //   title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
-  //   color: "#6C5CE7",
-  //   link: "/radar", // màn hình radar mình vừa code
-  // },
+  {
+    id: 11,
+    icon: "locate", // icon cho Radar / Quanh đây
+    iconLib: "Ionicons",
+    title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
+    color: "#6C5CE7",
+    link: "/radar", // màn hình radar mình vừa code
+  },
 ];
 
 /* ---------- Utils ---------- */

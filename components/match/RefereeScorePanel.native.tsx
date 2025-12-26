@@ -1253,6 +1253,15 @@ export default function RefereeJudgePanel({ matchId }) {
   const lastServerUidRef = useRef("");
   const startServer2Ref = useRef({ gameIndex: -1, side: "", uid: "" });
 
+  // ✅ Pin tạm thời serverUid để tránh icon nhảy 2 lần do refetch/socket lệch nhịp
+  const forcedServerRef = useRef({
+    uid: "",
+    until: 0,
+    gameIndex: -1,
+    side: "",
+    serverNum: 0,
+  });
+
   // ✅ Snapshot để chống "serverId nhảy" sau khi đội đang giao ghi điểm
   const prevServeSnapRef = useRef({
     gameIndex: -1,
@@ -1273,6 +1282,16 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // raw từ server (có thể "nhảy" sau khi inc điểm)
   const rawServerUid = serve?.serverId ? String(serve.serverId) : "";
+
+  // ✅ forced uid còn hiệu lực thì ưu tiên tuyệt đối
+  const forcedUid =
+    forcedServerRef.current.uid &&
+    Date.now() < forcedServerRef.current.until &&
+    forcedServerRef.current.gameIndex === curIdx &&
+    forcedServerRef.current.side === activeSide &&
+    Number(forcedServerRef.current.serverNum) === Number(activeServerNum)
+      ? forcedServerRef.current.uid
+      : "";
 
   // ✅ Detect case: đội đang giao ghi điểm, serve.side + serveNum không đổi
   const prevSnap = prevServeSnapRef.current || {};
@@ -2017,7 +2036,17 @@ export default function RefereeJudgePanel({ matchId }) {
     if (side !== (serve?.side || "A")) return;
 
     const prevServerUid = serverUidShow || lastServerUidRef.current; // ✅ lấy đúng người đang cầm bóng trước khi cộng điểm
-
+    // ✅ pin ngay lập tức để icon nhảy lên luôn và KHÔNG bị giật xuống
+    if (prevServerUid) {
+      forcedServerRef.current = {
+        uid: prevServerUid,
+        until: Date.now() + 800, // 500-800ms là đẹp
+        gameIndex: curIdx,
+        side: activeSide,
+        serverNum: activeServerNum,
+      };
+      lastServerUidRef.current = prevServerUid;
+    }
     setIncBusy(true);
     pendingOpRef.current = {
       type: "inc",
@@ -2526,6 +2555,18 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   }, [match?.status, waitingStart, curIdx, curA, curB, midPoint]);
 
+  useEffect(() => {
+    const f = forcedServerRef.current;
+    if (!f?.uid) return;
+
+    const raw = serve?.serverId ? String(serve.serverId) : "";
+    if (raw && raw === f.uid) {
+      // server đã sync đúng -> bỏ pin sớm
+      forcedServerRef.current.until = 0;
+      forcedServerRef.current.uid = "";
+    }
+  }, [serve?.serverId]);
+
   /* ========== render ========== */
   if (isLoading && !match)
     return (
@@ -2774,7 +2815,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   setVoiceEnabled(nextState);
                   // Feedback nhẹ cho người dùng biết
                   if (nextState) {
-                    Speech.speak("Voice on");
+                    Speech.speak("Bật âm thanh");
                   } else {
                     Speech.stop();
                   }

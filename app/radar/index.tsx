@@ -1,5 +1,11 @@
 /* eslint-disable react/prop-types */
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -8,25 +14,48 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  Platform,
+  StatusBar,
+  useColorScheme,
   SafeAreaView,
-  Alert,
+  Modal,
+  TouchableWithoutFeedback,
+  Image,
+  Linking,
 } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
-import { useSelector } from "react-redux";
+import { useRouter } from "expo-router";
 import MapboxGL from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 
+import {
+  useGetRadarExploreQuery,
+  useUpsertMyPresenceMutation,
+} from "@/slices/radarApiSlice";
+
+// --- CONFIG ---
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
-// ✅ cấu hình Mapbox 1 lần
 MapboxGL.setAccessToken(MAPBOX_TOKEN || "");
 
 const { width } = Dimensions.get("window");
+const CARD_WIDTH = width * 0.82;
 
-const DEFAULT_CENTER = [105.804817, 21.028511]; // Hà Nội [lng, lat]
-const RANGE_OPTIONS = [2, 5, 10, 20];
-const PRESENCE_INTERVAL_MS = 2 * 60 * 1000;
+// --- COLORS ---
+const THEME_COLOR = "#F97316";
+const NEON_BLUE = "#0EA5E9";
+
+// Default center (không xin được vị trí vẫn xem map bình thường)
+const DEFAULT_CENTER = [100.5018, 13.7563]; // Bangkok
 
 const PLAY_TYPES = [
   { key: "any", label: "Tất cả" },
@@ -35,328 +64,427 @@ const PLAY_TYPES = [
   { key: "mixed", label: "Mixed" },
 ];
 
+const ENTITY_TYPES = [
+  { key: "all", label: "Mọi thứ" },
+  { key: "user", label: "VĐV" },
+  { key: "tournament", label: "Giải" },
+  { key: "club", label: "CLB" },
+  { key: "court", label: "Sân" }, // bạn thêm sau (backend trả về là chạy)
+];
+
+const RANGE_OPTIONS = [2, 5, 10, 20];
+
+// --- HELPERS ---
+const getBoundsFromRadius = (center, radiusKm) => {
+  if (!center) return null;
+  const [lng, lat] = center;
+  const latDelta = radiusKm / 111.0;
+  const lngDelta = radiusKm / (111.0 * Math.cos(lat * (Math.PI / 180)));
+  return {
+    ne: [lng + lngDelta, lat + latDelta],
+    sw: [lng - lngDelta, lat - latDelta],
+  };
+};
+
+const createGeoJSONCircle = (center, radiusInKm, points = 64) => {
+  if (!center) return null;
+  const coords = { latitude: center[1], longitude: center[0] };
+  const km = radiusInKm;
+  const ret = [];
+  const distanceX = km / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
+  const distanceY = km / 110.574;
+
+  let theta, x, y;
+  for (let i = 0; i < points; i++) {
+    theta = (i / points) * (2 * Math.PI);
+    x = distanceX * Math.cos(theta);
+    y = distanceY * Math.sin(theta);
+    ret.push([coords.longitude + x, coords.latitude + y]);
+  }
+  ret.push(ret[0]);
+  return {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", geometry: { type: "Polygon", coordinates: [ret] } },
+    ],
+  };
+};
+
+const formatKm = (meters) => {
+  if (!Number.isFinite(meters)) return "";
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+};
+
+const typeIcon = (type) => {
+  switch (type) {
+    case "user":
+      return { name: "account", color: THEME_COLOR };
+    case "tournament":
+      return { name: "trophy", color: "#FACC15" };
+    case "club":
+      return { name: "shield-star", color: "#22C55E" };
+    case "court":
+      return { name: "map-marker", color: NEON_BLUE };
+    default:
+      return { name: "map-marker", color: "#64748B" };
+  }
+};
+
+const safeAvatarFallback = (title = "PK") =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    title
+  )}&background=0EA5E9&color=fff&size=128`;
+
+// --- COMPONENTS ---
+const RadarLoading = ({ isDark }) => (
+  <View
+    style={[
+      styles.centerFill,
+      { backgroundColor: isDark ? "#020617" : "#F8FAFC" },
+    ]}
+  >
+    <ActivityIndicator size="large" color={THEME_COLOR} />
+    <Text style={[styles.loadingText, { color: isDark ? "#FFF" : "#333" }]}>
+      Đang tải radar...
+    </Text>
+  </View>
+);
+
+const PermissionHintBanner = ({ isDark, onEnable }) => (
+  <View
+    style={[
+      styles.permissionBanner,
+      {
+        backgroundColor: isDark
+          ? "rgba(15,23,42,0.92)"
+          : "rgba(255,255,255,0.95)",
+      },
+    ]}
+  >
+    <MaterialCommunityIcons name="map-marker-off" size={18} color="#64748B" />
+    <Text
+      style={{
+        flex: 1,
+        marginLeft: 8,
+        color: isDark ? "#E5E7EB" : "#111827",
+        fontSize: 12,
+      }}
+    >
+      Bật định vị để quét xung quanh bạn.
+    </Text>
+    <TouchableOpacity onPress={onEnable} style={styles.permissionBannerBtn}>
+      <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 12 }}>
+        Bật
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const RadarPulse = () => {
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withRepeat(
+      withTiming(4, { duration: 3000, easing: Easing.out(Easing.ease) }),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withTiming(0, { duration: 3000, easing: Easing.out(Easing.ease) }),
+      -1,
+      false
+    );
+  }, []);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+  return (
+    <View style={styles.radarContainer} pointerEvents="none">
+      <View style={styles.radarStaticCircle} />
+      <Animated.View style={[styles.radarPulse, animatedStyle]} />
+    </View>
+  );
+};
+
+const StatusBubble = ({ message, emoji }) => {
+  return (
+    <View style={styles.bubbleContainer}>
+      <View style={styles.bubbleContent}>
+        {!!emoji && <Text style={styles.bubbleEmoji}>{emoji}</Text>}
+        <Text style={styles.bubbleText} numberOfLines={1}>
+          {message}
+        </Text>
+      </View>
+      <View style={styles.bubbleArrow} />
+    </View>
+  );
+};
+
+// --- MAIN SCREEN ---
 export default function PickleRadarScreen() {
   const router = useRouter();
-  const { userInfo } = useSelector((state) => state.auth || {});
-  const token = userInfo?.token;
+  const theme = useColorScheme();
+  const isDark = theme === "dark";
 
-  const [radarEnabled, setRadarEnabled] = useState(false);
+  // State
+  const [myLocation, setMyLocation] = useState(null); // [lng, lat] | null
+  const [hasLocationPermission, setHasLocationPermission] = useState(null); // null | true | false
+
+  const [selectedId, setSelectedId] = useState(null);
+  const [pingedIds, setPingedIds] = useState([]);
+
+  // Filters
   const [radiusKm, setRadiusKm] = useState(5);
   const [playTypeFilter, setPlayTypeFilter] = useState("any");
+  const [entityType, setEntityType] = useState("all");
 
-  const [center, setCenter] = useState(null); // [lng, lat]
-  const [playersRaw, setPlayersRaw] = useState([]);
-  const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingSettings, setLoadingSettings] = useState(false);
-  const [error, setError] = useState(null);
+  const [showRadiusModal, setShowRadiusModal] = useState(false);
+  const [circleGeoJSON, setCircleGeoJSON] = useState(null);
 
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-
-  const presenceTimerRef = useRef(null);
+  // Refs
   const cameraRef = useRef(null);
   const listRef = useRef(null);
+  const isUserInteracting = useRef(false);
 
-  const apiBase = process.env.EXPO_PUBLIC_API_URL;
+  // API
+  const typesParam = useMemo(() => {
+    if (entityType === "all") return "user,tournament,club";
+    return entityType; // "user" | "tournament" | "club" | "court"
+  }, [entityType]);
 
-  const authFetch = useCallback(
-    async (url, options = {}) => {
-      const headers = {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      };
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      const res = await fetch(url, {
-        ...options,
-        headers,
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-      return res.json();
+  const shouldQuery = !!myLocation;
+
+  const {
+    data: exploreData,
+    isLoading: isExploreLoading,
+    isFetching: isExploreFetching,
+    refetch,
+  } = useGetRadarExploreQuery(
+    {
+      lng: myLocation?.[0],
+      lat: myLocation?.[1],
+      radiusKm,
+      playType: playTypeFilter,
+      types: typesParam,
     },
-    [token]
+    { skip: !shouldQuery }
   );
 
-  const applyFilters = useCallback(
-    (list) => {
-      let filtered = list;
-      if (playTypeFilter !== "any") {
-        filtered = filtered.filter((p) => {
-          const pt =
-            p.preferredPlayType ||
-            p.matchPreferences?.preferredPlayType ||
-            "any";
-          return pt === playTypeFilter || pt === "any";
-        });
-      }
-      setPlayers(filtered);
-      if (
-        selectedPlayerId &&
-        !filtered.some((p) => String(p.userId) === String(selectedPlayerId))
-      ) {
-        setSelectedPlayerId(filtered[0]?.userId ?? null);
-      }
-    },
-    [playTypeFilter, selectedPlayerId]
-  );
+  const [upsertPresence, { isLoading: isPresenceSaving }] =
+    useUpsertMyPresenceMutation();
 
+  const radarItems = useMemo(() => {
+    const items = Array.isArray(exploreData?.items) ? exploreData.items : [];
+    // UI-side filter nhẹ: nếu item.type != selected type thì bỏ (server đã làm rồi, nhưng giữ cho chắc)
+    const filtered =
+      entityType === "all"
+        ? items
+        : items.filter((it) => it?.type === entityType);
+
+    // playTypeFilter hiện chủ yếu cho user; nếu bạn muốn strict hơn thì backend lọc theo profile
+    if (playTypeFilter === "any") return filtered;
+
+    return filtered.map((it) => it); // giữ nguyên cho hiện tại
+  }, [exploreData, entityType, playTypeFilter]);
+
+  // Auto select first item
+  useEffect(() => {
+    if (!selectedId && radarItems.length > 0) {
+      setSelectedId(String(radarItems[0]?.id));
+    }
+  }, [radarItems, selectedId]);
+
+  // Circle
+  useEffect(() => {
+    if (myLocation) setCircleGeoJSON(createGeoJSONCircle(myLocation, radiusKm));
+    else setCircleGeoJSON(null);
+  }, [myLocation, radiusKm]);
+
+  // --- LOGIC: LOCATION ---
   const getCurrentLocation = useCallback(async () => {
     try {
-      // 1. Check service có đang bật không
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        Alert.alert(
-          "Không dùng được vị trí",
-          "Location Services đang tắt. Bạn hãy bật định vị (GPS) trong Cài đặt rồi mở lại PickleRadar nhé."
-        );
-        setCenter(DEFAULT_CENTER);
-        return DEFAULT_CENTER;
-      }
-
-      // 2. Xin quyền
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Quyền vị trí",
-          "Bạn cần cho phép ứng dụng truy cập vị trí để dùng PickleRadar."
-        );
-        setCenter(DEFAULT_CENTER);
-        return DEFAULT_CENTER;
-      }
+      const granted = status === "granted";
+      setHasLocationPermission(granted);
 
-      // 3. Lấy vị trí (có thể set accuracy nhẹ nhàng)
+      if (!granted) return null;
+
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      const c = [loc.coords.longitude, loc.coords.latitude];
-      setCenter(c);
-      return c;
-    } catch (err) {
-      console.log("getCurrentLocation error", err);
-
-      Alert.alert(
-        "Lỗi vị trí",
-        "Không lấy được vị trí hiện tại. Thường là do cài đặt Location / Google Location Accuracy trên máy đang chặn."
-      );
-
-      // fallback Hà Nội
-      setCenter(DEFAULT_CENTER);
-      return DEFAULT_CENTER;
+      return [loc.coords.longitude, loc.coords.latitude];
+    } catch (e) {
+      console.log("Location Error:", e);
+      setHasLocationPermission(false);
+      return null;
     }
   }, []);
 
-  const sendPresence = useCallback(
-    async (lng, lat) => {
-      try {
-        await authFetch(`${apiBase}/api/radar/presence`, {
-          method: "POST",
-          body: JSON.stringify({
-            lng,
-            lat,
-            status: "looking_partner",
-            visibility: "venue_only",
-            source: "gps",
-          }),
-        });
-      } catch (err) {
-        console.log("sendPresence error", err.message);
-      }
-    },
-    [authFetch, apiBase]
-  );
+  const ensureLocationAndFetch = useCallback(async () => {
+    const loc = await getCurrentLocation();
+    if (loc) {
+      setMyLocation(loc);
 
-  const fetchNearby = useCallback(
-    async (lng, lat, rKm = radiusKm) => {
+      // upsert presence (best-effort)
       try {
-        setLoading(true);
-        setError(null);
-        const data = await authFetch(
-          `${apiBase}/api/radar/nearby?lng=${lng}&lat=${lat}&radiusKm=${rKm}`
-        );
-        const list = data.players || [];
-        setPlayersRaw(list);
-        applyFilters(list);
-        if (!selectedPlayerId && list.length) {
-          setSelectedPlayerId(list[0].userId);
-        }
-      } catch (err) {
-        console.log("fetchNearby error", err.message);
-        setError("Không tải được danh sách người chơi.");
-        setPlayersRaw([]);
-        setPlayers([]);
-      } finally {
-        setLoading(false);
+        await upsertPresence({
+          lng: loc[0],
+          lat: loc[1],
+          source: "gps",
+          visibility: "venue_only",
+          status: "looking_partner",
+          preferredRadiusKm: radiusKm,
+        }).unwrap();
+      } catch (e) {
+        // không block UX
+        console.log("Presence upsert failed:", e?.data || e?.message || e);
       }
-    },
-    [authFetch, apiBase, radiusKm, applyFilters, selectedPlayerId]
-  );
-
-  const loadRadarSettings = useCallback(async () => {
-    try {
-      setLoadingSettings(true);
-      const data = await authFetch(`${apiBase}/api/radar/settings`);
-      if (data?.radarSettings) {
-        setRadarEnabled(!!data.radarSettings.enabled);
-        setRadiusKm(data.radarSettings.radiusKm || 5);
-        setPlayTypeFilter(data.radarSettings.preferredPlayType || "any");
-      }
-    } catch (err) {
-      console.log("loadRadarSettings error", err.message);
-    } finally {
-      setLoadingSettings(false);
     }
-  }, [authFetch, apiBase]);
+  }, [getCurrentLocation, upsertPresence, radiusKm]);
 
-  const updateRadarSettings = useCallback(
-    async (nextEnabled = radarEnabled) => {
-      try {
-        setLoadingSettings(true);
-        const data = await authFetch(`${apiBase}/api/radar/settings`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            enabled: nextEnabled,
-            radiusKm,
-            preferredPlayType: playTypeFilter,
-          }),
-        });
-        setRadarEnabled(data.radarSettings.enabled);
-      } catch (err) {
-        console.log("updateRadarSettings error", err.message);
-        Alert.alert("Lỗi", "Không cập nhật được trạng thái radar.");
-      } finally {
-        setLoadingSettings(false);
-      }
-    },
-    [authFetch, apiBase, radarEnabled, radiusKm, playTypeFilter]
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-
-      (async () => {
-        if (!token) {
-          setError("Bạn cần đăng nhập để dùng PickleRadar.");
-          setLoading(false);
-          return;
-        }
-        await loadRadarSettings();
-        const c = await getCurrentLocation();
-        if (!active) return;
-        await fetchNearby(c[0], c[1]);
-        if (!radarEnabled) {
-          await updateRadarSettings(true);
-        }
-        await sendPresence(c[0], c[1]);
-      })();
-
-      return () => {
-        active = false;
-      };
-    }, [
-      token,
-      loadRadarSettings,
-      getCurrentLocation,
-      fetchNearby,
-      sendPresence,
-      updateRadarSettings,
-      radarEnabled,
-    ])
-  );
-
+  // Init: không block map nếu denied
+  const [bootLoading, setBootLoading] = useState(true);
   useEffect(() => {
-    if (!radarEnabled || !center) {
-      if (presenceTimerRef.current) {
-        clearInterval(presenceTimerRef.current);
-        presenceTimerRef.current = null;
+    (async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasLocationPermission(granted);
+
+      if (granted) {
+        await ensureLocationAndFetch();
       }
+      setBootLoading(false);
+    })();
+  }, [ensureLocationAndFetch]);
+
+  // --- ACTIONS ---
+  const zoomToRadius = (center, rKm) => {
+    if (!cameraRef.current || !center) return;
+    isUserInteracting.current = false;
+    const { ne, sw } = getBoundsFromRadius(center, rKm);
+    cameraRef.current.fitBounds(ne, sw, [150, 60, 350, 60], 800);
+  };
+
+  const handleSelectItem = (it, index) => {
+    isUserInteracting.current = false;
+    setSelectedId(String(it.id));
+
+    const coords = it?.location?.coordinates;
+    if (Array.isArray(coords) && coords.length === 2) {
+      cameraRef.current?.flyTo(coords, 800);
+    }
+
+    if (listRef.current && index != null) {
+      listRef.current.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  };
+
+  const handlePing = async (it) => {
+    if (pingedIds.includes(String(it.id))) return;
+    if (Platform.OS !== "web") {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setPingedIds((prev) => [...prev, String(it.id)]);
+  };
+
+  const handleOpenDetail = (it) => {
+    const id = String(it?.id || "");
+    if (!id) return;
+
+    if (it.type === "user") return router.push(`/profile/${id}`);
+    if (it.type === "tournament") return router.push(`/tournaments/${id}`);
+    if (it.type === "club") return router.push(`/clubs/${id}`);
+    if (it.type === "court") return router.push(`/courts/${id}`);
+  };
+
+  const handleRecenter = async () => {
+    // Nếu chưa có location -> xin quyền + lấy location
+    if (!myLocation) {
+      await ensureLocationAndFetch();
       return;
     }
-    presenceTimerRef.current = setInterval(() => {
-      const [lng, lat] = center;
-      sendPresence(lng, lat);
-      fetchNearby(lng, lat);
-    }, PRESENCE_INTERVAL_MS);
-
-    return () => {
-      if (presenceTimerRef.current) {
-        clearInterval(presenceTimerRef.current);
-        presenceTimerRef.current = null;
-      }
-    };
-  }, [radarEnabled, center, sendPresence, fetchNearby]);
-
-  useEffect(() => {
-    applyFilters(playersRaw);
-  }, [applyFilters, playersRaw]);
-
-  const onChangeRadius = async (value) => {
-    setRadiusKm(value);
-    if (!center) return;
-    const [lng, lat] = center;
-    await fetchNearby(lng, lat, value);
-    await updateRadarSettings(radarEnabled);
+    zoomToRadius(myLocation, radiusKm);
+    refetch?.();
   };
 
-  const flyToPlayer = (p) => {
-    if (!p?.location || !cameraRef.current) return;
-    const [lng, lat] = p.location.coordinates;
-    cameraRef.current.flyTo([lng, lat], 1000);
+  // --- STYLES ---
+  const dynamicStyles = {
+    container: { backgroundColor: isDark ? "#020617" : "#FFF" },
+    cardBg: isDark ? "rgba(15, 23, 42, 0.9)" : "rgba(255, 255, 255, 0.95)",
+    cardBorder: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+    textMain: isDark ? "#FFF" : "#1F2937",
+    textSub: isDark ? "#94A3B8" : "#6B7280",
+    chipBg: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+    pillBg: isDark ? "rgba(30, 41, 59, 0.9)" : "rgba(255, 255, 255, 0.95)",
+    modalBg: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(255,255,255, 0.95)",
   };
 
-  const handleSelectPlayer = (p, index) => {
-    setSelectedPlayerId(p.userId);
-    flyToPlayer(p);
-    if (listRef.current && index != null) {
-      listRef.current.scrollToIndex({ index, animated: true });
-    }
-  };
+  // --- RENDERERS ---
+  const renderMarker = (it) => {
+    const coords = it?.location?.coordinates;
+    if (!Array.isArray(coords) || coords.length !== 2) return null; // không có geo thì không vẽ marker
 
-  const sendPing = async (targetUserId) => {
-    try {
-      await authFetch(`${apiBase}/api/radar/ping`, {
-        method: "POST",
-        body: JSON.stringify({ targetUserId }),
-      });
-      Alert.alert("Đã ping", "Đã gửi tín hiệu tới người chơi này.");
-    } catch (err) {
-      console.log("ping error", err.message);
-      Alert.alert("Lỗi", "Không gửi được ping.");
-    }
-  };
+    const isSelected = String(it.id) === String(selectedId);
 
-  const renderMarker = (p) => {
-    const isSelected = String(p.userId) === String(selectedPlayerId);
-    const distanceKm = (p.distance || 0) / 1000;
+    // bubble ưu tiên statusMessage, fallback theo type
+    const bubbleText =
+      it?.statusMessage ||
+      (it.type === "tournament"
+        ? "Giải đấu gần bạn"
+        : it.type === "club"
+        ? "CLB"
+        : "");
+
+    const bubbleEmoji =
+      it?.statusEmoji ||
+      (it.type === "tournament" ? "🏆" : it.type === "club" ? "🛡️" : "");
+
+    const showBubble = !!bubbleText && !isSelected;
+
+    const imgUri =
+      it.avatarUrl || it.imageUrl || safeAvatarFallback(it.title || "PK");
 
     return (
       <MapboxGL.PointAnnotation
-        key={String(p.userId)}
-        id={`radar-${p.userId}`}
-        coordinate={[p.location.coordinates[0], p.location.coordinates[1]]}
-        onSelected={() => {
-          const idx = players.findIndex(
-            (x) => String(x.userId) === String(p.userId)
-          );
-          handleSelectPlayer(p, idx === -1 ? null : idx);
-        }}
+        key={`${it.type}-${String(it.id)}`}
+        id={`radar-${it.type}-${String(it.id)}`}
+        coordinate={coords}
+        onSelected={() => handleSelectItem(it, radarItems.indexOf(it))}
+        anchor={{ x: 0.5, y: 1 }}
       >
-        <View
-          style={[styles.pinWrapper, isSelected && styles.pinWrapperSelected]}
-        >
-          <ExpoImage source={{ uri: p.avatarUrl }} style={styles.pinAvatar} />
-          <View style={styles.pinInfo}>
-            <Text style={styles.pinName} numberOfLines={1}>
-              {p.displayName || "Người chơi"}
-            </Text>
-            <Text style={styles.pinSub} numberOfLines={1}>
-              {distanceKm.toFixed(1)} km
-            </Text>
+        <View style={styles.markerContainerFixed}>
+          {showBubble && (
+            <StatusBubble message={bubbleText} emoji={bubbleEmoji} />
+          )}
+          <View
+            style={[
+              styles.markerRoot,
+              isSelected && { transform: [{ scale: 1.25 }], zIndex: 99 },
+            ]}
+          >
+            <View
+              style={[
+                styles.markerRing,
+                {
+                  borderColor: isSelected ? THEME_COLOR : "#FFF",
+                  backgroundColor: "#FFF",
+                },
+              ]}
+            >
+              <Image
+                source={{ uri: imgUri }}
+                style={styles.markerImg}
+                resizeMode="cover"
+              />
+            </View>
+            {isSelected && <View style={styles.markerArrow} />}
           </View>
         </View>
       </MapboxGL.PointAnnotation>
@@ -364,328 +492,557 @@ export default function PickleRadarScreen() {
   };
 
   const renderCard = ({ item, index }) => {
-    const isSelected = String(item.userId) === String(selectedPlayerId);
-    const distanceKm = (item.distance || 0) / 1000;
-    const score = item.score || 0;
+    const isSelected = String(item.id) === String(selectedId);
+    const isPinged = pingedIds.includes(String(item.id));
+
+    const icon = typeIcon(item.type);
+    const distText = formatKm(item.distanceMeters);
+
+    const avatar =
+      item.avatarUrl || item.imageUrl || safeAvatarFallback(item.title || "PK");
+
+    const showScore = item.type === "user" && Number.isFinite(item.score);
+    const scoreVal = showScore ? item.score : 0;
 
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        style={[styles.card, isSelected && styles.cardSelected]}
-        onPress={() => handleSelectPlayer(item, index)}
+        onPress={() => handleSelectItem(item, index)}
+        style={styles.cardWrapper}
       >
-        <View style={styles.cardHeader}>
-          <ExpoImage
-            source={{ uri: item.avatarUrl }}
-            style={styles.cardAvatar}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardName} numberOfLines={1}>
-              {item.displayName || "Người chơi PickleTour"}
-            </Text>
-            <View style={styles.cardMetaRow}>
-              {item.rating && (
-                <View style={styles.badgeSmall}>
-                  <MaterialCommunityIcons
-                    name="star-circle"
-                    size={12}
-                    color="#FACC15"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.badgeSmallText}>{item.rating}</Text>
-                </View>
-              )}
-              <Text style={styles.cardMetaText}>
-                {distanceKm.toFixed(1)} km
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scoreRow}>
-          <View style={styles.scoreBarBg}>
-            <View style={[styles.scoreBarFill, { width: `${score}%` }]} />
-          </View>
-          <Text style={styles.scoreText}>
-            Match score: {score.toFixed(0)} / 100
-          </Text>
-        </View>
-
-        <View style={styles.cardBody}>
-          {item.mainClubName && (
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="tennisball"
-                size={14}
-                color="#22C55E"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.infoText} numberOfLines={1}>
-                {item.mainClubName}
-              </Text>
-            </View>
-          )}
-          <View style={styles.infoRow}>
-            <Ionicons
-              name="time-outline"
-              size={14}
-              color="#9CA3AF"
-              style={{ marginRight: 6 }}
+        <BlurView
+          intensity={80}
+          tint={isDark ? "dark" : "light"}
+          style={[
+            styles.cardBlur,
+            {
+              borderColor: isSelected ? THEME_COLOR : dynamicStyles.cardBorder,
+              backgroundColor:
+                Platform.OS === "android" ? dynamicStyles.cardBg : undefined,
+            },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <ExpoImage
+              source={{ uri: avatar }}
+              style={[styles.cardAvatar, { backgroundColor: "#FFF" }]}
             />
-            <Text style={styles.infoText} numberOfLines={1}>
-              Trạng thái:{" "}
-              {item.status === "looking_partner"
-                ? "Đang tìm partner"
-                : item.status === "in_match"
-                ? "Đang thi đấu"
-                : "Đang rảnh"}
-            </Text>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={styles.nameRow}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                    flex: 1,
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name={icon.name}
+                    size={14}
+                    color={icon.color}
+                  />
+                  <Text
+                    style={[styles.cardName, { color: dynamicStyles.textMain }]}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                </View>
+
+                {item.type === "user" && item.rating ? (
+                  <View style={styles.ratingPill}>
+                    <Ionicons name="star" size={10} color="#FACC15" />
+                    <Text style={styles.ratingText}>{item.rating}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {!!item.statusMessage ? (
+                <Text
+                  style={{
+                    color: THEME_COLOR,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  {item.statusEmoji ? `${item.statusEmoji} ` : ""}
+                  {item.statusMessage}
+                </Text>
+              ) : (
+                <Text
+                  style={[styles.cardClub, { color: dynamicStyles.textSub }]}
+                  numberOfLines={1}
+                >
+                  {item.subtitle || "—"}
+                  {distText ? ` • ${distText}` : ""}
+                </Text>
+              )}
+            </View>
           </View>
-          {item.intentKind && (
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="flash-outline"
-                size={14}
-                color="#F97316"
-                style={{ marginRight: 6 }}
+
+          {showScore ? (
+            <View style={styles.statsRow}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={{ fontSize: 10, color: dynamicStyles.textSub }}>
+                  Độ hợp:{" "}
+                  <Text style={{ fontWeight: "bold", color: THEME_COLOR }}>
+                    {scoreVal}%
+                  </Text>
+                </Text>
+                <View style={[styles.scoreTrack, { marginTop: 6 }]}>
+                  <View style={[styles.scoreFill, { width: `${scoreVal}%` }]} />
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.intentBadge,
+                  { backgroundColor: dynamicStyles.chipBg },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="target"
+                  size={12}
+                  color={dynamicStyles.textMain}
+                />
+                <Text
+                  style={[styles.intentText, { color: dynamicStyles.textMain }]}
+                >
+                  {item.intentKind || item.type}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.intentBadge,
+                {
+                  backgroundColor: dynamicStyles.chipBg,
+                  alignSelf: "flex-start",
+                  marginBottom: 12,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="information"
+                size={12}
+                color={dynamicStyles.textMain}
               />
-              <Text style={styles.infoText} numberOfLines={1}>
-                Đang tìm:{" "}
-                {item.intentKind === "practice"
-                  ? "Luyện tập"
-                  : item.intentKind === "tournament"
-                  ? "Đánh giải"
-                  : item.intentKind === "friendly"
-                  ? "Friendly"
-                  : "Cafe / trò chuyện"}
+              <Text
+                style={[styles.intentText, { color: dynamicStyles.textMain }]}
+              >
+                {item.type}
               </Text>
             </View>
           )}
-        </View>
 
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.pingBtn]}
-            onPress={() => sendPing(item.userId)}
-          >
-            <Text style={styles.pingText}>Ping</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            {item.type === "user" ? (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.btnAction,
+                    { backgroundColor: isPinged ? "#374151" : THEME_COLOR },
+                  ]}
+                  onPress={() => handlePing(item)}
+                  disabled={isPinged}
+                >
+                  {isPinged ? (
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Ionicons name="checkmark" size={16} color="#9CA3AF" />
+                      <Text
+                        style={[
+                          styles.btnTextPrimary,
+                          { color: "#9CA3AF", marginLeft: 4 },
+                        ]}
+                      >
+                        Đã Ping
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.btnTextPrimary, { color: "#FFF" }]}>
+                      Ping ⚡️
+                    </Text>
+                  )}
+                </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.primaryBtn]}
-            onPress={() => router.push(`/profile/${item.userId}`)}
-          >
-            <Text style={styles.actionTextPrimary}>Xem hồ sơ</Text>
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.btnAction,
+                    { backgroundColor: dynamicStyles.chipBg, flex: 2 },
+                  ]}
+                  onPress={() => handleOpenDetail(item)}
+                >
+                  <Text
+                    style={[
+                      styles.btnTextSecondary,
+                      { color: dynamicStyles.textMain },
+                    ]}
+                  >
+                    Xem Profile
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.btnAction,
+                    { backgroundColor: THEME_COLOR, flex: 2 },
+                  ]}
+                  onPress={() => handleOpenDetail(item)}
+                >
+                  <Text style={[styles.btnTextPrimary, { color: "#FFF" }]}>
+                    Xem chi tiết
+                  </Text>
+                </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.secondaryBtn]}
-            onPress={() =>
-              Alert.alert("Chat", "Hook vào màn chat tại đây nhé.")
-            }
-          >
-            <Text style={styles.actionTextSecondary}>Nhắn tin</Text>
-          </TouchableOpacity>
-        </View>
+                <TouchableOpacity
+                  style={[
+                    styles.btnAction,
+                    { backgroundColor: dynamicStyles.chipBg },
+                  ]}
+                  onPress={() => {
+                    // nếu item có location thì mở maps
+                    const coords = item?.location?.coordinates;
+                    if (!Array.isArray(coords) || coords.length !== 2) return;
+                    const [lng, lat] = coords;
+                    const url =
+                      Platform.OS === "ios"
+                        ? `http://maps.apple.com/?ll=${lat},${lng}`
+                        : `geo:${lat},${lng}?q=${lat},${lng}`;
+                    Linking.openURL(url).catch(() => {});
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.btnTextSecondary,
+                      { color: dynamicStyles.textMain },
+                    ]}
+                  >
+                    Maps
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {(isExploreFetching || isPresenceSaving) && isSelected ? (
+            <View
+              style={{
+                marginTop: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <ActivityIndicator size="small" color={THEME_COLOR} />
+              <Text style={{ color: dynamicStyles.textSub, fontSize: 12 }}>
+                Đang cập nhật…
+              </Text>
+            </View>
+          ) : null}
+        </BlurView>
       </TouchableOpacity>
     );
   };
 
-  const renderEmpty = () => {
-    if (loading || error || !center) return null;
-    if (!players.length) {
-      return (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Chưa có ai quanh đây</Text>
-          <Text style={styles.emptyText}>
-            Bạn đang là người đầu tiên bật PickleRadar. Rủ bạn bè bật để dễ ghép
-            cặp hơn nhé!
-          </Text>
-        </View>
-      );
-    }
-    return null;
-  };
+  // --- UI STATES ---
+  if (bootLoading) return <RadarLoading isDark={isDark} />;
 
-  if (!token) {
-    return (
-      <SafeAreaView style={styles.fullCenter}>
-        <Text style={styles.infoText}>
-          Bạn cần đăng nhập để dùng PickleRadar.
-        </Text>
-      </SafeAreaView>
-    );
-  }
+  const centerCoordinate = myLocation || DEFAULT_CENTER;
 
   return (
-    <View style={styles.container}>
-      {/* Map */}
-      {center ? (
-        <MapboxGL.MapView
-          style={styles.map}
-          styleURL={MapboxGL.StyleURL.Street}
-          logoEnabled={false}
-          attributionEnabled={false}
-        >
-          <MapboxGL.Camera
-            ref={cameraRef}
-            centerCoordinate={center}
-            zoomLevel={13}
-          />
+    <View style={[styles.container, dynamicStyles.container]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
-          {/* vị trí mình */}
-          <MapboxGL.PointAnnotation id="me" coordinate={center}>
-            <View style={styles.mePulseOuter}>
-              <View style={styles.mePulseInner} />
-            </View>
+      <MapboxGL.MapView
+        style={styles.map}
+        styleURL={isDark ? MapboxGL.StyleURL.Dark : MapboxGL.StyleURL.Street}
+        logoEnabled={false}
+        attributionEnabled={false}
+        onTouchStart={() => {
+          isUserInteracting.current = true;
+        }}
+      >
+        <MapboxGL.Camera
+          ref={cameraRef}
+          defaultSettings={{
+            centerCoordinate,
+            zoomLevel: myLocation ? 14 : 11,
+          }}
+        />
+
+        {myLocation && circleGeoJSON ? (
+          <MapboxGL.ShapeSource id="radiusSource" shape={circleGeoJSON}>
+            <MapboxGL.FillLayer
+              id="radiusFill"
+              style={{ fillColor: NEON_BLUE, fillOpacity: 0.08 }}
+            />
+            <MapboxGL.LineLayer
+              id="radiusStroke"
+              style={{
+                lineColor: NEON_BLUE,
+                lineWidth: 1.5,
+                lineOpacity: 0.6,
+                lineDasharray: [2, 2],
+              }}
+            />
+          </MapboxGL.ShapeSource>
+        ) : null}
+
+        {myLocation ? (
+          <MapboxGL.PointAnnotation id="me" coordinate={myLocation}>
+            <RadarPulse />
           </MapboxGL.PointAnnotation>
+        ) : null}
 
-          {/* người chơi */}
-          {players.map(renderMarker)}
-        </MapboxGL.MapView>
-      ) : (
-        <View style={styles.fullCenter}>
-          <ActivityIndicator />
-          <Text style={styles.infoText}>Đang lấy vị trí...</Text>
-        </View>
-      )}
+        {radarItems.map(renderMarker)}
+      </MapboxGL.MapView>
 
-      {/* overlay radar vòng tròn (static, đủ tạo vibe) */}
-      <View pointerEvents="none" style={styles.radarOverlay}>
-        <View style={styles.radarCircleBig} />
-        <View style={styles.radarCircleMid} />
-        <View style={styles.radarCircleSmall} />
-      </View>
+      <SafeAreaView style={styles.headerSafe} pointerEvents="box-none">
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.roundBtn, { backgroundColor: dynamicStyles.pillBg }]}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={22}
+              color={dynamicStyles.textMain}
+            />
+          </TouchableOpacity>
 
-      {/* Hero + filter */}
-      <SafeAreaView style={styles.topSafe}>
-        <View style={styles.heroRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.heroTitle}>PickleRadar</Text>
-            <Text style={styles.heroSubtitle}>
-              Tìm người chơi quanh bạn để ghép cặp, đặt trận và kết bạn dễ dàng
-              hơn.
-            </Text>
+          <View style={{ flex: 1, marginHorizontal: 8, gap: 8 }}>
+            {/* Entity types */}
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={ENTITY_TYPES}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item }) => {
+                const active = entityType === item.key;
+                return (
+                  <TouchableOpacity
+                    onPress={() => setEntityType(item.key)}
+                    style={[
+                      styles.pill,
+                      {
+                        paddingVertical: 8,
+                        backgroundColor: active
+                          ? THEME_COLOR
+                          : dynamicStyles.pillBg,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pillText,
+                        {
+                          color: active ? "#FFF" : dynamicStyles.textMain,
+                          fontWeight: active ? "700" : "400",
+                        },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+
+            {/* Play types */}
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={PLAY_TYPES}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item }) => {
+                const active = playTypeFilter === item.key;
+                return (
+                  <TouchableOpacity
+                    onPress={() => setPlayTypeFilter(item.key)}
+                    style={[
+                      styles.pill,
+                      {
+                        backgroundColor: active
+                          ? THEME_COLOR
+                          : dynamicStyles.pillBg,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pillText,
+                        {
+                          color: active ? "#FFF" : dynamicStyles.textMain,
+                          fontWeight: active ? "700" : "400",
+                        },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
           </View>
 
           <TouchableOpacity
-            style={[styles.statusPill]}
-            disabled={loadingSettings}
-            onPress={() => updateRadarSettings(!radarEnabled)}
+            onPress={() => setShowRadiusModal(true)}
+            style={[
+              styles.radiusBtn,
+              { backgroundColor: dynamicStyles.pillBg },
+            ]}
           >
-            <View
-              style={[styles.statusDot, radarEnabled && styles.statusDotOn]}
-            />
+            <MaterialCommunityIcons name="radar" size={18} color={NEON_BLUE} />
             <Text
-              style={[styles.statusText, radarEnabled && styles.statusTextOn]}
+              style={{
+                fontSize: 10,
+                fontWeight: "700",
+                color: dynamicStyles.textMain,
+                marginLeft: 4,
+              }}
             >
-              {radarEnabled ? "Đang hiển thị" : "Đang ẩn"}
+              {radiusKm}km
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.filtersRow}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Bán kính</Text>
-            <View style={styles.filterChipsRow}>
-              {RANGE_OPTIONS.map((r) => {
-                const active = r === radiusKm;
-                return (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => onChangeRadius(r)}
-                  >
-                    <Text
-                      style={[styles.chipText, active && styles.chipTextActive]}
-                    >
-                      {r} km
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Kiểu chơi</Text>
-            <View style={styles.filterChipsRow}>
-              {PLAY_TYPES.map((pt) => {
-                const active = pt.key === playTypeFilter;
-                return (
-                  <TouchableOpacity
-                    key={pt.key}
-                    style={[styles.chip, active && styles.chipActiveSoft]}
-                    onPress={() => setPlayTypeFilter(pt.key)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        active && styles.chipTextActiveSoft,
-                      ]}
-                    >
-                      {pt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
+        {hasLocationPermission === false ? (
+          <PermissionHintBanner
+            isDark={isDark}
+            onEnable={ensureLocationAndFetch}
+          />
+        ) : null}
       </SafeAreaView>
 
-      {/* Cards */}
-      <View style={styles.cardsContainer}>
-        {loading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator />
-          </View>
-        )}
-        {error && !loading && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-        {renderEmpty()}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showRadiusModal}
+        onRequestClose={() => setShowRadiusModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowRadiusModal(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <BlurView
+                intensity={40}
+                tint={isDark ? "dark" : "light"}
+                style={[
+                  styles.modalContent,
+                  { backgroundColor: dynamicStyles.modalBg },
+                ]}
+              >
+                <Text
+                  style={[styles.modalTitle, { color: dynamicStyles.textMain }]}
+                >
+                  Quét trong
+                </Text>
 
-        {!!players.length && (
-          <>
-            <FlatList
-              ref={listRef}
-              data={players}
-              keyExtractor={(item) => String(item.userId)}
-              renderItem={renderCard}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-              snapToInterval={width * 0.8 + 12}
-              decelerationRate="fast"
-              onMomentumScrollEnd={(e) => {
-                const index = Math.round(
-                  e.nativeEvent.contentOffset.x / (width * 0.8 + 12)
-                );
-                const p = players[index];
-                if (p) {
-                  setSelectedPlayerId(p.userId);
-                  flyToPlayer(p);
-                }
-              }}
-            />
+                <View style={styles.modalGrid}>
+                  {RANGE_OPTIONS.map((opt) => {
+                    const isActive = radiusKm === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          styles.modalOption,
+                          isActive && styles.modalOptionActive,
+                          {
+                            borderColor: isActive
+                              ? THEME_COLOR
+                              : dynamicStyles.cardBorder,
+                          },
+                        ]}
+                        onPress={() => {
+                          setRadiusKm(opt);
+                          setShowRadiusModal(false);
+                          if (myLocation) zoomToRadius(myLocation, opt);
+                          // Query tự refetch vì args đổi
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.modalOptionText,
+                            isActive
+                              ? { color: "#FFF", fontWeight: "bold" }
+                              : { color: dynamicStyles.textSub },
+                          ]}
+                        >
+                          {opt} km
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-            <View style={styles.rightIndicator}>
-              <View style={styles.rightIndicatorInner}>
-                <Ionicons
-                  name="people-circle-outline"
-                  size={16}
-                  color="#E5E7EB"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.rightIndicatorText}>
-                  {players.length} người chơi
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setShowRadiusModal(false)}
+                >
+                  <Text style={{ color: dynamicStyles.textSub, fontSize: 13 }}>
+                    Đóng
+                  </Text>
+                </TouchableOpacity>
+              </BlurView>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <TouchableOpacity
+        style={[styles.recenterBtn, { backgroundColor: dynamicStyles.pillBg }]}
+        onPress={handleRecenter}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons
+          name="crosshairs-gps"
+          size={24}
+          color={NEON_BLUE}
+        />
+      </TouchableOpacity>
+
+      {/* Bottom list */}
+      <View style={styles.bottomListContainer}>
+        {isExploreLoading && myLocation ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator color={THEME_COLOR} />
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={radarItems}
+            renderItem={renderCard}
+            keyExtractor={(item) => `${item.type}-${String(item.id)}`}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_WIDTH + 12}
+            decelerationRate="fast"
+            contentContainerStyle={{
+              paddingHorizontal: (width - CARD_WIDTH) / 2,
+            }}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(
+                e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12)
+              );
+              if (radarItems[idx]) handleSelectItem(radarItems[idx], null);
+            }}
+            ListEmptyComponent={
+              <View style={{ paddingVertical: 18, alignItems: "center" }}>
+                <Text style={{ color: dynamicStyles.textSub, fontSize: 12 }}>
+                  {myLocation
+                    ? "Không có dữ liệu quanh bạn."
+                    : "Bật định vị để quét quanh bạn."}
                 </Text>
               </View>
-            </View>
-          </>
+            }
+          />
         )}
       </View>
     </View>
@@ -693,390 +1050,277 @@ export default function PickleRadarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617" },
+  container: { flex: 1 },
+  centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadingText: { marginTop: 10, fontSize: 14, fontWeight: "500" },
+
   map: { flex: 1 },
 
-  fullCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#020617",
-  },
-
-  topSafe: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-
-  heroRow: {
+  permissionBanner: {
+    marginTop: 8,
+    marginHorizontal: 16,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  heroTitle: {
-    color: "#F9FAFB",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  heroSubtitle: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    marginTop: 4,
-    maxWidth: width * 0.6,
-  },
-
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(31,41,55,0.9)",
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#6B7280",
-    marginRight: 6,
-  },
-  statusDotOn: {
-    backgroundColor: "#22C55E",
-  },
-  statusText: {
-    color: "#E5E7EB",
-    fontSize: 12,
-  },
-  statusTextOn: {
-    fontWeight: "600",
-  },
-
-  filtersRow: {
-    borderRadius: 16,
-    backgroundColor: "rgba(15,23,42,0.92)",
+  permissionBannerBtn: {
+    backgroundColor: THEME_COLOR,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 4,
+    borderRadius: 10,
   },
-  filterGroup: {
-    marginBottom: 6,
+
+  markerContainerFixed: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    minWidth: 100,
+    minHeight: 100,
   },
-  filterLabel: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginBottom: 2,
+  markerRoot: { alignItems: "center", justifyContent: "center" },
+  markerRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    overflow: "hidden",
+    backgroundColor: "#FFF",
   },
-  filterChipsRow: {
+  markerImg: { width: "100%", height: "100%" },
+  markerArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: "transparent",
+    borderStyle: "solid",
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 0,
+    borderTopWidth: 9,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: THEME_COLOR,
+    marginTop: 2,
+  },
+
+  bubbleContainer: { marginBottom: 8, alignItems: "center", zIndex: 100 },
+  bubbleContent: {
+    backgroundColor: "#FFF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  bubbleEmoji: { fontSize: 14, marginRight: 4 },
+  bubbleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1F2937",
+    maxWidth: 130,
+  },
+  bubbleArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: "transparent",
+    borderStyle: "solid",
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#FFF",
+    marginTop: -1,
+  },
+
+  headerSafe: { position: "absolute", top: 0, left: 0, right: 0 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "android" ? 12 : 6,
+    paddingBottom: 8,
+  },
+  roundBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pillText: { fontSize: 13 },
+  radiusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: width * 0.8,
+    padding: 20,
+    borderRadius: 24,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  modalTitle: { fontSize: 16, fontWeight: "700", marginBottom: 16 },
+  modalGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 12,
   },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+  modalOption: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: "#374151",
-    marginRight: 6,
-    marginTop: 4,
-  },
-  chipActive: {
-    backgroundColor: "#10B981",
-    borderColor: "#10B981",
-  },
-  chipActiveSoft: {
-    backgroundColor: "rgba(59,130,246,0.25)",
-    borderColor: "#3B82F6",
-  },
-  chipText: {
-    fontSize: 11,
-    color: "#E5E7EB",
-  },
-  chipTextActive: {
-    color: "#022C22",
-    fontWeight: "600",
-  },
-  chipTextActiveSoft: {
-    color: "#E5E7EB",
-    fontWeight: "600",
-  },
-
-  mePulseOuter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(56,189,248,0.35)",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
-  mePulseInner: {
-    width: 13,
-    height: 13,
-    borderRadius: 6.5,
-    backgroundColor: "#0EA5E9",
-  },
+  modalOptionActive: { backgroundColor: THEME_COLOR, borderWidth: 0 },
+  modalOptionText: { fontSize: 14, fontWeight: "500" },
+  modalCloseBtn: { marginTop: 20, padding: 10 },
 
-  radarOverlay: {
+  recenterBtn: {
     position: "absolute",
-    top: "25%",
-    left: "10%",
-    right: "10%",
-    bottom: "32%",
+    right: 16,
+    bottom: 240,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-  },
-  radarCircleBig: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.3)",
-  },
-  radarCircleMid: {
-    position: "absolute",
-    width: "66%",
-    aspectRatio: 1,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.4)",
-  },
-  radarCircleSmall: {
-    position: "absolute",
-    width: "35%",
-    aspectRatio: 1,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: "rgba(56,189,248,0.7)",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
   },
 
-  pinWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(15,23,42,0.9)",
+  bottomListContainer: { position: "absolute", bottom: 30, width: "100%" },
+  cardWrapper: { width: CARD_WIDTH, marginHorizontal: 6 },
+  cardBlur: {
+    borderRadius: 20,
+    padding: 14,
     borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.6)",
+    overflow: "hidden",
   },
-  pinWrapperSelected: {
-    borderColor: "#22C55E",
-    backgroundColor: "rgba(22,163,74,0.85)",
-  },
-  pinAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 4,
-  },
-  pinInfo: {
-    maxWidth: 100,
-  },
-  pinName: {
-    fontSize: 11,
-    color: "#F9FAFB",
-  },
-  pinSub: {
-    fontSize: 10,
-    color: "#E5E7EB",
-  },
-
-  cardsContainer: {
-    position: "absolute",
-    bottom: 24,
-    left: 0,
-    right: 0,
-  },
-  card: {
-    width: width * 0.8,
-    marginRight: 12,
-    borderRadius: 18,
-    backgroundColor: "rgba(15,23,42,0.95)",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(55,65,81,0.9)",
-  },
-  cardSelected: {
-    borderColor: "#22C55E",
-    shadowColor: "#22C55E",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   cardAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: 10,
+    backgroundColor: "#CCC",
   },
-  cardName: {
-    color: "#F9FAFB",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  cardMetaRow: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    justifyContent: "space-between",
+    width: "90%",
   },
-  cardMetaText: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginLeft: 8,
-  },
-
-  scoreRow: {
-    marginTop: 8,
-  },
-  scoreBarBg: {
-    width: "100%",
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(31,41,55,0.9)",
-    overflow: "hidden",
-  },
-  scoreBarFill: {
-    height: 4,
-    backgroundColor: "#22C55E",
-  },
-  scoreText: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  cardBody: {
-    marginTop: 8,
-  },
-  infoRow: {
+  cardName: { fontSize: 16, fontWeight: "700", flexShrink: 1 },
+  cardClub: { fontSize: 12, marginTop: 2 },
+  ratingPill: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-
-  badgeSmall: {
-    flexDirection: "row",
-    alignItems: "center",
+    backgroundColor: "#111",
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 999,
-    backgroundColor: "rgba(120,53,15,0.35)",
+    borderRadius: 6,
+    alignItems: "center",
   },
-  badgeSmallText: {
+  ratingText: {
     color: "#FACC15",
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: "bold",
+    marginLeft: 2,
   },
-
-  cardActions: {
-    flexDirection: "row",
-    marginTop: 10,
+  statsRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  scoreTrack: {
+    width: "100%",
+    height: 4,
+    backgroundColor: "rgba(100,100,100,0.2)",
+    borderRadius: 2,
   },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 3,
-  },
-  pingBtn: {
-    borderWidth: 1,
-    borderColor: "#F97316",
-    backgroundColor: "rgba(248,113,113,0.1)",
-  },
-  primaryBtn: {
-    backgroundColor: "#22C55E",
-  },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: "#4B5563",
-  },
-  pingText: {
-    color: "#F97316",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  actionTextPrimary: {
-    color: "#022C22",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  actionTextSecondary: {
-    color: "#E5E7EB",
-    fontWeight: "500",
-    fontSize: 13,
-  },
-
-  loadingOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 80,
-    alignItems: "center",
-  },
-  errorBox: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 84,
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: "rgba(127,29,29,0.9)",
-  },
-  errorText: {
-    color: "#FEE2E2",
-    fontSize: 12,
-    textAlign: "center",
-  },
-
-  emptyState: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 84,
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: "rgba(15,23,42,0.96)",
-  },
-  emptyTitle: {
-    color: "#F9FAFB",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  emptyText: {
-    color: "#9CA3AF",
-    fontSize: 12,
-  },
-
-  rightIndicator: {
-    position: "absolute",
-    right: 18,
-    bottom: 190,
-  },
-  rightIndicatorInner: {
+  scoreFill: { height: 4, backgroundColor: THEME_COLOR, borderRadius: 2 },
+  intentBadge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(15,23,42,0.9)",
+    borderRadius: 6,
+    gap: 6,
   },
-  rightIndicatorText: {
-    color: "#E5E7EB",
-    fontSize: 11,
+  intentText: { fontSize: 11, fontWeight: "500" },
+  actionRow: { flexDirection: "row", gap: 8 },
+  btnAction: {
+    flex: 1,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  btnTextPrimary: { fontWeight: "700", fontSize: 13, color: "#000" },
+  btnTextSecondary: { fontWeight: "600", fontSize: 13 },
 
-  infoText: {
-    color: "#E5E7EB",
-    fontSize: 14,
+  radarContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 200,
+    height: 200,
+  },
+  radarStaticCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: NEON_BLUE,
+    borderWidth: 2,
+    borderColor: "#FFF",
+    zIndex: 10,
+  },
+  radarPulse: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(14, 165, 233, 0.4)",
+    borderColor: NEON_BLUE,
+    borderWidth: 1,
   },
 });
