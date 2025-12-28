@@ -43,6 +43,7 @@ import {
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
+import OTAUpdater from "@/services/OTAUpdater";
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -65,6 +66,15 @@ if (!global.__SPLASH_LOCKED__) {
   global.__SPLASH_LOCKED__ = true;
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
+
+/* ===================== OTA CONFIG ===================== */
+const OTA_API_URL = "https://pickletour.vn/api"; // ← Production API
+
+const ota = new OTAUpdater({
+  apiUrl: OTA_API_URL,
+  installMode: "onNextRestart",
+});
+/* ===================================================== */
 
 /* ===================== THEME ONLY ===================== */
 const BRAND_LIGHT = "#1976d2";
@@ -128,6 +138,72 @@ function Boot({ children }: { children: React.ReactNode }) {
 
     return () => clearTimeout(guard);
   }, []);
+
+  // ✅ OTA: Check for updates khi app ready
+  React.useEffect(() => {
+    if (!ready) return;
+
+    // Không check OTA trong Expo Go
+    const isExpoGo = Constants.appOwnership === "expo";
+    if (isExpoGo) {
+      if (__DEV__) console.log("[OTA] Skipped in Expo Go");
+      return;
+    }
+
+    // Check OTA sau khi app load xong
+    const checkOTA = async () => {
+      try {
+        if (__DEV__) console.log("[OTA] Checking for updates...");
+
+        const updated = await ota.sync({
+          showPrompt: true,
+          onProgress: (progress) => {
+            if (__DEV__) {
+              console.log(`[OTA] Download: ${Math.round(progress * 100)}%`);
+            }
+          },
+        });
+
+        if (updated) {
+          if (__DEV__)
+            console.log("[OTA] Update downloaded, will apply on next restart");
+        } else {
+          if (__DEV__) console.log("[OTA] No updates available");
+        }
+      } catch (error) {
+        if (__DEV__) console.warn("[OTA] Check failed:", error);
+      }
+    };
+
+    // Delay 2s để app render xong, không block UX
+    const timer = setTimeout(checkOTA, 2000);
+    return () => clearTimeout(timer);
+  }, [ready]);
+
+  // ✅ OTA: Check khi app từ background → foreground
+  React.useEffect(() => {
+    if (!ready) return;
+
+    const isExpoGo = Constants.appOwnership === "expo";
+    if (isExpoGo) return;
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        // Silent check, không show prompt
+        ota
+          .checkForUpdate()
+          .then((update) => {
+            if (update.updateAvailable && update.mandatory) {
+              // Mandatory update → auto download
+              ota.sync({ showPrompt: false });
+            }
+          })
+          .catch(() => {});
+      }
+    });
+
+    return () => subscription.remove();
+  }, [ready]);
 
   if (!ready) {
     return (
