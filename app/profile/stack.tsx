@@ -1,4 +1,4 @@
-// app/(tabs)/live.tsx
+// app/profile/stack.tsx
 import ProfileScreen from "@/screens/profile";
 import { Stack } from "expo-router";
 import React from "react";

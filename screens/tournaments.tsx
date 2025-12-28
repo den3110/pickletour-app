@@ -360,6 +360,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
+
   const me = useSelector((s) => s.auth?.userInfo || null);
   const isAdmin = !!(
     me?.isAdmin ||
@@ -443,6 +444,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
     : isPickingEnd
     ? "Chọn ngày kết thúc"
     : "Áp dụng";
+
   const openDateModal = () => {
     setRangeDraft({
       start: toDateId(fromDate),
@@ -477,6 +479,16 @@ export default function TournamentDashboardScreen({ isBack = false }) {
   const renderItem = ({ item: tt }) => {
     const statusMeta = STATUS_CONFIG[tt.status] || STATUS_CONFIG.finished;
 
+    const onPressSchedule = () => router.push(`/tournament/${tt._id}/schedule`);
+    const onPressRegister = () => router.push(`/tournament/${tt._id}/register`);
+    const onPressBracket = () =>
+      router.push({
+        pathname: "/tournament/[id]/bracket",
+        params: { id: tt._id },
+      });
+
+    const showRegister = canManage(tt) || tt.status === "upcoming";
+
     return (
       <View
         style={[
@@ -503,6 +515,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               cachePolicy="memory-disk"
             />
           </Pressable>
+
           <View style={styles.statusBadgeOverlay}>
             <View
               style={[styles.statusDot, { backgroundColor: statusMeta.color }]}
@@ -561,98 +574,34 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               marginBottom: -10,
             }}
           >
-            {canManage(tt) ? (
-              <>
-                <PrimaryBtn
-                  theme={theme}
-                  icon="calendar-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/schedule`)}
-                >
-                  Lịch đấu
-                </PrimaryBtn>
+            {/* ✅ FIX: Lịch đấu luôn hiện cho mọi user (kể cả khách) ở mọi trạng thái */}
+            <PrimaryBtn
+              theme={theme}
+              icon="calendar-outline"
+              onPress={onPressSchedule}
+            >
+              Lịch đấu
+            </PrimaryBtn>
 
-                <WarningBtn
-                  theme={theme}
-                  icon="person-add-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/register`)}
-                >
-                  Đăng ký
-                </WarningBtn>
-
-                <OutlineBtn
-                  theme={theme}
-                  icon="git-network-outline"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/tournament/[id]/bracket",
-                      params: { id: tt._id },
-                    })
-                  }
-                >
-                  Sơ đồ
-                </OutlineBtn>
-              </>
-            ) : tt.status === "upcoming" ? (
-              <>
-                <WarningBtn
-                  theme={theme}
-                  icon="person-add-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/register`)}
-                >
-                  Đăng ký
-                </WarningBtn>
-                <OutlineBtn
-                  theme={theme}
-                  icon="git-network-outline"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/tournament/[id]/bracket",
-                      params: { id: tt._id },
-                    })
-                  }
-                >
-                  Sơ đồ
-                </OutlineBtn>
-              </>
-            ) : tt.status === "ongoing" ? (
-              <>
-                <PrimaryBtn
-                  theme={theme}
-                  icon="calendar-outline"
-                  onPress={() => router.push(`/tournament/${tt._id}/schedule`)}
-                >
-                  Lịch đấu
-                </PrimaryBtn>
-                
-                <OutlineBtn
-                  theme={theme}
-                  icon="git-network-outline"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/tournament/[id]/bracket",
-                      params: { id: tt._id },
-                    })
-                  }
-                >
-                  Sơ đồ
-                </OutlineBtn>
-              </>
-            ) : (
-              <>
-                <OutlineBtn
-                  theme={theme}
-                  icon="git-network-outline"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/tournament/[id]/bracket",
-                      params: { id: tt._id },
-                    })
-                  }
-                >
-                  Xem sơ đồ
-                </OutlineBtn>
-              </>
+            {/* Đăng ký: giữ logic cũ (manager/admin luôn có, còn user thường chỉ upcoming) */}
+            {showRegister && (
+              <WarningBtn
+                theme={theme}
+                icon="person-add-outline"
+                onPress={onPressRegister}
+              >
+                Đăng ký
+              </WarningBtn>
             )}
+
+            {/* Sơ đồ luôn hiện như trước */}
+            <OutlineBtn
+              theme={theme}
+              icon="git-network-outline"
+              onPress={onPressBracket}
+            >
+              {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
+            </OutlineBtn>
           </View>
         </View>
       </View>
@@ -660,17 +609,11 @@ export default function TournamentDashboardScreen({ isBack = false }) {
   };
 
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: theme.colors.bg,
-      }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <View style={styles.container}>
         {/* ✅ FlatList bọc tất cả (kể cả Header) */}
         {isLoading || isFetching ? (
           <FlatList
-            // ✅ FIX 1: Truyền trực tiếp JSX vào ListHeaderComponent để không bị unmount/mount lại khi state thay đổi
             ListHeaderComponent={
               <View style={{ marginBottom: 10 }}>
                 {/* Header Title */}
@@ -847,12 +790,10 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             contentContainerStyle={{ paddingBottom: 30 }}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
-            // ✅ FIX 2: Cho phép bấm nút khi bàn phím đang mở
             keyboardShouldPersistTaps="handled"
           />
         ) : (
           <FlatList
-            // ✅ FIX 1: (Áp dụng tương tự cho list chính)
             ListHeaderComponent={
               <View style={{ marginBottom: 10 }}>
                 {/* Header Title */}
@@ -1031,7 +972,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             onRefresh={onRefresh}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
-            // ✅ FIX 2: Cho phép bấm nút khi bàn phím đang mở
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyState}>
@@ -1088,6 +1028,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             >
               {hintLabel}
             </Text>
+
             <Calendar
               markingType="period"
               onDayPress={(day) => {
@@ -1177,14 +1118,12 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 style={styles.modalTextBtn}
               >
                 <Text
-                  style={{
-                    color: theme.colors.textSec,
-                    fontWeight: "600",
-                  }}
+                  style={{ color: theme.colors.textSec, fontWeight: "600" }}
                 >
                   Đóng
                 </Text>
               </Pressable>
+
               <Pressable
                 disabled={!canApply}
                 onPress={() => {

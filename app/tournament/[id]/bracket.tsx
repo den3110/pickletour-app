@@ -3057,7 +3057,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                         <View style={styles.rankChips}>
                           <Chip label={`Điểm: ${pts}`} t={t} />
                           <Chip label={`Hiệu số: ${diff}`} t={t} />
-                          <Chip label={`Hạng: ${rank}`} tone="primary" t={t} />
+                          {/* <Chip label={`Hạng: ${rank}`} tone="primary" t={t} /> */}
                         </View>
                       </View>
                     );

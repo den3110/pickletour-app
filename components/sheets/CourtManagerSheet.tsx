@@ -378,10 +378,11 @@ function AssignSpecificSheet({ open, onClose, court, matches, onConfirm }) {
       snapPoints={["70%"]}
       onDismiss={onClose}
       backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} style={{zIndex: 1000}} />
       )}
       handleIndicatorStyle={{ backgroundColor: t.colors.border }}
       backgroundStyle={{ backgroundColor: t.colors.card }}
+      containerStyle={{zIndex: 1000}}
     >
       <BottomSheetScrollView contentContainerStyle={styles.container}>
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -893,10 +894,13 @@ export default function CourtManagerSheet({
             {...p}
             appearsOnIndex={0}
             disappearsOnIndex={-1}
+            style={{zIndex: 1000}}
+
           />
         )}
         handleIndicatorStyle={{ backgroundColor: t.colors.border }}
         backgroundStyle={{ backgroundColor: t.colors.card }}
+        containerStyle={{zIndex: 1000}}
       >
         <BottomSheetScrollView contentContainerStyle={styles.container}>
           {/* Header */}

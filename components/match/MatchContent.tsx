@@ -39,7 +39,7 @@ import {
   BottomSheetBackdrop,
 } from "@gorhom/bottom-sheet";
 import { useCreateFacebookLiveForMatchMutation } from "@/slices/adminMatchLiveApiSlice";
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
 
 /* =====================================
@@ -333,48 +333,53 @@ function formatStatus(status) {
   }
 }
 
-/* ---------- PlayerLink (Styling Upgraded) ---------- */
-const PlayerLink = memo(
-  ({ person, onOpen, align = "left", serving = false }) => {
-    const T = useThemeTokens();
-    if (!person) return null;
-    const uid =
-      person?.user?._id ||
-      person?.user?.id ||
-      person?.user ||
-      person?._id ||
-      person?.id ||
-      null;
+const PlayerLink = memo(({ person, align = "left", serving = false }) => {
+  const T = useThemeTokens();
+  if (!person) return null;
 
-    const handlePress = useCallback(() => {
-      if (uid && onOpen) onOpen(uid);
-    }, [uid, onOpen]);
+  const uid =
+    person?.user?._id ||
+    person?.user?.id ||
+    person?.user ||
+    person?._id ||
+    person?.id ||
+    null;
 
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
+  const handlePress = useCallback(() => {
+    if (!uid) return;
+
+    // ✅ Push qua trang profile
+    router.push({
+      pathname: "/profile/[id]",
+      params: { id: String(uid) },
+    });
+  }, [uid]);
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      disabled={!uid}
+      style={[
+        styles.playerLinkContainer,
+        align === "right" && { flexDirection: "row-reverse" },
+      ]}
+    >
+      {serving && (
+        <MaterialIcons name="sports-tennis" size={16} color={T.tint} />
+      )}
+      <Text
         style={[
-          styles.playerLinkContainer,
-          align === "right" && { flexDirection: "row-reverse" },
+          styles.linkText,
+          { color: T.textPrimary },
+          align === "right" && { textAlign: "right" },
         ]}
+        numberOfLines={1}
       >
-        {serving && (
-          <MaterialIcons name="sports-tennis" size={16} color={T.tint} />
-        )}
-        <Text
-          style={[
-            styles.linkText,
-            { color: T.textPrimary }, // Dùng textPrimary để dễ đọc hơn
-            align === "right" && { textAlign: "right" },
-          ]}
-          numberOfLines={1}
-        >
-          {nameWithNick(person)}
-        </Text>
-      </TouchableOpacity>
-    );
-  }
-);
+        {nameWithNick(person)}
+      </Text>
+    </TouchableOpacity>
+  );
+});
 
 /* ---------- Hooks: chống nháy (Giữ nguyên) ---------- */
 function useDelayedFlag(flag, ms = 250) {
@@ -2354,6 +2359,8 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       </View>
     );
   }
+  if (!merged) return <View style={{ paddingVertical: 8 }} />;
+
   if (showError) {
     return (
       <View
@@ -2375,7 +2382,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       </View>
     );
   }
-  if (!merged) return <View style={{ paddingVertical: 8 }} />;
 
   return (
     <>

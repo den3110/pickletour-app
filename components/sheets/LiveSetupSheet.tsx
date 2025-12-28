@@ -1077,7 +1077,6 @@ export default function LiveSetupSheet({
     <>
       {/* SHEET CHÍNH */}
       <BottomSheetModal
-        topInset={insets.top}
         ref={sheetRef}
         snapPoints={snapPoints}
         onDismiss={onClose}
@@ -1086,6 +1085,7 @@ export default function LiveSetupSheet({
             {...p}
             appearsOnIndex={0}
             disappearsOnIndex={-1}
+            style={{zIndex: 1000}}
           />
         )}
         handleIndicatorStyle={{ backgroundColor: colors.border }}
@@ -1094,6 +1094,7 @@ export default function LiveSetupSheet({
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
         }}
+        containerStyle={{zIndex: 1000}}
       >
         <BottomSheetFlatList
           data={courts}

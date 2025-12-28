@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -13,6 +13,8 @@ import { Chip } from "@/components/ui/Chip";
 import type { Club } from "@/types/club.types";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
+// 1. Import Theme Hook
+import { useTheme } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 32;
@@ -23,6 +25,20 @@ interface ClubCardProps {
 }
 
 export default function ClubCard({ club, onPress }: ClubCardProps) {
+  // 2. Lấy trạng thái theme
+  const theme = useTheme();
+  const isDark = theme.dark;
+
+  // 3. Định nghĩa màu động
+  const colors = useMemo(() => ({
+    cardBg: isDark ? "#1E1E1E" : "#fff",
+    textPrimary: isDark ? "#FFF" : "#333",
+    textSecondary: isDark ? "#AAA" : "#999",
+    textTertiary: isDark ? "#CCC" : "#666",
+    badgeBg: isDark ? "#333" : "#f0f0f0",
+    avatarBorder: isDark ? "#1E1E1E" : "#fff", // Viền avatar trùng màu nền card
+  }), [isDark]);
+
   const cover =
     club.coverUrl || club.logoUrl || "https://via.placeholder.com/400x200";
   const logo = club.logoUrl || "https://via.placeholder.com/80";
@@ -30,8 +46,11 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-      <Animated.View entering={FadeIn.duration(300)} style={styles.card}>
-        {/* Cover Image with Gradient Overlay (expo-image) */}
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        style={[styles.card, { backgroundColor: colors.cardBg }]} // Áp dụng màu nền dynamic
+      >
+        {/* Cover Image with Gradient Overlay */}
         <View style={styles.coverContainer}>
           <ExpoImage
             source={{ uri: normalizeUrl(cover) }}
@@ -60,18 +79,29 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Logo Avatar (expo-image, cached) */}
+          {/* Logo Avatar */}
           <View style={styles.avatarContainer}>
             <ExpoImage
               source={{ uri: normalizeUrl(logo) }}
-              style={styles.avatar}
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: colors.cardBg, // Nền avatar trùng nền card
+                  borderColor: colors.avatarBorder, // Viền avatar trùng nền card
+                },
+              ]}
               contentFit="cover"
               transition={150}
               cachePolicy="memory-disk"
               recyclingKey={`logo-${logo}`}
             />
             {club.isVerified && (
-              <View style={styles.avatarBadge}>
+              <View
+                style={[
+                  styles.avatarBadge,
+                  { backgroundColor: colors.avatarBorder }, // Nền badge trùng nền card
+                ]}
+              >
                 <MaterialCommunityIcons
                   name="check-circle"
                   size={18}
@@ -83,7 +113,10 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
 
           {/* Club Info */}
           <View style={styles.info}>
-            <Text style={styles.clubName} numberOfLines={1}>
+            <Text
+              style={[styles.clubName, { color: colors.textPrimary }]}
+              numberOfLines={1}
+            >
               {club.name}
             </Text>
 
@@ -93,9 +126,12 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
                 <MaterialCommunityIcons
                   name="map-marker"
                   size={14}
-                  color="#999"
+                  color={colors.textSecondary}
                 />
-                <Text style={styles.location} numberOfLines={1}>
+                <Text
+                  style={[styles.location, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                >
                   {club.city ? `${club.city}, ` : ""}
                   {club.province || ""}
                 </Text>
@@ -106,10 +142,18 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
             {club.sportTypes && club.sportTypes.length > 0 && (
               <View style={styles.sportsContainer}>
                 {club.sportTypes.slice(0, 2).map((sport) => (
-                  <Chip key={sport} label={sport} style={styles.sportChip} />
+                  <Chip
+                    key={sport}
+                    label={sport}
+                    style={styles.sportChip}
+                    // Nếu Chip component hỗ trợ prop theme/color thì truyền vào đây
+                    // Ví dụ: textColor={colors.textSecondary}
+                  />
                 ))}
                 {club.sportTypes.length > 2 && (
-                  <Text style={styles.moreSports}>
+                  <Text
+                    style={[styles.moreSports, { color: colors.textSecondary }]}
+                  >
                     +{club.sportTypes.length - 2}
                   </Text>
                 )}
@@ -122,13 +166,20 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
                 <MaterialCommunityIcons
                   name="account-group"
                   size={16}
-                  color="#667eea"
+                  color="#667eea" // Giữ màu brand hoặc đổi nếu cần
                 />
-                <Text style={styles.statText}>{memberCount} thành viên</Text>
+                <Text style={[styles.statText, { color: colors.textTertiary }]}>
+                  {memberCount} thành viên
+                </Text>
               </View>
 
               {club.shortCode && (
-                <View style={styles.shortCodeBadge}>
+                <View
+                  style={[
+                    styles.shortCodeBadge,
+                    { backgroundColor: colors.badgeBg },
+                  ]}
+                >
                   <Text style={styles.shortCodeText}>{club.shortCode}</Text>
                 </View>
               )}
@@ -149,7 +200,7 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    backgroundColor: "#fff",
+    // backgroundColor: handle inline
     borderRadius: 20,
     marginBottom: 16,
     overflow: "hidden",
@@ -199,16 +250,15 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#fff",
+    // backgroundColor & borderColor: handle inline
     borderWidth: 3,
-    borderColor: "#fff",
     elevation: 3,
   },
   avatarBadge: {
     position: "absolute",
     right: -2,
     bottom: -2,
-    backgroundColor: "#fff",
+    // backgroundColor: handle inline
     borderRadius: 10,
     width: 20,
     height: 20,
@@ -221,7 +271,7 @@ const styles = StyleSheet.create({
   clubName: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    // color: handle inline
   },
   locationRow: {
     flexDirection: "row",
@@ -230,7 +280,7 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 13,
-    color: "#999",
+    // color: handle inline
     flex: 1,
   },
   sportsContainer: {
@@ -246,7 +296,7 @@ const styles = StyleSheet.create({
   },
   moreSports: {
     fontSize: 11,
-    color: "#999",
+    // color: handle inline
     fontWeight: "600",
   },
   statsRow: {
@@ -262,11 +312,11 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
-    color: "#666",
+    // color: handle inline
     fontWeight: "500",
   },
   shortCodeBadge: {
-    backgroundColor: "#f0f0f0",
+    // backgroundColor: handle inline
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

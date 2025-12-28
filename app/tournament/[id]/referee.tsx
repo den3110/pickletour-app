@@ -821,7 +821,10 @@ export default function RefereeCenterScreen() {
           <MiniChipBtn
             icon="play-arrow"
             label="Bắt trận"
-            onPress={() => router.push(refereeRouteOf(m))}
+            onPress={() => {
+              console.log(refereeRouteOf(m))
+              router.push(refereeRouteOf(m))
+            }}
           />
         )}
         {has && (

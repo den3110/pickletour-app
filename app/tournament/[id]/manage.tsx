@@ -32,7 +32,8 @@ import { useTheme } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
+import * as LegacyFS from "expo-file-system/legacy";
 import { BlurView } from "expo-blur";
 import {
   useGetTournamentQuery,
@@ -56,9 +57,14 @@ import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
 import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
 import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import * as IntentLauncher from "expo-intent-launcher";
+import FileViewerModal from "@/components/FileViewerModal";
 
 const normalizeGroupCode = (code) => {
-  const s = String(code || "").trim().toUpperCase();
+  const s = String(code || "")
+    .trim()
+    .toUpperCase();
   if (!s) return "";
   if (/^\d+$/.test(s)) return s;
   if (/^[A-Z]$/.test(s)) return String(s.charCodeAt(0) - 64);
@@ -875,41 +881,36 @@ const EdgeFadedHScroll = memo(
 );
 
 const ActionButtons = memo(
-  ({ m, tour, me, onOpenVideoDlg, onOpenSheet, canManage }) => {
+  ({
+    m,
+    tour,
+    me,
+    onOpenVideoDlg,
+    onOpenSheet,
+    canManage,
+    onOpenRefReport,
+  }) => {
     const { colors, dark } = useTheme();
     const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
     const has = !!m?.video;
     const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
 
-    const onOpenRefNote = useCallback(async () => {
-      try {
-        const html = buildRefReportHTML({
-          tourName: tour?.name || "",
-          code: matchCode(m),
-          court: courtNameOf(m),
-          referee: refereeNames(m),
-          team1: pairLabel(m?.pairA),
-          team2: pairLabel(m?.pairB),
-          logoUrl: "",
-        });
-        const { uri } = await Print.printToFileAsync({ html });
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: "Biên bản trọng tài",
-        });
-      } catch {
-        RNAlert.alert("Lỗi", "Không xuất được biên bản.");
-      }
-    }, [tour, m]);
+    // SỬA: Gọi callback thay vì xử lý trực tiếp
+    const onOpenRefNote = useCallback(() => {
+      onOpenRefReport?.(m);
+    }, [m, onOpenRefReport]);
 
     const handleOpenVideo = useCallback(() => {
       Linking.openURL(m.video).catch(() =>
         RNAlert.alert("Lỗi", "Không mở được liên kết.")
       );
     }, [m.video]);
-    const handleStartMatch = useCallback(() => router.push(refereeRouteOf(m)), [
-      m,
-    ]);
+
+    const handleStartMatch = useCallback(() => {
+      console.log(refereeRouteOf(m));
+
+      router.push(refereeRouteOf(m));
+    }, [m]);
 
     return (
       <EdgeFadedHScroll
@@ -1697,18 +1698,14 @@ export default function ManageScreen() {
         !isThisMatchLive &&
         pAId &&
         liveBusyByPairId.has(pAId)
-          ? liveBusyByPairId
-              .get(pAId)
-              .find((x) => x.matchId !== String(m._id))
+          ? liveBusyByPairId.get(pAId).find((x) => x.matchId !== String(m._id))
           : null;
       const busyInfoB =
         !isThisMatchFinished &&
         !isThisMatchLive &&
         pBId &&
         liveBusyByPairId.has(pBId)
-          ? liveBusyByPairId
-              .get(pBId)
-              .find((x) => x.matchId !== String(m._id))
+          ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
           : null;
       const checked = selectedMatchIds.has(String(m._id));
       return (
@@ -1749,6 +1746,7 @@ export default function ManageScreen() {
             canManage={canManage}
             onOpenVideoDlg={openVideoDlg}
             onOpenSheet={handleOpenSheet}
+            onOpenRefReport={handleOpenRefReport} // THÊM DÒNG NÀY
           />
           <View style={styles.contentBlock}>
             <Text
@@ -1910,6 +1908,49 @@ export default function ManageScreen() {
   );
 
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
+  const [exportState, setExportState] = useState({
+    loading: false,
+    type: null, // 'pdf' | 'word'
+    success: false,
+    error: null,
+    uri: null,
+    fileName: null,
+  });
+
+  const [refReportState, setRefReportState] = useState({
+    loading: false,
+    success: false,
+    error: null,
+    uri: null,
+    fileName: null,
+    matchCode: null,
+  });
+
+  const [fileViewer, setFileViewer] = useState({
+    visible: false,
+    uri: null,
+    fileName: null,
+    mimeType: null,
+  });
+
+  const openFileViewer = useCallback((uri, fileName, mimeType) => {
+    setFileViewer({
+      visible: true,
+      uri,
+      fileName,
+      mimeType,
+    });
+  }, []);
+
+  const closeFileViewer = useCallback(() => {
+    setFileViewer({
+      visible: false,
+      uri: null,
+      fileName: null,
+      mimeType: null,
+    });
+  }, []);
+
   const isInitialLoading = tourLoading || brLoading || mLoading;
   const hasError = tourErr || brErr || mErr;
   const isRetryingError = refreshing || tourFetching || brFetching || mFetching;
@@ -1945,56 +1986,302 @@ export default function ManageScreen() {
   }, [bracketsOfTab, mergedAllMatches, filterSortMatches, buildRowsForBracket]);
   const handleExportPDF = useCallback(async () => {
     setHdrMenuOpen(false);
+
+    setExportState({
+      loading: true,
+      type: "pdf",
+      success: false,
+      error: null,
+      uri: null,
+      fileName: null,
+    });
+
     try {
       const sections = buildExportPayload();
-      if (!sections.length)
-        return RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
+      if (!sections.length) {
+        setExportState((prev) => ({
+          ...prev,
+          loading: false,
+          error:
+            "Không có dữ liệu để xuất. Hãy kiểm tra lại bracket và trận đấu.",
+        }));
+        return;
+      }
+
       const html = buildExportHTML({
         tourName: tour?.name || "",
         typeLabel: TYPE_LABEL(tab),
         sections,
       });
+
+      // Tạo PDF từ HTML
       const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, {
-        mimeType: "application/pdf",
-        dialogTitle: "Xuất PDF",
+
+      // Tạo tên file
+      const safeName = (tour?.name || "giai_dau")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_")
+        .toLowerCase()
+        .slice(0, 30);
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileName = `${safeName}_${TYPE_LABEL(tab)}_${timestamp}.pdf`;
+
+      setExportState({
+        loading: false,
+        type: "pdf",
+        success: true,
+        error: null,
+        uri: uri,
+        fileName,
       });
-    } catch {
-      RNAlert.alert("Lỗi", "Xuất PDF thất bại.");
+    } catch (err) {
+      console.error("Export PDF error:", err);
+      setExportState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err?.message || "Xuất PDF thất bại. Vui lòng thử lại.",
+      }));
     }
   }, [buildExportPayload, tour, tab]);
+
   const handleExportWord = useCallback(async () => {
     setHdrMenuOpen(false);
+
+    setExportState({
+      loading: true,
+      type: "word",
+      success: false,
+      error: null,
+      uri: null,
+      fileName: null,
+    });
+
     try {
       const sections = buildExportPayload();
-      if (!sections.length)
-        return RNAlert.alert("Thông báo", "Không có dữ liệu để xuất.");
+      if (!sections.length) {
+        setExportState((prev) => ({
+          ...prev,
+          loading: false,
+          error:
+            "Không có dữ liệu để xuất. Hãy kiểm tra lại bracket và trận đấu.",
+        }));
+        return;
+      }
+
       const html = buildExportHTML({
         tourName: tour?.name || "",
         typeLabel: TYPE_LABEL(tab),
         sections,
       });
-      const content = `\ufeff${html}`;
-      const safeName = (tour?.name || "export")
-        .replace(/[^\p{L}\p{N}]+/gu, "_")
-        .replace(/^_+|_+$/g, "")
-        .toLowerCase();
-      const fileName = `tournament_${safeName}_${tab}_${new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:T]/g, "-")}.doc`;
+
+      // Tạo tên file
+      const safeName = (tour?.name || "giai_dau")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_")
+        .toLowerCase()
+        .slice(0, 30);
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileName = `${safeName}_${TYPE_LABEL(tab)}_${timestamp}.doc`;
+
+      // Wrap HTML với Word-compatible format
+      const wordContent = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <style>
+    @page { size: A4; margin: 1.5cm; }
+    body { font-family: 'Times New Roman', Arial, sans-serif; font-size: 12pt; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; }
+    th, td { border: 1px solid #000; padding: 6pt; font-size: 11pt; }
+    th { background-color: #f0f0f0; font-weight: bold; }
+    h1 { font-size: 18pt; margin-bottom: 6pt; }
+    h2 { font-size: 14pt; margin-top: 12pt; margin-bottom: 6pt; }
+    .sub { color: #666; font-size: 10pt; margin-bottom: 12pt; }
+  </style>
+</head>
+<body>
+${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
+</body>
+</html>`;
+
+      const content = "\ufeff" + wordContent;
       const fileUri = FileSystem.cacheDirectory + fileName;
-      await FileSystem.writeAsStringAsync(fileUri, content, {
-        encoding: FileSystem.EncodingType.UTF8,
+
+      // Dùng Legacy API
+      await LegacyFS.writeAsStringAsync(fileUri, content, {
+        encoding: LegacyFS.EncodingType.UTF8,
       });
-      await Sharing.shareAsync(fileUri, {
-        mimeType: "application/msword",
-        dialogTitle: "Xuất Word",
+
+      // Verify
+      const fileInfo = await LegacyFS.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        throw new Error("Không thể tạo file");
+      }
+
+      setExportState({
+        loading: false,
+        type: "word",
+        success: true,
+        error: null,
+        uri: fileUri,
+        fileName,
       });
-    } catch {
-      RNAlert.alert("Lỗi", "Xuất Word thất bại.");
+    } catch (err) {
+      console.error("Export Word error:", err);
+      setExportState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err?.message || "Xuất Word thất bại. Vui lòng thử lại.",
+      }));
     }
   }, [buildExportPayload, tour, tab]);
+
+  const handleShareExport = useCallback(async () => {
+    if (!exportState.uri) return;
+
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        RNAlert.alert("Lỗi", "Thiết bị không hỗ trợ chia sẻ file");
+        return;
+      }
+
+      await Sharing.shareAsync(exportState.uri, {
+        mimeType:
+          exportState.type === "pdf" ? "application/pdf" : "application/msword",
+        dialogTitle: exportState.type === "pdf" ? "Lưu PDF" : "Lưu Word",
+        UTI:
+          exportState.type === "pdf"
+            ? "com.adobe.pdf"
+            : "com.microsoft.word.doc",
+      });
+    } catch (err) {
+      console.error("Share error:", err);
+      RNAlert.alert("Lỗi", "Không thể chia sẻ file. Vui lòng thử lại.");
+    }
+  }, [exportState]);
+
+  const closeExportDialog = useCallback(() => {
+    setExportState({
+      loading: false,
+      type: null,
+      success: false,
+      error: null,
+      uri: null,
+      fileName: null,
+    });
+  }, []);
+
+  // Hàm mở file để xem
+
+  const handleViewFile = useCallback(
+    (uri, mimeType = "application/pdf", fileName = "") => {
+      if (!uri) return;
+
+      // Mở FileViewerModal thay vì mở app ngoài
+      openFileViewer(uri, fileName, mimeType);
+    },
+    [openFileViewer]
+  );
+
+  // Đóng modal biên bản
+  const closeRefReportDialog = useCallback(() => {
+    setRefReportState({
+      loading: false,
+      success: false,
+      error: null,
+      uri: null,
+      fileName: null,
+      matchCode: null,
+    });
+  }, []);
+
+  // Share biên bản
+  const handleShareRefReport = useCallback(async () => {
+    if (!refReportState.uri) return;
+    try {
+      await Sharing.shareAsync(refReportState.uri, {
+        mimeType: "application/pdf",
+        dialogTitle: "Biên bản trọng tài",
+        UTI: "com.adobe.pdf",
+      });
+    } catch (err) {
+      RNAlert.alert("Lỗi", "Không thể chia sẻ file.");
+    }
+  }, [refReportState.uri]);
+
+  // Tạo biên bản TT
+  const handleOpenRefReport = useCallback(
+    async (m) => {
+      const code = matchCode(m);
+
+      setRefReportState({
+        loading: true,
+        success: false,
+        error: null,
+        uri: null,
+        fileName: null,
+        matchCode: code,
+      });
+
+      try {
+        const html = buildRefReportHTML({
+          tourName: tour?.name || "",
+          code: code,
+          court: courtNameOf(m),
+          referee: refereeNames(m),
+          team1: pairLabel(m?.pairA),
+          team2: pairLabel(m?.pairB),
+          logoUrl: tour?.image,
+        });
+
+        const { uri } = await Print.printToFileAsync({ html });
+
+        const safeTourName = (tour?.name || "giai")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/Đ/g, "D")
+          .replace(/[^a-zA-Z0-9\s]/g, "")
+          .replace(/\s+/g, "_")
+          .toLowerCase()
+          .slice(0, 20);
+
+        const safeCode = code.replace(/[^a-zA-Z0-9-]/g, "_");
+        const fileName = `bienban_${safeTourName}_${safeCode}.pdf`;
+
+        setRefReportState({
+          loading: false,
+          success: true,
+          error: null,
+          uri,
+          fileName,
+          matchCode: code,
+        });
+      } catch (err) {
+        console.error("Ref report error:", err);
+        setRefReportState((prev) => ({
+          ...prev,
+          loading: false,
+          error: err?.message || "Không xuất được biên bản.",
+        }));
+      }
+    },
+    [tour]
+  );
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const [headerHeight, setHeaderHeight] = useState(150);
@@ -2131,7 +2418,7 @@ export default function ManageScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <BottomSheetModalProvider>
       <Stack.Screen
         options={{
           title: `${tour?.name || ""}`,
@@ -2145,7 +2432,9 @@ export default function ManageScreen() {
               ]}
               hitSlop={12}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
                 <MaterialIcons name="tune" size={20} color={colors.text} />
                 <Text
                   style={{
@@ -2162,387 +2451,491 @@ export default function ManageScreen() {
         }}
       />
       <View style={{ flex: 1 }}>
-        <Animated.View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 12,
-            right: 12,
-            zIndex: 1,
-            elevation: 1,
-            transform: [{ translateY }],
-            backgroundColor: colors.background,
-            paddingTop: 12,
-          }}
-          onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
-        >
-          <View
-            style={[
-              styles.toolbar,
-              { borderColor: colors.border, backgroundColor: colors.card },
-            ]}
-          >
-            <View style={[styles.inputWrap, { borderColor: colors.border }]}>
-              <MaterialIcons name="search" size={18} color={t.muted} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="Tìm trận, cặp đấu, link…"
-                placeholderTextColor={t.placeholder}
-                value={q}
-                onChangeText={setQ}
-              />
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-              <PickerChip
-                label={`Sắp xếp: ${
-                  sortKey === "time"
-                    ? "Thời gian"
-                    : sortKey === "order"
-                    ? "Thứ tự"
-                    : "Vòng"
-                }`}
-                onPress={() =>
-                  setSortKey((k) =>
-                    k === "time" ? "round" : k === "round" ? "order" : "time"
-                  )
-                }
-                icon="sort"
-                colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
-              />
-              <PickerChip
-                label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
-                onPress={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-                icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
-                colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
-              />
-              <PickerChip
-                label={`Sân: ${courtFilter || "Tất cả"}`}
-                onPress={() => {
-                  setCourtOptions(collectCourts());
-                  setCourtPickerOpen(true);
-                }}
-                icon="stadium"
-                colorsTheme={{ bg: t.courtBg, fg: t.courtFg }}
-              />
-              <CheckChip
-                checked={showBye}
-                label="Hiện BYE"
-                onPress={() => setShowBye((v) => !v)}
-              />
-              <Pill
-                label={`${
-                  typesAvailable.length ? bracketsOfTab.length : 0
-                } bracket • ${TYPE_LABEL(tab)}`}
-              />
-            </View>
-          </View>
-          <View style={[styles.tabs, { borderColor: colors.border }]}>
-            {typesAvailable.map((tTab) => {
-              const active = tTab.type === tab;
-              return (
-                <Pressable
-                  key={tTab.type}
-                  onPress={() => setTab(tTab.type)}
-                  style={({ pressed }) => [
-                    styles.tabItem,
-                    {
-                      backgroundColor: active ? colors.primary : "transparent",
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                    pressed && { opacity: 0.95 },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: active ? "#fff" : colors.text,
-                      fontWeight: "700",
-                    }}
-                  >
-                    {TYPE_LABEL(tTab.type)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Animated.View>
-
-        <Animated.FlatList
-          data={bracketsOfTab}
-          keyExtractor={(b) => String(b._id)}
-          renderItem={renderBracket}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          contentContainerStyle={{
-            paddingTop: headerHeight + 12,
-            paddingHorizontal: 12,
-            paddingBottom: 24 + (selectedMatchIds.size > 0 ? 70 : 0),
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing || tourFetching || brFetching || mFetching}
-              onRefresh={onRefresh}
-              progressViewOffset={headerHeight + 20}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <View
-              style={[
-                styles.alert,
-                { borderColor: t.infoBorder, backgroundColor: t.infoBg },
-              ]}
-            >
-              <Text style={{ color: t.infoText }}>
-                Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
-              </Text>
-            </View>
-          }
-          extraData={`${liveBump}|${selBump}|${courtFilter}|${showBye}`}
-          removeClippedSubviews={Platform.OS === "android"}
-          maxToRenderPerBatch={3}
-          windowSize={5}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true }
-          )}
-          scrollEventThrottle={16}
-        />
-
-        <ResponsiveMatchViewer
-          open={viewer.open}
-          matchId={viewer.matchId}
-          onClose={closeMatch}
-        />
-
-        {selectedMatchIds.size > 0 && (
-          <View
-            style={[
-              styles.bottomBar,
-              {
-                paddingBottom: 8 + insets.bottom,
-                backgroundColor: colors.card,
-                borderTopColor: colors.border,
-              },
-            ]}
+        <View style={{ flex: 1 }}>
+          <Animated.View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 12,
+              right: 12,
+              zIndex: 1,
+              elevation: 1,
+              transform: [{ translateY }],
+              backgroundColor: colors.background,
+              paddingTop: 12,
+            }}
+            onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
           >
             <View
               style={[
-                styles.bottomRow,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                styles.toolbar,
+                { borderColor: colors.border, backgroundColor: colors.card },
               ]}
             >
-              <Pill
-                label={`Đã chọn ${selectedMatchIds.size} trận`}
-                kind="primary"
-              />
-              <View style={{ flex: 1 }}>
-                <EdgeFadedHScroll
-                  contentContainerStyle={styles.bottomActions}
-                  bgColor={colors.card}
-                  chevronColor={t.muted}
-                  style={{ maxHeight: 40 }}
-                >
-                  <BtnOutline onPress={() => setBatchRefDlg({ open: true })}>
-                    <Text style={{ fontWeight: "700", color: colors.text }}>
-                      Gán trọng tài
-                    </Text>
-                  </BtnOutline>
-                  <BtnOutline
-                    onPress={() => setBatchVideoDlg({ open: true, url: "" })}
-                  >
-                    <Text style={{ fontWeight: "700", color: colors.text }}>
-                      Gán video
-                    </Text>
-                  </BtnOutline>
-                  <BtnOutline onPress={clearSelection}>
-                    <Text style={{ fontWeight: "700", color: colors.text }}>
-                      Bỏ chọn
-                    </Text>
-                  </BtnOutline>
-                </EdgeFadedHScroll>
+              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+                <MaterialIcons name="search" size={18} color={t.muted} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="Tìm trận, cặp đấu, link…"
+                  placeholderTextColor={t.placeholder}
+                  value={q}
+                  onChangeText={setQ}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                <PickerChip
+                  label={`Sắp xếp: ${
+                    sortKey === "time"
+                      ? "Thời gian"
+                      : sortKey === "order"
+                      ? "Thứ tự"
+                      : "Vòng"
+                  }`}
+                  onPress={() =>
+                    setSortKey((k) =>
+                      k === "time" ? "round" : k === "round" ? "order" : "time"
+                    )
+                  }
+                  icon="sort"
+                  colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
+                />
+                <PickerChip
+                  label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
+                  onPress={() =>
+                    setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+                  }
+                  icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
+                  colorsTheme={{ bg: t.chipDefaultBg, fg: t.chipDefaultFg }}
+                />
+                <PickerChip
+                  label={`Sân: ${courtFilter || "Tất cả"}`}
+                  onPress={() => {
+                    setCourtOptions(collectCourts());
+                    setCourtPickerOpen(true);
+                  }}
+                  icon="stadium"
+                  colorsTheme={{ bg: t.courtBg, fg: t.courtFg }}
+                />
+                <CheckChip
+                  checked={showBye}
+                  label="Hiện BYE"
+                  onPress={() => setShowBye((v) => !v)}
+                />
+                <Pill
+                  label={`${
+                    typesAvailable.length ? bracketsOfTab.length : 0
+                  } bracket • ${TYPE_LABEL(tab)}`}
+                />
               </View>
             </View>
-          </View>
-        )}
+            <View style={[styles.tabs, { borderColor: colors.border }]}>
+              {typesAvailable.map((tTab) => {
+                const active = tTab.type === tab;
+                return (
+                  <Pressable
+                    key={tTab.type}
+                    onPress={() => setTab(tTab.type)}
+                    style={({ pressed }) => [
+                      styles.tabItem,
+                      {
+                        backgroundColor: active
+                          ? colors.primary
+                          : "transparent",
+                        borderColor: active ? colors.primary : colors.border,
+                      },
+                      pressed && { opacity: 0.95 },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: active ? "#fff" : colors.text,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {TYPE_LABEL(tTab.type)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
 
-        <Modal
-          visible={hdrMenuOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setHdrMenuOpen(false)}
-        >
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setHdrMenuOpen(false)}
-          >
-            <View />
-          </Pressable>
-          <View
-            style={[
-              styles.menuCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <MenuItem
-              icon="how-to-reg"
-              label="Quản lý trọng tài"
-              onPress={() => {
-                setHdrMenuOpen(false);
-                setRefMgrOpen(true);
-              }}
-            />
-            <MenuItem
-              icon="stadium"
-              label="Quản lý sân"
-              onPress={() => {
-                setHdrMenuOpen(false);
-                setCourtMgrSheet({ open: true, bracket: null });
-              }}
-            />
-            <MenuItem
-              icon="movie"
-              label="Thiết lập LIVE"
-              onPress={() => {
-                setHdrMenuOpen(false);
-                setLiveSetupSheet({ open: true, bracket: null });
-              }}
-            />
-            <View style={{ height: 8 }} />
-            <MenuItem
-              icon="picture-as-pdf"
-              label="Xuất PDF"
-              onPress={handleExportPDF}
-            />
-            <MenuItem
-              icon="description"
-              label="Xuất Word"
-              onPress={handleExportWord}
-            />
-            <MenuItem
-              icon="home"
-              label="Trang giải"
-              onPress={() => {
-                setHdrMenuOpen(false);
-                router.push(`/tournament/${tid}/home`);
-              }}
-            />
-            {isAdmin && (
-              <MenuItem
-                icon="casino"
-                label="Bốc thăm"
-                onPress={() => {
-                  setHdrMenuOpen(false);
-                  router.push(`/tournament/${tid}/draw`);
-                }}
+          <Animated.FlatList
+            data={bracketsOfTab}
+            keyExtractor={(b) => String(b._id)}
+            renderItem={renderBracket}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            contentContainerStyle={{
+              paddingTop: headerHeight + 12,
+              paddingHorizontal: 12,
+              paddingBottom: 24 + (selectedMatchIds.size > 0 ? 70 : 0),
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={
+                  refreshing || tourFetching || brFetching || mFetching
+                }
+                onRefresh={onRefresh}
+                progressViewOffset={headerHeight + 20}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
               />
-            )}
-          </View>
-        </Modal>
-
-        <Modal
-          visible={videoDlg.open}
-          transparent
-          animationType="fade"
-          onRequestClose={closeVideoDlg}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={{ flex: 1 }}
-          >
-            <View style={styles.modalBackdrop}>
-              <Pressable style={{ flex: 1 }} onPress={closeVideoDlg} />
+            }
+            ListEmptyComponent={
               <View
                 style={[
-                  styles.modalCard,
+                  styles.alert,
+                  { borderColor: t.infoBorder, backgroundColor: t.infoBg },
+                ]}
+              >
+                <Text style={{ color: t.infoText }}>
+                  Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
+                </Text>
+              </View>
+            }
+            extraData={`${liveBump}|${selBump}|${courtFilter}|${showBye}`}
+            removeClippedSubviews={Platform.OS === "android"}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: true }
+            )}
+            scrollEventThrottle={16}
+          />
+
+          {selectedMatchIds.size > 0 && (
+            <View
+              style={[
+                styles.bottomBar,
+                {
+                  paddingBottom: 8 + insets.bottom,
+                  backgroundColor: colors.card,
+                  borderTopColor: colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.bottomRow,
                   { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontWeight: "700",
-                      fontSize: 16,
-                    }}
+                <Pill
+                  label={`Đã chọn ${selectedMatchIds.size} trận`}
+                  kind="primary"
+                />
+                <View style={{ flex: 1 }}>
+                  <EdgeFadedHScroll
+                    contentContainerStyle={styles.bottomActions}
+                    bgColor={colors.card}
+                    chevronColor={t.muted}
+                    style={{ maxHeight: 40 }}
                   >
-                    {(videoDlg?.match &&
-                      (videoDlg.match.code || matchCode(videoDlg.match))) ||
-                      ""}{" "}
-                    — Link video
-                  </Text>
-                  <IconBtn
-                    name="close"
-                    color={colors.text}
-                    size={20}
-                    onPress={closeVideoDlg}
-                  />
-                </View>
-                <View style={[styles.inputWrap, { borderColor: colors.border }]}>
-                  <MaterialIcons name="link" size={18} color={t.muted} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="URL video (YouTube/Facebook/TikTok/M3U8...)"
-                    placeholderTextColor={t.placeholder}
-                    value={videoDlg.url}
-                    onChangeText={(s) => setVideoDlg((v) => ({ ...v, url: s }))}
-                  />
-                </View>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    gap: 8,
-                    marginTop: 10,
-                  }}
-                >
-                  <BtnOutline onPress={closeVideoDlg}>Đóng</BtnOutline>
-                  <BtnOutline onPress={onSaveVideo}>
-                    <Text style={{ color: colors.text, fontWeight: "700" }}>
-                      Lưu
-                    </Text>
-                  </BtnOutline>
+                    <BtnOutline onPress={() => setBatchRefDlg({ open: true })}>
+                      <Text style={{ fontWeight: "700", color: colors.text }}>
+                        Gán trọng tài
+                      </Text>
+                    </BtnOutline>
+                    <BtnOutline
+                      onPress={() => setBatchVideoDlg({ open: true, url: "" })}
+                    >
+                      <Text style={{ fontWeight: "700", color: colors.text }}>
+                        Gán video
+                      </Text>
+                    </BtnOutline>
+                    <BtnOutline onPress={clearSelection}>
+                      <Text style={{ fontWeight: "700", color: colors.text }}>
+                        Bỏ chọn
+                      </Text>
+                    </BtnOutline>
+                  </EdgeFadedHScroll>
                 </View>
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
+          )}
 
-        <BatchAssignRefModal
-          visible={batchRefDlg.open}
-          onClose={() => setBatchRefDlg({ open: false })}
-          tournamentId={tid}
-          selectedMatchIds={selectedMatchIds}
-          colors={colors}
-          t={t}
-          styles={styles}
-          IconBtn={IconBtn}
-          BtnOutline={BtnOutline}
-          onAssigned={() => {
-            refetchMatches?.();
-          }}
-        />
+          <Modal
+            visible={hdrMenuOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setHdrMenuOpen(false)}
+          >
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => setHdrMenuOpen(false)}
+            >
+              <View />
+            </Pressable>
+            <View
+              style={[
+                styles.menuCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <MenuItem
+                icon="how-to-reg"
+                label="Quản lý trọng tài"
+                onPress={() => {
+                  setHdrMenuOpen(false);
+                  setRefMgrOpen(true);
+                }}
+              />
+              <MenuItem
+                icon="stadium"
+                label="Quản lý sân"
+                onPress={() => {
+                  setHdrMenuOpen(false);
+                  setCourtMgrSheet({ open: true, bracket: null });
+                }}
+              />
+              <MenuItem
+                icon="movie"
+                label="Thiết lập LIVE"
+                onPress={() => {
+                  setHdrMenuOpen(false);
+                  setLiveSetupSheet({ open: true, bracket: null });
+                }}
+              />
+              <View style={{ height: 8 }} />
+              <MenuItem
+                icon="picture-as-pdf"
+                label="Xuất PDF"
+                onPress={handleExportPDF}
+              />
+              <MenuItem
+                icon="description"
+                label="Xuất Word"
+                onPress={handleExportWord}
+              />
+              <MenuItem
+                icon="home"
+                label="Trang giải"
+                onPress={() => {
+                  setHdrMenuOpen(false);
+                  router.push(`/tournament/${tid}/home`);
+                }}
+              />
+              {isAdmin && (
+                <MenuItem
+                  icon="casino"
+                  label="Bốc thăm"
+                  onPress={() => {
+                    setHdrMenuOpen(false);
+                    router.push(`/tournament/${tid}/draw`);
+                  }}
+                />
+              )}
+            </View>
+          </Modal>
 
-        <Modal
-          visible={batchVideoDlg.open}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setBatchVideoDlg({ open: false, url: "" })}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={{ flex: 1 }}
+          <Modal
+            visible={videoDlg.open}
+            transparent
+            animationType="fade"
+            onRequestClose={closeVideoDlg}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.modalBackdrop}>
+                <Pressable style={{ flex: 1 }} onPress={closeVideoDlg} />
+                <View
+                  style={[
+                    styles.modalCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontWeight: "700",
+                        fontSize: 16,
+                      }}
+                    >
+                      {(videoDlg?.match &&
+                        (videoDlg.match.code || matchCode(videoDlg.match))) ||
+                        ""}{" "}
+                      — Link video
+                    </Text>
+                    <IconBtn
+                      name="close"
+                      color={colors.text}
+                      size={20}
+                      onPress={closeVideoDlg}
+                    />
+                  </View>
+                  <View
+                    style={[styles.inputWrap, { borderColor: colors.border }]}
+                  >
+                    <MaterialIcons name="link" size={18} color={t.muted} />
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="URL video (YouTube/Facebook/TikTok/M3U8...)"
+                      placeholderTextColor={t.placeholder}
+                      value={videoDlg.url}
+                      onChangeText={(s) =>
+                        setVideoDlg((v) => ({ ...v, url: s }))
+                      }
+                    />
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                  >
+                    <BtnOutline onPress={closeVideoDlg}>Đóng</BtnOutline>
+                    <BtnOutline onPress={onSaveVideo}>
+                      <Text style={{ color: colors.text, fontWeight: "700" }}>
+                        Lưu
+                      </Text>
+                    </BtnOutline>
+                  </View>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+
+          <BatchAssignRefModal
+            visible={batchRefDlg.open}
+            onClose={() => setBatchRefDlg({ open: false })}
+            tournamentId={tid}
+            selectedMatchIds={selectedMatchIds}
+            colors={colors}
+            t={t}
+            styles={styles}
+            IconBtn={IconBtn}
+            BtnOutline={BtnOutline}
+            onAssigned={() => {
+              refetchMatches?.();
+            }}
+          />
+
+          <Modal
+            visible={batchVideoDlg.open}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setBatchVideoDlg({ open: false, url: "" })}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.modalBackdrop}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                />
+                <View
+                  style={[
+                    styles.modalCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontWeight: "700",
+                        fontSize: 16,
+                      }}
+                    >
+                      Gán video cho {selectedMatchIds.size} trận
+                    </Text>
+                    <IconBtn
+                      name="close"
+                      color={colors.text}
+                      size={20}
+                      onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                    />
+                  </View>
+                  <View
+                    style={[styles.inputWrap, { borderColor: colors.border }]}
+                  >
+                    <MaterialIcons name="link" size={18} color={t.muted} />
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="URL video (Facebook/YouTube/M3U8...)"
+                      placeholderTextColor={t.placeholder}
+                      value={batchVideoDlg.url}
+                      onChangeText={(s) =>
+                        setBatchVideoDlg((v) => ({ ...v, url: s }))
+                      }
+                    />
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                  >
+                    <BtnOutline
+                      onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                    >
+                      Đóng
+                    </BtnOutline>
+                    <Pressable
+                      onPress={submitBatchSetVideo}
+                      style={({ pressed }) => [
+                        styles.primaryBtn,
+                        {
+                          backgroundColor: colors.primary,
+                          opacity: pressed || batchingVideo ? 0.9 : 1,
+                        },
+                      ]}
+                      disabled={
+                        batchingVideo ||
+                        !batchVideoDlg.url.trim() ||
+                        selectedMatchIds.size === 0
+                      }
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "800" }}>
+                        Gán
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+
+          <Modal
+            visible={courtPickerOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setCourtPickerOpen(false)}
           >
             <View style={styles.modalBackdrop}>
               <Pressable
                 style={{ flex: 1 }}
-                onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                onPress={() => setCourtPickerOpen(false)}
               />
               <View
                 style={[
@@ -2565,27 +2958,81 @@ export default function ManageScreen() {
                       fontSize: 16,
                     }}
                   >
-                    Gán video cho {selectedMatchIds.size} trận
+                    Chọn sân để lọc
                   </Text>
                   <IconBtn
                     name="close"
                     color={colors.text}
                     size={20}
-                    onPress={() => setBatchVideoDlg({ open: false, url: "" })}
+                    onPress={() => setCourtPickerOpen(false)}
                   />
                 </View>
-                <View style={[styles.inputWrap, { borderColor: colors.border }]}>
-                  <MaterialIcons name="link" size={18} color={t.muted} />
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="URL video (Facebook/YouTube/M3U8...)"
-                    placeholderTextColor={t.placeholder}
-                    value={batchVideoDlg.url}
-                    onChangeText={(s) =>
-                      setBatchVideoDlg((v) => ({ ...v, url: s }))
-                    }
-                  />
-                </View>
+                <ScrollView style={{ maxHeight: 320 }}>
+                  <Pressable
+                    onPress={() => {
+                      setCourtFilter("");
+                      setCourtPickerOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.refRow,
+                      { borderColor: colors.border },
+                      pressed && { opacity: 0.9 },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={
+                        !courtFilter
+                          ? "radio-button-checked"
+                          : "radio-button-unchecked"
+                      }
+                      size={18}
+                      color={!courtFilter ? colors.primary : t.muted}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={{ color: colors.text, fontWeight: "700" }}>
+                      Tất cả sân
+                    </Text>
+                  </Pressable>
+                  {courtOptions.length === 0 ? (
+                    <Text style={{ color: t.muted, paddingVertical: 8 }}>
+                      Chưa có sân nào.
+                    </Text>
+                  ) : (
+                    courtOptions.map((c) => {
+                      const chosen = courtFilter === c;
+                      return (
+                        <Pressable
+                          key={c}
+                          onPress={() => {
+                            setCourtFilter(c);
+                            setCourtPickerOpen(false);
+                          }}
+                          style={({ pressed }) => [
+                            styles.refRow,
+                            { borderColor: colors.border },
+                            pressed && { opacity: 0.9 },
+                          ]}
+                        >
+                          <MaterialIcons
+                            name={
+                              chosen
+                                ? "radio-button-checked"
+                                : "radio-button-unchecked"
+                            }
+                            size={18}
+                            color={chosen ? colors.primary : t.muted}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text
+                            style={{ color: colors.text, fontWeight: "700" }}
+                          >
+                            {c}
+                          </Text>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
                 <View
                   style={{
                     flexDirection: "row",
@@ -2594,194 +3041,611 @@ export default function ManageScreen() {
                     marginTop: 10,
                   }}
                 >
-                  <BtnOutline
-                    onPress={() => setBatchVideoDlg({ open: false, url: "" })}
-                  >
+                  <BtnOutline onPress={() => setCourtPickerOpen(false)}>
                     Đóng
                   </BtnOutline>
-                  <Pressable
-                    onPress={submitBatchSetVideo}
-                    style={({ pressed }) => [
-                      styles.primaryBtn,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: pressed || batchingVideo ? 0.9 : 1,
-                      },
-                    ]}
-                    disabled={
-                      batchingVideo ||
-                      !batchVideoDlg.url.trim() ||
-                      selectedMatchIds.size === 0
-                    }
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "800" }}>Gán</Text>
-                  </Pressable>
                 </View>
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
+          </Modal>
 
-        <Modal
-          visible={courtPickerOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setCourtPickerOpen(false)}
-        >
-          <View style={styles.modalBackdrop}>
-            <Pressable
-              style={{ flex: 1 }}
-              onPress={() => setCourtPickerOpen(false)}
-            />
-            <View
-              style={[
-                styles.modalCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
+          <ManageRefereesSheet
+            open={refMgrOpen}
+            onClose={() => setRefMgrOpen(false)}
+            tournamentId={tid}
+            onChanged={() => {
+              refetchMatches?.();
+              refetchBrackets?.();
+            }}
+          />
+          <AssignCourtSheet
+            open={assignCourtSheet.open}
+            onClose={() => setAssignCourtSheet({ open: false, match: null })}
+            match={assignCourtSheet.match}
+            tournamentId={tid}
+            onAssigned={() => refetchMatches?.()}
+          />
+          <AssignRefSheet
+            open={assignRefSheet.open}
+            onClose={() => setAssignRefSheet({ open: false, match: null })}
+            match={assignRefSheet.match}
+            tournamentId={tid}
+            onChanged={() => refetchMatches?.()}
+          />
+          <CourtManagerSheet
+            open={courtMgrSheet.open}
+            onClose={() => setCourtMgrSheet({ open: false, bracket: null })}
+            tournamentId={tid}
+            bracketId={null}
+            bracketName=""
+            tournamentName={tour?.name || ""}
+          />
+          <LiveSetupSheet
+            open={liveSetupSheet.open}
+            onClose={() => setLiveSetupSheet({ open: false, bracket: null })}
+            tournamentId={tid}
+            bracketId={null}
+          />
+        </View>
+      </View>
+      {/* Export Status Modal */}
+      <Modal
+        visible={
+          exportState.loading || exportState.success || !!exportState.error
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={exportState.loading ? undefined : closeExportDialog}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={exportState.loading ? undefined : closeExportDialog}
+          />
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                alignItems: "center",
+                paddingVertical: 24,
+              },
+            ]}
+          >
+            {/* Loading */}
+            {exportState.loading && (
+              <>
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text
                   style={{
                     color: colors.text,
-                    fontWeight: "700",
                     fontSize: 16,
+                    fontWeight: "600",
+                    marginTop: 16,
                   }}
                 >
-                  Chọn sân để lọc
+                  Đang xuất {exportState.type === "pdf" ? "PDF" : "Word"}...
                 </Text>
-                <IconBtn
-                  name="close"
-                  color={colors.text}
-                  size={20}
-                  onPress={() => setCourtPickerOpen(false)}
-                />
-              </View>
-              <ScrollView style={{ maxHeight: 320 }}>
-                <Pressable
-                  onPress={() => {
-                    setCourtFilter("");
-                    setCourtPickerOpen(false);
+                <Text style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
+                  Vui lòng đợi trong giây lát
+                </Text>
+              </>
+            )}
+
+            {/* Success */}
+            {exportState.success && (
+              <>
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: t.successBg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
                   }}
-                  style={({ pressed }) => [
-                    styles.refRow,
-                    { borderColor: colors.border },
-                    pressed && { opacity: 0.9 },
-                  ]}
+                >
+                  <MaterialIcons name="check" size={36} color={t.successFg} />
+                </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  Xuất file thành công!
+                </Text>
+                <Text
+                  style={{
+                    color: t.muted,
+                    fontSize: 13,
+                    marginTop: 8,
+                    paddingHorizontal: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  {exportState.fileName}
+                </Text>
+
+                {/* 3 nút: Đóng | Xem | Lưu */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginTop: 20,
+                    paddingHorizontal: 12,
+                    width: "100%",
+                  }}
+                >
+                  <Pressable
+                    onPress={closeExportDialog}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: "center",
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "600" }}>
+                      Đóng
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      closeExportDialog(); // Đóng dialog trước
+                      handleViewFile(
+                        exportState.uri,
+                        exportState.type === "pdf"
+                          ? "application/pdf"
+                          : "application/msword",
+                        exportState.fileName
+                      );
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 4,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name="visibility"
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                      Xem
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleShareExport}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        backgroundColor: colors.primary,
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 4,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={Platform.OS === "ios" ? "ios-share" : "share"}
+                      size={18}
+                      color="#fff"
+                    />
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      Lưu
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {Platform.OS === "ios" && (
+                  <Text
+                    style={{
+                      color: t.muted,
+                      fontSize: 11,
+                      marginTop: 12,
+                      textAlign: "center",
+                      paddingHorizontal: 24,
+                    }}
+                  >
+                    💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" để lưu file
+                  </Text>
+                )}
+              </>
+            )}
+
+            {/* Error */}
+            {!!exportState.error && (
+              <>
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: t.dangerBg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
                 >
                   <MaterialIcons
-                    name={
-                      !courtFilter
-                        ? "radio-button-checked"
-                        : "radio-button-unchecked"
-                    }
-                    size={18}
-                    color={!courtFilter ? colors.primary : t.muted}
-                    style={{ marginRight: 8 }}
+                    name="error-outline"
+                    size={36}
+                    color={t.dangerText}
                   />
-                  <Text style={{ color: colors.text, fontWeight: "700" }}>
-                    Tất cả sân
-                  </Text>
-                </Pressable>
-                {courtOptions.length === 0 ? (
-                  <Text style={{ color: t.muted, paddingVertical: 8 }}>
-                    Chưa có sân nào.
-                  </Text>
-                ) : (
-                  courtOptions.map((c) => {
-                    const chosen = courtFilter === c;
-                    return (
-                      <Pressable
-                        key={c}
-                        onPress={() => {
-                          setCourtFilter(c);
-                          setCourtPickerOpen(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.refRow,
-                          { borderColor: colors.border },
-                          pressed && { opacity: 0.9 },
-                        ]}
-                      >
-                        <MaterialIcons
-                          name={
-                            chosen
-                              ? "radio-button-checked"
-                              : "radio-button-unchecked"
-                          }
-                          size={18}
-                          color={chosen ? colors.primary : t.muted}
-                          style={{ marginRight: 8 }}
-                        />
-                        <Text style={{ color: colors.text, fontWeight: "700" }}>
-                          {c}
-                        </Text>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </ScrollView>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
-                <BtnOutline onPress={() => setCourtPickerOpen(false)}>
-                  Đóng
-                </BtnOutline>
-              </View>
-            </View>
+                </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  Xuất file thất bại
+                </Text>
+                <Text
+                  style={{
+                    color: t.dangerText,
+                    fontSize: 13,
+                    marginTop: 8,
+                    textAlign: "center",
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  {exportState.error}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 12,
+                    marginTop: 20,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Pressable
+                    onPress={closeExportDialog}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: "center",
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "600" }}>
+                      Đóng
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      closeExportDialog();
+                      if (exportState.type === "pdf") handleExportPDF();
+                      else handleExportWord();
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        backgroundColor: colors.primary,
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 6,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons name="refresh" size={18} color="#fff" />
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      Thử lại
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
-        </Modal>
+        </View>
+      </Modal>
+      {/* Ref Report Modal */}
+      <Modal
+        visible={
+          refReportState.loading ||
+          refReportState.success ||
+          !!refReportState.error
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={
+          refReportState.loading ? undefined : closeRefReportDialog
+        }
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={refReportState.loading ? undefined : closeRefReportDialog}
+          />
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                alignItems: "center",
+                paddingVertical: 24,
+              },
+            ]}
+          >
+            {/* Loading */}
+            {refReportState.loading && (
+              <>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 16,
+                    fontWeight: "600",
+                    marginTop: 16,
+                  }}
+                >
+                  Đang tạo biên bản...
+                </Text>
+                <Text style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
+                  Trận {refReportState.matchCode}
+                </Text>
+              </>
+            )}
 
-        <ManageRefereesSheet
-          open={refMgrOpen}
-          onClose={() => setRefMgrOpen(false)}
-          tournamentId={tid}
-          onChanged={() => {
-            refetchMatches?.();
-            refetchBrackets?.();
-          }}
-        />
-        <AssignCourtSheet
-          open={assignCourtSheet.open}
-          onClose={() => setAssignCourtSheet({ open: false, match: null })}
-          match={assignCourtSheet.match}
-          tournamentId={tid}
-          onAssigned={() => refetchMatches?.()}
-        />
-        <AssignRefSheet
-          open={assignRefSheet.open}
-          onClose={() => setAssignRefSheet({ open: false, match: null })}
-          match={assignRefSheet.match}
-          tournamentId={tid}
-          onChanged={() => refetchMatches?.()}
-        />
-        <CourtManagerSheet
-          open={courtMgrSheet.open}
-          onClose={() => setCourtMgrSheet({ open: false, bracket: null })}
-          tournamentId={tid}
-          bracketId={null}
-          bracketName=""
-          tournamentName={tour?.name || ""}
-        />
-        <LiveSetupSheet
-          open={liveSetupSheet.open}
-          onClose={() => setLiveSetupSheet({ open: false, bracket: null })}
-          tournamentId={tid}
-          bracketId={null}
-        />
-      </View>
-    </View>
+            {/* Success */}
+            {refReportState.success && (
+              <>
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: t.successBg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <MaterialIcons name="check" size={36} color={t.successFg} />
+                </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  Tạo biên bản thành công!
+                </Text>
+                <Text style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
+                  Trận {refReportState.matchCode}
+                </Text>
+                <Text style={{ color: t.muted, fontSize: 12, marginTop: 4 }}>
+                  {refReportState.fileName}
+                </Text>
+
+                {/* 3 nút */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginTop: 20,
+                    paddingHorizontal: 12,
+                    width: "100%",
+                  }}
+                >
+                  <Pressable
+                    onPress={closeRefReportDialog}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: "center",
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "600" }}>
+                      Đóng
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      closeRefReportDialog(); // Đóng dialog trước
+                      handleViewFile(
+                        refReportState.uri,
+                        "application/pdf",
+                        refReportState.fileName
+                      );
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 4,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name="visibility"
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                      Xem
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleShareRefReport}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        backgroundColor: colors.primary,
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 4,
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={Platform.OS === "ios" ? "ios-share" : "share"}
+                      size={18}
+                      color="#fff"
+                    />
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                      Lưu
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {Platform.OS === "ios" && (
+                  <Text
+                    style={{
+                      color: t.muted,
+                      fontSize: 11,
+                      marginTop: 12,
+                      textAlign: "center",
+                      paddingHorizontal: 24,
+                    }}
+                  >
+                    💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" hoặc "Print" để in
+                  </Text>
+                )}
+              </>
+            )}
+            {/* Error */}
+            {!!refReportState.error && (
+              <>
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: t.dangerBg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <MaterialIcons
+                    name="error-outline"
+                    size={36}
+                    color={t.dangerText}
+                  />
+                </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  Tạo biên bản thất bại
+                </Text>
+                <Text
+                  style={{
+                    color: t.dangerText,
+                    fontSize: 13,
+                    marginTop: 8,
+                    textAlign: "center",
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  {refReportState.error}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 12,
+                    marginTop: 20,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <Pressable
+                    onPress={closeRefReportDialog}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: "center",
+                        opacity: pressed ? 0.8 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.text, fontWeight: "600" }}>
+                      Đóng
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+      <FileViewerModal
+        visible={fileViewer.visible}
+        uri={fileViewer.uri}
+        fileName={fileViewer.fileName}
+        mimeType={fileViewer.mimeType}
+        onClose={closeFileViewer}
+      />
+      <ResponsiveMatchViewer
+        open={viewer.open}
+        matchId={viewer.matchId}
+        onClose={closeMatch}
+      />
+    </BottomSheetModalProvider>
   );
 }
 
@@ -2877,6 +3741,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 12,
     paddingTop: 8,
+
     borderTopWidth: 1,
     ...Platform.select({
       ios: {

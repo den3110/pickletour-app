@@ -37,6 +37,8 @@ import { VN_PROVINCES } from "@/constants/provinces";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { normalizeUrl } from "@/utils/normalizeUri";
+// 1. IMPORT THEME
+import { useTheme } from "@react-navigation/native";
 
 type ClubCreateModalProps = {
   visible: boolean;
@@ -45,7 +47,7 @@ type ClubCreateModalProps = {
   initial?: any;
 };
 
-// ... (Giữ nguyên phần OPTIONS và Helpers ở trên, không thay đổi) ...
+// ... CONSTANTS (Giữ nguyên) ...
 const VISIBILITY_OPTIONS = ["public", "private", "hidden"] as const;
 const VISIBILITY_LABELS: Record<string, string> = {
   public: "Công khai",
@@ -96,9 +98,7 @@ function extractErrorMessage(err: any) {
   );
 }
 
-// ================= CONFIG CHIỀU CAO =================
-const HEADER_MAX_HEIGHT = 300; // ✅ Cao hơn để thoáng (theo yêu cầu)
-// HEADER_MIN_HEIGHT sẽ được tính dynamic theo tai thỏ (inset.top)
+const HEADER_MAX_HEIGHT = 300;
 
 export default function ClubCreateModal({
   visible,
@@ -106,12 +106,29 @@ export default function ClubCreateModal({
   onCreated,
   initial,
 }: ClubCreateModalProps) {
-  const insets = useSafeAreaInsets();
-  // Tính toán vùng an toàn phía trên:
-  // Nếu có tai thỏ (insets.top > 20), ta cộng thêm chút padding cho thoáng
-  const topPad = Math.max(insets.top, RNStatusBar.currentHeight || 20);
+  // 2. SETUP THEME
+  const theme = useTheme();
+  const isDark = theme.dark;
 
-  // Chiều cao khi thu gọn = Padding trên + Chiều cao Navbar (khoảng 60px)
+  const colors = useMemo(
+    () => ({
+      bg: isDark ? "#121212" : "#f6f7fb",
+      card: isDark ? "#1E1E1E" : "#fff",
+      text: isDark ? "#FFF" : "#222",
+      subText: isDark ? "#AAA" : "#666",
+      border: isDark ? "#333" : "#94a3b8",
+      placeholder: isDark ? "#666" : "#999",
+      inputBg: isDark ? "#2C2C2E" : "#fff",
+      switchOff: isDark ? "#444" : "#d1d5db",
+      sheetHandle: isDark ? "#444" : "#e5e7eb",
+      divider: isDark ? "#333" : "#eee",
+      logoBorder: isDark ? "#1E1E1E" : "#fff",
+    }),
+    [isDark]
+  );
+
+  const insets = useSafeAreaInsets();
+  const topPad = Math.max(insets.top, RNStatusBar.currentHeight || 20);
   const HEADER_MIN_HEIGHT = topPad + 60;
   const SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
@@ -218,44 +235,35 @@ export default function ClubCreateModal({
     }
   };
 
-  // ==== Province picker ====
   const [showProvincePicker, setShowProvincePicker] = useState(false);
 
-  // ==========================================
-  // ==== 🚀 ANIMATION LOGIC (UPDATED) ====
-  // ==========================================
+  // ==== ANIMATION LOGIC ====
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // 1. Header dịch chuyển lên trên
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE],
     outputRange: [0, -SCROLL_DISTANCE],
     extrapolate: "clamp",
   });
 
-  // 2. Navbar dịch chuyển xuống dưới để GHIM lại
   const navbarTranslateY = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE],
     outputRange: [0, SCROLL_DISTANCE],
     extrapolate: "clamp",
   });
 
-  // 3. Logo Fade Out: ✅ NÉ NAVBAR
-  // Khi scroll được 80% quãng đường, logo sẽ mờ dần về 0 để không đè chữ
   const logoOpacity = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE * 0.6, SCROLL_DISTANCE],
     outputRange: [1, 0.5, 0],
     extrapolate: "clamp",
   });
 
-  // 4. Logo Scale nhẹ
   const logoScale = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE],
     outputRange: [1, 0.8],
     extrapolate: "clamp",
   });
 
-  // 5. Parallax Cover
   const coverTranslateY = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE],
     outputRange: [0, SCROLL_DISTANCE * 0.5],
@@ -267,7 +275,6 @@ export default function ClubCreateModal({
     extrapolate: "clamp",
   });
 
-  // 6. Bo góc
   const headerRadius = scrollY.interpolate({
     inputRange: [0, SCROLL_DISTANCE],
     outputRange: [24, 0],
@@ -279,7 +286,6 @@ export default function ClubCreateModal({
     { useNativeDriver: true }
   );
 
-  // Keyboard scroll helper
   const scrollRef = useRef<Animated.ScrollView | null>(null);
   const ensureVisible = useCallback(() => {
     // @ts-ignore
@@ -294,7 +300,7 @@ export default function ClubCreateModal({
       onRequestClose={() => onClose?.(false)}
     >
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <View style={styles.modalRoot}>
+      <View style={[styles.modalRoot, { backgroundColor: colors.bg }]}>
         {/* === ANIMATED HEADER === */}
         <Animated.View
           style={[
@@ -307,7 +313,6 @@ export default function ClubCreateModal({
             },
           ]}
         >
-          {/* Background Gradient */}
           <LinearGradient
             colors={["#667eea", "#764ba2"]}
             start={{ x: 0, y: 0 }}
@@ -315,7 +320,6 @@ export default function ClubCreateModal({
             style={StyleSheet.absoluteFill}
           />
 
-          {/* Cover Image Parallax */}
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
@@ -349,7 +353,6 @@ export default function ClubCreateModal({
             />
           </Animated.View>
 
-          {/* Mask loading */}
           {uploading && (
             <View style={styles.uploadMask}>
               <View
@@ -364,13 +367,13 @@ export default function ClubCreateModal({
             </View>
           )}
 
-          {/* NAVBAR: Buttons & Title (Fixed) */}
+          {/* NAVBAR */}
           <Animated.View
             style={[
               styles.navBar,
               {
                 height: HEADER_MIN_HEIGHT,
-                paddingTop: topPad, // ✅ Né tai thỏ
+                paddingTop: topPad,
                 transform: [{ translateY: navbarTranslateY }],
               },
             ]}
@@ -403,12 +406,13 @@ export default function ClubCreateModal({
             </TouchableOpacity>
           </Animated.View>
 
-          {/* LOGO: ✅ Fade out khi scroll để né Navbar */}
+          {/* LOGO */}
           <Animated.View
             style={[
               styles.logoWrap,
               {
-                opacity: logoOpacity, // Mờ dần
+                borderColor: colors.logoBorder, // Border match bg or white
+                opacity: logoOpacity,
                 transform: [{ scale: logoScale }],
               },
             ]}
@@ -447,14 +451,14 @@ export default function ClubCreateModal({
             onScroll={onScroll}
             scrollEventThrottle={16}
             contentContainerStyle={{
-              paddingTop: HEADER_MAX_HEIGHT + 20, // Đẩy nội dung xuống dưới Header
+              paddingTop: HEADER_MAX_HEIGHT + 20,
               paddingHorizontal: 16,
               paddingBottom: 40,
             }}
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            {/* ... Form inputs ... */}
+            {/* NAME */}
             <TextInput
               placeholder="Tên CLB *"
               value={form.name}
@@ -463,12 +467,21 @@ export default function ClubCreateModal({
               }
               onFocus={() => setFocusField("name")}
               onBlur={() => setFocusField(null)}
+              // Dynamic Theme
+              placeholderTextColor={colors.placeholder}
+              style={{ color: colors.text }}
               containerStyle={[
                 styles.inputContainer,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
                 focusField === "name" && styles.inputFocus,
                 { marginBottom: 12 },
               ]}
             />
+
+            {/* DESCRIPTION */}
             <TextInput
               placeholder="Mô tả"
               value={form.description}
@@ -479,8 +492,15 @@ export default function ClubCreateModal({
               numberOfLines={4}
               onFocus={() => setFocusField("description")}
               onBlur={() => setFocusField(null)}
+              // Dynamic Theme
+              placeholderTextColor={colors.placeholder}
+              style={{ color: colors.text }}
               containerStyle={[
                 styles.inputContainer,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
                 focusField === "description" && styles.inputFocus,
                 { marginBottom: 12 },
               ]}
@@ -490,6 +510,7 @@ export default function ClubCreateModal({
             <FieldLabel
               title="Hiển thị"
               subtitle={VISIBILITY_HINTS[form.visibility]}
+              colors={colors}
             />
             <View style={styles.rowWrap}>
               {VISIBILITY_OPTIONS.map((v) => (
@@ -499,6 +520,8 @@ export default function ClubCreateModal({
                   selected={form.visibility === v}
                   onPress={() => setForm((f: any) => ({ ...f, visibility: v }))}
                   style={styles.chip}
+                  // Chip usually handles theme internally if implemented correctly,
+                  // or you can pass style overrides here.
                 />
               ))}
             </View>
@@ -506,6 +529,7 @@ export default function ClubCreateModal({
             <FieldLabel
               title="Chính sách gia nhập"
               subtitle={JOIN_POLICY_HINTS[form.joinPolicy]}
+              colors={colors}
             />
             <View style={styles.rowWrap}>
               {JOIN_POLICY_OPTIONS.map((jp) => (
@@ -523,7 +547,7 @@ export default function ClubCreateModal({
               ))}
             </View>
 
-            <FieldLabel title="Ai được xem thành viên" />
+            <FieldLabel title="Ai được xem thành viên" colors={colors} />
             <View style={styles.rowWrap}>
               {MEMBER_VIS_OPTIONS.map((opt) => (
                 <Chip
@@ -541,7 +565,9 @@ export default function ClubCreateModal({
             </View>
 
             <View style={[styles.rowBetween, { marginBottom: 14 }]}>
-              <Text style={styles.fieldTitle}>Hiện nhãn Admin/Owner</Text>
+              <Text style={[styles.fieldTitle, { color: colors.text }]}>
+                Hiện nhãn Admin/Owner
+              </Text>
               <TouchableOpacity
                 onPress={() =>
                   setForm((f: any) => ({
@@ -551,6 +577,7 @@ export default function ClubCreateModal({
                 }
                 style={[
                   styles.switchBtn,
+                  { backgroundColor: colors.switchOff }, // Dynamic off color
                   form.showRolesToMembers && styles.switchOn,
                 ]}
               >
@@ -564,18 +591,29 @@ export default function ClubCreateModal({
             </View>
 
             {/* Address */}
-            <FieldLabel title="Địa chỉ" />
+            <FieldLabel title="Địa chỉ" colors={colors} />
             <TouchableOpacity
               onPress={() => setShowProvincePicker(true)}
               activeOpacity={0.8}
               style={{ marginBottom: 10 }}
             >
-              <View style={styles.selectInput}>
+              <View
+                style={[
+                  styles.selectInput,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
                 <Text
                   style={
                     form.province
-                      ? styles.selectValue
-                      : styles.selectPlaceholder
+                      ? [styles.selectValue, { color: colors.text }]
+                      : [
+                          styles.selectPlaceholder,
+                          { color: colors.placeholder },
+                        ]
                   }
                 >
                   {form.province || "Tỉnh/Thành"}
@@ -583,10 +621,11 @@ export default function ClubCreateModal({
                 <MaterialCommunityIcons
                   name="chevron-down"
                   size={20}
-                  color="#999"
+                  color={colors.placeholder}
                 />
               </View>
             </TouchableOpacity>
+
             <TextInput
               placeholder="Quận/Huyện"
               value={form.city}
@@ -598,12 +637,20 @@ export default function ClubCreateModal({
                 ensureVisible();
               }}
               onBlur={() => setFocusField(null)}
+              // Dynamic Theme
+              placeholderTextColor={colors.placeholder}
+              style={{ color: colors.text }}
               containerStyle={[
                 styles.inputContainer,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
                 focusField === "city" && styles.inputFocus,
                 { marginBottom: 12 },
               ]}
             />
+
             <TextInput
               placeholder="Mã ngắn (VD: PBC)"
               value={form.shortCode}
@@ -616,8 +663,15 @@ export default function ClubCreateModal({
               }}
               onBlur={() => setFocusField(null)}
               autoCapitalize="characters"
+              // Dynamic Theme
+              placeholderTextColor={colors.placeholder}
+              style={{ color: colors.text }}
               containerStyle={[
                 styles.inputContainer,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
                 focusField === "shortCode" && styles.inputFocus,
               ]}
             />
@@ -632,7 +686,7 @@ export default function ClubCreateModal({
           </Animated.ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Modal Province (Giữ nguyên) */}
+        {/* Modal Province */}
         <Modal
           visible={showProvincePicker}
           transparent
@@ -644,27 +698,47 @@ export default function ClubCreateModal({
               style={styles.sheetBackdrop}
               onPress={() => setShowProvincePicker(false)}
             />
-            <View style={styles.sheetCard}>
-              <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Chọn Tỉnh/Thành</Text>
+            <View
+              style={[
+                styles.sheetCard,
+                { backgroundColor: colors.card }, // Dynamic sheet bg
+              ]}
+            >
+              <View
+                style={[
+                  styles.sheetHandle,
+                  { backgroundColor: colors.sheetHandle },
+                ]}
+              />
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>
+                Chọn Tỉnh/Thành
+              </Text>
               <Animated.ScrollView
                 contentContainerStyle={{ paddingBottom: 12 }}
               >
                 <TouchableOpacity
-                  style={styles.sheetItem}
+                  style={[
+                    styles.sheetItem,
+                    { borderBottomColor: colors.divider },
+                  ]}
                   onPress={() => {
                     setForm((f: any) => ({ ...f, province: "" }));
                     setShowProvincePicker(false);
                   }}
                 >
-                  <Text style={styles.sheetItemText}>— Chọn —</Text>
+                  <Text style={[styles.sheetItemText, { color: colors.text }]}>
+                    — Chọn —
+                  </Text>
                 </TouchableOpacity>
                 {VN_PROVINCES.map((p) => (
                   <TouchableOpacity
                     key={p}
                     style={[
                       styles.sheetItem,
-                      form.province === p && styles.sheetItemActive,
+                      { borderBottomColor: colors.divider },
+                      form.province === p && {
+                        backgroundColor: isDark ? "#333" : "#eef2ff", // Highlight item
+                      },
                     ]}
                     onPress={() => {
                       setForm((f: any) => ({ ...f, province: p }));
@@ -675,6 +749,7 @@ export default function ClubCreateModal({
                     <Text
                       style={[
                         styles.sheetItemText,
+                        { color: colors.text },
                         form.province === p && styles.sheetItemTextActive,
                       ]}
                     >
@@ -698,17 +773,30 @@ export default function ClubCreateModal({
   );
 }
 
-function FieldLabel({ title, subtitle }: { title: string; subtitle?: string }) {
+// Updated FieldLabel to accept colors
+function FieldLabel({
+  title,
+  subtitle,
+  colors,
+}: {
+  title: string;
+  subtitle?: string;
+  colors: any;
+}) {
   return (
     <View style={{ marginBottom: subtitle ? 6 : 10 }}>
-      <Text style={styles.fieldTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.fieldHint}>{subtitle}</Text> : null}
+      <Text style={[styles.fieldTitle, { color: colors.text }]}>{title}</Text>
+      {subtitle ? (
+        <Text style={[styles.fieldHint, { color: colors.subText }]}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  modalRoot: { flex: 1, backgroundColor: "#f6f7fb" },
+  modalRoot: { flex: 1 },
 
   headerContainer: {
     position: "absolute",
@@ -729,7 +817,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
-    zIndex: 20, // Cao hơn cover
+    zIndex: 20,
   },
 
   headerTitle: {
@@ -747,7 +835,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.2)", // Nền mờ cho nút để không bị chìm
+    backgroundColor: "rgba(0,0,0,0.2)",
   },
 
   coverImg: { width: "100%", height: "100%" },
@@ -768,16 +856,14 @@ const styles = StyleSheet.create({
   logoWrap: {
     position: "absolute",
     left: 20,
-    bottom: 20, // Neo ở đáy header
+    bottom: 20,
     width: 80,
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: "#fff",
     backgroundColor: "#e0e7ff",
     zIndex: 25,
     overflow: "hidden",
-    // Shadow cho logo
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -792,14 +878,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#667eea",
   },
 
-  // ... (Các styles khác giữ nguyên) ...
   fieldTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#222",
     marginBottom: 6,
   },
-  fieldHint: { fontSize: 12, color: "#666" },
+  fieldHint: { fontSize: 12 },
   rowWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   chip: { marginRight: 6, marginBottom: 6 },
   rowBetween: {
@@ -811,7 +895,6 @@ const styles = StyleSheet.create({
     width: 46,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#d1d5db",
     padding: 3,
     alignItems: "flex-start",
   },
@@ -827,9 +910,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#94a3b8",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -839,12 +920,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  selectPlaceholder: { color: "#999" },
-  selectValue: { color: "#111", fontWeight: "600" },
+  selectPlaceholder: {},
+  selectValue: { fontWeight: "600" },
   sheetRoot: { flex: 1, justifyContent: "flex-end" },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "#0008" },
   sheetCard: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: "70%",
@@ -855,7 +935,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#e5e7eb",
     marginTop: 8,
     marginBottom: 6,
   },
@@ -864,25 +943,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
     paddingVertical: 8,
-    color: "#111",
   },
   sheetItem: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  sheetItemActive: { backgroundColor: "#eef2ff" },
-  sheetItemText: { fontSize: 14, color: "#111" },
+  sheetItemText: { fontSize: 14 },
   sheetItemTextActive: { color: "#4f46e5", fontWeight: "700" },
   inputContainer: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#94a3b8",
     paddingHorizontal: 12,
     minHeight: 48,
     justifyContent: "center",

@@ -269,10 +269,16 @@ export default function AssignCourtSheet({
       snapPoints={["80%"]}
       onDismiss={onClose}
       backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+        <BottomSheetBackdrop
+          {...p}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          style={{ zIndex: 1000 }}
+        />
       )}
       handleIndicatorStyle={{ backgroundColor: t.colors.border }}
       backgroundStyle={{ backgroundColor: t.colors.card }}
+      containerStyle={{ zIndex: 1000 }}
     >
       <BottomSheetScrollView contentContainerStyle={[styles.container]}>
         <Title />

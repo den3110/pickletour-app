@@ -21,12 +21,14 @@ import {
 } from "@/slices/clubsApiSlice";
 import * as Haptics from "expo-haptics";
 import { normalizeUrl } from "@/utils/normalizeUri";
+// Thêm 2 thư viện này
+import { useTheme } from "@react-navigation/native";
+import { router } from "expo-router";
 
-// --- COMPONENT AVATAR (Đã sửa lỗi khung trắng) ---
-function UserAvatar({ uri, size = 68 }) {
+// --- COMPONENT AVATAR (Đã thêm dark mode prop) ---
+function UserAvatar({ uri, size = 68, colors }) {
   const [hasError, setHasError] = useState(false);
 
-  // Kiểm tra kỹ URI có hợp lệ không (tránh trường hợp chuỗi "null", "undefined" hoặc rỗng)
   const isValidUri =
     uri &&
     typeof uri === "string" &&
@@ -34,23 +36,26 @@ function UserAvatar({ uri, size = 68 }) {
     uri !== "null" &&
     uri !== "undefined";
 
-  // Logic hiển thị Placeholder (Icon)
   if (!isValidUri || hasError) {
     return (
       <View
         style={[
           styles.avatarBase,
           styles.avatarPlaceholder,
-          { width: size, height: size, borderRadius: size / 2 },
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: colors.avatarPlaceholder, // Dynamic color
+            borderColor: colors.border,
+          },
         ]}
       >
-        {/* Icon người dùng nằm chính giữa */}
         <Ionicons name="person" size={size * 0.45} color="#818CF8" />
       </View>
     );
   }
 
-  // Logic hiển thị Ảnh
   return (
     <Image
       source={{ uri: normalizeUrl(uri) }}
@@ -60,21 +65,32 @@ function UserAvatar({ uri, size = 68 }) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: "#E0E7FF",
+          backgroundColor: colors.avatarBg,
+          borderColor: colors.border,
         },
       ]}
       contentFit="cover"
       cachePolicy="memory-disk"
       transition={200}
-      onError={() => setHasError(true)} // Nếu load ảnh lỗi -> chuyển sang Icon
+      onError={() => setHasError(true)}
     />
   );
 }
 
-// --- UI HELPERS ---
-function GradLightCard({ children, style, pad = 12 }) {
+// --- UI HELPERS (Đã thêm dark mode prop) ---
+function GradLightCard({ children, style, pad = 12, colors }) {
   return (
-    <View style={[styles.card, style]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+        style,
+      ]}
+    >
+      {/* Giữ gradient overlay nhẹ để tạo hiệu ứng kính/bóng */}
       <LinearGradient
         colors={["rgba(102,126,234,0.08)", "rgba(118,75,162,0.08)"]}
         start={{ x: 0, y: 0 }}
@@ -115,13 +131,21 @@ function SmallGradBtn({ title, onPress, style, disabled, icon }) {
   );
 }
 
-function SmallDangerBtn({ title, onPress, style, disabled }) {
+function SmallDangerBtn({ title, onPress, style, disabled, isDark }) {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
       disabled={disabled}
-      style={[styles.smallDangerBtn, style, disabled && { opacity: 0.6 }]}
+      style={[
+        styles.smallDangerBtn,
+        {
+          backgroundColor: isDark ? "rgba(255, 59, 48, 0.15)" : "#FFE9EC",
+          borderColor: isDark ? "rgba(255, 59, 48, 0.3)" : "#FFD5DA",
+        },
+        style,
+        disabled && { opacity: 0.6 },
+      ]}
     >
       <Text style={styles.smallDangerText}>{title}</Text>
     </TouchableOpacity>
@@ -131,6 +155,31 @@ function SmallDangerBtn({ title, onPress, style, disabled }) {
 // --- MAIN COMPONENT ---
 export default function ClubMembersManagerRN({ club, canManage }) {
   const clubId = club?._id;
+
+  // 1. SETUP THEME
+  const theme = useTheme();
+  const isDark = theme.dark;
+
+  const colors = useMemo(
+    () => ({
+      text: isDark ? "#FFFFFF" : "#2D3561",
+      subText: isDark ? "#A0A0A0" : "#6B7280",
+      card: isDark ? "#1E1E1E" : "#FFFFFF",
+      border: isDark ? "#333333" : "#E6E8F5",
+      inputBg: isDark ? "#2C2C2E" : "#F9FAFB",
+      placeholderText: isDark ? "#666" : "#9CA3AF",
+      avatarPlaceholder: isDark ? "#2C2C2E" : "#EEF2FF",
+      avatarBg: isDark ? "#333" : "#E0E7FF",
+      // Role Pills colors
+      roleOwnerBg: isDark ? "rgba(255, 193, 7, 0.2)" : "#FFF7E6",
+      roleOwnerText: isDark ? "#FFD54F" : "#B7791F",
+      roleAdminBg: isDark ? "rgba(99, 102, 241, 0.2)" : "#EEF2FF",
+      roleAdminText: isDark ? "#818CF8" : "#4F46E5",
+      roleMemberBg: isDark ? "#2C2C2E" : "#F1F5F9",
+      roleMemberText: isDark ? "#A0A0A0" : "#64748B",
+    }),
+    [isDark]
+  );
 
   const { data, isLoading, refetch, isFetching } = useListMembersQuery(
     { id: clubId },
@@ -143,7 +192,6 @@ export default function ClubMembersManagerRN({ club, canManage }) {
   const [addKey, setAddKey] = useState("");
   const members = useMemo(() => data?.items || [], [data]);
 
-  // Handle Add Member
   const handleAdd = async () => {
     const key = addKey.trim();
     if (!key) {
@@ -163,29 +211,49 @@ export default function ClubMembersManagerRN({ club, canManage }) {
     }
   };
 
-  const roleLabel = (role) =>
-    role === "owner" ? "Owner" : role === "admin" ? "Admin" : "Member";
-  const rolePillStyle = (role) => {
-    if (role === "owner") return [styles.pill, { backgroundColor: "#FFF7E6" }];
-    if (role === "admin") return [styles.pill, { backgroundColor: "#EEF2FF" }];
-    return [styles.pill, { backgroundColor: "#F1F5F9" }];
+  // 2. Navigation
+  const goToProfile = (userId) => {
+    if (!userId) return;
+    router.push(`/profile/${userId}`);
   };
 
-  // --- RENDER CONTENT (Fix layout shift) ---
+  const roleLabel = (role) =>
+    role === "owner" ? "Owner" : role === "admin" ? "Admin" : "Member";
+
+  // Dynamic Role Style
+  const rolePillStyle = (role) => {
+    if (role === "owner")
+      return [styles.pill, { backgroundColor: colors.roleOwnerBg }];
+    if (role === "admin")
+      return [styles.pill, { backgroundColor: colors.roleAdminBg }];
+    return [styles.pill, { backgroundColor: colors.roleMemberBg }];
+  };
+
+  const roleTextStyle = (role) => {
+    if (role === "owner") return { color: colors.roleOwnerText };
+    if (role === "admin") return { color: colors.roleAdminText };
+    return { color: colors.roleMemberText };
+  };
+
   const renderContent = () => {
-    // Nếu đang loading lần đầu (chưa có data)
     if (isLoading) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
-          <Text style={styles.loadingText}>Đang tải danh sách...</Text>
+          <Text style={[styles.loadingText, { color: colors.subText }]}>
+            Đang tải danh sách...
+          </Text>
         </View>
       );
     }
 
     if (!members.length) {
       return (
-        <EmptyState label="Chưa có thành viên" icon="account-group-outline" />
+        <EmptyState
+          label="Chưa có thành viên"
+          icon="account-group-outline"
+          // Bạn có thể cần truyền thêm prop color cho EmptyState nếu component đó hỗ trợ
+        />
       );
     }
 
@@ -202,66 +270,78 @@ export default function ClubMembersManagerRN({ club, canManage }) {
             m?.user?.nickname || m?.user?.fullName || m?.user?.email || "User";
           const role = m?.role;
           const avatarUri = m?.user?.avatar ? String(m?.user?.avatar) : null;
+          const userId = m?.user?._id || m?.user?.id;
           const toggleTitle = role === "admin" ? "Hạ role" : "Phong làm admin";
 
           return (
-            <GradLightCard style={{ width: 164 }}>
-              <View style={{ alignItems: "center" }}>
-                {/* Dùng component UserAvatar đã fix */}
-                <UserAvatar uri={avatarUri} size={68} />
+            // 3. Wrap trong TouchableOpacity để điều hướng
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => goToProfile(userId)}
+            >
+              <GradLightCard style={{ width: 164 }} colors={colors}>
+                <View style={{ alignItems: "center" }}>
+                  <UserAvatar uri={avatarUri} size={68} colors={colors} />
 
-                <Text style={styles.name} numberOfLines={1}>
-                  {name}
-                </Text>
+                  <Text
+                    style={[styles.name, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
 
-                <View style={rolePillStyle(role)}>
-                  <Text style={styles.pillText}>{roleLabel(role)}</Text>
-                </View>
-
-                {canManage && role !== "owner" && (
-                  <View style={styles.actionsRow}>
-                    <SmallGradBtn
-                      title={toggleTitle}
-                      disabled={settingRole}
-                      style={{ paddingHorizontal: 8 }}
-                      onPress={async () => {
-                        await setRole({
-                          id: clubId,
-                          userId: m?.user?._id,
-                          role: role === "admin" ? "member" : "admin",
-                        }).unwrap();
-                        Haptics.selectionAsync();
-                        refetch();
-                      }}
-                    />
-                    <SmallDangerBtn
-                      title="Kick"
-                      disabled={kicking}
-                      style={{ paddingHorizontal: 8 }}
-                      onPress={() => {
-                        Alert.alert("Xác nhận", `Mời ${name} ra khỏi CLB?`, [
-                          { text: "Hủy", style: "cancel" },
-                          {
-                            text: "Kick",
-                            style: "destructive",
-                            onPress: async () => {
-                              await kickMember({
-                                id: clubId,
-                                userId: m?.user?._id,
-                              }).unwrap();
-                              Haptics.notificationAsync(
-                                Haptics.NotificationFeedbackType.Success
-                              );
-                              refetch();
-                            },
-                          },
-                        ]);
-                      }}
-                    />
+                  <View style={rolePillStyle(role)}>
+                    <Text style={[styles.pillText, roleTextStyle(role)]}>
+                      {roleLabel(role)}
+                    </Text>
                   </View>
-                )}
-              </View>
-            </GradLightCard>
+
+                  {canManage && role !== "owner" && (
+                    <View style={styles.actionsRow}>
+                      <SmallGradBtn
+                        title={toggleTitle}
+                        disabled={settingRole}
+                        style={{ paddingHorizontal: 8 }}
+                        onPress={async () => {
+                          await setRole({
+                            id: clubId,
+                            userId: userId,
+                            role: role === "admin" ? "member" : "admin",
+                          }).unwrap();
+                          Haptics.selectionAsync();
+                          refetch();
+                        }}
+                      />
+                      <SmallDangerBtn
+                        title="Kick"
+                        disabled={kicking}
+                        isDark={isDark}
+                        style={{ paddingHorizontal: 8 }}
+                        onPress={() => {
+                          Alert.alert("Xác nhận", `Mời ${name} ra khỏi CLB?`, [
+                            { text: "Hủy", style: "cancel" },
+                            {
+                              text: "Kick",
+                              style: "destructive",
+                              onPress: async () => {
+                                await kickMember({
+                                  id: clubId,
+                                  userId: userId,
+                                }).unwrap();
+                                Haptics.notificationAsync(
+                                  Haptics.NotificationFeedbackType.Success
+                                );
+                                refetch();
+                              },
+                            },
+                          ]);
+                        }}
+                      />
+                    </View>
+                  )}
+                </View>
+              </GradLightCard>
+            </TouchableOpacity>
           );
         }}
       />
@@ -270,16 +350,24 @@ export default function ClubMembersManagerRN({ club, canManage }) {
 
   return (
     <Section title="Thành viên">
-      {/* FORM THÊM THÀNH VIÊN */}
       {canManage && (
         <View style={{ marginBottom: 16 }}>
-          <GradLightCard pad={16}>
-            <Text style={styles.addLabel}>Thêm thành viên mới</Text>
+          <GradLightCard pad={16} colors={colors}>
+            <Text style={[styles.addLabel, { color: colors.text }]}>
+              Thêm thành viên mới
+            </Text>
             <View style={styles.inputRow}>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder="Nhập nickname hoặc email..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.placeholderText}
                 value={addKey}
                 onChangeText={setAddKey}
                 autoCapitalize="none"
@@ -291,14 +379,13 @@ export default function ClubMembersManagerRN({ club, canManage }) {
                 style={{ height: 44, borderRadius: 8, paddingHorizontal: 16 }}
               />
             </View>
-            <Text style={styles.hintText}>
+            <Text style={[styles.hintText, { color: colors.subText }]}>
               * Nhập chính xác nickname hoặc email đã đăng ký.
             </Text>
           </GradLightCard>
         </View>
       )}
 
-      {/* NÚT REFRESH */}
       <View style={styles.toolbar}>
         <TouchableOpacity
           onPress={refetch}
@@ -326,7 +413,6 @@ export default function ClubMembersManagerRN({ club, canManage }) {
         </TouchableOpacity>
       </View>
 
-      {/* KHUNG CONTENT CỐ ĐỊNH CHIỀU CAO (Min-Height) */}
       <View style={styles.contentWrapper}>{renderContent()}</View>
     </Section>
   );
@@ -336,9 +422,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E6E8F5",
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 6 },
@@ -346,21 +430,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  // --- STYLE AVATAR & PLACEHOLDER ---
   avatarBase: {
     borderWidth: 1,
-    borderColor: "#E6E8F5",
-    overflow: "hidden", // Quan trọng để bo tròn hình bên trong
+    overflow: "hidden",
   },
   avatarPlaceholder: {
-    backgroundColor: "#EEF2FF", // Màu nền tím rất nhạt (thay vì xám trắng)
-    justifyContent: "center", // Căn giữa dọc
-    alignItems: "center", // Căn giữa ngang
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  // Layout Fix
   contentWrapper: {
-    minHeight: 200, // Giữ chỗ để không bị giật layout khi load
+    minHeight: 200,
   },
   loadingContainer: {
     height: 200,
@@ -368,35 +448,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  loadingText: { marginTop: 8, color: "#9CA3AF", fontSize: 13 },
+  loadingText: { marginTop: 8, fontSize: 13 },
 
-  // Form Styles
   addLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#2D3561",
     marginBottom: 8,
   },
   inputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
     flex: 1,
     height: 44,
-    backgroundColor: "#F9FAFB",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 14,
-    color: "#333",
   },
   hintText: {
     fontSize: 11,
-    color: "#9CA3AF",
     marginTop: 6,
     fontStyle: "italic",
   },
 
-  // Toolbar
   toolbar: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -406,8 +479,7 @@ const styles = StyleSheet.create({
   refreshBtn: { flexDirection: "row", alignItems: "center" },
   refreshText: { color: "#667eea", fontWeight: "600", fontSize: 13 },
 
-  // Card items
-  name: { color: "#2D3561", fontWeight: "700", marginTop: 8, maxWidth: 140 },
+  name: { fontWeight: "700", marginTop: 8, maxWidth: 140 },
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -423,7 +495,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Buttons
   smallBtn: {
     height: 34,
     paddingHorizontal: 12,
@@ -439,9 +510,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFE9EC",
     borderWidth: 1,
-    borderColor: "#FFD5DA",
   },
   smallDangerText: { color: "#B4232D", fontWeight: "800", fontSize: 12 },
 });

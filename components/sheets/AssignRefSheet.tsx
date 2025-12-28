@@ -82,6 +82,146 @@ function useTokens() {
   };
 }
 
+/* ============ themed atoms (MUST be OUTSIDE main component) ============ */
+const ThemedCard = React.memo(({ t, children, style }) => (
+  <View
+    style={[
+      styles.card,
+      { backgroundColor: t.colors.card, borderColor: t.colors.border },
+      style,
+    ]}
+  >
+    {children}
+  </View>
+));
+
+const ThemedChip = React.memo(
+  ({ t, text, icon, outlined = false, tone = "default", onPress, disabled }) => {
+    const map = {
+      default: {
+        bg: t.chipDefaultBg,
+        fg: t.chipDefaultFg,
+        bd: t.chipDefaultBd,
+      },
+      primary: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
+      warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" },
+      success: { bg: "#dcfce7", fg: "#166534", bd: "#bbf7d0" },
+      secondary: { bg: t.chipSecBg, fg: t.chipSecFg, bd: t.chipSecBd },
+      error: { bg: t.chipErrBg, fg: t.chipErrFg, bd: t.chipErrBd },
+      info: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
+    };
+    const c = map[tone] || map.default;
+
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled || !onPress}
+        style={({ pressed }) => [
+          styles.chip,
+          outlined
+            ? {
+                backgroundColor: "transparent",
+                borderColor: c.bd,
+                borderWidth: 1,
+              }
+            : { backgroundColor: c.bg, borderColor: "transparent" },
+          pressed && { opacity: 0.9 },
+        ]}
+      >
+        {icon ? (
+          <MaterialIcons
+            name={icon}
+            size={14}
+            color={c.fg}
+            style={{ marginRight: 6 }}
+          />
+        ) : null}
+        <Text style={{ color: c.fg, fontSize: 12, fontWeight: "700" }}>
+          {text}
+        </Text>
+      </Pressable>
+    );
+  }
+);
+
+const ThemedBtn = React.memo(
+  ({ t, children, onPress, variant = "solid", disabled, icon }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.btn,
+        variant === "solid"
+          ? { backgroundColor: t.colors.primary }
+          : {
+              borderWidth: 1,
+              borderColor: t.colors.primary,
+              backgroundColor: "transparent",
+            },
+        disabled && { opacity: 0.5 },
+        pressed && !disabled && { opacity: 0.9 },
+      ]}
+    >
+      {icon ? (
+        <MaterialIcons
+          name={icon}
+          size={16}
+          color={variant === "solid" ? "#fff" : t.colors.primary}
+          style={{ marginRight: 6 }}
+        />
+      ) : null}
+      <Text
+        style={{
+          color: variant === "solid" ? "#fff" : t.colors.primary,
+          fontWeight: "700",
+        }}
+      >
+        {children}
+      </Text>
+    </Pressable>
+  )
+);
+
+const ThemedIconBtn = React.memo(({ t, name, onPress, size = 18, color }) => (
+  <Pressable
+    onPress={onPress}
+    hitSlop={8}
+    style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
+  >
+    <MaterialIcons
+      name={name}
+      size={size}
+      color={color ?? t.colors.text}
+    />
+  </Pressable>
+));
+
+const ThemedCheckbox = React.memo(({ t, checked }) => (
+  <MaterialIcons
+    name={checked ? "check-box" : "check-box-outline-blank"}
+    size={22}
+    color={checked ? t.colors.primary : t.muted}
+  />
+));
+
+const ThemedAvatar = React.memo(({ t, name }) => {
+  const ch = (String(name || "").trim()[0] || "U").toUpperCase();
+  return (
+    <View
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: t.colors.primary,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ color: "#fff", fontWeight: "700" }}>{ch}</Text>
+    </View>
+  );
+});
+
 /* ============ main sheet ============ */
 export default function AssignRefSheet({
   open,
@@ -94,6 +234,8 @@ export default function AssignRefSheet({
 }) {
   const t = useTokens();
   const sheetRef = useRef(null);
+
+  const snapPoints = useMemo(() => ["92%"], []);
 
   // Hiển thị / ẩn sheet
   useEffect(() => {
@@ -123,7 +265,7 @@ export default function AssignRefSheet({
     isLoading,
     isFetching,
     error,
-    refetch, // 👈 cần cái này
+    refetch,
   } = useListTournamentRefereesQuery(
     { tid: tournamentId, q: debouncedQ, limit },
     { skip: !open || !tournamentId }
@@ -134,21 +276,17 @@ export default function AssignRefSheet({
     data: assignedForSingle = [],
     isLoading: assignedLoading,
     isFetching: assignedFetching,
-    refetch: refetchAssigned, // 👈 lấy refetch luôn
+    refetch: refetchAssigned,
   } = useAdminGetMatchRefereesQuery(
     { tid: tournamentId, matchId: singleMatchId || "" },
     { skip: !open || !tournamentId || !singleMatchId }
   );
 
-  // 👉 mỗi lần sheet mở thì refetch lại 2 cái trên
+  // mỗi lần sheet mở thì refetch lại
   useEffect(() => {
     if (!open) return;
-    // gọi lại danh sách trọng tài của giải
     refetch?.();
-    // nếu đang gán 1 trận thì gọi lại DS đã gán
-    if (singleMatchId) {
-      refetchAssigned?.();
-    }
+    if (singleMatchId) refetchAssigned?.();
   }, [open, refetch, refetchAssigned, singleMatchId]);
 
   // State chọn
@@ -221,7 +359,7 @@ export default function AssignRefSheet({
     try {
       await batchAssign({
         ids: effectiveMatchIds,
-        referees: selected, // backend nên $set toàn bộ danh sách
+        referees: selected,
       }).unwrap();
 
       const msg =
@@ -231,10 +369,6 @@ export default function AssignRefSheet({
       Alert.alert("Thành công", msg);
 
       onChanged?.();
-      // giữ sheet mở để thao tác tiếp
-      // 👉 sau khi lưu xong cũng có thể refetch lại nếu muốn:
-      // refetch?.();
-      // if (singleMatchId) refetchAssigned?.();
     } catch (e) {
       Alert.alert(
         "Lỗi",
@@ -243,151 +377,18 @@ export default function AssignRefSheet({
     }
   };
 
-  /* ---- themed atoms (dùng token) ---- */
-  const Card = ({ children, style }) => (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: t.colors.card, borderColor: t.colors.border },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
-
-  const Chip = ({
-    text,
-    icon,
-    outlined = false,
-    tone = "default",
-    onPress,
-    disabled,
-  }) => {
-    const map = {
-      default: {
-        bg: t.chipDefaultBg,
-        fg: t.chipDefaultFg,
-        bd: t.chipDefaultBd,
-      },
-      primary: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
-      warning: { bg: "#fff7ed", fg: "#9a3412", bd: "#fed7aa" },
-      success: { bg: "#dcfce7", fg: "#166534", bd: "#bbf7d0" },
-      secondary: { bg: t.chipSecBg, fg: t.chipSecFg, bd: t.chipSecBd },
-      error: { bg: t.chipErrBg, fg: t.chipErrFg, bd: t.chipErrBd },
-      info: { bg: t.chipInfoBg, fg: t.chipInfoFg, bd: t.chipInfoBd },
-    };
-    const c = map[tone] || map.default;
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={disabled || !onPress}
-        style={({ pressed }) => [
-          styles.chip,
-          outlined
-            ? {
-                backgroundColor: "transparent",
-                borderColor: c.bd,
-                borderWidth: 1,
-              }
-            : { backgroundColor: c.bg, borderColor: "transparent" },
-          pressed && { opacity: 0.9 },
-        ]}
-      >
-        {icon ? (
-          <MaterialIcons
-            name={icon}
-            size={14}
-            color={c.fg}
-            style={{ marginRight: 6 }}
-          />
-        ) : null}
-        <Text style={{ color: c.fg, fontSize: 12, fontWeight: "700" }}>
-          {text}
-        </Text>
-      </Pressable>
-    );
-  };
-
-  const Btn = ({ children, onPress, variant = "solid", disabled, icon }) => (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        variant === "solid"
-          ? { backgroundColor: t.colors.primary }
-          : {
-              borderWidth: 1,
-              borderColor: t.colors.primary,
-              backgroundColor: "transparent",
-            },
-        disabled && { opacity: 0.5 },
-        pressed && !disabled && { opacity: 0.9 },
-      ]}
-    >
-      {icon ? (
-        <MaterialIcons
-          name={icon}
-          size={16}
-          color={variant === "solid" ? "#fff" : t.colors.primary}
-          style={{ marginRight: 6 }}
-        />
-      ) : null}
-      <Text
-        style={{
-          color: variant === "solid" ? "#fff" : t.colors.primary,
-          fontWeight: "700",
-        }}
-      >
-        {children}
-      </Text>
-    </Pressable>
-  );
-
-  const IconBtn = ({ name, onPress, size = 18, color = t.colors.text }) => (
-    <Pressable
-      onPress={onPress}
-      hitSlop={8}
-      style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
-    >
-      <MaterialIcons name={name} size={size} color={color} />
-    </Pressable>
-  );
-
-  const Checkbox = ({ checked }) => (
-    <MaterialIcons
-      name={checked ? "check-box" : "check-box-outline-blank"}
-      size={22}
-      color={checked ? t.colors.primary : t.muted}
-    />
-  );
-
-  const Avatar = ({ name }) => {
-    const ch = (String(name || "").trim()[0] || "U").toUpperCase();
-    return (
-      <View
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          backgroundColor: t.colors.primary,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "700" }}>{ch}</Text>
-      </View>
-    );
-  };
-
   return (
     <BottomSheetModal
       ref={sheetRef}
-      snapPoints={["92%"]}
+      snapPoints={snapPoints}
       onDismiss={onClose}
       backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} />
+        <BottomSheetBackdrop
+          {...p}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          style={{ zIndex: 1000 }}
+        />
       )}
       handleIndicatorStyle={{ backgroundColor: t.colors.border }}
       backgroundStyle={{
@@ -395,8 +396,16 @@ export default function AssignRefSheet({
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
       }}
+      containerStyle={{ zIndex: 1000 }}
+      // optional nhưng giúp keyboard + sheet mượt hơn
+      keyboardBehavior="interactive"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
     >
-      <BottomSheetScrollView contentContainerStyle={styles.container}>
+      <BottomSheetScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
           <Row style={{ alignItems: "center", gap: 6 }}>
@@ -406,30 +415,40 @@ export default function AssignRefSheet({
             </Text>
           </Row>
           <Row style={{ alignItems: "center", gap: 6 }}>
-            <IconBtn
+            <ThemedIconBtn
+              t={t}
               name="refresh"
               onPress={() => {
                 refetch?.();
                 if (singleMatchId) refetchAssigned?.();
               }}
             />
-            <IconBtn name="close" onPress={() => sheetRef.current?.dismiss()} />
+            <ThemedIconBtn
+              t={t}
+              name="close"
+              onPress={() => sheetRef.current?.dismiss()}
+            />
           </Row>
         </Row>
 
         {/* Chips trạng thái */}
         <Row style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {singleMatchId ? (
-            <Chip text={`Đã gán: ${assignedCount}`} outlined tone="secondary" />
+            <ThemedChip
+              t={t}
+              text={`Đã gán: ${assignedCount}`}
+              outlined
+              tone="secondary"
+            />
           ) : null}
-          <Chip text={`Đang chọn: ${selected.length}`} outlined />
+          <ThemedChip t={t} text={`Đang chọn: ${selected.length}`} outlined />
           {(isLoading || isFetching || assignedLoading || assignedFetching) && (
-            <Chip text="Đang tải…" outlined icon="hourglass-empty" />
+            <ThemedChip t={t} text="Đang tải…" outlined icon="hourglass-empty" />
           )}
         </Row>
 
         {/* Thanh tìm kiếm + actions nhanh */}
-        <Card>
+        <ThemedCard t={t}>
           <Row style={{ alignItems: "center", gap: 8 }}>
             <MaterialIcons name="person-search" size={18} color={t.muted} />
             <TextInput
@@ -438,48 +457,50 @@ export default function AssignRefSheet({
               placeholderTextColor={t.muted}
               value={q}
               onChangeText={setQ}
+              // optional: giảm các case mất focus kỳ lạ trên Android
+              autoCorrect={false}
+              autoCapitalize="none"
             />
           </Row>
 
           <Row style={{ flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-            <Btn
+            <ThemedBtn
+              t={t}
               onPress={selectAllOnPage}
               variant="outline"
               icon="done-all"
               disabled={!referees?.length}
             >
               Chọn tất cả
-            </Btn>
-            <Btn onPress={clearAll} variant="outline" icon="clear-all">
+            </ThemedBtn>
+            <ThemedBtn t={t} onPress={clearAll} variant="outline" icon="clear-all">
               Bỏ chọn
-            </Btn>
+            </ThemedBtn>
             {singleMatchId ? (
-              <Btn
+              <ThemedBtn
+                t={t}
                 onPress={() =>
-                  setSelected(
-                    (assignedForSingle || []).map((u) => String(u._id))
-                  )
+                  setSelected((assignedForSingle || []).map((u) => String(u._id)))
                 }
                 variant="outline"
               >
                 Dùng DS đã gán
-              </Btn>
+              </ThemedBtn>
             ) : null}
           </Row>
-        </Card>
+        </ThemedCard>
 
         {/* Danh sách trọng tài */}
-        <Card>
-          <Row
-            style={{ justifyContent: "space-between", alignItems: "center" }}
-          >
+        <ThemedCard t={t}>
+          <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
             <Row style={{ alignItems: "center", gap: 8 }}>
               <Text style={[styles.subtitle, { color: t.colors.text }]}>
                 Trọng tài trong giải
               </Text>
-              <Chip text={`${referees?.length || 0} kết quả`} outlined />
+              <ThemedChip t={t} text={`${referees?.length || 0} kết quả`} outlined />
             </Row>
-            <Btn
+            <ThemedBtn
+              t={t}
               onPress={() => {
                 refetch?.();
                 if (singleMatchId) refetchAssigned?.();
@@ -487,7 +508,7 @@ export default function AssignRefSheet({
               variant="outline"
             >
               Refresh
-            </Btn>
+            </ThemedBtn>
           </Row>
 
           {isLoading ? (
@@ -515,28 +536,27 @@ export default function AssignRefSheet({
                     ]}
                   >
                     <Row style={{ alignItems: "center", gap: 10 }}>
-                      <Avatar name={personNickname(u)} />
+                      <ThemedAvatar t={t} name={personNickname(u)} />
                       <View style={{ flex: 1 }}>
-                        <Text
-                          style={{ fontWeight: "600", color: t.colors.text }}
-                        >
+                        <Text style={{ fontWeight: "600", color: t.colors.text }}>
                           {personNickname(u)}
                         </Text>
                         <Text style={{ color: t.muted, fontSize: 12 }}>
                           {u?.email || u?.phone || ""}
                         </Text>
                       </View>
-                      <Checkbox checked={checked} />
+                      <ThemedCheckbox t={t} checked={checked} />
                     </Row>
                   </Pressable>
                 );
               })}
             </View>
           )}
-        </Card>
+        </ThemedCard>
 
         {/* Cảnh báo */}
-        <Card
+        <ThemedCard
+          t={t}
           style={{
             backgroundColor: t.chipInfoBg,
             borderColor: t.chipInfoBd,
@@ -553,20 +573,21 @@ export default function AssignRefSheet({
             </Text>{" "}
             trận được chọn.
           </Text>
-        </Card>
+        </ThemedCard>
 
         {/* Footer actions */}
         <Row style={{ justifyContent: "flex-end", gap: 8 }}>
-          <Btn variant="outline" onPress={() => sheetRef.current?.dismiss()}>
+          <ThemedBtn t={t} variant="outline" onPress={() => sheetRef.current?.dismiss()}>
             Đóng
-          </Btn>
-          <Btn
+          </ThemedBtn>
+          <ThemedBtn
+            t={t}
             onPress={handleSubmit}
             icon="send"
             disabled={!canSubmit || assigning}
           >
             {assigning ? "Đang lưu…" : "Lưu"}
-          </Btn>
+          </ThemedBtn>
         </Row>
       </BottomSheetScrollView>
     </BottomSheetModal>

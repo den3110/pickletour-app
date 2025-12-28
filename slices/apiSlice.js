@@ -355,8 +355,11 @@ export const apiSlice = createApi({
     "Leaderboard",
     "SystemSettings",
     "UserMatch",
-    "SupportTicket", 
-    "Radar"
+    "SupportTicket",
+    "Radar",
+    "Head2Head",
+    "PlayerStats",
+    "FrequentOpponents",
   ],
   endpoints: () => ({}),
 });

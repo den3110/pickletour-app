@@ -134,6 +134,11 @@ function cleanPhone(v) {
   return s;
 }
 
+function cleanCccd(v) {
+  if (typeof v !== "string") return "";
+  return v.trim().replace(/[^\d]/g, "");
+}
+
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -189,12 +194,15 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
   const dob = form.dob || "";
   const password = form.password || "";
   const confirmPassword = form.confirmPassword || "";
+  const cccdRaw = (form.cccd || "").trim();
+  const cccdDigits = cleanCccd(form.cccd || "");
 
   const fields = {
     name: "",
     nickname: "",
     email: "",
     phone: "",
+    cccd: "",
     gender: "",
     dob: "",
     province: "",
@@ -220,6 +228,15 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
   } else {
     if (phoneRaw && !/^0\d{9}$/.test(phoneRaw)) {
       fields.phone = "SĐT phải bắt đầu bằng 0 và đủ 10 số.";
+    }
+  }
+
+  if (requireOptional) {
+    if (!cccdRaw) fields.cccd = "Vui lòng nhập số CCCD.";
+    else if (!/^\d+$/.test(cccdRaw)) fields.cccd = "CCCD chỉ được chứa chữ số.";
+  } else {
+    if (cccdRaw && !/^\d+$/.test(cccdRaw)) {
+      fields.cccd = "CCCD chỉ được chứa chữ số.";
     }
   }
 
@@ -311,6 +328,7 @@ export default function RegisterScreen() {
     nickname: "",
     email: "",
     phone: "",
+    cccd: "",
     gender: "",
     dob: "",
     province: "",
@@ -622,6 +640,19 @@ export default function RegisterScreen() {
               required={requireOptional}
               error={showErrors && !!validation.fields.phone}
               helperText={showErrors ? validation.fields.phone : ""}
+            />
+            <Field
+              label="Số CCCD"
+              value={form.cccd}
+              onChangeText={(v) => handleChange("cccd", v)}
+              border={border}
+              textPrimary={textPrimary}
+              textSecondary={textSecondary}
+              keyboardType="number-pad"
+              maxLength={12}
+              required={requireOptional}
+              error={showErrors && !!validation.fields.cccd}
+              helperText={showErrors ? validation.fields.cccd : ""}
             />
 
             {/* Gender - Thay đổi thành SelectTrigger */}

@@ -1886,17 +1886,17 @@ export default function TournamentRegistrationScreen() {
         options={{
           headerShown: searchOpen ? false : true,
           title: "Đăng ký giải đấu",
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-              }}
-            >
-              <Ionicons name="chevron-back" size={24} />
-            </TouchableOpacity>
-          ),
+          // headerLeft: () => (
+          //   <TouchableOpacity
+          //     onPress={() => router.back()}
+          //     style={{
+          //       paddingHorizontal: 8,
+          //       paddingVertical: 4,
+          //     }}
+          //   >
+          //     <Ionicons name="chevron-back" size={24} />
+          //   </TouchableOpacity>
+          // ),
         }}
       />
       <View style={{ flex: 1, backgroundColor: C.pageBg }}>

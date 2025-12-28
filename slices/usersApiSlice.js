@@ -179,6 +179,7 @@ export const {
   useGetProfileQuery,
   useLazyGetProfileQuery,
   useLazySearchUserQuery,
+  useSearchUserQuery,
   useDeleteMeMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,

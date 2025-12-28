@@ -1,5 +1,5 @@
 // components/ui/TextInput.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TextInput as RNTextInput,
   View,
@@ -8,6 +8,8 @@ import {
   TextInputProps as RNTextInputProps,
   ViewStyle,
 } from 'react-native';
+// 1. Import Theme Hook
+import { useTheme } from '@react-navigation/native';
 
 interface TextInputProps extends RNTextInputProps {
   label?: string;
@@ -26,18 +28,47 @@ export default function TextInput({
   style,
   ...props
 }: TextInputProps) {
+  // 2. Lấy theme hiện tại
+  const { dark } = useTheme();
+
+  // 3. Định nghĩa màu sắc dynamic
+  const colors = useMemo(() => ({
+    label: dark ? '#A0A0A0' : '#666', // Label sáng hơn chút ở dark mode
+    inputBg: dark ? '#2C2C2E' : '#f5f5f5', // Nền input tối
+    text: dark ? '#FFFFFF' : '#333', // Chữ trắng
+    placeholder: dark ? '#666' : '#999', // Placeholder tối hơn
+    border: dark ? '#333' : 'transparent', // Viền nhẹ ở dark mode để tách biệt
+  }), [dark]);
+
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[styles.inputContainer, error && styles.inputError]}>
+      {label && (
+        <Text style={[styles.label, { color: colors.label }]}>
+          {label}
+        </Text>
+      )}
+      
+      <View
+        style={[
+          styles.inputContainer,
+          { 
+            backgroundColor: colors.inputBg,
+            borderColor: colors.border,
+          },
+          error && styles.inputError,
+        ]}
+      >
         {leftIcon && <View style={styles.icon}>{leftIcon}</View>}
+        
         <RNTextInput
-          style={[styles.input, style]}
-          placeholderTextColor="#999"
+          style={[styles.input, { color: colors.text }, style]}
+          placeholderTextColor={colors.placeholder}
           {...props}
         />
+        
         {rightIcon && <View style={styles.icon}>{rightIcon}</View>}
       </View>
+      
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
@@ -50,26 +81,25 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'transparent',
+    // BackgroundColor & BorderColor handled inline via theme
   },
   inputError: {
     borderColor: '#f44336',
+    borderWidth: 1, // Đảm bảo hiện viền đỏ cả khi ở light mode
   },
   input: {
     flex: 1,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#333',
+    // Color handled inline via theme
   },
   icon: {
     marginHorizontal: 4,

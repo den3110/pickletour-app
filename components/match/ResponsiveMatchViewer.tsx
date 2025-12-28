@@ -21,6 +21,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetScrollView,
   useBottomSheetModal,
+  BottomSheetModalProvider,
 } from "@gorhom/bottom-sheet";
 import {
   SafeAreaView,
@@ -452,7 +453,10 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
 
   // Né Dynamic Island khi landscape
   const sideInset = isLandscape ? Math.max(insets.left, insets.right) : 0;
-  const topInset = Math.max(insets.top, Platform.OS === "android" ? 12 : 0);
+  const topInset = isLandscape
+    ? Math.max(insets.top, Platform.OS === "android" ? 12 : 0)
+    : 0;
+  const bottomInset = Math.max(insets.bottom, 8);
 
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => ["80%", "100%"], []);
@@ -562,87 +566,92 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
         disappearsOnIndex={-1}
         pressBehavior="close"
         opacity={1}
-        style={{ backgroundColor: T.backdrop }}
+        style={{ backgroundColor: T.backdrop, zIndex: 1000 }}
       />
     ),
     [T.backdrop]
   );
 
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      onPresent={() => {
-        isDismissedRef.current = false;
-        // khi present xong, chắc chắn không còn animate
-        setTimeout(() => {
-          isAnimatingRef.current = false;
-        }, 50);
-      }}
-      onChange={(index) => {
-        if (index >= 0) {
+      <BottomSheetModal
+      
+        ref={sheetRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        onPresent={() => {
           isDismissedRef.current = false;
-        }
-      }}
-      onDismiss={() => {
-        isDismissedRef.current = true;
-        isAnimatingRef.current = false;
-        onClose?.();
-      }}
-      backdropComponent={renderBackdrop}
-      topInset={topInset}
-      containerStyle={{
-        marginLeft: sideInset,
-        marginRight: sideInset,
-      }}
-      handleIndicatorStyle={{ backgroundColor: T.handle }}
-      backgroundStyle={{ backgroundColor: T.sheetBg }}
-      enableDynamicSizing={false}
-    >
-      {/* Header */}
-      <View style={[styles.header, { borderColor: T.softBorder }]}>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[styles.headerTitle, { color: T.textPrimary }]}
-            numberOfLines={1}
-          >
-            {code ? `Trận đấu • ${code}` : "Trận đấu"}
-          </Text>
-          <StatusPill status={status} />
-        </View>
-        <TouchableOpacity
-          onPress={safeDismiss}
-          style={styles.closeBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialIcons name="close" size={22} color={T.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Body — không đặt flex:1 cho BottomSheetScrollView */}
-      <BottomSheetScrollView
-        contentContainerStyle={{
-          paddingBottom: Math.max(insets.bottom, 16),
-          paddingHorizontal: 12,
-          gap: 12,
-          backgroundColor: T.sheetBg,
+          // khi present xong, chắc chắn không còn animate
+          setTimeout(() => {
+            isAnimatingRef.current = false;
+          }, 50);
         }}
+        onChange={(index) => {
+          if (index >= 0) {
+            isDismissedRef.current = false;
+          }
+        }}
+        onDismiss={() => {
+          isDismissedRef.current = true;
+          isAnimatingRef.current = false;
+          onClose?.();
+        }}
+        backdropComponent={renderBackdrop}
+        topInset={topInset}
+        containerStyle={{
+          marginLeft: sideInset,
+          marginRight: sideInset,
+          zIndex: 1000  
+        }}
+        handleIndicatorStyle={{ backgroundColor: T.handle }}
+        backgroundStyle={{ backgroundColor: T.sheetBg }}
+        enableDynamicSizing={false}
       >
-        <MatchContent
-          m={mm}
-          isLoading={loading}
-          liveLoading={false}
-          onSaved={handleSaved}
-          // (optional) nếu MatchContent hỗ trợ theme props:
-          // textPrimary={T.textPrimary}
-          // textSecondary={T.textSecondary}
-          // tint={T.tint}
-          // softBg={T.softBg}
-          // softBorder={T.softBorder}
-        />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+        {/* Header */}
+        <View style={[styles.header, { borderColor: T.softBorder }]}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[styles.headerTitle, { color: T.textPrimary }]}
+              numberOfLines={1}
+            >
+              {code ? `Trận đấu • ${code}` : "Trận đấu"}
+            </Text>
+            <StatusPill status={status} />
+          </View>
+          <TouchableOpacity
+            onPress={safeDismiss}
+            style={styles.closeBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MaterialIcons name="close" size={22} color={T.textPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Body — không đặt flex:1 cho BottomSheetScrollView */}
+        <BottomSheetScrollView
+          contentContainerStyle={{
+            paddingBottom: Math.max(insets.bottom, 16),
+            paddingHorizontal: 12,
+            gap: 12,
+            backgroundColor: T.sheetBg,
+          }}
+        >
+          <MatchContent
+            m={mm}
+            isLoading={loading}
+            liveLoading={false}
+            onSaved={handleSaved}
+            // (optional) nếu MatchContent hỗ trợ theme props:
+            // textPrimary={T.textPrimary}
+            // textSecondary={T.textSecondary}
+            // tint={T.tint}
+            // softBg={T.softBg}
+            // softBorder={T.softBorder}
+          />
+        </BottomSheetScrollView>
+      </BottomSheetModal>
   );
 }
 

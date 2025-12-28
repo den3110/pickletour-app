@@ -1173,8 +1173,18 @@ export default function RefereeJudgePanel({ matchId }) {
     match?.status === "scheduled";
   const theCurIdx = Math.max(0, gs.length - 1);
   const curIdx = theCurIdx;
-  const curA = Number(gs[curIdx]?.a ?? 0);
-  const curB = Number(gs[curIdx]?.b ?? 0);
+  const serverA = Number(gs[curIdx]?.a ?? 0);
+  const serverB = Number(gs[curIdx]?.b ?? 0);
+
+  const g = scoreGuardRef.current;
+  const guardOn = g && Date.now() < g.until;
+
+  // nếu đang guard, không cho điểm hiển thị "tụt" xuống
+  const curA =
+    guardOn && typeof g.a === "number" ? Math.max(serverA, g.a) : serverA;
+
+  const curB =
+    guardOn && typeof g.b === "number" ? Math.max(serverB, g.b) : serverB;
 
   const playersA = useMemo(
     () => playersOf(match?.pairA, eventType),
@@ -1260,7 +1270,8 @@ export default function RefereeJudgePanel({ matchId }) {
     gameIndex: -1,
     side: "",
     serverNum: 0,
-  });
+  }); // ✅ Chặn score render bị "lùi" gây nhảy slot trong 1-1.5s
+  const scoreGuardRef = useRef({ a: null, b: null, until: 0 });
 
   // ✅ Snapshot để chống "serverId nhảy" sau khi đội đang giao ghi điểm
   const prevServeSnapRef = useRef({
@@ -1314,15 +1325,20 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ serverUidShow:
   // - nếu đúng case "đang giao ghi điểm" => GIỮ UID CŨ để icon không nhảy xuống ô dưới
   // - bình thường => ưu tiên rawServerUid, rồi pin start2, rồi last ref
-  const serverUidShow = serveSideScored
+  // ✅ base logic như cũ
+  const baseServerUidShow = serveSideScored
     ? stablePrevUid ||
       rawServerUid ||
       (activeServerNum === 2 ? pinnedStart2 : "") ||
+      lastServerUidRef.current ||
       ""
     : rawServerUid ||
       (activeServerNum === 2 ? pinnedStart2 : "") ||
       lastServerUidRef.current ||
       "";
+
+  // ✅ forcedUid phải ưu tiên cao nhất để khỏi nhảy 2 lần
+  const serverUidShow = forcedUid || baseServerUidShow;
   // ✅ INIT serve đầu game:
   // - double: 0-0-2 (server #2, người ở ô phải / slot 1)
   // - single: 0-0-1 (server #1)
@@ -2054,6 +2070,12 @@ export default function RefereeJudgePanel({ matchId }) {
       prevA: curA,
       prevB: curB,
       t: Date.now(),
+    };
+    // ✅ chặn score "lùi" trong 1.5s để slot không flip -> bóng không nhảy 2 lần
+    scoreGuardRef.current = {
+      a: side === "A" ? curA + 1 : curA,
+      b: side === "B" ? curB + 1 : curB,
+      until: Date.now() + 1500,
     };
     beginOpTimeout("inc");
 

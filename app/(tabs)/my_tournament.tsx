@@ -6,7 +6,10 @@
 // - Điểm số ưu tiên scoreText, fallback gameScores/sets
 // - NEW: Skeleton loading cho danh sách giải + trận
 
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import React, {
   useMemo,
   useState,
@@ -37,6 +40,7 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useSocket } from "@/context/SocketContext";
 import { useTheme } from "@react-navigation/native";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 /* ================= Theme ================= */
 function useThemeTokens() {
@@ -1170,80 +1174,84 @@ export default function MyTournament() {
   );
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: tokens.colors.background }}
-    >
-      <Stack.Screen
-        options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
-      />
-
-      {!isAuthed ? (
-        <LoginPrompt tokens={tokens} />
-      ) : isLoading ? (
-        // 🔥 Skeleton loading
-        <FlatList
-          data={[1, 2, 3]}
-          keyExtractor={(i) => String(i)}
-          renderItem={() => <SkeletonTournamentCard tokens={tokens} />}
-          contentContainerStyle={[
-            styles.screen,
-            {
-              backgroundColor: tokens.colors.background,
-              paddingBottom: (insets?.bottom ?? 0) + 28,
-            },
-          ]}
-          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
-          ListHeaderComponent={<SkeletonHeader tokens={tokens} />}
-          ListFooterComponent={
-            <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
-          }
+    <BottomSheetModalProvider>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: tokens.colors.background }}
+      >
+        <Stack.Screen
+          options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
         />
-      ) : (
-        <FlatList
-          data={tournaments}
-          keyExtractor={(t) => String(t._id)}
-          contentContainerStyle={[
-            styles.screen,
-            {
-              backgroundColor: tokens.colors.background,
-              paddingBottom: (insets?.bottom ?? 0) + 28,
-            },
-          ]}
-          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
-          renderItem={({ item }) => (
-            <TournamentCard
-              t={item}
-              onOpenMatch={handleOpenMatch}
-              tokens={tokens}
-            />
-          )}
-          ListHeaderComponent={StickyHeader}
-          stickyHeaderIndices={[0]}
-          contentInset={{ bottom: insets?.bottom ?? 0 }}
-          scrollIndicatorInsets={{ bottom: insets?.bottom ?? 0 }}
-          removeClippedSubviews={Platform.OS === "android" ? false : undefined}
-          ListEmptyComponent={EmptyState}
-          refreshControl={
-            <RefreshControl
-              refreshing={isFetching}
-              onRefresh={refetch}
-              tintColor={tokens.tint}
-              colors={[tokens.tint]}
-              progressBackgroundColor={tokens.colors.card}
-            />
-          }
-          ListFooterComponent={
-            <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
-          }
-        />
-      )}
 
-      <ResponsiveMatchViewer
-        open={open}
-        matchId={matchId}
-        onClose={() => setOpen(false)}
-      />
-    </SafeAreaView>
+        {!isAuthed ? (
+          <LoginPrompt tokens={tokens} />
+        ) : isLoading ? (
+          // 🔥 Skeleton loading
+          <FlatList
+            data={[1, 2, 3]}
+            keyExtractor={(i) => String(i)}
+            renderItem={() => <SkeletonTournamentCard tokens={tokens} />}
+            contentContainerStyle={[
+              styles.screen,
+              {
+                backgroundColor: tokens.colors.background,
+                paddingBottom: (insets?.bottom ?? 0) + 28,
+              },
+            ]}
+            ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+            ListHeaderComponent={<SkeletonHeader tokens={tokens} />}
+            ListFooterComponent={
+              <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
+            }
+          />
+        ) : (
+          <FlatList
+            data={tournaments}
+            keyExtractor={(t) => String(t._id)}
+            contentContainerStyle={[
+              styles.screen,
+              {
+                backgroundColor: tokens.colors.background,
+                paddingBottom: (insets?.bottom ?? 0) + 28,
+              },
+            ]}
+            ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+            renderItem={({ item }) => (
+              <TournamentCard
+                t={item}
+                onOpenMatch={handleOpenMatch}
+                tokens={tokens}
+              />
+            )}
+            ListHeaderComponent={StickyHeader}
+            stickyHeaderIndices={[0]}
+            contentInset={{ bottom: insets?.bottom ?? 0 }}
+            scrollIndicatorInsets={{ bottom: insets?.bottom ?? 0 }}
+            removeClippedSubviews={
+              Platform.OS === "android" ? false : undefined
+            }
+            ListEmptyComponent={EmptyState}
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching}
+                onRefresh={refetch}
+                tintColor={tokens.tint}
+                colors={[tokens.tint]}
+                progressBackgroundColor={tokens.colors.card}
+              />
+            }
+            ListFooterComponent={
+              <View style={{ height: (insets?.bottom ?? 0) + 12 }} />
+            }
+          />
+        )}
+
+        <ResponsiveMatchViewer
+          open={open}
+          matchId={matchId}
+          onClose={() => setOpen(false)}
+        />
+      </SafeAreaView>
+    </BottomSheetModalProvider>
   );
 }
 

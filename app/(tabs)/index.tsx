@@ -15,7 +15,7 @@ import {
   DeviceEventEmitter,
   Easing,
 } from "react-native";
-import { Stack, router } from "expo-router";
+import { Stack, router, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector, useDispatch } from "react-redux";
 import Hero from "@/components/Hero";
@@ -152,6 +152,14 @@ const FEATURES = [
     title: "Quanh đây", // hoặc "PickleRadar" nếu bạn thích brand hơn
     color: "#6C5CE7",
     link: "/radar", // màn hình radar mình vừa code
+  },
+  {
+    id: 12,
+    icon: "git-compare",
+    iconLib: "Ionicons",
+    title: "Đối đầu",
+    color: "#81ECEC",
+    link: "/head2head",
   },
 ];
 
@@ -415,7 +423,23 @@ function AnimatedLogo() {
 /* ---------- Athlete Island Card ---------- */
 function AthleteIsland() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
+  const router = useRouter();
   const goProfile = React.useCallback(() => router.push("/profile/stack"), []);
+
+  // 1. Lấy theme hiện tại
+  const { dark } = useTheme();
+
+  // 2. Định nghĩa màu sắc dynamic
+  const themeColors = useMemo(
+    () => ({
+      cardBg: dark ? "#1E1E1E" : "#FFFFFF",
+      textPrimary: dark ? "#FFFFFF" : "#1F2937",
+      textSecondary: dark ? "#9CA3AF" : "#6B7280",
+      border: dark ? "#333333" : "transparent", // Viền nhẹ cho Dark mode để tách nền
+      shadowOpacity: dark ? 0.3 : 0.1, // Shadow đậm hơn chút ở dark mode hoặc ẩn đi tuỳ ý
+    }),
+    [dark]
+  );
 
   // Logic Rank & Role
   const rankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null;
@@ -457,11 +481,23 @@ function AthleteIsland() {
       <AnimatedLogo />
 
       {/* Premium Island Card with Drop Shadow */}
-      <View style={styles.athleteIslandWrapper}>
+      <View
+        style={[
+          styles.athleteIslandWrapper,
+          { shadowOpacity: themeColors.shadowOpacity }, // Dynamic shadow
+        ]}
+      >
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={userInfo ? goProfile : () => router.push("/login")}
-          style={styles.athleteIslandContent}
+          style={[
+            styles.athleteIslandContent,
+            {
+              backgroundColor: themeColors.cardBg,
+              borderColor: themeColors.border,
+              borderWidth: dark ? 1 : 0,
+            },
+          ]}
         >
           {/* Left: Avatar */}
           <View style={styles.avatarContainer}>
@@ -488,10 +524,18 @@ function AthleteIsland() {
 
           {/* Center: Info */}
           <View style={styles.nameContainer}>
-            <Text style={styles.athleteName} numberOfLines={1}>
+            <Text
+              style={[styles.athleteName, { color: themeColors.textPrimary }]}
+              numberOfLines={1}
+            >
               {userInfo ? name : "Bắt đầu hành trình"}
             </Text>
-            <Text style={styles.athleteTitle}>
+            <Text
+              style={[
+                styles.athleteTitle,
+                { color: themeColors.textSecondary },
+              ]}
+            >
               {userInfo ? roleUser() : "Cùng PickleTour"}
             </Text>
           </View>
@@ -868,6 +912,7 @@ function TournamentsSection() {
 
 /* ---------- News Card ---------- */
 function NewsCard({ news, theme }) {
+  const [imageError, setImageError] = useState(false);
   const isDark = !!theme?.dark;
   const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
@@ -882,16 +927,25 @@ function NewsCard({ news, theme }) {
         activeOpacity={0.95}
         onPress={() => router.push(`/news/${news.slug}`)}
       >
-        <Image
-          source={{
-            uri:
-              normalizeUrl(news.thumbImageUrl) ||
-              "https://dummyimage.com/400x300/A29BFE/ffffff&text=News",
-          }}
-          style={styles.newsImage}
-          contentFit="cover"
-          transition={500}
-        />
+        <View style={styles.newsImageContainer}>
+          {!imageError && news.thumbImageUrl ? (
+            <Image
+              source={{ uri: normalizeUrl(news.thumbImageUrl) }}
+              style={styles.newsImage}
+              contentFit="cover"
+              transition={500}
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View style={styles.fallbackImageContainer}>
+              <Image
+                source={require("@/assets/images/icon.png")}
+                style={styles.fallbackLogo}
+                contentFit="contain"
+              />
+            </View>
+          )}
+        </View>
         <View style={styles.newsInfo}>
           <Text style={[styles.newsTitle, { color: text }]} numberOfLines={3}>
             {news.title}
@@ -1648,4 +1702,22 @@ const styles = StyleSheet.create({
   },
   socialLabel: { fontSize: 14, fontWeight: "600", marginBottom: 12 },
   socialButtons: { flexDirection: "row", gap: 16, flexWrap: "wrap" },
+  newsImageContainer: {
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#f5f5f5", // Background nhẹ khi loading
+  },
+
+  fallbackImageContainer: {
+    width: "100%",
+    height: 150,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa", // Hoặc màu nền nhẹ khác
+  },
+  fallbackLogo: {
+    width: 120,
+    height: 120,
+    borderRadius: 20,
+  },
 });

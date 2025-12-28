@@ -35,6 +35,7 @@ import {
   useListTournamentBracketsQuery,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 /* ----------------------------------------------------- */
 /* ------------------- CÁC HÀM HELPER VÀ LOGIC GIỮ NGUYÊN ------------------- */
@@ -170,8 +171,8 @@ function useThemeTokens() {
       // Status Colors
       live: "#e65100", // Cam cháy (Live) - Mạnh mẽ hơn
       liveSoft: isDark ? "rgba(230,81,0,0.15)" : "#fff8e6",
-      upcoming: "#0b6623", // Xanh lá cây đậm (Upcoming)
-      finished: "#4a4e53", // Xám đậm (Finished)
+      upcoming: "#4a4e53", // Xám đậm (Finished)
+      finished: "#0b6623", // Xanh lá cây đậm (Upcoming)
       // Chip variants
       chipLiveBg: "#e65100", // Live chip nền đầy đủ màu
       chipLiveFg: "#ffffff",
@@ -1477,7 +1478,7 @@ export default function TournamentScheduleNative() {
   ]);
 
   return (
-    <>
+    <BottomSheetModalProvider>
       <Stack.Screen
         options={{
           title: `Lịch thi đấu${
@@ -1565,7 +1566,7 @@ export default function TournamentScheduleNative() {
           onClose={closeViewer}
         />
       </View>
-    </>
+    </BottomSheetModalProvider>
   );
 }
 

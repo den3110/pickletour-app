@@ -272,7 +272,7 @@ export default function LoginScreen() {
                   >
                     <Text
                       style={{
-                        color: "#111",
+                        color: textPrimary,
                         fontWeight: "700",
                       }}
                     >

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// screens/ClubsListScreen.tsx (UPDATED WITH SKELETON)
+// screens/ClubsListScreen.tsx (UPDATED WITH DARK MODE)
 // ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import {
@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
-  // ActivityIndicator, // ❌ Bỏ cái này đi vì ko dùng nữa
 } from "react-native";
 import { Text } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -24,25 +23,30 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
-} from "react-native-reanimated"; // 🆕 Thêm withRepeat, withTiming, withSequence
+} from "react-native-reanimated";
 import { Stack, useRouter } from "expo-router";
 import { useListClubsQuery } from "@/slices/clubsApiSlice";
 import ClubCard from "@/components/clubs/ClubCard";
 import EmptyState from "@/components/clubs/EmptyState";
 import TextInput from "@/components/ui/TextInput";
 import { Chip } from "@/components/ui/Chip";
-import Button from "@/components/ui/Button";
-import type { Club } from "@/types/club.types";
 import { Ionicons } from "@expo/vector-icons";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
+// 🆕 Import Theme Hook
+import { useTheme } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
 const SPORT_OPTIONS: string[] = [];
 
-// 🆕 COMPONENT SKELETON MỚI
+// 🆕 COMPONENT SKELETON (Đã update Theme)
 const ClubSkeleton = () => {
+  const { dark, colors } = useTheme(); // Lấy theme
   const opacity = useSharedValue(0.5);
+
+  // Màu sắc dựa trên theme
+  const cardBg = dark ? "#1E1E1E" : "#fff";
+  const shapeBg = dark ? "#333" : "#e1e4e8";
 
   useEffect(() => {
     opacity.value = withRepeat(
@@ -60,17 +64,26 @@ const ClubSkeleton = () => {
   }));
 
   return (
-    <Animated.View style={[styles.skeletonCard, animatedStyle]}>
-      {/* Ảnh cover giả */}
-      <View style={styles.skeletonCover} />
-      {/* Nội dung bên dưới */}
+    <Animated.View
+      style={[
+        styles.skeletonCard,
+        animatedStyle,
+        { backgroundColor: cardBg }, // Dynamic background
+      ]}
+    >
+      <View style={[styles.skeletonCover, { backgroundColor: shapeBg }]} />
       <View style={{ padding: 12 }}>
-        <View style={styles.skeletonTitle} />
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: "60%" }]} />
+        <View style={[styles.skeletonTitle, { backgroundColor: shapeBg }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: shapeBg }]} />
+        <View
+          style={[
+            styles.skeletonLine,
+            { width: "60%", backgroundColor: shapeBg },
+          ]}
+        />
         <View style={styles.skeletonTagsRow}>
-          <View style={styles.skeletonChip} />
-          <View style={styles.skeletonChip} />
+          <View style={[styles.skeletonChip, { backgroundColor: shapeBg }]} />
+          <View style={[styles.skeletonChip, { backgroundColor: shapeBg }]} />
         </View>
       </View>
     </Animated.View>
@@ -79,6 +92,9 @@ const ClubSkeleton = () => {
 
 export default function ClubsListScreen() {
   const router = useRouter();
+  // 🆕 Lấy theme hiện tại
+  const { colors, dark } = useTheme();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedSport, setSelectedSport] = useState("");
@@ -152,7 +168,13 @@ export default function ClubsListScreen() {
             leftIcon={
               <MaterialCommunityIcons name="magnify" size={20} color="#999" />
             }
-            containerStyle={{ marginBottom: 0 }}
+            containerStyle={{
+              marginBottom: 0,
+              // Giữ nền trắng mờ để nổi bật trên gradient, hoặc dùng màu theme
+              borderWidth: 0,
+            }}
+            style={{ color: dark ? "#fff" : "#333" }}
+            placeholderTextColor={dark ? "#ccc" : "#999"}
           />
         </View>
 
@@ -162,7 +184,10 @@ export default function ClubsListScreen() {
             onPress={() => setTab("all")}
           >
             <Text
-              style={[styles.tabText, tab === "all" && styles.tabTextActive]}
+              style={[
+                styles.tabText,
+                tab === "all" && { color: "#667eea" }, // Active text color
+              ]}
             >
               Tất cả
             </Text>
@@ -172,7 +197,10 @@ export default function ClubsListScreen() {
             onPress={() => setTab("mine")}
           >
             <Text
-              style={[styles.tabText, tab === "mine" && styles.tabTextActive]}
+              style={[
+                styles.tabText,
+                tab === "mine" && { color: "#667eea" }, // Active text color
+              ]}
             >
               CLB của tôi
             </Text>
@@ -193,7 +221,16 @@ export default function ClubsListScreen() {
                 onPress={() =>
                   setSelectedSport(selectedSport === sport ? "" : sport)
                 }
-                style={{ marginRight: 8 }}
+                style={{
+                  marginRight: 8,
+                  // Tùy chỉnh chip trên nền gradient nếu cần
+                  backgroundColor:
+                    selectedSport === sport ? "#fff" : "rgba(255,255,255,0.2)",
+                  borderColor: "transparent",
+                }}
+                labelStyle={{
+                  color: selectedSport === sport ? "#667eea" : "#fff",
+                }}
               />
             ))}
           </ScrollView>
@@ -208,12 +245,16 @@ export default function ClubsListScreen() {
         .duration(400)
         .springify()}
     >
-      <ClubCard club={item} onPress={() => router.push(`/clubs/${item._id}`)} />
+      <ClubCard
+        club={item}
+        onPress={() => router.push(`/clubs/${item._id}`)}
+        // Nếu ClubCard hỗ trợ style đè hoặc tự xử lý theme thì tốt
+        // Nếu không, card sẽ tự động dùng màu của ThemeProvider nếu được cấu hình đúng
+      />
     </Animated.View>
   );
 
   const renderEmpty = () => {
-    // 🆕 SỬA LOGIC: Render Skeleton list khi loading
     if (isLoading) {
       return (
         <View style={{ gap: 16 }}>
@@ -247,6 +288,9 @@ export default function ClubsListScreen() {
     );
   };
 
+  // Màu nền chính của màn hình
+  const mainBackgroundColor = dark ? "#121212" : "#f5f5f5";
+
   return (
     <>
       <Stack.Screen
@@ -254,7 +298,9 @@ export default function ClubsListScreen() {
           headerShown: false,
         }}
       />
-      <View style={styles.container}>
+      <View
+        style={[styles.container, { backgroundColor: mainBackgroundColor }]}
+      >
         {renderHeader()}
 
         <FlatList
@@ -269,7 +315,7 @@ export default function ClubsListScreen() {
               refreshing={isFetching && !isLoading}
               onRefresh={refetch}
               colors={["#667eea"]}
-              tintColor="#667eea"
+              tintColor={dark ? "#fff" : "#667eea"} // Spinner màu trắng trên nền tối
             />
           }
           ListEmptyComponent={renderEmpty}
@@ -309,7 +355,7 @@ export default function ClubsListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    // backgroundColor được set inline để dynamic
   },
   headerContainer: {
     zIndex: 10,
@@ -359,9 +405,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
-  tabTextActive: {
-    color: "#667eea",
-  },
+  // tabTextActive xử lý inline để dùng màu brand chính xác
   filterContainer: {
     paddingLeft: 20,
   },
@@ -371,18 +415,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingTop: 20,
-  },
-  // BỎ loadingContainer cũ đi cũng được vì giờ dùng Skeleton
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 100,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: "#666",
-    fontSize: 14,
+    paddingBottom: 100, // Thêm padding dưới để tránh FAB che nội dung
   },
   fab: {
     position: "absolute",
@@ -414,9 +447,9 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
 
-  /* 🆕 SKELETON STYLES */
+  /* SKELETON STYLES */
   skeletonCard: {
-    backgroundColor: "#fff",
+    // backgroundColor handled inline
     borderRadius: 16,
     marginBottom: 16,
     overflow: "hidden",
@@ -428,22 +461,22 @@ const styles = StyleSheet.create({
   },
   skeletonCover: {
     height: 140,
-    backgroundColor: "#e1e4e8",
     width: "100%",
+    // backgroundColor handled inline
   },
   skeletonTitle: {
     height: 20,
-    backgroundColor: "#e1e4e8",
     width: "70%",
     borderRadius: 4,
     marginBottom: 10,
+    // backgroundColor handled inline
   },
   skeletonLine: {
     height: 14,
-    backgroundColor: "#e1e4e8",
     width: "90%",
     borderRadius: 4,
     marginBottom: 6,
+    // backgroundColor handled inline
   },
   skeletonTagsRow: {
     flexDirection: "row",
@@ -454,6 +487,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#e1e4e8",
+    // backgroundColor handled inline
   },
 });

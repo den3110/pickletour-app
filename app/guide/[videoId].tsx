@@ -102,14 +102,14 @@ export default function GuideVideoScreen() {
           title: titleStr || "Video hướng dẫn",
           headerTitleAlign: "center",
           // Landscape: ẩn header cho cảm giác fullscreen
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-            >
-              <Ionicons name="chevron-back" size={24} />
-            </TouchableOpacity>
-          ),
+          // headerLeft: () => (
+          //   <TouchableOpacity
+          //     onPress={() => router.back()}
+          //     style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+          //   >
+          //     <Ionicons name="chevron-back" size={24} />
+          //   </TouchableOpacity>
+          // ),
           headerShown: !isLandscape,
         }}
       />

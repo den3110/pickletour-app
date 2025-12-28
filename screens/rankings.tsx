@@ -9,9 +9,8 @@ import React, {
   memo,
 } from "react";
 import {
-  ActivityIndicator,
+  ActivityIndicator, // ✅ Đã thêm
   Animated,
-  Dimensions,
   FlatList,
   Keyboard,
   Pressable,
@@ -25,6 +24,7 @@ import {
   TouchableWithoutFeedback,
   useColorScheme,
   DeviceEventEmitter,
+  InteractionManager,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
@@ -32,48 +32,39 @@ import { useTheme } from "@react-navigation/native";
 import ImageViewing from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 
 import { useGetRankingsQuery } from "@/slices/rankingsApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
 import { setKeyword } from "@/slices/rankingUiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
-
-import * as Haptics from "expo-haptics";
+import RankingChart from "@/components/RankingChart";
 
 /* ================= Config ================= */
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";
-const CARD_HEIGHT_ESTIMATE = 340;
-const MIN_RATING = 1.6;
-const MAX_RATING = 8.0;
+const COLORS = {
+  gold: "#f59e0b",
+  silver: "#C0C0C0",
+  bronze: "#CD7F32",
+  kycVerified: "#22c55e",
+  kycPending: "#f59e0b",
+  scoreRed: "#ef4444",
+  scoreGrey: "#94a3b8",
+};
 
 const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
 
-// ✅ CHỈNH LẠI MÀU SẮC CHUẨN
-const COLORS = {
-  gold: "#f59e0b", // Vàng (Dùng cho điểm xịn & Medal)
-  silver: "#C0C0C0",
-  bronze: "#CD7F32",
+const CustomImageComponent = (props) => (
+  <ExpoImage
+    {...props}
+    style={{ width: "100%", height: "100%" }}
+    contentFit="contain"
+    cachePolicy="memory-disk"
+    transition={200}
+  />
+);
 
-  kycVerified: "#22c55e", // Xanh lá (Dùng cho Chip KYC Đã xác thực)
-  kycPending: "#f59e0b", // Cam (Chờ xác thực)
-
-  scoreRed: "#ef4444", // Đỏ (Điểm tự chấm)
-  scoreGrey: "#94a3b8", // Xám (Chưa có điểm)
-};
-
-const CustomImageComponent = (props) => {
-  return (
-    <ExpoImage
-      {...props}
-      style={{ width: "100%", height: "100%" }}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-      transition={200}
-    />
-  );
-};
-
-/* ================= Theme ================= */
+/* ================= Theme Hook ================= */
 function useThemeColors() {
   const navTheme = useTheme();
   const sysScheme = useColorScheme?.() || "light";
@@ -176,13 +167,12 @@ const canGradeUser = (me, targetProvince) => {
 const canViewKycAdmin = (me, status) =>
   me?.role === "admin" && (status === "verified" || status === "pending");
 
-// ✅ Logic Chip KYC (Xanh lá là Verified)
 const getVerifyChip = (status, tierColor) => {
   if (status === "verified")
     return {
       label: "Đã xác thực",
-      bg: "rgba(34, 197, 94, 0.1)", // Xanh lá nhạt
-      fg: COLORS.kycVerified, // Xanh lá đậm
+      bg: "rgba(34, 197, 94, 0.1)",
+      fg: COLORS.kycVerified,
       icon: "checkmark-circle",
     };
   if (status === "pending")
@@ -206,6 +196,84 @@ const getVerifyChip = (status, tierColor) => {
     icon: "alert-circle",
   };
 };
+
+/* ================= ViewModeToggle (Optimized) ================= */
+const ViewModeToggle = memo(({ mode, onToggle, theme }) => {
+  // Local state để animation chạy tức thì
+  const [localMode, setLocalMode] = useState(mode);
+  const animValue = useRef(new Animated.Value(mode === "list" ? 0 : 1)).current;
+
+  // Sync nếu props mode thay đổi từ bên ngoài
+  useEffect(() => {
+    if (mode !== localMode) {
+      animateSwitch(mode);
+    }
+  }, [mode]);
+
+  const animateSwitch = (targetMode) => {
+    setLocalMode(targetMode);
+    Animated.spring(animValue, {
+      toValue: targetMode === "list" ? 0 : 1,
+      useNativeDriver: true,
+      tension: 140,
+      friction: 12,
+    }).start();
+  };
+
+  const handlePress = (targetMode) => {
+    if (localMode === targetMode) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // 1. Chạy Animation UI ngay lập tức
+    animateSwitch(targetMode);
+
+    // 2. Đẩy việc update state nặng ra sau khi tương tác xong
+    InteractionManager.runAfterInteractions(() => {
+      onToggle(targetMode);
+    });
+  };
+
+  const translateX = animValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 36],
+  });
+
+  return (
+    <View style={[styles.toggleContainer, { backgroundColor: theme.inputBg }]}>
+      <Animated.View
+        style={[
+          styles.toggleIndicator,
+          {
+            backgroundColor: theme.primary,
+            transform: [{ translateX }],
+          },
+        ]}
+      />
+      <Pressable
+        style={styles.toggleBtn}
+        onPress={() => handlePress("list")}
+        hitSlop={8}
+      >
+        <Ionicons
+          name="list"
+          size={18}
+          color={localMode === "list" ? "#fff" : theme.subText}
+        />
+      </Pressable>
+      <Pressable
+        style={styles.toggleBtn}
+        onPress={() => handlePress("chart")}
+        hitSlop={8}
+      >
+        <Ionicons
+          name="analytics"
+          size={18}
+          color={localMode === "chart" ? "#fff" : theme.subText}
+        />
+      </Pressable>
+    </View>
+  );
+});
 
 /* ================= Sub-Components ================= */
 const InfoTag = memo(({ icon, text, theme }) => (
@@ -236,7 +304,7 @@ const ScoreBlock = memo(({ label, score, color, theme }) => (
   </View>
 ));
 
-/* ================= Skeletons ================= */
+/* ================= Skeletons & Cards ================= */
 const SkeletonCard = memo(() => {
   const theme = useThemeColors();
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -256,20 +324,16 @@ const SkeletonCard = memo(() => {
         }),
       ])
     ).start();
-  }, [opacity]);
+  }, []);
 
   const bg = theme.isDark ? "#2a2d36" : "#e1e4e8";
-
   return (
     <View
       style={[
         styles.card,
         {
           backgroundColor: theme.card,
-          // ✅ THÊM DÒNG NÀY ĐỂ BỎ VIỀN ĐEN
           borderWidth: 0,
-          // (Tuỳ chọn) Bỏ luôn shadow cho skeleton nhìn nó phẳng (flat) đẹp hơn
-          shadowOpacity: 0,
           elevation: 0,
         },
       ]}
@@ -348,7 +412,6 @@ const FlameCard = memo(({ medal, theme, children }) => {
       </View>
     );
   }
-
   return (
     <FlameCardAnimated medal={medal} theme={theme}>
       {children}
@@ -358,7 +421,6 @@ const FlameCard = memo(({ medal, theme, children }) => {
 
 const FlameCardAnimated = memo(({ medal, theme, children }) => {
   const anim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -376,10 +438,9 @@ const FlameCardAnimated = memo(({ medal, theme, children }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, []);
 
   const { border, glow1, glow2 } = getMedalColors(medal);
-
   const op1 = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.18, 0.35],
@@ -424,7 +485,6 @@ const FlameCardAnimated = memo(({ medal, theme, children }) => {
 });
 
 const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
-  // không podium -> không animate
   if (!medal) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
@@ -445,7 +505,6 @@ const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
       </TouchableOpacity>
     );
   }
-
   return (
     <FlameAvatarAnimated
       uri={uri}
@@ -458,7 +517,6 @@ const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
 
 const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
   const anim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -476,10 +534,9 @@ const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, []);
 
   const { border, glow1, glow2 } = getMedalColors(medal);
-
   const scale1 = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.06],
@@ -541,7 +598,7 @@ const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
   );
 });
 
-/* ================= Ranking Card (VIP Optimized) ================= */
+/* ================= Ranking Card ================= */
 const RankingCard = memo(
   ({
     item,
@@ -560,15 +617,11 @@ const RankingCard = memo(
     const avatarSrc = u?.avatar || PLACE;
     const age = calcAge(u);
 
-    // ✅ Logic màu ĐIỂM:
-    // Red -> Đỏ (Tự chấm)
-    // Yellow -> Vàng (Điểm xác thực - đây là cái bạn muốn vàng)
-    // Khác -> Xám
     const scoreColor =
       r?.tierColor === "red"
         ? COLORS.scoreRed
         : r?.tierColor === "yellow"
-        ? COLORS.gold // Vàng cho điểm
+        ? COLORS.gold
         : COLORS.scoreGrey;
 
     const sp = scorePatch[u?._id || ""] || {};
@@ -580,8 +633,6 @@ const RankingCard = memo(
     const effectiveStatus = cccdPatch[u?._id] || u?.cccdStatus;
     const allowGrade = canGradeUser(me, u?.province);
     const allowKyc = canViewKycAdmin(me, effectiveStatus);
-
-    // ✅ Logic Chip KYC: Xanh lá nếu Verified
     const verifyChip = getVerifyChip(effectiveStatus, r?.tierColor);
 
     return (
@@ -638,7 +689,6 @@ const RankingCard = memo(
               </View>
             </View>
 
-            {/* Medal or Province */}
             {podium ? (
               <TouchableOpacity
                 onPress={() => onGoToTournament(podium.picked)}
@@ -677,17 +727,14 @@ const RankingCard = memo(
           </View>
         </View>
 
-        {/* Info Tags */}
         <View style={styles.tagsRow}>
           {age && <InfoTag text={`${age} tuổi`} theme={theme} />}
           <InfoTag text={genderLabel(u?.gender)} theme={theme} />
-          {/* Hiện tỉnh nếu chưa có giải */}
           {podium && u?.province && (
             <InfoTag icon="location" text={u.province} theme={theme} />
           )}
         </View>
 
-        {/* Scores - ĐÔI TRƯỚC, ĐƠN SAU - Màu điểm theo tierColor */}
         <View style={styles.scoreGrid}>
           <ScoreBlock
             label="ĐIỂM ĐÔI"
@@ -703,12 +750,10 @@ const RankingCard = memo(
           />
         </View>
 
-        {/* Actions */}
         <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => {
-              // Rung nhẹ khi bấm chuyển trang
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push(`/profile/${u?._id}`);
             }}
@@ -727,7 +772,6 @@ const RankingCard = memo(
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => {
-                // Rung đầm hơn (Medium) cho hành động mở form
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 onOpenGrade(u, r);
               }}
@@ -743,7 +787,6 @@ const RankingCard = memo(
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => {
-                // Rung đầm hơn (Medium) cho hành động quản trị
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 onOpenKyc(u);
               }}
@@ -762,7 +805,6 @@ const RankingCard = memo(
       </FlameCard>
     );
   },
-  // Custom Compare
   (prev, next) => {
     return (
       prev.item?._id === next.item?._id &&
@@ -770,6 +812,75 @@ const RankingCard = memo(
       prev.cccdPatch === next.cccdPatch &&
       prev.podium?.medal === next.podium?.medal &&
       prev.me?.role === next.me?.role
+    );
+  }
+);
+
+/* ================= MEMOIZED VIEWS ================= */
+
+// View List: Chỉ render lại khi data thay đổi
+const MemoizedListView = memo(
+  ({
+    data,
+    renderItem,
+    header,
+    footer,
+    onLoadMore,
+    isRefreshing,
+    onRefresh,
+    theme,
+    scrollRef,
+  }) => {
+    return (
+      <FlatList
+        ref={scrollRef}
+        data={data}
+        keyExtractor={(item) => String(item._id)}
+        renderItem={renderItem}
+        ListHeaderComponent={header}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        onEndReached={onLoadMore}
+        onEndReachedThreshold={0.5}
+        removeClippedSubviews={Platform.OS === "android"}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+          />
+        }
+        ListFooterComponent={footer}
+      />
+    );
+  },
+  (prev, next) => {
+    return (
+      prev.data === next.data &&
+      prev.isRefreshing === next.isRefreshing &&
+      prev.theme.isDark === next.theme.isDark &&
+      prev.header === next.header
+    );
+  }
+);
+
+// View Chart: Tách biệt
+const MemoizedChartView = memo(
+  ({ data, theme, onUserPress, onLoadMore, hasMore, isLoadingMore }) => {
+    return (
+      <RankingChart
+        rankings={data}
+        theme={theme}
+        onUserPress={onUserPress}
+        onLoadMore={onLoadMore}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+      />
     );
   }
 );
@@ -783,7 +894,14 @@ export default function RankingListScreen({ isBack = false }) {
   const { keyword = "" } = useSelector((s) => s?.rankingUi || {});
   const [kw, setKw] = useState(keyword || "");
 
-  // --- Infinite Scroll State ---
+  // UI State
+  const [viewMode, setViewMode] = useState("list");
+
+  // ✅ STATE MỚI: Kiểm soát Lazy Loading Chart
+  const [hasRenderedChart, setHasRenderedChart] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
+
+  // Pagination State
   const [page, setPage] = useState(0);
   const [accumulatedList, setAccumulatedList] = useState([]);
   const [hasMore, setHasMore] = useState(true);
@@ -794,14 +912,12 @@ export default function RankingListScreen({ isBack = false }) {
     page,
   });
 
-  const scrollViewRef = React.useRef(null);
-  React.useEffect(() => {
+  const scrollViewRef = useRef(null);
+  useEffect(() => {
     const listener = DeviceEventEmitter.addListener(
       "SCROLL_TO_TOP",
       (tabName) => {
         if (tabName === "rankings") {
-          // ✅ FIX LỖI Ở ĐÂY:
-          // FlatList dùng scrollToOffset, không phải scrollTo
           scrollViewRef.current?.scrollToOffset({ offset: 0, animated: true });
         }
       }
@@ -809,6 +925,7 @@ export default function RankingListScreen({ isBack = false }) {
     return () => listener.remove();
   }, []);
 
+  // Data Logic
   useEffect(() => {
     if (data?.docs) {
       if (page === 0) {
@@ -824,6 +941,23 @@ export default function RankingListScreen({ isBack = false }) {
     }
   }, [data, page]);
 
+  // ✅ LOGIC "Double Delay" để chống lag lần đầu mở Chart
+  useEffect(() => {
+    if (viewMode === "chart") {
+      if (!hasRenderedChart) {
+        setHasRenderedChart(true);
+        // Delay 1: Chờ Animation nút bấm xong
+        InteractionManager.runAfterInteractions(() => {
+          // Delay 2: Nhường CPU vẽ UI 1 chút rồi mới vẽ Chart
+          setTimeout(() => {
+            setChartReady(true);
+          }, 150);
+        });
+      }
+    }
+  }, [viewMode, hasRenderedChart]);
+
+  // Debounce Search
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(0);
@@ -839,6 +973,7 @@ export default function RankingListScreen({ isBack = false }) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerImages, setViewerImages] = useState([]);
 
+  // Callbacks
   const openZoom = useCallback((src) => {
     if (src) {
       setViewerImages([{ uri: normalizeUrl(src) || PLACE }]);
@@ -889,25 +1024,34 @@ export default function RankingListScreen({ isBack = false }) {
     [router]
   );
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (!isFetching && hasMore) {
       setPage((prev) => prev + 1);
     }
-  };
+  }, [isFetching, hasMore]);
 
   const clearSearch = () => {
     setKw("");
     Keyboard.dismiss();
   };
 
+  const handleChartUserPress = useCallback(
+    (user) => {
+      if (user?._id) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push(`/profile/${user._id}`);
+      }
+    },
+    [router]
+  );
+
+  // Memoized Data
   const podiumByUser = useMemo(() => {
     const src = data?.podiums30d || {};
     const rank = { gold: 3, silver: 2, bronze: 1 };
     const out = {};
-
     for (const [uid, arr] of Object.entries(src)) {
       if (!Array.isArray(arr) || !arr.length) continue;
-
       const picked = [...arr].sort((a, b) => {
         const r = (rank[b.medal] || 0) - (rank[a.medal] || 0);
         if (r) return r;
@@ -915,15 +1059,12 @@ export default function RankingListScreen({ isBack = false }) {
         const ta = new Date(a.finishedAt || 0).getTime();
         return tb - ta;
       })[0];
-
       const plusN = Math.max(0, arr.length - 1);
       const title = `${medalLabel(picked.medal)} – ${
         picked.tournamentName || "Giải đấu"
       }${plusN > 0 ? ` (+${plusN} giải khác)` : ""}`;
-
       out[String(uid)] = { medal: picked.medal, label: title, picked };
     }
-
     return out;
   }, [data?.podiums30d]);
 
@@ -947,35 +1088,37 @@ export default function RankingListScreen({ isBack = false }) {
   const initialLoading =
     isLoading || (isFetching && page === 0 && accumulatedList.length === 0);
 
-  // Header Legend (Chú thích)
-  const HeaderComponent = (
-    <View style={{ marginBottom: 16 }}>
-      <View
-        style={[
-          styles.legendContainer,
-          { backgroundColor: theme.card, borderColor: theme.border },
-        ]}
-      >
-        <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: COLORS.gold }]} />
-          <Text style={[styles.legendText, { color: theme.subText }]}>
-            Điểm xác thực
-          </Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: COLORS.scoreRed }]} />
-          <Text style={[styles.legendText, { color: theme.subText }]}>
-            Tự chấm
-          </Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: COLORS.scoreGrey }]} />
-          <Text style={[styles.legendText, { color: theme.subText }]}>
-            Chưa có điểm
-          </Text>
+  const HeaderComponent = useMemo(
+    () => (
+      <View style={{ marginBottom: 16 }}>
+        <View
+          style={[
+            styles.legendContainer,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: COLORS.gold }]} />
+            <Text style={[styles.legendText, { color: theme.subText }]}>
+              Điểm xác thực
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: COLORS.scoreRed }]} />
+            <Text style={[styles.legendText, { color: theme.subText }]}>
+              Tự chấm
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: COLORS.scoreGrey }]} />
+            <Text style={[styles.legendText, { color: theme.subText }]}>
+              Chưa có điểm
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
+    ),
+    [theme]
   );
 
   return (
@@ -997,14 +1140,28 @@ export default function RankingListScreen({ isBack = false }) {
                 Bảng xếp hạng
               </Text>
             </View>
-            {canSelfAssess && (
-              <TouchableOpacity
-                style={[styles.selfBtn, { backgroundColor: theme.primary }]}
-                onPress={() => router.push("/levelpoint")}
-              >
-                <Text style={styles.selfBtnText}>Tự chấm</Text>
-              </TouchableOpacity>
-            )}
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <ViewModeToggle
+                mode={viewMode}
+                onToggle={setViewMode}
+                theme={theme}
+              />
+              {canSelfAssess && !isLoading && (
+                <TouchableOpacity
+                  style={[styles.selfBtn, { backgroundColor: theme.primary }]}
+                  onPress={() => router.push("/levelpoint")}
+                >
+                  <Text style={styles.selfBtnText}>Tự chấm</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <View
@@ -1051,46 +1208,86 @@ export default function RankingListScreen({ isBack = false }) {
             ListHeaderComponent={HeaderComponent}
           />
         ) : (
-          <FlatList
-            ref={scrollViewRef}
-            data={accumulatedList}
-            keyExtractor={(item) => String(item._id)}
-            renderItem={renderItem}
-            ListHeaderComponent={HeaderComponent}
-            contentContainerStyle={{ paddingBottom: 80 }}
-            // 🔥 Tối ưu hiệu năng & Scroll mượt (Bỏ getItemLayout)
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            removeClippedSubviews={Platform.OS === "android"}
-            initialNumToRender={5}
-            maxToRenderPerBatch={5}
-            windowSize={7}
-            updateCellsBatchingPeriod={50}
-            keyboardShouldPersistTaps="always"
-            keyboardDismissMode="on-drag"
-            refreshControl={
-              <RefreshControl
-                refreshing={isFetching && page === 0}
+          /* ✅ OPTIMIZED STRUCTURE: Keep views alive */
+          <View style={{ flex: 1 }}>
+            {/* 1. LIST VIEW */}
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  opacity: viewMode === "list" ? 1 : 0,
+                  zIndex: viewMode === "list" ? 1 : 0,
+                  transform: [{ translateX: viewMode === "list" ? 0 : 9999 }],
+                },
+              ]}
+            >
+              <MemoizedListView
+                scrollRef={scrollViewRef}
+                data={accumulatedList}
+                renderItem={renderItem}
+                header={HeaderComponent}
+                footer={
+                  isFetching && page > 0 ? (
+                    <View style={{ paddingVertical: 10, gap: 16 }}>
+                      <SkeletonCard />
+                      <SkeletonCard />
+                    </View>
+                  ) : (
+                    <View style={{ height: 20 }} />
+                  )
+                }
+                onLoadMore={handleLoadMore}
+                isRefreshing={isFetching && page === 0}
                 onRefresh={() => {
                   setPage(0);
                   refetch();
                 }}
-                tintColor={theme.primary}
+                theme={theme}
               />
-            }
-            // ✅ Footer: Thay spinner bằng 3 Skeleton Items
-            ListFooterComponent={
-              isFetching && page > 0 ? (
-                <View style={{ paddingVertical: 10, gap: 16 }}>
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
-                </View>
-              ) : (
-                <View style={{ height: 20 }} />
-              )
-            }
-          />
+            </View>
+
+            {/* 2. CHART VIEW: Lazy + Double Delay */}
+            {hasRenderedChart && (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    opacity: viewMode === "chart" ? 1 : 0,
+                    zIndex: viewMode === "chart" ? 1 : 0,
+                    transform: [
+                      { translateX: viewMode === "chart" ? 0 : 9999 },
+                    ],
+                  },
+                ]}
+              >
+                {!chartReady ? (
+                  // ✅ LOAD NHẸ TRƯỚC
+                  <View style={styles.center}>
+                    <ActivityIndicator size="small" color={theme.primary} />
+                    <Text
+                      style={{
+                        marginTop: 12,
+                        color: theme.subText,
+                        fontSize: 13,
+                      }}
+                    >
+                      Đang tải biểu đồ...
+                    </Text>
+                  </View>
+                ) : (
+                  // ✅ LOAD NẶNG SAU 150ms
+                  <MemoizedChartView
+                    data={accumulatedList}
+                    theme={theme}
+                    onUserPress={handleChartUserPress}
+                    onLoadMore={handleLoadMore}
+                    hasMore={hasMore}
+                    isLoadingMore={isFetching && page > 0}
+                  />
+                )}
+              </View>
+            )}
+          </View>
         )}
       </View>
 
@@ -1136,7 +1333,26 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   selfBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-
+  toggleContainer: {
+    flexDirection: "row",
+    borderRadius: 10,
+    padding: 3,
+    position: "relative",
+  },
+  toggleIndicator: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    width: 36,
+    height: 30,
+    borderRadius: 8,
+  },
+  toggleBtn: {
+    width: 36,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1146,7 +1362,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15, height: "100%" },
-
   legendContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1159,8 +1374,6 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center" },
   dot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   legendText: { fontSize: 12, fontWeight: "600" },
-
-  /* === CARD STYLES === */
   card: {
     borderRadius: 24,
     padding: 16,
@@ -1173,13 +1386,6 @@ const styles = StyleSheet.create({
   },
   cardHeader: { flexDirection: "row", marginBottom: 16 },
   avatarContainer: { position: "relative", width: 68, height: 68 },
-  avatar: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 34,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
   avatarBorder: {
     position: "absolute",
     top: -4,
@@ -1191,7 +1397,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   nickname: { fontSize: 18, fontWeight: "800", maxWidth: "85%" },
-
   verifyBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1201,27 +1406,20 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   verifyText: { fontSize: 11, fontWeight: "700" },
-
   provinceText: { fontSize: 13, marginTop: 4 },
-
-  medalBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
+  medalPill: {
+    width: "100%",
+    borderWidth: 1.5,
+    borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingVertical: 8,
     marginTop: 8,
-    maxWidth: "95%",
   },
-  medalText: {
+  medalPillText: {
     fontSize: 12,
-    fontWeight: "700",
-    marginLeft: 6,
+    fontWeight: "800",
     flex: 1,
   },
-
   tagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1237,7 +1435,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   infoTagText: { fontSize: 11, fontWeight: "600" },
-
   scoreGrid: { flexDirection: "row", gap: 12, marginBottom: 16 },
   scoreBlock: {
     flex: 1,
@@ -1253,7 +1450,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   scoreValue: { fontSize: 22, fontWeight: "900" },
-
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1267,29 +1463,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   actionText: { fontSize: 13, fontWeight: "600" },
-  medalPill: {
-    width: "100%",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 8,
-  },
-  medalPillText: {
-    fontSize: 12,
-    fontWeight: "800",
-    flex: 1,
-  },
   flameCardWrap: { position: "relative" },
   cardFlameGlow: {
     position: "absolute",
     top: -4,
     left: -4,
     right: -4,
-    bottom: 12, // chừa chút vì card có marginBottom
+    bottom: 12,
     borderRadius: 28,
   },
-
   flameAvatarWrap: {
     width: 68,
     height: 68,
@@ -1302,7 +1484,6 @@ const styles = StyleSheet.create({
     height: 74,
     borderRadius: 37,
   },
-
   avatarRing: {
     padding: 2,
     borderWidth: 2,

@@ -606,7 +606,7 @@ export default function InAppBrowserScreen() {
             style={[styles.toolBtn, { backgroundColor: C.chipBg }]}
           >
             <Ionicons
-              name="arrow-forward"
+              name="chevron-forward"
               size={20}
               color={canGoForward ? C.icon : C.iconDisabled}
             />

@@ -677,64 +677,60 @@ export default function RootLayout() {
                           contentStyle: {
                             backgroundColor: bg,
                           },
+
+                          // ✅ GLOBAL: tất cả chevron-back tự ăn theme (theo tintColor)
+                          headerLeft: ({ canGoBack, tintColor }) => {
+                            if (!canGoBack) return null;
+                            return (
+                              <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                }}
+                                hitSlop={{
+                                  top: 10,
+                                  bottom: 10,
+                                  left: 10,
+                                  right: 10,
+                                }}
+                              >
+                                <Ionicons
+                                  name="chevron-back"
+                                  size={24}
+                                  color={tintColor ?? navTheme.colors.text}
+                                />
+                              </TouchableOpacity>
+                            );
+                          },
                         }}
                       >
                         <Stack.Screen
                           name="(tabs)"
                           options={{ headerShown: false }}
                         />
+
                         <Stack.Screen
                           name="register"
                           options={{
                             title: "Đăng ký",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="forgot-password"
                           options={{
                             title: "Quên mật khẩu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="levelpoint"
                           options={{
                             title: "Tự chấm trình",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
 
@@ -743,17 +739,6 @@ export default function RootLayout() {
                           options={{
                             title: "Check-in giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
 
@@ -762,249 +747,147 @@ export default function RootLayout() {
                           options={{
                             title: "Đăng ký giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           options={{
                             title: "Duyệt định danh",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                           name="user/[id]/kyc"
                         />
+
                         <Stack.Screen
                           options={{
                             title: "Chấm trình",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                           name="user/[id]/grade"
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/draw"
                           options={{
                             title: "Bốc thăm giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/bracket"
                           options={{
                             title: "Sơ đồ giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/home"
                           options={{
                             title: "Tổng quan giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/index"
                           options={{
                             title: "Giải đấu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/manage"
                           options={{
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/schedule"
                           options={{
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="tournament/[id]/referee"
                           options={{
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="match/[id]/referee"
                           options={{ headerShown: false }}
                         />
+
                         <Stack.Screen
                           name="contact"
                           options={{
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
+
                         <Stack.Screen
                           name="live/home"
                           options={{
                             headerShown: false,
                           }}
                         />
+
                         <Stack.Screen
                           name="admin/home"
                           options={{
                             headerShown: false,
                           }}
                         />
+
                         <Stack.Screen
                           name="clubs"
                           options={{
                             headerShown: false,
                           }}
                         />
+
                         <Stack.Screen
                           name="login"
                           options={{
                             headerShown: false,
                           }}
                         />
+
                         <Stack.Screen
                           name="radar/index"
                           options={{
                             headerShown: false,
                           }}
                         />
-                         <Stack.Screen
+
+                        <Stack.Screen
                           name="clubs/[id]/index"
                           options={{
                             headerShown: false,
                           }}
                         />
+
+                        <Stack.Screen
+                          name="guide/index"
+                          options={{
+                            headerTitleAlign: "center",
+                            headerTintColor: navTheme.colors.primary,
+                            headerTitleStyle: {
+                              color: navTheme.colors.text,
+                              fontWeight: "700",
+                            },
+                          }}
+                        />
+
                         <Stack.Screen
                           name="reset-password"
                           options={{
                             title: "Đặt lại mật khẩu",
                             headerTitleAlign: "center",
-                            headerLeft: () => (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                              >
-                                <Ionicons name="chevron-back" size={24} />
-                              </TouchableOpacity>
-                            ),
                           }}
                         />
 
@@ -1067,9 +950,9 @@ export default function RootLayout() {
               </SafeAreaProvider>
             </Boot>
           </SocketProvider>
+          <ForceUpdateModal />
+          <Toast />
         </BottomSheetModalProvider>
-        <ForceUpdateModal />
-        <Toast />
       </GestureHandlerRootView>
     </Provider>
   );

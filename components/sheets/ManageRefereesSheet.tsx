@@ -172,10 +172,12 @@ export default function ManageRefereesSheet({
           appearsOnIndex={0}
           disappearsOnIndex={-1}
           opacity={0.5}
+          style={{zIndex: 1000}}
         />
       )}
       handleIndicatorStyle={{ backgroundColor: colors.border }}
       backgroundStyle={{ backgroundColor: colors.card }}
+      containerStyle={{zIndex: 1000}}
     >
       <BottomSheetScrollView contentContainerStyle={s.container}>
         {/* Header */}
