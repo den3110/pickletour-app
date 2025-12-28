@@ -20,7 +20,6 @@ import {
   SafeAreaView,
   Modal,
   TouchableWithoutFeedback,
-  Image,
   Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -42,6 +41,7 @@ import {
   useGetRadarExploreQuery,
   useUpsertMyPresenceMutation,
 } from "@/slices/radarApiSlice";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 // --- CONFIG ---
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -50,7 +50,6 @@ MapboxGL.setAccessToken(MAPBOX_TOKEN || "");
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.82;
 
-// --- COLORS ---
 const THEME_COLOR = "#F97316";
 const NEON_BLUE = "#0EA5E9";
 
@@ -69,10 +68,12 @@ const ENTITY_TYPES = [
   { key: "user", label: "VĐV" },
   { key: "tournament", label: "Giải" },
   { key: "club", label: "CLB" },
-  { key: "court", label: "Sân" }, // bạn thêm sau (backend trả về là chạy)
+  { key: "court", label: "Sân" },
 ];
 
-const RANGE_OPTIONS = [2, 5, 10, 20];
+const RANGE_OPTIONS = [2, 5, 10, 20, 50];
+
+const getLabel = (arr, key) => arr.find((x) => x.key === key)?.label || key;
 
 // --- HELPERS ---
 const getBoundsFromRadius = (center, radiusKm) => {
@@ -102,6 +103,7 @@ const createGeoJSONCircle = (center, radiusInKm, points = 64) => {
     ret.push([coords.longitude + x, coords.latitude + y]);
   }
   ret.push(ret[0]);
+
   return {
     type: "FeatureCollection",
     features: [
@@ -174,7 +176,7 @@ const PermissionHintBanner = ({ isDark, onEnable }) => (
       Bật định vị để quét xung quanh bạn.
     </Text>
     <TouchableOpacity onPress={onEnable} style={styles.permissionBannerBtn}>
-      <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 12 }}>
+      <Text style={{ color: "#FFF", fontWeight: "800", fontSize: 12 }}>
         Bật
       </Text>
     </TouchableOpacity>
@@ -184,6 +186,7 @@ const PermissionHintBanner = ({ isDark, onEnable }) => (
 const RadarPulse = () => {
   const scale = useSharedValue(0);
   const opacity = useSharedValue(1);
+
   useEffect(() => {
     scale.value = withRepeat(
       withTiming(4, { duration: 3000, easing: Easing.out(Easing.ease) }),
@@ -196,10 +199,12 @@ const RadarPulse = () => {
       false
     );
   }, []);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
+
   return (
     <View style={styles.radarContainer} pointerEvents="none">
       <View style={styles.radarStaticCircle} />
@@ -240,7 +245,9 @@ export default function PickleRadarScreen() {
   const [playTypeFilter, setPlayTypeFilter] = useState("any");
   const [entityType, setEntityType] = useState("all");
 
-  const [showRadiusModal, setShowRadiusModal] = useState(false);
+  // UI: filter modal
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   const [circleGeoJSON, setCircleGeoJSON] = useState(null);
 
   // Refs
@@ -248,10 +255,13 @@ export default function PickleRadarScreen() {
   const listRef = useRef(null);
   const isUserInteracting = useRef(false);
 
-  // API
+  // ✅ IMPORTANT: PointAnnotation snapshot -> cần refresh khi ảnh load
+  const markerRefs = useRef({}); // { [annId]: PointAnnotationRef }
+
+  // API params
   const typesParam = useMemo(() => {
-    if (entityType === "all") return "user,tournament,club";
-    return entityType; // "user" | "tournament" | "club" | "court"
+    if (entityType === "all") return "user,tournament,club,court";
+    return entityType;
   }, [entityType]);
 
   const shouldQuery = !!myLocation;
@@ -277,17 +287,9 @@ export default function PickleRadarScreen() {
 
   const radarItems = useMemo(() => {
     const items = Array.isArray(exploreData?.items) ? exploreData.items : [];
-    // UI-side filter nhẹ: nếu item.type != selected type thì bỏ (server đã làm rồi, nhưng giữ cho chắc)
-    const filtered =
-      entityType === "all"
-        ? items
-        : items.filter((it) => it?.type === entityType);
-
-    // playTypeFilter hiện chủ yếu cho user; nếu bạn muốn strict hơn thì backend lọc theo profile
-    if (playTypeFilter === "any") return filtered;
-
-    return filtered.map((it) => it); // giữ nguyên cho hiện tại
-  }, [exploreData, entityType, playTypeFilter]);
+    if (entityType === "all") return items;
+    return items.filter((it) => it?.type === entityType);
+  }, [exploreData, entityType]);
 
   // Auto select first item
   useEffect(() => {
@@ -323,30 +325,30 @@ export default function PickleRadarScreen() {
     }
   }, []);
 
+  const [bootLoading, setBootLoading] = useState(true);
+
   const ensureLocationAndFetch = useCallback(async () => {
     const loc = await getCurrentLocation();
-    if (loc) {
-      setMyLocation(loc);
+    if (!loc) return;
 
-      // upsert presence (best-effort)
-      try {
-        await upsertPresence({
-          lng: loc[0],
-          lat: loc[1],
-          source: "gps",
-          visibility: "venue_only",
-          status: "looking_partner",
-          preferredRadiusKm: radiusKm,
-        }).unwrap();
-      } catch (e) {
-        // không block UX
-        console.log("Presence upsert failed:", e?.data || e?.message || e);
-      }
+    setMyLocation(loc);
+
+    // ✅ Có: gọi API update tọa độ cá nhân (best-effort)
+    try {
+      await upsertPresence({
+        lng: loc[0],
+        lat: loc[1],
+        source: "gps",
+        visibility: "venue_only",
+        status: "looking_partner",
+        preferredRadiusKm: radiusKm,
+      }).unwrap();
+    } catch (e) {
+      console.log("Presence upsert failed:", e?.data || e?.message || e);
     }
   }, [getCurrentLocation, upsertPresence, radiusKm]);
 
   // Init: không block map nếu denied
-  const [bootLoading, setBootLoading] = useState(true);
   useEffect(() => {
     (async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
@@ -405,13 +407,19 @@ export default function PickleRadarScreen() {
   };
 
   const handleRecenter = async () => {
-    // Nếu chưa có location -> xin quyền + lấy location
     if (!myLocation) {
       await ensureLocationAndFetch();
       return;
     }
     zoomToRadius(myLocation, radiusKm);
     refetch?.();
+  };
+
+  const handleResetFilters = () => {
+    setEntityType("all");
+    setPlayTypeFilter("any");
+    setRadiusKm(5);
+    if (myLocation) zoomToRadius(myLocation, 5);
   };
 
   // --- STYLES ---
@@ -429,11 +437,10 @@ export default function PickleRadarScreen() {
   // --- RENDERERS ---
   const renderMarker = (it) => {
     const coords = it?.location?.coordinates;
-    if (!Array.isArray(coords) || coords.length !== 2) return null; // không có geo thì không vẽ marker
+    if (!Array.isArray(coords) || coords.length !== 2) return null;
 
     const isSelected = String(it.id) === String(selectedId);
 
-    // bubble ưu tiên statusMessage, fallback theo type
     const bubbleText =
       it?.statusMessage ||
       (it.type === "tournament"
@@ -450,26 +457,38 @@ export default function PickleRadarScreen() {
 
     const imgUri =
       it.avatarUrl || it.imageUrl || safeAvatarFallback(it.title || "PK");
+    const uri = normalizeUrl(imgUri);
+
+    const annId = `radar-${it.type}-${String(it.id)}`;
 
     return (
       <MapboxGL.PointAnnotation
-        key={`${it.type}-${String(it.id)}`}
-        id={`radar-${it.type}-${String(it.id)}`}
+        key={annId}
+        id={annId}
         coordinate={coords}
-        onSelected={() => handleSelectItem(it, radarItems.indexOf(it))}
         anchor={{ x: 0.5, y: 1 }}
+        ref={(ref) => {
+          if (ref) markerRefs.current[annId] = ref;
+        }}
+        onSelected={() => handleSelectItem(it, radarItems.indexOf(it))}
       >
-        <View style={styles.markerContainerFixed}>
-          {showBubble && (
-            <StatusBubble message={bubbleText} emoji={bubbleEmoji} />
-          )}
+        {/* ✅ collapsable={false} tránh Android tối ưu mất view */}
+        <View collapsable={false} style={styles.markerFixedBox}>
+          {showBubble ? (
+            <View collapsable={false}>
+              <StatusBubble message={bubbleText} emoji={bubbleEmoji} />
+            </View>
+          ) : null}
+
           <View
+            collapsable={false}
             style={[
               styles.markerRoot,
               isSelected && { transform: [{ scale: 1.25 }], zIndex: 99 },
             ]}
           >
             <View
+              collapsable={false}
               style={[
                 styles.markerRing,
                 {
@@ -478,12 +497,24 @@ export default function PickleRadarScreen() {
                 },
               ]}
             >
-              <Image
-                source={{ uri: imgUri }}
+              <ExpoImage
+                source={{ uri }}
                 style={styles.markerImg}
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+                onLoad={() => {
+                  // ✅ FIX: ép Mapbox chụp lại snapshot sau khi ảnh load
+                  const r = markerRefs.current[annId];
+                  r?.refresh?.();
+                  setTimeout(() => r?.refresh?.(), 60);
+                }}
+                onError={(e) => {
+                  console.log("[Radar marker img error]", uri, e);
+                }}
               />
             </View>
+
             {isSelected && <View style={styles.markerArrow} />}
           </View>
         </View>
@@ -524,8 +555,10 @@ export default function PickleRadarScreen() {
         >
           <View style={styles.cardHeader}>
             <ExpoImage
-              source={{ uri: avatar }}
+              source={{ uri: normalizeUrl(avatar) }}
               style={[styles.cardAvatar, { backgroundColor: "#FFF" }]}
+              contentFit="cover"
+              cachePolicy="memory-disk"
             />
             <View style={{ flex: 1, marginLeft: 10 }}>
               <View style={styles.nameRow}>
@@ -563,7 +596,7 @@ export default function PickleRadarScreen() {
                   style={{
                     color: THEME_COLOR,
                     fontSize: 12,
-                    fontWeight: "600",
+                    fontWeight: "700",
                     marginTop: 2,
                   }}
                   numberOfLines={1}
@@ -588,7 +621,7 @@ export default function PickleRadarScreen() {
               <View style={{ flex: 1, marginRight: 12 }}>
                 <Text style={{ fontSize: 10, color: dynamicStyles.textSub }}>
                   Độ hợp:{" "}
-                  <Text style={{ fontWeight: "bold", color: THEME_COLOR }}>
+                  <Text style={{ fontWeight: "900", color: THEME_COLOR }}>
                     {scoreVal}%
                   </Text>
                 </Text>
@@ -708,10 +741,9 @@ export default function PickleRadarScreen() {
                     { backgroundColor: dynamicStyles.chipBg },
                   ]}
                   onPress={() => {
-                    // nếu item có location thì mở maps
-                    const coords = item?.location?.coordinates;
-                    if (!Array.isArray(coords) || coords.length !== 2) return;
-                    const [lng, lat] = coords;
+                    const c = item?.location?.coordinates;
+                    if (!Array.isArray(c) || c.length !== 2) return;
+                    const [lng, lat] = c;
                     const url =
                       Platform.OS === "ios"
                         ? `http://maps.apple.com/?ll=${lat},${lng}`
@@ -805,6 +837,7 @@ export default function PickleRadarScreen() {
         {radarItems.map(renderMarker)}
       </MapboxGL.MapView>
 
+      {/* SMART HEADER */}
       <SafeAreaView style={styles.headerSafe} pointerEvents="box-none">
         <View style={styles.headerRow}>
           <TouchableOpacity
@@ -818,99 +851,34 @@ export default function PickleRadarScreen() {
             />
           </TouchableOpacity>
 
-          <View style={{ flex: 1, marginHorizontal: 8, gap: 8 }}>
-            {/* Entity types */}
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={ENTITY_TYPES}
-              keyExtractor={(item) => item.key}
-              renderItem={({ item }) => {
-                const active = entityType === item.key;
-                return (
-                  <TouchableOpacity
-                    onPress={() => setEntityType(item.key)}
-                    style={[
-                      styles.pill,
-                      {
-                        paddingVertical: 8,
-                        backgroundColor: active
-                          ? THEME_COLOR
-                          : dynamicStyles.pillBg,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        {
-                          color: active ? "#FFF" : dynamicStyles.textMain,
-                          fontWeight: active ? "700" : "400",
-                        },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-
-            {/* Play types */}
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={PLAY_TYPES}
-              keyExtractor={(item) => item.key}
-              renderItem={({ item }) => {
-                const active = playTypeFilter === item.key;
-                return (
-                  <TouchableOpacity
-                    onPress={() => setPlayTypeFilter(item.key)}
-                    style={[
-                      styles.pill,
-                      {
-                        backgroundColor: active
-                          ? THEME_COLOR
-                          : dynamicStyles.pillBg,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pillText,
-                        {
-                          color: active ? "#FFF" : dynamicStyles.textMain,
-                          fontWeight: active ? "700" : "400",
-                        },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
-
           <TouchableOpacity
-            onPress={() => setShowRadiusModal(true)}
+            activeOpacity={0.85}
+            onPress={() => setShowFilterModal(true)}
             style={[
-              styles.radiusBtn,
+              styles.smartFilterPill,
               { backgroundColor: dynamicStyles.pillBg },
             ]}
           >
-            <MaterialCommunityIcons name="radar" size={18} color={NEON_BLUE} />
+            <MaterialCommunityIcons
+              name="tune-variant"
+              size={18}
+              color={dynamicStyles.textMain}
+            />
             <Text
-              style={{
-                fontSize: 10,
-                fontWeight: "700",
-                color: dynamicStyles.textMain,
-                marginLeft: 4,
-              }}
+              style={[
+                styles.smartFilterText,
+                { color: dynamicStyles.textMain },
+              ]}
+              numberOfLines={1}
             >
-              {radiusKm}km
+              {getLabel(ENTITY_TYPES, entityType)} •{" "}
+              {getLabel(PLAY_TYPES, playTypeFilter)} • {radiusKm}km
             </Text>
+            <MaterialCommunityIcons
+              name="chevron-down"
+              size={18}
+              color={dynamicStyles.textSub}
+            />
           </TouchableOpacity>
         </View>
 
@@ -922,13 +890,14 @@ export default function PickleRadarScreen() {
         ) : null}
       </SafeAreaView>
 
+      {/* FILTER MODAL */}
       <Modal
         animationType="fade"
-        transparent={true}
-        visible={showRadiusModal}
-        onRequestClose={() => setShowRadiusModal(false)}
+        transparent
+        visible={showFilterModal}
+        onRequestClose={() => setShowFilterModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowRadiusModal(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowFilterModal(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <BlurView
@@ -942,37 +911,139 @@ export default function PickleRadarScreen() {
                 <Text
                   style={[styles.modalTitle, { color: dynamicStyles.textMain }]}
                 >
-                  Quét trong
+                  Bộ lọc Radar
                 </Text>
 
+                <Text
+                  style={[
+                    styles.modalSectionTitle,
+                    { color: dynamicStyles.textSub },
+                  ]}
+                >
+                  Loại
+                </Text>
+                <View style={styles.modalGridWide}>
+                  {ENTITY_TYPES.map((opt) => {
+                    const active = entityType === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.modalChip,
+                          {
+                            borderColor: active
+                              ? THEME_COLOR
+                              : dynamicStyles.cardBorder,
+                            backgroundColor: active
+                              ? THEME_COLOR
+                              : "transparent",
+                          },
+                        ]}
+                        onPress={() => setEntityType(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.modalChipText,
+                            active
+                              ? { color: "#FFF", fontWeight: "900" }
+                              : {
+                                  color: dynamicStyles.textMain,
+                                  fontWeight: "800",
+                                },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text
+                  style={[
+                    styles.modalSectionTitle,
+                    { color: dynamicStyles.textSub, marginTop: 14 },
+                  ]}
+                >
+                  Hình thức
+                </Text>
+                <View style={styles.modalGridWide}>
+                  {PLAY_TYPES.map((opt) => {
+                    const active = playTypeFilter === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.modalChip,
+                          {
+                            borderColor: active
+                              ? THEME_COLOR
+                              : dynamicStyles.cardBorder,
+                            backgroundColor: active
+                              ? THEME_COLOR
+                              : "transparent",
+                          },
+                        ]}
+                        onPress={() => setPlayTypeFilter(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.modalChipText,
+                            active
+                              ? { color: "#FFF", fontWeight: "900" }
+                              : {
+                                  color: dynamicStyles.textMain,
+                                  fontWeight: "800",
+                                },
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text
+                  style={[
+                    styles.modalSectionTitle,
+                    { color: dynamicStyles.textSub, marginTop: 14 },
+                  ]}
+                >
+                  Bán kính
+                </Text>
                 <View style={styles.modalGrid}>
                   {RANGE_OPTIONS.map((opt) => {
-                    const isActive = radiusKm === opt;
+                    const active = radiusKm === opt;
                     return (
                       <TouchableOpacity
                         key={opt}
                         style={[
                           styles.modalOption,
-                          isActive && styles.modalOptionActive,
                           {
-                            borderColor: isActive
+                            borderColor: active
                               ? THEME_COLOR
                               : dynamicStyles.cardBorder,
+                            backgroundColor: active
+                              ? THEME_COLOR
+                              : "transparent",
                           },
                         ]}
                         onPress={() => {
                           setRadiusKm(opt);
-                          setShowRadiusModal(false);
                           if (myLocation) zoomToRadius(myLocation, opt);
-                          // Query tự refetch vì args đổi
                         }}
                       >
                         <Text
                           style={[
                             styles.modalOptionText,
-                            isActive
-                              ? { color: "#FFF", fontWeight: "bold" }
-                              : { color: dynamicStyles.textSub },
+                            active
+                              ? { color: "#FFF", fontWeight: "900" }
+                              : {
+                                  color: dynamicStyles.textSub,
+                                  fontWeight: "800",
+                                },
                           ]}
                         >
                           {opt} km
@@ -982,14 +1053,36 @@ export default function PickleRadarScreen() {
                   })}
                 </View>
 
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={() => setShowRadiusModal(false)}
-                >
-                  <Text style={{ color: dynamicStyles.textSub, fontSize: 13 }}>
-                    Đóng
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.modalFooterRow}>
+                  <TouchableOpacity
+                    onPress={handleResetFilters}
+                    style={[
+                      styles.modalFooterBtn,
+                      { backgroundColor: dynamicStyles.chipBg },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: dynamicStyles.textMain,
+                        fontWeight: "900",
+                      }}
+                    >
+                      Reset
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setShowFilterModal(false)}
+                    style={[
+                      styles.modalFooterBtn,
+                      { backgroundColor: THEME_COLOR },
+                    ]}
+                  >
+                    <Text style={{ color: "#FFF", fontWeight: "900" }}>
+                      Xong
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </BlurView>
             </TouchableWithoutFeedback>
           </View>
@@ -1052,7 +1145,7 @@ export default function PickleRadarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
-  loadingText: { marginTop: 10, fontSize: 14, fontWeight: "500" },
+  loadingText: { marginTop: 10, fontSize: 14, fontWeight: "600" },
 
   map: { flex: 1 },
 
@@ -1076,11 +1169,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  markerContainerFixed: {
+  // --- Marker ---
+  markerFixedBox: {
+    width: 70,
+    height: 80,
     alignItems: "center",
     justifyContent: "flex-end",
-    minWidth: 100,
-    minHeight: 100,
   },
   markerRoot: { alignItems: "center", justifyContent: "center" },
   markerRing: {
@@ -1088,7 +1182,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 2,
-    overflow: "hidden",
+    overflow: "hidden", // ✅ MUST: để ảnh không “tràn/không vẽ”
     backgroundColor: "#FFF",
   },
   markerImg: { width: "100%", height: "100%" },
@@ -1107,6 +1201,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // --- Bubble ---
   bubbleContainer: { marginBottom: 8, alignItems: "center", zIndex: 100 },
   bubbleContent: {
     backgroundColor: "#FFF",
@@ -1123,9 +1218,9 @@ const styles = StyleSheet.create({
   bubbleEmoji: { fontSize: 14, marginRight: 4 },
   bubbleText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#1F2937",
-    maxWidth: 130,
+    width: "auto",
   },
   bubbleArrow: {
     width: 0,
@@ -1141,6 +1236,7 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
 
+  // --- Header ---
   headerSafe: { position: "absolute", top: 0, left: 0, right: 0 },
   headerRow: {
     flexDirection: "row",
@@ -1160,31 +1256,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  pill: {
+  smartFilterPill: {
+    flex: 1,
+    marginLeft: 10,
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
+    gap: 8,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 2,
   },
-  pillText: { fontSize: 13 },
-  radiusBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 40,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  smartFilterText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
   },
 
+  // --- Modal ---
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1192,13 +1284,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    width: width * 0.8,
-    padding: 20,
+    width: width * 0.86,
+    padding: 18,
     borderRadius: 24,
     alignItems: "center",
     overflow: "hidden",
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", marginBottom: 16 },
+  modalTitle: { fontSize: 16, fontWeight: "900", marginBottom: 12 },
+
+  modalSectionTitle: {
+    alignSelf: "flex-start",
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+
+  modalGridWide: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+  },
+
+  modalChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 92,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalChipText: { fontSize: 13 },
+
   modalGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1212,12 +1331,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
-  modalOptionActive: { backgroundColor: THEME_COLOR, borderWidth: 0 },
-  modalOptionText: { fontSize: 14, fontWeight: "500" },
-  modalCloseBtn: { marginTop: 20, padding: 10 },
+  modalOptionText: { fontSize: 14 },
 
+  modalFooterRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  modalFooterBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // --- Recenter ---
   recenterBtn: {
     position: "absolute",
     right: 16,
@@ -1234,6 +1365,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
+  // --- Cards ---
   bottomListContainer: { position: "absolute", bottom: 30, width: "100%" },
   cardWrapper: { width: CARD_WIDTH, marginHorizontal: 6 },
   cardBlur: {
@@ -1255,7 +1387,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "90%",
   },
-  cardName: { fontSize: 16, fontWeight: "700", flexShrink: 1 },
+  cardName: { fontSize: 16, fontWeight: "900", flexShrink: 1 },
   cardClub: { fontSize: 12, marginTop: 2 },
   ratingPill: {
     flexDirection: "row",
@@ -1268,7 +1400,7 @@ const styles = StyleSheet.create({
   ratingText: {
     color: "#FACC15",
     fontSize: 10,
-    fontWeight: "bold",
+    fontWeight: "900",
     marginLeft: 2,
   },
   statsRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
@@ -1287,7 +1419,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 6,
   },
-  intentText: { fontSize: 11, fontWeight: "500" },
+  intentText: { fontSize: 11, fontWeight: "700" },
   actionRow: { flexDirection: "row", gap: 8 },
   btnAction: {
     flex: 1,
@@ -1296,9 +1428,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  btnTextPrimary: { fontWeight: "700", fontSize: 13, color: "#000" },
-  btnTextSecondary: { fontWeight: "600", fontSize: 13 },
+  btnTextPrimary: { fontWeight: "900", fontSize: 13, color: "#000" },
+  btnTextSecondary: { fontWeight: "800", fontSize: 13 },
 
+  // --- Radar pulse ---
   radarContainer: {
     alignItems: "center",
     justifyContent: "center",
