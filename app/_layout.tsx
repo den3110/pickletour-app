@@ -120,7 +120,7 @@ function Boot({ children }: { children: React.ReactNode }) {
     restart: otaRestart,
     close: otaClose,
   } = useOTAUpdate({
-    apiUrl: "https://pickletour.vn",  // Không có /api vì hook tự thêm
+    apiUrl: "https://pickletour.vn/api",  // Không có /api vì hook tự thêm
     autoCheck: true,
     delayMs: 2000,
   });
