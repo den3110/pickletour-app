@@ -1,6 +1,5 @@
 /**
- * useOTAUpdate Hook
- * Easy to use OTA update with UI
+ * useOTAUpdate Hook - Simple version
  */
 
 import { useState, useCallback, useEffect } from "react";
@@ -8,13 +7,7 @@ import { Alert, NativeModules } from "react-native";
 import OTAUpdater from "@/services/OTAUpdater";
 import Constants from "expo-constants";
 
-type OTAStatus =
-  | "idle"
-  | "checking"
-  | "downloading"
-  | "installing"
-  | "done"
-  | "error";
+type OTAStatus = "idle" | "checking" | "downloading" | "done" | "error";
 
 interface UseOTAUpdateOptions {
   apiUrl: string;
@@ -22,32 +15,16 @@ interface UseOTAUpdateOptions {
   delayMs?: number;
 }
 
-interface UseOTAUpdateReturn {
-  // State
-  visible: boolean;
-  progress: number;
-  status: OTAStatus;
-  version: string | undefined;
-
-  // Actions
-  checkForUpdate: () => Promise<void>;
-  restart: () => void;
-  close: () => void;
-}
-
-export function useOTAUpdate(options: UseOTAUpdateOptions): UseOTAUpdateReturn {
+export function useOTAUpdate(options: UseOTAUpdateOptions) {
   const [visible, setVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<OTAStatus>("idle");
   const [version, setVersion] = useState<string | undefined>();
-
-  const [ota] = useState(
-    () =>
-      new OTAUpdater({
-        apiUrl: options.apiUrl,
-        installMode: "onNextRestart",
-      })
-  );
+  
+  const [ota] = useState(() => new OTAUpdater({
+    apiUrl: options.apiUrl,
+    installMode: "onNextRestart",
+  }));
 
   const isExpoGo = Constants.appOwnership === "expo";
 
@@ -59,30 +36,21 @@ export function useOTAUpdate(options: UseOTAUpdateOptions): UseOTAUpdateReturn {
 
     try {
       setStatus("checking");
-
+      
       const updateInfo = await ota.checkForUpdate();
-
+      
       if (!updateInfo.updateAvailable) {
         setStatus("idle");
-        console.log("[OTA] No updates available");
         return;
       }
 
-      // Show modal với thông tin update
       setVersion(updateInfo.version);
       setProgress(0);
       setVisible(true);
-
-      // Hỏi user có muốn update không
+      
       Alert.alert(
         "Có bản cập nhật mới",
-        `Phiên bản ${updateInfo.version}\n${
-          updateInfo.description || ""
-        }\n\nKích thước: ${
-          updateInfo.size
-            ? (updateInfo.size / (1024 * 1024)).toFixed(1) + " MB"
-            : "N/A"
-        }`,
+        `Phiên bản ${updateInfo.version}\n${updateInfo.description || ""}`,
         [
           {
             text: "Để sau",
@@ -96,15 +64,14 @@ export function useOTAUpdate(options: UseOTAUpdateOptions): UseOTAUpdateReturn {
             text: "Cập nhật",
             onPress: async () => {
               setStatus("downloading");
-
+              
               const success = await ota.downloadAndInstall(
                 updateInfo,
                 (prog) => {
                   setProgress(prog);
-                  console.log(`[OTA] Downloading: ${Math.round(prog * 100)}%`);
                 }
               );
-
+              
               if (success) {
                 setStatus("done");
                 setProgress(1);
@@ -123,16 +90,8 @@ export function useOTAUpdate(options: UseOTAUpdateOptions): UseOTAUpdateReturn {
 
   const restart = useCallback(() => {
     setVisible(false);
-
-    if (NativeModules.OTAModule?.restart) {
-      console.log("[OTA] Restarting via native module...");
-      NativeModules.OTAModule.restart();
-    } else {
-      import("expo-updates").then((Updates) => {
-        Updates.reloadAsync();
-      });
-    }
-  }, []);
+    ota.restartApp();
+  }, [ota]);
 
   const close = useCallback(() => {
     setVisible(false);
@@ -140,13 +99,10 @@ export function useOTAUpdate(options: UseOTAUpdateOptions): UseOTAUpdateReturn {
     setProgress(0);
   }, []);
 
-  // Auto check on mount
+  // Auto check
   useEffect(() => {
     if (options.autoCheck !== false && !isExpoGo) {
-      const timer = setTimeout(() => {
-        checkForUpdate();
-      }, options.delayMs || 2000);
-
+      const timer = setTimeout(checkForUpdate, options.delayMs || 2000);
       return () => clearTimeout(timer);
     }
   }, []);
