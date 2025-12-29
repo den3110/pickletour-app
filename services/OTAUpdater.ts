@@ -199,7 +199,10 @@ class OTAUpdater {
       if (NativeModules.OTAModule?.setBundleVersion) {
         try {
           await NativeModules.OTAModule.setBundleVersion(updateInfo.version);
-          console.log("[OTA] Synced version to native UserDefaults:", updateInfo.version);
+          console.log(
+            "[OTA] Synced version to native UserDefaults:",
+            updateInfo.version
+          );
         } catch (e) {
           console.warn("[OTA] Failed to sync to native:", e);
         }
@@ -230,6 +233,7 @@ class OTAUpdater {
   async sync(options?: {
     onProgress?: (progress: number) => void;
     showPrompt?: boolean;
+    onStatusChange?: (status: string) => void;
   }): Promise<boolean> {
     const updateInfo = await this.checkForUpdate();
 
@@ -240,10 +244,15 @@ class OTAUpdater {
     // Show prompt for non-mandatory updates
     if (options?.showPrompt && !updateInfo.mandatory) {
       return new Promise((resolve) => {
+        const sizeInMB = updateInfo.size
+          ? (updateInfo.size / (1024 * 1024)).toFixed(1) + " MB"
+          : "unknown";
+
         Alert.alert(
           "Có bản cập nhật mới",
-          updateInfo.description ||
-            `Phiên bản ${updateInfo.version} đã sẵn sàng.`,
+          `${
+            updateInfo.description || `Phiên bản ${updateInfo.version}`
+          }\n\nKích thước: ${sizeInMB}`,
           [
             {
               text: "Để sau",
@@ -253,21 +262,43 @@ class OTAUpdater {
             {
               text: "Cập nhật",
               onPress: async () => {
+                // Show downloading alert
+                let currentProgress = 0;
+
                 const success = await this.downloadAndInstall(
                   updateInfo,
-                  options.onProgress
+                  (progress) => {
+                    currentProgress = Math.round(progress * 100);
+                    options.onProgress?.(progress);
+                    options.onStatusChange?.(`Đang tải: ${currentProgress}%`);
+                    console.log(`[OTA] Downloading: ${currentProgress}%`);
+                  }
                 );
+
                 if (success) {
-                  // ✅ Tự động restart sau khi download xong
+                  options.onStatusChange?.("Hoàn tất!");
+                  // Show restart button
                   Alert.alert(
-                    "Cập nhật thành công",
-                    "Ứng dụng sẽ khởi động lại để áp dụng bản cập nhật.",
+                    "✅ Cập nhật thành công",
+                    `Đã tải xong phiên bản ${updateInfo.version}.\nKhởi động lại để áp dụng bản cập nhật.`,
                     [
                       {
-                        text: "OK",
+                        text: "Để sau",
+                        style: "cancel",
+                      },
+                      {
+                        text: "Khởi động lại",
+                        style: "default",
                         onPress: () => this.restartApp(),
                       },
                     ]
+                  );
+                } else {
+                  options.onStatusChange?.("Lỗi tải xuống");
+                  Alert.alert(
+                    "❌ Lỗi cập nhật",
+                    "Không thể tải bản cập nhật. Vui lòng thử lại sau.",
+                    [{ text: "OK" }]
                   );
                 }
                 resolve(success);
