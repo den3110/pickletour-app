@@ -401,7 +401,7 @@ export default function PickleRadarScreen() {
     if (!id) return;
 
     if (it.type === "user") return router.push(`/profile/${id}`);
-    if (it.type === "tournament") return router.push(`/tournaments/${id}`);
+    if (it.type === "tournament") return router.push(`/tournament/${id}/index`);
     if (it.type === "club") return router.push(`/clubs/${id}`);
     if (it.type === "court") return router.push(`/courts/${id}`);
   };
