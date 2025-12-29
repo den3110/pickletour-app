@@ -231,7 +231,7 @@ class OTAUpdater {
     if (options?.showPrompt && !updateInfo.mandatory) {
       return new Promise((resolve) => {
         Alert.alert(
-          "Cập nhật mới",
+          "Có bản cập nhật mới",
           updateInfo.description ||
             `Phiên bản ${updateInfo.version} đã sẵn sàng.`,
           [
