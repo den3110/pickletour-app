@@ -502,6 +502,7 @@ export default function LiveLikeFBScreenKey({
   const startedPreviewRef = useRef(false);
   const lastUrlRef = useRef<string | null>(null);
   const currentMatchRef = useRef<string | null>(null);
+  const overlayReadyRef = useRef(false);
   const shouldResumeLiveRef = useRef(false);
   const previewRetryRef = useRef<{ cancel: boolean }>({ cancel: false });
   const chosenProfileRef = useRef<StreamProfile | null>(null);
@@ -823,6 +824,7 @@ export default function LiveLikeFBScreenKey({
         } catch {}
         try {
           await Live.overlayRemove?.();
+          overlayReadyRef.current = false;
         } catch {}
         try {
           await Live.stopPreview?.();
@@ -1073,6 +1075,20 @@ export default function LiveLikeFBScreenKey({
     log("Live.stop → done");
   }, [isRecording]);
 
+  // ✅ Stop stream nhưng giữ preview + giữ overlay (logo/sponsor không reload)
+  const stopStreamOnlyNative = useCallback(async () => {
+    try {
+      await Live.stopStreamOnly?.();
+      return;
+    } catch (e) {
+      log("⚠️ stopStreamOnlyNative failed", e);
+    }
+    // Nếu native chưa có stopStreamOnly thì fallback (sẽ reset overlay)
+    try {
+      await Live.stop?.();
+    } catch {}
+  }, []);
+
   /* ==== Query ==== */
   const [isFocused, setIsFocused] = useState(true);
   useFocusEffect(
@@ -1252,8 +1268,14 @@ export default function LiveLikeFBScreenKey({
         platform: "all",
       }).unwrap?.();
     } catch {}
-    await stopNativeNow();
-    setMode("ended");
+    await stopStreamOnlyNative();
+    setMode("idle");
+    setStatusText("Đang chờ trận được gán (assigned) vào sân…");
+    currentMatchRef.current = null;
+    lastUrlRef.current = null;
+    setLiveStartAt(null);
+    clearGapTimers();
+    return;
     setStatusText("Đã kết thúc buổi phát.");
     clearGapTimers();
   }, [notifyStreamEnded, stopNativeNow, clearGapTimers]);
@@ -1660,7 +1682,10 @@ export default function LiveLikeFBScreenKey({
           const fw = profile.width;
           const fh = profile.height;
 
-          await Live.overlayLoad("", fw, fh, "tl", 100, 100, 0, 0);
+          if (!overlayReadyRef.current) {
+            await Live.overlayLoad("", fw, fh, "tl", 100, 100, 0, 0);
+            overlayReadyRef.current = true;
+          }
           await Live.overlaySetVisible?.(true);
           log("overlay → loaded (native)");
         } catch (e) {
@@ -1934,7 +1959,7 @@ export default function LiveLikeFBScreenKey({
               platform: "all",
             }).unwrap?.();
           } catch {}
-          await stopNativeNow();
+          await stopStreamOnlyNative();
           setMode("idle");
           if (!gapWaitingRef.current && !gapWarnVisible) {
             beginGapWait();
@@ -1970,7 +1995,7 @@ export default function LiveLikeFBScreenKey({
                 platform: "all",
               }).unwrap?.();
             } catch {}
-            await stopNativeNow();
+            await stopStreamOnlyNative();
             setMode("idle");
             const ok = await startForMatch(currentMatchId);
             if (ok) lastAutoStartedForRef.current = currentMatchId;
@@ -2008,7 +2033,7 @@ export default function LiveLikeFBScreenKey({
               platform: "all",
             }).unwrap?.();
           } catch {}
-          await stopNativeNow();
+          await stopStreamOnlyNative();
           setMode("idle");
           beginGapWait();
         })();

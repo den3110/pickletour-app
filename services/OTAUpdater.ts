@@ -1,5 +1,6 @@
 /**
  * OTA Update Client for PickleTour (Expo version)
+ * Supports ZIP bundles with assets
  */
 
 import * as FileSystem from "expo-file-system/legacy";
@@ -7,6 +8,7 @@ import * as Application from "expo-application";
 import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform, Alert, NativeModules } from "react-native";
+import { unzip } from "react-native-zip-archive";
 
 const STORAGE_KEYS = {
   BUNDLE_VERSION: "@ota_bundle_version",
@@ -22,6 +24,8 @@ interface UpdateInfo {
   size?: number;
   mandatory?: boolean;
   description?: string;
+  isZip?: boolean;
+  logId?: string;
 }
 
 interface OTAConfig {
@@ -140,23 +144,28 @@ class OTAUpdater {
     this.isDownloading = true;
 
     try {
-      const bundlePath = `${this.bundlesDir}${updateInfo.version}/`;
-      const bundleFile = `${bundlePath}index.bundle`;
+      const versionDir = `${this.bundlesDir}${updateInfo.version}/`;
+      const isZip = updateInfo.isZip || false;
 
       // Create version directory
-      const dirInfo = await FileSystem.getInfoAsync(bundlePath);
+      const dirInfo = await FileSystem.getInfoAsync(versionDir);
       if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(bundlePath, {
+        await FileSystem.makeDirectoryAsync(versionDir, {
           intermediates: true,
         });
       }
 
-      // Download bundle với progress
+      // Download file
+      const downloadFile = isZip
+        ? `${versionDir}bundle.zip`
+        : `${versionDir}index.bundle`;
+
       console.log("[OTA] Downloading:", updateInfo.downloadUrl);
+      console.log("[OTA] isZip:", isZip);
 
       const downloadResumable = FileSystem.createDownloadResumable(
         updateInfo.downloadUrl,
-        bundleFile,
+        downloadFile,
         {},
         (downloadProgress) => {
           const progress =
@@ -172,19 +181,40 @@ class OTAUpdater {
         throw new Error("Download failed");
       }
 
-      // Verify hash if provided
-      if (updateInfo.hash) {
-        console.log(
-          "[OTA] Hash verification skipped (implement with expo-crypto if needed)"
-        );
+      console.log("[OTA] Downloaded to:", downloadResult.uri);
+
+      // If ZIP, extract it
+      if (isZip) {
+        console.log("[OTA] Extracting ZIP...");
+        onProgress?.(0.95); // Show 95% while extracting
+
+        try {
+          await unzip(downloadFile, versionDir);
+          console.log("[OTA] Extracted successfully");
+
+          // Delete zip file after extraction
+          await FileSystem.deleteAsync(downloadFile, { idempotent: true });
+        } catch (unzipError) {
+          console.error("[OTA] Unzip error:", unzipError);
+          throw new Error("Failed to extract update");
+        }
       }
 
-      // Save pending update info
+      // Find the bundle file path
+      const bundlePath = await this.findBundlePath(versionDir);
+      if (!bundlePath) {
+        throw new Error("Bundle file not found after extraction");
+      }
+
+      console.log("[OTA] Bundle path:", bundlePath);
+
+      // Save pending update info with bundle path
       await AsyncStorage.setItem(
         STORAGE_KEYS.PENDING_UPDATE,
         JSON.stringify({
           version: updateInfo.version,
-          bundlePath: bundleFile,
+          bundlePath,
+          versionDir,
           installedAt: Date.now(),
         })
       );
@@ -195,23 +225,33 @@ class OTAUpdater {
         updateInfo.version
       );
 
-      // ✅ QUAN TRỌNG: Sync với Native UserDefaults để AppDelegate đọc được
+      // ✅ Sync với Native - lưu version VÀ bundle path
       if (NativeModules.OTAModule?.setBundleVersion) {
         try {
           await NativeModules.OTAModule.setBundleVersion(updateInfo.version);
-          console.log(
-            "[OTA] Synced version to native UserDefaults:",
-            updateInfo.version
-          );
+          console.log("[OTA] Synced version to native:", updateInfo.version);
         } catch (e) {
-          console.warn("[OTA] Failed to sync to native:", e);
+          console.warn("[OTA] Failed to sync version to native:", e);
         }
-      } else {
-        console.warn("[OTA] NativeModules.OTAModule not available");
+      }
+
+      // Lưu bundle path vào native để AppDelegate đọc được
+      if (NativeModules.OTAModule?.setBundlePath) {
+        try {
+          await NativeModules.OTAModule.setBundlePath(bundlePath);
+          console.log("[OTA] Synced bundle path to native:", bundlePath);
+        } catch (e) {
+          console.warn("[OTA] Failed to sync path to native:", e);
+        }
       }
 
       console.log("[OTA] Download complete:", updateInfo.version);
-      console.log("[OTA] Bundle saved to:", bundleFile);
+      onProgress?.(1);
+
+      // Report success to server
+      if (updateInfo.logId) {
+        this.reportStatus(updateInfo.logId, "success");
+      }
 
       // Apply update based on install mode
       if (this.config.installMode === "immediate") {
@@ -221,9 +261,81 @@ class OTAUpdater {
       return true;
     } catch (error) {
       console.error("[OTA] Download error:", error);
+
+      // Report failure to server
+      if (updateInfo.logId) {
+        this.reportStatus(updateInfo.logId, "failed", String(error));
+      }
+
       return false;
     } finally {
       this.isDownloading = false;
+    }
+  }
+
+  /**
+   * Find bundle file path in extracted directory
+   */
+  private async findBundlePath(versionDir: string): Promise<string | null> {
+    // Check common Expo export paths
+    const possiblePaths = [
+      // Expo export structure: _expo/static/js/{platform}/entry-xxx.hbc
+      `${versionDir}_expo/static/js/${Platform.OS}/`,
+      `${versionDir}_expo/static/js/`,
+      // Direct bundle
+      `${versionDir}`,
+    ];
+
+    for (const basePath of possiblePaths) {
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(basePath);
+        if (dirInfo.exists && dirInfo.isDirectory) {
+          const files = await FileSystem.readDirectoryAsync(basePath);
+
+          // Look for .hbc (Hermes) or .bundle files
+          const bundleFile = files.find(
+            (f) =>
+              f.endsWith(".hbc") ||
+              f.endsWith(".bundle") ||
+              f === "index.bundle" ||
+              f.startsWith("entry-")
+          );
+
+          if (bundleFile) {
+            return `${basePath}${bundleFile}`;
+          }
+        }
+      } catch (e) {
+        // Directory doesn't exist, continue
+      }
+    }
+
+    // Fallback: look for index.bundle directly
+    const directBundle = `${versionDir}index.bundle`;
+    const directInfo = await FileSystem.getInfoAsync(directBundle);
+    if (directInfo.exists) {
+      return directBundle;
+    }
+
+    return null;
+  }
+
+  /**
+   * Report update status to server
+   */
+  private async reportStatus(
+    logId: string,
+    status: string,
+    errorMessage?: string
+  ) {
+    try {
+      await fetch(`${this.config.apiUrl}/api/ota/report-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logId, status, errorMessage }),
+      });
+    } catch (e) {
+      console.warn("[OTA] Failed to report status:", e);
     }
   }
 
@@ -262,7 +374,6 @@ class OTAUpdater {
             {
               text: "Cập nhật",
               onPress: async () => {
-                // Show downloading alert
                 let currentProgress = 0;
 
                 const success = await this.downloadAndInstall(
@@ -277,18 +388,13 @@ class OTAUpdater {
 
                 if (success) {
                   options.onStatusChange?.("Hoàn tất!");
-                  // Show restart button
                   Alert.alert(
                     "✅ Cập nhật thành công",
                     `Đã tải xong phiên bản ${updateInfo.version}.\nKhởi động lại để áp dụng bản cập nhật.`,
                     [
-                      {
-                        text: "Để sau",
-                        style: "cancel",
-                      },
+                      { text: "Để sau", style: "cancel" },
                       {
                         text: "Khởi động lại",
-                        style: "default",
                         onPress: () => this.restartApp(),
                       },
                     ]
@@ -313,30 +419,6 @@ class OTAUpdater {
   }
 
   /**
-   * Get path to current bundle
-   */
-  async getCurrentBundlePath(): Promise<string | null> {
-    try {
-      const pendingUpdate = await AsyncStorage.getItem(
-        STORAGE_KEYS.PENDING_UPDATE
-      );
-
-      if (pendingUpdate) {
-        const { bundlePath } = JSON.parse(pendingUpdate);
-        const fileInfo = await FileSystem.getInfoAsync(bundlePath);
-
-        if (fileInfo.exists) {
-          return bundlePath;
-        }
-      }
-
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
    * Rollback to embedded bundle
    */
   async rollback(): Promise<void> {
@@ -344,17 +426,10 @@ class OTAUpdater {
       await AsyncStorage.removeItem(STORAGE_KEYS.BUNDLE_VERSION);
       await AsyncStorage.removeItem(STORAGE_KEYS.PENDING_UPDATE);
 
-      // ✅ Clear native UserDefaults
       if (NativeModules.OTAModule?.clearBundleVersion) {
-        try {
-          await NativeModules.OTAModule.clearBundleVersion();
-          console.log("[OTA] Cleared native UserDefaults");
-        } catch (e) {
-          console.warn("[OTA] Failed to clear native:", e);
-        }
+        await NativeModules.OTAModule.clearBundleVersion();
       }
 
-      // Clear downloaded bundles
       const dirInfo = await FileSystem.getInfoAsync(this.bundlesDir);
       if (dirInfo.exists) {
         await FileSystem.deleteAsync(this.bundlesDir, { idempotent: true });
@@ -370,55 +445,22 @@ class OTAUpdater {
   }
 
   /**
-   * Cleanup old bundles
-   */
-  async cleanup(): Promise<void> {
-    try {
-      const currentVersion = await this.getCurrentBundleVersion();
-      const items = await FileSystem.readDirectoryAsync(this.bundlesDir);
-
-      for (const item of items) {
-        if (item !== currentVersion) {
-          await FileSystem.deleteAsync(`${this.bundlesDir}${item}`, {
-            idempotent: true,
-          });
-          console.log("[OTA] Cleaned up:", item);
-        }
-      }
-    } catch (error) {
-      console.error("[OTA] Cleanup error:", error);
-    }
-  }
-
-  /**
-   * Restart app to apply update
+   * Restart app
    */
   restartApp(): void {
-    // ✅ Dùng native module để restart
     if (NativeModules.OTAModule?.restart) {
-      console.log("[OTA] Restarting app via native module...");
       NativeModules.OTAModule.restart();
     } else {
-      // Fallback: dùng expo-updates
-      console.log("[OTA] Restarting app via expo-updates...");
       import("expo-updates").then((Updates) => {
-        Updates.reloadAsync().catch((error) => {
-          console.warn("[OTA] Reload failed:", error);
-        });
+        Updates.reloadAsync().catch(() => {});
       });
     }
   }
 
   /**
-   * Get update status
+   * Get status
    */
-  async getStatus(): Promise<{
-    currentVersion: string;
-    lastCheck: number | null;
-    hasPendingUpdate: boolean;
-    appVersion: string;
-    device: string;
-  }> {
+  async getStatus() {
     const currentVersion = await this.getCurrentBundleVersion();
     const lastCheckStr = await AsyncStorage.getItem(STORAGE_KEYS.LAST_CHECK);
     const pendingUpdate = await AsyncStorage.getItem(
