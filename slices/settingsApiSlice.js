@@ -36,6 +36,15 @@ export const settingsApiSlice = apiSlice.injectEndpoints({
         url: "/api/settings/guide-link",
       }),
     }),
+     /* ================== Mobile: OTA Allowed ====================== */
+    // allowed=true => cho hiện prompt update (bắt update theo bạn hiểu)
+    // allowed=false => vào app bình thường
+    getOtaAllowed: builder.query({
+      query: () => ({
+        url: "/api/auth/system/ota/allowed",
+      }),
+      providesTags: ["SystemSettings"],
+    }),
   }),
 });
 
@@ -44,4 +53,5 @@ export const {
   useUpdateSystemSettingsMutation,
   useGetRegistrationSettingsQuery,
   useGetGuideLinkQuery,
+  useGetOtaAllowedQuery,
 } = settingsApiSlice;
