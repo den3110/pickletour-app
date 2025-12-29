@@ -6,8 +6,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform, Alert } from "react-native";
-import * as Updates from "expo-updates";
+import { Platform, Alert, NativeModules } from "react-native";
 
 const STORAGE_KEYS = {
   BUNDLE_VERSION: "@ota_bundle_version",
@@ -175,8 +174,6 @@ class OTAUpdater {
 
       // Verify hash if provided
       if (updateInfo.hash) {
-        // Note: expo-file-system không có hash function built-in
-        // Có thể dùng expo-crypto nếu cần verify
         console.log(
           "[OTA] Hash verification skipped (implement with expo-crypto if needed)"
         );
@@ -192,13 +189,26 @@ class OTAUpdater {
         })
       );
 
-      // Update current version
+      // Update current version in AsyncStorage
       await AsyncStorage.setItem(
         STORAGE_KEYS.BUNDLE_VERSION,
         updateInfo.version
       );
 
+      // ✅ QUAN TRỌNG: Sync với Native UserDefaults để AppDelegate đọc được
+      if (NativeModules.OTAModule?.setBundleVersion) {
+        try {
+          await NativeModules.OTAModule.setBundleVersion(updateInfo.version);
+          console.log("[OTA] Synced version to native UserDefaults:", updateInfo.version);
+        } catch (e) {
+          console.warn("[OTA] Failed to sync to native:", e);
+        }
+      } else {
+        console.warn("[OTA] NativeModules.OTAModule not available");
+      }
+
       console.log("[OTA] Download complete:", updateInfo.version);
+      console.log("[OTA] Bundle saved to:", bundleFile);
 
       // Apply update based on install mode
       if (this.config.installMode === "immediate") {
@@ -247,6 +257,19 @@ class OTAUpdater {
                   updateInfo,
                   options.onProgress
                 );
+                if (success) {
+                  // ✅ Tự động restart sau khi download xong
+                  Alert.alert(
+                    "Cập nhật thành công",
+                    "Ứng dụng sẽ khởi động lại để áp dụng bản cập nhật.",
+                    [
+                      {
+                        text: "OK",
+                        onPress: () => this.restartApp(),
+                      },
+                    ]
+                  );
+                }
                 resolve(success);
               },
             },
@@ -290,6 +313,16 @@ class OTAUpdater {
       await AsyncStorage.removeItem(STORAGE_KEYS.BUNDLE_VERSION);
       await AsyncStorage.removeItem(STORAGE_KEYS.PENDING_UPDATE);
 
+      // ✅ Clear native UserDefaults
+      if (NativeModules.OTAModule?.clearBundleVersion) {
+        try {
+          await NativeModules.OTAModule.clearBundleVersion();
+          console.log("[OTA] Cleared native UserDefaults");
+        } catch (e) {
+          console.warn("[OTA] Failed to clear native:", e);
+        }
+      }
+
       // Clear downloaded bundles
       const dirInfo = await FileSystem.getInfoAsync(this.bundlesDir);
       if (dirInfo.exists) {
@@ -330,10 +363,19 @@ class OTAUpdater {
    * Restart app to apply update
    */
   restartApp(): void {
-    // Dùng expo-updates để reload
-    Updates.reloadAsync().catch((error) => {
-      console.warn("[OTA] Reload failed:", error);
-    });
+    // ✅ Dùng native module để restart
+    if (NativeModules.OTAModule?.restart) {
+      console.log("[OTA] Restarting app via native module...");
+      NativeModules.OTAModule.restart();
+    } else {
+      // Fallback: dùng expo-updates
+      console.log("[OTA] Restarting app via expo-updates...");
+      import("expo-updates").then((Updates) => {
+        Updates.reloadAsync().catch((error) => {
+          console.warn("[OTA] Reload failed:", error);
+        });
+      });
+    }
   }
 
   /**
