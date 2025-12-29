@@ -1175,6 +1175,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const curIdx = theCurIdx;
   const serverA = Number(gs[curIdx]?.a ?? 0);
   const serverB = Number(gs[curIdx]?.b ?? 0);
+  const scoreGuardRef = useRef({ a: null, b: null, until: 0 });
 
   const g = scoreGuardRef.current;
   const guardOn = g && Date.now() < g.until;
@@ -1271,7 +1272,6 @@ export default function RefereeJudgePanel({ matchId }) {
     side: "",
     serverNum: 0,
   }); // ✅ Chặn score render bị "lùi" gây nhảy slot trong 1-1.5s
-  const scoreGuardRef = useRef({ a: null, b: null, until: 0 });
 
   // ✅ Snapshot để chống "serverId nhảy" sau khi đội đang giao ghi điểm
   const prevServeSnapRef = useRef({
