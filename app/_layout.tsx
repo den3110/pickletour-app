@@ -34,8 +34,9 @@ import { Provider } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
-import OTAProgressModal from "@/components/OTAProgressModal";
-import { useOTAUpdate } from "@/hooks/useOTAUpdate";
+// ✅ Thay OTA cũ bằng Expo Updates
+import ExpoUpdateModal from "@/components/ExpoUpdateModal";
+import { useExpoUpdate } from "@/hooks/useExpoUpdate";
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
@@ -111,18 +112,16 @@ function Boot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
   useExpoPushToken();
 
-  // ✅ OTA Hook - tự động check update khi app ready
+  // ✅ Expo Updates Hook - thay thế OTA cũ
   const {
-    visible: otaVisible,
-    progress: otaProgress,
-    status: otaStatus,
-    version: otaVersion,
-    restart: otaRestart,
-    close: otaClose,
-  } = useOTAUpdate({
-    apiUrl: "https://pickletour.vn/api",  // Không có /api vì hook tự thêm
+    visible: updateVisible,
+    status: updateStatus,
+    closeModal: closeUpdateModal,
+  } = useExpoUpdate({
     autoCheck: true,
     delayMs: 2000,
+    showPrompt: true,
+    checkOnForeground: false,
   });
 
   React.useEffect(() => {
@@ -157,14 +156,11 @@ function Boot({ children }: { children: React.ReactNode }) {
     <>
       {children}
 
-      {/* ✅ OTA Progress Modal */}
-      <OTAProgressModal
-        visible={otaVisible}
-        progress={otaProgress}
-        status={otaStatus}
-        version={otaVersion}
-        onRestart={otaRestart}
-        onClose={otaClose}
+      {/* ✅ Expo Update Modal */}
+      <ExpoUpdateModal
+        visible={updateVisible}
+        status={updateStatus}
+        onClose={closeUpdateModal}
       />
     </>
   );

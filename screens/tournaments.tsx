@@ -14,6 +14,7 @@ import {
   View,
   Keyboard,
   Modal,
+  SafeAreaView
 } from "react-native";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
@@ -22,7 +23,6 @@ import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-  SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";

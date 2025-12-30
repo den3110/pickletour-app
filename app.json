@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      
+
       "buildNumber": "26",
       "associatedDomains": [
         "applinks:pickletour.vn",
@@ -188,7 +188,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/33bf4371-b5a6-4121-a651-99f3c2f19ba2"
+      "enabled": true,
+      "url": "https://pickletour.vn/api/api/expo-updates/manifest",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
     }
   }
 }

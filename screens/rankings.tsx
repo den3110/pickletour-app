@@ -1137,7 +1137,7 @@ export default function RankingListScreen({ isBack = false }) {
                 </Pressable>
               )}
               <Text style={[styles.screenTitle, { color: theme.text }]}>
-                Bảng xếp hạng
+                Bảng xếp hạng 1
               </Text>
             </View>
 
