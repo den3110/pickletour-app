@@ -3,23 +3,22 @@
 /**
  * Expo Updates Upload CLI
  * Build và upload OTA update lên server
- *
+ * 
  * Usage:
- *   node scripts/expo-upload.js ios "Bug fixes"
- *   node scripts/expo-upload.js android "New feature"
+ *   node expo-upload.js ios "Bug fixes"
+ *   node expo-upload.js android "New feature"
  */
 
 const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const FormData = require("form-data");
 
 const PLATFORM = process.argv[2]; // ios | android
 const MESSAGE = process.argv[3] || "OTA Update";
 const API_URL = process.env.API_URL || "https://pickletour.vn/api";
 
 if (!PLATFORM || !["ios", "android"].includes(PLATFORM)) {
-  console.error("Usage: node scripts/expo-upload.js <ios|android> [message]");
+  console.error("Usage: node expo-upload.js <ios|android> [message]");
   process.exit(1);
 }
 
@@ -41,8 +40,18 @@ async function main() {
 
   // Read app.json to get runtimeVersion
   const appJson = JSON.parse(fs.readFileSync("./app.json", "utf-8"));
-  const runtimeVersion =
-    appJson.expo?.runtimeVersion || appJson.expo?.version || "1.0.0";
+  let runtimeVersion = appJson.expo?.runtimeVersion;
+  
+  // Handle runtimeVersion as object (policy-based)
+  if (typeof runtimeVersion === "object") {
+    if (runtimeVersion.policy === "appVersion") {
+      runtimeVersion = appJson.expo?.version || "1.0.0";
+    } else {
+      runtimeVersion = appJson.expo?.version || "1.0.0";
+    }
+  }
+  
+  runtimeVersion = runtimeVersion || appJson.expo?.version || "1.0.0";
 
   console.log(`\n📋 Runtime Version: ${runtimeVersion}`);
 
@@ -55,25 +64,58 @@ async function main() {
   // Upload to server
   console.log("\n☁️  Uploading to server...");
 
-  const FormData = (await import("form-data")).default;
-  const fetch = (await import("node-fetch")).default;
-
+  const FormData = require("form-data");
   const form = new FormData();
+  
   form.append("platform", PLATFORM);
   form.append("runtimeVersion", runtimeVersion);
   form.append("message", MESSAGE);
 
+  // ✅ Send paths separately to preserve directory structure
+  const filePaths = files.map(f => f.relativePath);
+  form.append("paths", JSON.stringify(filePaths));
+
   for (const file of files) {
     form.append("files", fs.createReadStream(file.fullPath), {
-      filename: file.relativePath,
+      // Use index as filename to maintain order, paths array has real paths
+      filename: `file_${files.indexOf(file)}`,
       contentType: getContentType(file.relativePath),
     });
   }
 
-  const response = await fetch(`${API_URL}/api/expo-updates/upload`, {
-    method: "POST",
-    body: form,
-    headers: form.getHeaders(),
+  // Use http/https modules directly for FormData streaming
+  const response = await new Promise((resolve, reject) => {
+    const https = require("https");
+    const http = require("http");
+    const { URL } = require("url");
+    
+    const url = new URL(`${API_URL}/api/expo-updates/upload`);
+    const protocol = url.protocol === "https:" ? https : http;
+    
+    const req = protocol.request(
+      {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === "https:" ? 443 : 80),
+        path: url.pathname,
+        method: "POST",
+        headers: form.getHeaders(),
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            text: () => Promise.resolve(data),
+            json: () => Promise.resolve(JSON.parse(data)),
+          });
+        });
+      }
+    );
+
+    req.on("error", reject);
+    form.pipe(req);
   });
 
   if (!response.ok) {
@@ -100,7 +142,8 @@ function collectFiles(baseDir, currentDir, files) {
     if (stat.isDirectory()) {
       collectFiles(baseDir, fullPath, files);
     } else {
-      const relativePath = path.relative(baseDir, fullPath);
+      // Use forward slashes for consistency
+      const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, "/");
       files.push({ fullPath, relativePath });
     }
   }

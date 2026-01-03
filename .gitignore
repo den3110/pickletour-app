@@ -32,6 +32,7 @@ yarn.lock
 
 # local env files
 .env*.local
+.env.hotupdater
 
 # typescript
 *.tsbuildinfo
@@ -43,3 +44,5 @@ google-services.json
 GoogleService-Info.plist
 android copy
 ota-build
+# hot-updater
+.hot-updater/output

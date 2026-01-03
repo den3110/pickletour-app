@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Alert, AppState } from "react-native";
-import * as Updates from "expo-updates";
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 
 type UpdateStatus = "idle" | "checking" | "downloading" | "done" | "error";
 
@@ -29,7 +29,7 @@ export function useExpoUpdate(options: UseExpoUpdateOptions = {}) {
   const [status, setStatus] = useState<UpdateStatus>("idle");
 
   const isExpoGo = Constants.appOwnership === "expo";
-  const isDev = __DEV__;
+  const isDev = false;
 
   const checkAndUpdate = useCallback(
     async (silent = false) => {
@@ -41,14 +41,16 @@ export function useExpoUpdate(options: UseExpoUpdateOptions = {}) {
 
       try {
         if (!silent) setStatus("checking");
-
+        console.log(1)
         const update = await Updates.checkForUpdateAsync();
+        console.log(2)
 
         if (!update.isAvailable) {
           console.log("[Updates] No update available");
           setStatus("idle");
           return;
         }
+        console.log(3)
 
         console.log("[Updates] Update available!");
 
@@ -70,8 +72,12 @@ export function useExpoUpdate(options: UseExpoUpdateOptions = {}) {
             ]
           );
         } else {
+        console.log(4)
+
           // Auto download
           await downloadUpdate();
+        console.log(5)
+        
         }
       } catch (error) {
         console.error("[Updates] Check error:", error);

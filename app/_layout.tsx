@@ -10,6 +10,7 @@ import React, { useEffect } from "react";
 import {
   ActivityIndicator,
   View,
+  Text,
   AppState,
   InteractionManager,
   DeviceEventEmitter,
@@ -34,9 +35,7 @@ import { Provider } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
-// ✅ Thay OTA cũ bằng Expo Updates
-import ExpoUpdateModal from "@/components/ExpoUpdateModal";
-import { useExpoUpdate } from "@/hooks/useExpoUpdate";
+import { HotUpdater } from "@hot-updater/react-native";
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
@@ -46,7 +45,6 @@ import {
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
-
 // app/_layout.tsx
 if (__DEV__) {
   require("../dev/reactotron");
@@ -112,18 +110,6 @@ function Boot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
   useExpoPushToken();
 
-  // ✅ Expo Updates Hook - thay thế OTA cũ
-  const {
-    visible: updateVisible,
-    status: updateStatus,
-    closeModal: closeUpdateModal,
-  } = useExpoUpdate({
-    autoCheck: true,
-    delayMs: 2000,
-    showPrompt: true,
-    checkOnForeground: false,
-  });
-
   React.useEffect(() => {
     let done = false;
     const guard = setTimeout(() => {
@@ -152,23 +138,12 @@ function Boot({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
-    <>
-      {children}
-
-      {/* ✅ Expo Update Modal */}
-      <ExpoUpdateModal
-        visible={updateVisible}
-        status={updateStatus}
-        onClose={closeUpdateModal}
-      />
-    </>
-  );
+  return <>{children}</>;
 }
 
 const isExpoGo = Constants.appOwnership === "expo";
 
-export default function RootLayout() {
+function RootLayout() {
   const segments = useSegments();
 
   const clarityInitRef = React.useRef(false);
@@ -984,3 +959,80 @@ export default function RootLayout() {
     </Provider>
   );
 }
+
+// ✅ Wrap app với HotUpdater cho OTA updates
+export default HotUpdater.wrap({
+  baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
+  updateStrategy: "appVersion",
+  updateMode: "auto",
+  fallbackComponent: ({ progress, status, message }) => (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#0b0c10",
+        padding: 32,
+      }}
+    >
+      <ActivityIndicator size="large" color="#1976d2" />
+      <Text
+        style={{
+          color: "#ffffff",
+          fontSize: 18,
+          fontWeight: "600",
+          marginTop: 24,
+          textAlign: "center",
+        }}
+      >
+        {status === "UPDATING"
+          ? "Đang cập nhật..."
+          : "Đang kiểm tra cập nhật..."}
+      </Text>
+      {progress > 0 && (
+        <>
+          <View
+            style={{
+              width: "80%",
+              height: 6,
+              backgroundColor: "#2a2d35",
+              borderRadius: 3,
+              marginTop: 16,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                width: `${Math.round(progress * 100)}%`,
+                height: "100%",
+                backgroundColor: "#1976d2",
+                borderRadius: 3,
+              }}
+            />
+          </View>
+          <Text
+            style={{
+              color: "#9ca3af",
+              fontSize: 14,
+              marginTop: 8,
+            }}
+          >
+            {Math.round(progress * 100)}%
+          </Text>
+        </>
+      )}
+      {message && (
+        <Text
+          style={{
+            color: "#9ca3af",
+            fontSize: 12,
+            marginTop: 12,
+            textAlign: "center",
+          }}
+        >
+          {message}
+        </Text>
+      )}
+    </View>
+  ),
+})(RootLayout);

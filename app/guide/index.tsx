@@ -372,21 +372,7 @@ export default function GuidesScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: "Hướng dẫn",
-          headerTitleAlign: "center",
-          // headerLeft: () => (
-          //   <TouchableOpacity
-          //     onPress={() => router.back()}
-          //     style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-          //   >
-          //     <Ionicons name="chevron-back" size={24} />
-          //   </TouchableOpacity>
-          // ),
-          headerBackTitle: "Quay lại",
-        }}
-      />
+    
       <View style={[styles.container, { backgroundColor: bg }]}>
         {showSkeleton ? (
           <FlatList
@@ -554,7 +540,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 16,
     paddingBottom: 32,
   },
   item: {

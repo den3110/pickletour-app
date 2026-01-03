@@ -25,13 +25,14 @@ import {
   useColorScheme,
   DeviceEventEmitter,
   InteractionManager,
+  SafeAreaView
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
 import { useTheme } from "@react-navigation/native";
 import ImageViewing from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+// import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import { useGetRankingsQuery } from "@/slices/rankingsApiSlice";
@@ -1137,7 +1138,7 @@ export default function RankingListScreen({ isBack = false }) {
                 </Pressable>
               )}
               <Text style={[styles.screenTitle, { color: theme.text }]}>
-                Bảng xếp hạng 1
+                Bảng xếp hạng
               </Text>
             </View>
 

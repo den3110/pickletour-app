@@ -7,7 +7,7 @@
 // - NEW: Skeleton loading cho danh sách giải + trận
 
 import {
-  SafeAreaView,
+  // SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import React, {
@@ -18,6 +18,7 @@ import React, {
   useRef,
 } from "react";
 import {
+    SafeAreaView,
   ActivityIndicator,
   FlatList,
   Platform,

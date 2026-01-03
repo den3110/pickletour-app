@@ -173,7 +173,13 @@
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@hot-updater/react-native",
+        {
+          "channel": "production"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -183,15 +189,6 @@
       "eas": {
         "projectId": "33bf4371-b5a6-4121-a651-99f3c2f19ba2"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "enabled": true,
-      "url": "https://pickletour.vn/api/api/expo-updates/manifest",
-      "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD"
     }
   }
 }
