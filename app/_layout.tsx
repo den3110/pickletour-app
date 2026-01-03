@@ -961,11 +961,158 @@ function RootLayout() {
 }
 
 // ✅ Wrap app với HotUpdater cho OTA updates
+const LAST_UPDATE_KEY = "HOT_UPDATER_LAST_BUNDLE";
+
+// Custom Update Screen Component
+const UpdateScreen = ({
+  progress,
+  status,
+  message,
+}: {
+  progress: number;
+  status: string;
+  message: string | null;
+}) => {
+  const [updateReady, setUpdateReady] = React.useState(false);
+
+  React.useEffect(() => {
+    // Khi progress đạt 100% hoặc status thay đổi từ UPDATING, đánh dấu sẵn sàng
+    if (
+      progress >= 1 ||
+      (status !== "UPDATING" && status !== "CHECK_FOR_UPDATE" && progress > 0)
+    ) {
+      setUpdateReady(true);
+    }
+  }, [progress, status]);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#0b0c10",
+        padding: 32,
+      }}
+    >
+      {!updateReady ? (
+        <>
+          <ActivityIndicator size="large" color="#1976d2" />
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 18,
+              fontWeight: "600",
+              marginTop: 24,
+              textAlign: "center",
+            }}
+          >
+            {status === "UPDATING"
+              ? "Đang tải bản cập nhật..."
+              : "Đang kiểm tra cập nhật..."}
+          </Text>
+          {progress > 0 && (
+            <>
+              <View
+                style={{
+                  width: "80%",
+                  height: 6,
+                  backgroundColor: "#2a2d35",
+                  borderRadius: 3,
+                  marginTop: 16,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    width: `${Math.round(progress * 100)}%`,
+                    height: "100%",
+                    backgroundColor: "#1976d2",
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+              <Text
+                style={{
+                  color: "#9ca3af",
+                  fontSize: 14,
+                  marginTop: 8,
+                }}
+              >
+                {Math.round(progress * 100)}%
+              </Text>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <Text
+            style={{
+              color: "#22c55e",
+              fontSize: 48,
+              marginBottom: 16,
+            }}
+          >
+            ✓
+          </Text>
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 20,
+              fontWeight: "700",
+              textAlign: "center",
+              marginBottom: 8,
+            }}
+          >
+            Cập nhật hoàn tất!
+          </Text>
+          <Text
+            style={{
+              color: "#9ca3af",
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 24,
+            }}
+          >
+            {message || "Bản cập nhật đã được tải về thành công"}
+          </Text>
+          <TouchableOpacity
+            onPress={() => HotUpdater.reload()}
+            style={{
+              backgroundColor: "#1976d2",
+              paddingHorizontal: 32,
+              paddingVertical: 14,
+              borderRadius: 8,
+            }}
+          >
+            <Text
+              style={{
+                color: "#ffffff",
+                fontSize: 16,
+                fontWeight: "600",
+              }}
+            >
+              Mở lại ứng dụng
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  );
+};
+
 export default HotUpdater.wrap({
   baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
   updateStrategy: "appVersion",
   updateMode: "auto",
-  fallbackComponent: ({ progress, status, message }) => (
+  reloadOnForceUpdate: true, // Tự reload ngay khi download xong
+  onError: (error) => {
+    console.error("[HotUpdater] Error:", error);
+  },
+  onProgress: (progress) => {
+    console.log("[HotUpdater] Progress:", Math.round(progress * 100) + "%");
+  },
+  fallbackComponent: ({ progress, status }) => (
     <View
       style={{
         flex: 1,
@@ -986,7 +1133,7 @@ export default HotUpdater.wrap({
         }}
       >
         {status === "UPDATING"
-          ? "Đang cập nhật..."
+          ? "Đang tải bản cập nhật..."
           : "Đang kiểm tra cập nhật..."}
       </Text>
       {progress > 0 && (
@@ -1010,28 +1157,10 @@ export default HotUpdater.wrap({
               }}
             />
           </View>
-          <Text
-            style={{
-              color: "#9ca3af",
-              fontSize: 14,
-              marginTop: 8,
-            }}
-          >
+          <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 8 }}>
             {Math.round(progress * 100)}%
           </Text>
         </>
-      )}
-      {message && (
-        <Text
-          style={{
-            color: "#9ca3af",
-            fontSize: 12,
-            marginTop: 12,
-            textAlign: "center",
-          }}
-        >
-          {message}
-        </Text>
       )}
     </View>
   ),
