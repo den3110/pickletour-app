@@ -1197,22 +1197,33 @@ export default function RefereeJudgePanel({ matchId }) {
   );
 
   const slotsBase = match?.slots?.base || match?.meta?.slots?.base || {};
+  // Optimistic override: vị trí ô được cập nhật ngay khi đổi bên, không chờ server
+  const [localBaseOverride, setLocalBaseOverride] = useState<{
+    A: Record<string, number>;
+    B: Record<string, number>;
+  } | null>(null);
+
+  // Clear override khi server data mới về (slotsBase thay đổi)
+  useEffect(() => {
+    if (localBaseOverride) setLocalBaseOverride(null);
+  }, [slotsBase?.A, slotsBase?.B]);
+
   const baseA = useMemo(() => {
-    const raw = slotsBase?.A || {};
+    const raw = localBaseOverride?.A || slotsBase?.A || {};
     const out = { ...raw };
     const ids = playersA.map(userIdOf);
     if (ids[0] && !out[ids[0]]) out[ids[0]] = 1;
     if (ids[1] && !out[ids[1]]) out[ids[1]] = 2;
     return out;
-  }, [slotsBase?.A, playersA]);
+  }, [slotsBase?.A, localBaseOverride?.A, playersA]);
   const baseB = useMemo(() => {
-    const raw = slotsBase?.B || {};
+    const raw = localBaseOverride?.B || slotsBase?.B || {};
     const out = { ...raw };
     const ids = playersB.map(userIdOf);
     if (ids[0] && !out[ids[0]]) out[ids[0]] = 1;
     if (ids[1] && !out[ids[1]]) out[ids[1]] = 2;
     return out;
-  }, [slotsBase?.B, playersB]);
+  }, [slotsBase?.B, localBaseOverride?.B, playersB]);
 
   const slotsNowA = useMemo(() => {
     const o = {};
@@ -2168,6 +2179,18 @@ export default function RefereeJudgePanel({ matchId }) {
         };
         beginOpTimeout("undo");
 
+        // After undo, if score drops below midPoint → allow re-triggering the prompt
+        const newA = entry.side === "A" ? curA - 1 : curA;
+        const newB = entry.side === "B" ? curB - 1 : curB;
+        if (
+          midPoint != null &&
+          midAskedRef.current[curIdx] &&
+          newA < midPoint &&
+          newB < midPoint
+        ) {
+          delete midAskedRef.current[curIdx];
+        }
+
         await dec(entry.side);
         socket?.emit("score:inc", {
           matchId: match?._id,
@@ -2228,6 +2251,19 @@ export default function RefereeJudgePanel({ matchId }) {
       } else if (entry.t === "SWAP_SIDES") {
         setUndoBusy(true);
         setLeftRight(entry.prev);
+        // Restore base slot positions: optimistic update ngay
+        if (entry.prevBase) {
+          setLocalBaseOverride(entry.prevBase);
+          if (match?._id) {
+            socket?.emit(
+              "slots:setBase",
+              { matchId: match._id, base: entry.prevBase, userMatch },
+              (ack) => {
+                if (ack?.ok) refetch();
+              }
+            );
+          }
+        }
         setUndoBusy(false);
       }
     } catch {
@@ -2269,6 +2305,17 @@ export default function RefereeJudgePanel({ matchId }) {
     const uidRight = uidFound || Object.keys(nextSlotsMap)[0] || "";
 
     lastServerUidRef.current = uidRight;
+
+    // Pin server UID ngay để toggleServerNum (đổi tay) hoạt động luôn mà không chờ refetch
+    if (uidRight) {
+      forcedServerRef.current = {
+        uid: uidRight,
+        until: Date.now() + 1500,
+        gameIndex: curIdx,
+        side: nextSide,
+        serverNum: wantOrder,
+      };
+    }
 
     socket?.emit(
       "serve:set",
@@ -2450,8 +2497,33 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const swapSides = () => {
     const prev = { ...leftRight };
+    const prevBase = { A: baseA, B: baseB };
     setLeftRight(({ left, right }) => ({ left: right, right: left }));
-    pushUndo({ t: "SWAP_SIDES", prev });
+
+    // Đổi bên = VĐV lên ô chéo: flip slot trong mỗi đội (1→2, 2→1)
+    const flipSlots = (base: Record<string, number>) => {
+      const flipped: Record<string, number> = {};
+      for (const [uid, slot] of Object.entries(base)) {
+        flipped[uid] = Number(slot) === 1 ? 2 : 1;
+      }
+      return flipped;
+    };
+    const newBase = { A: flipSlots(baseA), B: flipSlots(baseB) };
+
+    // Optimistic: cập nhật UI ngay lập tức
+    setLocalBaseOverride(newBase);
+
+    if (match?._id) {
+      socket?.emit(
+        "slots:setBase",
+        { matchId: match._id, base: newBase, userMatch },
+        (ack) => {
+          if (ack?.ok) refetch();
+        }
+      );
+    }
+
+    pushUndo({ t: "SWAP_SIDES", prev, prevBase });
   };
 
   const handleBack = useCallback(async () => {

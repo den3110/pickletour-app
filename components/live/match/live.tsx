@@ -163,8 +163,6 @@ type Orient = "portrait" | "landscape";
 
 type QualityId =
   | "auto"
-  | "1080p30"
-  | "1080p60"
   | "720p60"
   | "720p30"
   | "720p24"
@@ -220,22 +218,6 @@ const QUALITY_PRESETS: Record<
     height: 720,
     fps: 24,
     bitrate: 3_000_000,
-  },
-  "1080p30": {
-    label: "1080p • 30fps (Cần WiFi tốt)",
-    shortLabel: "1080p30",
-    width: 1920,
-    height: 1080,
-    fps: 30,
-    bitrate: 5_000_000,
-  },
-  "1080p60": {
-    label: "1080p • 60fps (Cần WiFi)",
-    shortLabel: "1080p60",
-    width: 1920,
-    height: 1080,
-    fps: 60,
-    bitrate: 6_500_000,
   },
   "540p30": {
     label: "540p • 30fps (4G yếu)",
@@ -1429,7 +1411,7 @@ export default function LiveLikeFBUserMatchScreen({
           }
         }
       } catch (e) {
-        console.log(e)
+        console.log(e);
         log("startForMatch → getSurfaceState error (ignored):", e);
       }
 
@@ -1437,7 +1419,6 @@ export default function LiveLikeFBUserMatchScreen({
 
       const liveInfo = await ensureOutputsForMatch(mid);
       if (!liveInfo) {
-        
         setStatusText("❌ Backend chưa trả RTMP cho trận này.");
         Alert.alert("Không thể phát", "Chưa có RTMPS URL từ server.");
         return false;
@@ -2108,7 +2089,6 @@ export default function LiveLikeFBUserMatchScreen({
                   if (onFinishedGoToTournament)
                     return onFinishedGoToTournament();
                   router.push("/match/stack");
-
                 }}
               >
                 <Text style={styles.endedBtnTxt}>Về danh sách trận đấu</Text>

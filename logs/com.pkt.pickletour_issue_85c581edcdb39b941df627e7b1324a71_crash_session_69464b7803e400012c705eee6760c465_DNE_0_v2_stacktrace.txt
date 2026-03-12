@@ -1,0 +1,2569 @@
+# Crashlytics - Stack trace
+# Application: com.pkt.pickletour
+# Platform: android
+# Version: 1.0.5 (14)
+# Issue: 85c581edcdb39b941df627e7b1324a71
+# Session: 69464b7803e400012c705eee6760c465_DNE_0_v2
+# Date: Sat Dec 20 2025 15:30:08 GMT+0700 (Indochina Time)
+
+Crashed: Thread: SIGABRT  0x0000000000000000
+#00 pc 0x51ce8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x51cb8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xa0210 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#03 pc 0x9eeb0 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x9f374 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#05 pc 0x9f314 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#06 pc 0x25d574 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#07 pc 0x3a2c70 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#08 pc 0x3194ac libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#09 pc 0xaaa24 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#10 pc 0xaa760 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#11 pc 0xb2cd8 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#12 pc 0x12a220 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#13 pc 0xb2cd8 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#14 pc 0xcb530 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#15 pc 0xc520c libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#16 pc 0xc4a28 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#17 pc 0xb2d90 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#18 pc 0xb15e4 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#19 pc 0x10c464 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#20 pc 0xb2cd8 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#21 pc 0xc50c8 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#22 pc 0xc4a28 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#23 pc 0xb2d90 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#24 pc 0xb2918 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#25 pc 0xa39a8 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#26 pc 0x41d478 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#27 pc 0x41b654 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#28 pc 0x41bf64 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#29 pc 0x41bc74 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#30 pc 0x265d80 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#31 pc 0x45e930 libreactnative.so (BuildId: daceecb3f8ffe4c2)
+#32 pc 0x17dd0 libfbjni.so (BuildId: e438f6554af1d86b210a05412e96c4251e570157)
+#33 pc 0x17d10 libfbjni.so (BuildId: e438f6554af1d86b210a05412e96c4251e570157)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x5bfaa8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x4605a0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x78a69d5a3c
+#09 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x170bd0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x78a69d5a3c
+#13 pc 0x78a4c8f590
+#14 pc 0x78a4c901f0
+#15 pc 0x78a4c8ebb8
+#16 pc 0x78a69d59ac
+#17 pc 0x78a69d59b4
+#18 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0x20b0d4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0x78a69d59b4
+#21 pc 0x78a69d59c8
+#22 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#23 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0x170bd0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#25 pc 0x78a69d59c8
+#26 pc 0x78a4c8f590
+#27 pc 0x78a4c901f0
+#28 pc 0x78a4c8ebb8
+#29 pc 0x78a69d5858
+#30 pc 0x78a69d5858
+#31 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#32 pc 0x20b0d4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#33 pc 0x78a69d5858
+#34 pc 0x78a69d58b4
+#35 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#36 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#37 pc 0x170bd0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#38 pc 0x78a69d58b4
+#39 pc 0x78a4c8f590
+#40 pc 0x62e028 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#41 pc 0x78a4c8ebb8
+#42 pc 0x78a69d575e
+#43 pc 0x78a69d575e
+#44 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#45 pc 0x20b0d4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#46 pc 0x78a69d575e
+#47 pc 0x78a69d57de
+#48 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#49 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#50 pc 0x170bd0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#51 pc 0x78a69d57de
+#52 pc 0x78a4c8f590
+#53 pc 0x62e028 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#54 pc 0x78a4c8ebb8
+#55 pc 0x78a69d5b60
+#56 pc 0x78a69d5b60
+#57 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#58 pc 0x20b0d4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#59 pc 0x78a69d5b60
+#60 pc 0x78a69d5baa
+#61 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#62 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#63 pc 0x170bd0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x4909c8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x78a5226c14
+#08 pc 0x78a5228904
+#09 pc 0x78a5218b28
+#10 pc 0x78a521adb4
+#11 pc 0x78a5228064
+#12 pc 0x78a5218b28
+#13 pc 0x78a4fd79e0
+#14 pc 0x78a5218818
+#15 pc 0x78a51d96c0
+#16 pc 0x78a51c0924
+#17 pc 0x78a4ce0954
+#18 pc 0x78a51c0658
+#19 pc 0x78a4fcf040
+#20 pc 0x78a51cc4e4
+#21 pc 0xac354 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#22 pc 0x583a34 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#23 pc 0x586da8 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#24 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#25 pc 0x2f0a54 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#26 pc 0x457e00 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0x48c038 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#28 pc 0x1c5bb0 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#29 pc 0x50c894 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#30 pc 0x50e5ec boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#31 pc 0x48b9f8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#32 pc 0x99148 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#33 pc 0x507a50 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#34 pc 0x510d6c boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#35 pc 0xdc380 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#36 pc 0x457e00 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#37 pc 0x58bbc4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#38 pc 0x609af8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#39 pc 0x22affc libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#40 pc 0x483b4c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#41 pc 0xc0ad0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#42 pc 0x22b5c4 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#43 pc 0x72e4 libnativehelper.so (BuildId: 7d33f4aa26119d7759ab2e212da2631b)
+#44 pc 0xccdf8 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#45 pc 0x136f app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#46 pc 0xb9518 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#47 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#48 pc 0x139f app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#49 pc 0xb9518 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#50 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#51 pc 0x1488c libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#52 pc 0xc8f94 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#53 pc 0x139f app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#54 pc 0x2568 app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#55 pc 0x139f app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#56 pc 0x307c app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#57 pc 0x307c app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#58 pc 0x303c app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+#59 pc 0x20e1b4 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#60 pc 0x307c app_process64 (BuildId: e5c8e451062a069d911fde2ba7f22a1d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x5a6ddc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x78a4fa249c
+#08 pc 0x78a4f6d7a8
+#09 pc 0x78a4f6d47c
+#10 pc 0x78a4fb5fa0
+#11 pc 0x78a4f6ea24
+#12 pc 0x78a51c39b4
+#13 pc 0x78a4fd7ae0
+#14 pc 0x78a4fda448
+#15 pc 0x78a4fcee68
+#16 pc 0x78a51d2d0c
+#17 pc 0x78a51cc4e4
+#18 pc 0x78a5219f5c
+#19 pc 0x78a52287cc
+#20 pc 0x78a5227b0c
+#21 pc 0x78a5221644
+#22 pc 0x78a5221a78
+#23 pc 0x78a52231f8
+#24 pc 0x78a52248ac
+#25 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#26 pc 0x78a60208d0
+#27 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#28 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#29 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#30 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#31 pc 0x78a60208d0
+#32 pc 0x78a60208d0
+#33 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#34 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#35 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#36 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#37 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#38 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#39 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#40 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa3344 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x298c8 libopenjdk.so (BuildId: df8df6b1c275e887f918729a4f22136c)
+#02 pc 0x2a440 libopenjdk.so (BuildId: df8df6b1c275e887f918729a4f22136c)
+#03 pc 0x20a9d8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x32ccd4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x93bb4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x32c854 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x2588e4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x20a2b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x78a52e7cd4
+#13 pc 0x78a52dcb68
+#14 pc 0x78a52f04e4
+#15 pc 0x78a52f0790
+#16 pc 0x78a52c02fc
+#17 pc 0x78a52b6a00
+#18 pc 0x78a52b68ec
+#19 pc 0x78a528b4bc
+#20 pc 0x78a528e214
+#21 pc 0x78a528d33c
+#22 pc 0x308ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#23 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#25 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#26 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#28 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#29 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#30 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#31 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#32 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#33 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#34 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#35 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#36 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#37 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#38 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa3344 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x298c8 libopenjdk.so (BuildId: df8df6b1c275e887f918729a4f22136c)
+#02 pc 0x2a440 libopenjdk.so (BuildId: df8df6b1c275e887f918729a4f22136c)
+#03 pc 0x20a9d8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x32ccd4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x93bb4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x32c854 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x2588e4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x20a2b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x78a52e7cd4
+#13 pc 0x78a52dcb68
+#14 pc 0x78a52f04e4
+#15 pc 0x78a52ef3b4
+#16 pc 0x78a52f0d9c
+#17 pc 0x78a52d79c0
+#18 pc 0x78a52d1cf0
+#19 pc 0x78a5294f98
+#20 pc 0x308ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#21 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#23 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#24 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#25 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#26 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#28 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#29 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#30 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#31 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#32 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#33 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#34 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#35 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#36 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x4909c8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x78a4d1349c
+#08 pc 0x467f18 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a4d128b4
+#10 pc 0x78a51c0658
+#11 pc 0x78a4fcee68
+#12 pc 0x78a51d2d0c
+#13 pc 0x78a51cc4e4
+#14 pc 0x78a5219f5c
+#15 pc 0x78a52287cc
+#16 pc 0x78a5227b0c
+#17 pc 0x78a5221644
+#18 pc 0x78a52218c8
+#19 pc 0x78a52231f8
+#20 pc 0x78a52248ac
+#21 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0x78a60208d0
+#23 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#25 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#26 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0x78a60208d0
+#28 pc 0x78a60208d0
+#29 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#30 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#31 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#32 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#33 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#34 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#35 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#36 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x393168 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x454f08 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x567b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x567a80 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x57340 libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#11 pc 0x48fec libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#12 pc 0x4ff24 libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#13 pc 0x4db0a0 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#14 pc 0x78a4cedee4
+#15 pc 0x78a4ced3a0
+#16 pc 0x458134 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xac354 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#18 pc 0x583aa0 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#19 pc 0x586da8 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#20 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#21 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#22 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#23 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#25 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#26 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#28 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#29 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#30 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#31 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#32 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#33 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#34 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#35 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#36 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa38a4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5df74 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x20074 libopenjdk.so (BuildId: df8df6b1c275e887f918729a4f22136c)
+#03 pc 0x20c234 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x36f100 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3591b4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x359ac0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x78a4f6482c
+#08 pc 0x78a4f5f4ec
+#09 pc 0x78a4fcee68
+#10 pc 0x78a51cc4e4
+#11 pc 0x78a5219f5c
+#12 pc 0x78a52287cc
+#13 pc 0x78a5227b0c
+#14 pc 0x78a5221644
+#15 pc 0x78a5221a08
+#16 pc 0x78a52231f8
+#17 pc 0x78a52248ac
+#18 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0x78a60208d0
+#20 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#23 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0x78a60208d0
+#25 pc 0x78a60208d0
+#26 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#27 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#28 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#29 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#30 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#31 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#32 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#33 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x352f54 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3512cc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3511fc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x78a4bdc1f0
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45450 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#15 pc 0x46130 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#16 pc 0xd19fc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0xd19fc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#27 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#28 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a493466c
+#05 pc 0x34f184 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x78a4950a44
+#10 pc 0x78a4950734
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x78a60208d0
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x78a60208d0
+#18 pc 0x78a60208d0
+#19 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#27 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#28 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a527687c
+#04 pc 0x78a492947c
+#05 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x78a493466c
+#07 pc 0x34f184 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x78a4950a44
+#12 pc 0x78a4950734
+#13 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#18 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0x78a60208d0
+#20 pc 0x78a60208d0
+#21 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#23 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#27 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#28 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1eb720 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a51b9678
+#05 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x78a4fd7ae0
+#07 pc 0x78a51c0924
+#08 pc 0x353ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x307698 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x78a51cc630
+#11 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x78a4c2fe54
+#14 pc 0x78a4c2fc60
+#15 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#16 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x4850ec libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa15ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#23 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#24 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#27 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#28 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x589014 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x78a4b5cae8
+#07 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4b4c988
+#09 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#11 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#17 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#27 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a4714d04
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x45450 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#14 pc 0x46130 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#15 pc 0xd64fc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#16 pc 0xd64fc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#27 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x475c libopenjdkjvm.so (BuildId: f2797f708d79c1aeee6b6d0d8e853836)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3512cc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3511fc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x78a4bdc1f0
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x298648 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0xafc1c boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0xafaa0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0xa10704 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x78a492f8a8
+#07 pc 0x78a492efc4
+#08 pc 0x308ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x78a492ee30
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a493466c
+#05 pc 0x34f184 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x78a4950a44
+#10 pc 0x78a4950734
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x78a60208d0
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x78a60208d0
+#18 pc 0x78a60208d0
+#19 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x78a6ea3124
+#07 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x17f1bc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x78a6ea3124
+#08 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4850ec libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa15ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x17f1bc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x78a6ea3124
+#08 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4850ec libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa15ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x438e0 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#04 pc 0x1eb720 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x38e14c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x353ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x307698 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x78a528d1c8
+#10 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#14 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#18 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#22 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#26 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4c2fe54
+#09 pc 0x78a4c2fc60
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#24 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4c2fe54
+#09 pc 0x78a4c2fc60
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#24 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x4d738 boot-core-libart.oat (BuildId: 50be351c037c9ef19c64a12189d8d997f90b5f9f)
+#04 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#24 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1eb684 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x354014 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x81ec84 libskcodec.so (BuildId: 8d2239c308d0924ab39cbac296f2e876)
+#10 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#11 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#17 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1eb720 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x38e14c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x353ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x307698 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a528d1c8
+#09 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#11 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#17 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34f184 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4950a44
+#09 pc 0x78a4950734
+#10 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x78a60208d0
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x78a60208d0
+#17 pc 0x78a60208d0
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34f184 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4950a44
+#09 pc 0x78a4950734
+#10 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x78a60208d0
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4850ec libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa15ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x78a60208d0
+#17 pc 0x78a60208d0
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1eb720 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x353ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x307698 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x78a51cc630
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x78a4c2fe54
+#11 pc 0x78a4c2fc60
+#12 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#13 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x4850ec libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xa15ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#21 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#25 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x20087c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x298648 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x20a254 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x6d2b0c libskcodec.so (BuildId: 8d2239c308d0924ab39cbac296f2e876)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1eb720 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x941c0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x1ec540 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x353ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x307698 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x78a4d140d4
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x78a4d1478c
+#08 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#12 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#16 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#20 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#24 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x34d2f8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x78a4c2fe54
+#09 pc 0x78a4c2fc60
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x3512cc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3511fc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x78a4bdc1f0
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467d84 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1f0824 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x3512cc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#05 pc 0x3511fc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x3076f0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x308be4 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#08 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x78a49f50e8
+#08 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x78a49f4800
+#10 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#11 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#15 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a5221c0c
+#04 pc 0x78a52238c0
+#05 pc 0x78a5221a78
+#06 pc 0x78a52230e4
+#07 pc 0x78a52248ac
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x78a60208d0
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x78a60208d0
+#15 pc 0x78a60208d0
+#16 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#19 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#23 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#21 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#22 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x1344fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#21 pc 0x1347fc ld-android.so (BuildId: 86809b5f0db5a593eb62ca8d4402d361)
+#22 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x4e1ef8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0824 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x78a528d00c
+#04 pc 0x78a528e9c4
+#05 pc 0x78a528d1b4
+#06 pc 0x308ed0 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#07 pc 0x43a8c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#08 pc 0x3060b8 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#09 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#14 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#18 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#22 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0xbf984 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#06 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#09 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0xbf984 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#06 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#09 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#13 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x93504 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a52dbd00
+#05 pc 0x78a52dc16c
+#06 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x78a60208d0
+#08 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#11 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0x78a60208d0
+#13 pc 0x78a60208d0
+#14 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#17 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#21 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x1623b0 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#04 pc 0x589700 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#05 pc 0x586a08 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#06 pc 0x586900 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#07 pc 0x585b18 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#08 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#12 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#15 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#16 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#19 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#20 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x1ef528 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a51d7f00
+#05 pc 0x17f210 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#06 pc 0x457b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x484e54 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x4fd7e8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x45c0 libartpalette-system.so (BuildId: e72b985990f185e2e27112f3f59375bf)
+#10 pc 0x484b20 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#11 pc 0x5ce334 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#12 pc 0xa13ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#13 pc 0xa14ffc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#14 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#15 pc 0x621ffc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#16 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#17 pc 0xb66d4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#18 pc 0x5cdc9c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x393168 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x454f08 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x4129c libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#09 pc 0x4b14c libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#10 pc 0x1a90c libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#11 pc 0x20d94 libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#12 pc 0x1bc74 libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#13 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#14 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#15 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#16 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x1f3d60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x1c97a4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x20b828 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x1e8460 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x223350 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0x2234e0 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#12 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#13 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#14 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x5a6c964 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#04 pc 0x595949c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#05 pc 0x5a6c79c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#06 pc 0x587d664 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#07 pc 0x57b6d1c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#08 pc 0x57b6714 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#09 pc 0x57b6664 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#10 pc 0x57b421c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#11 pc 0x57b29a8 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#12 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#13 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x5a6c964 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#04 pc 0x595949c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#05 pc 0x5a6c79c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#06 pc 0x587d664 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#07 pc 0x57b6d1c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#08 pc 0x57b6714 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#09 pc 0x57b6664 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#10 pc 0x57b421c libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#11 pc 0x57b29a8 libmonochrome_64.so (BuildId: 265c51cb1c2a3187bfe29f3dd6ad7f37499f0c1e)
+#12 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#13 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21de60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x21e784 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x21e5a8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x21e478 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21de60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x21e784 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x21e5a8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x21e478 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21de60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x21e784 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x21e5a8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x21e478 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21de60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x21e784 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x21e5a8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x21e478 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x22e9f4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x256304 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x1f3df8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21de60 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x21e784 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x21e5a8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0x21e478 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#10 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#11 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#12 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x393168 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x454f08 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x567b6c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x567a80 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#10 pc 0x57340 libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#11 pc 0x48fec libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+#12 pc 0x4ff24 libmedia_jni.so (BuildId: f908f073231d03b2a09b10fbd55f4548)
+
+Thread:
+#00 pc 0x37bd58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#01 pc 0x37bdbc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x37b8ac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x377ae4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x3a1360 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x39eaa4 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x2d9158 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0x44658c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#08 pc 0x5bfaa8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#09 pc 0x19df60 boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#10 pc 0x2b7f94 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#11 pc 0x400cb4 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x2541b8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#02 pc 0x2540b4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#03 pc 0x20b828 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x1e8460 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x223350 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x21639c libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x2234e0 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#09 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#10 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf44c libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x2e585c libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0x2e57e8 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#06 pc 0x2e5764 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#07 pc 0x35e9dc libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf44c libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x2e585c libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0x2e57e8 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#06 pc 0x2e5764 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#07 pc 0x35e9dc libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf44c libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x2e585c libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0x2e57e8 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#06 pc 0x2e5764 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#07 pc 0x35e9dc libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf44c libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x2e585c libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0x2e57e8 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#06 pc 0x2e5764 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#07 pc 0x35e9dc libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x87974 libhidlbase.so (BuildId: 33969b3761aabf59a6562f7f8911db4b)
+#03 pc 0x87ab4 libhidlbase.so (BuildId: 33969b3761aabf59a6562f7f8911db4b)
+#04 pc 0x88d38 libhidlbase.so (BuildId: 33969b3761aabf59a6562f7f8911db4b)
+#05 pc 0x942c0 libhidlbase.so (BuildId: 33969b3761aabf59a6562f7f8911db4b)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x2541b8 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#02 pc 0x2540b4 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#03 pc 0x20b828 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#04 pc 0x1e8460 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#05 pc 0x223350 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#06 pc 0x2234e0 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#07 pc 0x22f280 libcronet.143.0.7445.0.so (BuildId: 7d776c91dda24c007c6147efcb0bb27f96348c96)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa27c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5b860 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5aa00 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#03 pc 0x5acdc libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#04 pc 0x5b5f8 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#05 pc 0x89db4 libbinder.so (BuildId: b6b3f50edbdfb01574bcc2c3594a934f)
+#06 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#07 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#08 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#09 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x579a7c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x57995c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x4853dc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#07 pc 0xfbe4 boot-core-libart.oat (BuildId: 50be351c037c9ef19c64a12189d8d997f90b5f9f)
+#08 pc 0x7919318653
+
+Thread:
+#00 pc 0xa37a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x17444 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#02 pc 0x17328 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#03 pc 0x5165d8 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#04 pc 0x536990 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#05 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x56ad8 libc++.so (BuildId: c43691f579c6316722d646cc6daa2e0e)
+#04 pc 0x53a134 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#05 pc 0x53a370 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x56ad8 libc++.so (BuildId: c43691f579c6316722d646cc6daa2e0e)
+#04 pc 0x53a134 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#05 pc 0x53a370 libhwui.so (BuildId: 61df35c159e6b43415a147e80a00e7d1)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x56ad8 libc++.so (BuildId: c43691f579c6316722d646cc6daa2e0e)
+#04 pc 0xae144 libgui.so (BuildId: d12446aa9bf9c3760403c5c78b6c1bb7)
+#05 pc 0xae50c libgui.so (BuildId: d12446aa9bf9c3760403c5c78b6c1bb7)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x56ad8 libc++.so (BuildId: c43691f579c6316722d646cc6daa2e0e)
+#04 pc 0x1bf64 libstagefright_bufferpool@2.0.1.so (BuildId: c0a030620caeef04259efcdff186c3dc)
+#05 pc 0x1c5e8 libstagefright_bufferpool@2.0.1.so (BuildId: c0a030620caeef04259efcdff186c3dc)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x62724 libaudioclient.so (BuildId: 47d22d8f2c83d27e5312f650f8defeea)
+#04 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#05 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x1bb74 libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#04 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#05 pc 0xcd150 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#06 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#07 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x62d4a0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x62d300 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x62d1dc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf3b8 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x35ea10 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf3b8 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x35ea10 libmapbox-common.so (BuildId: 9d2e809b28eed6aa0adf9853991b4f35177d982e)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x184358c libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#04 pc 0x16fc070 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf3b8 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x161230 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0xdf3b8 libc++_shared.so (BuildId: 6783a7f3a0d9c67c55a74cadc441ed55aaa493da)
+#04 pc 0x161230 libhermes.so (BuildId: 3742cb807f54bf165f89bd93a20345afc069184d)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x5a6ddc libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5b84 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x1bcdc libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#04 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0xb5ac4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x1bb74 libstagefright_foundation.so (BuildId: 0badc9d613bbff980dfc844daac1ed3e)
+#04 pc 0x12f18 libutils.so (BuildId: a5ca39eaeeeb017be4afa358811e69fb)
+#05 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#06 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x3ef5b0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x579bac libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0x2d910c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#05 pc 0x446470 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#06 pc 0x4909c8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa31c8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x60c28 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x57fa14 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x57f61c libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x55a328 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x559738 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5fbc0 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x163ec28 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5fbc0 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x163ec28 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5fbc0 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x163ec28 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x529b8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x5fbc0 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x163ec28 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0xa2f64 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x64de4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x1c714 libstagefright_bufferpool@2.0.1.so (BuildId: c0a030620caeef04259efcdff186c3dc)
+#03 pc 0x1caf0 libstagefright_bufferpool@2.0.1.so (BuildId: c0a030620caeef04259efcdff186c3dc)
+#04 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#05 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a60208d0
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a60208d0
+
+Thread:
+#00 pc 0xa38a4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x5df74 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#02 pc 0x163ef04 libGLES_mali.so (BuildId: 53ff94fb536d6f7ecc1df4bc84cdb450)
+#03 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#04 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x78a60208d0
+
+Thread:
+#00 pc 0xa24e4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x1e0f4 libperfetto_hprof.so (BuildId: 796c9c10460500734dd5245b60704e28)
+#02 pc 0xb67a8 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#03 pc 0x5340c libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7919318653
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7919318653
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x4e1ef8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0824 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7919318653
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7919318653
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7919318653
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x3a9984 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0cd0 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#03 pc 0x932dc boot.oat (BuildId: c1e4535ad118667c012bcf950ce15dd7736d7b04)
+#04 pc 0x7c3c78d4d0
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x4e1ef8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0824 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0xa24e4 libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x1bbcd8 libandroid_runtime.so (BuildId: 07a600b9ec8cdcc4b9380bb90f3cdb60)
+#02 pc 0x1c5964 boot-framework.oat (BuildId: cfecee3f3d06c1a520b5f05600a072b49fb84987)
+#03 pc 0x7917989a10
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x467e58 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x467688 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+
+Thread:
+#00 pc 0x4e1dc libc.so (BuildId: 173441c90e5afc5b5229a361bc9d8d2d)
+#01 pc 0x4e1ef8 libart.so (BuildId: 289d75599f6112d5757113220599e90b)
+#02 pc 0x4e0824 libart.so (BuildId: 289d75599f6112d5757113220599e90b)

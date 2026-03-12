@@ -35,7 +35,15 @@ import { Provider } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
-import { HotUpdater } from "@hot-updater/react-native";
+// HotUpdater: import động để tránh crash trên Expo Go
+let HotUpdater: any = null;
+if (Constants.appOwnership !== "expo") {
+  try {
+    HotUpdater = require("@hot-updater/react-native").HotUpdater;
+  } catch (e) {
+    if (__DEV__) console.warn("HotUpdater not available (Expo Go?):", e);
+  }
+}
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
@@ -1101,67 +1109,23 @@ const UpdateScreen = ({
   );
 };
 
-export default HotUpdater.wrap({
-  baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
-  updateStrategy: "appVersion",
-  updateMode: "auto",
-  reloadOnForceUpdate: true, // Tự reload ngay khi download xong
-  onError: (error) => {
-    console.error("[HotUpdater] Error:", error);
-  },
-  onProgress: (progress) => {
-    console.log("[HotUpdater] Progress:", Math.round(progress * 100) + "%");
-  },
-  fallbackComponent: ({ progress, status }) => (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#0b0c10",
-        padding: 32,
-      }}
-    >
-      <ActivityIndicator size="large" color="#1976d2" />
-      <Text
-        style={{
-          color: "#ffffff",
-          fontSize: 18,
-          fontWeight: "600",
-          marginTop: 24,
-          textAlign: "center",
-        }}
-      >
-        {status === "UPDATING"
-          ? "Đang tải bản cập nhật..."
-          : "Đang kiểm tra cập nhật..."}
-      </Text>
-      {progress > 0 && (
-        <>
-          <View
-            style={{
-              width: "80%",
-              height: 6,
-              backgroundColor: "#2a2d35",
-              borderRadius: 3,
-              marginTop: 16,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                width: `${Math.round(progress * 100)}%`,
-                height: "100%",
-                backgroundColor: "#1976d2",
-                borderRadius: 3,
-              }}
-            />
-          </View>
-          <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 8 }}>
-            {Math.round(progress * 100)}%
-          </Text>
-        </>
-      )}
-    </View>
-  ),
-})(RootLayout);
+// ✅ Expo Go: bỏ qua HotUpdater (native module không khả dụng)
+const ExportedLayout = HotUpdater
+  ? HotUpdater.wrap({
+      baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
+      updateStrategy: "appVersion",
+      updateMode: "auto",
+      reloadOnForceUpdate: false,
+      onError: (error: any) => {
+        console.error("[HotUpdater] Error:", error);
+      },
+      onProgress: (progress: number) => {
+        console.log(
+          "[HotUpdater] Progress:",
+          Math.round(progress * 100) + "%"
+        );
+      },
+    })(RootLayout)
+  : RootLayout;
+
+export default ExportedLayout;

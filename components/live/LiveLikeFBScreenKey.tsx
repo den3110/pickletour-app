@@ -191,8 +191,6 @@ type Orient = "portrait" | "landscape";
 
 type QualityId =
   | "auto"
-  | "1080p30"
-  | "1080p60"
   | "720p60"
   | "720p30"
   | "720p24"
@@ -238,22 +236,6 @@ const QUALITY_PRESETS: Record<
     height: 720,
     fps: 24,
     bitrate: 3_000_000,
-  },
-  "1080p30": {
-    label: "1080p • 30fps (Cần WiFi tốt)",
-    shortLabel: "1080p30",
-    width: 1920,
-    height: 1080,
-    fps: 30,
-    bitrate: 5_000_000,
-  },
-  "1080p60": {
-    label: "1080p • 60fps (Cần WiFi)",
-    shortLabel: "1080p60",
-    width: 1920,
-    height: 1080,
-    fps: 60,
-    bitrate: 6_500_000,
   },
   "540p30": {
     label: "540p • 30fps (4G yếu)",

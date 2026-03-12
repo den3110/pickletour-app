@@ -38,7 +38,7 @@ yarn.lock
 *.tsbuildinfo
 
 app-example
-android
+# android
 ios
 google-services.json
 GoogleService-Info.plist

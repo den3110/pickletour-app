@@ -36,7 +36,6 @@ import { useGetMyUserMatchesQuery } from "@/slices/userMatchesApiSlice";
 // ==========================================
 
 const RESOLUTION_PRESETS = [
-  { id: "1080p30", label: "1080p 30fps", minGB: 6 },
   { id: "720p30", label: "720p 30fps", minGB: 4 },
   { id: "480p30", label: "480p 30fps", minGB: 2 },
 ];

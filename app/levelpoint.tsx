@@ -551,7 +551,7 @@ export default function LevelPointScreen({ userId: userIdProp }) {
         userId,
         singleLevel: sV,
         doubleLevel: dV,
-        note: "Updated from App",
+        note: "Tự chấm trình",
       }).unwrap();
       Alert.alert("Thành công", "Đã cập nhật trình độ!");
     } catch (err) {

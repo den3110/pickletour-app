@@ -1,11 +1,23 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { AppState, Platform } from "react-native";
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from "expo-speech-recognition";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
+import Constants from "expo-constants";
+
+// expo-speech-recognition: native-only, không chạy được trên Expo Go
+let ExpoSpeechRecognitionModule = null;
+let useSpeechRecognitionEvent = (_event, _cb) => {}; // no-op fallback
+
+const _isExpoGo = Constants.appOwnership === "expo";
+if (!_isExpoGo) {
+  try {
+    const mod = require("expo-speech-recognition");
+    ExpoSpeechRecognitionModule = mod.ExpoSpeechRecognitionModule;
+    useSpeechRecognitionEvent = mod.useSpeechRecognitionEvent;
+  } catch (e) {
+    if (__DEV__) console.warn("expo-speech-recognition not available:", e);
+  }
+}
 
 // ============ CONFIG ============
 const CONFIG = {
@@ -418,7 +430,7 @@ export function useVoiceCommands({
       if (!isActiveRef.current || !isMountedRef.current) return;
 
       try {
-        ExpoSpeechRecognitionModule.start({
+        ExpoSpeechRecognitionModule?.start({
           lang: language,
           interimResults: true,
           continuous: true,
@@ -523,7 +535,7 @@ export function useVoiceCommands({
           log.info("App background, stopping voice...");
           clearRestartTimeout();
           try {
-            ExpoSpeechRecognitionModule.abort();
+            ExpoSpeechRecognitionModule?.abort();
           } catch {}
         }
       }
@@ -542,9 +554,9 @@ export function useVoiceCommands({
     // Request permission
     try {
       const result =
-        await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        await ExpoSpeechRecognitionModule?.requestPermissionsAsync();
 
-      if (!result.granted) {
+      if (!result?.granted) {
         log.error("Permission denied");
         safeSetState(setPermissionGranted, false);
         updateStatus("error");
@@ -567,7 +579,7 @@ export function useVoiceCommands({
       isActiveRef.current = true;
       restartAttemptsRef.current = 0;
 
-      ExpoSpeechRecognitionModule.start({
+      ExpoSpeechRecognitionModule?.start({
         lang: language,
         interimResults: true,
         continuous: true, // Continuous mode để tránh beep và auto-restart
@@ -599,7 +611,7 @@ export function useVoiceCommands({
     clearRestartTimeout();
 
     try {
-      ExpoSpeechRecognitionModule.abort();
+      ExpoSpeechRecognitionModule?.abort();
     } catch {}
 
     safeSetState(setTranscript, "");
@@ -626,7 +638,7 @@ export function useVoiceCommands({
       isActiveRef.current = false;
       clearRestartTimeout();
       try {
-        ExpoSpeechRecognitionModule.abort();
+        ExpoSpeechRecognitionModule?.abort();
       } catch {}
     };
   }, [clearRestartTimeout]);
