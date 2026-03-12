@@ -207,7 +207,7 @@ const NameBadge = memo(
       displayNick(user);
 
     const avatarUri = normalizeUrl(
-      user?.avatar || user?.avatarURL || user?.photoURL || user?.picture || ""
+      user?.avatar || user?.avatarURL || user?.photoURL || user?.picture || "",
     );
 
     const showIcon = !avatarUri || imgError;
@@ -306,7 +306,7 @@ const NameBadge = memo(
       (pu.fullName || pu.name) === (nu.fullName || nu.name) &&
       prev.isServer === next.isServer
     );
-  }
+  },
 );
 
 const TeamSimple = memo(
@@ -393,7 +393,7 @@ const TeamSimple = memo(
       prev.players === next.players &&
       prev.slotsNow === next.slotsNow
     );
-  }
+  },
 );
 
 function WinTargetTuner({ value, base, onToggle }) {
@@ -566,7 +566,7 @@ function TimeoutHeader({
               </Text>
             )}
           </View>
-        </Ripple>
+        </Ripple>,
       );
     }
 
@@ -735,8 +735,8 @@ function ColorCoinToss({ disabled, onClose }) {
     phase === "idle"
       ? t.colors.border
       : active === "blue"
-      ? "#0a84ff"
-      : "#ef4444";
+        ? "#0a84ff"
+        : "#ef4444";
 
   const Panel = ({ kind }) => {
     const label = kind === "blue" ? "ĐỘI XANH" : "ĐỘI ĐỎ";
@@ -906,7 +906,7 @@ function CourtAssignModalFull({
   const { data, isLoading, isFetching, error, refetch } =
     useGetCourtsForMatchQuery(
       { matchId, includeBusy: false },
-      { skip: !visible || !matchId }
+      { skip: !visible || !matchId },
     );
   const [assignCourt, { isLoading: assigning }] =
     useRefereeAssignCourtMutation();
@@ -920,11 +920,11 @@ function CourtAssignModalFull({
       await assignCourt({ matchId, courtId }).unwrap();
       const courtName =
         textOf(
-          (courts.find((x) => (x?._id || x?.id) === courtId) || {}).name
+          (courts.find((x) => (x?._id || x?.id) === courtId) || {}).name,
         ) || "";
       Alert.alert(
         "Đã gán sân",
-        courtName ? `Sân: ${courtName}` : "Gán sân thành công"
+        courtName ? `Sân: ${courtName}` : "Gán sân thành công",
       );
       onAssigned?.({ courtId });
       onClose?.();
@@ -1149,18 +1149,18 @@ export default function RefereeJudgePanel({ matchId }) {
       bestOfOverride != null
         ? bestOfOverride
         : matchRules.bestOf != null
-        ? matchRules.bestOf
-        : 1
+          ? matchRules.bestOf
+          : 1,
     ),
     pointsToWin: Number(
-      matchRules.pointsToWin != null ? matchRules.pointsToWin : 11
+      matchRules.pointsToWin != null ? matchRules.pointsToWin : 11,
     ),
     winByTwo:
       winByTwoOverride != null
         ? !!winByTwoOverride
         : matchRules.winByTwo != null
-        ? !!matchRules.winByTwo
-        : true,
+          ? !!matchRules.winByTwo
+          : true,
   };
 
   const basePointsToWin = Number(rules.pointsToWin || 11);
@@ -1189,11 +1189,11 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const playersA = useMemo(
     () => playersOf(match?.pairA, eventType),
-    [match?.pairA, eventType]
+    [match?.pairA, eventType],
   );
   const playersB = useMemo(
     () => playersOf(match?.pairB, eventType),
-    [match?.pairB, eventType]
+    [match?.pairB, eventType],
   );
 
   const slotsBase = match?.slots?.base || match?.meta?.slots?.base || {};
@@ -1258,11 +1258,11 @@ export default function RefereeJudgePanel({ matchId }) {
     (teamKey, slotNum) => {
       const map = teamKey === "A" ? slotsNowA : slotsNowB;
       const entry = Object.entries(map || {}).find(
-        ([, v]) => Number(v) === Number(slotNum)
+        ([, v]) => Number(v) === Number(slotNum),
       );
       return entry ? entry[0] : null;
     },
-    [slotsNowA, slotsNowB]
+    [slotsNowA, slotsNowB],
   );
 
   // ==== Serve state
@@ -1432,7 +1432,7 @@ export default function RefereeJudgePanel({ matchId }) {
             lastServerUidRef.current = uidRight;
             refetch();
           }
-        }
+        },
       );
     } else if (currentServerId) {
       // Nếu đúng rồi thì thôi, đánh dấu đã init
@@ -1509,18 +1509,18 @@ export default function RefereeJudgePanel({ matchId }) {
           activeSide === "A" ? curB : curA
         }`
       : activeSide === "A"
-      ? `${curA}-${curB}-${activeServerNum}`
-      : `${curB}-${curA}-${activeServerNum}`;
+        ? `${curA}-${curB}-${activeServerNum}`
+        : `${curB}-${curA}-${activeServerNum}`;
 
   const aWins = gs.filter(
     (g) =>
       isGameWin(g?.a, g?.b, Number(rules.pointsToWin), rules.winByTwo) &&
-      g.a > g.b
+      g.a > g.b,
   ).length;
   const bWins = gs.filter(
     (g) =>
       isGameWin(g?.a, g?.b, Number(rules.pointsToWin), rules.winByTwo) &&
-      g.b > g.a
+      g.b > g.a,
   ).length;
 
   const needSetWinsVal = needWins(rules.bestOf);
@@ -1587,7 +1587,7 @@ export default function RefereeJudgePanel({ matchId }) {
           break;
       }
     },
-    [canScoreNow, incBusy, undoBusy, activeSide, leftSide, localBreak]
+    [canScoreNow, incBusy, undoBusy, activeSide, leftSide, localBreak],
   );
 
   const {
@@ -1657,7 +1657,7 @@ export default function RefereeJudgePanel({ matchId }) {
       if (!matchId) return;
       await AsyncStorage.setItem(
         UNDO_KEY(matchId),
-        JSON.stringify(undoStack.current)
+        JSON.stringify(undoStack.current),
       );
     } catch {}
   }, [matchId]);
@@ -1680,7 +1680,7 @@ export default function RefereeJudgePanel({ matchId }) {
         await AsyncStorage.setItem(PTW_KEY(matchId), val ? "1" : "0");
       } catch {}
     },
-    [matchId]
+    [matchId],
   );
 
   const loadPtwBoost = useCallback(async () => {
@@ -1751,10 +1751,10 @@ export default function RefereeJudgePanel({ matchId }) {
           ? curA === op.prevA + 1
           : curB === op.prevB + 1
         : op.type === "undo"
-        ? op.side === "A"
-          ? curA === op.prevA - 1
-          : curB === op.prevB - 1
-        : false;
+          ? op.side === "A"
+            ? curA === op.prevA - 1
+            : curB === op.prevB - 1
+          : false;
 
     if (changed) {
       if (op.type === "inc") setIncBusy(false);
@@ -1891,10 +1891,10 @@ export default function RefereeJudgePanel({ matchId }) {
               text2: `Điểm set: ${nextVal}`,
             });
           } catch {}
-        }
+        },
       );
     },
-    [match?._id, refetch, socket]
+    [match?._id, refetch, socket],
   );
 
   // ✅ gửi delta: +4 hoặc -4; cập nhật UI + lưu cờ
@@ -1930,10 +1930,10 @@ export default function RefereeJudgePanel({ matchId }) {
             text1: "Đã cập nhật",
             text2: `Điểm set: ${nextVal}`,
           });
-        }
+        },
       );
     },
-    [match?._id, socket, ptw, persistPtwBoost, refetch]
+    [match?._id, socket, ptw, persistPtwBoost, refetch],
   );
 
   /* --- Cấu hình Timeout Local --- */
@@ -2118,7 +2118,7 @@ export default function RefereeJudgePanel({ matchId }) {
             serverId: prevServerUid, // ✅ ép đúng user đang giao
             userMatch,
           },
-          () => {}
+          () => {},
         );
       }
 
@@ -2225,7 +2225,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 text2: ack?.message || "Không khôi phục giao bóng",
               });
             } else refetch();
-          }
+          },
         );
       } else if (entry.t === "SLOTS_SET") {
         setUndoBusy(true);
@@ -2246,7 +2246,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 text2: ack?.message || "Không khôi phục vị trí Ô",
               });
             } else refetch();
-          }
+          },
         );
       } else if (entry.t === "SWAP_SIDES") {
         setUndoBusy(true);
@@ -2260,7 +2260,7 @@ export default function RefereeJudgePanel({ matchId }) {
               { matchId: match._id, base: entry.prevBase, userMatch },
               (ack) => {
                 if (ack?.ok) refetch();
-              }
+              },
             );
           }
         }
@@ -2285,7 +2285,7 @@ export default function RefereeJudgePanel({ matchId }) {
     const nextSlotsMap = nextSide === "A" ? slotsNowA : slotsNowB;
     const teamList = nextSide === "A" ? playersA : playersB;
     const uidFound = Object.keys(nextSlotsMap).find(
-      (uid) => Number(nextSlotsMap[uid]) === targetSlot
+      (uid) => Number(nextSlotsMap[uid]) === targetSlot,
     );
     // console.log("5. User tìm thấy ở slot", targetSlot, "là:", uidFound);
     // LOG END
@@ -2336,7 +2336,7 @@ export default function RefereeJudgePanel({ matchId }) {
         try {
           refetch();
         } catch {}
-      }
+      },
     );
   };
   // --- ĐỔI TAY trong cùng đội
@@ -2376,7 +2376,7 @@ export default function RefereeJudgePanel({ matchId }) {
           pushUndo({ t: "SERVE_SET", prev });
           refetch();
         }
-      }
+      },
     );
   }, [
     match?._id,
@@ -2443,7 +2443,7 @@ export default function RefereeJudgePanel({ matchId }) {
             const mapAfter = teamKey === "A" ? nextA : nextB;
             const uidRightNew =
               Object.entries(mapAfter).find(
-                ([, slot]) => Number(slot) === 2
+                ([, slot]) => Number(slot) === 2,
               )?.[0] ||
               Object.keys(mapAfter)[0] ||
               "";
@@ -2470,7 +2470,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   }
                   // Dù sao cũng refetch để UI khớp trạng thái mới
                   refetch();
-                }
+                },
               );
               return; // đã refetch trong callback
             }
@@ -2478,7 +2478,7 @@ export default function RefereeJudgePanel({ matchId }) {
 
           // Trường hợp thường: chỉ refetch sau khi đổi ô
           refetch();
-        }
+        },
       );
     },
     [
@@ -2492,7 +2492,7 @@ export default function RefereeJudgePanel({ matchId }) {
       baseB,
       activeSide,
       refetch,
-    ]
+    ],
   );
 
   const swapSides = () => {
@@ -2519,7 +2519,7 @@ export default function RefereeJudgePanel({ matchId }) {
         { matchId: match._id, base: newBase, userMatch },
         (ack) => {
           if (ack?.ok) refetch();
-        }
+        },
       );
     }
 
@@ -2529,7 +2529,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const handleBack = useCallback(async () => {
     try {
       await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT_UP
+        ScreenOrientation.OrientationLock.PORTRAIT_UP,
       );
     } catch {}
     router.back();
@@ -2541,7 +2541,7 @@ export default function RefereeJudgePanel({ matchId }) {
       textOf(match?.code) ||
       textOf(match?.slotCode) ||
       textOf(match?.bracketCode) ||
-      "—"
+      "—",
   ).toUpperCase();
   const headerText = [
     baseCode,
@@ -2569,7 +2569,7 @@ export default function RefereeJudgePanel({ matchId }) {
       curA,
       curB,
       Number(rules?.pointsToWin ?? 11),
-      !!rules?.winByTwo
+      !!rules?.winByTwo,
     );
 
     const winnerBySets =
@@ -2695,7 +2695,7 @@ export default function RefereeJudgePanel({ matchId }) {
           match?.court?.name ||
             match?.court?.label ||
             match?.court?.title ||
-            match?.court
+            match?.court,
         )
       : textOf(match?.courtName || match?.meta?.courtName || "");
 
