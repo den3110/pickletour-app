@@ -2,7 +2,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import { NativeModules, NativeEventEmitter } from "react-native";
 
 const { FacebookLiveModule } = NativeModules;
-const liveEmitter = new NativeEventEmitter(FacebookLiveModule);
+const liveEmitter = FacebookLiveModule
+  ? new NativeEventEmitter(FacebookLiveModule)
+  : null;
 
 const log = (...args: any[]) => {
   console.log(`[VideoUploader ${new Date().toISOString()}]`, ...args);

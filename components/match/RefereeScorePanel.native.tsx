@@ -163,7 +163,9 @@ const getCurrentSlotOfUser = ({
   return currentSlotFromBase(Number(base), ts);
 };
 
-const preStartRightSlotForSide = (side) => (side === "A" ? 2 : 1);
+const preStartRightSlotForSide = (side, leftSide) =>
+  leftSide === side ? 2 : 1;
+const oppositeSlot = (slot) => (Number(slot) === 1 ? 2 : 1);
 
 /* ✅ Luôn ưu tiên theo USER (serverId / lastServerUid)
    ✅ Chỉ fallback theo slot khi chưa có gì */
@@ -172,6 +174,7 @@ const computeServerUid = ({
   isStartOfGame,
   activeServerNum,
   activeSide,
+  leftSide,
   getUidAtSlotNow,
   lastServerUid,
 }) => {
@@ -183,10 +186,10 @@ const computeServerUid = ({
 
   // ✅ fallback cuối cùng: chỉ dùng khi 0-0-2 và chưa biết serverId
   if (isStartOfGame && activeServerNum === 2) {
-    const rightSlot = preStartRightSlotForSide(activeSide);
+    const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
     return (
       getUidAtSlotNow?.(activeSide, rightSlot) ||
-      getUidAtSlotNow?.(activeSide, rightSlot === 1 ? 2 : 1) ||
+      getUidAtSlotNow?.(activeSide, oppositeSlot(rightSlot)) ||
       ""
     );
   }
@@ -1171,6 +1174,9 @@ export default function RefereeJudgePanel({ matchId }) {
   const isPreMatch =
     (match?.status !== "live" && gs.length === 0) ||
     match?.status === "scheduled";
+  const [leftRight, setLeftRight] = useState({ left: "A", right: "B" });
+  const leftSide = leftRight.left;
+  const rightSide = leftRight.right;
   const theCurIdx = Math.max(0, gs.length - 1);
   const curIdx = theCurIdx;
   const serverA = Number(gs[curIdx]?.a ?? 0);
@@ -1351,11 +1357,9 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ forcedUid phải ưu tiên cao nhất để khỏi nhảy 2 lần
   const serverUidShow = forcedUid || baseServerUidShow;
   // ✅ INIT serve đầu game:
-  // - double: 0-0-2 (server #2, người ở ô phải / slot 1)
+  // - double: 0-0-2 (server #2, người đang đứng ở ô phải/even)
   // - single: 0-0-1 (server #1)
-  // ✅ INIT serve đầu game:
-  // ✅ INIT serve đầu game:
-  // Tự động set người giao bóng chuẩn Referee View (A=2, B=1) khi tỉ số 0-0
+  // Tự động set người giao bóng chuẩn theo bên đang đứng khi tỉ số 0-0
   const initServeDoneRef = useRef({});
 
   useEffect(() => {
@@ -1381,35 +1385,11 @@ export default function RefereeJudgePanel({ matchId }) {
     const isDouble = eventType !== "single";
     const wantServerNum = isDouble ? 2 : 1;
 
-    let uidRight = "";
-
-    // 🔥 FORCE LOGIC CHO USER MATCH (0-0) - GÓC NHÌN TRỌNG TÀI
-    // Đội Trái (A): Ô Phải giao bóng nằm ở DƯỚI (Slot 2)
-    // Đội Phải (B): Ô Phải giao bóng nằm ở TRÊN (Slot 1)
-    if (isUserMatch) {
-      if (activeSide === "A") {
-        uidRight = getUidAtSlotNow("A", 2); // Tìm người ở Slot 2
-      } else {
-        uidRight = getUidAtSlotNow("B", 1); // Tìm người ở Slot 1
-      }
-
-      // Fallback: nếu slot chuẩn chưa tìm ra (do lag), lấy đại slot kia
-      if (!uidRight) {
-        uidRight =
-          getUidAtSlotNow(activeSide, activeSide === "A" ? 1 : 2) || "";
-      }
-    } else {
-      // --- LOGIC CŨ CHO MATCH GIẢI ĐẤU (Dựa vào Base DB) ---
-      const currentPlayers = activeSide === "A" ? playersA : playersB;
-      const currentBase = activeSide === "A" ? baseA : baseB;
-      const p1 = currentPlayers[0];
-      const p1Id = userIdOf(p1);
-      const p1BaseSlot = Number(currentBase[p1Id] || 1);
-      uidRight =
-        getUidAtSlotNow(activeSide, p1BaseSlot) ||
-        getUidAtSlotNow(activeSide, p1BaseSlot === 1 ? 2 : 1) ||
-        "";
-    }
+    const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
+    const uidRight =
+      getUidAtSlotNow(activeSide, rightSlot) ||
+      getUidAtSlotNow(activeSide, oppositeSlot(rightSlot)) ||
+      "";
 
     // Nếu UID tính ra KHÁC với UID đang lưu trên server (hoặc server chưa có)
     // -> Gửi lệnh SET đè lên ngay lập tức
@@ -1458,6 +1438,7 @@ export default function RefereeJudgePanel({ matchId }) {
     getUidAtSlotNow,
     userMatch,
     waitingStart,
+    leftSide,
   ]);
 
   useEffect(() => {
@@ -1465,12 +1446,12 @@ export default function RefereeJudgePanel({ matchId }) {
     if (!is000) return;
     if (activeServerNum !== 2) return;
 
-    const rightSlot = activeSide === "A" ? 2 : 1; // ✅ Referee view
+    const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
     const uid =
       (serve?.serverId ? String(serve.serverId) : "") ||
       lastServerUidRef.current ||
       getUidAtSlotNow?.(activeSide, rightSlot) ||
-      getUidAtSlotNow?.(activeSide, rightSlot === 1 ? 2 : 1) ||
+      getUidAtSlotNow?.(activeSide, oppositeSlot(rightSlot)) ||
       "";
 
     if (uid) {
@@ -1485,6 +1466,7 @@ export default function RefereeJudgePanel({ matchId }) {
     activeServerNum,
     serve?.serverId,
     getUidAtSlotNow,
+    leftSide,
   ]);
 
   // Luôn ghi nhớ người giao hiện tại
@@ -1527,11 +1509,6 @@ export default function RefereeJudgePanel({ matchId }) {
   const matchDecided = aWins >= needSetWinsVal || bWins >= needSetWinsVal;
 
   const gameLocked = isGameWin(curA, curB, ptw, rules.winByTwo);
-
-  // ====== local UI state ======
-  const [leftRight, setLeftRight] = useState({ left: "A", right: "B" });
-  const leftSide = leftRight.left;
-  const rightSide = leftRight.right;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -2280,15 +2257,14 @@ export default function RefereeJudgePanel({ matchId }) {
 
     const nextSide = activeSide === "A" ? "B" : "A";
 
-    // LOG START
-    const targetSlot = nextSide === "A" ? 2 : 1;
+    const nextTeamScore = nextSide === "A" ? curA : curB;
+    const rightSlot = preStartRightSlotForSide(nextSide, leftSide);
+    const targetSlot =
+      Number(nextTeamScore) % 2 === 0 ? rightSlot : oppositeSlot(rightSlot);
     const nextSlotsMap = nextSide === "A" ? slotsNowA : slotsNowB;
-    const teamList = nextSide === "A" ? playersA : playersB;
     const uidFound = Object.keys(nextSlotsMap).find(
       (uid) => Number(nextSlotsMap[uid]) === targetSlot,
     );
-    // console.log("5. User tìm thấy ở slot", targetSlot, "là:", uidFound);
-    // LOG END
 
     // ... (giữ nguyên phần code xử lý bên dưới)
     const prev = {
@@ -2437,13 +2413,14 @@ export default function RefereeJudgePanel({ matchId }) {
 
           // ⛳ Theo yêu cầu: nếu chưa bắt đầu trận/game thì KHÔNG đổi giao.
           // Nhưng nếu hoán đổi ngay tại đội đang giao, cần đảm bảo 0-0-2
-          // và người giao là người đang ở ô phải (slot 1) sau hoán đổi.
+          // và người giao là người đang ở ô phải theo bên hiện tại sau hoán đổi.
           if (preOrZero && teamKey === activeSide) {
-            // Tính UID ở ô phải (slot 1) theo base "mới"
+            const rightSlot = preStartRightSlotForSide(teamKey, leftSide);
+            // Tính UID ở ô phải theo base "mới"
             const mapAfter = teamKey === "A" ? nextA : nextB;
             const uidRightNew =
               Object.entries(mapAfter).find(
-                ([, slot]) => Number(slot) === 2,
+                ([, slot]) => Number(slot) === rightSlot,
               )?.[0] ||
               Object.keys(mapAfter)[0] ||
               "";
@@ -2491,6 +2468,7 @@ export default function RefereeJudgePanel({ matchId }) {
       baseA,
       baseB,
       activeSide,
+      leftSide,
       refetch,
     ],
   );

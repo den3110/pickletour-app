@@ -37,6 +37,10 @@ export function CustomTabBar({
 }: CustomTabBarProps) {
   // 2. Lấy chiều rộng màn hình động tại đây
   const { width: screenWidth } = useWindowDimensions();
+  const rootOptions = descriptors[state.routes[0]?.key]?.options ?? {};
+  const activeTint =
+    rootOptions.tabBarActiveTintColor ?? (isDark ? "#A78BFA" : "#8B5CF6");
+  const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
   const extraPaddingBottom = Platform.OS === "ios" ? 20 : 0;
 
@@ -118,13 +122,7 @@ export function CustomTabBar({
         <Animated.View style={[styles.tabButtonInner, animatedStyle]}>
           {options.tabBarIcon?.({
             focused: isFocused,
-            color: isFocused
-              ? isDark
-                ? "#4A90E2"
-                : "#007AFF"
-              : isDark
-              ? "#8E8E93"
-              : "#8E8E93",
+            color: isFocused ? activeTint : inactiveTint,
             size: 24,
           })}
 
@@ -133,7 +131,7 @@ export function CustomTabBar({
               style={[
                 styles.activeIndicator,
                 {
-                  backgroundColor: isDark ? "#4A90E2" : "#007AFF",
+                  backgroundColor: activeTint,
                 },
               ]}
             />
@@ -213,9 +211,7 @@ export function CustomTabBar({
                     styles.absoluteFloatingButton,
                     {
                       backgroundColor: isFocused
-                        ? isDark
-                          ? "#4A90E2"
-                          : "#007AFF"
+                        ? activeTint
                         : isDark
                         ? "#3A3A3C"
                         : "#F2F2F7",
@@ -226,9 +222,7 @@ export function CustomTabBar({
                     focused: isFocused,
                     color: isFocused
                       ? "#FFFFFF"
-                      : isDark
-                      ? "#FFFFFF"
-                      : "#007AFF",
+                      : inactiveTint,
                     size: 30,
                   })}
                 </View>

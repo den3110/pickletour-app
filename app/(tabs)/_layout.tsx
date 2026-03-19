@@ -6,7 +6,6 @@ import { useSelector } from "react-redux";
 import { Image } from "expo-image";
 
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { CustomTabBar } from "@/components/tabbar/Customtabbar";
 import LottieView from "lottie-react-native";
@@ -15,6 +14,17 @@ import LottieView from "lottie-react-native";
 const HOME_LOTTIE = require("@/assets/lottie/home-lt-icon.json");
 /** Icon bot mới */
 const CHATBOT_ICON = require("@/assets/images/icon-chatbot.png");
+const ACTIVE_TAB_TINT = {
+  light: "#8B5CF6",
+  dark: "#A78BFA",
+};
+const HOME_LOTTIE_COLOR_FILTERS = (color: string) => [
+  { keypath: "Fill 1", color },
+  { keypath: "Group 1.Fill 1", color },
+  { keypath: "Group 2.Fill 1", color },
+  { keypath: "Home Outlines.Group 1.Fill 1", color },
+  { keypath: "Home Outlines.Group 2.Fill 1", color },
+];
 
 // Event constant cho scroll to top
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";
@@ -75,6 +85,7 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
       source={HOME_LOTTIE}
       autoPlay={false}
       loop={false}
+      colorFilters={HOME_LOTTIE_COLOR_FILTERS(color)}
       style={{ width: size + 6, height: size + 6, marginTop: 2 }}
       pointerEvents="none"
     />
@@ -84,6 +95,8 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const userInfo = useSelector((s: any) => s.auth?.userInfo);
+  const activeTabTint =
+    colorScheme === "dark" ? ACTIVE_TAB_TINT.dark : ACTIVE_TAB_TINT.light;
 
   const isAdmin = React.useMemo(
     () => !!(userInfo?.isAdmin || userInfo?.role === "admin"),
@@ -109,7 +122,7 @@ export default function TabLayout() {
     <Tabs
       tabBar={renderTabBar}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: activeTabTint,
         headerShown: false,
         tabBarHideOnKeyboard: true,
       }}

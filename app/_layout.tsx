@@ -4,13 +4,12 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { router, Stack, usePathname, useSegments } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import {
   ActivityIndicator,
   View,
-  Text,
   AppState,
   InteractionManager,
   DeviceEventEmitter,
@@ -35,6 +34,7 @@ import { Provider } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
+import HotUpdateModal from "@/components/HotUpdateModal";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
 if (Constants.appOwnership !== "expo") {
@@ -64,6 +64,16 @@ console.log("Is Fabric Enabled:", global.nativeFabricUIManager ? "YES" : "NO");
 const SPLASH_FONT_FAILSAFE_MS = 1500;
 const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
+const HOT_UPDATE_NOTIFY_EVENT = "hotupdater:notify";
+const HOT_UPDATE_NOTIFY_KEY = "__PICKLETOUR_HOTUPDATE_NOTIFY__";
+
+const publishHotUpdateNotify = (payload: {
+  status: "PROMOTED" | "RECOVERED" | "STABLE";
+  crashedBundleId?: string;
+}) => {
+  (globalThis as any)[HOT_UPDATE_NOTIFY_KEY] = payload;
+  DeviceEventEmitter.emit(HOT_UPDATE_NOTIFY_EVENT, payload);
+};
 
 // 🔒 Guard: tránh gọi preventAutoHideAsync nhiều lần khi HMR/Fast Refresh
 declare global {
@@ -156,11 +166,177 @@ function RootLayout() {
 
   const clarityInitRef = React.useRef(false);
   const clarityModRef = React.useRef<any>(null);
+  const otaCheckInFlightRef = React.useRef(false);
+  const otaLastCheckAtRef = React.useRef(0);
+  const otaIgnoredUpdateIdRef = React.useRef<string | null>(null);
+  const otaInitialCheckDoneRef = React.useRef(false);
+
+  const [hotUpdateVisible, setHotUpdateVisible] = React.useState(false);
+  const [hotUpdateProgress, setHotUpdateProgress] = React.useState(0);
+  const [hotUpdateStatus, setHotUpdateStatus] = React.useState<
+    "downloading" | "done" | "error"
+  >("downloading");
+  const [hotUpdateMessage, setHotUpdateMessage] = React.useState<string | null>(
+    null
+  );
 
   // Initialize analytics
   useEffect(() => {
     if (isExpoGo) return;
     analytics.init();
+  }, []);
+
+  const startHotUpdate = React.useCallback(async (updateInfo: any) => {
+    if (!HotUpdater || !updateInfo?.updateBundle) return;
+
+    otaCheckInFlightRef.current = true;
+    otaIgnoredUpdateIdRef.current = null;
+    setHotUpdateVisible(true);
+    setHotUpdateStatus("downloading");
+    setHotUpdateProgress(0);
+    setHotUpdateMessage(
+      updateInfo?.message || "Đang tải bản cập nhật mới cho ứng dụng."
+    );
+
+    try {
+      const success = await updateInfo.updateBundle();
+      if (!success) {
+        throw new Error("Không thể tải bản cập nhật.");
+      }
+
+      setHotUpdateProgress(1);
+      setHotUpdateStatus("done");
+      setHotUpdateMessage("Bản cập nhật đã tải xong. Đang mở lại ứng dụng...");
+
+      setTimeout(() => {
+        HotUpdater.reload().catch((error: unknown) => {
+          console.error("[HotUpdater] Reload error:", error);
+          setHotUpdateStatus("error");
+          setHotUpdateMessage(
+            "Tải xong bản cập nhật nhưng không thể mở lại ứng dụng."
+          );
+        });
+      }, 700);
+    } catch (error) {
+      console.error("[HotUpdater] Download error:", error);
+      setHotUpdateStatus("error");
+      setHotUpdateMessage("Không thể tải bản cập nhật. Vui lòng thử lại sau.");
+      otaCheckInFlightRef.current = false;
+    }
+  }, []);
+
+  const checkForHotUpdate = React.useCallback(async () => {
+    if (isExpoGo || !HotUpdater || otaCheckInFlightRef.current) return;
+
+    const now = Date.now();
+    if (now - otaLastCheckAtRef.current < 15000) return;
+    otaLastCheckAtRef.current = now;
+    otaCheckInFlightRef.current = true;
+
+    try {
+      const updateInfo = await HotUpdater.checkForUpdate({
+        updateStrategy: "appVersion",
+        requestTimeout: 8000,
+      });
+
+      if (!updateInfo) {
+        otaCheckInFlightRef.current = false;
+        return;
+      }
+      if (otaIgnoredUpdateIdRef.current === updateInfo.id) {
+        otaCheckInFlightRef.current = false;
+        return;
+      }
+
+      const isForceUpdate = updateInfo.shouldForceUpdate === true;
+      const title = isForceUpdate
+        ? "Cần cập nhật ứng dụng"
+        : "Có bản cập nhật mới";
+      const message =
+        updateInfo.message ||
+        "Đã có bản cập nhật mới. Bạn có muốn tải và áp dụng ngay bây giờ không?";
+
+      const buttons = isForceUpdate
+        ? [
+            {
+              text: "Cập nhật",
+              onPress: () => {
+                void startHotUpdate(updateInfo);
+              },
+            },
+          ]
+        : [
+            {
+              text: "Để sau",
+              style: "cancel" as const,
+              onPress: () => {
+                otaIgnoredUpdateIdRef.current = updateInfo.id;
+                otaCheckInFlightRef.current = false;
+              },
+            },
+            {
+              text: "Cập nhật",
+              onPress: () => {
+                void startHotUpdate(updateInfo);
+              },
+            },
+          ];
+
+      Alert.alert(title, message, buttons, { cancelable: false });
+      otaCheckInFlightRef.current = false;
+    } catch (error) {
+      console.error("[HotUpdater] Check error:", error);
+      otaCheckInFlightRef.current = false;
+    }
+  }, [startHotUpdate]);
+
+  React.useEffect(() => {
+    if (isExpoGo || !HotUpdater) return;
+
+    const unsubscribe = HotUpdater.addListener(
+      "onProgress",
+      ({ progress }: { progress: number }) => {
+        setHotUpdateProgress(progress || 0);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
+  React.useEffect(() => {
+    const showNotify = (payload?: {
+      status: "PROMOTED" | "RECOVERED" | "STABLE";
+      crashedBundleId?: string;
+    }) => {
+      if (!payload || payload.status === "STABLE") return;
+
+      if (payload.status === "PROMOTED") {
+        Toast.show({
+          type: "success",
+          text1: "Ứng dụng đã được cập nhật",
+          text2: "Bản cập nhật mới đã được áp dụng thành công.",
+        });
+        return;
+      }
+
+      Toast.show({
+        type: "error",
+        text1: "Đã khôi phục bản ổn định",
+        text2: "Ứng dụng đã tự rollback về bản an toàn.",
+      });
+    };
+
+    const initialPayload = (globalThis as any)[HOT_UPDATE_NOTIFY_KEY];
+    if (initialPayload) {
+      delete (globalThis as any)[HOT_UPDATE_NOTIFY_KEY];
+      showNotify(initialPayload);
+    }
+
+    const sub = DeviceEventEmitter.addListener(
+      HOT_UPDATE_NOTIFY_EVENT,
+      showNotify
+    );
+    return () => sub.remove();
   }, []);
 
   // Track screen changes
@@ -317,6 +493,19 @@ function RootLayout() {
     }
   }, [firstFrameDone, fontsReady, lifecycle.phase, hideSplashSafe]);
 
+  React.useEffect(() => {
+    if (isExpoGo || !HotUpdater) return;
+    if (lifecycle.phase !== "ready") return;
+    if (otaInitialCheckDoneRef.current) return;
+
+    otaInitialCheckDoneRef.current = true;
+    const timer = setTimeout(() => {
+      void checkForHotUpdate();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [lifecycle.phase, checkForHotUpdate]);
+
   // Failsafe hide toàn cục
   React.useEffect(() => {
     const t = setTimeout(() => {
@@ -337,6 +526,9 @@ function RootLayout() {
   React.useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active") {
+        if (lifecycle.phase === "ready") {
+          void checkForHotUpdate();
+        }
         if (
           lifecycle.phase === "initializing" ||
           lifecycle.phase === "splash-hiding"
@@ -346,7 +538,7 @@ function RootLayout() {
       }
     });
     return () => sub.remove();
-  }, [lifecycle.phase, hideSplashSafe]);
+  }, [lifecycle.phase, hideSplashSafe, checkForHotUpdate]);
 
   // ✅ Global Android back button handler
   React.useEffect(() => {
@@ -961,6 +1153,21 @@ function RootLayout() {
             </Boot>
           </SocketProvider>
           <ForceUpdateModal />
+          <HotUpdateModal
+            visible={hotUpdateVisible}
+            progress={hotUpdateProgress}
+            status={hotUpdateStatus}
+            message={hotUpdateMessage}
+            isDark={isDark}
+            accentColor={navTheme.colors.primary}
+            onClose={() => {
+              setHotUpdateVisible(false);
+              setHotUpdateProgress(0);
+              setHotUpdateStatus("downloading");
+              setHotUpdateMessage(null);
+              otaCheckInFlightRef.current = false;
+            }}
+          />
           <Toast />
         </BottomSheetModalProvider>
       </GestureHandlerRootView>
@@ -968,162 +1175,17 @@ function RootLayout() {
   );
 }
 
-// ✅ Wrap app với HotUpdater cho OTA updates
-const LAST_UPDATE_KEY = "HOT_UPDATER_LAST_BUNDLE";
-
-// Custom Update Screen Component
-const UpdateScreen = ({
-  progress,
-  status,
-  message,
-}: {
-  progress: number;
-  status: string;
-  message: string | null;
-}) => {
-  const [updateReady, setUpdateReady] = React.useState(false);
-
-  React.useEffect(() => {
-    // Khi progress đạt 100% hoặc status thay đổi từ UPDATING, đánh dấu sẵn sàng
-    if (
-      progress >= 1 ||
-      (status !== "UPDATING" && status !== "CHECK_FOR_UPDATE" && progress > 0)
-    ) {
-      setUpdateReady(true);
-    }
-  }, [progress, status]);
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#0b0c10",
-        padding: 32,
-      }}
-    >
-      {!updateReady ? (
-        <>
-          <ActivityIndicator size="large" color="#1976d2" />
-          <Text
-            style={{
-              color: "#ffffff",
-              fontSize: 18,
-              fontWeight: "600",
-              marginTop: 24,
-              textAlign: "center",
-            }}
-          >
-            {status === "UPDATING"
-              ? "Đang tải bản cập nhật..."
-              : "Đang kiểm tra cập nhật..."}
-          </Text>
-          {progress > 0 && (
-            <>
-              <View
-                style={{
-                  width: "80%",
-                  height: 6,
-                  backgroundColor: "#2a2d35",
-                  borderRadius: 3,
-                  marginTop: 16,
-                  overflow: "hidden",
-                }}
-              >
-                <View
-                  style={{
-                    width: `${Math.round(progress * 100)}%`,
-                    height: "100%",
-                    backgroundColor: "#1976d2",
-                    borderRadius: 3,
-                  }}
-                />
-              </View>
-              <Text
-                style={{
-                  color: "#9ca3af",
-                  fontSize: 14,
-                  marginTop: 8,
-                }}
-              >
-                {Math.round(progress * 100)}%
-              </Text>
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <Text
-            style={{
-              color: "#22c55e",
-              fontSize: 48,
-              marginBottom: 16,
-            }}
-          >
-            ✓
-          </Text>
-          <Text
-            style={{
-              color: "#ffffff",
-              fontSize: 20,
-              fontWeight: "700",
-              textAlign: "center",
-              marginBottom: 8,
-            }}
-          >
-            Cập nhật hoàn tất!
-          </Text>
-          <Text
-            style={{
-              color: "#9ca3af",
-              fontSize: 14,
-              textAlign: "center",
-              marginBottom: 24,
-            }}
-          >
-            {message || "Bản cập nhật đã được tải về thành công"}
-          </Text>
-          <TouchableOpacity
-            onPress={() => HotUpdater.reload()}
-            style={{
-              backgroundColor: "#1976d2",
-              paddingHorizontal: 32,
-              paddingVertical: 14,
-              borderRadius: 8,
-            }}
-          >
-            <Text
-              style={{
-                color: "#ffffff",
-                fontSize: 16,
-                fontWeight: "600",
-              }}
-            >
-              Mở lại ứng dụng
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
-  );
-};
-
 // ✅ Expo Go: bỏ qua HotUpdater (native module không khả dụng)
 const ExportedLayout = HotUpdater
   ? HotUpdater.wrap({
       baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
-      updateStrategy: "appVersion",
-      updateMode: "auto",
-      reloadOnForceUpdate: false,
-      onError: (error: any) => {
-        console.error("[HotUpdater] Error:", error);
-      },
-      onProgress: (progress: number) => {
-        console.log(
-          "[HotUpdater] Progress:",
-          Math.round(progress * 100) + "%"
-        );
+      updateMode: "manual",
+      requestTimeout: 8000,
+      onNotifyAppReady: (result: {
+        status: "PROMOTED" | "RECOVERED" | "STABLE";
+        crashedBundleId?: string;
+      }) => {
+        publishHotUpdateNotify(result);
       },
     })(RootLayout)
   : RootLayout;

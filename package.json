@@ -8,9 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint",
-    "ota:android": "npx expo export --platform android --output-dir ./ota-build",
-    "ota:ios": "npx expo export --platform ios --output-dir ./ota-build"
+    "lint": "expo lint"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
