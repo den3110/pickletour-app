@@ -32,10 +32,19 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import {
   useGetTournamentQuery,
   useListPublicMatchesByTournamentQuery,
-  useListTournamentBracketsQuery,
+  useVerifyRefereeQuery,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import {
+  getMatchPayloadId,
+  getPairDisplayName,
+  isNewerOrEqualMatchPayload,
+  isLightweightMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 
 /* ----------------------------------------------------- */
 /* ------------------- CÁC HÀM HELPER VÀ LOGIC GIỮ NGUYÊN ------------------- */
@@ -110,12 +119,8 @@ function orderKey(m) {
   const ts = m?.createdAt ? new Date(m.createdAt).getTime() : 9e15;
   return [bo, r, o, codeNum, ts];
 }
-function pairToName(pair) {
-  if (!pair) return null;
-  const p1 = pair.player1?.nickName || pair.player1?.fullName;
-  const p2 = pair.player2?.nickName || pair.player2?.fullName;
-  const name = [p1, p2].filter(Boolean).join(" / ");
-  return name || null;
+function pairToName(pair, source) {
+  return getPairDisplayName(pair, source) || null;
 }
 function seedToName(seed) {
   return seed?.label || null;
@@ -124,7 +129,7 @@ function teamNameFrom(m, side) {
   if (!m) return "TBD";
   const pair = side === "A" ? m.pairA : m.pairB;
   const seed = side === "A" ? m.seedA : m.seedB;
-  return pairToName(pair) || seedToName(seed) || "TBD";
+  return pairToName(pair, m) || seedToName(seed) || "TBD";
 }
 function scoreText(m) {
   if (typeof m?.scoreText === "string" && m.scoreText.trim())
@@ -946,17 +951,10 @@ export default function TournamentScheduleNative() {
     data: matchesResp,
     isLoading: mLoading,
     error: mError,
-    refetch: refetchMatches,
   } = useListPublicMatchesByTournamentQuery({
     tid: id,
-    params: { limit: 1000 },
   });
-  const { data: brackets = [], refetch: refetchBrackets } =
-    useListTournamentBracketsQuery(id, {
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-    });
+  const brackets = useMemo(() => [], []);
   const loading = tLoading || mLoading;
   const errorMsg =
     (tError && (tError.data?.message || tError.error)) ||
@@ -973,57 +971,50 @@ export default function TournamentScheduleNative() {
 
   useEffect(() => {
     const mp = new Map();
-    const list = matchesResp?.list || [];
+    const list = (matchesResp?.list || []).map((m) =>
+      normalizeMatchDisplay(m, tournament)
+    );
     for (const m of list) if (m?._id) mp.set(String(m._id), m);
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
-  }, [matchesResp]);
+  }, [matchesResp, tournament]);
 
   const flushPending = useCallback(() => {
     if (!pendingRef.current.size) return;
     const mp = liveMapRef.current;
     for (const [mid, inc] of pendingRef.current) {
       const cur = mp.get(mid);
-      const vNew = Number(inc?.liveVersion ?? inc?.version ?? 0);
-      const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
-      const merged = !cur || vNew >= vOld ? { ...(cur || {}), ...inc } : cur;
+      const merged =
+        !cur || isNewerOrEqualMatchPayload(cur, inc)
+          ? mergeMatchPayload(cur, inc, cur || tournament) ||
+            normalizeMatchDisplay(inc, cur || tournament)
+          : cur;
       mp.set(mid, merged);
     }
     pendingRef.current.clear();
     setLiveBump((x) => x + 1);
-  }, []);
+  }, [tournament]);
 
   const queueUpsert = useCallback(
     (incRaw) => {
-      const inc = incRaw?.data ?? incRaw?.match ?? incRaw;
-      if (!inc?._id) return;
-      const normalizeEntity = (v) => {
-        if (v == null) return v;
-        if (typeof v === "string" || typeof v === "number") return v;
-        if (typeof v === "object") {
-          return {
-            _id: v._id ?? (typeof v.id === "string" ? v.id : undefined),
-            name:
-              (typeof v.name === "string" && v.name) ||
-              (typeof v.label === "string" && v.label) ||
-              (typeof v.title === "string" && v.title) ||
-              "",
-          };
-        }
-        return v;
-      };
-      if (inc.court) inc.court = normalizeEntity(inc.court);
-      if (inc.venue) inc.venue = normalizeEntity(inc.venue);
-      if (inc.location) inc.location = normalizeEntity(inc.location);
-
-      pendingRef.current.set(String(inc._id), inc);
+      const id = getMatchPayloadId(incRaw);
+      if (!id) return;
+      if (isLightweightMatchPayload(incRaw)) {
+        socket?.emit("match:snapshot:request", { matchId: id });
+        return;
+      }
+      const payload = incRaw?.data ?? incRaw?.match ?? incRaw;
+      pendingRef.current.set(
+        String(id),
+        normalizeMatchDisplay(payload, tournament)
+      );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         flushPending();
       });
     },
-    [flushPending]
+    [flushPending, socket, tournament]
   );
 
   const diffSet = (currentSet, nextArr) => {
@@ -1039,6 +1030,17 @@ export default function TournamentScheduleNative() {
     return { added, removed, nextSet };
   };
 
+  const tournamentRoomIds = useMemo(
+    () => (id ? [String(id)] : []),
+    [id]
+  );
+
+  useSocketRoomSet(socket, tournamentRoomIds, {
+    subscribeEvent: "tournament:subscribe",
+    unsubscribeEvent: "tournament:unsubscribe",
+    payloadKey: "tournamentId",
+  });
+
   useEffect(() => {
     if (!socket) return;
     const onUpsert = (p) => queueUpsert(p);
@@ -1050,40 +1052,18 @@ export default function TournamentScheduleNative() {
         setLiveBump((x) => x + 1);
       }
     };
-    const onRefilled = () => {
-      refetchMatches();
-      refetchBrackets();
-    };
-    const onConnected = () => {
-      subscribedBracketsRef.current.forEach((bid) =>
-        socket.emit("draw:subscribe", { bracketId: bid })
-      );
-      joinedMatchesRef.current.forEach((mid) => {
-        socket.emit("match:join", { matchId: mid });
-        socket.emit("match:snapshot:request", { matchId: mid });
-      });
-    };
-    socket.on("connect", onConnected);
-    socket.on("match:update", onUpsert);
-    socket.on("match:snapshot", onUpsert);
-    socket.on("score:updated", onUpsert);
+
+    socket.on("tournament:match:update", onUpsert);
     socket.on("match:deleted", onRemove);
-    socket.on("draw:refilled", onRefilled);
-    socket.on("bracket:updated", onRefilled);
     return () => {
-      socket.off("connect", onConnected);
-      socket.off("match:update", onUpsert);
-      socket.off("match:snapshot", onUpsert);
-      socket.off("score:updated", onUpsert);
+      socket.off("tournament:match:update", onUpsert);
       socket.off("match:deleted", onRemove);
-      socket.off("draw:refilled", onRefilled);
-      socket.off("bracket:updated", onRefilled);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, refetchMatches, refetchBrackets]);
+  }, [socket, queueUpsert]);
 
   const bracketsKey = useMemo(
     () =>
@@ -1094,26 +1074,6 @@ export default function TournamentScheduleNative() {
         .join(","),
     [brackets]
   );
-  useEffect(() => {
-    if (!socket) return;
-    const nextIds =
-      (brackets || []).map((b) => String(b._id)).filter(Boolean) ?? [];
-    const { added, removed, nextSet } = diffSet(
-      subscribedBracketsRef.current,
-      nextIds
-    );
-    added.forEach((bid) => socket.emit("draw:subscribe", { bracketId: bid }));
-    removed.forEach((bid) =>
-      socket.emit("draw:unsubscribe", { bracketId: bid })
-    );
-    subscribedBracketsRef.current = nextSet;
-    return () => {
-      nextSet.forEach((bid) =>
-        socket.emit("draw:unsubscribe", { bracketId: bid })
-      );
-    };
-  }, [socket, bracketsKey]);
-
   const matchesKey = useMemo(
     () =>
       ((matchesResp?.list || []).map((m) => String(m._id)) || [])
@@ -1123,23 +1083,9 @@ export default function TournamentScheduleNative() {
     [matchesResp]
   );
   useEffect(() => {
-    if (!socket) return;
-    const nextIds =
-      (matchesResp?.list || []).map((m) => String(m._id)).filter(Boolean) ?? [];
-    const { added, removed, nextSet } = diffSet(
-      joinedMatchesRef.current,
-      nextIds
-    );
-    added.forEach((mid) => {
-      socket.emit("match:join", { matchId: mid });
-      socket.emit("match:snapshot:request", { matchId: mid });
-    });
-    removed.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
-    joinedMatchesRef.current = nextSet;
-    return () => {
-      nextSet.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
-    };
-  }, [socket, matchesKey]);
+    subscribedBracketsRef.current = new Set();
+    joinedMatchesRef.current = new Set();
+  }, [bracketsKey, matchesKey]);
 
   // --- Data Processing (Giữ nguyên logic xử lý data) ---
   const matches = useMemo(
@@ -1154,10 +1100,14 @@ export default function TournamentScheduleNative() {
     () => isManagerOfTournament(tournament, me) || admin,
     [tournament, me, admin]
   );
-  const referee = useMemo(
+  const inferredReferee = useMemo(
     () => isRefereeOfTournament(tournament, matches, me),
     [tournament, matches, me]
   );
+  const { data: refereeCheck } = useVerifyRefereeQuery(id, {
+    skip: !id || !me?._id,
+  });
+  const referee = !!(inferredReferee || refereeCheck?.isReferee);
   const allSorted = useMemo(() => {
     return [...matches].sort((a, b) => {
       const ak = orderKey(a);

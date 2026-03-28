@@ -121,7 +121,7 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
 
     getTournament: builder.query({
       query: (id) => `/api/tournaments/${id}`,
-      keepUnusedDataFor: 0,
+      keepUnusedDataFor: 60,
       providesTags: (res, err, id) => [{ type: "Tournaments", id }],
     }),
 
@@ -162,7 +162,7 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
         if (res?.list && Array.isArray(res.list)) return res.list;
         return [];
       },
-      keepUnusedDataFor: 0,
+      keepUnusedDataFor: 60,
     }),
 
     // GET /api/tournaments/:id/matches  (user route)
@@ -177,11 +177,51 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
         if (res?.list && Array.isArray(res.list)) return res.list;
         return [];
       },
-      keepUnusedDataFor: 0,
+      keepUnusedDataFor: 45,
+    }),
+
+    listTournamentManagers: builder.query({
+      query: (tournamentId) => ({
+        url: `/api/tournaments/${tournamentId}/managers`,
+        method: "GET",
+      }),
+      transformResponse: (res) => {
+        if (Array.isArray(res)) return res;
+        if (res?.list && Array.isArray(res.list)) return res.list;
+        return [];
+      },
+      keepUnusedDataFor: 30,
+      providesTags: (_res, _err, tournamentId) => [
+        { type: "TournamentManagers", id: tournamentId },
+      ],
+    }),
+
+    addTournamentManager: builder.mutation({
+      query: ({ tournamentId, userId }) => ({
+        url: `/api/tournaments/${tournamentId}/managers`,
+        method: "POST",
+        body: { userId },
+      }),
+      invalidatesTags: (_res, _err, { tournamentId }) => [
+        { type: "TournamentManagers", id: tournamentId },
+        { type: "Tournaments", id: tournamentId },
+      ],
+    }),
+
+    removeTournamentManager: builder.mutation({
+      query: ({ tournamentId, userId }) => ({
+        url: `/api/tournaments/${tournamentId}/managers/${userId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_res, _err, { tournamentId }) => [
+        { type: "TournamentManagers", id: tournamentId },
+        { type: "Tournaments", id: tournamentId },
+      ],
     }),
 
     getMatchPublic: builder.query({
       query: (matchId) => `/api/tournaments/matches/${matchId}`,
+      keepUnusedDataFor: 30,
       providesTags: (res, err, id) => [{ type: "Match", id }],
     }),
 
@@ -369,14 +409,13 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
     }),
     listPublicMatchesByTournament: builder.query({
       query: ({ tid, params }) => {
-        // backend nên trả danh sách đã tối ưu cho hiển thị (simple fields)
         const search = new URLSearchParams({
           ...(params || {}),
-          public: 1,
-          pageSize: 500,
+          view: "schedule",
         }).toString();
         return `/api/tournaments/${tid}/matches?${search}`;
       },
+      keepUnusedDataFor: 30,
       providesTags: (r, e, { tid }) => [{ type: "TournamentMatches", id: tid }],
     }),
     adminGetBrackets: builder.query({
@@ -729,6 +768,9 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
     verifyManager: builder.query({
       query: (tid) => `/api/tournaments/${tid}/is-manager`,
     }),
+    verifyReferee: builder.query({
+      query: (tid) => `/api/tournaments/${tid}/is-referee`,
+    }),
     refereeSetBreak: builder.mutation({
       query: ({ matchId, ...body }) => ({
         url: `/api/referee/matches/${matchId}/break`,
@@ -784,6 +826,9 @@ export const {
   useUserCheckinRegistrationMutation,
   useListTournamentBracketsQuery,
   useListTournamentMatchesQuery,
+  useListTournamentManagersQuery,
+  useAddTournamentManagerMutation,
+  useRemoveTournamentManagerMutation,
   useGetMatchPublicQuery,
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
@@ -826,7 +871,8 @@ export const {
   useAdminClearMatchCourtMutation,
   useAdminGetMatchRefereesQuery,
   useVerifyManagerQuery,
+  useVerifyRefereeQuery,
   useRefereeSetBreakMutation,
   useAdminBatchSetMatchLiveUrlMutation,
-  useUpdateMatchMutation
+  useUpdateMatchMutation,
 } = tournamentsApiSlice;

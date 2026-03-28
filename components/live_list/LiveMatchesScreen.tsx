@@ -32,9 +32,23 @@ import { useGetLiveMatchesQuery } from "@/slices/liveApiSlice";
 import FiltersBottomSheet from "./FiltersModal";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useSocket } from "@/context/SocketContext";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 
 const LIMIT = 12;
 const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
+const REALTIME_REFETCH_MIN_GAP_MS = 1500;
+
+function normalizeTournamentId(value) {
+  if (!value) return "";
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+  if (typeof value === "object") {
+    return String(value?._id || value?.id || "").trim();
+  }
+  return "";
+}
 
 function useThemeTokens() {
   const navTheme = useTheme?.();
@@ -291,6 +305,9 @@ export default function LiveMatchesScreen({ isBack = false }) {
   const T = useThemeTokens();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
+  const socket = useSocket();
+  const realtimeRefetchTimerRef = useRef(null);
+  const lastRealtimeRefetchAtRef = useRef(0);
 
   const [keyword, setKeyword] = useState("");
   const debouncedKeyword = useDebouncedValue(keyword, 350);
@@ -310,7 +327,7 @@ export default function LiveMatchesScreen({ isBack = false }) {
 
     const args = {
       keyword: debouncedKeyword,
-      page: page - 1,
+      page,
       limit: LIMIT,
       statuses: filteredStatuses.join(","),
       windowMs: windowHours * 3600 * 1000,
@@ -328,6 +345,31 @@ export default function LiveMatchesScreen({ isBack = false }) {
     const raw = Array.isArray(data?.items) ? data.items : [];
     return raw.map((m) => ({ ...m, matchId: m.matchId || m._id }));
   }, [data?.items]);
+  const tournamentRoomIds = useMemo(() => {
+    const ids = new Set();
+
+    if (qArgs?.tournamentId) {
+      const id = normalizeTournamentId(qArgs.tournamentId);
+      if (id) ids.add(id);
+    }
+
+    const buckets = Array.isArray(data?.tournaments) ? data.tournaments : [];
+    for (const bucket of buckets) {
+      const id = normalizeTournamentId(bucket?._id || bucket?.id);
+      if (id) ids.add(id);
+    }
+
+    for (const item of items) {
+      const id = normalizeTournamentId(item?.tournament?._id || item?.tournament);
+      if (id) ids.add(id);
+    }
+
+    return Array.from(ids);
+  }, [data?.tournaments, items, qArgs?.tournamentId]);
+  const tournamentRoomIdsKey = useMemo(
+    () => tournamentRoomIds.join("|"),
+    [tournamentRoomIds]
+  );
 
   const total = data?.count ?? items.length;
 
@@ -356,6 +398,93 @@ export default function LiveMatchesScreen({ isBack = false }) {
     const id = setInterval(() => refetch(), Math.max(5, refreshSec) * 1000);
     return () => clearInterval(id);
   }, [autoRefresh, refreshSec, refetch]);
+
+  const scheduleRealtimeRefetch = useCallback(
+    (delayMs = 250) => {
+      const now = Date.now();
+      const gapMs = Math.max(
+        0,
+        REALTIME_REFETCH_MIN_GAP_MS - (now - lastRealtimeRefetchAtRef.current)
+      );
+      const waitMs = Math.max(delayMs, gapMs);
+
+      if (realtimeRefetchTimerRef.current) return;
+      realtimeRefetchTimerRef.current = setTimeout(() => {
+        realtimeRefetchTimerRef.current = null;
+        lastRealtimeRefetchAtRef.current = Date.now();
+        refetch();
+      }, waitMs);
+    },
+    [refetch]
+  );
+
+  useEffect(
+    () => () => {
+      if (realtimeRefetchTimerRef.current) {
+        clearTimeout(realtimeRefetchTimerRef.current);
+        realtimeRefetchTimerRef.current = null;
+      }
+    },
+    []
+  );
+
+  useSocketRoomSet(socket, tournamentRoomIds, {
+    subscribeEvent: "tournament:subscribe",
+    unsubscribeEvent: "tournament:unsubscribe",
+    payloadKey: "tournamentId",
+  });
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const onTournamentMatchUpdate = (payload = {}) => {
+      const type = String(payload?.type || "").trim().toLowerCase();
+      if (type.startsWith("score:") || type.startsWith("serve:")) return;
+
+      const tournamentId = normalizeTournamentId(
+        payload?.tournamentId ||
+          payload?.data?.tournament?._id ||
+          payload?.data?.tournament
+      );
+      if (
+        tournamentId &&
+        tournamentRoomIds.length > 0 &&
+        !tournamentRoomIds.includes(tournamentId)
+      ) {
+        return;
+      }
+
+      scheduleRealtimeRefetch();
+    };
+
+    const onTournamentInvalidate = (payload = {}) => {
+      const tournamentId = normalizeTournamentId(payload?.tournamentId);
+      if (
+        tournamentId &&
+        tournamentRoomIds.length > 0 &&
+        !tournamentRoomIds.includes(tournamentId)
+      ) {
+        return;
+      }
+      scheduleRealtimeRefetch(150);
+    };
+
+    const onConnect = () => {
+      if (tournamentRoomIds.length > 0) {
+        scheduleRealtimeRefetch(150);
+      }
+    };
+
+    socket.on("tournament:match:update", onTournamentMatchUpdate);
+    socket.on("tournament:invalidate", onTournamentInvalidate);
+    socket.on("connect", onConnect);
+
+    return () => {
+      socket.off("tournament:match:update", onTournamentMatchUpdate);
+      socket.off("tournament:invalidate", onTournamentInvalidate);
+      socket.off("connect", onConnect);
+    };
+  }, [socket, scheduleRealtimeRefetch, tournamentRoomIds, tournamentRoomIdsKey]);
 
   const handleOpenFilters = useCallback(() => {
     Keyboard.dismiss();
@@ -436,7 +565,7 @@ export default function LiveMatchesScreen({ isBack = false }) {
         ))}
       </View>
     ),
-    [T.scheme]
+    [T]
   );
 
   const renderEmpty = useCallback(

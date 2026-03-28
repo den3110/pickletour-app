@@ -19,6 +19,10 @@ import Toast from "react-native-toast-message";
 import { useGetMatchPublicQuery } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import MatchContent from "@/components/match/MatchContent";
+import {
+  getPlayerDisplayName,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /* ---------- theme tokens ---------- */
 function useThemeTokens() {
@@ -58,12 +62,7 @@ function pickCode(m: any): string | null {
   return null;
 }
 function preferName(p: any) {
-  return (
-    (p?.nickname && String(p.nickname).trim()) ||
-    (p?.name && String(p.name).trim()) ||
-    (p?.nickname && String(p.nickname).trim()) ||
-    ""
-  );
+  return getPlayerDisplayName(p) || "";
 }
 function buildVsTitle(m: any): string {
   if (!m) return "Chi tiết trận";
@@ -99,7 +98,7 @@ export default function MatchHomePage() {
     useGetMatchPublicQuery(matchId ? matchId : (skipToken as any));
 
   // Chuẩn hoá object trận từ API
-  const match = useMemo(() => data ?? null, [data]);
+  const match = useMemo(() => normalizeMatchDisplay(data) ?? null, [data]);
   const title = useMemo(() => buildVsTitle(match), [match]);
 
   // Refresh thủ công

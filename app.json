@@ -50,7 +50,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 13,
+      "versionCode": 28,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",

@@ -1,11 +1,11 @@
 package com.pkt.pickletour
 
 import android.app.Application
+import android.content.Context
 import android.content.res.Configuration
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
-import com.hotupdater.HotUpdater
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
@@ -25,7 +25,7 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               // Packages that cannot be autolinked yet can be added manually here, for example:
-              add(FacebookLivePackage())
+              // add(FacebookLivePackage()) // disabled — no longer using Facebook Live native module
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
@@ -35,7 +35,7 @@ class MainApplication : Application(), ReactApplication {
           override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
 
           override fun getJSBundleFile(): String? {
-              return HotUpdater.getJSBundleFile(applicationContext)
+              return resolveHotUpdaterBundleFile() ?: super.getJSBundleFile()
           }
       }
   )
@@ -58,4 +58,22 @@ class MainApplication : Application(), ReactApplication {
     super.onConfigurationChanged(newConfig)
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
   }
+
+  private fun resolveHotUpdaterBundleFile(): String? =
+    runCatching {
+      val hotUpdaterClass = Class.forName("com.hotupdater.HotUpdater")
+      val bundleMethod =
+        hotUpdaterClass.methods.firstOrNull { method ->
+          method.name == "getJSBundleFile" &&
+            method.parameterTypes.contentEquals(arrayOf(Context::class.java))
+        }
+
+      if (bundleMethod != null) {
+        bundleMethod.invoke(null, applicationContext) as? String
+      } else {
+        val companion = hotUpdaterClass.getField("Companion").get(null)
+        val companionMethod = companion.javaClass.getMethod("getJSBundleFile", Context::class.java)
+        companionMethod.invoke(companion, applicationContext) as? String
+      }
+    }.getOrNull()
 }

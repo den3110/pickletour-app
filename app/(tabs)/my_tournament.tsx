@@ -40,8 +40,16 @@ import { useListMyTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useSocket } from "@/context/SocketContext";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useTheme } from "@react-navigation/native";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import {
+  getMatchPayloadId,
+  getPlayerDisplayName,
+  isLightweightMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /* ================= Theme ================= */
 function useThemeTokens() {
@@ -122,9 +130,7 @@ const stripVN = (s = "") =>
     .toLowerCase()
     .trim();
 const nameWithNick = (p) => {
-  if (!p) return "—";
-  const nick = p.nickName || p.nickname || p.nick || p.alias;
-  return nick?.trim() || p.fullName || p.name || "—";
+  return getPlayerDisplayName(p) || "—";
 };
 const teamLabel = (team, eventType) => {
   if (!team) return "—";
@@ -912,7 +918,7 @@ export default function MyTournament() {
     const mp = liveMapRef.current;
     for (const [mid, inc] of pendingRef.current) {
       const cur = mp.get(mid);
-      mp.set(mid, { ...(cur || {}), ...inc });
+      mp.set(mid, mergeMatchPayload(cur, inc, cur) || normalizeMatchDisplay(inc));
     }
     pendingRef.current.clear();
     setLiveBump((x) => x + 1);
@@ -920,44 +926,30 @@ export default function MyTournament() {
 
   const queueUpsert = useCallback(
     (payload) => {
+      const id = getMatchPayloadId(payload);
+      if (!id) return;
+      if (isLightweightMatchPayload(payload)) {
+        socket?.emit("match:snapshot:request", { matchId: id });
+        return;
+      }
       const incRaw = payload?.data ?? payload?.match ?? payload;
-      const inc = incRaw?._id ? incRaw : null;
-      if (!inc) return;
-
-      const normalizeEntity = (v) => {
-        if (v == null) return v;
-        if (typeof v === "string" || typeof v === "number") return v;
-        if (typeof v === "object") {
-          return {
-            _id: v._id ?? (typeof v.id === "string" ? v.id : undefined),
-            name:
-              (typeof v.name === "string" && v.name) ||
-              (typeof v.label === "string" && v.label) ||
-              (typeof v.title === "string" && v.title) ||
-              "",
-          };
-        }
-        return v;
-      };
-      if (inc.court) inc.court = normalizeEntity(inc.court);
-      if (inc.venue) inc.venue = normalizeEntity(inc.venue);
-      if (inc.location) inc.location = normalizeEntity(inc.location);
-
-      pendingRef.current.set(String(inc._id), inc);
+      pendingRef.current.set(String(id), normalizeMatchDisplay(incRaw));
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         flushPending();
       });
     },
-    [flushPending]
+    [flushPending, socket]
   );
 
   // Seed từ API
   useEffect(() => {
     const mp = new Map();
     for (const t of tournamentsRaw) {
-      const list = Array.isArray(t.matches) ? t.matches : [];
+      const list = Array.isArray(t.matches)
+        ? t.matches.map((m) => normalizeMatchDisplay(m))
+        : [];
       for (const m of list) if (m?._id) mp.set(String(m._id), m);
     }
     liveMapRef.current = mp;
@@ -965,6 +957,20 @@ export default function MyTournament() {
   }, [tournamentsRaw]);
 
   // Socket listeners
+  const tournamentRoomIds = useMemo(
+    () =>
+      (tournamentsRaw || [])
+        .map((t) => String(t?._id))
+        .filter(Boolean),
+    [tournamentsRaw]
+  );
+
+  useSocketRoomSet(socket, tournamentRoomIds, {
+    subscribeEvent: "tournament:subscribe",
+    unsubscribeEvent: "tournament:unsubscribe",
+    payloadKey: "tournamentId",
+  });
+
   useEffect(() => {
     if (!socket) return;
 
@@ -977,98 +983,24 @@ export default function MyTournament() {
         setLiveBump((x) => x + 1);
       }
     };
-    const onRefilled = () => {
-      refetch();
-    };
-    const onConnected = () => {
-      subscribedBracketsRef.current.forEach((bid) =>
-        socket.emit("draw:subscribe", { bracketId: bid })
-      );
-      joinedMatchesRef.current.forEach((mid) => {
-        socket.emit("match:join", { matchId: mid });
-        socket.emit("match:snapshot:request", { matchId: mid });
-      });
-    };
 
-    socket.on("connect", onConnected);
-    socket.on("match:update", onUpsert);
-    socket.on("match:patched", onUpsert);
-    socket.on("match:snapshot", onUpsert);
-    socket.on("score:updated", onUpsert);
-    socket.on("score:update", onUpsert);
+    socket.on("tournament:match:update", onUpsert);
     socket.on("match:deleted", onRemove);
-    socket.on("draw:refilled", onRefilled);
-    socket.on("bracket:updated", onRefilled);
 
     return () => {
-      socket.off("connect", onConnected);
-      socket.off("match:update", onUpsert);
-      socket.off("match:patched", onUpsert);
-      socket.off("match:snapshot", onUpsert);
-      socket.off("score:updated", onUpsert);
-      socket.off("score:update", onUpsert);
+      socket.off("tournament:match:update", onUpsert);
       socket.off("match:deleted", onRemove);
-      socket.off("draw:refilled", onRefilled);
-      socket.off("bracket:updated", onRefilled);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, refetch]);
+  }, [socket, queueUpsert]);
 
-  // Subscribe/unsubscribe brackets theo diff
   useEffect(() => {
-    if (!socket) return;
-    const nextIds = bracketsKey ? bracketsKey.split(",") : [];
-    const cur = subscribedBracketsRef.current;
-    const nextSet = new Set(nextIds);
-
-    nextSet.forEach((bid) => {
-      if (!cur.has(bid)) socket.emit("draw:subscribe", { bracketId: bid });
-    });
-    cur.forEach((bid) => {
-      if (!nextSet.has(bid))
-        socket.emit("draw:unsubscribe", { bracketId: bid });
-    });
-    subscribedBracketsRef.current = nextSet;
-
-    return () => {
-      nextSet.forEach((bid) =>
-        socket.emit("draw:unsubscribe", { bracketId: bid })
-      );
-    };
-  }, [socket, bracketsKey]);
-
-  // Join/leave match rooms theo diff
-  useEffect(() => {
-    if (!socket) return;
-
-    const nextIds =
-      tournamentsRaw
-        .flatMap((t) => (Array.isArray(t.matches) ? t.matches : []))
-        .map((m) => String(m._id))
-        .filter(Boolean) ?? [];
-
-    const curSet = joinedMatchesRef.current;
-    const nextSet = new Set(nextIds);
-
-    nextSet.forEach((mid) => {
-      if (!curSet.has(mid)) {
-        socket.emit("match:join", { matchId: mid });
-        socket.emit("match:snapshot:request", { matchId: mid });
-      }
-    });
-    curSet.forEach((mid) => {
-      if (!nextSet.has(mid)) socket.emit("match:leave", { matchId: mid });
-    });
-
-    joinedMatchesRef.current = nextSet;
-
-    return () => {
-      nextSet.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
-    };
-  }, [socket, matchesKey, tournamentsRaw]);
+    subscribedBracketsRef.current = new Set();
+    joinedMatchesRef.current = new Set();
+  }, [bracketsKey, matchesKey]);
 
   // Merge realtime vào từng giải
   const liveMatchesByTid = useMemo(() => {

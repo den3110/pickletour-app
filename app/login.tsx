@@ -14,7 +14,7 @@ import {
   Keyboard, // ⬅️ THÊM
 } from "react-native";
 import { Image } from "expo-image";
-import { router, Stack, Redirect } from "expo-router";
+import { router, Stack, Redirect, useLocalSearchParams } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { useLoginMutation } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
@@ -36,7 +36,25 @@ const normPhone = (v) => {
 const isLikelyPhone = (raw) => {
   if (!raw) return false;
   const s = normPhone(raw);
-  return /^0\d{8,10}$/.test(s);
+  return /^0\d{9}$/.test(s);
+};
+
+const getLoginErrorMessage = (err) => {
+  if (err?.data?.message) return String(err.data.message);
+  if (err?.data?.code === "UPGRADE_REQUIRED" || err?.status === 426) {
+    return "Phiên bản ứng dụng này đã quá cũ hoặc bị chặn. Vui lòng cập nhật ứng dụng rồi thử lại.";
+  }
+  if (err?.data?.code === "MAINTENANCE" || err?.status === 503) {
+    return "Hệ thống đang bảo trì. Vui lòng thử lại sau.";
+  }
+  if (err?.status === "FETCH_ERROR") {
+    return "Không kết nối được tới máy chủ. Vui lòng kiểm tra mạng hoặc cập nhật ứng dụng.";
+  }
+  if (err?.status === "PARSING_ERROR") {
+    return "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại sau.";
+  }
+  if (err?.error) return String(err.error);
+  return "Đăng nhập thất bại. Vui lòng kiểm tra lại.";
 };
 
 const LOGO_SRC = require("@/assets/images/icon.png");
@@ -45,6 +63,7 @@ const BG_LOTTIE = require("@/assets/lottie/animated-bg.json");
 const BOTTOM_ACTIONS_H = 132;
 
 export default function LoginScreen() {
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
@@ -58,6 +77,13 @@ export default function LoginScreen() {
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const [login, { isLoading }] = useLoginMutation();
+  const returnTo = useMemo(() => {
+    const raw = Array.isArray(params.returnTo)
+      ? params.returnTo[0]
+      : params.returnTo;
+    const next = String(raw || "/(tabs)").trim();
+    return next.startsWith("/") ? next : "/(tabs)";
+  }, [params.returnTo]);
 
   // State
   const [loginId, setLoginId] = useState("");
@@ -98,9 +124,9 @@ export default function LoginScreen() {
 
   const onSubmit = async () => {
     const id = (loginId || "").trim();
-    const pass = (password || "").trim();
+    const pass = typeof password === "string" ? password : "";
 
-    if (!id || !pass) {
+    if (!id || pass.length === 0) {
       Alert.alert("Thiếu thông tin", "Vui lòng nhập tài khoản và mật khẩu.");
       return;
     }
@@ -120,20 +146,17 @@ export default function LoginScreen() {
       dispatch(apiSlice.util.resetApiState());
       await saveUserInfo(normalized);
 
-      router.replace("/(tabs)");
+      router.replace(returnTo as any);
     } catch (err) {
-      const msg =
-        err?.data?.message ||
-        err?.error ||
-        "Đăng nhập thất bại. Vui lòng kiểm tra lại.";
-      Alert.alert("Lỗi", String(msg));
+      console.log("[login] auth failed", err);
+      Alert.alert("Lỗi", getLoginErrorMessage(err));
     }
   };
 
   const shouldRedirect = !!userInfo;
 
   return shouldRedirect ? (
-    <Redirect href="/(tabs)" />
+    <Redirect href={returnTo as any} />
   ) : (
     <>
       <Stack.Screen options={{ headerShown: false }} />

@@ -8,10 +8,24 @@ import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 
 // ================= Base URL =================
+const PROD_API_URL = "https://pickletour.vn/api";
+const DEV_API_URL = "http://192.168.0.105:5001";
+
+function normalizeBaseUrl(v) {
+  if (typeof v !== "string") return "";
+  return v
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .replace(/\/+$/, "");
+}
+
+const configuredBaseUrl = normalizeBaseUrl(
+  process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.API_URL
+);
+
 const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  Constants.expoConfig?.extra?.API_URL ||
-  "http://192.168.0.105:5001";
+  configuredBaseUrl ||
+  (process.env.NODE_ENV === "development" ? DEV_API_URL : PROD_API_URL);
 
 // ============== Helpers ==============
 const generateRequestId = () => {

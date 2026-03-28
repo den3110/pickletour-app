@@ -31,6 +31,11 @@ import {
   useAdminGetBracketsQuery,
   useAdminListMatchesByTournamentQuery,
 } from "@/slices/tournamentsApiSlice";
+import {
+  getPairDisplayName,
+  getPlayerDisplayName,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /* ======================== Helpers ======================== */
 const TYPE_LABEL = (t) => {
@@ -43,13 +48,10 @@ const TYPE_LABEL = (t) => {
   if (key === "gsl") return "GSL";
   return t || "Khác";
 };
-const playerName = (p) =>
-  p?.fullName || p?.name || p?.nickName || p?.nickname || "—";
-const pairLabel = (pair) => {
+const playerName = (p, source) => getPlayerDisplayName(p, source) || "—";
+const pairLabel = (pair, source) => {
   if (!pair) return "—";
-  if (pair.name) return pair.name;
-  const ps = [pair.player1, pair.player2].filter(Boolean).map(playerName);
-  return ps.join(" / ") || "—";
+  return getPairDisplayName(pair, source) || "—";
 };
 const matchCode = (m) =>
   m?.code || `R${m?.round ?? "?"}#${(m?.order ?? 0) + 1}`;
@@ -138,7 +140,13 @@ export default function OverviewScreen() {
     page: 1,
     pageSize: 2000,
   });
-  const allMatches = matchPage?.list || [];
+  const allMatches = useMemo(
+    () =>
+      (Array.isArray(matchPage?.list) ? matchPage.list : []).map((m) =>
+        normalizeMatchDisplay(m, tour)
+      ),
+    [matchPage?.list, tour]
+  );
 
   // 2) Permissions
   const isAdmin = !!(

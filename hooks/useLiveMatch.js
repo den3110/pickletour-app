@@ -1,29 +1,34 @@
 // src/hooks/useLiveMatch.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/context/SocketContext";
+import {
+  extractMatchPayload,
+  getMatchPayloadId,
+  isLightweightMatchPayload,
+  isNewerOrEqualMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /**
  * Realtime match state over Socket.IO
- * - Kết nối dùng singleton từ SocketContext (không tạo socket mới)
- * - Tự join/leave phòng `match:<matchId>`
- * - Nhận `match:snapshot` (full) và `match:update` (diff hoặc full)
- * - So sánh version để tránh ghi đè state cũ lên mới
+ * - Uses the singleton socket from SocketContext
+ * - Auto join/leave `match:<matchId>`
+ * - Accepts `match:snapshot`, `match:update`, `score:updated`
+ * - Lightweight payloads only trigger snapshot refresh; they never replace identity
  */
 export function useLiveMatch(matchId, token) {
   const socket = useSocket();
   const [state, setState] = useState({ loading: true, data: null });
   const mountedRef = useRef(false);
 
-  // reset khi đổi trận
   useEffect(() => {
     setState({ loading: Boolean(matchId), data: null });
   }, [matchId]);
 
-  // Nếu có token truyền vào và socket chưa connect, gán vào auth rồi connect (optional)
   useEffect(() => {
     if (!socket) return;
     if (token && !socket.connected && !socket.active) {
-      // cập nhật token cho lần connect kế tiếp
       socket.auth = { ...(socket.auth || {}), token };
       socket.connect();
     }
@@ -33,38 +38,47 @@ export function useLiveMatch(matchId, token) {
     if (!socket || !matchId) return;
     mountedRef.current = true;
 
-    const onSnapshot = (payload) => {
-      if (!mountedRef.current) return;
-      setState({ loading: false, data: payload });
+    const requestSnapshot = () =>
+      socket.emit?.("match:snapshot:request", { matchId });
+
+    const isForThisMatch = (payload) => {
+      const got = getMatchPayloadId(payload);
+      return Boolean(got) && String(got) === String(matchId);
     };
 
-    const onUpdate = (evt) => {
+    const applyIncoming = (payload, { allowLightweight = false } = {}) => {
       if (!mountedRef.current) return;
+      if (!isForThisMatch(payload)) return;
+      const extracted = extractMatchPayload(payload);
+      const incoming = normalizeMatchDisplay(extracted);
+      if (!incoming) return;
+      if (!allowLightweight && isLightweightMatchPayload(payload)) {
+        requestSnapshot();
+        return;
+      }
+
       setState((prev) => {
-        // evt có thể là { data, patch } tuỳ server. Ở đây ưu tiên evt.data + version
-        const incoming = evt?.data ?? evt;
-        if (!prev.data) return { loading: false, data: incoming };
-        const vIn = incoming?.version ?? 0;
-        const vCur = prev.data?.version ?? 0;
-        // chỉ nhận khi version mới hơn hoặc bằng (bằng để đồng bộ khi refetch server phát lại)
-        if (vIn >= vCur) return { loading: false, data: incoming };
-        return prev;
+        const next = prev.data
+          ? mergeMatchPayload(prev.data, incoming, prev.data)
+          : incoming;
+
+        if (!next) return prev;
+        if (prev.data && !isNewerOrEqualMatchPayload(prev.data, next)) {
+          return prev;
+        }
+        return { loading: false, data: next };
       });
     };
 
-    // 🔥 CHỈNH SỬA: nhận sự kiện tăng/giảm điểm nhẹ từ server và cập nhật ngay UI
-    const onScoreUpdated = (evt) => {
-      setState({loading: false, data: evt})
-    };
+    const onSnapshot = (payload) =>
+      applyIncoming(payload, { allowLightweight: true });
+    const onUpdate = (payload) => applyIncoming(payload);
+    const onScoreUpdated = (payload) => applyIncoming(payload);
 
-    // Join phòng và lắng nghe sự kiện
     socket.emit("match:join", { matchId });
     socket.on("match:snapshot", onSnapshot);
     socket.on("match:update", onUpdate);
     socket.on("score:updated", onScoreUpdated);
-
-    // Optionally xin snapshot ngay (nếu server hỗ trợ)
-    socket.emit?.("match:snapshot:request", { matchId });
 
     return () => {
       mountedRef.current = false;
@@ -75,9 +89,8 @@ export function useLiveMatch(matchId, token) {
     };
   }, [socket, matchId]);
 
-  // API điều khiển cho trọng tài (emit các event)
-  const api = useMemo(() => {
-    return {
+  const api = useMemo(
+    () => ({
       start: (refereeId) => socket?.emit("match:start", { matchId, refereeId }),
       pointA: (step = 1) =>
         socket?.emit("match:point", { matchId, team: "A", step }),
@@ -87,15 +100,14 @@ export function useLiveMatch(matchId, token) {
       finish: (winner) => socket?.emit("match:finish", { matchId, winner }),
       forfeit: (winner, reason = "forfeit") =>
         socket?.emit("match:forfeit", { matchId, winner, reason }),
-      // tuỳ chọn: đổi luật giữa chừng
       setRules: (rules) => socket?.emit("match:rules", { matchId, rules }),
-      // tuỳ chọn: set court / scheduledAt
       assignCourt: (courtId) =>
         socket?.emit("match:court", { matchId, courtId }),
       scheduleAt: (datetimeISO) =>
         socket?.emit("match:schedule", { matchId, scheduledAt: datetimeISO }),
-    };
-  }, [socket, matchId]);
+    }),
+    [socket, matchId]
+  );
 
   return { ...state, api };
 }

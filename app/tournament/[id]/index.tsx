@@ -38,6 +38,7 @@ import {
   useGetRegistrationsQuery,
 } from "@/slices/tournamentsApiSlice";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { getPairDisplayName, normalizeMatchDisplay } from "@/utils/matchDisplay";
 
 /* -------------------- helpers (nhẹ, đủ dùng cho overview) -------------------- */
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v || 0));
@@ -65,14 +66,8 @@ function orderKey(m) {
   const ts = m?.createdAt ? new Date(m.createdAt).getTime() : 9e15;
   return [bo, r, o, codeNum, ts];
 }
-function pairToName(pair) {
-  if (!pair) return null;
-  const p1 =
-    pair.player1?.nickName || pair.player1?.nickname || pair.player1?.fullName;
-  const p2 =
-    pair.player2?.nickName || pair.player2?.nickname || pair.player2?.fullName;
-  const name = [p1, p2].filter(Boolean).join(" / ");
-  return name || null;
+function pairToName(pair, source) {
+  return getPairDisplayName(pair, source) || null;
 }
 function seedToName(seed) {
   return seed?.label || null;
@@ -81,7 +76,7 @@ function teamNameFrom(m, side) {
   if (!m) return "TBD";
   const pair = side === "A" ? m.pairA : m.pairB;
   const seed = side === "A" ? m.seedA : m.seedB;
-  return pairToName(pair) || seedToName(seed) || "TBD";
+  return pairToName(pair, m) || seedToName(seed) || "TBD";
 }
 function scoreText(m) {
   if (typeof m?.scoreText === "string" && m.scoreText.trim())
@@ -424,7 +419,6 @@ export default function TournamentOverviewScreen() {
     refetch: refetchMatches,
   } = useListPublicMatchesByTournamentQuery({
     tid: id,
-    params: { limit: 1000 },
   });
 
   const {
@@ -433,9 +427,9 @@ export default function TournamentOverviewScreen() {
     error: bError,
     refetch: refetchBrackets,
   } = useListTournamentBracketsQuery(id, {
-    refetchOnMountOrArgChange: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
   });
 
   const {
@@ -446,7 +440,13 @@ export default function TournamentOverviewScreen() {
   } = useGetRegistrationsQuery(id);
 
   const loading = tLoading || mLoading || bLoading;
-  const matches = matchesResp?.list || [];
+  const matches = useMemo(
+    () =>
+      (Array.isArray(matchesResp?.list) ? matchesResp.list : []).map((m) =>
+        normalizeMatchDisplay(m, tournament)
+      ),
+    [matchesResp?.list, tournament]
+  );
 
   const admin = useMemo(() => isAdminUser(me), [me]);
   const manager = useMemo(

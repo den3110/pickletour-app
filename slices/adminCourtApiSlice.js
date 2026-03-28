@@ -96,7 +96,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const tid = asId(tournamentId);
         const bid = asId(bracket);
         return {
-          url: `/api/admin/tournaments/${enc(tid)}/courts/state?bracket=${enc(
+          url: `/api/admin/tournaments/${enc(tid)}/scheduler/state?bracket=${enc(
             bid
           )}`,
           method: "GET",
@@ -154,6 +154,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 0, // bỏ cache khi unmount
       forceRefetch: () => true, // luôn refetch khi có subscriber mới
       providesTags: () => [{ type: "ADMIN_MATCHES", id: "LIST" }],
+      extraOptions: { skip404Redirect: true },
     }),
     // ⭐ NEW: Gán 1 trận cụ thể vào 1 sân
     assignSpecificHttp: builder.mutation({
@@ -163,6 +164,66 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         body: { bracket, matchId, replace },
       }),
       invalidatesTags: [{ type: "Scheduler", id: "STATE" }],
+    }),
+    setCourtMatchList: builder.mutation({
+      query: ({ tournamentId, courtId, bracket, matchIds = [] }) => {
+        const tid = asId(tournamentId);
+        const cid = asId(courtId);
+        const bid = asId(bracket);
+        return {
+          url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
+            cid
+          )}/match-list`,
+          method: "PUT",
+          body: {
+            ...(bid ? { bracket: bid } : {}),
+            matchIds: Array.isArray(matchIds)
+              ? matchIds.map((id) => asId(id)).filter(Boolean)
+              : [],
+          },
+        };
+      },
+      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
+    }),
+    clearCourtMatchList: builder.mutation({
+      query: ({ tournamentId, courtId, bracket }) => {
+        const tid = asId(tournamentId);
+        const cid = asId(courtId);
+        const bid = asId(bracket);
+        return {
+          url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
+            cid
+          )}/match-list`,
+          method: "DELETE",
+          body: {
+            ...(bid ? { bracket: bid } : {}),
+          },
+        };
+      },
+      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
+    }),
+    advanceCourtMatchList: builder.mutation({
+      query: ({
+        tournamentId,
+        courtId,
+        bracket,
+        action = "skip_current",
+      }) => {
+        const tid = asId(tournamentId);
+        const cid = asId(courtId);
+        const bid = asId(bracket);
+        return {
+          url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
+            cid
+          )}/match-list/advance`,
+          method: "POST",
+          body: {
+            ...(bid ? { bracket: bid } : {}),
+            action,
+          },
+        };
+      },
+      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
     }),
 
     // ⭐ NEW: Reset tất cả sân & gỡ gán
@@ -269,6 +330,9 @@ export const {
   useGetSchedulerStateQuery,
   useListMatchesQuery,
   useAssignSpecificHttpMutation,
+  useSetCourtMatchListMutation,
+  useClearCourtMatchListMutation,
+  useAdvanceCourtMatchListMutation,
   useResetCourtsHttpMutation,
   useLazyGetSchedulerMatchesLiteQuery,
   useAdminListCourtsQuery,

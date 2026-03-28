@@ -43,16 +43,16 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { getPlayerDisplayName, resolveDisplayMode } from "@/utils/matchDisplay";
 import CCCDModal from "../CCCDModal.native";
 import { useTheme } from "@react-navigation/native";
 import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
 import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
 import MatchSettingsModal from "./MatchSettingsModal";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
+import * as Speech from "expo-speech";
 
 const VOICE_API_URL = "https://pickletour.vn/api/api/voice/parse";
-// ✅ THÊM: Import Speech
-import * as Speech from "expo-speech";
 /* ---------- Theme tokens ---------- */
 function useTokens() {
   const navTheme = useTheme?.() || {};
@@ -118,9 +118,6 @@ const userIdOf = (u) => {
   // Cần đảm bảo tên khác nhau, nếu trùng tên thì logic này vẫn rủi ro nhẹ nhưng đỡ hơn là ""
   return u?.fullName || u?.name || u?.displayName || u?.nickName || "";
 };
-const displayNick = (u) =>
-  u?.nickname || u?.nick || u?.shortName || u?.fullName || u?.name || "—";
-
 const playersOf = (reg, eventType = "double") => {
   const et = (eventType || "double").toLowerCase();
   if (!reg) return [];
@@ -199,15 +196,18 @@ const computeServerUid = ({
 
 /* ======= memo child components ======= */
 const NameBadge = memo(
-  function NameBadge({ user, isServer, onPressAvatar }) {
+  function NameBadge({ user, isServer, onPressAvatar, source }) {
     const t = useTokens();
     const [imgError, setImgError] = useState(false);
-
-    const fullName =
-      user?.fullName ||
-      user?.name ||
-      [user?.lastName, user?.firstName].filter(Boolean).join(" ") ||
-      displayNick(user);
+    const mode = resolveDisplayMode(user, source);
+    const primaryName = getPlayerDisplayName(user, source) || "—";
+    const secondaryName =
+      mode === "fullName"
+        ? user?.nickname || user?.nick || user?.shortName || ""
+        : user?.fullName ||
+          user?.name ||
+          [user?.lastName, user?.firstName].filter(Boolean).join(" ") ||
+          "";
 
     const avatarUri = normalizeUrl(
       user?.avatar || user?.avatarURL || user?.photoURL || user?.picture || "",
@@ -217,15 +217,15 @@ const NameBadge = memo(
     const AV_SIZE = 34;
 
     return (
-      <View style={{ alignItems: "center", maxWidth: "100%" }}>
+      <View style={{ alignItems: "center", width: "100%" }}>
         <Text
-          style={[s.fullNameText, { color: t.colors.text }]}
+          style={[s.fullNameText, { color: t.colors.text, flexShrink: 1, paddingHorizontal: 4 }]}
           numberOfLines={1}
         >
-          {fullName}
+          {primaryName}
         </Text>
 
-        <View style={{ position: "relative", marginTop: 6 }}>
+        <View style={{ position: "relative", marginTop: 6, width: "100%", alignItems: "center" }}>
           <View
             style={[
               s.badgeName,
@@ -274,10 +274,12 @@ const NameBadge = memo(
             )}
 
             <Text
-              style={[s.nickText, { color: t.colors.text }]}
+              style={[s.nickText, { color: t.colors.text, flexShrink: 1 }]}
               numberOfLines={1}
             >
-              {displayNick(user)}
+              {secondaryName && secondaryName !== primaryName
+                ? secondaryName
+                : ""}
             </Text>
           </View>
 
@@ -318,6 +320,7 @@ const TeamSimple = memo(
     players = [],
     slotsNow,
     onSwap,
+    source,
     isServing,
     activeSide,
     serverUidShow,
@@ -353,11 +356,12 @@ const TeamSimple = memo(
         ]}
       >
         <View
-          style={{ alignItems: "center", justifyContent: "center", gap: 8 }}
+          style={{ alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}
         >
           {p1 ? (
             <NameBadge
               user={p1}
+              source={source}
               isServer={!!isServerP1}
               onPressAvatar={onPressAvatar}
             />
@@ -379,6 +383,7 @@ const TeamSimple = memo(
           {p2 ? (
             <NameBadge
               user={p2}
+              source={source}
               isServer={!!isServerP2}
               onPressAvatar={onPressAvatar}
             />
@@ -2075,28 +2080,9 @@ export default function RefereeJudgePanel({ matchId }) {
         autoNext: false,
       }).unwrap();
 
-      socket?.emit("score:inc", {
-        matchId: match._id,
-        side,
-        delta: +1,
-        autoNext: false,
-      });
-
       // ✅ IMPORTANT: đội đang giao ghi điểm -> người giao KHÔNG đổi
       if (prevServerUid) {
         lastServerUidRef.current = prevServerUid; // giữ local để UI không nhảy
-
-        socket?.emit(
-          "serve:set",
-          {
-            matchId: match._id,
-            side: serve?.side || "A", // giữ nguyên đội đang giao
-            server: activeServerNum, // giữ nguyên số tay (0-0-2 -> 1-0-2 vẫn là 2)
-            serverId: prevServerUid, // ✅ ép đúng user đang giao
-            userMatch,
-          },
-          () => {},
-        );
       }
 
       refetch();
@@ -2169,12 +2155,6 @@ export default function RefereeJudgePanel({ matchId }) {
         }
 
         await dec(entry.side);
-        socket?.emit("score:inc", {
-          matchId: match?._id,
-          side: entry.side,
-          delta: -1,
-          autoNext: false,
-        });
         refetch();
       } else if (entry.t === "SERVE_SET") {
         setUndoBusy(true);
@@ -2734,6 +2714,30 @@ export default function RefereeJudgePanel({ matchId }) {
                   <Text style={[s.matchCodeText, { color: t.colors.text }]}>
                     {headerText}
                   </Text>
+                  {false && (
+                    <Ripple
+                      onPress={swapSides}
+                      style={[
+                        s.btnSwapSm,
+                        {
+                          backgroundColor: t.chipInfo2Bg,
+                          borderColor: t.chipInfo2Bd,
+                        },
+                      ]}
+                      rippleContainerBorderRadius={10}
+                    >
+                      <MaterialIcons
+                        name="swap-horiz"
+                        size={16}
+                        color={t.colors.text}
+                      />
+                      <Text
+                        style={[s.btnSwapSmText, { color: t.chipInfo2Fg }]}
+                      >
+                        Äá»•i bÃªn
+                      </Text>
+                    </Ripple>
+                  )}
                 </View>
 
                 <View style={{ flexDirection: "row", gap: 6, flexShrink: 0 }}>
@@ -2862,12 +2866,12 @@ export default function RefereeJudgePanel({ matchId }) {
                         ? isVoiceListening
                           ? t.colors.primary
                           : "#f59e0b"
-                        : "#f2f0f5",
+                        : t.chipInfoBg,
                     },
                   ]}
                 >
                   {isVoiceProcessing ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={t.chipInfoFg} />
                   ) : (
                     <MaterialIcons
                       name={
@@ -2876,7 +2880,7 @@ export default function RefereeJudgePanel({ matchId }) {
                           : "voice-over-off"
                       }
                       size={20}
-                      color={voiceCommandEnabled ? "#fff" : t.colors.text}
+                      color={voiceCommandEnabled ? "#fff" : t.chipInfoFg}
                     />
                   )}
                 </View>
@@ -2901,18 +2905,18 @@ export default function RefereeJudgePanel({ matchId }) {
                       borderRadius: 20,
                       backgroundColor: voiceEnabled
                         ? t.colors.primary
-                        : "#f2f0f5", // Đổi màu khi bật
+                        : t.chipInfoBg,
                       borderWidth: 1,
                       borderColor: voiceEnabled
                         ? t.colors.primary
-                        : "transparent",
+                        : t.chipInfoBd,
                     },
                   ]}
                 >
                   <MaterialIcons
                     name={voiceEnabled ? "volume-up" : "volume-off"}
                     size={20}
-                    color={voiceEnabled ? "#fff" : t.colors.text}
+                    color={voiceEnabled ? "#fff" : t.chipInfoFg}
                   />
                 </View>
               </TouchableOpacity>
@@ -2924,16 +2928,19 @@ export default function RefereeJudgePanel({ matchId }) {
                 {/* View này chịu trách nhiệm hiển thị hình tròn và màu nền */}
                 <View
                   style={[
-                    s.iconBtnSetting, // Style gốc (nếu có)
+                    s.iconBtnSetting,
                     {
-                      borderRadius: 20, // Bo tròn thành hình tròn
+                      borderRadius: 20,
+                      backgroundColor: t.chipInfoBg,
+                      borderWidth: 1,
+                      borderColor: t.chipInfoBd,
                     },
                   ]}
                 >
                   <MaterialIcons
                     name="settings"
                     size={20}
-                    color={t.colors.text}
+                    color={t.chipInfoFg}
                   />
                 </View>
               </TouchableOpacity>
@@ -2975,6 +2982,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 players={leftSide === "A" ? playersA : playersB}
                 slotsNow={leftSide === "A" ? slotsNowA : slotsNowB}
                 onSwap={() => swapTeamSlots(leftSide)}
+                source={match}
                 isServing={leftSide === activeSide}
                 activeSide={activeSide}
                 serverUidShow={serverUidShow}
@@ -3085,6 +3093,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 players={rightSide === "A" ? playersA : playersB}
                 slotsNow={rightSide === "A" ? slotsNowA : slotsNowB}
                 onSwap={() => swapTeamSlots(rightSide)}
+                source={match}
                 isServing={rightSide === activeSide}
                 activeSide={activeSide}
                 serverUidShow={serverUidShow}
@@ -3265,6 +3274,29 @@ export default function RefereeJudgePanel({ matchId }) {
 
                 {isPreMatch && (
                   <Ripple
+                    onPress={swapSides}
+                    rippleContainerBorderRadius={12}
+                    style={[
+                      s.bigActionBtn,
+                      {
+                        backgroundColor: t.colors.card,
+                        borderColor: t.colors.border,
+                      },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name="swap-horiz"
+                      size={16}
+                      color={t.colors.text}
+                    />
+                    <Text style={[s.bigActionText, { color: t.colors.text }]}>
+                      Äá»•i bÃªn
+                    </Text>
+                  </Ripple>
+                )}
+
+                {isPreMatch && (
+                  <Ripple
                     onPress={() => setMenuOpen(true)}
                     rippleContainerBorderRadius={12} // 👈 cùng radius
                     style={[
@@ -3415,7 +3447,7 @@ export default function RefereeJudgePanel({ matchId }) {
 /* ========== styles ========== */
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: "#fff" },
-  fullNameText: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  fullNameText: { fontSize: 16, fontWeight: "800", color: "#0f172a", flexShrink: 1, textAlign: "center" },
   nickText: { fontSize: 14, fontWeight: "800", color: "#0f172a" },
   center: { padding: 16, alignItems: "center", justifyContent: "center" },
 
@@ -3576,7 +3608,7 @@ const s = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#e5e7eb", maxWidth: "100%",
   },
 
   clockText: { fontWeight: "900", color: "#0f172a" },

@@ -35,7 +35,10 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 // import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
-import { useGetRankingsQuery } from "@/slices/rankingsApiSlice";
+import {
+  useGetRankingsListQuery,
+  useGetRankingsPodiums30dQuery,
+} from "@/slices/rankingsApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
 import { setKeyword } from "@/slices/rankingUiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -908,10 +911,18 @@ export default function RankingListScreen({ isBack = false }) {
   const [hasMore, setHasMore] = useState(true);
 
   // API
-  const { data, isLoading, isFetching, error, refetch } = useGetRankingsQuery({
+  const {
+    data: listData,
+    isLoading: isLoadingList,
+    isFetching: isFetchingList,
+    error,
+    refetch: refetchList,
+  } = useGetRankingsListQuery({
     keyword,
     page,
   });
+  const { data: podiumData, refetch: refetchPodiums } =
+    useGetRankingsPodiums30dQuery();
 
   const scrollViewRef = useRef(null);
   useEffect(() => {
@@ -928,19 +939,19 @@ export default function RankingListScreen({ isBack = false }) {
 
   // Data Logic
   useEffect(() => {
-    if (data?.docs) {
+    if (listData?.docs) {
       if (page === 0) {
-        setAccumulatedList(data.docs);
+        setAccumulatedList(listData.docs);
       } else {
         setAccumulatedList((prev) => {
           const existingIds = new Set(prev.map((p) => p._id));
-          const newDocs = data.docs.filter((d) => !existingIds.has(d._id));
+          const newDocs = listData.docs.filter((d) => !existingIds.has(d._id));
           return [...prev, ...newDocs];
         });
       }
-      setHasMore(data.page < data.totalPages - 1);
+      setHasMore(listData.page < listData.totalPages - 1);
     }
-  }, [data, page]);
+  }, [listData, page]);
 
   // ✅ LOGIC "Double Delay" để chống lag lần đầu mở Chart
   useEffect(() => {
@@ -1026,10 +1037,10 @@ export default function RankingListScreen({ isBack = false }) {
   );
 
   const handleLoadMore = useCallback(() => {
-    if (!isFetching && hasMore) {
+    if (!isFetchingList && hasMore) {
       setPage((prev) => prev + 1);
     }
-  }, [isFetching, hasMore]);
+  }, [isFetchingList, hasMore]);
 
   const clearSearch = () => {
     setKw("");
@@ -1048,7 +1059,7 @@ export default function RankingListScreen({ isBack = false }) {
 
   // Memoized Data
   const podiumByUser = useMemo(() => {
-    const src = data?.podiums30d || {};
+    const src = podiumData?.podiums30d || podiumData || {};
     const rank = { gold: 3, silver: 2, bronze: 1 };
     const out = {};
     for (const [uid, arr] of Object.entries(src)) {
@@ -1067,7 +1078,7 @@ export default function RankingListScreen({ isBack = false }) {
       out[String(uid)] = { medal: picked.medal, label: title, picked };
     }
     return out;
-  }, [data?.podiums30d]);
+  }, [podiumData]);
 
   const renderItem = useCallback(
     ({ item }) => (
@@ -1087,7 +1098,8 @@ export default function RankingListScreen({ isBack = false }) {
   );
 
   const initialLoading =
-    isLoading || (isFetching && page === 0 && accumulatedList.length === 0);
+    isLoadingList ||
+    (isFetchingList && page === 0 && accumulatedList.length === 0);
 
   const HeaderComponent = useMemo(
     () => (
@@ -1154,7 +1166,7 @@ export default function RankingListScreen({ isBack = false }) {
                 onToggle={setViewMode}
                 theme={theme}
               />
-              {canSelfAssess && !isLoading && (
+              {canSelfAssess && !isLoadingList && (
                 <TouchableOpacity
                   style={[styles.selfBtn, { backgroundColor: theme.primary }]}
                   onPress={() => router.push("/levelpoint")}
@@ -1193,7 +1205,13 @@ export default function RankingListScreen({ isBack = false }) {
         {error ? (
           <View style={styles.center}>
             <Text style={{ color: theme.subText }}>Có lỗi xảy ra.</Text>
-            <TouchableOpacity onPress={refetch} style={{ marginTop: 10 }}>
+            <TouchableOpacity
+              onPress={() => {
+                refetchList();
+                refetchPodiums();
+              }}
+              style={{ marginTop: 10 }}
+            >
               <Text style={{ color: theme.primary, fontWeight: "700" }}>
                 Thử lại
               </Text>
@@ -1228,7 +1246,7 @@ export default function RankingListScreen({ isBack = false }) {
                 renderItem={renderItem}
                 header={HeaderComponent}
                 footer={
-                  isFetching && page > 0 ? (
+                  isFetchingList && page > 0 ? (
                     <View style={{ paddingVertical: 10, gap: 16 }}>
                       <SkeletonCard />
                       <SkeletonCard />
@@ -1238,10 +1256,11 @@ export default function RankingListScreen({ isBack = false }) {
                   )
                 }
                 onLoadMore={handleLoadMore}
-                isRefreshing={isFetching && page === 0}
+                isRefreshing={isFetchingList && page === 0}
                 onRefresh={() => {
                   setPage(0);
-                  refetch();
+                  refetchList();
+                  refetchPodiums();
                 }}
                 theme={theme}
               />
@@ -1283,7 +1302,7 @@ export default function RankingListScreen({ isBack = false }) {
                     onUserPress={handleChartUserPress}
                     onLoadMore={handleLoadMore}
                     hasMore={hasMore}
-                    isLoadingMore={isFetching && page > 0}
+                    isLoadingMore={isFetchingList && page > 0}
                   />
                 )}
               </View>

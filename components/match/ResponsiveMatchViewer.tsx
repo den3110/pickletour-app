@@ -314,11 +314,13 @@ function useLockedDialogMatch({
   const [mm, setMm] = useState(null);
   const sigRef = useRef("");
   const throttleRef = useRef(null);
+  const previousLockedIdRef = useRef("");
   // Reset khi đổi match hoặc đóng
   useEffect(() => {
     if (!open || !lockedId) {
       setMm(null);
       sigRef.current = "";
+      previousLockedIdRef.current = "";
       return;
     }
   }, [open, lockedId]);
@@ -335,15 +337,18 @@ function useLockedDialogMatch({
     const next = pick(live) || pick(base);
     if (!next) return;
 
+    const isMatchChanged = previousLockedIdRef.current !== lockedId;
+    if (isMatchChanged) {
+      sigRef.current = "";
+    }
+
     const nextSig = makeMatchSignature(next);
     if (sigRef.current === nextSig) return; // không đổi -> bỏ
     if (throttleRef.current) clearTimeout(throttleRef.current);
     throttleRef.current = setTimeout(() => {
       sigRef.current = nextSig;
-      setMm((prev) => {
-        const prevId = String(prev?._id || prev?.id || "");
-        return prevId && prevId !== lockedId ? prev : next;
-      });
+      previousLockedIdRef.current = lockedId;
+      setMm(next);
     }, 80); // gom update 12fps để mượt UI
 
     return () => throttleRef.current && clearTimeout(throttleRef.current);
@@ -443,7 +448,7 @@ export function StatusPill({ status }) {
 }
 
 /* ================= Component ================= */
-export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
+function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
   const { userInfo } = useSelector((s) => s.auth || {});
   const token = userInfo?.token;
 
@@ -639,6 +644,7 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
           }}
         >
           <MatchContent
+            key={String(matchId || "")}
             m={mm}
             isLoading={loading}
             liveLoading={false}
@@ -653,6 +659,11 @@ export default function ResponsiveMatchViewer({ open, matchId, onClose }) {
         </BottomSheetScrollView>
       </BottomSheetModal>
   );
+}
+
+export default function ResponsiveMatchViewer(props) {
+  const viewerKey = String(props.matchId || "");
+  return <ResponsiveMatchViewerBody key={viewerKey} {...props} />;
 }
 
 /* ================= Styles ================= */

@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import ImageViewing from "react-native-image-viewing";
+import { skipToken } from "@reduxjs/toolkit/query";
 
 import BottomSheet, {
   BottomSheetView,
@@ -1023,12 +1024,20 @@ export default function PublicProfileScreen() {
   const [statsSheetType, setStatsSheetType] = useState(null);
   const shareSnapPoints = useMemo(() => ["45%"], []);
   const statsSnapPoints = useMemo(() => ["55%", "90%"], []);
+  const needsMatches =
+    activeTab === 1 || statsSheetType === "matches" || statsSheetType === "wins";
+  const needsRatings = activeTab === 2 || statsSheetType === "rating";
+  const needsAchievements = activeTab === 3;
 
   // Queries
   const baseQ = useGetPublicProfileQuery(id);
-  const rateQ = useGetRatingHistoryQuery(id);
-  const matchQ = useGetMatchHistoryQuery(id);
-  const achQ = useGetUserAchievementsQuery(id);
+  const rateQ = useGetRatingHistoryQuery(
+    needsRatings ? { id, all: 1 } : skipToken
+  );
+  const matchQ = useGetMatchHistoryQuery(
+    needsMatches ? { id, all: 1 } : skipToken
+  );
+  const achQ = useGetUserAchievementsQuery(needsAchievements ? id : skipToken);
 
   const [deleteHistory, { isLoading: deleting }] =
     useDeleteRatingHistoryMutation();
@@ -1041,6 +1050,8 @@ export default function PublicProfileScreen() {
   const matchRaw = Array.isArray(matchQ.data)
     ? matchQ.data
     : matchQ.data?.items || [];
+  const summaryScore = base?.summary?.score || {};
+  const summaryMatches = base?.summary?.matches || {};
 
   const sc = useMemo(() => getSPC(base), [base]);
 
@@ -1059,19 +1070,40 @@ export default function PublicProfileScreen() {
 
   const latestSingle = useMemo(() => {
     for (const r of ratingRaw) if (Number.isFinite(r.single)) return r.single;
+    const fromSummary = Number(summaryScore?.single);
+    if (Number.isFinite(fromSummary)) return fromSummary;
     const fb = base?.levelPoint?.single ?? base?.levelPoint?.score;
     return Number.isFinite(Number(fb)) ? Number(fb) : NaN;
-  }, [ratingRaw, base]);
+  }, [ratingRaw, summaryScore?.single, base]);
 
   const latestDouble = useMemo(() => {
     for (const r of ratingRaw) if (Number.isFinite(r.double)) return r.double;
+    const fromSummary = Number(summaryScore?.double);
+    if (Number.isFinite(fromSummary)) return fromSummary;
     const fb = base?.levelPoint?.double;
     return Number.isFinite(Number(fb)) ? Number(fb) : NaN;
-  }, [ratingRaw, base]);
+  }, [ratingRaw, summaryScore?.double, base]);
 
   const uid = base?._id || id;
 
   const { totalMatches, wins, losses, winRate } = useMemo(() => {
+    if (!matchRaw.length) {
+      const total = Number(summaryMatches?.total) || 0;
+      const w = Number(summaryMatches?.wins) || 0;
+      const l = Number(summaryMatches?.losses) || 0;
+      const wr = Number(summaryMatches?.winRate);
+      return {
+        totalMatches: total,
+        wins: w,
+        losses: l,
+        winRate: Number.isFinite(wr)
+          ? Math.round(wr)
+          : total
+          ? Math.round((w / total) * 100)
+          : 0,
+      };
+    }
+
     let total = 0,
       w = 0,
       l = 0;
@@ -1089,7 +1121,7 @@ export default function PublicProfileScreen() {
       losses: l,
       winRate: total ? Math.round((w / total) * 100) : 0,
     };
-  }, [matchRaw, uid]);
+  }, [matchRaw, uid, summaryMatches]);
 
   // Paging
   const [pageMatch, setPageMatch] = useState(1);
@@ -1109,6 +1141,7 @@ export default function PublicProfileScreen() {
 
   // Stats sheet data
   const matchStatsData = useMemo(() => {
+    if (!matchRaw.length) return null;
     const monthlyMap = {};
     matchRaw.forEach((m) => {
       if (!m.dateTime) return;
@@ -1138,6 +1171,10 @@ export default function PublicProfileScreen() {
   }, [matchRaw, totalMatches]);
 
   const winStatsData = useMemo(() => {
+    if (!matchRaw.length) {
+      return { wins, losses, winRate, streak: 0 };
+    }
+
     let streak = 0,
       lastResult = null;
     for (const m of matchRaw) {
@@ -1192,18 +1229,17 @@ export default function PublicProfileScreen() {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await Promise.all([
-        baseQ.refetch?.(),
-        rateQ.refetch?.(),
-        matchQ.refetch?.(),
-        achQ.refetch?.(),
-      ]);
+      const tasks = [baseQ.refetch?.()];
+      if (needsRatings && rateQ.refetch) tasks.push(rateQ.refetch());
+      if (needsMatches && matchQ.refetch) tasks.push(matchQ.refetch());
+      if (needsAchievements && achQ.refetch) tasks.push(achQ.refetch());
+      await Promise.all(tasks);
     } catch (e) {
       // ignore
     } finally {
       setRefreshing(false);
     }
-  }, [baseQ, rateQ, matchQ, achQ]);
+  }, [baseQ, rateQ, matchQ, achQ, needsRatings, needsMatches, needsAchievements]);
 
   const handleCopy = useCallback((value, label) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2136,7 +2172,14 @@ export default function PublicProfileScreen() {
             {/* TAB 1 (RESTORED OLD UI) */}
             {activeTab === 1 && (
               <View style={styles.matchTab}>
-                {matchPaged.length === 0 ? (
+                {matchQ.isLoading || (matchQ.isFetching && !matchRaw.length) ? (
+                  <View style={styles.emptyContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.emptyText, { color: colors.subText }]}>
+                      Đang tải dữ liệu trận đấu...
+                    </Text>
+                  </View>
+                ) : matchPaged.length === 0 ? (
                   <View style={styles.emptyContainer}>
                     <MaterialCommunityIcons
                       name="tennis-ball"
@@ -2251,7 +2294,14 @@ export default function PublicProfileScreen() {
             {/* TAB 2 */}
             {activeTab === 2 && (
               <View style={styles.ratingTab}>
-                {ratePaged.length === 0 ? (
+                {rateQ.isLoading || (rateQ.isFetching && !ratingRaw.length) ? (
+                  <View style={styles.emptyContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.emptyText, { color: colors.subText }]}>
+                      Đang tải lịch sử điểm trình...
+                    </Text>
+                  </View>
+                ) : ratePaged.length === 0 ? (
                   <View style={styles.emptyContainer}>
                     <Ionicons
                       name="stats-chart"

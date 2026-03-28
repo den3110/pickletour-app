@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   Modal,
   useColorScheme,
-  Platform,
   SafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useTheme } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
+import { Video } from "expo-av";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { getLiveMatchCourtText } from "./courtDisplay";
 
 const BLURHASH = "|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXo";
 
@@ -47,17 +48,94 @@ const buildFbPluginUrl = (watchUrl) => {
 
 const getStatusText = (status) => {
   const statusMap = {
-    scheduled: "Đã lên lịch",
-    queued: "Chờ thi đấu",
-    assigned: "Đã gán sân",
-    live: "Đang phát",
-    finished: "Đã kết thúc",
-    ended: "Đã kết thúc",
-    paused: "Tạm dừng",
-    canceled: "Đã hủy",
+    scheduled: "ÄÃ£ lÃªn lá»‹ch",
+    queued: "Chá» thi Ä‘áº¥u",
+    assigned: "ÄÃ£ gÃ¡n sÃ¢n",
+    live: "Äang phÃ¡t",
+    finished: "ÄÃ£ káº¿t thÃºc",
+    ended: "ÄÃ£ káº¿t thÃºc",
+    paused: "Táº¡m dá»«ng",
+    canceled: "ÄÃ£ há»§y",
   };
   return statusMap[String(status || "").toLowerCase()] || status;
 };
+
+function buildCanonicalSessions(match = {}) {
+  const defaultStreamKey =
+    typeof match?.defaultStreamKey === "string" ? match.defaultStreamKey : "";
+  const streams = Array.isArray(match?.streams) ? match.streams : [];
+  return streams
+    .filter(
+      (stream) =>
+        stream &&
+        typeof stream === "object" &&
+        (typeof stream?.playUrl === "string" || typeof stream?.openUrl === "string")
+    )
+    .sort((a, b) => Number(a?.priority || 99) - Number(b?.priority || 99))
+    .map((stream) => {
+      const playUrl =
+        typeof stream?.playUrl === "string" ? stream.playUrl.trim() : "";
+      const openUrl =
+        typeof stream?.openUrl === "string" ? stream.openUrl.trim() : "";
+      const url = playUrl || openUrl;
+      const kind = String(stream?.kind || "").trim().toLowerCase();
+      const primary =
+        (defaultStreamKey && String(stream?.key || "") === defaultStreamKey) ||
+        Boolean(stream?.primary);
+      if (!url) return null;
+      if (kind === "facebook") {
+        return {
+          key: stream?.key || "server1",
+          label: stream?.displayLabel || "Server 1",
+          providerLabel: stream?.providerLabel || "Facebook",
+          watchUrl: url,
+          pluginUrl: buildFbPluginUrl(url),
+          canInlineEmbed: true,
+          primary,
+          ready: stream?.ready !== false,
+          delaySeconds: Number(stream?.delaySeconds || 0),
+        };
+      }
+      if (kind === "file" || kind === "hls") {
+        return {
+          key: stream?.key || "stream",
+          label: stream?.displayLabel || "Video",
+          providerLabel: stream?.providerLabel || "PickleTour",
+          watchUrl: openUrl || url,
+          directUrl: url,
+          canInlineEmbed: true,
+          primary,
+          ready: stream?.ready !== false,
+          delaySeconds: Number(stream?.delaySeconds || 0),
+        };
+      }
+      if (kind === "delayed_manifest") {
+        return {
+          key: stream?.key || "server2",
+          label: stream?.displayLabel || "Server 2",
+          providerLabel: stream?.providerLabel || "PickleTour CDN",
+          watchUrl: openUrl || "",
+          manifestUrl: url,
+          canInlineEmbed: false,
+          primary,
+          ready: stream?.ready !== false,
+          delaySeconds: Number(stream?.delaySeconds || 0),
+        };
+      }
+      return {
+        key: stream?.key || "stream",
+        label: stream?.displayLabel || "Stream",
+        providerLabel: stream?.providerLabel || "Stream",
+        watchUrl: openUrl || url,
+        directUrl: url,
+        canInlineEmbed: false,
+        primary,
+        ready: stream?.ready !== false,
+        delaySeconds: Number(stream?.delaySeconds || 0),
+      };
+    })
+    .filter(Boolean);
+}
 
 const LiveMatchCard = memo(
   function LiveMatchCard({ item = {} }) {
@@ -66,13 +144,34 @@ const LiveMatchCard = memo(
 
     const m = item || {};
     const fb = m.facebookLive || {};
-
+    const canonicalSessions = buildCanonicalSessions(m);
     const baseWatchUrl =
       fb.video_permalink_url ||
       fb.permalink_url ||
       fb.watch_url ||
       fb.embed_url ||
       (fb.videoId ? `https://www.facebook.com/watch/?v=${fb.videoId}` : "");
+    const sessions =
+      canonicalSessions.length > 0
+        ? canonicalSessions
+        : baseWatchUrl
+        ? [
+            {
+              key: "server1",
+              label: "Server 1",
+              providerLabel: "Facebook",
+              watchUrl: baseWatchUrl,
+              pluginUrl: buildFbPluginUrl(baseWatchUrl),
+              canInlineEmbed: true,
+              primary: true,
+              ready: true,
+              delaySeconds: 0,
+            },
+          ]
+        : [];
+    const primarySession =
+      sessions.find((session) => session.primary) || sessions[0] || null;
+    const courtText = getLiveMatchCourtText(m);
 
     const thumbnail =
       m.embed_thumbnail ||
@@ -81,13 +180,15 @@ const LiveMatchCard = memo(
       fb.picture ||
       (fb.id ? `https://graph.facebook.com/${fb.id}/picture?type=large` : null);
 
-    const pluginUrl = buildFbPluginUrl(baseWatchUrl);
+    const pluginUrl = primarySession?.pluginUrl || null;
     const vt = parseVT(m.code);
     const isLive = String(m.status || "").toLowerCase() === "live";
 
     const handleOpenPlayer = useCallback(() => {
-      if (baseWatchUrl) setPlayerVisible(true);
-    }, [baseWatchUrl]);
+      if (primarySession?.pluginUrl || primarySession?.directUrl) {
+        setPlayerVisible(true);
+      }
+    }, [primarySession]);
 
     const handleClosePlayer = useCallback(() => {
       setPlayerVisible(false);
@@ -147,15 +248,35 @@ const LiveMatchCard = memo(
               )}
             </View>
 
-            {m.courtLabel && (
+            {courtText && (
               <Text style={[styles.courtText, { color: T.textSecondary }]} numberOfLines={1}>
-                🏟️ {m.courtLabel}
+                ðŸŸï¸ {courtText}
               </Text>
             )}
 
             <Text style={[styles.statusText, { color: T.textSecondary }]}>
-              {isLive ? "🔴 Đang phát trực tiếp" : getStatusText(m.status)}
+              {isLive ? "ðŸ”´ Äang phÃ¡t trá»±c tiáº¿p" : getStatusText(m.status)}
             </Text>
+            {sessions.length > 0 ? (
+              <View style={styles.serverRow}>
+                {sessions.map((session) => (
+                  <View
+                    key={session.key || session.watchUrl || session.manifestUrl}
+                    style={[
+                      styles.serverBadge,
+                      {
+                        backgroundColor: T.isDark ? "rgba(124,192,255,0.12)" : "#e3f2fd",
+                        borderColor: T.cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: T.textPrimary, fontSize: 12, fontWeight: "700" }}>
+                      {session.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         </TouchableOpacity>
 
@@ -190,19 +311,27 @@ const LiveMatchCard = memo(
                   allowsInlineMediaPlayback
                   mediaPlaybackRequiresUserAction={false}
                 />
+              ) : primarySession?.directUrl ? (
+                <Video
+                  style={styles.webview}
+                  source={{ uri: primarySession.directUrl }}
+                  useNativeControls
+                  shouldPlay
+                  resizeMode="contain"
+                />
               ) : (
                 <View style={styles.noVideo}>
                   <Ionicons name="videocam-off" size={64} color="rgba(255,255,255,0.5)" />
-                  <Text style={styles.noVideoText}>Video không khả dụng</Text>
+                  <Text style={styles.noVideoText}>Video khÃ´ng kháº£ dá»¥ng</Text>
                 </View>
               )}
             </View>
 
             {/* Footer */}
-            {m.courtLabel && (
+            {courtText && (
               <View style={styles.modalFooter}>
-                <Text style={styles.footerText}>🏟️ {m.courtLabel}</Text>
-                {isLive && <Text style={styles.footerLive}>🔴 LIVE</Text>}
+                <Text style={styles.footerText}>ðŸŸï¸ {courtText}</Text>
+                {isLive && <Text style={styles.footerLive}>ðŸ”´ LIVE</Text>}
               </View>
             )}
           </SafeAreaView>
@@ -213,7 +342,9 @@ const LiveMatchCard = memo(
   (prev, next) =>
     prev.item._id === next.item._id &&
     prev.item.code === next.item.code &&
-    prev.item.status === next.item.status
+    prev.item.status === next.item.status &&
+    prev.item.updatedAt === next.item.updatedAt &&
+    getLiveMatchCourtText(prev.item) === getLiveMatchCourtText(next.item)
 );
 
 export default LiveMatchCard;
@@ -335,6 +466,18 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  serverRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  serverBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
 
   // Modal

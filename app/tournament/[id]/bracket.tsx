@@ -39,6 +39,16 @@ import {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
+import {
+  getMatchPayloadId,
+  getPairDisplayName,
+  getPlayerDisplayName,
+  isNewerOrEqualMatchPayload,
+  isLightweightMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import Ripple from "react-native-material-ripple";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -84,34 +94,14 @@ function useTokens() {
 
 /* ===================== Helpers (names) ===================== */
 // (giữ nguyên các helper cũ để không ảnh hưởng nơi khác nếu còn dùng)
-export const safePairName = (pair, eventType = "double") => {
-  if (!pair) return "—";
-  const p1 =
-    pair.player1?.fullName ||
-    pair.player1?.name ||
-    pair.player1?.nickname ||
-    "N/A";
-  const p2 =
-    pair.player2?.fullName ||
-    pair.player2?.name ||
-    pair.player2?.nickname ||
-    "";
-  const isSingle = String(eventType).toLowerCase() === "single";
-  if (isSingle) return p1;
-  return p2 ? `${p1} & ${p2}` : p1;
+export const safePairName = (pair, eventType = "double", source = null) => {
+  return getPairDisplayName(pair, source || pair) || "—";
 };
 
-export const preferName = (p) =>
-  (p?.fullName && String(p.fullName).trim()) ||
-  (p?.name && String(p.name).trim()) ||
-  (p?.nickname && String(p.nickname).trim()) ||
-  "N/A";
+export const preferName = (p, source) =>
+  getPlayerDisplayName(p, source) || "N/A";
 
-export const preferNick = (p) =>
-  (p?.nickname && String(p.nickname).trim()) ||
-  (p?.nickName && String(p.nickName).trim()) ||
-  (p?.nick && String(p.nick).trim()) ||
-  "";
+export const preferNick = (p, source) => getPlayerDisplayName(p, source) || "";
 
 /* 🆕 Helpers: nhận diện đăng ký của chính user trong giải */
 const getUserIdFromUserInfo = (u) =>
@@ -165,32 +155,19 @@ function collectMyRegIdsFromTour(tour, userId) {
 }
 
 // === NEW: luôn ưu tiên chỉ hiện nickname ===
-export const safePairNick = (pair, eventType = "double") => {
-  if (!pair) return "—";
-  const n1 = preferNick(pair.player1) || "N/A";
-  const n2 = preferNick(pair.player2) || "";
-  const isSingle = String(eventType).toLowerCase() === "single";
-  return isSingle ? n1 : n2 ? `${n1} & ${n2}` : n1;
+export const safePairNick = (pair, eventType = "double", source = null) => {
+  return getPairDisplayName(pair, source || pair) || "—";
 };
 
-export const pairLabelNickOnly = (pair, eventType = "double") =>
-  safePairNick(pair, eventType);
+export const pairLabelNickOnly = (pair, eventType = "double", source = null) =>
+  safePairNick(pair, eventType, source);
 
 // (giữ để backward-compat ở file khác nếu có import)
 export const nameWithNick = (p) => {
-  if (!p) return "—";
-  const nm = preferName(p);
-  const nk = preferNick(p);
-  if (!nk) return nm;
-  return nm.toLowerCase() === nk.toLowerCase() ? nm : `${nm} (${nk})`;
+  return getPlayerDisplayName(p) || "—";
 };
-export const pairLabelWithNick = (pair, eventType = "double") => {
-  if (!pair) return "—";
-  const isSingle = String(eventType).toLowerCase() === "single";
-  const a = nameWithNick(pair.player1);
-  if (isSingle) return a;
-  const b = pair.player2 ? nameWithNick(pair.player2) : "";
-  return b ? `${a} & ${b}` : a;
+export const pairLabelWithNick = (pair, eventType = "double", source = null) => {
+  return getPairDisplayName(pair, source || pair) || "—";
 };
 
 /* ----- V/T helpers (đồng bộ với web) ----- */
@@ -1465,10 +1442,10 @@ const FilterSheet = React.forwardRef(
 const MatchModal = ({ visible, match, onClose, eventType, t }) => {
   if (!match) return null;
   const a = match.pairA
-    ? pairLabelNickOnly(match.pairA, eventType)
+    ? pairLabelNickOnly(match.pairA, eventType, match)
     : smartDepLabel(match, match.previousA) || seedLabel(match.seedA);
   const b = match.pairB
-    ? pairLabelNickOnly(match.pairB, eventType)
+    ? pairLabelNickOnly(match.pairB, eventType, match)
     : smartDepLabel(match, match.previousB) || seedLabel(match.seedB);
 
   return (
@@ -2170,12 +2147,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     error: e3,
     refetch: refetchMatches,
   } = useListTournamentMatchesQuery(
-    { tournamentId: tourId },
+    { tournamentId: tourId, view: "bracket" },
     {
       skip: !tourId,
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
+      refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
     }
   );
 
@@ -2187,15 +2164,18 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const [liveBump, setLiveBump] = useState(0);
   const pendingRef = useRef(new Map());
   const rafRef = useRef(null);
+  const bracketIdsRef = useRef(new Set());
 
   const flushPending = useCallback(() => {
     if (!pendingRef.current.size) return;
     const mp = liveMapRef.current;
     for (const [id, inc] of pendingRef.current) {
       const cur = mp.get(id);
-      const vNew = Number(inc?.liveVersion ?? inc?.version ?? 0);
-      const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
-      const merged = !cur || vNew >= vOld ? { ...(cur || {}), ...inc } : cur;
+      const merged =
+        !cur || isNewerOrEqualMatchPayload(cur, inc)
+          ? mergeMatchPayload(cur, inc, cur || tour) ||
+            normalizeMatchDisplay(inc, cur || tour)
+          : cur;
       mp.set(id, merged);
     }
     pendingRef.current.clear();
@@ -2204,17 +2184,24 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
   const queueUpsert = useCallback(
     (incRaw) => {
-      const inc = incRaw?.data ?? incRaw?.match ?? incRaw;
-      if (!inc?._id) return;
-      const id = String(inc._id);
-      pendingRef.current.set(id, inc);
+      const id = getMatchPayloadId(incRaw);
+      if (!id) return;
+      if (isLightweightMatchPayload(incRaw)) {
+        socket?.emit("match:snapshot:request", { matchId: id });
+        return;
+      }
+      const payload = incRaw?.data ?? incRaw?.match ?? incRaw;
+      pendingRef.current.set(
+        String(id),
+        normalizeMatchDisplay(payload, tour)
+      );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         flushPending();
       });
     },
-    [flushPending]
+    [flushPending, socket, tour]
   );
 
   const filterSheetRef = useRef(null);
@@ -2235,15 +2222,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     });
   }, []);
 
-  const refetchBracketsRef = useRef(refetchBrackets);
-  const refetchMatchesRef = useRef(refetchMatches);
-  useEffect(() => {
-    refetchBracketsRef.current = refetchBrackets;
-  }, [refetchBrackets]);
-  useEffect(() => {
-    refetchMatchesRef.current = refetchMatches;
-  }, [refetchMatches]);
-
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
     try {
@@ -2262,10 +2240,15 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     () => (brackets || []).map((b) => String(b._id)),
     [brackets]
   );
-  const matchIds = useMemo(
-    () => (allMatchesFetched || []).map((m) => String(m._id)).filter(Boolean),
-    [allMatchesFetched]
-  );
+  useEffect(() => {
+    bracketIdsRef.current = new Set(bracketIds.filter(Boolean));
+  }, [bracketIds]);
+
+  useSocketRoomSet(socket, bracketIds, {
+    subscribeEvent: "draw:subscribe",
+    unsubscribeEvent: "draw:unsubscribe",
+    payloadKey: "bracketId",
+  });
   const initialSeededRef = useRef(false);
 
   const versionOf = (m) => {
@@ -2282,7 +2265,9 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
     if (!initialSeededRef.current) {
       const mp = new Map();
-      for (const m of allMatchesFetched) {
+      for (const m of allMatchesFetched.map((item) =>
+        normalizeMatchDisplay(item, tour)
+      )) {
         if (m?._id) mp.set(String(m._id), m);
       }
       liveMapRef.current = mp;
@@ -2295,7 +2280,9 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     let changed = false;
 
     const seen = new Set();
-    for (const m of allMatchesFetched) {
+    for (const m of allMatchesFetched.map((item) =>
+      normalizeMatchDisplay(item, tour)
+    )) {
       if (!m?._id) continue;
       const id = String(m._id);
       seen.add(id);
@@ -2325,82 +2312,21 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       liveMapRef.current = mp;
       setLiveBump((x) => x + 1);
     }
-  }, [allMatchesFetched]);
+  }, [allMatchesFetched, tour]);
 
   useEffect(() => {
     if (!socket) return;
-
-    const joined = new Set();
-
-    const subscribeDrawRooms = () => {
-      try {
-        bracketIds.forEach((bid) =>
-          socket.emit("draw:subscribe", { bracketId: bid })
-        );
-      } catch {}
-    };
-    const unsubscribeDrawRooms = () => {
-      try {
-        bracketIds.forEach((bid) =>
-          socket.emit("draw:unsubscribe", { bracketId: bid })
-        );
-      } catch {}
-    };
-
-    const joinAllMatches = () => {
-      try {
-        matchIds.forEach((mid) => {
-          if (!joined.has(mid)) {
-            socket.emit("match:join", { matchId: mid });
-            socket.emit("match:snapshot:request", { matchId: mid });
-            joined.add(mid);
-          }
-        });
-      } catch {}
-    };
-
-    const onConnect = () => {
-      subscribeDrawRooms();
-      joinAllMatches();
-    };
-
     const onUpsert = (payload) => queueUpsert(payload);
-    const onRemove = (payload) => {
-      const id = String(payload?.id ?? payload?._id ?? "");
-      if (!id) return;
-      if (liveMapRef.current.has(id)) {
-        liveMapRef.current.delete(id);
-        setLiveBump((x) => x + 1);
-      }
-    };
-    const onRefilled = () => {
-      refetchBracketsRef.current?.();
-      refetchMatchesRef.current?.();
-    };
-
-    if (socket.connected) onConnect();
-
-    socket.on("connect", onConnect);
-    socket.on("match:snapshot", onUpsert);
-    socket.on("score:updated", onUpsert);
-    socket.on("match:deleted", onRemove);
-    socket.on("draw:refilled", onRefilled);
-    socket.on("bracket:updated", onRefilled);
+    socket.on("draw:match:update", onUpsert);
 
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("match:snapshot", onUpsert);
-      socket.off("score:updated", onUpsert);
-      socket.off("match:deleted", onRemove);
-      socket.off("draw:refilled", onRefilled);
-      socket.off("bracket:updated", onRefilled);
-      unsubscribeDrawRooms();
+      socket.off("draw:match:update", onUpsert);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, bracketIds.join(","), matchIds.join(",")]);
+  }, [socket, queueUpsert, tourId]);
 
   const matchesMerged = useMemo(
     () =>
@@ -2515,18 +2441,18 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         }
 
         const pair = side === "A" ? m.pairA : m.pairB;
-        if (pair) return pairLabelNickOnly(pair, eventType);
+        if (pair) return pairLabelNickOnly(pair, eventType, m);
 
         const inferred =
           resolvePairFromGroupRankSeed(seed, brackets, byBracket, eventType) ||
           null;
-        if (inferred) return pairLabelNickOnly(inferred, eventType);
+        if (inferred) return pairLabelNickOnly(inferred, eventType, tour);
 
         return seedLabel(seed);
       }
 
       const pair = side === "A" ? m.pairA : m.pairB;
-      if (pair) return pairLabelNickOnly(pair, eventType);
+      if (pair) return pairLabelNickOnly(pair, eventType, m);
 
       const prev = side === "A" ? m.previousA : m.previousB;
       if (prev) {
@@ -2538,7 +2464,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           matchIndex.get(prevId) || (typeof prev === "object" ? prev : null);
         if (pm && pm.status === "finished" && pm.winner) {
           const wp = pm.winner === "A" ? pm.pairA : pm.pairB;
-          if (wp) return pairLabelNickOnly(wp, eventType);
+          if (wp) return pairLabelNickOnly(wp, eventType, pm);
         }
         return smartDepLabel(m, prev);
       }
@@ -3012,7 +2938,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                 <View style={{ gap: 8 }}>
                   {gStand.rows.map((row, idx) => {
                     const name = row.pair
-                      ? safePairNick(row.pair, tour?.eventType)
+                      ? safePairNick(row.pair, tour?.eventType, tour)
                       : row.name || "—";
                     const pts = Number(row.pts ?? 0);
                     const diff = Number.isFinite(row.pointDiff)
@@ -3160,7 +3086,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             <Text style={{ color: t.colors.text }}>
               Vô địch:{" "}
               <Text style={styles.bold}>
-                {pairLabelNickOnly(championPair, tour?.eventType)}
+                {pairLabelNickOnly(championPair, tour?.eventType, tour)}
               </Text>
             </Text>
           </Card>

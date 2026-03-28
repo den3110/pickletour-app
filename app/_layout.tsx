@@ -30,11 +30,12 @@ import store from "@/store";
 import { loadUserInfo } from "@/utils/authStorage";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Provider } from "react-redux";
+import { Provider, useSelector } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
+import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
 if (Constants.appOwnership !== "expo") {
@@ -157,6 +158,35 @@ function Boot({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+function AuthSessionSync() {
+  const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
+  const [triggerProfile] = useLazyGetProfileQuery();
+  const lastSyncAtRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (!userInfo?.token) return;
+
+    const syncProfile = () => {
+      const now = Date.now();
+      if (now - lastSyncAtRef.current < 5000) return;
+      lastSyncAtRef.current = now;
+      triggerProfile();
+    };
+
+    syncProfile();
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        syncProfile();
+      }
+    });
+
+    return () => sub.remove();
+  }, [triggerProfile, userInfo?.token]);
+
+  return null;
 }
 
 const isExpoGo = Constants.appOwnership === "expo";
@@ -856,6 +886,7 @@ function RootLayout() {
         <BottomSheetModalProvider>
           <SocketProvider>
             <Boot>
+              <AuthSessionSync />
               <SafeAreaProvider>
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}

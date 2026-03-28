@@ -7,63 +7,46 @@ export const liveApiSlice = apiSlice.injectEndpoints({
     getLiveMatches: builder.query({
       query: ({
         statuses = "scheduled,queued,assigned,live",
-        excludeFinished, // ← bỏ default value
+        excludeFinished,
         windowMs = 8 * 3600 * 1000,
-        concurrency = 4,
+        keyword = "",
+        q = "",
+        tournamentId = "",
+        page = 1,
+        limit = LIMIT,
+        all = false,
       } = {}) => {
-        // Build URL động
-        const params = new URLSearchParams({
-          statuses: statuses,
-          windowMs: windowMs.toString(),
-          concurrency: concurrency.toString(),
-        });
+        const params = new URLSearchParams();
 
-        // Chỉ thêm excludeFinished khi có giá trị false
-        if (excludeFinished === false) {
-          params.append("excludeFinished", "false");
-        }
+        if (statuses) params.set("statuses", statuses);
+        if (windowMs > 0) params.set("windowMs", String(windowMs));
+        if (excludeFinished === false) params.set("excludeFinished", "false");
+        if (keyword || q) params.set("q", String(q || keyword || "").trim());
+        if (tournamentId) params.set("tournamentId", tournamentId);
+        if (page) params.set("page", String(page));
+        if (limit) params.set("limit", String(limit));
+        if (all) params.set("all", "true");
 
-        return `/api/live/matches?${params.toString()}`;
+        const queryString = params.toString();
+        return `/api/live/matches${queryString ? `?${queryString}` : ""}`;
       },
       keepUnusedDataFor: 30,
       transformResponse: (resp, meta, arg) => {
-        const { keyword = "", page = 0, limit = LIMIT } = arg || {};
-        let items = Array.isArray(resp?.items) ? resp.items : [];
-
-        const kw = String(keyword || "").toLowerCase();
-        if (kw) {
-          items = items.filter((it) => {
-            const m = it.match || {};
-            const platformStr = (it.platforms || []).join(" ");
-            return (
-              String(m.code || "")
-                .toLowerCase()
-                .includes(kw) ||
-              String(m.labelKey || "")
-                .toLowerCase()
-                .includes(kw) ||
-              String(m.courtLabel || "")
-                .toLowerCase()
-                .includes(kw) ||
-              platformStr.toLowerCase().includes(kw)
-            );
-          });
-        }
-
-        const total = items.length;
-        const pages = Math.max(1, Math.ceil(total / limit));
-        const safePage = Math.min(Math.max(0, page), pages - 1);
-        const start = safePage * limit;
-        const pageItems = items.slice(start, start + limit);
+        const requestPage = Math.max(1, Number(arg?.page || 1));
+        const requestLimit = Math.max(1, Number(arg?.limit || LIMIT));
+        const total = Number(resp?.count || 0);
 
         return {
-          items: pageItems,
+          items: Array.isArray(resp?.items) ? resp.items : [],
           total,
-          page: safePage,
-          pages,
-          limit,
+          count: total,
+          page: Number(resp?.page || requestPage),
+          pages: Math.max(1, Number(resp?.pages || 1)),
+          limit: Number(resp?.limit || requestLimit),
           meta: resp?.meta || {},
-          rawCount: resp?.count ?? total,
+          tournaments: Array.isArray(resp?.tournaments) ? resp.tournaments : [],
+          rawCount: total,
+          countLive: Number(resp?.countLive || 0),
         };
       },
     }),

@@ -72,13 +72,11 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const PREF_THEME_KEY = "PREF_THEME";
 const PREF_PUSH_ENABLED = "PREF_PUSH_ENABLED";
 
-// ✨ CONFIG CHIỀU CAO (✅ FIX: cover không quá to)
-const HEADER_MAX_HEIGHT = 250; // ✅ giảm từ 280
+// ✨ HEADER LAYOUT (dynamic — tự tính theo insets.top của từng thiết bị)
 const HEADER_MIN_HEIGHT = 96;
-const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
-
-// ✅ FIX: đẩy profile content lên để nickname không bị cắt (đặc biệt máy notch/insets lớn)
-const PROFILE_TOP_OFFSET = 44; // trước đây +50
+const TOP_ROW_H = 50;       // chiều cao topRow (nút back, mini-name, nút ảnh bìa)
+const AVATAR_SIZE = 100;     // avatar
+const NAME_AREA_H = 62;     // name + handle + status chip
 
 /* ---------- Data ---------- */
 const PROVINCES = [
@@ -244,14 +242,14 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   const type = /\.png$/i.test(name)
     ? "image/png"
     : /\.webp$/i.test(name)
-    ? "image/webp"
-    : "image/jpeg";
+      ? "image/webp"
+      : "image/jpeg";
   return { uri, name, type, size: sizeInfo.size };
 }
 
 const yyyyMMdd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
+    d.getDate(),
   ).padStart(2, "0")}`;
 
 function dmyToIso(s) {
@@ -263,7 +261,7 @@ function dmyToIso(s) {
 }
 
 const mapGender = (g) =>
-  ({ male: "Nam", female: "Nữ", other: "Khác" }[g] || "—");
+  ({ male: "Nam", female: "Nữ", other: "Khác" })[g] || "—";
 
 const fmtScore = (v) => {
   const n = Number(v);
@@ -367,7 +365,7 @@ export default function ProfileScreen({ isBack = false }) {
           ...p,
           ...Object.fromEntries(keys.map((k) => [k, false])),
         })),
-      ms
+      ms,
     );
   };
 
@@ -390,6 +388,10 @@ export default function ProfileScreen({ isBack = false }) {
   const [viewerLabels, setViewerLabels] = useState([]);
   const [activeTab, setActiveTab] = useState("home");
   const [refreshing, setRefreshing] = useState(false);
+
+  // ✅ Dynamic header sizing — tự co giãn theo safe-area của từng thiết bị
+  const HEADER_MAX_HEIGHT = insets.top + TOP_ROW_H + AVATAR_SIZE + NAME_AREA_H;
+  const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
   // Scroll Animation
   const scrollY = useSharedValue(0);
@@ -499,9 +501,9 @@ export default function ProfileScreen({ isBack = false }) {
   const isDirty = useMemo(
     () =>
       Object.keys(form).some(
-        (k) => k !== "confirmPassword" && form[k] !== initialRef.current[k]
+        (k) => k !== "confirmPassword" && form[k] !== initialRef.current[k],
       ),
-    [form]
+    [form],
   );
   const isValid = useMemo(() => !Object.keys(errors).length, [errors]);
   const showErr = (f) => touched[f] && !!errors[f];
@@ -528,7 +530,7 @@ export default function ProfileScreen({ isBack = false }) {
     }
     if (r?.address) {
       const match = PROVINCES.find((p) =>
-        r.address.toLowerCase().includes(p.toLowerCase())
+        r.address.toLowerCase().includes(p.toLowerCase()),
       );
       if (match) updates.province = match;
     }
@@ -581,7 +583,7 @@ export default function ProfileScreen({ isBack = false }) {
           cancelButtonIndex: 0,
           userInterfaceStyle: scheme,
         },
-        (idx) => idx === 1 && go()
+        (idx) => idx === 1 && go(),
       );
     } else {
       Alert.alert("Bạn có chắc muốn đăng xuất?", "Bạn chắc chắn?", [
@@ -624,7 +626,7 @@ export default function ProfileScreen({ isBack = false }) {
           cancelButtonIndex: 0,
           userInterfaceStyle: scheme,
         },
-        (idx) => idx === 1 && setDelPwModalOpen(true)
+        (idx) => idx === 1 && setDelPwModalOpen(true),
       );
     } else {
       Alert.alert(
@@ -637,7 +639,7 @@ export default function ProfileScreen({ isBack = false }) {
             style: "destructive",
             onPress: () => setDelPwModalOpen(true),
           },
-        ]
+        ],
       );
     }
   };
@@ -649,10 +651,10 @@ export default function ProfileScreen({ isBack = false }) {
   useEffect(() => {
     (async () => {
       setPrefTheme(
-        (await SecureStore.getItemAsync(PREF_THEME_KEY)) || "system"
+        (await SecureStore.getItemAsync(PREF_THEME_KEY)) || "system",
       );
       setPushEnabled(
-        ((await SecureStore.getItemAsync(PREF_PUSH_ENABLED)) || "1") === "1"
+        ((await SecureStore.getItemAsync(PREF_PUSH_ENABLED)) || "1") === "1",
       );
     })();
   }, []);
@@ -699,7 +701,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [0, HEADER_SCROLL_DISTANCE],
       [0, -HEADER_SCROLL_DISTANCE],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return {
       height: HEADER_MAX_HEIGHT,
@@ -713,7 +715,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [0, HEADER_SCROLL_DISTANCE],
       [0, HEADER_SCROLL_DISTANCE],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return { transform: [{ translateY }] };
   });
@@ -724,13 +726,13 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [0, HEADER_SCROLL_DISTANCE],
       [1, 0.7],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     const opacity = interpolate(
       scrollY.value,
       [HEADER_SCROLL_DISTANCE * 0.5, HEADER_SCROLL_DISTANCE * 0.9],
       [1, 0],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -746,7 +748,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [0, HEADER_SCROLL_DISTANCE * 0.6],
       [1, 0],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return { opacity };
   });
@@ -757,7 +759,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [HEADER_SCROLL_DISTANCE * 0.8, HEADER_SCROLL_DISTANCE],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return { opacity };
   });
@@ -769,7 +771,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [HEADER_SCROLL_DISTANCE * 0.5, HEADER_SCROLL_DISTANCE * 0.9],
       [1, 0],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     const opacity = Math.max(0, Math.min(1, 1 - avatarOpacity));
@@ -778,7 +780,7 @@ export default function ProfileScreen({ isBack = false }) {
       scrollY.value,
       [HEADER_SCROLL_DISTANCE * 0.5, HEADER_SCROLL_DISTANCE],
       [0.98, 1],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -810,7 +812,7 @@ export default function ProfileScreen({ isBack = false }) {
           <View
             style={[
               styles.skelProfileArea,
-              { paddingTop: insets.top + 50 }, // ✅ né statusbar + topRow
+              { paddingTop: insets.top + TOP_ROW_H }, // ✅ né statusbar + topRow
             ]}
           >
             <View style={styles.skelAvatar} />
@@ -973,14 +975,14 @@ export default function ProfileScreen({ isBack = false }) {
           </View>
         </Animated.View>
         {/* Content bên trong Header */}
-        <View style={[styles.profileArea, { paddingTop: 0 }]}>
+        <View style={[styles.profileArea, { paddingTop: insets.top + TOP_ROW_H }]}>
           <Animated.View style={[styles.avatarContainer, avatarContainerStyle]}>
             <Pressable onPress={openAvatarViewer} style={styles.avatarInner}>
               <XImage
                 uri={
                   avatarUrl ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    user.name || "U"
+                    user.name || "U",
                   )}&background=8b5cf6&color=fff`
                 }
                 style={styles.avatarImg}
@@ -1114,7 +1116,7 @@ export default function ProfileScreen({ isBack = false }) {
                   gradient={["#14b8a6", "#06b6d4"]}
                   icon="trending-up"
                   value={`${fmtScore(user.ratingDouble)}/${fmtScore(
-                    user.ratingSingle
+                    user.ratingSingle,
                   )}`}
                   label="Điểm đôi/điểm đơn"
                 />
@@ -1359,8 +1361,8 @@ export default function ProfileScreen({ isBack = false }) {
                             status === "verified"
                               ? "rgba(34,197,94,0.1)"
                               : status === "pending"
-                              ? "rgba(245,158,11,0.1)"
-                              : "rgba(239,68,68,0.1)",
+                                ? "rgba(245,158,11,0.1)"
+                                : "rgba(239,68,68,0.1)",
                         },
                       ]}
                     >
@@ -1369,16 +1371,16 @@ export default function ProfileScreen({ isBack = false }) {
                           status === "verified"
                             ? "check-circle"
                             : status === "pending"
-                            ? "clock"
-                            : "x-circle"
+                              ? "clock"
+                              : "x-circle"
                         }
                         size={20}
                         color={
                           status === "verified"
                             ? "#22c55e"
                             : status === "pending"
-                            ? "#f59e0b"
-                            : "#ef4444"
+                              ? "#f59e0b"
+                              : "#ef4444"
                         }
                       />
                       <Text
@@ -1387,16 +1389,16 @@ export default function ProfileScreen({ isBack = false }) {
                             status === "verified"
                               ? "#22c55e"
                               : status === "pending"
-                              ? "#f59e0b"
-                              : "#ef4444",
+                                ? "#f59e0b"
+                                : "#ef4444",
                           fontWeight: "600",
                         }}
                       >
                         {status === "verified"
                           ? "Đã xác minh"
                           : status === "pending"
-                          ? "Đang chờ duyệt"
-                          : "Bị từ chối"}
+                            ? "Đang chờ duyệt"
+                            : "Bị từ chối"}
                       </Text>
                     </View>
                   </>
@@ -1952,7 +1954,7 @@ const FormSelect = ({
 const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState(
-    value ? new Date(value) : new Date(1990, 0, 1)
+    value ? new Date(value) : new Date(1990, 0, 1),
   );
   useEffect(() => {
     if (value) setTemp(new Date(value));

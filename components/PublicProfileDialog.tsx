@@ -791,51 +791,56 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
     });
   const closeSnack = () => setSnack((s) => ({ ...s, open: false }));
 
-  // Queries
-  const baseQ = useGetPublicProfileQuery(idArg);
-  const rateQ = useGetRatingHistoryQuery(idArg);
-  const matchQ = useGetMatchHistoryQuery(idArg);
-  const achQ = useGetUserAchievementsQuery(idArg);
-
-  const base: any = baseQ.data || {};
-
   // Tabs
   const [tab, setTab] = useState(0);
   useEffect(() => {
     if (canOpen) setTab(0);
   }, [canOpen]);
 
-  // Data + FE pagination
-  const ratingRaw = Array.isArray(rateQ.data?.history)
-    ? rateQ.data.history
-    : rateQ.data?.items || [];
-  const ratingTotal = rateQ.data?.total ?? ratingRaw.length;
-
-  const matchRaw = Array.isArray(matchQ.data)
-    ? matchQ.data
-    : matchQ.data?.items || [];
-  const matchTotal = matchQ.data?.total ?? matchRaw.length;
-
   const [ratingPage, setRatingPage] = useState(1);
   const ratingPerPage = 10;
   const [matchPage, setMatchPage] = useState(1);
   const matchPerPage = 10;
 
+  const wantsRatings = canOpen && tab === 1;
+  const wantsMatches = canOpen && tab === 2;
+  const wantsAchievements = canOpen && tab === 3;
+
+  // Queries
+  const baseQ = useGetPublicProfileQuery(idArg);
+  const rateQ = useGetRatingHistoryQuery(
+    wantsRatings
+      ? { id: userId as string, page: ratingPage, limit: ratingPerPage }
+      : (skipToken as any)
+  );
+  const matchQ = useGetMatchHistoryQuery(
+    wantsMatches
+      ? { id: userId as string, page: matchPage, limit: matchPerPage }
+      : (skipToken as any)
+  );
+  const achQ = useGetUserAchievementsQuery(
+    wantsAchievements ? (userId as string) : (skipToken as any)
+  );
+
+  const base: any = baseQ.data || {};
+
+  // Data + backend pagination
+  const ratingPaged = Array.isArray(rateQ.data?.history)
+    ? rateQ.data.history
+    : rateQ.data?.items || [];
+  const ratingTotal = rateQ.data?.total ?? 0;
+
+  const matchPaged = Array.isArray(matchQ.data)
+    ? matchQ.data
+    : matchQ.data?.items || [];
+  const matchTotal = matchQ.data?.total ?? 0;
+
   useEffect(() => {
     if (canOpen) setRatingPage(1);
-  }, [canOpen, ratingTotal]);
+  }, [canOpen, userId]);
   useEffect(() => {
     if (canOpen) setMatchPage(1);
-  }, [canOpen, matchTotal]);
-
-  const ratingPaged = useMemo(() => {
-    const start = (ratingPage - 1) * ratingPerPage;
-    return ratingRaw.slice(start, start + ratingPerPage);
-  }, [ratingRaw, ratingPage]);
-  const matchPaged = useMemo(() => {
-    const start = (matchPage - 1) * matchPerPage;
-    return matchRaw.slice(start, start + matchPerPage);
-  }, [matchRaw, matchPage]);
+  }, [canOpen, userId]);
 
   // Zoom image
   const [zoom, setZoom] = useState({ open: false, src: "" });
@@ -1996,12 +2001,11 @@ export default function PublicProfileSheet({ open, onClose, userId }: Props) {
 
   /* ---------- Pull-to-refresh ---------- */
   const refetchAll = async () => {
-    await Promise.all([
-      baseQ.refetch?.(),
-      rateQ.refetch?.(),
-      matchQ.refetch?.(),
-      achQ.refetch?.(),
-    ]);
+    const tasks = [baseQ.refetch?.()];
+    if (wantsRatings && rateQ.refetch) tasks.push(rateQ.refetch());
+    if (wantsMatches && matchQ.refetch) tasks.push(matchQ.refetch());
+    if (wantsAchievements && achQ.refetch) tasks.push(achQ.refetch());
+    await Promise.all(tasks);
   };
   const anyFetching =
     baseQ.isFetching ||

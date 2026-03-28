@@ -11,6 +11,8 @@ expo-env.d.ts
 
 # Native
 .kotlin/
+.android-user/
+.gradle-user/
 *.orig.*
 *.jks
 *.p8
@@ -36,6 +38,11 @@ yarn.lock
 
 # typescript
 *.tsbuildinfo
+
+# local build/cache artifacts
+.tmp-hotupdater/
+android/app/release/
+android/app/_disabled_native/
 
 app-example
 # android

@@ -982,12 +982,6 @@ export default function RefereeJudgePanel({
         delta: +1,
         autoNext: autoNextGame,
       }).unwrap();
-      socket?.emit("score:inc", {
-        matchId: match._id,
-        side,
-        delta: +1,
-        autoNext: autoNextGame,
-      });
     } catch (e) {
       Toast.show({
         type: "error",
@@ -1007,12 +1001,6 @@ export default function RefereeJudgePanel({
         delta: -1,
         autoNext: autoNextGame,
       }).unwrap();
-      socket?.emit("score:inc", {
-        matchId: match._id,
-        side,
-        delta: -1,
-        autoNext: autoNextGame,
-      });
     } catch (e) {
       Toast.show({
         type: "error",

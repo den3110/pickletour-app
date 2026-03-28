@@ -49,6 +49,7 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { Image as ExpoImage } from "expo-image"; // <--- Dùng Expo Image
 import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
+import { getPlayerDisplayName } from "@/utils/matchDisplay";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Ionicons,
@@ -109,8 +110,8 @@ const normType = (t?: string) => {
   if (s === "single" || s === "singles") return "single";
   return s === "double" || s === "doubles" ? "double" : s || "double";
 };
-const displayName = (pl: any) =>
-  pl?.nickName || pl?.nickname || pl?.fullName || pl?.name || "—";
+const displayName = (pl: any, source?: any) =>
+  getPlayerDisplayName(pl, source) || "—";
 const getUserId = (pl: any) => pl?.user?._id || pl?.user || null;
 const totalScoreOf = (r: any, isSingles: boolean) =>
   (r?.player1?.score || 0) + (isSingles ? 0 : r?.player2?.score || 0);
@@ -679,6 +680,7 @@ const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
 const RegItem = memo(function RegItem({
   r,
   index,
+  displaySource,
   isSingles,
   canManage,
   cap,
@@ -791,7 +793,9 @@ const RegItem = memo(function RegItem({
             }}
           >
             <TouchableOpacity
-              onPress={() => onPreview(pl?.avatar, displayName(pl))}
+              onPress={() =>
+                onPreview(pl?.avatar, displayName(pl, displaySource))
+              }
             >
               <ExpoImage
                 source={{ uri: normalizeUrl(pl?.avatar) || PLACE }}
@@ -833,7 +837,7 @@ const RegItem = memo(function RegItem({
                     fontSize: 14,
                   }}
                 >
-                  {displayName(pl)}
+                  {displayName(pl, displaySource)}
                 </Text>
                 {pl?.cccdStatus === "verified" && (
                   <MaterialIcons name="verified" size={14} color={C.tint} />
@@ -1141,12 +1145,13 @@ export default function TournamentRegistrationScreen() {
     if (!searchQ.trim()) return regs;
     const q = normalizeNoAccent(searchQ.toLowerCase());
     return regs.filter((r: any) => {
-      const txt = `${displayName(r.player1)} ${r.player1?.phone} ${displayName(
-        r.player2
+      const txt = `${displayName(r.player1, tour)} ${r.player1?.phone} ${displayName(
+        r.player2,
+        tour
       )} ${r.player2?.phone} ${regCodeOf(r)}`;
       return normalizeNoAccent(txt.toLowerCase()).includes(q);
     });
-  }, [regs, searchQ]);
+  }, [regs, searchQ, tour]);
 
   const handleRefresh = useCallback(() => {
     refetchRegs();
@@ -1579,7 +1584,7 @@ export default function TournamentRegistrationScreen() {
                     }}
                   >
                     <Text style={{ fontWeight: "700", color: C.textPrimary }}>
-                      Bạn (VĐV 1): {displayName(me)}
+                      Bạn (VĐV 1): {displayName(me, tour)}
                     </Text>
                     <Text
                       style={{
@@ -1844,6 +1849,7 @@ export default function TournamentRegistrationScreen() {
             <RegItem
               r={item}
               index={index}
+              displaySource={tour}
               isSingles={isSingles}
               canManage={canManage}
               cap={cap}
@@ -1911,6 +1917,7 @@ export default function TournamentRegistrationScreen() {
             <RegItem
               r={item}
               index={index}
+              displaySource={tour}
               isSingles={isSingles}
               canManage={canManage}
               cap={cap}

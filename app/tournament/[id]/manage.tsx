@@ -52,6 +52,7 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
 
 import ManageRefereesSheet from "@/components/sheets/ManageRefereesSheet";
+import TournamentManagersSheet from "@/components/sheets/TournamentManagersSheet";
 import AssignCourtSheet from "@/components/sheets/AssignCourtSheet";
 import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
@@ -1194,6 +1195,12 @@ export default function ManageScreen() {
       return tour.managers.some((m) => String(m?.user ?? m) === String(me._id));
     return !!tour?.isManager;
   }, [tour, me]);
+  const canManageManagers = useMemo(() => {
+    const meId = String(me?._id || me?.id || "");
+    const creatorId = String(tour?.createdBy?._id || tour?.createdBy || "");
+    if (!meId) return false;
+    return isAdmin || creatorId === meId;
+  }, [isAdmin, me, tour]);
   const canManage = isAdmin || isManager;
 
   const typesAvailable = useMemo(() => {
@@ -1657,6 +1664,7 @@ export default function ManageScreen() {
   ]);
 
   const [refMgrOpen, setRefMgrOpen] = useState(false);
+  const [managerMgrOpen, setManagerMgrOpen] = useState(false);
   const [assignCourtSheet, setAssignCourtSheet] = useState({
     open: false,
     match: null,
@@ -2681,9 +2689,19 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                   setRefMgrOpen(true);
                 }}
               />
+              {canManageManagers ? (
+                <MenuItem
+                  icon="supervisor-account"
+                  label="Quản lý người quản lý"
+                  onPress={() => {
+                    setHdrMenuOpen(false);
+                    setManagerMgrOpen(true);
+                  }}
+                />
+              ) : null}
               <MenuItem
                 icon="stadium"
-                label="Quản lý sân"
+                label="Quản lý sân theo cụm"
                 onPress={() => {
                   setHdrMenuOpen(false);
                   setCourtMgrSheet({ open: true, bracket: null });
@@ -3058,6 +3076,15 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               refetchBrackets?.();
             }}
           />
+          <TournamentManagersSheet
+            open={managerMgrOpen}
+            onClose={() => setManagerMgrOpen(false)}
+            tournamentId={tid}
+            onChanged={() => {
+              refetchTour?.();
+              refetchMatches?.();
+            }}
+          />
           <AssignCourtSheet
             open={assignCourtSheet.open}
             onClose={() => setAssignCourtSheet({ open: false, match: null })}
@@ -3085,6 +3112,8 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             onClose={() => setLiveSetupSheet({ open: false, bracket: null })}
             tournamentId={tid}
             bracketId={null}
+            tournamentName={tour?.name || ""}
+            allowedClusters={tour?.allowedCourtClusters || []}
           />
         </View>
       </View>

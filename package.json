@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:online": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -79,6 +80,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-calendars": "^1.1313.0",
+    "react-native-draglist": "^3.10.0",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-gifted-charts": "^1.4.65",
     "react-native-image-viewing": "^0.2.2",

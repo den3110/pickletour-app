@@ -39,6 +39,7 @@ import {
   BottomSheetBackdrop,
 } from "@gorhom/bottom-sheet";
 import { useCreateFacebookLiveForMatchMutation } from "@/slices/adminMatchLiveApiSlice";
+import { getPlayerDisplayName } from "@/utils/matchDisplay";
 import { router, useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
 
@@ -188,32 +189,13 @@ function buildOverlayUrl(base, matchId, { theme, size, showSets, autoNext }) {
 }
 
 /* ---------- name helpers ---------- */
-export const preferName = (p) =>
-  (p?.fullName && String(p.fullName).trim()) ||
-  (p?.name && String(p.name).trim()) ||
-  (p?.nickname && String(p.nickname).trim()) ||
-  "N/A";
+export const preferName = (p, source) =>
+  getPlayerDisplayName(p, source) || "N/A";
 
-export const preferNick = (p) =>
-  (p?.nickname && String(p.nickname).trim()) ||
-  (p?.nickName && String(p.nickName).trim()) ||
-  (p?.nick && String(p.nick).trim()) ||
-  (p?.user?.nickname && String(p.user.nickname).trim()) ||
-  (p?.user?.nickName && String(p.user.nickName).trim()) ||
-  (p?.user?.nick && String(p.user.nick).trim()) ||
-  "";
+export const preferNick = (p, source) => getPlayerDisplayName(p, source) || "";
 
-export const nameWithNick = (p) => {
-  if (!p) return "—";
-  const nk = preferNick(p);
-  const nm =
-    (p?.fullName && String(p.fullName).trim()) ||
-    (p?.name && String(p.name).trim()) ||
-    (p?.user?.fullName && String(p.user.fullName).trim()) ||
-    (p?.user?.name && String(p.user.name).trim()) ||
-    "";
-  return nk || nm || "—";
-};
+export const nameWithNick = (p, source) =>
+  getPlayerDisplayName(p, source) || "—";
 
 /* ---------- seed/dep label ---------- */
 export const seedLabel = (seed) => {
@@ -395,25 +377,30 @@ function useDelayedFlag(flag, ms = 250) {
 
 /* ---------- LOCK: chỉ cập nhật đúng match đang mở (Giữ nguyên) ---------- */
 function useLockedMatch(m, { loading }) {
-  const [lockedId, setLockedId] = useState(() => (m?._id ? String(m._id) : ""));
-  const [view, setView] = useState(() => (m?._id ? m : null));
+  const nextId = m?._id ? String(m._id) : "";
+  const previousLockedIdRef = useRef(nextId);
+  const [lockedId, setLockedId] = useState(() => nextId);
+  const [view, setView] = useState(() => (nextId ? m : null));
 
   useEffect(() => {
-    if (!lockedId && m?._id) {
-      setLockedId(String(m._id));
-      setView(m);
+    if (!nextId) {
+      if (!loading) {
+        previousLockedIdRef.current = "";
+        setLockedId("");
+        setView(null);
+      }
+      return;
     }
-  }, [m?._id, lockedId, m]);
 
-  useEffect(() => {
-    if (!m) return;
-    if (lockedId && String(m._id) === lockedId) {
-      setView((prev) => (isMatchEqual(prev, m) ? prev : m));
-    } else if (!lockedId && m?._id) {
-      setLockedId(String(m._id));
-      setView(m);
-    }
-  }, [m, lockedId]);
+    const isMatchChanged = previousLockedIdRef.current !== nextId;
+    previousLockedIdRef.current = nextId;
+
+    setLockedId(nextId);
+    setView((prev) => {
+      if (isMatchChanged || !prev) return m;
+      return isMatchEqual(prev, m) ? prev : m;
+    });
+  }, [loading, m, nextId]);
 
   const waiting = loading && !view;
   return { lockedId, view, setView, waiting };
@@ -520,6 +507,12 @@ function providerLabel(kind, fallback = "Link") {
 function isNonEmptyString(x) {
   return typeof x === "string" && x.trim().length > 0;
 }
+function isFacebookUrl(url) {
+  const u = safeURL(url);
+  if (!u) return false;
+  const host = u.hostname.toLowerCase();
+  return host.includes("facebook.com") || host.includes("fb.watch");
+}
 function detectEmbed(url) {
   const u = safeURL(url);
   if (!u) return { kind: "unknown", canEmbed: false, aspect: "16:9" };
@@ -615,6 +608,10 @@ function detectEmbed(url) {
     return { kind: "file", canEmbed: true, embedUrl: url, aspect };
   }
 
+  if (/\/api\/live\/recordings\/v2\/[^/]+\/play(?:\?|$)/i.test(url)) {
+    return { kind: "file", canEmbed: true, embedUrl: url, aspect };
+  }
+
   // Google Drive preview
   if (host.includes("drive.google.com")) {
     const m = url.match(/\/file\/d\/([^/]+)\//);
@@ -640,6 +637,8 @@ function detectEmbed(url) {
 function normalizeStreams(m) {
   const out = [];
   const seen = new Set();
+  const defaultStreamKey =
+    typeof m?.defaultStreamKey === "string" ? m.defaultStreamKey.trim() : "";
 
   const pushUrl = (url, { label, primary = false } = {}) => {
     if (!isNonEmptyString(url)) return;
@@ -655,7 +654,100 @@ function normalizeStreams(m) {
     seen.add(u);
   };
 
-  if (isNonEmptyString(m?.video)) pushUrl(m.video, { primary: true });
+  const pushCanonicalStream = (stream) => {
+    const playUrl = isNonEmptyString(stream?.playUrl) ? stream.playUrl.trim() : "";
+    if (!playUrl) return false;
+    const dedupeKey =
+      stream?.key && typeof stream.key === "string"
+        ? `key:${stream.key}`
+        : `url:${playUrl}`;
+    if (seen.has(dedupeKey) || seen.has(playUrl)) return true;
+
+    const kind = String(stream?.kind || "").trim().toLowerCase();
+    const det =
+      kind === "delayed_manifest"
+        ? {
+            kind: "delayed_manifest",
+            canEmbed: true,
+            embedUrl: playUrl,
+            aspect: "16:9",
+          }
+        : detectEmbed(playUrl);
+    out.push({
+      key: stream?.key || null,
+      label:
+        stream?.displayLabel ||
+        stream?.label ||
+        providerLabel(det.kind, "Link"),
+      url: playUrl,
+      openUrl:
+        typeof stream?.openUrl === "string" && stream.openUrl.trim()
+          ? stream.openUrl.trim()
+          : "",
+      primary:
+        Boolean(stream?.primary) ||
+        (defaultStreamKey && String(stream?.key || "") === defaultStreamKey),
+      providerLabel: stream?.providerLabel || providerLabel(det.kind, "Link"),
+      delaySeconds: Number(stream?.delaySeconds || 0),
+      ready: stream?.ready !== false,
+      disabledReason:
+        typeof stream?.disabledReason === "string"
+          ? stream.disabledReason
+          : "",
+      status: typeof stream?.status === "string" ? stream.status : "",
+      meta: stream?.meta || {},
+      ...det,
+    });
+    seen.add(dedupeKey);
+    seen.add(playUrl);
+    return true;
+  };
+
+  const canonicalStreams = Array.isArray(m?.streams)
+    ? m.streams.filter(
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          (isNonEmptyString(item?.playUrl) || isNonEmptyString(item?.openUrl))
+      )
+    : [];
+  if (canonicalStreams.length > 0) {
+    canonicalStreams
+      .slice()
+      .sort(
+        (a, b) =>
+          Number(a?.priority || 99) - Number(b?.priority || 99)
+      )
+      .forEach((stream) => {
+        pushCanonicalStream(stream);
+      });
+    return out;
+  }
+
+  const fb = m?.facebookLive || {};
+  const normalizedMatchStatus = String(m?.status || "")
+    .trim()
+    .toLowerCase();
+  const normalizedFbStatus = String(fb?.status || "")
+    .trim()
+    .toLowerCase();
+  const finishedLike =
+    ["finished", "ended", "stopped"].includes(normalizedMatchStatus) ||
+    ["finished", "ended", "stopped"].includes(normalizedFbStatus);
+  const primaryVideo = isNonEmptyString(m?.video) ? m.video.trim() : "";
+  const preferFinishedFacebookVideo =
+    finishedLike &&
+    isFacebookUrl(primaryVideo) &&
+    isNonEmptyString(fb?.video_permalink_url) &&
+    fb.video_permalink_url.trim() !== primaryVideo;
+
+  if (preferFinishedFacebookVideo) {
+    pushUrl(fb.video_permalink_url, {
+      label: "Facebook Video",
+      primary: true,
+    });
+  }
+  if (primaryVideo) pushUrl(primaryVideo, { primary: !preferFinishedFacebookVideo });
 
   const singles = [
     ["Video", m?.videoUrl],
@@ -673,6 +765,24 @@ function normalizeStreams(m) {
     ["URL", m?.sources?.url],
   ];
   for (const [label, val] of singles)
+    if (isNonEmptyString(val)) pushUrl(val, { label });
+
+  const facebookSingles = finishedLike
+    ? [
+        ["Facebook Video", fb?.video_permalink_url],
+        ["Facebook Watch", fb?.watch_url],
+        ["Facebook Live", fb?.permalink_url],
+        ["Facebook Raw", fb?.raw_permalink_url],
+        ["Facebook Embed", fb?.embed_url],
+      ]
+    : [
+        ["Facebook Watch", fb?.watch_url],
+        ["Facebook Live", fb?.permalink_url],
+        ["Facebook Video", fb?.video_permalink_url],
+        ["Facebook Raw", fb?.raw_permalink_url],
+        ["Facebook Embed", fb?.embed_url],
+      ];
+  for (const [label, val] of facebookSingles)
     if (isNonEmptyString(val)) pushUrl(val, { label });
 
   const asStrArray = (arr) =>
@@ -708,6 +818,148 @@ const AspectBox = memo(({ ratio = 16 / 9, children }) => {
     >
       {children}
     </View>
+  );
+});
+
+const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
+  const [ratio, setRatio] = useState(
+    stream?.aspect === "9:16" ? 9 / 16 : 16 / 9
+  );
+  const [items, setItems] = useState([]);
+  const [currentUrl, setCurrentUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setRatio(stream?.aspect === "9:16" ? 9 / 16 : 16 / 9);
+  }, [stream?.aspect, stream?.embedUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timerId;
+
+    const applyManifest = (manifest) => {
+      const segments = Array.isArray(manifest?.segments) ? manifest.segments : [];
+      const playable = segments
+        .map((segment) => ({
+          key: `segment:${segment?.index ?? ""}`,
+          url: typeof segment?.url === "string" ? segment.url.trim() : "",
+        }))
+        .filter((segment) => segment.url);
+      const finalPlaybackUrl =
+        typeof manifest?.finalPlaybackUrl === "string"
+          ? manifest.finalPlaybackUrl.trim()
+          : "";
+      if (finalPlaybackUrl) {
+        playable.push({
+          key: "final",
+          url: finalPlaybackUrl,
+        });
+      }
+      setItems(playable);
+      setCurrentUrl((prev) => {
+        if (prev && playable.some((item) => item.url === prev)) return prev;
+        return playable[0]?.url || "";
+      });
+      setLoading(false);
+      if (!playable.length) {
+        setError(stream?.disabledReason || "Server 2 dang chuan bi du lieu tre.");
+      } else {
+        setError("");
+      }
+    };
+
+    const fetchManifest = async () => {
+      try {
+        const resp = await fetch(stream.embedUrl, { cache: "no-store" });
+        if (!resp.ok) {
+          throw new Error(`Manifest HTTP ${resp.status}`);
+        }
+        const manifest = await resp.json();
+        if (cancelled) return;
+        applyManifest(manifest);
+      } catch (fetchError) {
+        if (cancelled) return;
+        setLoading(false);
+        setError(fetchError?.message || "Khong tai duoc delayed manifest.");
+      } finally {
+        if (!cancelled) {
+          const refreshSeconds =
+            Number(stream?.meta?.refreshSeconds || 6) > 0
+              ? Number(stream?.meta?.refreshSeconds || 6)
+              : 6;
+          timerId = setTimeout(fetchManifest, refreshSeconds * 1000);
+        }
+      }
+    };
+
+    setItems([]);
+    setCurrentUrl("");
+    setLoading(true);
+    setError("");
+    fetchManifest();
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [stream?.embedUrl, stream?.disabledReason, stream?.meta?.refreshSeconds]);
+
+  if (loading) {
+    return (
+      <View style={{ padding: 16, alignItems: "center" }}>
+        <ActivityIndicator size="small" color="#fff" />
+        <Text style={{ color: "#fff", marginTop: 8 }}>
+          Dang tai video tu PickleTour...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!currentUrl) {
+    return (
+      <View style={{ padding: 16, alignItems: "center" }}>
+        <Text style={{ color: "#fff" }}>
+          {error || "Server 2 dang chuan bi."}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <AspectBox ratio={ratio}>
+        <Video
+          style={{ width: "100%", height: "100%" }}
+          source={{ uri: currentUrl }}
+          useNativeControls
+          shouldPlay
+          resizeMode="contain"
+          onPlaybackStatusUpdate={(status) => {
+            if (!status?.isLoaded) return;
+            if (status.didJustFinish) {
+              setCurrentUrl((prev) => {
+                const currentIndex = items.findIndex((item) => item.url === prev);
+                if (currentIndex >= 0 && currentIndex < items.length - 1) {
+                  return items[currentIndex + 1].url;
+                }
+                return prev;
+              });
+            }
+          }}
+          onLoad={(meta) => {
+            const w = meta?.naturalSize?.width;
+            const h = meta?.naturalSize?.height;
+            if (w && h) setRatio(w / h);
+          }}
+        />
+      </AspectBox>
+      {error ? (
+        <View style={{ padding: 12 }}>
+          <Text style={{ color: "#fff" }}>{error}</Text>
+        </View>
+      ) : null}
+    </>
   );
 });
 
@@ -757,6 +1009,8 @@ const StreamPlayer = memo(({ stream }) => {
           />
         </AspectBox>
       );
+    case "delayed_manifest":
+      return <DelayedManifestPlayer stream={stream} />;
     default:
       return null;
   }
@@ -1767,6 +2021,9 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         next.streams = streamsArr;
         next.meta = { ...(next.meta || {}), streams: streamsArr };
       }
+      if (typeof snap.defaultStreamKey === "string" && snap.defaultStreamKey.trim()) {
+        next.defaultStreamKey = snap.defaultStreamKey.trim();
+      }
       return next;
     });
   }, []);
@@ -2349,7 +2606,10 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   }, [overlayUrl]);
 
   const handleOpenActiveStream = useCallback(() => {
-    if (activeStream?.url) Linking.openURL(activeStream.url);
+    const targetUrl =
+      activeStream?.openUrl ||
+      (activeStream?.kind === "delayed_manifest" ? "" : activeStream?.url);
+    if (targetUrl) Linking.openURL(targetUrl);
   }, [activeStream]);
 
   if (showSpinner) {
@@ -2396,6 +2656,69 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           expanded={isLiveExpanded}
           onToggle={toggleLiveSection}
         />
+
+        {streams.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
+          >
+            {streams.map((stream, index) => {
+              const selected = index === activeIdx;
+              const subtitle = stream.providerLabel || "";
+              return (
+                <TouchableOpacity
+                  key={stream.key || `${stream.url}-${index}`}
+                  onPress={() => setActiveIdx(index)}
+                  style={[
+                    styles.streamServerChip,
+                    {
+                      backgroundColor: selected ? T.tint : T.cardBg,
+                      borderColor: selected ? T.tint : T.cardBorder,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selected ? "#fff" : T.textPrimary,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {stream.label}
+                  </Text>
+                  {subtitle ? (
+                    <Text
+                      style={{
+                        color: selected ? "rgba(255,255,255,0.9)" : T.textSecondary,
+                        fontSize: 12,
+                        marginTop: 2,
+                      }}
+                    >
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {activeStream && !activeStream.ready && activeStream.disabledReason ? (
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: T.cardBg,
+                borderColor: T.cardBorder,
+                ...T.shadow,
+              },
+            ]}
+          >
+            <Text style={{ color: T.textSecondary }}>
+              {activeStream.disabledReason}
+            </Text>
+          </View>
+        ) : null}
 
         {activeStream && isLiveExpanded && (
           <View
@@ -2977,6 +3300,12 @@ const styles = StyleSheet.create({
   // Stream
   aspectBox: {
     width: "100%",
+  },
+  streamServerChip: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   streamLinkBtn: {
     padding: 12,

@@ -33,7 +33,17 @@ import {
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useIsFocused } from "@react-navigation/native";
+import {
+  getMatchPayloadId,
+  getPairDisplayName,
+  getPlayerDisplayName,
+  isNewerOrEqualMatchPayload,
+  isLightweightMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /* ---------------- THEME ---------------- */
 function useThemeTokens() {
@@ -120,14 +130,11 @@ const courtLabelOf = (m) => {
   return "";
 };
 
-const playerName = (p) =>
-  p?.nickName || p?.nickname || p?.fullName || p?.name || "—";
+const playerName = (p, source) => getPlayerDisplayName(p, source) || "—";
 
-const pairLabel = (pair) => {
+const pairLabel = (pair, source) => {
   if (!pair) return "—";
-  if (pair.name) return pair.name;
-  const ps = [pair.player1, pair.player2].filter(Boolean).map(playerName);
-  return ps.join(" / ") || "—";
+  return getPairDisplayName(pair, source) || "—";
 };
 
 const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
@@ -313,8 +320,13 @@ export default function RefereeCenterScreen() {
   const pendingRef = useRef(new Map());
   const rafRef = useRef(null);
   const [liveBump, setLiveBump] = useState(0);
-  const joinedMatchesRef = useRef(new Set());
   const lastSnapshotAtRef = useRef(new Map());
+  const displaySourceRef = useRef(null);
+  const tournamentRoomIds = useMemo(
+    () => (id ? [String(id)] : []),
+    [id]
+  );
+  const tournamentIdsRef = useRef(new Set());
 
   const requestSnapshot = useCallback(
     (mid) => {
@@ -327,15 +339,31 @@ export default function RefereeCenterScreen() {
     },
     [socket]
   );
+  useEffect(() => {
+    tournamentIdsRef.current = new Set(tournamentRoomIds);
+  }, [tournamentRoomIds]);
+
+  useSocketRoomSet(socket, tournamentRoomIds, {
+    subscribeEvent: "tournament:subscribe",
+    unsubscribeEvent: "tournament:unsubscribe",
+    payloadKey: "tournamentId",
+  });
 
   const queueUpsertRef = useRef(null);
   const requestSnapshotRef = useRef(null);
   useEffect(() => {
     queueUpsertRef.current = (payload) => {
-      const incRaw = payload?.data ?? payload?.match ?? payload;
-      const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
+      const id = getMatchPayloadId(payload);
       if (!id) return;
-      const inc = { ...(incRaw || {}), _id: String(id) };
+      if (isLightweightMatchPayload(payload)) {
+        requestSnapshotRef.current?.(String(id));
+        return;
+      }
+      const incRaw = payload?.data ?? payload?.match ?? payload;
+      const inc = normalizeMatchDisplay(
+        { ...(incRaw || {}), _id: String(id) },
+        displaySourceRef.current
+      );
 
       if (Array.isArray(inc.scores) && !inc.gameScores)
         inc.gameScores = inc.scores;
@@ -350,10 +378,11 @@ export default function RefereeCenterScreen() {
         const mp = liveMapRef.current;
         for (const [mid, inc2] of pendingRef.current) {
           const cur = mp.get(mid);
-          const vNew = Number(inc2?.liveVersion ?? inc2?.version ?? 0);
-          const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
           const merged =
-            !cur || vNew >= vOld ? { ...(cur || {}), ...inc2 } : cur;
+            !cur || isNewerOrEqualMatchPayload(cur, inc2)
+              ? mergeMatchPayload(cur, inc2, cur || displaySourceRef.current) ||
+                normalizeMatchDisplay(inc2, cur || displaySourceRef.current)
+              : cur;
           mp.set(mid, merged);
         }
         pendingRef.current.clear();
@@ -397,6 +426,10 @@ export default function RefereeCenterScreen() {
     { refetchOnFocus: true, refetchOnReconnect: true }
   );
 
+  useEffect(() => {
+    displaySourceRef.current = tour || null;
+  }, [tour]);
+
   // Seed realtime map từ API
   const allMatches = useMemo(
     () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
@@ -417,21 +450,17 @@ export default function RefereeCenterScreen() {
     seededFingerprintRef.current = fp;
 
     const mp = new Map();
-    for (const m of allMatches) if (m?._id) mp.set(String(m._id), m);
+    for (const m of allMatches.map((item) => normalizeMatchDisplay(item, tour))) {
+      if (m?._id) mp.set(String(m._id), m);
+    }
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
-  }, [allMatches]);
+  }, [allMatches, tour]);
 
   // Socket listeners
   useEffect(() => {
     if (!socket) return;
 
-    const onConnected = () => {
-      joinedMatchesRef.current.forEach((mid) => {
-        socket.emit("match:join", { matchId: mid });
-        requestSnapshotRef.current?.(mid);
-      });
-    };
     const onUpsert = (payload) => queueUpsertRef.current?.(payload);
     const onRemove = (payload) => {
       const id = String(payload?.id ?? payload?._id ?? "");
@@ -442,7 +471,11 @@ export default function RefereeCenterScreen() {
       }
     };
     const lastRefillAtRef = { current: 0 };
-    const onRefilled = () => {
+    const onInvalidate = (payload) => {
+      const tournamentId = String(payload?.tournamentId || "").trim();
+      if (tournamentId && !tournamentIdsRef.current.has(tournamentId)) {
+        return;
+      }
       const now = Date.now();
       if (now - lastRefillAtRef.current < 800) return;
       lastRefillAtRef.current = now;
@@ -452,13 +485,21 @@ export default function RefereeCenterScreen() {
 
     const applyDirectMerge = (raw) => {
       const mp = liveMapRef.current;
-      const incRaw = raw?.data ?? raw?.match ?? raw;
-      const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
+      const id = getMatchPayloadId(raw);
       if (!id) return;
       const _id = String(id);
       const cur = mp.get(_id);
 
-      const inc = { ...(incRaw || {}), _id };
+      if (isLightweightMatchPayload(raw)) {
+        requestSnapshotRef.current?.(_id);
+        return;
+      }
+
+      const incRaw = raw?.data ?? raw?.match ?? raw;
+      const inc = normalizeMatchDisplay(
+        { ...(incRaw || {}), _id },
+        cur || displaySourceRef.current
+      );
       if (Array.isArray(inc.scores) && !inc.gameScores)
         inc.gameScores = inc.scores;
       if (inc.score_text && !inc.scoreText) inc.scoreText = inc.score_text;
@@ -466,21 +507,12 @@ export default function RefereeCenterScreen() {
       if (inc.match_status && !inc.status) inc.status = inc.match_status;
       if (inc.updated_at && !inc.updatedAt) inc.updatedAt = inc.updated_at;
 
-      const tNew = Date.parse(inc?.updatedAt ?? inc?.liveAt ?? 0);
-      const tOld = Date.parse(cur?.updatedAt ?? cur?.liveAt ?? 0);
-      const vNew = Number(inc?.liveVersion ?? inc?.version ?? NaN);
-      const vOld = Number(cur?.liveVersion ?? cur?.version ?? NaN);
-
-      let accept = !cur;
-      if (!accept) {
-        if (Number.isFinite(tNew) && Number.isFinite(tOld))
-          accept = tNew >= tOld;
-        else if (Number.isFinite(vNew) && Number.isFinite(vOld))
-          accept = vNew >= vOld;
-      }
+      const accept = !cur || isNewerOrEqualMatchPayload(cur, inc);
 
       if (!accept) return;
-      const next = { ...(cur || {}), ...inc };
+      const next =
+        mergeMatchPayload(cur, inc, cur || displaySourceRef.current) ||
+        normalizeMatchDisplay(inc, cur || displaySourceRef.current);
       mp.set(_id, next);
       setLiveBump((x) => x + 1);
     };
@@ -498,55 +530,24 @@ export default function RefereeCenterScreen() {
       applyDirectMerge(payload);
     };
 
-    socket.on("connect", onConnected);
+    socket.on("tournament:match:update", onUpsert);
     socket.on("match:snapshot", onUpsert);
     socket.on("score:updated", onScoreUpdated);
     socket.on("match:deleted", onRemove);
-    socket.on("draw:refilled", onRefilled);
-    socket.on("bracket:updated", onRefilled);
+    socket.on("tournament:invalidate", onInvalidate);
 
     return () => {
-      socket.off("connect", onConnected);
+      socket.off("tournament:match:update", onUpsert);
       socket.off("match:snapshot", onUpsert);
       socket.off("score:updated", onScoreUpdated);
       socket.off("match:deleted", onRemove);
-      socket.off("draw:refilled", onRefilled);
-      socket.off("bracket:updated", onRefilled);
+      socket.off("tournament:invalidate", onInvalidate);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
   }, [socket, refetchMatches, refetchBrackets]);
-
-  // Join ALL matches
-  const allMatchIds = useMemo(
-    () => (allMatches || []).map((m) => String(m?._id)).filter(Boolean),
-    [allMatches]
-  );
-  useEffect(() => {
-    if (!socket) return;
-    const cur = joinedMatchesRef.current;
-
-    allMatchIds.forEach((mid) => {
-      if (!cur.has(mid)) {
-        socket.emit("match:join", { matchId: mid });
-        requestSnapshot(mid);
-        cur.add(mid);
-      }
-    });
-    cur.forEach((mid) => {
-      if (!allMatchIds.includes(mid)) {
-        socket.emit("match:leave", { matchId: mid });
-        cur.delete(mid);
-      }
-    });
-
-    return () => {
-      cur.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
-      cur.clear();
-    };
-  }, [socket, allMatchIds, requestSnapshot]);
 
   // Matches đã merge realtime (chỉ của giải hiện tại)
   const mergedAllMatches = useMemo(() => {
