@@ -173,31 +173,8 @@ function ExpoGoVideo({
   );
 }
 
-function NativeVideo({
-  source,
-  style,
-  shouldPlay,
-  useNativeControls,
-  resizeMode,
-  onLoad,
-  onPlaybackStatusUpdate,
-}: CompatVideoProps) {
-  const { Video } = require("expo-av");
-  return (
-    <Video
-      style={style}
-      source={source}
-      useNativeControls={useNativeControls}
-      shouldPlay={shouldPlay}
-      resizeMode={resizeMode}
-      onLoad={onLoad}
-      onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-    />
-  );
-}
-
 export function CompatVideo(props: CompatVideoProps) {
-  return isExpoGo ? <ExpoGoVideo {...props} /> : <NativeVideo {...props} />;
+  return <ExpoGoVideo {...props} />;
 }
 
 export function useCompatSfx<SfxKey extends string>(
@@ -216,64 +193,31 @@ export function useCompatSfx<SfxKey extends string>(
 
     (async () => {
       try {
-        if (isExpoGo) {
-          const { createAudioPlayer, setAudioModeAsync } = require("expo-audio");
-          await setAudioModeAsync({
-            playsInSilentMode: true,
-            interruptionMode: "mixWithOthers",
-            shouldPlayInBackground: false,
-          });
-
-          const nextPlayers = {} as Record<SfxKey, any>;
-          for (const key of Object.keys(sourcesRef.current) as SfxKey[]) {
-            const player = createAudioPlayer(sourcesRef.current[key]);
-            player.volume = volume;
-            nextPlayers[key] = player;
-          }
-
-          if (cancelled) {
-            for (const key of Object.keys(nextPlayers) as SfxKey[]) {
-              try {
-                nextPlayers[key]?.remove?.();
-              } catch {}
-            }
-            return;
-          }
-
-          playersRef.current = nextPlayers;
-          return;
-        }
-
-        const { Audio } = require("expo-av");
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          allowsRecordingIOS: true,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-          staysActiveInBackground: false,
+        const { createAudioPlayer, setAudioModeAsync } = require("expo-audio");
+        await setAudioModeAsync({
+          allowsRecording: false,
+          interruptionMode: "duckOthers",
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
+          shouldRouteThroughEarpiece: false,
         });
 
-        const nextSounds = {} as Record<SfxKey, any>;
+        const nextPlayers = {} as Record<SfxKey, any>;
         for (const key of Object.keys(sourcesRef.current) as SfxKey[]) {
-          const { sound } = await Audio.Sound.createAsync(
-            sourcesRef.current[key],
-            {
-              volume,
-              isLooping: false,
-              shouldPlay: false,
-            }
-          );
+          const player = createAudioPlayer(sourcesRef.current[key], {
+            keepAudioSessionActive: true,
+          });
+          player.loop = false;
+          player.volume = volume;
           if (cancelled) {
-            await sound.unloadAsync();
+            player.remove();
             continue;
           }
-          nextSounds[key] = sound;
+          nextPlayers[key] = player;
         }
 
         if (!cancelled) {
-          playersRef.current = nextSounds;
+          playersRef.current = nextPlayers;
         }
       } catch {
         // Intentionally ignore sound initialization errors.
@@ -288,11 +232,7 @@ export function useCompatSfx<SfxKey extends string>(
       (async () => {
         for (const key of Object.keys(currentPlayers) as SfxKey[]) {
           try {
-            if (isExpoGo) {
-              currentPlayers[key]?.remove?.();
-            } else {
-              await currentPlayers[key]?.unloadAsync?.();
-            }
+            currentPlayers[key]?.remove?.();
           } catch {}
         }
       })();
@@ -305,23 +245,16 @@ export function useCompatSfx<SfxKey extends string>(
       if (!player) return;
 
       try {
-        if (isExpoGo) {
-          player.volume = volume;
+        player.volume = volume;
+        player.pause?.();
+        await player.seekTo(0);
+        player.play();
+      } catch {
+        try {
+          player.pause?.();
           await player.seekTo(0);
           player.play();
-          return;
-        }
-
-        await player.setVolumeAsync(volume);
-        await player.setPositionAsync(0);
-        await player.playAsync();
-      } catch {
-        if (!isExpoGo) {
-          try {
-            await player.stopAsync();
-            await player.playAsync();
-          } catch {}
-        }
+        } catch {}
       }
     },
     [volume]
