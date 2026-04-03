@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour",
     "slug": "pickletour-app",
-    "version": "1.0.25",
+    "version": "1.0.26",
     "orientation": "default",
     "icon": "./assets/images/icon-circle.png",
     "scheme": "pickletourapp",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "28",
+      "buildNumber": "29",
       "associatedDomains": [
         "applinks:pickletour.vn",
         "applinks:www.pickletour.vn"
@@ -25,6 +25,8 @@
         "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn và nhắc nhở tự động.",
         "NSRemindersUsageDescription": "Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.",
         "NSCalendarsWriteOnlyAccessUsageDescription": "Ứng dụng cần quyền để thêm sự kiện trận đấu vào lịch của bạn.",
+        "NSSupportsLiveActivities": true,
+        "NSSupportsLiveActivitiesFrequentUpdates": true,
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
@@ -123,6 +125,7 @@
             "enableMinifyInReleaseBuilds": true
           },
           "ios": {
+            "deploymentTarget": "16.1",
             "useFrameworks": "static"
           }
         }

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { useSelector } from "react-redux";
@@ -12,32 +11,11 @@ import {
   loadExpoNotifications,
   notificationsRequireNativeBuild,
 } from "@/lib/expoNotifications";
+import {
+  getOrCreatePushDeviceId,
+} from "@/services/deviceIdentity";
 import { useRegisterPushTokenMutation } from "@/slices/pushApiSlice";
-
-export const LEGACY_DEVICE_ID_KEY = "PT_DEVICE_ID";
-export const DEVICE_ID_KEY = "deviceId";
 export const PUSH_TOKEN_KEY = "pushToken";
-
-async function getOrCreateDeviceId() {
-  let id = await SecureStore.getItemAsync(DEVICE_ID_KEY);
-  if (id) return id;
-
-  const legacy = await SecureStore.getItemAsync(LEGACY_DEVICE_ID_KEY);
-  if (legacy) {
-    await SecureStore.setItemAsync(DEVICE_ID_KEY, legacy);
-    return legacy;
-  }
-
-  const bytes = await Crypto.getRandomBytesAsync(16);
-  id = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  await Promise.all([
-    SecureStore.setItemAsync(DEVICE_ID_KEY, id),
-    SecureStore.setItemAsync(LEGACY_DEVICE_ID_KEY, id),
-  ]);
-  return id;
-}
 
 export function useExpoPushToken() {
   const [expoPushToken, setToken] = useState<string | null>(null);
@@ -50,7 +28,7 @@ export function useExpoPushToken() {
       if (!auth?._id) return;
 
       try {
-        const deviceId = await getOrCreateDeviceId();
+        const deviceId = await getOrCreatePushDeviceId();
         const appVersion = `${Application.nativeApplicationVersion ?? "0"}.${
           Application.nativeBuildVersion ?? "0"
         }`;

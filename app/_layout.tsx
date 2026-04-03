@@ -42,6 +42,7 @@ import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import { loadExpoNotifications } from "@/lib/expoNotifications";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
+import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
@@ -1055,10 +1056,13 @@ function RootLayout() {
         });
       }
 
-      // Ignore the Expo dev-server root URL on cold start.
+      // Ignore Expo / Dev Client bootstrap URLs on cold start.
       if (
-        /^exp(s)?$/i.test(String(scheme || "")) &&
-        (!path || path === "/" || path === "--" || path === "--/")
+        (
+          /^exp(s)?$/i.test(String(scheme || "")) ||
+          String(hostname || "").toLowerCase() === "expo-development-client"
+        ) &&
+        (!path || path === "/" || path === "--" || path === "--/" || path === "expo-development-client")
       ) {
         return null;
       }
@@ -1160,6 +1164,7 @@ function RootLayout() {
           <SocketProvider>
             <Boot>
               <AuthSessionSync />
+              <MatchLiveActivityBootstrap />
               <SafeAreaProvider>
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}

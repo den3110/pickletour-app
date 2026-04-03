@@ -19,6 +19,33 @@ export const pushApiSlice = apiSlice.injectEndpoints({
       }),
     }),
 
+    syncLiveActivities: builder.mutation<
+      {
+        ok: boolean;
+        registeredCount?: number;
+        activeCount?: number;
+        disabledCount?: number;
+      },
+      {
+        deviceId: string;
+        platform?: "ios";
+        appVersion?: string;
+        activities: {
+          matchId: string;
+          activityId: string;
+          pushToken?: string | null;
+          status?: string | null;
+          matchCode?: string | null;
+        }[];
+      }
+    >({
+      query: (body) => ({
+        url: "/api/push/me/live-activities/sync",
+        method: "POST",
+        body,
+      }),
+    }),
+
     // dùng khi muốn “tắt” token của thiết bị hiện tại lúc logout
     unregisterPushToken: builder.mutation<
       { ok: boolean; matched?: number; modified?: number },
@@ -46,6 +73,7 @@ export const pushApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useRegisterPushTokenMutation,
+  useSyncLiveActivitiesMutation,
   useUnregisterPushTokenMutation,
   useUnregisterAllMyTokensMutation,
 } = pushApiSlice;

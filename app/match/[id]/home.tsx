@@ -19,6 +19,7 @@ import Toast from "react-native-toast-message";
 import { useGetMatchPublicQuery } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import MatchContent from "@/components/match/MatchContent";
+import { useMatchLiveActivity } from "@/hooks/useMatchLiveActivity";
 import {
   getPlayerDisplayName,
   normalizeMatchDisplay,
@@ -100,6 +101,13 @@ export default function MatchHomePage() {
   // Chuẩn hoá object trận từ API
   const match = useMemo(() => normalizeMatchDisplay(data) ?? null, [data]);
   const title = useMemo(() => buildVsTitle(match), [match]);
+
+  useMatchLiveActivity(match, {
+    enabled: Boolean(match?._id),
+    cleanupOnUnmount: false,
+    preserveLiveOnUnmount: true,
+    source: "match-home",
+  });
 
   // Refresh thủ công
   const onRefresh = useCallback(async () => {

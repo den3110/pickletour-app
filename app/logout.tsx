@@ -6,15 +6,18 @@ import { useDispatch } from "react-redux";
 import * as SecureStore from "expo-secure-store";
 
 import { logout as logoutAction } from "@/slices/authSlice";
-import apiSlice from "@/slices/apiSlice";
 import { useLogoutMutation } from "@/slices/usersApiSlice";
-import { useUnregisterPushTokenMutation } from "@/slices/pushApiSlice";
-import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
+import {
+  useSyncLiveActivitiesMutation,
+  useUnregisterPushTokenMutation,
+} from "@/slices/pushApiSlice";
+import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
 
 export default function LogoutScreen() {
   const dispatch = useDispatch();
   const [logoutApi] = useLogoutMutation();
   const [unregisterDeviceToken] = useUnregisterPushTokenMutation();
+  const [syncLiveActivities] = useSyncLiveActivitiesMutation();
   const once = useRef(false);
 
   useEffect(() => {
@@ -26,6 +29,13 @@ export default function LogoutScreen() {
         try {
           const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
           if (deviceId) {
+            if (Platform.OS === "ios") {
+              await syncLiveActivities({
+                deviceId,
+                platform: "ios",
+                activities: [],
+              }).unwrap();
+            }
             await unregisterDeviceToken({ deviceId }).unwrap();
           }
         } catch (e) {
@@ -53,7 +63,7 @@ export default function LogoutScreen() {
       }
     };
     run();
-  }, [dispatch, logoutApi, unregisterDeviceToken]);
+  }, [dispatch, logoutApi, syncLiveActivities, unregisterDeviceToken]);
 
   return (
     <>
