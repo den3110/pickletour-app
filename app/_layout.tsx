@@ -1043,19 +1043,28 @@ function RootLayout() {
   const parseDeepLink = React.useCallback((url: string) => {
     try {
       const parsed = Linking.parse(url);
-      const { hostname, path, queryParams } = parsed;
+      const { hostname, path, queryParams, scheme } = parsed;
 
       if (__DEV__) {
         console.log("🔗 Deep Link Parsed:", {
           url,
+          scheme,
           hostname,
           path,
           queryParams,
         });
       }
 
+      // Ignore the Expo dev-server root URL on cold start.
+      if (
+        /^exp(s)?$/i.test(String(scheme || "")) &&
+        (!path || path === "/" || path === "--" || path === "--/")
+      ) {
+        return null;
+      }
+
       const resolved = resolvePikoraNavigationTarget(url);
-      return resolved.internalPath || "/(tabs)";
+      return resolved.internalPath || null;
     } catch (error) {
       console.error("Deep Link Parse Error:", error);
       return null;

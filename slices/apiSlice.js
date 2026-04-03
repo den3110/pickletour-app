@@ -294,6 +294,7 @@ const baseQuery = async (args, api, extraOptions) => {
   }
 
   if (status === 404) {
+    console.log(result)
     const requestMeta = describeBaseQueryArgs(args);
     console.warn("[apiSlice][404]", {
       endpoint: api?.endpoint,

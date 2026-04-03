@@ -234,6 +234,38 @@ function normalizeCustomScheme(rawValue: string) {
   return normalizeBrowserPath(path);
 }
 
+function normalizeExpoDevLink(rawValue: string) {
+  try {
+    const parsed = Linking.parse(rawValue);
+    const rawPath = String(parsed.path || "").replace(/^\/+/, "");
+    const normalizedPath = rawPath.replace(/^--\/?/, "");
+
+    if (!normalizedPath) {
+      return null;
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(parsed.queryParams || {}).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item != null) params.append(key, String(item));
+        });
+        return;
+      }
+
+      if (value != null) {
+        params.set(key, String(value));
+      }
+    });
+
+    const query = params.toString();
+    const nextPath = `/${normalizedPath}${query ? `?${query}` : ""}`;
+    return normalizeBrowserPath(nextPath);
+  } catch {
+    return null;
+  }
+}
+
 export function resolvePikoraNavigationTarget(
   target?: string | null,
 ): NavigationResolution {
@@ -245,6 +277,13 @@ export function resolvePikoraNavigationTarget(
   if (/^pickletour:\/\//i.test(value)) {
     return {
       internalPath: normalizeCustomScheme(value),
+      externalUrl: null,
+    };
+  }
+
+  if (/^exp(s)?:\/\//i.test(value)) {
+    return {
+      internalPath: normalizeExpoDevLink(value),
       externalUrl: null,
     };
   }
