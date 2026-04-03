@@ -8,24 +8,22 @@ import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 
 // ================= Base URL =================
-const PROD_API_URL = "https://pickletour.vn/api";
-const DEV_API_URL = "http://192.168.0.105:5001";
 
-function normalizeBaseUrl(v) {
-  if (typeof v !== "string") return "";
-  return v
-    .trim()
-    .replace(/^['"]+|['"]+$/g, "")
-    .replace(/\/+$/, "");
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+function describeBaseQueryArgs(args) {
+  if (typeof args === "string") {
+    return { url: args, method: "GET" };
+  }
+  if (args && typeof args === "object") {
+    return {
+      url: typeof args.url === "string" ? args.url : "",
+      method: String(args.method || "GET").toUpperCase(),
+      params: args.params,
+    };
+  }
+  return { url: "", method: "GET" };
 }
-
-const configuredBaseUrl = normalizeBaseUrl(
-  process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.API_URL
-);
-
-const BASE_URL =
-  configuredBaseUrl ||
-  (process.env.NODE_ENV === "development" ? DEV_API_URL : PROD_API_URL);
 
 // ============== Helpers ==============
 const generateRequestId = () => {
@@ -57,7 +55,7 @@ function sanitizeHeaderValue(v, max = 120) {
 
 // Cache deviceId để không gọi SecureStore nhiều lần
 let _deviceIdCache = null;
-async function getDeviceId() {
+export async function getDeviceId() {
   if (_deviceIdCache) return _deviceIdCache;
   let id = await SecureStore.getItemAsync("deviceId");
   if (!id) {
@@ -70,7 +68,7 @@ async function getDeviceId() {
 
 // Cache deviceName (tên người dùng đặt cho máy)
 let _deviceNameCache = null;
-async function getDeviceName() {
+export async function getDeviceName() {
   if (_deviceNameCache) return _deviceNameCache;
   try {
     let name = Device.deviceName ?? null;
@@ -86,7 +84,7 @@ async function getDeviceName() {
     return name;
   } catch {
     const fallback = sanitizeHeaderValue(
-      Device.modelName || String(Platform.OS)
+      Device.modelName || String(Platform.OS),
     );
     _deviceNameCache = fallback;
     return fallback;
@@ -112,7 +110,7 @@ function getDetailedDeviceFields() {
 
   const brand = sanitizeHeaderValue(brandRaw);
   let modelName = sanitizeHeaderValue(
-    Platform.OS === "android" ? modelNameRaw.replace(/_/g, " ") : modelNameRaw
+    Platform.OS === "android" ? modelNameRaw.replace(/_/g, " ") : modelNameRaw,
   );
   const modelId = sanitizeHeaderValue(modelIdRaw, 60);
 
@@ -275,15 +273,6 @@ function redirectTo404() {
   }
 }
 
-function redirectTo403() {
-  try {
-    router.replace("/403");
-  } catch (e) {
-    console.log("redirectTo403 error:", e);
-    router.replace("/(tabs)");
-  }
-}
-
 // ============== Wrapper baseQuery (xử lý status) ==============
 const baseQuery = async (args, api, extraOptions) => {
   const result = await rawBaseQuery(args, api, extraOptions);
@@ -304,8 +293,24 @@ const baseQuery = async (args, api, extraOptions) => {
     return result;
   }
 
-  if (status === 404 && !extraOptions?.skip404Redirect) {
-    redirectTo404();
+  if (status === 404) {
+    const requestMeta = describeBaseQueryArgs(args);
+    console.warn("[apiSlice][404]", {
+      endpoint: api?.endpoint,
+      type: api?.type,
+      url: requestMeta.url,
+      method: requestMeta.method,
+      params: requestMeta.params,
+      error: result?.error?.data || result?.error,
+    });
+
+    if (__DEV__) {
+      return result;
+    }
+
+    if (!extraOptions?.skip404Redirect) {
+      redirectTo404();
+    }
   }
 
   if (status === 426) {
@@ -333,6 +338,7 @@ export const apiSlice = createApi({
     "Match",
     "ADMIN_BRACKETS",
     "ADMIN_MATCHES",
+    "REFEREE_MATCHES",
     "TournamentMatches",
     "MyTournaments",
     "Matches",
@@ -374,6 +380,13 @@ export const apiSlice = createApi({
     "Head2Head",
     "PlayerStats",
     "FrequentOpponents",
+    "LiveCluster",
+    "LiveCourt",
+    "LiveMatches",
+    "LiveMatch",
+    "TournamentCourtClusters",
+    "TournamentCourtClusterRuntime",
+    "CourtClusterRuntime",
   ],
   endpoints: () => ({}),
 });

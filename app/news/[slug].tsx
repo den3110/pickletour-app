@@ -259,7 +259,8 @@ export default function NewsDetailScreen() {
                   contentWidth={screenWidth - 32}
                   defaultTextProps={{
                     selectable: false,
-                    allowFontScaling: true,
+                    allowFontScaling: false,
+                    maxFontSizeMultiplier: 1,
                   }}
                   baseStyle={{
                     color: text,

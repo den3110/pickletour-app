@@ -1,8 +1,7 @@
-// app/(tabs)/chat.tsx
-
 import React from "react";
-import ChatAssistant from "@/components/chatbot/ChatAssistant";
+
+import PikoraScreen from "@/components/chatbot/PikoraScreen";
 
 export default function ChatScreen() {
-  return <ChatAssistant />;
+  return <PikoraScreen />;
 }

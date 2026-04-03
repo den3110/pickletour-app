@@ -1,665 +1,910 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-  memo,
-} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Platform,
-  Keyboard,
   ActivityIndicator,
-  SafeAreaView,
-  KeyboardAvoidingView,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
   useColorScheme,
-  Animated,
-  Easing,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-
-import LiveMatchCard from "./LiveMatchCard";
-import { useGetLiveMatchesQuery } from "@/slices/liveApiSlice";
-import FiltersBottomSheet from "./FiltersModal";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useSocket } from "@/context/SocketContext";
-import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 
-const LIMIT = 12;
-const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
-const REALTIME_REFETCH_MIN_GAP_MS = 1500;
+import LiveMatchesFeed from "./LiveMatchesFeed";
+import LiveMatchCard from "./LiveMatchCard";
+import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
+import {
+  useGetLiveClusterQuery,
+  useGetLiveClustersQuery,
+  useGetLiveMatchesQuery,
+} from "@/slices/liveApiSlice";
+import {
+  buildStationSearchText,
+  getLiveMatchSubtitle,
+  getLiveMatchTitle,
+  getLiveStatusLabel,
+  groupMatchesByTournament,
+  mergeUniqueMatches,
+  sid,
+} from "./liveUtils";
 
-function normalizeTournamentId(value) {
-  if (!value) return "";
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value).trim();
-  }
-  if (typeof value === "object") {
-    return String(value?._id || value?.id || "").trim();
-  }
-  return "";
-}
+const SEGMENTS = [
+  { key: "clusters", label: "Cụm sân", icon: "apps-outline" },
+  { key: "live", label: "Đang phát", icon: "radio-outline" },
+  { key: "archive", label: "Đã live", icon: "albums-outline" },
+];
+const ARCHIVE_LIMIT = 12;
 
 function useThemeTokens() {
   const navTheme = useTheme?.();
   const sysScheme = useColorScheme?.() ?? "light";
   const isDark = typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
 
-  return useMemo(
-    () => ({
-      scheme: isDark ? "dark" : "light",
-      tint: navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff"),
-      textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a"),
-      textSecondary: isDark ? "#d1d1d1" : "#475569",
-      placeholder: isDark ? "#9aa4b2" : "#94a3b8",
-      pageBg: navTheme?.colors?.background ?? (isDark ? "#0b0c0f" : "#f6f7fb"),
-      cardBg: navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff"),
-      cardBorder: navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e5e7eb"),
-      chip: {
-        bg: isDark ? "rgba(199,210,254,0.16)" : "#e3f2fd",
-        text: isDark ? "#e0e7ff" : "#1976d2",
-      },
-      skeleton: {
-        base: isDark ? "#1a1c20" : "#e9eef5",
-        shine: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.55)",
-      },
-    }),
-    [isDark, navTheme]
-  );
+  return {
+    isDark,
+    tint: navTheme?.colors?.primary ?? (isDark ? "#6ee7d8" : "#0f766e"),
+    textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#102a26"),
+    textSecondary: isDark ? "#b8c4c2" : "#5b6f6a",
+    pageBg: navTheme?.colors?.background ?? (isDark ? "#091513" : "#f5f3ec"),
+    cardBg: navTheme?.colors?.card ?? (isDark ? "#10201d" : "#fffdf8"),
+    border: navTheme?.colors?.border ?? (isDark ? "#25423d" : "#d9e7e2"),
+    softBg: isDark ? "#17312d" : "#eef6f3",
+    heroStart: isDark ? "#14332d" : "#fff1da",
+    heroEnd: isDark ? "#0d1f1b" : "#dff6ef",
+    highlight: isDark ? "rgba(110,231,216,0.14)" : "rgba(15,118,110,0.1)",
+  };
 }
 
-function useTickingAgo() {
-  const [ts, setTs] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setTs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return ts;
-}
-
-function useDebouncedValue(value, delay = 350) {
+function useDebouncedValue(value: string, delay = 320) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const id = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(id);
-  }, [value, delay]);
+  }, [delay, value]);
   return debounced;
 }
 
-const Shimmer = memo(function Shimmer({ style, shineColor }) {
-  const translate = useRef(new Animated.Value(-1)).current;
-  const widthRef = useRef(300);
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(translate, {
-        toValue: 1,
-        duration: 1200,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [translate]);
-
-  const transformX = translate.interpolate({
-    inputRange: [-1, 1],
-    outputRange: [-widthRef.current, widthRef.current],
-  });
-
-  return (
-    <View
-      style={[{ overflow: "hidden" }, style]}
-      onLayout={(e) => {
-        widthRef.current = e.nativeEvent.layout.width || 300;
-      }}
-    >
-      <Animated.View
-        style={{
-          position: "absolute",
-          left: -widthRef.current,
-          top: 0,
-          bottom: 0,
-          width: widthRef.current * 2,
-          transform: [{ translateX: transformX }],
-        }}
-      >
-        <LinearGradient
-          colors={["transparent", shineColor, "transparent"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ flex: 1 }}
-        />
-      </Animated.View>
-    </View>
-  );
-});
-
-const SkeletonCard = memo(function SkeletonCard({ T }) {
-  return (
-    <View style={[styles.skelCard, { backgroundColor: T.cardBg, borderColor: T.cardBorder }]}>
-      <View
-        style={{
-          width: "100%",
-          aspectRatio: 16 / 9,
-          backgroundColor: T.skeleton.base,
-          overflow: "hidden",
-        }}
-      >
-        <Shimmer style={{ flex: 1 }} shineColor={T.skeleton.shine} />
-      </View>
-      <View style={{ padding: 12 }}>
-        <View
-          style={{
-            width: "60%",
-            height: 16,
-            backgroundColor: T.skeleton.base,
-            borderRadius: 4,
-            overflow: "hidden",
-          }}
-        >
-          <Shimmer style={{ flex: 1 }} shineColor={T.skeleton.shine} />
-        </View>
-        <View
-          style={{
-            width: "40%",
-            height: 12,
-            backgroundColor: T.skeleton.base,
-            borderRadius: 4,
-            marginTop: 8,
-            overflow: "hidden",
-          }}
-        >
-          <Shimmer style={{ flex: 1 }} shineColor={T.skeleton.shine} />
-        </View>
-      </View>
-    </View>
-  );
-});
-
-const Header = memo(function Header({
-  keyword,
-  setKeyword,
-  onOpenFilters,
-  onManualRefresh,
-  isFetching,
-  isManualRefreshing,
-  activeFilters,
-  total,
-  updatedAgoSec,
-  statuses,
-  excludeFinished,
-  windowHours,
-  autoRefresh,
-  refreshSec,
-  isBack,
-  T,
-}) {
-  return (
-    <View style={styles.header}>
-      <View style={styles.headerTopRow}>
-        {isBack && (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={22} color={T.textPrimary} />
-          </TouchableOpacity>
-        )}
-        <Text style={[styles.headerTitle, { color: T.textPrimary }]}>Trận trực tiếp</Text>
-      </View>
-
-      <View style={[styles.searchBar, { backgroundColor: T.cardBg, borderColor: T.cardBorder }]}>
-        <Ionicons name="search" size={18} color={T.placeholder} style={{ marginRight: 8 }} />
-        <TextInput
-          style={[styles.searchInput, { color: T.textPrimary }]}
-          value={keyword}
-          onChangeText={setKeyword}
-          placeholder="Tìm mã trận, sân..."
-          placeholderTextColor={T.placeholder}
-          returnKeyType="search"
-        />
-        {keyword.length > 0 && (
-          <TouchableOpacity onPress={() => setKeyword("")} style={styles.clearBtn}>
-            <Text style={[styles.clearBtnText, { color: T.textSecondary }]}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.filterBtn, { backgroundColor: T.cardBg, borderColor: T.cardBorder }]}
-          onPress={onOpenFilters}
-        >
-          <Text style={[styles.iconText, { color: T.textPrimary }]}>⚙️</Text>
-          <Text style={[styles.filterBtnText, { color: T.textPrimary }]}>
-            Bộ lọc {activeFilters > 0 ? `(${activeFilters})` : ""}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.refreshBtn, { backgroundColor: T.cardBg, borderColor: T.cardBorder }]}
-          onPress={onManualRefresh}
-          disabled={isFetching && isManualRefreshing}
-        >
-          {isFetching && isManualRefreshing ? (
-            <ActivityIndicator size="small" color={T.tint} />
-          ) : (
-            <Text style={[styles.iconText, { color: T.textPrimary }]}>🔄</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.statsRow}>
-        <Text style={[styles.statsText, { color: T.textSecondary }]}>
-          ▶️ {total} luồng • cập nhật {updatedAgoSec}s trước
-        </Text>
-      </View>
-
-      {activeFilters > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsRow}
-          contentContainerStyle={styles.chipsContent}
-        >
-          {statuses.length !== STATUS_OPTIONS.length && (
-            <View style={[styles.chip, { backgroundColor: T.chip.bg }]}>
-              <Text style={[styles.chipText, { color: T.chip.text }]} numberOfLines={1}>
-                Trạng thái: {statuses.join(", ")}
-              </Text>
-            </View>
-          )}
-          {windowHours !== 8 && (
-            <View style={[styles.chip, { backgroundColor: T.chip.bg }]}>
-              <Text style={[styles.chipText, { color: T.chip.text }]}>Cửa sổ: {windowHours}h</Text>
-            </View>
-          )}
-          {!excludeFinished && (
-            <View style={[styles.chip, { backgroundColor: T.chip.bg }]}>
-              <Text style={[styles.chipText, { color: T.chip.text }]}>Gồm finished</Text>
-            </View>
-          )}
-          {(!autoRefresh || refreshSec !== 15) && (
-            <View style={[styles.chip, { backgroundColor: T.chip.bg }]}>
-              <Text style={[styles.chipText, { color: T.chip.text }]}>
-                Auto: {autoRefresh ? `${refreshSec}s` : "Tắt"}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      )}
-    </View>
-  );
-});
-
-export default function LiveMatchesScreen({ isBack = false }) {
+export default function LiveMatchesScreen({ isBack = false }: { isBack?: boolean }) {
   const T = useThemeTokens();
-  const insets = useSafeAreaInsets();
-  const bottomSheetRef = useRef(null);
-  const socket = useSocket();
-  const realtimeRefetchTimerRef = useRef(null);
-  const lastRealtimeRefetchAtRef = useRef(0);
+  const [segment, setSegment] = useState("clusters");
+  const [selectedClusterId, setSelectedClusterId] = useState("");
+  const [selectedStation, setSelectedStation] = useState<any>(null);
 
-  const [keyword, setKeyword] = useState("");
-  const debouncedKeyword = useDebouncedValue(keyword, 350);
-
-  const [statuses, setStatuses] = useState([...STATUS_OPTIONS]);
-  const [excludeFinished, setExcludeFinished] = useState(true);
-  const [windowHours, setWindowHours] = useState(8);
-  const [page, setPage] = useState(1);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshSec, setRefreshSec] = useState(15);
-  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-
-  const qArgs = useMemo(() => {
-    const filteredStatuses = excludeFinished
-      ? statuses.filter((s) => s !== "finished")
-      : statuses;
-
-    const args = {
-      keyword: debouncedKeyword,
-      page,
-      limit: LIMIT,
-      statuses: filteredStatuses.join(","),
-      windowMs: windowHours * 3600 * 1000,
-    };
-    if (!excludeFinished) args.excludeFinished = false;
-    return args;
-  }, [debouncedKeyword, page, statuses, excludeFinished, windowHours]);
-
-  const { data, isLoading, isFetching, refetch } = useGetLiveMatchesQuery(qArgs, {
-    refetchOnFocus: false,
+  const {
+    data: clusters = [],
+    isFetching: isFetchingClusters,
+    refetch: refetchClusters,
+  } = useGetLiveClustersQuery(undefined, {
+    pollingInterval: 15000,
+    refetchOnFocus: true,
     refetchOnReconnect: true,
   });
 
-  const items = useMemo(() => {
-    const raw = Array.isArray(data?.items) ? data.items : [];
-    return raw.map((m) => ({ ...m, matchId: m.matchId || m._id }));
-  }, [data?.items]);
-  const tournamentRoomIds = useMemo(() => {
-    const ids = new Set();
-
-    if (qArgs?.tournamentId) {
-      const id = normalizeTournamentId(qArgs.tournamentId);
-      if (id) ids.add(id);
-    }
-
-    const buckets = Array.isArray(data?.tournaments) ? data.tournaments : [];
-    for (const bucket of buckets) {
-      const id = normalizeTournamentId(bucket?._id || bucket?.id);
-      if (id) ids.add(id);
-    }
-
-    for (const item of items) {
-      const id = normalizeTournamentId(item?.tournament?._id || item?.tournament);
-      if (id) ids.add(id);
-    }
-
-    return Array.from(ids);
-  }, [data?.tournaments, items, qArgs?.tournamentId]);
-  const tournamentRoomIdsKey = useMemo(
-    () => tournamentRoomIds.join("|"),
-    [tournamentRoomIds]
-  );
-
-  const total = data?.count ?? items.length;
-
-  const tick = useTickingAgo();
-  const lastFetchRef = useRef(Date.now());
-  useEffect(() => {
-    if (!isFetching) {
-      lastFetchRef.current = Date.now();
-      setIsManualRefreshing(false);
-    }
-  }, [isFetching]);
-
-  const updatedAgoSec = Math.max(0, Math.floor((tick - lastFetchRef.current) / 1000));
-
-  const activeFilters = useMemo(
-    () =>
-      (statuses.length !== STATUS_OPTIONS.length ? 1 : 0) +
-      (excludeFinished ? 0 : 1) +
-      (windowHours !== 8 ? 1 : 0) +
-      (!autoRefresh || refreshSec !== 15 ? 1 : 0),
-    [statuses.length, excludeFinished, windowHours, autoRefresh, refreshSec]
-  );
-
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const id = setInterval(() => refetch(), Math.max(5, refreshSec) * 1000);
-    return () => clearInterval(id);
-  }, [autoRefresh, refreshSec, refetch]);
-
-  const scheduleRealtimeRefetch = useCallback(
-    (delayMs = 250) => {
-      const now = Date.now();
-      const gapMs = Math.max(
-        0,
-        REALTIME_REFETCH_MIN_GAP_MS - (now - lastRealtimeRefetchAtRef.current)
-      );
-      const waitMs = Math.max(delayMs, gapMs);
-
-      if (realtimeRefetchTimerRef.current) return;
-      realtimeRefetchTimerRef.current = setTimeout(() => {
-        realtimeRefetchTimerRef.current = null;
-        lastRealtimeRefetchAtRef.current = Date.now();
-        refetch();
-      }, waitMs);
-    },
-    [refetch]
-  );
-
-  useEffect(
-    () => () => {
-      if (realtimeRefetchTimerRef.current) {
-        clearTimeout(realtimeRefetchTimerRef.current);
-        realtimeRefetchTimerRef.current = null;
-      }
-    },
-    []
-  );
-
-  useSocketRoomSet(socket, tournamentRoomIds, {
-    subscribeEvent: "tournament:subscribe",
-    unsubscribeEvent: "tournament:unsubscribe",
-    payloadKey: "tournamentId",
+  const {
+    data: clusterDetail,
+    isFetching: isFetchingCluster,
+    refetch: refetchCluster,
+  } = useGetLiveClusterQuery(selectedClusterId, {
+    skip: !selectedClusterId,
+    pollingInterval: 5000,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
-    if (!socket) return;
+    if (!clusters.length) {
+      setSelectedClusterId("");
+      return;
+    }
 
-    const onTournamentMatchUpdate = (payload = {}) => {
-      const type = String(payload?.type || "").trim().toLowerCase();
-      if (type.startsWith("score:") || type.startsWith("serve:")) return;
+    setSelectedClusterId((prev) =>
+      prev && clusters.some((cluster: any) => sid(cluster) === prev) ? prev : sid(clusters[0])
+    );
+  }, [clusters]);
 
-      const tournamentId = normalizeTournamentId(
-        payload?.tournamentId ||
-          payload?.data?.tournament?._id ||
-          payload?.data?.tournament
-      );
-      if (
-        tournamentId &&
-        tournamentRoomIds.length > 0 &&
-        !tournamentRoomIds.includes(tournamentId)
-      ) {
-        return;
-      }
+  useEffect(() => {
+    if (!selectedStation) return;
+    const stations = Array.isArray(clusterDetail?.stations) ? clusterDetail.stations : [];
+    const refreshed = stations.find((station: any) => sid(station) === sid(selectedStation));
+    if (refreshed) setSelectedStation(refreshed);
+  }, [clusterDetail?.stations, selectedStation]);
 
-      scheduleRealtimeRefetch();
-    };
-
-    const onTournamentInvalidate = (payload = {}) => {
-      const tournamentId = normalizeTournamentId(payload?.tournamentId);
-      if (
-        tournamentId &&
-        tournamentRoomIds.length > 0 &&
-        !tournamentRoomIds.includes(tournamentId)
-      ) {
-        return;
-      }
-      scheduleRealtimeRefetch(150);
-    };
-
-    const onConnect = () => {
-      if (tournamentRoomIds.length > 0) {
-        scheduleRealtimeRefetch(150);
-      }
-    };
-
-    socket.on("tournament:match:update", onTournamentMatchUpdate);
-    socket.on("tournament:invalidate", onTournamentInvalidate);
-    socket.on("connect", onConnect);
-
-    return () => {
-      socket.off("tournament:match:update", onTournamentMatchUpdate);
-      socket.off("tournament:invalidate", onTournamentInvalidate);
-      socket.off("connect", onConnect);
-    };
-  }, [socket, scheduleRealtimeRefetch, tournamentRoomIds, tournamentRoomIdsKey]);
-
-  const handleOpenFilters = useCallback(() => {
-    Keyboard.dismiss();
-    bottomSheetRef.current?.expand?.();
-  }, []);
-
-  const handleManualRefresh = useCallback(() => {
-    setIsManualRefreshing(true);
-    refetch();
-  }, [refetch]);
-
-  const applyFilters = useCallback((filters) => {
-    setStatuses(filters.statuses);
-    setExcludeFinished(filters.excludeFinished);
-    setWindowHours(filters.windowHours);
-    setAutoRefresh(filters.autoRefresh);
-    setRefreshSec(filters.refreshSec);
-    setPage(1);
-    bottomSheetRef.current?.close?.();
-  }, []);
-
-  const handlePullToRefresh = useCallback(() => {
-    setIsManualRefreshing(true);
-    refetch();
-  }, [refetch]);
-
-  const renderItem = useCallback(({ item }) => <LiveMatchCard item={item} />, []);
-
-  const keyExtractor = useCallback((item) => item.matchId || item._id, []);
-
-  const headerEl = useMemo(
-    () => (
-      <Header
-        keyword={keyword}
-        setKeyword={setKeyword}
-        onOpenFilters={handleOpenFilters}
-        onManualRefresh={handleManualRefresh}
-        isFetching={isFetching}
-        isManualRefreshing={isManualRefreshing}
-        activeFilters={activeFilters}
-        total={total}
-        updatedAgoSec={updatedAgoSec}
-        statuses={statuses}
-        excludeFinished={excludeFinished}
-        windowHours={windowHours}
-        autoRefresh={autoRefresh}
-        refreshSec={refreshSec}
-        isBack={isBack}
-        T={T}
-      />
-    ),
-    [
-      keyword,
-      handleOpenFilters,
-      handleManualRefresh,
-      isFetching,
-      isManualRefreshing,
-      activeFilters,
-      total,
-      updatedAgoSec,
-      statuses,
-      excludeFinished,
-      windowHours,
-      autoRefresh,
-      refreshSec,
-      isBack,
-      T,
-    ]
+  const selectedCluster = useMemo(
+    () => clusters.find((cluster: any) => sid(cluster) === selectedClusterId) || null,
+    [clusters, selectedClusterId]
   );
 
-  const showSkeleton = (isLoading || (isFetching && items.length === 0)) && !isManualRefreshing;
-
-  const skeletonEl = useMemo(
-    () => (
-      <View>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonCard key={i} T={T} />
-        ))}
-      </View>
-    ),
-    [T]
+  const totalStations = useMemo(
+    () => clusters.reduce((sum: number, cluster: any) => sum + Number(cluster?.stationsCount || 0), 0),
+    [clusters]
   );
-
-  const renderEmpty = useCallback(
-    () => (
-      <View style={styles.emptyContainer}>
-        <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>Không có trận phù hợp</Text>
-        <Text style={[styles.emptySubtitle, { color: T.textSecondary }]}>
-          Thử điều chỉnh bộ lọc hoặc tìm kiếm khác
-        </Text>
-      </View>
-    ),
-    [T.textPrimary, T.textSecondary]
+  const totalLiveStations = useMemo(
+    () => clusters.reduce((sum: number, cluster: any) => sum + Number(cluster?.liveCount || 0), 0),
+    [clusters]
   );
+  const heroSubtitle = useMemo(() => {
+    if (segment === "clusters") {
+      return "Chọn cụm sân và theo dõi đúng sân vật lý đang lên sóng, giống luồng xem trên web.";
+    }
+    if (segment === "live") {
+      return "Theo dõi luồng đang phát, trận sắp vào sân và các thay đổi được đẩy gần như thời gian thực.";
+    }
+    return "Lọc theo giải đấu để xem lại các trận đã phát có video hoặc stream công khai.";
+  }, [segment]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: T.pageBg }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <FlatList
-          data={items}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          ListHeaderComponent={headerEl}
-          ListEmptyComponent={showSkeleton ? skeletonEl : renderEmpty}
-          onRefresh={handlePullToRefresh}
-          refreshing={isManualRefreshing && isFetching}
-          contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={true}
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          windowSize={10}
-        />
-      </KeyboardAvoidingView>
+    <SafeAreaView style={[styles.screen, { backgroundColor: T.pageBg }]} edges={["top", "left", "right"]}>
+      <View style={styles.chrome}>
+        <LinearGradient
+          colors={[T.heroStart, T.heroEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { borderColor: T.border }]}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroTitleWrap}>
+              {isBack ? (
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  style={[styles.backBtn, { backgroundColor: T.highlight, borderColor: T.border }]}
+                >
+                  <Ionicons name="chevron-back" size={18} color={T.textPrimary} />
+                </TouchableOpacity>
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.eyebrow, { color: T.tint }]}>PickleTour Live</Text>
+                <Text style={[styles.heroTitle, { color: T.textPrimary }]}>Hub xem live trên app</Text>
+              </View>
+            </View>
+          </View>
 
-      <FiltersBottomSheet
-        ref={bottomSheetRef}
-        initial={{ statuses, excludeFinished, windowHours, autoRefresh, refreshSec }}
-        onApply={applyFilters}
+          <Text style={[styles.heroSubtitle, { color: T.textSecondary }]}>{heroSubtitle}</Text>
+
+          <View style={styles.heroStats}>
+            <HeroStat label="Cụm mở" value={String(clusters.length)} T={T} />
+            <HeroStat label="Sân đang live" value={String(totalLiveStations)} T={T} />
+            <HeroStat label="Sân có nội dung" value={String(totalStations)} T={T} />
+          </View>
+        </LinearGradient>
+
+        <View style={[styles.segmentWrap, { backgroundColor: T.softBg, borderColor: T.border }]}>
+          {SEGMENTS.map((item) => {
+            const active = item.key === segment;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                onPress={() => setSegment(item.key)}
+                style={[
+                  styles.segmentBtn,
+                  {
+                    backgroundColor: active ? T.cardBg : "transparent",
+                    borderColor: active ? T.border : "transparent",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={item.icon as any}
+                  size={16}
+                  color={active ? T.textPrimary : T.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    { color: active ? T.textPrimary : T.textSecondary },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.body}>
+        {segment === "clusters" ? (
+          <LiveClustersPane
+            T={T}
+            clusters={clusters}
+            selectedClusterId={selectedClusterId}
+            selectedCluster={selectedCluster}
+            clusterDetail={clusterDetail}
+            isFetchingClusters={isFetchingClusters}
+            isFetchingCluster={isFetchingCluster}
+            onSelectCluster={setSelectedClusterId}
+            onRefresh={() => {
+              refetchClusters();
+              if (selectedClusterId) refetchCluster();
+            }}
+            onOpenStation={setSelectedStation}
+          />
+        ) : null}
+
+        {segment === "live" ? <LiveMatchesFeed /> : null}
+
+        {segment === "archive" ? <LiveArchivePane T={T} /> : null}
+      </View>
+
+      <ResponsiveMatchViewer
+        open={Boolean(selectedStation)}
+        matchId={selectedStation?.currentMatch?._id || ""}
+        onClose={() => setSelectedStation(null)}
       />
     </SafeAreaView>
   );
 }
 
+function LiveClustersPane({
+  T,
+  clusters,
+  selectedClusterId,
+  selectedCluster,
+  clusterDetail,
+  isFetchingClusters,
+  isFetchingCluster,
+  onSelectCluster,
+  onRefresh,
+  onOpenStation,
+}: any) {
+  const [keyword, setKeyword] = useState("");
+
+  const stations = useMemo(() => {
+    const base = Array.isArray(clusterDetail?.stations)
+      ? clusterDetail.stations
+      : Array.isArray(selectedCluster?.stations)
+      ? selectedCluster.stations
+      : [];
+
+    const query = String(keyword || "").trim().toLowerCase();
+    if (!query) return base;
+    return base.filter((station: any) => buildStationSearchText(station).includes(query));
+  }, [clusterDetail?.stations, keyword, selectedCluster?.stations]);
+
+  const summary = useMemo(() => {
+    const total = stations.length;
+    const live = stations.filter((station: any) => String(station?.status || "").toLowerCase() === "live").length;
+    const active = stations.filter((station: any) => Boolean(station?.currentMatch)).length;
+    return { total, live, active };
+  }, [stations]);
+  const refreshing = isFetchingClusters || isFetchingCluster;
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <View style={styles.sectionHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Live theo cụm sân</Text>
+          <Text style={[styles.sectionText, { color: T.textSecondary }]}>
+            Chạm vào một sân để mở viewer bám theo sân đó. Khi trận đổi trên sân, viewer sẽ đi cùng trận mới.
+          </Text>
+        </View>
+        {refreshing ? <ActivityIndicator color={T.tint} /> : null}
+      </View>
+
+      <View style={[styles.searchBar, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+        <Ionicons name="search" size={18} color={T.textSecondary} />
+        <TextInput
+          value={keyword}
+          onChangeText={setKeyword}
+          placeholder="Tìm theo sân, mã trận hoặc giải..."
+          placeholderTextColor={T.textSecondary}
+          style={[styles.searchInput, { color: T.textPrimary }]}
+        />
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clusterRail}>
+        {clusters.map((cluster: any) => {
+          const active = sid(cluster) === selectedClusterId;
+          return (
+            <TouchableOpacity
+              key={sid(cluster)}
+              onPress={() => onSelectCluster(sid(cluster))}
+              style={[
+                styles.clusterCard,
+                {
+                  backgroundColor: active ? T.cardBg : T.softBg,
+                  borderColor: active ? T.tint : T.border,
+                },
+              ]}
+            >
+              <Text style={[styles.clusterName, { color: T.textPrimary }]} numberOfLines={1}>
+                {cluster?.name || "Cụm sân"}
+              </Text>
+              <Text style={[styles.clusterVenue, { color: T.textSecondary }]} numberOfLines={2}>
+                {cluster?.venueName || cluster?.description || "Cụm sân PickleTour"}
+              </Text>
+              <View style={styles.clusterMetaRow}>
+                <Pill label={`${cluster?.stationsCount || 0} sân`} T={T} />
+                <Pill label={`${cluster?.liveCount || 0} live`} tone="accent" T={T} />
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {selectedCluster ? (
+        <View style={[styles.summaryCard, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+          <View style={styles.summaryHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.summaryTitle, { color: T.textPrimary }]}>
+                {clusterDetail?.cluster?.name || selectedCluster?.name}
+              </Text>
+              <Text style={[styles.summaryText, { color: T.textSecondary }]}>
+                {clusterDetail?.cluster?.venueName ||
+                  selectedCluster?.venueName ||
+                  clusterDetail?.cluster?.description ||
+                  selectedCluster?.description ||
+                  "Không có mô tả"}
+              </Text>
+            </View>
+            <View style={styles.summaryBadges}>
+              <Pill label={`${summary.total} sân`} T={T} />
+              <Pill label={`${summary.live} live`} tone="accent" T={T} />
+              <Pill label={`${summary.active} có trận`} T={T} />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {stations.length === 0 ? (
+        <View style={[styles.emptyBox, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+          <Ionicons name="tv-outline" size={34} color={T.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>
+            {keyword ? "Không tìm thấy sân phù hợp" : "Cụm này chưa có sân sẵn sàng"}
+          </Text>
+          <Text style={[styles.emptyText, { color: T.textSecondary }]}>
+            {keyword
+              ? "Thử đổi từ khóa hoặc chuyển sang cụm sân khác."
+              : "Chỉ những sân đang có trận live với video công khai mới xuất hiện ở đây."}
+          </Text>
+        </View>
+      ) : (
+        stations.map((station: any) => (
+          <TouchableOpacity
+            key={sid(station)}
+            onPress={() => station?.currentMatch && onOpenStation(station)}
+            activeOpacity={station?.currentMatch ? 0.9 : 1}
+            style={[styles.stationCard, { backgroundColor: T.cardBg, borderColor: T.border }]}
+          >
+            <View style={styles.stationHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.stationTitle, { color: T.textPrimary }]}>
+                  {station?.name || station?.code || "Sân"}
+                </Text>
+                <Text style={[styles.stationCode, { color: T.textSecondary }]}>
+                  {station?.code || sid(station)}
+                </Text>
+              </View>
+              <Pill
+                label={String(station?.status || "").toLowerCase() === "live" ? "Live" : getLiveStatusLabel(station?.status)}
+                tone={String(station?.status || "").toLowerCase() === "live" ? "accent" : "default"}
+                T={T}
+              />
+            </View>
+
+            {station?.currentMatch ? (
+              <>
+                <Text style={[styles.stationMatchTitle, { color: T.textPrimary }]}>
+                  {getLiveMatchTitle(station.currentMatch)}
+                </Text>
+                <Text style={[styles.stationMatchSubtitle, { color: T.textSecondary }]}>
+                  {getLiveMatchSubtitle(station.currentMatch)}
+                </Text>
+                <View style={styles.stationFooter}>
+                  <View style={[styles.viewerBtn, { backgroundColor: T.tint }]}>
+                    <Ionicons name="play-circle-outline" size={18} color="#ffffff" />
+                    <Text style={styles.viewerBtnText}>Xem sân này</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <Text style={[styles.stationMatchSubtitle, { color: T.textSecondary }]}>
+                Sân này hiện chưa có trận để xem.
+              </Text>
+            )}
+          </TouchableOpacity>
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+function LiveArchivePane({ T }: any) {
+  const [keyword, setKeyword] = useState("");
+  const [archiveTournamentId, setArchiveTournamentId] = useState("all");
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<any[]>([]);
+  const debouncedKeyword = useDebouncedValue(keyword, 320);
+
+  useEffect(() => {
+    setPage(1);
+    setItems([]);
+  }, [archiveTournamentId, debouncedKeyword]);
+
+  const queryArgs = useMemo(
+    () => ({
+      statuses: "finished",
+      excludeFinished: false,
+      all: true,
+      keyword: debouncedKeyword,
+      tournamentId: archiveTournamentId === "all" ? "" : archiveTournamentId,
+      page,
+      limit: ARCHIVE_LIMIT,
+    }),
+    [archiveTournamentId, debouncedKeyword, page]
+  );
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetLiveMatchesQuery(queryArgs, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  useEffect(() => {
+    const nextItems = Array.isArray(data?.items) ? data.items : [];
+    setItems((current) => (page === 1 ? nextItems : mergeUniqueMatches(current, nextItems)));
+  }, [data?.items, page]);
+
+  const archiveTournaments = useMemo(() => {
+    const raw = Array.isArray(data?.tournaments) ? data.tournaments : [];
+    return [{ _id: "all", name: "Tất cả giải", count: data?.count || 0 }, ...raw];
+  }, [data?.count, data?.tournaments]);
+
+  const archiveGroups = useMemo(() => groupMatchesByTournament(items), [items]);
+  const pages = Math.max(1, Number(data?.pages || 1));
+  const count = Number(data?.count || 0);
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching && page === 1}
+          onRefresh={() => {
+            setPage(1);
+            setItems([]);
+            refetch();
+          }}
+        />
+      }
+    >
+      <View style={styles.sectionHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Kho trận đã live</Text>
+          <Text style={[styles.sectionText, { color: T.textSecondary }]}>
+            Lọc theo giải đấu hoặc tìm trực tiếp theo mã trận để mở lại đúng video đã phát.
+          </Text>
+        </View>
+        {isFetching ? <ActivityIndicator color={T.tint} /> : null}
+      </View>
+
+      <View style={[styles.searchBar, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+        <Ionicons name="search" size={18} color={T.textSecondary} />
+        <TextInput
+          value={keyword}
+          onChangeText={setKeyword}
+          placeholder="Tìm theo mã trận hoặc tên giải..."
+          placeholderTextColor={T.textSecondary}
+          style={[styles.searchInput, { color: T.textPrimary }]}
+        />
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.clusterRail}>
+        {archiveTournaments.map((tournament: any) => {
+          const active = archiveTournamentId === sid(tournament?._id);
+          return (
+            <TouchableOpacity
+              key={sid(tournament?._id)}
+              onPress={() => setArchiveTournamentId(sid(tournament?._id))}
+              style={[
+                styles.filterTab,
+                {
+                  backgroundColor: active ? T.cardBg : T.softBg,
+                  borderColor: active ? T.tint : T.border,
+                },
+              ]}
+            >
+              <Text style={[styles.filterTabText, { color: T.textPrimary }]}>
+                {tournament?.name || "Không rõ giải"}
+              </Text>
+              <Text style={[styles.filterTabCount, { color: T.textSecondary }]}>
+                {tournament?.count || 0} trận
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <View style={[styles.summaryCard, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+        <View style={styles.summaryHead}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.summaryTitle, { color: T.textPrimary }]}>Các trận đã từng lên sóng</Text>
+            <Text style={[styles.summaryText, { color: T.textSecondary }]}>
+              Hiện có {count} trận có thể xem lại trong bộ lọc đang chọn.
+            </Text>
+          </View>
+          <Pill label={`Trang ${page}/${pages}`} T={T} />
+        </View>
+      </View>
+
+      {isLoading && items.length === 0 ? (
+        <View style={[styles.emptyBox, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+          <ActivityIndicator color={T.tint} />
+          <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>Đang tải archive</Text>
+          <Text style={[styles.emptyText, { color: T.textSecondary }]}>
+            Hệ thống đang gom các trận đã live và nguồn xem lại.
+          </Text>
+        </View>
+      ) : archiveGroups.length === 0 ? (
+        <View style={[styles.emptyBox, { backgroundColor: T.cardBg, borderColor: T.border }]}>
+          <Ionicons name="archive-outline" size={34} color={T.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: T.textPrimary }]}>Chưa có trận phù hợp</Text>
+          <Text style={[styles.emptyText, { color: T.textSecondary }]}>
+            Thử xóa từ khóa tìm kiếm hoặc chuyển sang giải đấu khác.
+          </Text>
+        </View>
+      ) : (
+        archiveGroups.map((group: any) => (
+          <View key={group.key} style={styles.archiveGroup}>
+            <Text style={[styles.archiveGroupTitle, { color: T.textPrimary }]}>
+              {group?.tournament?.name || "Không rõ giải"}
+            </Text>
+            {group.items.map((item: any) => (
+              <LiveMatchCard key={sid(item?._id || item?.matchId)} item={item} />
+            ))}
+          </View>
+        ))
+      )}
+
+      {page < pages ? (
+        <TouchableOpacity
+          onPress={() => setPage((current) => current + 1)}
+          style={[styles.loadMoreBtn, { backgroundColor: T.cardBg, borderColor: T.border }]}
+        >
+          {isFetching && page > 1 ? (
+            <ActivityIndicator color={T.tint} />
+          ) : (
+            <>
+              <Ionicons name="chevron-down-outline" size={18} color={T.textPrimary} />
+              <Text style={[styles.loadMoreText, { color: T.textPrimary }]}>Tải thêm trận đã live</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function HeroStat({ label, value, T }: any) {
+  return (
+    <View style={[styles.heroStat, { backgroundColor: T.highlight, borderColor: T.border }]}>
+      <Text style={[styles.heroStatLabel, { color: T.textSecondary }]}>{label}</Text>
+      <Text style={[styles.heroStatValue, { color: T.textPrimary }]}>{value}</Text>
+    </View>
+  );
+}
+
+function Pill({ label, tone = "default", T }: any) {
+  return (
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: tone === "accent" ? T.highlight : T.softBg,
+          borderColor: tone === "accent" ? T.tint : T.border,
+        },
+      ]}
+    >
+      <Text style={[styles.pillText, { color: T.textPrimary }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  listContent: { paddingHorizontal: 12 },
-  header: { marginBottom: 16 },
-  headerTopRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  backBtn: { paddingRight: 8, paddingVertical: 4, marginRight: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
-  searchBar: {
+  screen: {
+    flex: 1,
+  },
+  chrome: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 12,
+  },
+  hero: {
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 14,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  heroTitleWrap: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
+    gap: 12,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "500",
+  },
+  heroStats: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  heroStat: {
+    flex: 1,
+    borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "ios" ? 12 : 8,
-    marginBottom: 12,
+    paddingVertical: 12,
   },
-  searchInput: { flex: 1, fontSize: 15, padding: 0 },
-  clearBtn: { padding: 4, marginLeft: 4 },
-  clearBtnText: { fontSize: 18 },
-  actionRow: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 8 },
-  filterBtn: {
+  heroStatLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 5,
+  },
+  heroStatValue: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  segmentWrap: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 6,
+    flexDirection: "row",
+    gap: 6,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 16,
+    borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    flex: 1,
-    borderWidth: 1,
-  },
-  iconText: { fontSize: 18 },
-  filterBtnText: { marginLeft: 8, fontSize: 14, fontWeight: "600" },
-  refreshBtn: {
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 10,
-    width: 44,
-    height: 44,
     justifyContent: "center",
-    alignItems: "center",
+    gap: 8,
   },
-  statsRow: { marginBottom: 8 },
-  statsText: { fontSize: 13, fontWeight: "500" },
-  chipsRow: { marginBottom: 0 },
-  chipsContent: { paddingRight: 12 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 8, maxWidth: 220 },
-  chipText: { fontSize: 12, fontWeight: "500" },
-  skelCard: { padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
-  emptyContainer: { paddingVertical: 80, alignItems: "center" },
-  emptyTitle: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  body: {
+    flex: 1,
+    marginTop: 6,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 28,
+    gap: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  sectionText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "500",
+  },
+  searchBar: {
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    minHeight: 52,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  clusterRail: {
+    gap: 10,
+    paddingRight: 6,
+  },
+  clusterCard: {
+    width: 220,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  clusterName: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  clusterVenue: {
+    fontSize: 12,
+    lineHeight: 18,
+    minHeight: 36,
+  },
+  clusterMetaRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  pill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  summaryCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+  },
+  summaryHead: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  summaryText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  summaryBadges: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  emptyBox: {
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 34,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 12,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  stationCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  stationHead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  stationTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  stationCode: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  stationMatchTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  stationMatchSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  stationFooter: {
+    flexDirection: "row",
+  },
+  viewerBtn: {
+    minHeight: 44,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  viewerBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  filterTab: {
+    minWidth: 148,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  filterTabCount: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  archiveGroup: {
+    gap: 12,
+  },
+  archiveGroupTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  loadMoreBtn: {
+    minHeight: 50,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });

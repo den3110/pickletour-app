@@ -1,5 +1,5 @@
 // app/screens/PickleBall/match/MatchSettingsModal.jsx
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Modal,
   SafeAreaView,
@@ -10,18 +10,13 @@ import {
   TextInput,
   Switch,
   RefreshControl,
-  Alert, // Thêm Alert để báo lỗi/thành công nếu cần
-  ActivityIndicator, // Thêm loading indicator
+  Alert,
+  ActivityIndicator,
+  useColorScheme,
 } from "react-native";
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
-import { useColorScheme } from "react-native";
-// ✅ 1. Import thêm useUpdateMatchMutation
-import { 
-  useGetMatchQuery, 
-  useUpdateMatchMutation 
-} from "@/slices/tournamentsApiSlice";
 
 /* ---------- Theme tokens (nhẹ hơn bản full) ---------- */
 function useTokens() {
@@ -131,25 +126,17 @@ export default function MatchSettingsModal({
   visible,
   onClose,
   matchId,
+  matchSnapshot,
+  onRefresh,
   onSave,
 }) {
   const t = useTokens();
-
-  // ✅ Lấy match trực tiếp theo matchId
-  const {
-    data: match,
-    isFetching,
-    refetch,
-  } = useGetMatchQuery(matchId, {
-    skip: !visible || !matchId,
-  });
-
-  // ✅ 2. Khởi tạo Mutation Hook
-  const [updateMatch, { isLoading: isUpdating }] = useUpdateMatchMutation();
+  const match = matchSnapshot || null;
+  const [isFetching, setIsFetching] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const rules = match?.rules || {};
 
-  // Chuẩn hoá initial values dựa vào model:
   const iv = useMemo(
     () => ({
       bestOf: rules.bestOf ?? 1,
@@ -181,17 +168,6 @@ export default function MatchSettingsModal({
   const [timeoutMinutes, setTimeoutMinutes] = useState(1);
   const [medicalTimeouts, setMedicalTimeouts] = useState(1);
 
-  const openedRef = useRef(false);
-
-  useEffect(() => {
-    if (!visible || !matchId) return;
-    if (openedRef.current) {
-      refetch();
-    } else {
-      openedRef.current = true;
-    }
-  }, [visible, matchId, refetch]);
-
   useEffect(() => {
     if (!visible) return;
 
@@ -213,12 +189,10 @@ export default function MatchSettingsModal({
   }, [visible, iv]);
 
   const handleClose = () => {
-    // Không cho đóng khi đang lưu để tránh lỗi state
-    if (isUpdating) return; 
-    onClose && onClose();
+    if (isUpdating) return;
+    onClose?.();
   };
 
-  // ✅ 3. Xử lý lưu (Update Match)
   const handleSave = async () => {
     const safeCap =
       pointsCap != null && Number.isFinite(pointsCap) && pointsCap > 0
@@ -239,26 +213,25 @@ export default function MatchSettingsModal({
     };
 
     try {
-      // Gọi API update (giả sử API nhận object { id, ...data } hoặc { id, body })
-      // Bạn cần kiểm tra lại arguments của mutation trong slice nhé.
-      // Dưới đây là cách phổ biến: truyền matchId và body.
-      await updateMatch({ matchId, ...payload }).unwrap();
-
-      // Nếu có callback onSave (để refresh list ở ngoài hoặc hiện toast)
-      if (onSave) onSave(payload);
-
-      // Đóng modal sau khi lưu thành công
-      handleClose();
-      
+      setIsUpdating(true);
+      await Promise.resolve(onSave?.(payload));
+      onClose?.();
     } catch (error) {
       console.error("Failed to update match settings:", error);
       Alert.alert("Lỗi", "Không thể cập nhật cấu hình trận đấu. Vui lòng thử lại.");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  const handleRefresh = () => {
-    if (!matchId) return;
-    refetch();
+  const handleRefresh = async () => {
+    if (!matchId || !onRefresh) return;
+    try {
+      setIsFetching(true);
+      await onRefresh();
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   return (
@@ -291,11 +264,11 @@ export default function MatchSettingsModal({
             <Ripple
               onPress={handleClose}
               rippleContainerBorderRadius={999}
-              disabled={isUpdating} // Disable nút đóng khi đang lưu
+              disabled={isUpdating}
               style={[
                 styles.headerIconBtn,
                 { backgroundColor: t.colors.background },
-                { opacity: isUpdating ? 0.5 : 1 }
+                { opacity: isUpdating ? 0.5 : 1 },
               ]}
             >
               <MaterialIcons name="close" size={20} color={t.colors.text} />
@@ -305,19 +278,18 @@ export default function MatchSettingsModal({
             </Text>
           </View>
 
-          {/* ✅ 4. UI Nút Lưu có trạng thái Loading */}
           <Ripple
             onPress={handleSave}
             disabled={isUpdating}
             rippleContainerBorderRadius={999}
             style={[
-              styles.saveBtn, 
+              styles.saveBtn,
               { backgroundColor: t.colors.primary },
-              { opacity: isUpdating ? 0.7 : 1 }
+              { opacity: isUpdating ? 0.7 : 1 },
             ]}
           >
             {isUpdating ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <ActivityIndicator size="small" color="#fff" />
                 <Text style={styles.saveBtnText}>Đang lưu...</Text>
               </View>
@@ -339,7 +311,6 @@ export default function MatchSettingsModal({
             />
           }
         >
-          {/* ... (Phần nội dung input giữ nguyên như cũ) ... */}
           <Text style={[styles.sectionTitle, { color: t.subtext }]}>
             Luật trận đấu
           </Text>
@@ -439,7 +410,6 @@ export default function MatchSettingsModal({
 }
 
 const styles = StyleSheet.create({
-  // ... (Giữ nguyên styles cũ)
   wrap: {
     flex: 1,
   },

@@ -11,13 +11,13 @@ import {
   Alert as RNAlert,
   FlatList,
   Linking,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   useColorScheme,
-  useWindowDimensions,
   View,
   ScrollView,
 } from "react-native";
@@ -28,7 +28,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import {
   useGetTournamentQuery,
   useListTournamentBracketsQuery,
-  useAdminListMatchesByTournamentQuery,
+  useListRefereeMatchesByTournamentQuery,
 } from "@/slices/tournamentsApiSlice";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
@@ -36,6 +36,7 @@ import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useIsFocused } from "@react-navigation/native";
 import {
+  getMatchDisplayCode,
   getMatchPayloadId,
   getPairDisplayName,
   getPlayerDisplayName,
@@ -116,12 +117,19 @@ const TYPE_LABEL = (t) => {
   return t || "Khác";
 };
 
+const TAB_ALL = "__all_matches__";
+const TAB_STATION_PREFIX = "__station__:";
+const SEARCH_PLACEHOLDER =
+  "Tìm trận, cặp đấu, link...";
+
 /**
  * LẤY NHÃN SÂN ĐÃ GÁN
  * ưu tiên: match.courtLabel -> match.court.name -> match.court.label -> match.court
  */
 const courtLabelOf = (m) => {
   if (!m) return "";
+  if (m.courtStationName) return m.courtStationName;
+  if (m.courtStationLabel) return m.courtStationLabel;
   if (m.courtLabel) return m.courtLabel;
   if (m.court && typeof m.court === "object") {
     return m.court.name || m.court.label || m.court.code || "";
@@ -137,7 +145,8 @@ const pairLabel = (pair, source) => {
   return getPairDisplayName(pair, source) || "—";
 };
 
-const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
+const matchCode = (m) =>
+  getMatchDisplayCode(m) || m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
 
 /**
  * CHUẨN HOÁ TỈ SỐ SET
@@ -251,21 +260,38 @@ const IconBtn = ({ name, onPress, color = "#111", size = 18, style }, ref) => (
 const IconBtnRef = React.forwardRef(IconBtn);
 
 // Trọng tài của trận
-const _extractRefereeIds = (m) => {
-  if (!m) return [];
-  const raw = m.referees ?? m.referee ?? m.judges ?? [];
-  const arr = Array.isArray(raw) ? raw : [raw];
+const _extractIds = (raw) => {
+  const arr = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
   return arr
     .map((r) =>
       String(r?.user?._id ?? r?.user ?? r?._id ?? r?.id ?? (r || "")).trim()
     )
     .filter(Boolean);
 };
-const isUserRefereeOfMatch = (m, user) => {
+const _extractManualRefereeIds = (m) =>
+  _extractIds(m?.referees ?? m?.referee ?? m?.judges ?? []);
+const _extractStationRefereeIds = (m) => _extractIds(m?.courtStationReferees);
+const isUserManualRefereeOfMatch = (m, user) => {
   if (!user?._id) return false;
   const myId = String(user._id);
-  const refIds = _extractRefereeIds(m).map(String);
+  const refIds = _extractManualRefereeIds(m).map(String);
   return refIds.includes(myId);
+};
+const isUserStationRefereeOfMatch = (m, user) => {
+  if (!user?._id) return false;
+  const myId = String(user._id);
+  const refIds = _extractStationRefereeIds(m).map(String);
+  return refIds.includes(myId);
+};
+const isUserRefereeOfMatch = (m, user) =>
+  isUserManualRefereeOfMatch(m, user) ||
+  isUserStationRefereeOfMatch(m, user);
+const stationIdOf = (m) =>
+  String(m?.courtStationId ?? m?.courtStation?._id ?? m?.courtStation ?? "").trim();
+const stationTabLabelOf = (station) => {
+  const label = String(station?.label || station?.name || "").trim();
+  if (!label) return "Sân";
+  return /^s[aâ]n\b/i.test(label) ? label : `Sân ${label}`;
 };
 
 // Đường dẫn “trang bắt trận”
@@ -285,27 +311,21 @@ const statusWeight = (s) =>
     ? STATUS_GROUP_WEIGHT[_normStatus(s)]
     : 3.5;
 
-// Tab "Tất cả trận"
-const TAB_ALL = "__all_matches__";
-
 /* ---------------- main (Public Referee Center) ---------------- */
 export default function RefereeCenterScreen() {
   const isFocused = useIsFocused();
   const { id } = useLocalSearchParams();
-  const { width } = useWindowDimensions();
   const T = useThemeTokens();
 
   const me = useSelector((s) => s.auth?.userInfo || null);
 
   // ===== Header-right dropdown state & refs
   const [hdrMenuOpen, setHdrMenuOpen] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState(null); // {x,y,width,height}
   const hdrBtnRef = useRef(null);
   const onToggleHdrMenu = useCallback(() => {
     if (hdrMenuOpen) return setHdrMenuOpen(false);
     try {
-      hdrBtnRef.current?.measureInWindow?.((x, y, w, h) => {
-        setMenuAnchor({ x, y, width: w, height: h });
+      hdrBtnRef.current?.measureInWindow?.(() => {
         setHdrMenuOpen(true);
       });
       if (!hdrBtnRef.current?.measureInWindow) setHdrMenuOpen(true);
@@ -327,6 +347,8 @@ export default function RefereeCenterScreen() {
     [id]
   );
   const tournamentIdsRef = useRef(new Set());
+  const watchedStationIdsRef = useRef(new Set());
+  const lastRealtimeRefreshAtRef = useRef(0);
 
   const requestSnapshot = useCallback(
     (mid) => {
@@ -396,7 +418,6 @@ export default function RefereeCenterScreen() {
   const {
     data: tour,
     isLoading: tourLoading,
-    isFetching: tourFetching,
     error: tourErr,
     refetch: refetchTour,
   } = useGetTournamentQuery(id, {
@@ -407,7 +428,6 @@ export default function RefereeCenterScreen() {
   const {
     data: bracketsData = [],
     isLoading: brLoading,
-    isFetching: brFetching,
     error: brErr,
     refetch: refetchBrackets,
   } = useListTournamentBracketsQuery(id, {
@@ -416,12 +436,11 @@ export default function RefereeCenterScreen() {
   });
 
   const {
-    data: matchPage,
+    data: refereeMatchesData,
     isLoading: mLoading,
-    isFetching: mFetching,
     error: mErr,
     refetch: refetchMatches,
-  } = useAdminListMatchesByTournamentQuery(
+  } = useListRefereeMatchesByTournamentQuery(
     { tid: id, page: 1, pageSize: 1000 },
     { refetchOnFocus: true, refetchOnReconnect: true }
   );
@@ -432,8 +451,26 @@ export default function RefereeCenterScreen() {
 
   // Seed realtime map từ API
   const allMatches = useMemo(
-    () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
-    [matchPage?.list]
+    () =>
+      Array.isArray(refereeMatchesData?.items) ? refereeMatchesData.items : [],
+    [refereeMatchesData?.items]
+  );
+  const stationTabs = useMemo(
+    () =>
+      Array.isArray(refereeMatchesData?.stationTabs)
+        ? refereeMatchesData.stationTabs
+        : [],
+    [refereeMatchesData?.stationTabs]
+  );
+  const triggerRealtimeRefresh = useCallback(
+    ({ includeBrackets = false } = {}) => {
+      const now = Date.now();
+      if (now - lastRealtimeRefreshAtRef.current < 800) return;
+      lastRealtimeRefreshAtRef.current = now;
+      refetchMatches?.();
+      if (includeBrackets) refetchBrackets?.();
+    },
+    [refetchBrackets, refetchMatches]
   );
   const seededFingerprintRef = useRef("");
   useEffect(() => {
@@ -470,17 +507,25 @@ export default function RefereeCenterScreen() {
         setLiveBump((x) => x + 1);
       }
     };
-    const lastRefillAtRef = { current: 0 };
     const onInvalidate = (payload) => {
       const tournamentId = String(payload?.tournamentId || "").trim();
       if (tournamentId && !tournamentIdsRef.current.has(tournamentId)) {
         return;
       }
-      const now = Date.now();
-      if (now - lastRefillAtRef.current < 800) return;
-      lastRefillAtRef.current = now;
-      refetchMatches?.();
-      refetchBrackets?.();
+      triggerRealtimeRefresh({ includeBrackets: true });
+    };
+    const onCourtStationUpdate = (payload) => {
+      const stationId = String(
+        payload?.station?._id || payload?.stationId || payload?._id || ""
+      ).trim();
+      if (
+        stationId &&
+        watchedStationIdsRef.current.size &&
+        !watchedStationIdsRef.current.has(stationId)
+      ) {
+        return;
+      }
+      triggerRealtimeRefresh();
     };
 
     const applyDirectMerge = (raw) => {
@@ -535,6 +580,7 @@ export default function RefereeCenterScreen() {
     socket.on("score:updated", onScoreUpdated);
     socket.on("match:deleted", onRemove);
     socket.on("tournament:invalidate", onInvalidate);
+    socket.on("court-station:update", onCourtStationUpdate);
 
     return () => {
       socket.off("tournament:match:update", onUpsert);
@@ -542,22 +588,51 @@ export default function RefereeCenterScreen() {
       socket.off("score:updated", onScoreUpdated);
       socket.off("match:deleted", onRemove);
       socket.off("tournament:invalidate", onInvalidate);
+      socket.off("court-station:update", onCourtStationUpdate);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, refetchMatches, refetchBrackets]);
+  }, [socket, triggerRealtimeRefresh]);
 
   // Matches đã merge realtime (chỉ của giải hiện tại)
-  const mergedAllMatches = useMemo(() => {
-    const vals = Array.from(liveMapRef.current.values());
-    return vals.filter(
-      (m) => String(m?.tournament?._id || m?.tournament) === String(id)
-    );
-  }, [id, liveBump]);
+  const mergedAllMatches = Array.from(liveMapRef.current.values()).filter(
+    (m) => String(m?.tournament?._id || m?.tournament) === String(id)
+  );
 
   // Tabs động THEO THỨ TỰ BRACKET (order từ BE)
+  const watchedStationIds = useMemo(() => {
+    const ids = new Set();
+
+    stationTabs.forEach((station) => {
+      const stationId = String(station?.stationId || "").trim();
+      if (stationId) ids.add(stationId);
+    });
+
+    allMatches.forEach((match) => {
+      const stationId = stationIdOf(match);
+      if (stationId) ids.add(stationId);
+    });
+
+    mergedAllMatches.forEach((match) => {
+      const stationId = stationIdOf(match);
+      if (stationId) ids.add(stationId);
+    });
+
+    return Array.from(ids).sort();
+  }, [allMatches, mergedAllMatches, stationTabs]);
+
+  useEffect(() => {
+    watchedStationIdsRef.current = new Set(watchedStationIds);
+  }, [watchedStationIds]);
+
+  useSocketRoomSet(socket, watchedStationIds, {
+    subscribeEvent: "court-station:watch",
+    unsubscribeEvent: "court-station:unwatch",
+    payloadKey: "stationId",
+  });
+
   const typesAvailable = useMemo(() => {
     const list = Array.isArray(bracketsData) ? bracketsData : [];
     if (!list.length)
@@ -589,24 +664,47 @@ export default function RefereeCenterScreen() {
   }, [bracketsData]);
 
   // Thêm tab "Tất cả trận" đứng trước Vòng bảng
+  const stationTabTypes = useMemo(
+    () =>
+      stationTabs.map((station, idx) => ({
+        ...station,
+        type: `${TAB_STATION_PREFIX}${station.stationId}`,
+        label: stationTabLabelOf(station),
+        order: idx,
+        idx,
+      })),
+    [stationTabs]
+  );
   const displayTabs = useMemo(
-    () => [{ type: TAB_ALL, label: "Tất cả trận" }, ...typesAvailable],
-    [typesAvailable]
+    () => [
+      ...stationTabTypes,
+      { type: TAB_ALL, label: "Tất cả trận" },
+      ...typesAvailable,
+    ],
+    [stationTabTypes, typesAvailable]
   );
 
   const [tab, setTab] = useState(TAB_ALL);
-  useEffect(() => {
-    // Giữ nguyên fallback cũ, nhưng không ép khi đang ở tab "Tất cả trận"
-    if (tab === TAB_ALL) return;
-    const existed = typesAvailable.some((t) => t.type === tab);
-    const fallback = typesAvailable[0]?.type || "group";
-    if (!existed && fallback && fallback !== tab) setTab(fallback);
-  }, [typesAvailable, tab]);
-
-  // Lọc/sort
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState("time"); // "round" | "order" | "time"
   const [sortDir, setSortDir] = useState("asc");
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [tabsViewportWidth, setTabsViewportWidth] = useState(0);
+  const [tabsContentWidth, setTabsContentWidth] = useState(0);
+  const [tabsShowHint, setTabsShowHint] = useState(false);
+  useEffect(() => {
+    const existed = displayTabs.some((item) => item.type === tab);
+    if (existed) return;
+    const fallback = stationTabTypes[0]?.type || TAB_ALL;
+    if (fallback && fallback !== tab) setTab(fallback);
+  }, [displayTabs, stationTabTypes, tab]);
+  const activeTabMeta = useMemo(
+    () => displayTabs.find((item) => item.type === tab) || null,
+    [displayTabs, tab]
+  );
+  useEffect(() => {
+    setTabsShowHint(tabsContentWidth > tabsViewportWidth + 16);
+  }, [tabsContentWidth, tabsViewportWidth]);
 
   // so sánh trong NHÓM trạng thái (giữ nguyên logic cũ)
   const compareWithinGroup = useCallback(
@@ -659,9 +757,14 @@ export default function RefereeCenterScreen() {
           matchCode(m),
           pairLabel(m?.pairA),
           pairLabel(m?.pairB),
+          playerName(m?.pairA?.player1),
+          playerName(m?.pairA?.player2),
+          playerName(m?.pairB?.player1),
+          playerName(m?.pairB?.player2),
           m?.status,
           m?.video,
           courtLabelOf(m),
+          activeTabMeta?.label,
         ]
           .join(" ")
           .toLowerCase();
@@ -679,7 +782,7 @@ export default function RefereeCenterScreen() {
 
       return sorted;
     },
-    [q, compareWithinGroup, me]
+    [q, compareWithinGroup, me, activeTabMeta?.label]
   );
 
   // Danh sách "Tất cả trận" (chưa/đang thi đấu) dùng logic sort cũ
@@ -689,6 +792,29 @@ export default function RefereeCenterScreen() {
     );
     return filterSortMatches(base);
   }, [mergedAllMatches, filterSortMatches]);
+  const stationMatchesForTab = useMemo(() => {
+    if (!String(tab).startsWith(TAB_STATION_PREFIX)) return [];
+    const targetStationId = tab.slice(TAB_STATION_PREFIX.length);
+    const targetStationTab = stationTabs.find(
+      (station) => String(station?.stationId || "").trim() === targetStationId
+    );
+    const allowedMatchIds = new Set(
+      Array.isArray(targetStationTab?.matchIds)
+        ? targetStationTab.matchIds
+            .map((matchId) => String(matchId || "").trim())
+            .filter(Boolean)
+        : []
+    );
+    const base = mergedAllMatches.filter((m) => {
+      if (_normStatus(m?.status) === "finished") return false;
+      if (allowedMatchIds.size) {
+        return allowedMatchIds.has(String(m?._id || "").trim());
+      }
+      if (stationIdOf(m) !== targetStationId) return false;
+      return isUserStationRefereeOfMatch(m, me);
+    });
+    return filterSortMatches(base);
+  }, [filterSortMatches, me, mergedAllMatches, stationTabs, tab]);
 
   // Brackets theo tab hiện tại (giữ nguyên logic cũ)
   const bracketsForTab = useMemo(
@@ -822,10 +948,7 @@ export default function RefereeCenterScreen() {
           <MiniChipBtn
             icon="play-arrow"
             label="Bắt trận"
-            onPress={() => {
-              console.log(refereeRouteOf(m))
-              router.push(refereeRouteOf(m))
-            }}
+            onPress={() => router.push(refereeRouteOf(m))}
           />
         )}
         {has && (
@@ -1095,93 +1218,108 @@ export default function RefereeCenterScreen() {
       />
 
       <View style={[styles.screen, { backgroundColor: T.bg }]}>
-        {/* Controls */}
-        <View
+        <Pressable
+          onPress={() => setSearchModalOpen(true)}
           style={[
-            styles.toolbar,
-            { borderColor: T.border, backgroundColor: T.cardBg },
+            styles.searchLauncher,
+            {
+              borderColor: T.border,
+              backgroundColor: T.cardBg,
+            },
           ]}
         >
-          <View style={[styles.inputWrap, { borderColor: T.border }]}>
-            <MaterialIcons name="search" size={18} color={T.subtext} />
-            <TextInput
-              style={[styles.input, { color: T.text }]}
-              placeholder="Tìm trận, cặp đấu, link…"
-              placeholderTextColor={T.muted}
-              value={q}
-              onChangeText={setQ}
-            />
+          <MaterialIcons name="search" size={18} color={T.subtext} />
+          <Text
+            style={[
+              styles.searchLauncherText,
+              { color: q ? T.text : T.muted },
+            ]}
+            numberOfLines={1}
+          >
+            {q || SEARCH_PLACEHOLDER}
+          </Text>
+          <View style={styles.searchLauncherMeta}>
+            <MaterialIcons name="tune" size={16} color={T.tint} />
           </View>
+        </Pressable>
 
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-            <PickerChip
-              theme={T}
-              label={`Sắp xếp: ${
-                sortKey === "time"
-                  ? "Thời gian"
-                  : sortKey === "order"
-                  ? "Thứ tự"
-                  : "Vòng"
-              }`}
-              onPress={() =>
-                setSortKey((k) =>
-                  k === "time" ? "round" : k === "round" ? "order" : "time"
-                )
-              }
-              icon="sort"
-            />
-            <PickerChip
-              theme={T}
-              label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
-              onPress={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
-            />
-            <Pill
-              label={`${(bracketsData || []).length} loại • ${
-                tab === TAB_ALL ? "Tất cả trận" : TYPE_LABEL(tab)
-              }`}
-            />
-          </View>
-        </View>
-
-        {/* Tabs động */}
-        <View style={[styles.tabs, { borderColor: T.tabBd }]}>
-          {displayTabs.map((t) => {
-            const active = t.type === tab;
-            const label =
-              t.label ||
-              (t.type === TAB_ALL ? "Tất cả trận" : TYPE_LABEL(t.type));
-            return (
-              <Pressable
-                key={t.type}
-                onPress={() => setTab(t.type)}
-                style={({ pressed }) => [
-                  styles.tabItem,
-                  {
-                    backgroundColor: active ? T.tint : "transparent",
-                    borderColor: active ? T.tint : T.tabBd,
-                  },
-                  pressed && { opacity: 0.95 },
-                ]}
-              >
-                <Text
-                  style={{ color: active ? "#fff" : T.text, fontWeight: "700" }}
+        <View
+          style={styles.tabsShell}
+          onLayout={(event) =>
+            setTabsViewportWidth(event.nativeEvent.layout.width)
+          }
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onContentSizeChange={(width) => setTabsContentWidth(width)}
+            onScroll={(event) => {
+              const x = event.nativeEvent.contentOffset.x || 0;
+              const maxScroll = Math.max(0, tabsContentWidth - tabsViewportWidth);
+              setTabsShowHint(maxScroll > 16 && x < maxScroll - 12);
+            }}
+            contentContainerStyle={[
+              styles.tabs,
+              {
+                borderColor: T.tabBd,
+                borderWidth: 1,
+                borderRadius: 12,
+                backgroundColor: T.cardBg,
+              },
+            ]}
+          >
+            {displayTabs.map((t) => {
+              const active = t.type === tab;
+              const label =
+                t.label ||
+                (t.type === TAB_ALL ? "Tất cả trận" : TYPE_LABEL(t.type));
+              return (
+                <Pressable
+                  key={t.type}
+                  onPress={() => setTab(t.type)}
+                  style={({ pressed }) => [
+                    styles.tabItem,
+                    {
+                      backgroundColor: active ? T.tint : "transparent",
+                      borderColor: active ? T.tint : T.tabBd,
+                    },
+                    pressed && { opacity: 0.95 },
+                  ]}
                 >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    style={{ color: active ? "#fff" : T.text, fontWeight: "700" }}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {tabsShowHint ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.tabsHint,
+                { backgroundColor: T.cardBg, borderColor: T.border },
+              ]}
+            >
+              <MaterialIcons name="swipe" size={12} color={T.tint} />
+              <Text style={{ color: T.tint, fontSize: 11, fontWeight: "700" }}>
+                Vuốt
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* List brackets / tất cả trận */}
-        {tab === TAB_ALL ? (
+        {String(tab).startsWith(TAB_STATION_PREFIX) ? (
           <FlatList
-            data={allUpcomingMatches}
+            data={stationMatchesForTab}
             keyExtractor={(m) => String(m._id)}
             renderItem={renderMatchRow}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            refreshing={refreshing || tourFetching || brFetching || mFetching}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={{ paddingBottom: 24 }}
             ListEmptyComponent={
@@ -1192,7 +1330,30 @@ export default function RefereeCenterScreen() {
                 ]}
               >
                 <Text style={{ color: T.infoText }}>
-                  Hiện không có trận nào chưa/đang thi đấu mà bạn là trọng tài.
+                  Chưa có trận nào trong danh sách của {activeTabMeta?.label || "sân này"}.
+                </Text>
+              </View>
+            }
+            extraData={liveBump}
+          />
+        ) : tab === TAB_ALL ? (
+          <FlatList
+            data={allUpcomingMatches}
+            keyExtractor={(m) => String(m._id)}
+            renderItem={renderMatchRow}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            ListEmptyComponent={
+              <View
+                style={[
+                  styles.alert,
+                  { borderColor: T.infoBd, backgroundColor: T.infoBg },
+                ]}
+              >
+                <Text style={{ color: T.infoText }}>
+                  Hiện không có trận nào đang được gán cho bạn.
                 </Text>
               </View>
             }
@@ -1204,7 +1365,7 @@ export default function RefereeCenterScreen() {
             keyExtractor={(b) => String(b._id)}
             renderItem={renderBracket}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            refreshing={refreshing || tourFetching || brFetching || mFetching}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={{ paddingBottom: 24 }}
             ListEmptyComponent={
@@ -1215,7 +1376,7 @@ export default function RefereeCenterScreen() {
                 ]}
               >
                 <Text style={{ color: T.infoText }}>
-                  Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
+                  Chưa có trận nào thuộc nhóm {activeTabMeta?.label || TYPE_LABEL(tab)}.
                 </Text>
               </View>
             }
@@ -1228,6 +1389,120 @@ export default function RefereeCenterScreen() {
           matchId={viewer.matchId}
           onClose={closeMatch}
         />
+        <Modal
+          visible={searchModalOpen}
+          animationType="slide"
+          onRequestClose={() => setSearchModalOpen(false)}
+        >
+          <View style={[styles.filterModalWrap, { backgroundColor: T.bg }]}>
+            <View
+              style={[
+                styles.filterModalHeader,
+                { borderBottomColor: T.border, backgroundColor: T.cardBg },
+              ]}
+            >
+              <Pressable
+                onPress={() => setSearchModalOpen(false)}
+                style={({ pressed }) => [styles.iconCircleBtn, pressed && { opacity: 0.8 }]}
+              >
+                <MaterialIcons name="arrow-back" size={20} color={T.text} />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: T.text, fontSize: 18, fontWeight: "800" }}>
+                  Tìm kiếm & bộ lọc
+                </Text>
+                <Text style={{ color: T.subtext, fontSize: 12 }}>
+                  {activeTabMeta?.label || "Tất cả trận"}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  setQ("");
+                  setSortKey("time");
+                  setSortDir("asc");
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.8 }]}
+              >
+                <Text style={{ color: T.tint, fontWeight: "700" }}>Đặt lại</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.filterModalBody}>
+              <View
+                style={[
+                  styles.inputWrap,
+                  styles.filterInputWrap,
+                  { borderColor: T.border, backgroundColor: T.cardBg },
+                ]}
+              >
+                <MaterialIcons name="search" size={18} color={T.subtext} />
+                <TextInput
+                  autoFocus
+                  style={[styles.input, { color: T.text }]}
+                  placeholder={SEARCH_PLACEHOLDER}
+                  placeholderTextColor={T.muted}
+                  value={q}
+                  onChangeText={setQ}
+                />
+              </View>
+
+              <View
+                style={[
+                  styles.filterCard,
+                  { borderColor: T.border, backgroundColor: T.cardBg },
+                ]}
+              >
+                <Text style={{ color: T.muted, fontSize: 12, marginBottom: 10 }}>
+                  Sắp xếp
+                </Text>
+                <View style={styles.filterChipRow}>
+                  <PickerChip
+                    theme={T}
+                    label={`Sắp xếp: ${
+                      sortKey === "time"
+                        ? "Thời gian"
+                        : sortKey === "order"
+                        ? "Thứ tự"
+                        : "Vòng"
+                    }`}
+                    onPress={() =>
+                      setSortKey((k) =>
+                        k === "time" ? "round" : k === "round" ? "order" : "time"
+                      )
+                    }
+                    icon="sort"
+                  />
+                  <PickerChip
+                    theme={T}
+                    label={`Chiều: ${sortDir === "asc" ? "Tăng" : "Giảm"}`}
+                    onPress={() =>
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+                    }
+                    icon={sortDir === "asc" ? "arrow-upward" : "arrow-downward"}
+                  />
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.filterCard,
+                  { borderColor: T.border, backgroundColor: T.cardBg },
+                ]}
+              >
+                <Text style={{ color: T.muted, fontSize: 12, marginBottom: 10 }}>
+                  Đang xem
+                </Text>
+                <View style={styles.filterChipRow}>
+                  <Pill label={activeTabMeta?.label || "Tất cả trận"} kind="primary" />
+                  <Pill label={`${allUpcomingMatches.length} trận đang hiển thị`} />
+                </View>
+                <Text style={{ color: T.subtext, fontSize: 13, marginTop: 10 }}>
+                  Gõ từ khóa để lọc nhanh theo mã trận, cặp đấu, sân hoặc link video.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
 
       {/* Header dropdown (anchored) */}
@@ -1271,37 +1546,6 @@ export default function RefereeCenterScreen() {
   );
 }
 
-/* ---------------- small UI (buttons, chips) ---------------- */
-function BtnPrimary({ onPress, children, disabled, theme }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        { backgroundColor: disabled ? theme.btnDisabledBg : theme.tint },
-        pressed && !disabled && { opacity: 0.9 },
-      ]}
-    >
-      <Text style={{ color: "#fff", fontWeight: "700" }}>{children}</Text>
-    </Pressable>
-  );
-}
-function BtnOutline({ onPress, children, theme }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.btn,
-        styles.btnOutline,
-        { borderColor: theme.tint },
-        pressed && { opacity: 0.95 },
-      ]}
-    >
-      <Text style={{ color: theme.tint, fontWeight: "700" }}>{children}</Text>
-    </Pressable>
-  );
-}
 function PickerChip({ label, onPress, icon, theme }) {
   const T = theme;
   return (
@@ -1334,23 +1578,55 @@ function PickerChip({ label, onPress, icon, theme }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 16 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  searchLauncher: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  searchLauncherText: { flex: 1, fontSize: 15 },
+  searchLauncherMeta: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabsShell: {
+    position: "relative",
+    marginBottom: 12,
+  },
 
   tabs: {
     flexDirection: "row",
-    borderWidth: 1,
-    borderRadius: 12,
     padding: 4,
     gap: 8,
-    marginBottom: 12,
+    paddingRight: 44,
   },
   tabItem: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
     borderWidth: 1,
     paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 112,
+  },
+  tabsHint: {
+    position: "absolute",
+    right: 0,
+    top: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
   },
 
   toolbar: {
@@ -1370,6 +1646,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   input: { flex: 1, fontSize: 15 },
+  filterModalWrap: { flex: 1 },
+  filterModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  iconCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterModalBody: {
+    flex: 1,
+    padding: 16,
+    gap: 14,
+  },
+  filterInputWrap: {
+    minHeight: 52,
+  },
+  filterCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+  },
+  filterChipRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
 
   card: { borderWidth: 1, borderRadius: 14, padding: 12 },
   bracketTitle: { fontSize: 16, fontWeight: "700" },

@@ -1,11 +1,11 @@
 import React, {
   forwardRef,
-  useImperativeHandle,
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
   memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
 } from "react";
 import {
   View,
@@ -15,114 +15,138 @@ import {
   Switch,
   useColorScheme,
 } from "react-native";
+import { useTheme } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
-  BottomSheetBackdrop,
 } from "@gorhom/bottom-sheet";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@react-navigation/native";
 
 const STATUS_OPTIONS = ["scheduled", "queued", "assigned", "live", "finished"];
-const HOUR_PRESETS = [2, 4, 8, 24];
+const HOUR_PRESETS = [4, 8, 24, 72];
 const REFRESH_PRESETS = [10, 15, 30, 60];
+const DEFAULT_FILTERS = {
+  statuses: [...STATUS_OPTIONS],
+  excludeFinished: true,
+  windowHours: 24,
+  autoRefresh: true,
+  refreshSec: 15,
+};
 
-/* ============================
- * THEME TOKENS
- * ============================ */
 function useThemeTokens() {
-  // Ưu tiên theme từ react-navigation; fallback theo hệ thống
   const navTheme = useTheme?.();
   const sysScheme = useColorScheme?.() ?? "light";
-  const isDark =
-    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
-  const scheme = isDark ? "dark" : "light";
-
-  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
-  const textPrimary =
-    navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a");
-  const textSecondary = isDark ? "#cbd5e1" : "#475569";
-
-  // Đồng bộ với màu trong NavigationContainer
-  const sheetBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
-  const border = navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
-  const handle = isDark ? "#6b7280" : "#dddddd";
-  const softBg = isDark ? "#1e1f23" : "#f5f5f5";
+  const isDark = typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
 
   return {
-    scheme,
-    tint,
-    textPrimary,
-    textSecondary,
-    sheetBg,
-    border,
-    handle,
-    softBg,
+    isDark,
+    tint: navTheme?.colors?.primary ?? (isDark ? "#6ee7d8" : "#0f766e"),
+    textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#102a26"),
+    textSecondary: isDark ? "#b8c4c2" : "#5a6f6a",
+    sheetBg: navTheme?.colors?.card ?? (isDark ? "#10201d" : "#fffdf8"),
+    border: navTheme?.colors?.border ?? (isDark ? "#23403a" : "#dce8e4"),
+    softBg: isDark ? "#18302c" : "#f1f7f5",
+    handle: isDark ? "#4e6b65" : "#b3c8c3",
   };
 }
 
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    scheduled: "Đã lên lịch",
+    queued: "Chờ thi đấu",
+    assigned: "Đã gán sân",
+    live: "Đang phát",
+    finished: "Đã kết thúc",
+  };
+  return map[status] || status;
+}
+
 const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
-  { initial, onApply }: any,
+  { initial, defaults = DEFAULT_FILTERS, onApply }: any,
   ref
 ) {
   const T = useThemeTokens();
   const insets = useSafeAreaInsets();
   const modalRef = React.useRef<BottomSheetModal>(null);
+  const snapPoints = useMemo(() => ["90%"], []);
 
-  // Snap points — modal luôn phủ lên trên tab bar nhờ portal
-  const snapPoints = useMemo(() => ["90%", "100%"], []);
-
-  const [statuses, setStatuses] = useState<string[]>(initial.statuses);
-  const [excludeFinished, setExcludeFinished] = useState<boolean>(
-    initial.excludeFinished
+  const [statuses, setStatuses] = useState<string[]>(
+    initial?.statuses || defaults?.statuses || [...STATUS_OPTIONS]
   );
-  const [windowHours, setWindowHours] = useState<number>(initial.windowHours);
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(initial.autoRefresh);
-  const [refreshSec, setRefreshSec] = useState<number>(initial.refreshSec);
+  const [excludeFinished, setExcludeFinished] = useState<boolean>(
+    typeof initial?.excludeFinished === "boolean"
+      ? initial.excludeFinished
+      : typeof defaults?.excludeFinished === "boolean"
+      ? defaults.excludeFinished
+      : true
+  );
+  const [windowHours, setWindowHours] = useState<number>(
+    initial?.windowHours || defaults?.windowHours || 24
+  );
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(
+    typeof initial?.autoRefresh === "boolean"
+      ? initial.autoRefresh
+      : typeof defaults?.autoRefresh === "boolean"
+      ? defaults.autoRefresh
+      : true
+  );
+  const [refreshSec, setRefreshSec] = useState<number>(
+    initial?.refreshSec || defaults?.refreshSec || 15
+  );
 
-  // 🔧 FIX: chỉ sync khi nội dung initial thực sự đổi (không dựa vào object identity)
-  const initialKey = useMemo(() => JSON.stringify(initial), [initial]);
-  const syncFromInitial = useCallback((src: any) => {
-    setStatuses(src?.statuses ?? [...STATUS_OPTIONS]);
-    setExcludeFinished(
-      typeof src?.excludeFinished === "boolean" ? src.excludeFinished : true
-    );
-    setWindowHours(src?.windowHours ?? 8);
-    setAutoRefresh(
-      typeof src?.autoRefresh === "boolean" ? src.autoRefresh : true
-    );
-    setRefreshSec(src?.refreshSec ?? 15);
-  }, []);
+  const initialKey = useMemo(() => JSON.stringify(initial || {}), [initial]);
+  const defaultKey = useMemo(() => JSON.stringify(defaults || {}), [defaults]);
+
   useEffect(() => {
-    syncFromInitial(initial);
-  }, [initialKey, syncFromInitial]);
+    setStatuses(initial?.statuses || defaults?.statuses || [...STATUS_OPTIONS]);
+    setExcludeFinished(
+      typeof initial?.excludeFinished === "boolean"
+        ? initial.excludeFinished
+        : typeof defaults?.excludeFinished === "boolean"
+        ? defaults.excludeFinished
+        : true
+    );
+    setWindowHours(initial?.windowHours || defaults?.windowHours || 24);
+    setAutoRefresh(
+      typeof initial?.autoRefresh === "boolean"
+        ? initial.autoRefresh
+        : typeof defaults?.autoRefresh === "boolean"
+        ? defaults.autoRefresh
+        : true
+    );
+    setRefreshSec(initial?.refreshSec || defaults?.refreshSec || 15);
+  }, [defaultKey, defaults, initial, initialKey]);
 
   useImperativeHandle(ref, () => ({
-    // API cũ
     expand: () => modalRef.current?.present(),
     close: () => modalRef.current?.dismiss(),
   }));
 
-  const handleReset = useCallback(() => {
-    setStatuses([...STATUS_OPTIONS]);
-    setExcludeFinished(true);
-    setWindowHours(8);
-    setAutoRefresh(true);
-    setRefreshSec(15);
-  }, []);
-
   const toggleStatus = useCallback((status: string) => {
     setStatuses((prev) => {
       if (prev.includes(status)) {
-        const next = prev.filter((s) => s !== status);
+        const next = prev.filter((item) => item !== status);
         return next.length ? next : [...STATUS_OPTIONS];
       }
       return [...prev, status];
     });
   }, []);
 
+  const handleReset = useCallback(() => {
+    setStatuses(defaults?.statuses || [...STATUS_OPTIONS]);
+    setExcludeFinished(
+      typeof defaults?.excludeFinished === "boolean" ? defaults.excludeFinished : true
+    );
+    setWindowHours(defaults?.windowHours || 24);
+    setAutoRefresh(
+      typeof defaults?.autoRefresh === "boolean" ? defaults.autoRefresh : true
+    );
+    setRefreshSec(defaults?.refreshSec || 15);
+  }, [defaults]);
+
   const handleApply = useCallback(() => {
-    onApply({
+    onApply?.({
       statuses,
       excludeFinished,
       windowHours,
@@ -130,24 +154,15 @@ const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
       refreshSec,
     });
     modalRef.current?.dismiss();
-  }, [
-    statuses,
-    excludeFinished,
-    windowHours,
-    autoRefresh,
-    refreshSec,
-    onApply,
-  ]);
-
-  const allSelected = statuses.length === STATUS_OPTIONS.length;
+  }, [autoRefresh, excludeFinished, onApply, refreshSec, statuses, windowHours]);
 
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
         {...props}
-        disappearsOnIndex={-1}
         appearsOnIndex={0}
-        opacity={0.5}
+        disappearsOnIndex={-1}
+        opacity={0.48}
       />
     ),
     []
@@ -157,224 +172,188 @@ const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
     <BottomSheetModal
       ref={modalRef}
       snapPoints={snapPoints}
+      topInset={insets.top}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
+      handleIndicatorStyle={[styles.handle, { backgroundColor: T.handle }]}
       backgroundStyle={[
-        styles.bottomSheetBackground,
-        { backgroundColor: T.sheetBg, borderTopColor: T.border },
+        styles.sheet,
+        {
+          backgroundColor: T.sheetBg,
+          borderTopColor: T.border,
+        },
       ]}
-      handleIndicatorStyle={[
-        styles.handleIndicator,
-        { backgroundColor: T.handle },
-      ]}
-      topInset={insets.top}
       android_keyboardInputMode="adjustResize"
     >
       <BottomSheetScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 80 },
-        ]}
+        contentContainerStyle={{
+          paddingHorizontal: 18,
+          paddingTop: 12,
+          paddingBottom: insets.bottom + 84,
+          gap: 24,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: T.textPrimary }]}>Bộ lọc</Text>
+          <View>
+            <Text style={[styles.eyebrow, { color: T.tint }]}>Điều chỉnh feed</Text>
+            <Text style={[styles.title, { color: T.textPrimary }]}>Bộ lọc live</Text>
+          </View>
           <TouchableOpacity
             onPress={handleReset}
-            style={[styles.resetBtn, { backgroundColor: T.softBg }]}
-            activeOpacity={0.7}
+            style={[styles.resetBtn, { backgroundColor: T.softBg, borderColor: T.border }]}
           >
-            <Text style={[styles.resetBtnText, { color: T.tint }]}>
-              🔄 Mặc định
-            </Text>
+            <Text style={[styles.resetText, { color: T.tint }]}>Mặc định</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Trạng thái */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-            Trạng thái
-          </Text>
-
-          <TouchableOpacity
-            style={styles.optionRow}
-            onPress={() => setStatuses(allSelected ? [] : [...STATUS_OPTIONS])}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.checkbox, { borderColor: T.tint }]}>
-              {allSelected && (
-                <View
-                  style={[styles.checkboxInner, { backgroundColor: T.tint }]}
-                />
-              )}
-            </View>
-            <Text style={[styles.optionText, { color: T.textPrimary }]}>
-              Tất cả
-            </Text>
-          </TouchableOpacity>
-
-          <View style={[styles.divider, { backgroundColor: T.border }]} />
-
-          {STATUS_OPTIONS.map((status) => (
-            <TouchableOpacity
-              key={status}
-              style={styles.optionRow}
-              onPress={() => toggleStatus(status)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.checkbox, { borderColor: T.tint }]}>
-                {statuses.includes(status) && (
-                  <View
-                    style={[styles.checkboxInner, { backgroundColor: T.tint }]}
-                  />
-                )}
-              </View>
-              <Text style={[styles.optionText, { color: T.textPrimary }]}>
-                {status}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Cửa sổ thời gian */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-            Cửa sổ thời gian
-          </Text>
-
-          <View style={styles.buttonGrid}>
-            {HOUR_PRESETS.map((h) => (
-              <TouchableOpacity
-                key={h}
-                style={[
-                  styles.gridButton,
-                  { backgroundColor: T.sheetBg, borderColor: T.border },
-                  windowHours === h && {
-                    backgroundColor: T.tint,
-                    borderColor: T.tint,
-                  },
-                ]}
-                onPress={() => setWindowHours(h)}
-                activeOpacity={0.7}
-              >
-                <Text
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Trạng thái</Text>
+          <View style={styles.chipWrap}>
+            {STATUS_OPTIONS.map((status) => {
+              const active = statuses.includes(status);
+              return (
+                <TouchableOpacity
+                  key={status}
+                  onPress={() => toggleStatus(status)}
                   style={[
-                    styles.gridButtonText,
-                    { color: T.textSecondary },
-                    windowHours === h && styles.gridButtonTextActive,
+                    styles.chip,
+                    {
+                      backgroundColor: active ? T.tint : T.softBg,
+                      borderColor: active ? T.tint : T.border,
+                    },
                   ]}
                 >
-                  {h} giờ
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? "#ffffff" : T.textPrimary },
+                    ]}
+                  >
+                    {statusLabel(status)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Cửa sổ thời gian</Text>
+          <View style={styles.chipWrap}>
+            {HOUR_PRESETS.map((hours) => {
+              const active = windowHours === hours;
+              return (
+                <TouchableOpacity
+                  key={hours}
+                  onPress={() => setWindowHours(hours)}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? T.tint : T.softBg,
+                      borderColor: active ? T.tint : T.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? "#ffffff" : T.textPrimary },
+                    ]}
+                  >
+                    {hours} giờ
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={styles.switchRow}>
-            <Text style={[styles.switchLabel, { color: T.textPrimary }]}>
-              {excludeFinished ? "Loại trận finished" : "Gồm cả finished"}
-            </Text>
+          <View style={[styles.switchRow, { backgroundColor: T.softBg, borderColor: T.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.switchTitle, { color: T.textPrimary }]}>Ẩn trận đã xong</Text>
+              <Text style={[styles.switchHint, { color: T.textSecondary }]}>
+                Bật nếu bạn chỉ muốn xem các trận sắp diễn ra hoặc đang phát.
+              </Text>
+            </View>
             <Switch
-              value={!excludeFinished}
-              onValueChange={(val) => setExcludeFinished(!val)}
+              value={excludeFinished}
+              onValueChange={setExcludeFinished}
               trackColor={{ false: T.border, true: T.tint }}
-              thumbColor={
-                !excludeFinished
-                  ? "#fff"
-                  : T.scheme === "dark"
-                  ? "#1f2937"
-                  : "#f4f3f4"
-              }
+              thumbColor={excludeFinished ? "#ffffff" : T.isDark ? "#1d2d29" : "#f8fafc"}
             />
           </View>
         </View>
 
-        {/* Tự động làm mới */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-            Tự động làm mới
-          </Text>
-
-          <View style={styles.switchRow}>
-            <Text style={[styles.switchLabel, { color: T.textPrimary }]}>
-              Bật tự động làm mới
-            </Text>
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Tự làm mới</Text>
+          <View style={[styles.switchRow, { backgroundColor: T.softBg, borderColor: T.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.switchTitle, { color: T.textPrimary }]}>Bật tự đồng bộ</Text>
+              <Text style={[styles.switchHint, { color: T.textSecondary }]}>
+                Feed sẽ tự cập nhật khi có thay đổi từ sân hoặc giải đấu.
+              </Text>
+            </View>
             <Switch
               value={autoRefresh}
               onValueChange={setAutoRefresh}
               trackColor={{ false: T.border, true: T.tint }}
-              thumbColor={
-                autoRefresh
-                  ? "#fff"
-                  : T.scheme === "dark"
-                  ? "#1f2937"
-                  : "#f4f3f4"
-              }
+              thumbColor={autoRefresh ? "#ffffff" : T.isDark ? "#1d2d29" : "#f8fafc"}
             />
           </View>
 
-          <View style={styles.buttonGrid}>
-            {REFRESH_PRESETS.map((sec) => (
-              <TouchableOpacity
-                key={sec}
-                style={[
-                  styles.gridButton,
-                  { backgroundColor: T.sheetBg, borderColor: T.border },
-                  refreshSec === sec &&
-                    autoRefresh && {
-                      backgroundColor: T.tint,
-                      borderColor: T.tint,
-                    },
-                  !autoRefresh && styles.gridButtonDisabled,
-                ]}
-                onPress={() => autoRefresh && setRefreshSec(sec)}
-                disabled={!autoRefresh}
-                activeOpacity={0.7}
-              >
-                <Text
+          <View style={styles.chipWrap}>
+            {REFRESH_PRESETS.map((seconds) => {
+              const active = autoRefresh && refreshSec === seconds;
+              return (
+                <TouchableOpacity
+                  key={seconds}
+                  disabled={!autoRefresh}
+                  onPress={() => setRefreshSec(seconds)}
                   style={[
-                    styles.gridButtonText,
-                    { color: T.textSecondary },
-                    refreshSec === sec &&
-                      autoRefresh &&
-                      styles.gridButtonTextActive,
-                    !autoRefresh && styles.gridButtonTextDisabled,
+                    styles.chip,
+                    {
+                      opacity: autoRefresh ? 1 : 0.45,
+                      backgroundColor: active ? T.tint : T.softBg,
+                      borderColor: active ? T.tint : T.border,
+                    },
                   ]}
                 >
-                  {sec}s
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: active ? "#ffffff" : T.textPrimary },
+                    ]}
+                  >
+                    {seconds}s
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       </BottomSheetScrollView>
 
-      {/* Footer */}
       <View
         style={[
           styles.footer,
           {
-            paddingBottom: insets.bottom + 16,
-            borderTopColor: T.border,
+            paddingBottom: insets.bottom + 14,
             backgroundColor: T.sheetBg,
+            borderTopColor: T.border,
           },
         ]}
       >
         <TouchableOpacity
-          style={[styles.cancelBtn, { backgroundColor: T.softBg }]}
           onPress={() => modalRef.current?.dismiss()}
-          activeOpacity={0.7}
+          style={[styles.footerBtn, { backgroundColor: T.softBg, borderColor: T.border }]}
         >
-          <Text style={[styles.cancelBtnText, { color: T.tint }]}>Hủy</Text>
+          <Text style={[styles.footerBtnText, { color: T.textPrimary }]}>Hủy</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={[styles.applyBtn, { backgroundColor: T.tint }]}
           onPress={handleApply}
-          activeOpacity={0.7}
+          style={[styles.footerBtn, styles.primaryBtn, { backgroundColor: T.tint, borderColor: T.tint }]}
         >
-          <Text style={styles.applyBtnText}>Áp dụng</Text>
+          <Text style={[styles.footerBtnText, { color: "#ffffff" }]}>Áp dụng</Text>
         </TouchableOpacity>
       </View>
     </BottomSheetModal>
@@ -382,90 +361,105 @@ const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
 });
 
 const styles = StyleSheet.create({
-  bottomSheetBackground: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  handleIndicator: { width: 40, height: 4, borderRadius: 999 },
-  content: { paddingHorizontal: 16 },
+  handle: {
+    width: 44,
+    height: 4,
+    borderRadius: 999,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
-    paddingTop: 8,
+    gap: 12,
   },
-  title: { fontSize: 24, fontWeight: "700" },
-  resetBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
-  resetBtnText: { fontSize: 14, fontWeight: "600" },
-  section: { marginBottom: 28 },
-  sectionTitle: { fontSize: 17, fontWeight: "600", marginBottom: 14 },
-  optionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    marginRight: 12,
-    justifyContent: "center",
-    alignItems: "center",
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
   },
-  checkboxInner: { width: 14, height: 14, borderRadius: 3 },
-  optionText: { fontSize: 16 },
-  divider: { height: 1, marginVertical: 8 },
-  buttonGrid: {
+  resetBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  resetText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  section: {
+    gap: 14,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  chipWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 16,
   },
-  gridButton: {
-    flex: 1,
-    minWidth: "47%",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 2,
-    alignItems: "center",
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  gridButtonDisabled: { opacity: 0.4 },
-  gridButtonText: { fontSize: 15, fontWeight: "600" },
-  gridButtonTextActive: { color: "#fff" },
-  gridButtonTextDisabled: { color: "#999" },
+  chipText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
   switchRow: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    gap: 14,
   },
-  switchLabel: { fontSize: 16, flex: 1 },
+  switchTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  switchHint: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   footer: {
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingTop: 12,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  cancelBtn: {
+  footerBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
+    minHeight: 48,
+    borderRadius: 16,
     alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
-  cancelBtnText: { fontSize: 16, fontWeight: "600" },
-  applyBtn: {
-    flex: 2,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
+  primaryBtn: {
+    flex: 1.3,
   },
-  applyBtnText: { fontSize: 16, color: "#fff", fontWeight: "700" },
+  footerBtnText: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
 });
 
 export default memo(FiltersBottomSheet);

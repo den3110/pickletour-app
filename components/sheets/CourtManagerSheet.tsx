@@ -45,10 +45,13 @@ import {
 import {
   useAssignTournamentMatchToCourtStationMutation,
   useFreeTournamentCourtStationMutation,
+  useGetAdminCourtClusterRuntimeQuery,
   useGetTournamentCourtClusterOptionsQuery,
   useGetTournamentCourtClusterRuntimeQuery,
+  useUpdateTournamentAllowedCourtClustersMutation,
   useUpdateTournamentCourtStationAssignmentConfigMutation,
 } from "@/slices/courtClustersAdminApiSlice";
+import { useListTournamentRefereesQuery } from "@/slices/refereeScopeApiSlice";
 
 /* ================= helpers / formatters ================= */
 const norm = (s) => String(s || "").toLowerCase();
@@ -166,8 +169,8 @@ const fallbackGlobalCode = (m, idx) => {
     typeof m?.order === "number" && Number.isFinite(m.order)
       ? m.order
       : Number.isFinite(idx)
-      ? idx
-      : 0;
+        ? idx
+        : 0;
   const T = baseOrder + 1;
 
   if (isGroupLike(m)) {
@@ -210,7 +213,7 @@ const tournamentTitle = (match) =>
     normalizedMatch(match)?.tournament?.name ||
       match?.tournamentName ||
       match?.tournament?.name ||
-      ""
+      "",
   ).trim() || "Giải không xác định";
 
 const formatRuntimeMatchLabel = (match) => {
@@ -229,8 +232,88 @@ const toIdString = (value) =>
       value?._id ||
       value?.id ||
       value?.toString?.() ||
-      ""
+      "",
   );
+
+const normalizeAssignmentMode = (value) => {
+  const mode = String(value || "")
+    .trim()
+    .toLowerCase();
+  return mode === "queue" || mode === "auto" ? "queue" : "manual";
+};
+
+const modeLabel = (value) =>
+  normalizeAssignmentMode(value) === "queue" ? "Danh sách" : "Gán tay";
+
+const stationStatusLabel = (status) =>
+  ({
+    idle: "Sẵn sàng",
+    assigned: "Đã được gán trận",
+    live: "Đang live",
+    maintenance: "Bảo trì",
+  })[
+    String(status || "")
+      .trim()
+      .toLowerCase()
+  ] ||
+  status ||
+  "—";
+
+const getRefId = (value) =>
+  String(
+    (typeof value === "string" && value) ||
+      value?._id ||
+      value?.id ||
+      value?.userId ||
+      value?.refId ||
+      value?.uid ||
+      "",
+  );
+
+const refDisplayName = (referee) => {
+  if (!referee || typeof referee !== "object") return "";
+  const candidates = [
+    referee.nickname,
+    referee.nickName,
+    referee.displayName,
+    referee.fullName,
+    referee.name,
+    referee.code,
+    referee.email,
+    referee.phone,
+  ];
+  for (const value of candidates) {
+    const next = String(value || "").trim();
+    if (next) return next;
+  }
+  return getRefId(referee);
+};
+
+const getStationDefaultRefereeIds = (station) => {
+  if (Array.isArray(station?.defaultRefereeIds)) {
+    return station.defaultRefereeIds
+      .map((value) => toIdString(value))
+      .filter(Boolean);
+  }
+  if (Array.isArray(station?.defaultReferees)) {
+    return station.defaultReferees
+      .map((value) => getRefId(value))
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const buildStationDraft = (station) => ({
+  assignmentMode: normalizeAssignmentMode(station?.assignmentMode),
+  queueMatchIds: Array.isArray(station?.queueItems)
+    ? station.queueItems
+        .map((item) => toIdString(item?.matchId || item?.match?._id))
+        .filter(Boolean)
+    : [],
+  defaultRefereeIds: getStationDefaultRefereeIds(station),
+  pickerMatchIds: [],
+  dirty: false,
+});
 
 const getMatchBracketId = (match) =>
   toIdString(match?.bracket?._id || match?.bracket);
@@ -323,19 +406,23 @@ function IconBtn({ name, onPress, color, size = 18, style }) {
   );
 }
 
-function Btn({ variant = "solid", onPress, children, disabled, danger }) {
+function Btn({
+  variant = "solid",
+  onPress,
+  children,
+  disabled,
+  danger,
+  style,
+}) {
   const t = useTokens();
   const isDisabled = Boolean(disabled);
-  const bg =
-    variant === "solid"
-      ? danger
-        ? "#ef4444"
-        : t.colors.primary
-      : "transparent";
   const base = [
     styles.btn,
+    style,
     variant === "solid"
-      ? { backgroundColor: bg }
+      ? {
+          backgroundColor: danger ? "#ef4444" : t.colors.primary,
+        }
       : { borderColor: danger ? "#ef4444" : t.colors.primary, borderWidth: 1 },
     isDisabled && { opacity: 0.5 },
   ];
@@ -343,7 +430,10 @@ function Btn({ variant = "solid", onPress, children, disabled, danger }) {
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed }) => [base, pressed && !isDisabled && { opacity: 0.9 }]}
+      style={({ pressed }) => [
+        base,
+        pressed && !isDisabled && { opacity: 0.9 },
+      ]}
     >
       <Text
         style={{
@@ -351,8 +441,8 @@ function Btn({ variant = "solid", onPress, children, disabled, danger }) {
             variant === "solid"
               ? "#fff"
               : danger
-              ? "#ef4444"
-              : t.colors.primary,
+                ? "#ef4444"
+                : t.colors.primary,
           fontWeight: "700",
         }}
       >
@@ -409,7 +499,7 @@ function AssignSpecificSheet({
     return base.filter((m) =>
       (formatRuntimeMatchLabel(m) || optionLabel(m))
         .toLowerCase()
-        .includes(debouncedQ)
+        .includes(debouncedQ),
     );
   }, [matches, debouncedQ, optionLabel]);
 
@@ -419,11 +509,16 @@ function AssignSpecificSheet({
       snapPoints={["70%"]}
       onDismiss={onClose}
       backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} style={{zIndex: 1000}} />
+        <BottomSheetBackdrop
+          {...p}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          style={{ zIndex: 1000 }}
+        />
       )}
       handleIndicatorStyle={{ backgroundColor: t.colors.border }}
       backgroundStyle={{ backgroundColor: t.colors.card }}
-      containerStyle={{zIndex: 1000}}
+      containerStyle={{ zIndex: 1000 }}
     >
       <BottomSheetScrollView contentContainerStyle={styles.container}>
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -576,7 +671,7 @@ function MatchListSheet({
 
   const selectedMatches = useMemo(
     () => draftIds.map((id) => resolveMatchById(id)).filter(Boolean),
-    [draftIds, resolveMatchById]
+    [draftIds, resolveMatchById],
   );
 
   const availableMatches = useMemo(() => {
@@ -586,7 +681,8 @@ function MatchListSheet({
       const matchId = toIdString(match?._id || match?.id);
       if (!matchId || pickedIds.has(matchId)) return false;
       if (!debouncedQ) return true;
-      const haystack = `${getLabel(match)} ${match?.courtLabel || ""}`.toLowerCase();
+      const haystack =
+        `${getLabel(match)} ${match?.courtLabel || ""}`.toLowerCase();
       return haystack.includes(debouncedQ);
     });
   }, [matches, draftIds, debouncedQ, getLabel]);
@@ -594,7 +690,13 @@ function MatchListSheet({
   const courtLabel =
     court?.name || court?.label || court?.title || court?.code || "(không rõ)";
 
-  const renderSelectedMatch = ({ item, index, onDragStart, onDragEnd, isActive }) => {
+  const renderSelectedMatch = ({
+    item,
+    index,
+    onDragStart,
+    onDragEnd,
+    isActive,
+  }) => {
     const matchId = toIdString(item?._id || item?.id);
     return (
       <View
@@ -669,7 +771,11 @@ function MatchListSheet({
       <BottomSheetScrollView contentContainerStyle={styles.container}>
         <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
           <Row style={{ alignItems: "center", gap: 8 }}>
-            <MaterialIcons name="playlist-add" size={18} color={t.colors.text} />
+            <MaterialIcons
+              name="playlist-add"
+              size={18}
+              color={t.colors.text}
+            />
             <Text style={[styles.title, { color: t.colors.text }]}>
               Gán danh sách trận theo sân
             </Text>
@@ -683,15 +789,18 @@ function MatchListSheet({
             { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
           ]}
         >
-            <Text style={{ color: t.chipInfoFg }}>
-              Sân: <Text style={{ fontWeight: "700", color: t.chipInfoFg }}>{courtLabel}</Text>
+          <Text style={{ color: t.chipInfoFg }}>
+            Sân:{" "}
+            <Text style={{ fontWeight: "700", color: t.chipInfoFg }}>
+              {courtLabel}
             </Text>
-            <Text style={{ color: t.chipInfoFg, marginTop: 4 }}>
-              {currentMatch
-                ? `Trận hiện tại: ${getLabel(currentMatch)}`
-                : "Sân đang trống"}
-            </Text>
-          </View>
+          </Text>
+          <Text style={{ color: t.chipInfoFg, marginTop: 4 }}>
+            {currentMatch
+              ? `Trận hiện tại: ${getLabel(currentMatch)}`
+              : "Sân đang trống"}
+          </Text>
+        </View>
 
         <View style={[styles.inputWrap, { borderColor: t.colors.border }]}>
           <MaterialIcons name="search" size={18} color={t.muted} />
@@ -714,10 +823,10 @@ function MatchListSheet({
           ]}
         >
           <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-            List dang chon ({selectedMatches.length})
+            Danh sách đang chọn ({selectedMatches.length})
           </Text>
           <Text style={[styles.selectedQueueGuide, { color: t.muted }]}>
-            Giu bieu tuong keo de doi thu tu. Cham vao row de mo chi tiet tran.
+            Giữ biểu tượng kéo để đổi thứ tự. Chạm vào hàng để mở chi tiết trận.
           </Text>
           {selectedMatches.length > 0 ? (
             <DragList
@@ -742,7 +851,7 @@ function MatchListSheet({
               ]}
             >
               <Text style={{ color: t.chipInfoFg }}>
-                Chua co tran nao trong list.
+                Chưa có trận nào trong danh sách.
               </Text>
             </View>
           )}
@@ -755,7 +864,7 @@ function MatchListSheet({
           ]}
         >
           <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-            Tran co the them
+            Trận có thể thêm
           </Text>
           <View style={{ gap: 8 }}>
             {availableMatches.map((match) => {
@@ -813,17 +922,12 @@ function MatchListSheet({
         </View>
 
         <Row style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-          <Btn
-            variant="outline"
-            danger
-            onPress={onClear}
-            disabled={isClearing}
-          >
-              {isClearing ? "Đang xóa..." : "Xóa danh sách"}
+          <Btn variant="outline" danger onPress={onClear} disabled={isClearing}>
+            {isClearing ? "Đang xóa..." : "Xóa danh sách"}
           </Btn>
           <Row style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
             <Btn variant="outline" onPress={onClose}>
-              Huy
+              Hủy
             </Btn>
             <Btn onPress={onSave} disabled={isSaving}>
               {isSaving ? "Đang lưu..." : "Lưu danh sách"}
@@ -832,6 +936,641 @@ function MatchListSheet({
         </Row>
       </BottomSheetScrollView>
     </BottomSheetModal>
+  );
+}
+
+function ClusterRuntimeStationCard({
+  t,
+  station,
+  stationId,
+  stationDraft,
+  selectedRefereeId,
+  selectedRefereeLabel,
+  refereeOptions,
+  refereePickerOpen,
+  loadingTournamentReferees,
+  selectableMatches,
+  reservedByOther,
+  pickerQuery,
+  clusterInteractionDisabled,
+  savingStationConfig,
+  freeingStation,
+  tournamentId,
+  onToggleRefereePicker,
+  onSelectReferee,
+  onChangeAssignmentMode,
+  onChangePickerQuery,
+  onTogglePickerMatch,
+  onAddQueueMatches,
+  onRemoveQueueMatch,
+  onReorderQueue,
+  onSaveConfig,
+  onFreeCurrent,
+  onOpenViewer,
+}) {
+  const normalizedPickerQuery = String(pickerQuery || "")
+    .trim()
+    .toLowerCase();
+  const assignmentMode = normalizeAssignmentMode(
+    stationDraft?.assignmentMode || station?.assignmentMode,
+  );
+  const currentMatch = normalizedMatch(station?.currentMatch);
+  const liveCurrentMatch =
+    String(currentMatch?.status || "").toLowerCase() === "live"
+      ? currentMatch
+      : null;
+  const liveCurrentMatchId = toIdString(
+    liveCurrentMatch?._id || liveCurrentMatch?.id,
+  );
+  const occupiedTournamentId = toIdString(
+    liveCurrentMatch?.tournament?._id ||
+      station?.currentTournament?._id ||
+      station?.currentTournamentId,
+  );
+  const occupiedByAnotherTournament = Boolean(
+    occupiedTournamentId && occupiedTournamentId !== String(tournamentId),
+  );
+
+  const matchById = new Map();
+  selectableMatches.forEach((match) => {
+    const matchId = toIdString(match?._id || match?.id);
+    if (matchId) matchById.set(matchId, normalizedMatch(match));
+  });
+  if (station?.currentMatch?._id) {
+    matchById.set(
+      toIdString(station.currentMatch._id),
+      normalizedMatch(station.currentMatch),
+    );
+  }
+  (Array.isArray(station?.queueItems) ? station.queueItems : []).forEach(
+    (item) => {
+      const match = normalizedMatch(item?.match);
+      const matchId = toIdString(item?.matchId || match?._id);
+      if (matchId && match) {
+        matchById.set(matchId, match);
+      }
+    },
+  );
+
+  const displayQueueMatchIds = (stationDraft?.queueMatchIds || []).filter(
+    (matchId) => matchId && matchId !== liveCurrentMatchId,
+  );
+  const queueMatches = displayQueueMatchIds
+    .map((matchId) => matchById.get(matchId))
+    .filter(Boolean);
+
+  const elsewhere = new Set();
+  reservedByOther.forEach((ids, otherStationId) => {
+    if (otherStationId === stationId) return;
+    ids.forEach((matchId) => elsewhere.add(matchId));
+  });
+
+  const filteredAvailableMatches = selectableMatches
+    .filter((match) => {
+      const matchId = toIdString(match?._id || match?.id);
+      return (
+        matchId &&
+        !stationDraft?.queueMatchIds?.includes(matchId) &&
+        !elsewhere.has(matchId) &&
+        liveCurrentMatchId !== matchId
+      );
+    })
+    .filter((match) =>
+      !normalizedPickerQuery
+        ? true
+        : formatRuntimeMatchLabel(match)
+            .toLowerCase()
+            .includes(normalizedPickerQuery),
+    )
+    .slice(0, normalizedPickerQuery ? 18 : 8);
+
+  const saveDisabled =
+    clusterInteractionDisabled || savingStationConfig || !stationDraft?.dirty;
+  const freeDisabled =
+    clusterInteractionDisabled || freeingStation || !currentMatch;
+
+  const renderQueueMatch = ({
+    item,
+    index,
+    onDragStart,
+    onDragEnd,
+    isActive,
+  }) => {
+    const matchId = toIdString(item?._id || item?.id);
+    return (
+      <View
+        style={[
+          styles.stationQueueRow,
+          {
+            borderColor: isActive ? t.colors.primary : t.colors.border,
+            backgroundColor: isActive ? t.chipInfoBg : t.colors.card,
+            opacity: isActive ? 0.92 : 1,
+          },
+        ]}
+      >
+        <Pressable
+          onPress={() => onOpenViewer(matchId)}
+          style={({ pressed }) => [
+            styles.stationQueueContent,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={[styles.itemName, { color: t.colors.text }]}>
+            #{index + 1} · {buildMatchCode(item)}
+          </Text>
+          <Text style={[styles.stationQueueMeta, { color: t.muted }]}>
+            {tournamentTitle(item)}
+          </Text>
+          <Text style={[styles.stationQueueMeta, { color: t.muted }]}>
+            {teamLine(item)}
+          </Text>
+        </Pressable>
+        <Row style={styles.stationQueueActions}>
+          <Pressable
+            onPressIn={onDragStart}
+            onPressOut={onDragEnd}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.dragHandleBtn,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <MaterialIcons
+              name="drag-handle"
+              size={22}
+              color={isActive ? t.colors.primary : t.colors.text}
+            />
+          </Pressable>
+          <IconBtn
+            name="delete-outline"
+            onPress={() => onRemoveQueueMatch(matchId)}
+            color="#ef4444"
+            style={styles.deleteQueueBtn}
+          />
+        </Row>
+      </View>
+    );
+  };
+
+  return (
+    <View
+      style={[
+        styles.paperRow,
+        {
+          borderColor: t.colors.border,
+          backgroundColor: t.colors.card,
+        },
+      ]}
+    >
+      <View style={styles.clusterStationStack}>
+        <Row style={styles.clusterStationHeader}>
+          <Chip tone="default">{station?.name || station?.code || "Sân"}</Chip>
+          <Chip tone="default">{stationStatusLabel(station?.status)}</Chip>
+          <Chip tone="default">{station?.code || "—"}</Chip>
+          <Chip tone="info">{modeLabel(assignmentMode)}</Chip>
+        </Row>
+
+        <Text
+          style={[
+            styles.clusterRefereeLabel,
+            {
+              color: selectedRefereeLabel ? t.colors.primary : t.muted,
+            },
+          ]}
+        >
+          {selectedRefereeLabel
+            ? `Trọng tài đứng sân: ${selectedRefereeLabel}`
+            : "Chưa gán trọng tài đứng sân."}
+        </Text>
+
+        {liveCurrentMatch ? (
+          <Pressable
+            onPress={() =>
+              onOpenViewer(
+                toIdString(liveCurrentMatch?._id || liveCurrentMatch?.id),
+              )
+            }
+            style={({ pressed }) => [
+              styles.liveMatchCard,
+              {
+                borderColor: t.chipWarnFg,
+                backgroundColor: t.dark
+                  ? "rgba(251, 191, 36, 0.08)"
+                  : "#fff7ed",
+              },
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <Row style={styles.liveMatchHeader}>
+              <View style={styles.liveMatchTitleWrap}>
+                <Text style={[styles.liveMatchTournament, { color: t.muted }]}>
+                  {tournamentTitle(liveCurrentMatch)}
+                </Text>
+                <Text style={[styles.liveMatchCode, { color: t.colors.text }]}>
+                  {buildMatchCode(liveCurrentMatch)}
+                </Text>
+              </View>
+              <Chip tone="warn">Đang live</Chip>
+            </Row>
+            <Text style={[styles.liveMatchTeams, { color: t.colors.text }]}>
+              {teamLine(liveCurrentMatch)}
+            </Text>
+          </Pressable>
+        ) : (
+          <View
+            style={[
+              styles.idleStationCard,
+              {
+                borderColor: t.colors.border,
+                backgroundColor: t.colors.background,
+              },
+            ]}
+          >
+            <Text style={{ color: t.muted }}>
+              Chưa có trận nào đang live trên sân.
+            </Text>
+          </View>
+        )}
+
+        {occupiedByAnotherTournament ? (
+          <View
+            style={[
+              styles.infoBox,
+              {
+                backgroundColor: t.chipWarnBg,
+                borderColor: t.colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={{ color: t.chipWarnFg, fontSize: 12, fontWeight: "700" }}
+            >
+              Sân này đang thuộc giải khác. Chỉ admin mới nên can thiệp.
+            </Text>
+          </View>
+        ) : null}
+
+        <Row style={styles.clusterControlsRow}>
+          <View style={styles.clusterFieldBlock}>
+            <Text style={[styles.clusterFieldLabel, { color: t.muted }]}>
+              Chế độ sân
+            </Text>
+            <Row style={styles.clusterSegmentRow}>
+              <Pressable
+                disabled={clusterInteractionDisabled}
+                onPress={() => onChangeAssignmentMode("manual")}
+                style={[
+                  styles.segmentOption,
+                  {
+                    borderColor:
+                      assignmentMode === "manual"
+                        ? t.colors.primary
+                        : t.colors.border,
+                    backgroundColor:
+                      assignmentMode === "manual"
+                        ? t.chipInfoBg
+                        : t.colors.background,
+                    opacity: clusterInteractionDisabled ? 0.55 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color:
+                      assignmentMode === "manual"
+                        ? t.colors.primary
+                        : t.colors.text,
+                    fontWeight: "700",
+                  }}
+                >
+                  Gán tay
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={clusterInteractionDisabled}
+                onPress={() => onChangeAssignmentMode("queue")}
+                style={[
+                  styles.segmentOption,
+                  {
+                    borderColor:
+                      assignmentMode === "queue"
+                        ? t.colors.primary
+                        : t.colors.border,
+                    backgroundColor:
+                      assignmentMode === "queue"
+                        ? t.chipInfoBg
+                        : t.colors.background,
+                    opacity: clusterInteractionDisabled ? 0.55 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color:
+                      assignmentMode === "queue"
+                        ? t.colors.primary
+                        : t.colors.text,
+                    fontWeight: "700",
+                  }}
+                >
+                  Danh sách
+                </Text>
+              </Pressable>
+            </Row>
+          </View>
+
+          <View style={styles.clusterFieldBlock}>
+            <Text style={[styles.clusterFieldLabel, { color: t.muted }]}>
+              Trọng tài đứng sân
+            </Text>
+            <Pressable
+              disabled={clusterInteractionDisabled}
+              onPress={onToggleRefereePicker}
+              style={({ pressed }) => [
+                styles.selectorField,
+                {
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.background,
+                  opacity: clusterInteractionDisabled ? 0.55 : 1,
+                },
+                pressed && !clusterInteractionDisabled && { opacity: 0.9 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.selectorFieldText,
+                  {
+                    color: selectedRefereeLabel ? t.colors.text : t.muted,
+                    fontWeight: selectedRefereeLabel ? "700" : "500",
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {loadingTournamentReferees
+                  ? "Đang tải trọng tài..."
+                  : selectedRefereeLabel || "Chưa gán trọng tài"}
+              </Text>
+              <MaterialIcons
+                name={
+                  refereePickerOpen
+                    ? "keyboard-arrow-up"
+                    : "keyboard-arrow-down"
+                }
+                size={20}
+                color={t.colors.text}
+              />
+            </Pressable>
+
+            {refereePickerOpen ? (
+              <View
+                style={[
+                  styles.selectorOptionsWrap,
+                  {
+                    borderColor: t.colors.border,
+                    backgroundColor: t.colors.background,
+                  },
+                ]}
+              >
+                <Pressable
+                  onPress={() => onSelectReferee("")}
+                  style={[
+                    styles.selectorOptionChip,
+                    {
+                      borderColor: !selectedRefereeId
+                        ? t.colors.primary
+                        : t.colors.border,
+                      backgroundColor: !selectedRefereeId
+                        ? t.chipInfoBg
+                        : t.colors.card,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: !selectedRefereeId
+                        ? t.colors.primary
+                        : t.colors.text,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Chưa gán
+                  </Text>
+                </Pressable>
+                {refereeOptions.map((referee) => {
+                  const refereeId = getRefId(referee);
+                  const isPicked = refereeId === selectedRefereeId;
+                  return (
+                    <Pressable
+                      key={refereeId}
+                      onPress={() => onSelectReferee(refereeId)}
+                      style={[
+                        styles.selectorOptionChip,
+                        {
+                          borderColor: isPicked
+                            ? t.colors.primary
+                            : t.colors.border,
+                          backgroundColor: isPicked
+                            ? t.chipInfoBg
+                            : t.colors.card,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: isPicked ? t.colors.primary : t.colors.text,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {refDisplayName(referee)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        </Row>
+
+        <Row style={styles.clusterActionRow}>
+          <Btn
+            variant="outline"
+            danger
+            onPress={onFreeCurrent}
+            disabled={freeDisabled}
+          >
+            {freeingStation ? "Đang xử lý..." : "Bỏ qua trận hiện tại"}
+          </Btn>
+          <Btn onPress={onSaveConfig} disabled={saveDisabled}>
+            {savingStationConfig
+              ? "Đang lưu..."
+              : stationDraft?.dirty
+                ? "Lưu cấu hình"
+                : "Đã lưu cấu hình"}
+          </Btn>
+        </Row>
+
+        {assignmentMode === "queue" ? (
+          <View
+            style={[
+              styles.stationQueueSection,
+              {
+                borderColor: t.colors.border,
+                backgroundColor: t.colors.background,
+              },
+            ]}
+          >
+            <Row style={styles.stationQueueHeader}>
+              <Chip tone="info">{`${queueMatches.length} trận trong danh sách`}</Chip>
+              {!!stationDraft?.pickerMatchIds?.length && (
+                <Chip tone="default">
+                  {`Đã chọn ${stationDraft.pickerMatchIds.length}`}
+                </Chip>
+              )}
+            </Row>
+
+            <View
+              style={[
+                styles.inputWrap,
+                {
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.card,
+                },
+              ]}
+            >
+              <MaterialIcons name="search" size={18} color={t.muted} />
+              <TextInput
+                style={[styles.input, { color: t.colors.text }]}
+                placeholder="Tìm và thêm trận vào danh sách sân..."
+                placeholderTextColor={t.muted}
+                value={pickerQuery}
+                onChangeText={onChangePickerQuery}
+                editable={!clusterInteractionDisabled}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <Text style={[styles.stationQueueHelp, { color: t.muted }]}>
+              Chọn nhiều trận rồi bấm thêm một lần, giống luồng trên web.
+            </Text>
+
+            <View style={styles.queueCandidateList}>
+              {filteredAvailableMatches.map((match) => {
+                const matchId = toIdString(match?._id || match?.id);
+                const picked = stationDraft?.pickerMatchIds?.includes(matchId);
+                return (
+                  <Pressable
+                    key={matchId}
+                    disabled={clusterInteractionDisabled}
+                    onPress={() => onTogglePickerMatch(matchId)}
+                    style={[
+                      styles.queueCandidateRow,
+                      {
+                        borderColor: picked
+                          ? t.colors.primary
+                          : t.colors.border,
+                        backgroundColor: picked ? t.chipInfoBg : t.colors.card,
+                        opacity: clusterInteractionDisabled ? 0.55 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={styles.queueCandidateContent}>
+                      <Text style={[styles.itemName, { color: t.colors.text }]}>
+                        {buildMatchCode(match)}
+                      </Text>
+                      <Text
+                        style={[styles.stationQueueMeta, { color: t.muted }]}
+                      >
+                        {teamLine(match)}
+                      </Text>
+                    </View>
+                    <MaterialIcons
+                      name={picked ? "check-circle" : "add-circle-outline"}
+                      size={22}
+                      color={picked ? t.colors.primary : t.muted}
+                    />
+                  </Pressable>
+                );
+              })}
+
+              {!filteredAvailableMatches.length ? (
+                <View
+                  style={[
+                    styles.infoBox,
+                    {
+                      backgroundColor: t.chipInfoBg,
+                      borderColor: t.chipInfoBd,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: t.chipInfoFg }}>
+                    Không còn trận phù hợp để thêm.
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Row style={styles.stationQueueAddRow}>
+              <Btn
+                variant="outline"
+                onPress={onAddQueueMatches}
+                disabled={
+                  clusterInteractionDisabled ||
+                  !stationDraft?.pickerMatchIds?.length
+                }
+              >
+                {stationDraft?.pickerMatchIds?.length
+                  ? `Thêm ${stationDraft.pickerMatchIds.length} trận`
+                  : "Thêm"}
+              </Btn>
+            </Row>
+
+            {!queueMatches.length ? (
+              <View
+                style={[
+                  styles.infoBox,
+                  {
+                    backgroundColor: t.chipInfoBg,
+                    borderColor: t.chipInfoBd,
+                  },
+                ]}
+              >
+                <Text style={{ color: t.chipInfoFg }}>
+                  Sân này chưa có danh sách trận.
+                </Text>
+              </View>
+            ) : (
+              <DragList
+                data={queueMatches}
+                keyExtractor={(item, index) =>
+                  toIdString(item?._id || item?.id) ||
+                  `queue-${stationId}-${index}`
+                }
+                renderItem={renderQueueMatch}
+                onReordered={onReorderQueue}
+                scrollEnabled={false}
+                nestedScrollEnabled
+                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+              />
+            )}
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.manualModeHint,
+              {
+                borderColor: t.colors.border,
+                backgroundColor: t.colors.background,
+              },
+            ]}
+          >
+            <Chip tone="default">
+              Sân sẽ chờ người vận hành gán trận như trên web
+            </Chip>
+          </View>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -861,22 +1600,25 @@ export default function CourtManagerSheet({
   const [listDraftIds, setListDraftIds] = useState([]);
   const [selectedClusterId, setSelectedClusterId] = useState("");
   const [viewerMatchId, setViewerMatchId] = useState("");
+  const [stationDrafts, setStationDrafts] = useState({});
+  const [stationPickerQueries, setStationPickerQueries] = useState({});
+  const [refereePickerStationId, setRefereePickerStationId] = useState("");
 
-  const allMatchesArgs = open && tournamentId
-    ? bracketId
-      ? { tournamentId, bracket: bracketId, limit: 500 }
-      : { tournamentId, limit: 500 }
-    : skipToken;
+  const allMatchesArgs =
+    open && tournamentId
+      ? bracketId
+        ? { tournamentId, bracket: bracketId, limit: 500 }
+        : { tournamentId, limit: 500 }
+      : skipToken;
   const {
     data: allMatches = [],
     error: allMatchesError,
     refetch: refetchAllMatches,
-  } =
-    useListMatchesQuery(allMatchesArgs, {
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-    });
+  } = useListMatchesQuery(allMatchesArgs, {
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
 
   const {
     data: clusterOptionsData,
@@ -888,55 +1630,113 @@ export default function CourtManagerSheet({
       refetchOnMountOrArgChange: true,
       refetchOnFocus: true,
       refetchOnReconnect: true,
-    }
+    },
   );
 
-  const allowedClusterOptions = useMemo(() => {
-    const selectedIds = Array.isArray(clusterOptionsData?.selectedIds)
-      ? clusterOptionsData.selectedIds.map((value) => toIdString(value)).filter(Boolean)
-      : [];
-    const items = Array.isArray(clusterOptionsData?.items)
-      ? clusterOptionsData.items
-      : [];
-    const selectedItems = items.filter((cluster) =>
-      selectedIds.includes(toIdString(cluster?._id || cluster?.id))
-    );
-    return selectedItems.length ? selectedItems : items;
-  }, [clusterOptionsData?.items, clusterOptionsData?.selectedIds]);
+  const selectedAllowedClusterIds = useMemo(
+    () =>
+      Array.isArray(clusterOptionsData?.selectedIds)
+        ? clusterOptionsData.selectedIds
+            .map((value) => toIdString(value))
+            .filter(Boolean)
+        : [],
+    [clusterOptionsData?.selectedIds],
+  );
+  const allowedClusterOptions = useMemo(
+    () =>
+      Array.isArray(clusterOptionsData?.items) ? clusterOptionsData.items : [],
+    [clusterOptionsData?.items],
+  );
+  const initialAllowedClusterId = useMemo(
+    () =>
+      selectedAllowedClusterIds[0] ||
+      toIdString(allowedClusterOptions[0]?._id || allowedClusterOptions[0]?.id),
+    [allowedClusterOptions, selectedAllowedClusterIds],
+  );
   const clusterOptionsErrorMessage = getApiErrorMessage(
     clusterOptionsError,
-    "Khong tai duoc cau hinh cum san."
+    "Không tải được cấu hình cụm sân.",
   );
   const allMatchesErrorMessage = getApiErrorMessage(
     allMatchesError,
-    "Khong tai duoc danh sach tran dau."
+    "Không tải được danh sách trận đấu.",
   );
 
   useEffect(() => {
     if (!open) return;
-    const firstId = toIdString(
-      allowedClusterOptions[0]?._id || allowedClusterOptions[0]?.id
-    );
-    if (!selectedClusterId || !allowedClusterOptions.some((cluster) => toIdString(cluster?._id || cluster?.id) === selectedClusterId)) {
-      setSelectedClusterId(firstId || "");
+    if (
+      !selectedClusterId ||
+      !allowedClusterOptions.some(
+        (cluster) =>
+          toIdString(cluster?._id || cluster?.id) === selectedClusterId,
+      )
+    ) {
+      setSelectedClusterId(initialAllowedClusterId || "");
     }
-  }, [allowedClusterOptions, open, selectedClusterId]);
+  }, [allowedClusterOptions, initialAllowedClusterId, open, selectedClusterId]);
+
+  const isPreviewingUnsavedCluster = Boolean(
+    selectedClusterId &&
+    initialAllowedClusterId &&
+    selectedClusterId !== initialAllowedClusterId,
+  );
 
   const {
-    data: clusterRuntime,
-    isLoading: isLoadingClusterRuntime,
-    error: clusterRuntimeError,
-    refetch: refetchClusterRuntime,
+    data: tournamentClusterRuntime,
+    isLoading: isLoadingTournamentClusterRuntime,
+    error: tournamentClusterRuntimeError,
+    refetch: refetchTournamentClusterRuntime,
   } = useGetTournamentCourtClusterRuntimeQuery(
-    open && tournamentId && selectedClusterId
+    open && tournamentId && selectedClusterId && !isPreviewingUnsavedCluster
       ? { tournamentId, clusterId: selectedClusterId }
       : skipToken,
     {
       refetchOnMountOrArgChange: true,
       refetchOnFocus: true,
       refetchOnReconnect: true,
-    }
+    },
   );
+
+  const {
+    data: previewClusterRuntime,
+    isLoading: isLoadingPreviewClusterRuntime,
+    error: previewClusterRuntimeError,
+    refetch: refetchPreviewClusterRuntime,
+  } = useGetAdminCourtClusterRuntimeQuery(
+    open && selectedClusterId && isPreviewingUnsavedCluster
+      ? selectedClusterId
+      : skipToken,
+    {
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
+
+  const clusterRuntime = isPreviewingUnsavedCluster
+    ? previewClusterRuntime
+    : tournamentClusterRuntime;
+  const isLoadingClusterRuntime = isPreviewingUnsavedCluster
+    ? isLoadingPreviewClusterRuntime
+    : isLoadingTournamentClusterRuntime;
+  const clusterRuntimeError = isPreviewingUnsavedCluster
+    ? previewClusterRuntimeError
+    : tournamentClusterRuntimeError;
+  const refetchClusterRuntime = isPreviewingUnsavedCluster
+    ? refetchPreviewClusterRuntime
+    : refetchTournamentClusterRuntime;
+
+  const { data: tournamentRefereesData, isLoading: loadingTournamentReferees } =
+    useListTournamentRefereesQuery(
+      open && tournamentId
+        ? { tid: tournamentId, q: "", limit: 100 }
+        : skipToken,
+      {
+        refetchOnMountOrArgChange: true,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+      },
+    );
 
   // mutations
   const [assignNextHttp] = useAssignNextHttpMutation();
@@ -948,6 +1748,10 @@ export default function CourtManagerSheet({
   const [advanceCourtMatchList, { isLoading: advancingMatchList }] =
     useAdvanceCourtMatchListMutation();
   const [deleteCourt, { isLoading: deletingOne }] = useDeleteCourtMutation();
+  const [
+    updateTournamentAllowedCourtClusters,
+    { isLoading: savingAllowedClusters },
+  ] = useUpdateTournamentAllowedCourtClustersMutation();
   const [assignTournamentMatchToCourtStation] =
     useAssignTournamentMatchToCourtStationMutation();
   const [
@@ -967,6 +1771,12 @@ export default function CourtManagerSheet({
     if (!open) clusterPickerRef.current?.dismiss?.();
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      setRefereePickerStationId("");
+    }
+  }, [open]);
+
   // join/leave socket room — ⭐ TOÀN GIẢI (chỉ theo tournamentId)
   useEffect(() => {
     if (!open || !socket || !tournamentId) return;
@@ -982,7 +1792,7 @@ export default function CourtManagerSheet({
         (queue && Array.isArray(queue) ? queue : matches || []).map((m) => ({
           id: m._id || m.id,
           ...m,
-        }))
+        })),
       );
     };
     const onNotify = (msg) => {
@@ -1029,7 +1839,7 @@ export default function CourtManagerSheet({
       const clusterId = toIdString(
         payload?.cluster?._id ||
           payload?.clusterId ||
-          payload?.station?.clusterId
+          payload?.station?.clusterId,
       );
       if (clusterId !== selectedClusterId) return;
       refetchClusterRuntime?.();
@@ -1066,7 +1876,7 @@ export default function CourtManagerSheet({
       if (station?.currentMatch?._id) {
         map.set(
           toIdString(station.currentMatch._id),
-          normalizedMatch(station.currentMatch)
+          normalizedMatch(station.currentMatch),
         );
       }
       for (const item of station?.queueItems || []) {
@@ -1077,7 +1887,7 @@ export default function CourtManagerSheet({
       if (station?.nextQueuedMatch?._id) {
         map.set(
           toIdString(station.nextQueuedMatch._id),
-          normalizedMatch(station.nextQueuedMatch)
+          normalizedMatch(station.nextQueuedMatch),
         );
       }
     }
@@ -1086,7 +1896,13 @@ export default function CourtManagerSheet({
       if (id) map.set(id, normalizedMatch(m));
     }
     return map;
-  }, [socketMatches, allMatches, courts, clusterRuntime?.availableMatches, clusterRuntime?.stations]);
+  }, [
+    socketMatches,
+    allMatches,
+    courts,
+    clusterRuntime?.availableMatches,
+    clusterRuntime?.stations,
+  ]);
 
   const getMatchForCourt = (c) => {
     if (c?.currentMatchObj) return c.currentMatchObj;
@@ -1123,7 +1939,7 @@ export default function CourtManagerSheet({
     for (const court of courts || []) {
       map.set(
         toIdString(court?._id || court?.id),
-        court?.name || court?.label || court?.title || court?.code || ""
+        court?.name || court?.label || court?.title || court?.code || "",
       );
     }
     return map;
@@ -1151,19 +1967,24 @@ export default function CourtManagerSheet({
 
     if (isClusterRuntimeMode) {
       if (!matchId) return "Trận không hợp lệ";
-      if (toIdString(court?.currentMatch?._id || court?.currentMatch) === matchId) {
+      if (
+        toIdString(court?.currentMatch?._id || court?.currentMatch) === matchId
+      ) {
         return "Đang là trận hiện tại của sân này";
       }
       for (const station of runtimeStations) {
         const stationId = toIdString(station?._id || station?.id);
         if (!stationId || stationId === currentCourtId) continue;
-        if (toIdString(station?.currentMatch?._id || station?.currentMatch) === matchId) {
+        if (
+          toIdString(station?.currentMatch?._id || station?.currentMatch) ===
+          matchId
+        ) {
           return `Đang ở ${station?.name || "sân khác"}`;
         }
         const inQueue = Array.isArray(station?.queueItems)
           ? station.queueItems.some(
               (item) =>
-                toIdString(item?.matchId || item?.match?._id) === matchId
+                toIdString(item?.matchId || item?.match?._id) === matchId,
             )
           : false;
         if (inQueue) {
@@ -1215,21 +2036,70 @@ export default function CourtManagerSheet({
 
   const getListPreviewItems = (court, count = 2) =>
     getCourtManualPendingItems(court)
-      .map((item) => item.match || matchMap.get(toIdString(item.matchId)) || null)
+      .map(
+        (item) => item.match || matchMap.get(toIdString(item.matchId)) || null,
+      )
       .filter(Boolean)
       .slice(0, count);
 
   const selectedCluster = useMemo(
     () =>
       allowedClusterOptions.find(
-        (cluster) => toIdString(cluster?._id || cluster?.id) === selectedClusterId
+        (cluster) =>
+          toIdString(cluster?._id || cluster?.id) === selectedClusterId,
       ) || null,
-    [allowedClusterOptions, selectedClusterId]
+    [allowedClusterOptions, selectedClusterId],
   );
 
   const runtimeStations = useMemo(
-    () => (Array.isArray(clusterRuntime?.stations) ? clusterRuntime.stations : []),
-    [clusterRuntime?.stations]
+    () =>
+      Array.isArray(clusterRuntime?.stations) ? clusterRuntime.stations : [],
+    [clusterRuntime?.stations],
+  );
+
+  const tournamentReferees = useMemo(() => {
+    if (Array.isArray(tournamentRefereesData?.items)) {
+      return tournamentRefereesData.items;
+    }
+    if (Array.isArray(tournamentRefereesData?.data)) {
+      return tournamentRefereesData.data;
+    }
+    if (Array.isArray(tournamentRefereesData)) {
+      return tournamentRefereesData;
+    }
+    return [];
+  }, [tournamentRefereesData]);
+
+  const refereeOptions = useMemo(() => {
+    const map = new Map();
+    tournamentReferees.forEach((referee) => {
+      const id = getRefId(referee);
+      if (id) map.set(id, referee);
+    });
+    runtimeStations.forEach((station) => {
+      (Array.isArray(station?.defaultReferees)
+        ? station.defaultReferees
+        : []
+      ).forEach((referee) => {
+        const id = getRefId(referee);
+        if (id && !map.has(id)) {
+          map.set(id, referee);
+        }
+      });
+    });
+    return Array.from(map.values()).sort((left, right) =>
+      refDisplayName(left).localeCompare(refDisplayName(right), "vi"),
+    );
+  }, [runtimeStations, tournamentReferees]);
+
+  const refereeOptionMap = useMemo(
+    () =>
+      new Map(
+        refereeOptions
+          .map((referee) => [getRefId(referee), referee])
+          .filter(([id]) => Boolean(id)),
+      ),
+    [refereeOptions],
   );
 
   const runtimeAvailableMatches = useMemo(
@@ -1238,10 +2108,40 @@ export default function CourtManagerSheet({
         ? clusterRuntime.availableMatches
         : []
       ).map((match) => normalizedMatch(match)),
-    [clusterRuntime?.availableMatches]
+    [clusterRuntime?.availableMatches],
   );
 
-  const sharedTournamentCount = Number(clusterRuntime?.sharedTournamentCount || 0);
+  useEffect(() => {
+    if (!runtimeStations.length) {
+      setStationDrafts({});
+      setStationPickerQueries({});
+      return;
+    }
+
+    setStationDrafts((current) => {
+      const next = {};
+      runtimeStations.forEach((station) => {
+        const stationId = toIdString(station?._id || station?.id);
+        next[stationId] = current[stationId]?.dirty
+          ? current[stationId]
+          : buildStationDraft(station);
+      });
+      return next;
+    });
+
+    setStationPickerQueries((current) => {
+      const next = {};
+      runtimeStations.forEach((station) => {
+        const stationId = toIdString(station?._id || station?.id);
+        next[stationId] = current[stationId] || "";
+      });
+      return next;
+    });
+  }, [runtimeStations]);
+
+  const sharedTournamentCount = Number(
+    clusterRuntime?.sharedTournamentCount || 0,
+  );
   const sharedTournamentNames = useMemo(
     () =>
       (Array.isArray(clusterRuntime?.sharedTournaments)
@@ -1250,16 +2150,91 @@ export default function CourtManagerSheet({
       )
         .map((item) => String(item?.name || "").trim())
         .filter(Boolean),
-    [clusterRuntime?.sharedTournaments]
+    [clusterRuntime?.sharedTournaments],
+  );
+  const clusterStats = useMemo(
+    () => ({
+      total: runtimeStations.length,
+      live: runtimeStations.filter(
+        (station) => String(station?.status || "").toLowerCase() === "live",
+      ).length,
+      occupied: runtimeStations.filter((station) =>
+        Boolean(station?.currentMatch),
+      ).length,
+      empty:
+        runtimeStations.length -
+        runtimeStations.filter((station) => Boolean(station?.currentMatch))
+          .length,
+    }),
+    [runtimeStations],
+  );
+  const clusterInteractionDisabled = isPreviewingUnsavedCluster;
+  const isClusterDirty = selectedClusterId !== initialAllowedClusterId;
+
+  const isClusterRuntimeMode = Boolean(
+    selectedClusterId && allowedClusterOptions.length,
   );
 
-  const isClusterRuntimeMode = Boolean(selectedClusterId && allowedClusterOptions.length);
+  const reservedByOther = useMemo(() => {
+    const next = new Map();
+    runtimeStations.forEach((station) => {
+      const ids = new Set();
+      const currentMatchId = toIdString(
+        station?.currentMatch?._id || station?.currentMatch,
+      );
+      if (currentMatchId) ids.add(currentMatchId);
+      (Array.isArray(station?.queueItems) ? station.queueItems : []).forEach(
+        (item) => {
+          const matchId = toIdString(item?.matchId || item?.match?._id);
+          if (matchId) ids.add(matchId);
+        },
+      );
+      next.set(toIdString(station?._id || station?.id), ids);
+    });
+    return next;
+  }, [runtimeStations]);
+
+  const setStationDraft = useCallback(
+    (stationId, patch, { markDirty = true } = {}) => {
+      setStationDrafts((current) => {
+        const previous = current[stationId] || buildStationDraft({});
+        const patchObject =
+          typeof patch === "function" ? patch(previous) : patch || {};
+        const next = {
+          ...previous,
+          ...patchObject,
+        };
+        return {
+          ...current,
+          [stationId]: {
+            ...next,
+            dirty: Object.prototype.hasOwnProperty.call(patchObject, "dirty")
+              ? patchObject.dirty
+              : markDirty
+                ? true
+                : previous.dirty,
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  const setStationPickerQuery = useCallback((stationId, value) => {
+    setStationPickerQueries((current) => ({
+      ...current,
+      [stationId]: value,
+    }));
+  }, []);
 
   // selectable matches (giống web)
   const selectableMatches = useMemo(() => {
     if (isClusterRuntimeMode) {
       return [...runtimeAvailableMatches].sort((a, b) =>
-        formatRuntimeMatchLabel(a).localeCompare(formatRuntimeMatchLabel(b), "vi")
+        formatRuntimeMatchLabel(a).localeCompare(
+          formatRuntimeMatchLabel(b),
+          "vi",
+        ),
       );
     }
     const seen = new Set();
@@ -1355,12 +2330,12 @@ export default function CourtManagerSheet({
       return (
         matchMap.get(normalized) ||
         selectableMatches.find(
-          (match) => toIdString(match?._id || match?.id) === normalized
+          (match) => toIdString(match?._id || match?.id) === normalized,
         ) ||
         null
       );
     },
-    [matchMap, selectableMatches]
+    [matchMap, selectableMatches],
   );
 
   const listMatchesForCourt = useMemo(() => {
@@ -1378,11 +2353,11 @@ export default function CourtManagerSheet({
     (item) =>
       Boolean(
         item &&
-          (Object.prototype.hasOwnProperty.call(item, "queueCount") ||
-            Object.prototype.hasOwnProperty.call(item, "queueItems") ||
-            Object.prototype.hasOwnProperty.call(item, "assignmentMode"))
+        (Object.prototype.hasOwnProperty.call(item, "queueCount") ||
+          Object.prototype.hasOwnProperty.call(item, "queueItems") ||
+          Object.prototype.hasOwnProperty.call(item, "assignmentMode")),
       ),
-    []
+    [],
   );
 
   /* ================ handlers ================ */
@@ -1390,13 +2365,20 @@ export default function CourtManagerSheet({
     if (socket && tournamentId) {
       socket.emit(
         "scheduler:requestState",
-        bracketId ? { tournamentId, bracket: bracketId } : { tournamentId }
+        bracketId ? { tournamentId, bracket: bracketId } : { tournamentId },
       );
     }
     refetchAllMatches?.();
     refetchClusterOptions?.();
     refetchClusterRuntime?.();
   };
+
+  const showPreviewClusterLockedAlert = useCallback(() => {
+    Alert.alert(
+      "Đang xem trước cụm sân",
+      'Hãy bấm "Lưu cụm sân" để áp dụng cụm này cho giải rồi mới thao tác gán sân hoặc danh sách chờ.',
+    );
+  }, []);
 
   const openClusterPicker = useCallback(() => {
     if (!allowedClusterOptions.length) return;
@@ -1407,6 +2389,171 @@ export default function CourtManagerSheet({
     setSelectedClusterId(clusterId);
     clusterPickerRef.current?.dismiss?.();
   }, []);
+
+  const handleSaveSelectedCluster = useCallback(async () => {
+    if (!tournamentId) return;
+    try {
+      await updateTournamentAllowedCourtClusters({
+        tournamentId,
+        allowedCourtClusterIds: selectedClusterId ? [selectedClusterId] : [],
+      }).unwrap();
+      await refetchClusterOptions?.();
+      refetchAllMatches?.();
+      Alert.alert(
+        "Thành công",
+        selectedClusterId
+          ? "Đã cập nhật cụm sân đang dùng cho giải."
+          : "Đã xóa cấu hình cụm sân của giải.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Lỗi",
+        getApiErrorMessage(error, "Không thể cập nhật cụm sân cho giải."),
+      );
+    }
+  }, [
+    refetchAllMatches,
+    refetchClusterOptions,
+    selectedClusterId,
+    tournamentId,
+    updateTournamentAllowedCourtClusters,
+  ]);
+
+  const addQueueMatches = useCallback(
+    (stationId) => {
+      setStationDraft(
+        stationId,
+        (draft) => {
+          const additions = draft.pickerMatchIds.filter(
+            (matchId) => !draft.queueMatchIds.includes(matchId),
+          );
+          if (!additions.length) {
+            return {
+              ...draft,
+              pickerMatchIds: [],
+            };
+          }
+          return {
+            ...draft,
+            queueMatchIds: [...draft.queueMatchIds, ...additions],
+            pickerMatchIds: [],
+            dirty: true,
+          };
+        },
+        { markDirty: false },
+      );
+    },
+    [setStationDraft],
+  );
+
+  const removeQueueMatch = useCallback(
+    (stationId, matchId) => {
+      setStationDraft(stationId, (draft) => ({
+        ...draft,
+        queueMatchIds: draft.queueMatchIds.filter((value) => value !== matchId),
+        dirty: true,
+      }));
+    },
+    [setStationDraft],
+  );
+
+  const reorderStationQueue = useCallback(
+    (stationId, fromIndex, toIndex) => {
+      setStationDraft(stationId, (draft) => {
+        const currentQueue = Array.isArray(draft.queueMatchIds)
+          ? draft.queueMatchIds
+          : [];
+        if (
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= currentQueue.length ||
+          toIndex >= currentQueue.length ||
+          fromIndex === toIndex
+        ) {
+          return draft;
+        }
+        const nextQueue = [...currentQueue];
+        const [picked] = nextQueue.splice(fromIndex, 1);
+        if (!picked) return draft;
+        nextQueue.splice(toIndex, 0, picked);
+        return {
+          ...draft,
+          queueMatchIds: nextQueue,
+          dirty: true,
+        };
+      });
+    },
+    [setStationDraft],
+  );
+
+  const saveStationConfig = useCallback(
+    async (station) => {
+      const stationId = toIdString(station?._id || station?.id);
+      const draft = stationDrafts[stationId] || buildStationDraft(station);
+      try {
+        await updateTournamentCourtStationAssignmentConfig({
+          tournamentId,
+          stationId,
+          assignmentMode: draft.assignmentMode,
+          queueMatchIds:
+            draft.assignmentMode === "queue" ? draft.queueMatchIds : undefined,
+          refereeIds: draft.defaultRefereeIds,
+        }).unwrap();
+        setStationDrafts((current) => ({
+          ...current,
+          [stationId]: {
+            ...draft,
+            pickerMatchIds: [],
+            dirty: false,
+          },
+        }));
+        await refetchClusterRuntime?.();
+        refetchAllMatches?.();
+        Alert.alert("Thành công", "Đã lưu cấu hình sân.");
+      } catch (error) {
+        Alert.alert(
+          "Lỗi",
+          getApiErrorMessage(error, "Không thể lưu cấu hình sân."),
+        );
+      }
+    },
+    [
+      refetchAllMatches,
+      refetchClusterRuntime,
+      setStationDrafts,
+      stationDrafts,
+      tournamentId,
+      updateTournamentCourtStationAssignmentConfig,
+    ],
+  );
+
+  const freeCurrentStation = useCallback(
+    async (stationId) => {
+      try {
+        await freeTournamentCourtStation({
+          tournamentId,
+          stationId,
+        }).unwrap();
+        await refetchClusterRuntime?.();
+        refetchAllMatches?.();
+        Alert.alert(
+          "Thành công",
+          "Đã bỏ qua trận hiện tại và cập nhật lại sân.",
+        );
+      } catch (error) {
+        Alert.alert(
+          "Lỗi",
+          getApiErrorMessage(error, "Không thể bỏ qua trận hiện tại."),
+        );
+      }
+    },
+    [
+      freeTournamentCourtStation,
+      refetchAllMatches,
+      refetchClusterRuntime,
+      tournamentId,
+    ],
+  );
 
   const handleAssignNext = async (courtId) => {
     if (!tournamentId || !courtId) return;
@@ -1445,8 +2592,8 @@ export default function CourtManagerSheet({
     const note = isLive
       ? "\n⚠️ Sân đang có TRẬN ĐANG THI ĐẤU. Bạn vẫn muốn xoá sân?"
       : m
-      ? "\nSân đang có trận được gán. Bạn vẫn muốn xoá sân?"
-      : "";
+        ? "\nSân đang có trận được gán. Bạn vẫn muốn xoá sân?"
+        : "";
 
     Alert.alert(
       `Xoá sân "${label}"?`,
@@ -1467,7 +2614,7 @@ export default function CourtManagerSheet({
             } catch (e) {
               Alert.alert(
                 "Lỗi",
-                e?.data?.message || e?.error || "Xoá sân thất bại"
+                e?.data?.message || e?.error || "Xoá sân thất bại",
               );
             } finally {
               setBusyDelete((s) => {
@@ -1478,7 +2625,7 @@ export default function CourtManagerSheet({
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -1486,6 +2633,10 @@ export default function CourtManagerSheet({
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignCourt, setAssignCourt] = useState(null);
   const openAssignDlg = (court) => {
+    if (clusterInteractionDisabled && isRuntimeStation(court)) {
+      showPreviewClusterLockedAlert();
+      return;
+    }
     setAssignCourt(court || null);
     setAssignOpen(true);
   };
@@ -1497,6 +2648,10 @@ export default function CourtManagerSheet({
     if (!tournamentId || !assignCourt || !matchId) return;
     try {
       if (isRuntimeStation(assignCourt)) {
+        if (clusterInteractionDisabled) {
+          showPreviewClusterLockedAlert();
+          return;
+        }
         await assignTournamentMatchToCourtStation({
           tournamentId,
           stationId: assignCourt._id || assignCourt.id,
@@ -1509,27 +2664,30 @@ export default function CourtManagerSheet({
         return;
       }
       await assignSpecificHttp({
-      tournamentId,
-      courtId: assignCourt._id || assignCourt.id,
-      bracket: getCourtBracketId(assignCourt, bracketId),
-      matchId,
-      replace: true,
-    }).unwrap();
-    Alert.alert("Đã yêu cầu", "Đã yêu cầu gán trận vào sân.");
-    requestState();
-    refetchAllMatches?.();
-    closeAssignDlg();
+        tournamentId,
+        courtId: assignCourt._id || assignCourt.id,
+        bracket: getCourtBracketId(assignCourt, bracketId),
+        matchId,
+        replace: true,
+      }).unwrap();
+      Alert.alert("Đã yêu cầu", "Đã yêu cầu gán trận vào sân.");
+      requestState();
+      refetchAllMatches?.();
+      closeAssignDlg();
     } catch (e) {
-      Alert.alert(
-        "Lỗi",
-        e?.data?.message || e?.error || "Gán trận thất bại"
-      );
+      Alert.alert("Lỗi", e?.data?.message || e?.error || "Gán trận thất bại");
     }
   };
 
   const openListSheet = (court) => {
+    if (clusterInteractionDisabled && isRuntimeStation(court)) {
+      showPreviewClusterLockedAlert();
+      return;
+    }
     if (isRuntimeStation(court)) {
-      const draftIds = (Array.isArray(court?.queueItems) ? court.queueItems : [])
+      const draftIds = (
+        Array.isArray(court?.queueItems) ? court.queueItems : []
+      )
         .map((item) => toIdString(item?.matchId || item?.match?._id || ""))
         .filter(Boolean);
       setListCourt(court || null);
@@ -1538,7 +2696,7 @@ export default function CourtManagerSheet({
       return;
     }
     const draftIds = getCourtManualPendingItems(court).map((item) =>
-      toIdString(item?.match?._id || item?.matchId || "")
+      toIdString(item?.match?._id || item?.matchId || ""),
     );
     setListCourt(court || null);
     setListDraftIds(draftIds.filter(Boolean));
@@ -1553,7 +2711,9 @@ export default function CourtManagerSheet({
 
   const pushMatchIntoListDraft = (matchId) => {
     if (!matchId) return;
-    setListDraftIds((prev) => (prev.includes(matchId) ? prev : [...prev, matchId]));
+    setListDraftIds((prev) =>
+      prev.includes(matchId) ? prev : [...prev, matchId],
+    );
   };
 
   const removeMatchFromListDraft = (matchId) => {
@@ -1583,6 +2743,10 @@ export default function CourtManagerSheet({
     if (!tournamentId || !listCourt) return;
     try {
       if (isRuntimeStation(listCourt)) {
+        if (clusterInteractionDisabled) {
+          showPreviewClusterLockedAlert();
+          return;
+        }
         await updateTournamentCourtStationAssignmentConfig({
           tournamentId,
           stationId: listCourt._id || listCourt.id,
@@ -1608,7 +2772,7 @@ export default function CourtManagerSheet({
     } catch (e) {
       Alert.alert(
         "Lỗi",
-        e?.data?.message || e?.error || "Lưu danh sách trận thất bại"
+        e?.data?.message || e?.error || "Lưu danh sách trận thất bại",
       );
     }
   };
@@ -1617,16 +2781,25 @@ export default function CourtManagerSheet({
     if (!tournamentId || !court) return;
     try {
       if (isRuntimeStation(court)) {
+        if (clusterInteractionDisabled) {
+          showPreviewClusterLockedAlert();
+          return;
+        }
         await updateTournamentCourtStationAssignmentConfig({
           tournamentId,
           stationId: court._id || court.id,
-          assignmentMode: String(court?.assignmentMode || "queue").toLowerCase(),
+          assignmentMode: String(
+            court?.assignmentMode || "queue",
+          ).toLowerCase(),
           queueMatchIds: [],
         }).unwrap();
         Alert.alert("Thành công", "Đã xóa danh sách trận của sân.");
         requestState();
         refetchAllMatches?.();
-        if (toIdString(listCourt?._id || listCourt?.id) === toIdString(court._id || court.id)) {
+        if (
+          toIdString(listCourt?._id || listCourt?.id) ===
+          toIdString(court._id || court.id)
+        ) {
           closeListSheet();
         }
         return;
@@ -1639,13 +2812,16 @@ export default function CourtManagerSheet({
       Alert.alert("Thành công", "Đã xóa danh sách trận của sân.");
       requestState();
       refetchAllMatches?.();
-      if (toIdString(listCourt?._id || listCourt?.id) === toIdString(court._id || court.id)) {
+      if (
+        toIdString(listCourt?._id || listCourt?.id) ===
+        toIdString(court._id || court.id)
+      ) {
         closeListSheet();
       }
     } catch (e) {
       Alert.alert(
         "Lỗi",
-        e?.data?.message || e?.error || "Xóa danh sách trận thất bại"
+        e?.data?.message || e?.error || "Xóa danh sách trận thất bại",
       );
     }
   };
@@ -1654,11 +2830,18 @@ export default function CourtManagerSheet({
     if (!tournamentId || !court) return;
     try {
       if (isRuntimeStation(court)) {
+        if (clusterInteractionDisabled) {
+          showPreviewClusterLockedAlert();
+          return;
+        }
         await freeTournamentCourtStation({
           tournamentId,
           stationId: court._id || court.id,
         }).unwrap();
-        Alert.alert("Thành công", "Đã bỏ qua trận hiện tại và chuyển sang trận kế.");
+        Alert.alert(
+          "Thành công",
+          "Đã bỏ qua trận hiện tại và chuyển sang trận kế.",
+        );
         requestState();
         refetchAllMatches?.();
         return;
@@ -1675,7 +2858,7 @@ export default function CourtManagerSheet({
     } catch (e) {
       Alert.alert(
         "Lỗi",
-        e?.data?.message || e?.error || "Chuyển sang trận kế thất bại"
+        e?.data?.message || e?.error || "Chuyển sang trận kế thất bại",
       );
     }
   };
@@ -1692,13 +2875,12 @@ export default function CourtManagerSheet({
             {...p}
             appearsOnIndex={0}
             disappearsOnIndex={-1}
-            style={{zIndex: 1000}}
-
+            style={{ zIndex: 1000 }}
           />
         )}
         handleIndicatorStyle={{ backgroundColor: t.colors.border }}
         backgroundStyle={{ backgroundColor: t.colors.card }}
-        containerStyle={{zIndex: 1000}}
+        containerStyle={{ zIndex: 1000 }}
       >
         <BottomSheetScrollView contentContainerStyle={styles.container}>
           {/* Header */}
@@ -1745,7 +2927,7 @@ export default function CourtManagerSheet({
                   ]}
                 >
                   <Text style={{ color: t.chipWarnFg, fontWeight: "700" }}>
-                    Khong tai duoc cau hinh cum san
+                    Không tải được cấu hình cụm sân
                   </Text>
                   <Text style={{ color: t.chipWarnFg, marginTop: 4 }}>
                     {clusterOptionsErrorMessage}
@@ -1764,7 +2946,7 @@ export default function CourtManagerSheet({
                   ]}
                 >
                   <Text style={{ color: t.chipWarnFg, fontWeight: "700" }}>
-                    Khong tai duoc danh sach tran dau
+                    Không tải được danh sách trận đấu
                   </Text>
                   <Text style={{ color: t.chipWarnFg, marginTop: 4 }}>
                     {allMatchesErrorMessage}
@@ -1781,11 +2963,14 @@ export default function CourtManagerSheet({
                   },
                 ]}
               >
-                <Text style={[styles.clusterPickerTitle, { color: t.colors.text }]}>
+                <Text
+                  style={[styles.clusterPickerTitle, { color: t.colors.text }]}
+                >
                   Cụm sân được phép dùng
                 </Text>
                 <Text style={[styles.clusterPickerHint, { color: t.muted }]}>
-                  Chạm để đổi cụm sân đang dùng, giống cách chọn trên web.
+                  Chọn cụm sân để xem trước runtime. Khi chọn xong, bấm lưu để
+                  áp dụng cho giải giống trên web.
                 </Text>
 
                 <Pressable
@@ -1800,11 +2985,16 @@ export default function CourtManagerSheet({
                   ]}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.clusterPickerLabel, { color: t.muted }]}>
-                      Cụm đang dùng
+                    <Text
+                      style={[styles.clusterPickerLabel, { color: t.muted }]}
+                    >
+                      {isClusterDirty ? "Đang xem trước" : "Cụm đang dùng"}
                     </Text>
                     <Text
-                      style={[styles.clusterPickerValue, { color: t.colors.text }]}
+                      style={[
+                        styles.clusterPickerValue,
+                        { color: t.colors.text },
+                      ]}
                       numberOfLines={1}
                     >
                       {[selectedCluster?.name, selectedCluster?.venueName]
@@ -1819,15 +3009,36 @@ export default function CourtManagerSheet({
                   />
                 </Pressable>
 
-                {allowedClusterOptions.length > 1 ? (
+                <Row
+                  style={{
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {allowedClusterOptions.length > 1 ? (
+                    <Btn variant="outline" onPress={openClusterPicker}>
+                      Đổi cụm sân
+                    </Btn>
+                  ) : (
+                    <View />
+                  )}
                   <Btn
-                    variant="outline"
-                    onPress={openClusterPicker}
-                    style={{ alignSelf: "flex-start" }}
+                    onPress={handleSaveSelectedCluster}
+                    disabled={
+                      !tournamentId ||
+                      savingAllowedClusters ||
+                      !selectedClusterId ||
+                      !isClusterDirty
+                    }
                   >
-                    Đổi cụm sân
+                    {savingAllowedClusters
+                      ? "Đang lưu..."
+                      : !isClusterDirty && selectedClusterId
+                        ? "Đã lưu cụm này"
+                        : "Lưu cụm sân"}
                   </Btn>
-                ) : null}
+                </Row>
               </View>
 
               <View
@@ -1856,7 +3067,7 @@ export default function CourtManagerSheet({
                       Alert.alert(
                         "Cụm sân dùng chung",
                         sharedTournamentNames.join("\n") ||
-                          `Đang dùng chung ${sharedTournamentCount} giải.`
+                          `Đang dùng chung ${sharedTournamentCount} giải.`,
                       )
                     }
                     style={{ marginTop: 8 }}
@@ -1867,6 +3078,113 @@ export default function CourtManagerSheet({
                   </Pressable>
                 ) : null}
               </View>
+
+              <View style={styles.clusterStatsRow}>
+                <View
+                  style={[
+                    styles.clusterStatCard,
+                    {
+                      borderColor: t.colors.border,
+                      backgroundColor: t.colors.background,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.clusterStatLabel, { color: t.muted }]}>
+                    Tổng sân
+                  </Text>
+                  <Text
+                    style={[styles.clusterStatValue, { color: t.colors.text }]}
+                  >
+                    {clusterStats.total}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.clusterStatCard,
+                    {
+                      borderColor: t.chipSuccessBd,
+                      backgroundColor: t.chipSuccessBg,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.clusterStatLabel,
+                      { color: t.chipSuccessFg },
+                    ]}
+                  >
+                    Sân trống
+                  </Text>
+                  <Text
+                    style={[
+                      styles.clusterStatValue,
+                      { color: t.chipSuccessFg },
+                    ]}
+                  >
+                    {clusterStats.empty}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.clusterStatCard,
+                    {
+                      borderColor: t.chipWarnFg,
+                      backgroundColor: t.chipWarnBg,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.clusterStatLabel, { color: t.chipWarnFg }]}
+                  >
+                    Đang có trận
+                  </Text>
+                  <Text
+                    style={[styles.clusterStatValue, { color: t.chipWarnFg }]}
+                  >
+                    {clusterStats.occupied}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.clusterStatCard,
+                    {
+                      borderColor: t.chipInfoBd,
+                      backgroundColor: t.chipInfoBg,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.clusterStatLabel, { color: t.chipInfoFg }]}
+                  >
+                    Đang live
+                  </Text>
+                  <Text
+                    style={[styles.clusterStatValue, { color: t.chipInfoFg }]}
+                  >
+                    {clusterStats.live}
+                  </Text>
+                </View>
+              </View>
+
+              {isPreviewingUnsavedCluster ? (
+                <View
+                  style={[
+                    styles.infoBox,
+                    {
+                      backgroundColor: t.chipInfoBg,
+                      borderColor: t.chipInfoBd,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: t.chipInfoFg, fontWeight: "700" }}>
+                    Đang xem trước cụm sân chưa lưu
+                  </Text>
+                  <Text style={{ color: t.chipInfoFg, marginTop: 4 }}>
+                    Bạn đang xem runtime của cụm mới chọn. Hãy bấm Lưu cụm sân
+                    để áp dụng cho giải và bật các thao tác gán sân.
+                  </Text>
+                </View>
+              ) : null}
 
               {isLoadingClusterRuntime ? (
                 <View
@@ -1916,36 +3234,173 @@ export default function CourtManagerSheet({
                 <View style={{ gap: 8 }}>
                   {runtimeStations.map((station) => {
                     const stationId = toIdString(station?._id || station?.id);
-                    const currentMatch = normalizedMatch(station?.currentMatch);
-                    const nextQueuedMatch = normalizedMatch(
-                      station?.nextQueuedMatch
+                    const stationDraft =
+                      stationDrafts[stationId] || buildStationDraft(station);
+                    const selectedRefereeId =
+                      stationDraft.defaultRefereeIds?.[0] || "";
+                    const selectedReferee =
+                      refereeOptionMap.get(selectedRefereeId) ||
+                      (selectedRefereeId &&
+                      Array.isArray(station?.defaultReferees)
+                        ? station.defaultReferees.find(
+                            (referee) =>
+                              getRefId(referee) === selectedRefereeId,
+                          ) || null
+                        : null);
+                    return (
+                      <ClusterRuntimeStationCard
+                        key={stationId}
+                        t={t}
+                        station={station}
+                        stationId={stationId}
+                        stationDraft={stationDraft}
+                        selectedRefereeId={selectedRefereeId}
+                        selectedRefereeLabel={
+                          selectedReferee ? refDisplayName(selectedReferee) : ""
+                        }
+                        refereeOptions={refereeOptions}
+                        refereePickerOpen={refereePickerStationId === stationId}
+                        loadingTournamentReferees={loadingTournamentReferees}
+                        selectableMatches={selectableMatches}
+                        reservedByOther={reservedByOther}
+                        pickerQuery={stationPickerQueries[stationId] || ""}
+                        clusterInteractionDisabled={clusterInteractionDisabled}
+                        savingStationConfig={savingStationConfig}
+                        freeingStation={freeingStation}
+                        tournamentId={tournamentId}
+                        onToggleRefereePicker={() =>
+                          setRefereePickerStationId((current) =>
+                            current === stationId ? "" : stationId,
+                          )
+                        }
+                        onSelectReferee={(refereeId) => {
+                          setStationDraft(stationId, {
+                            defaultRefereeIds: refereeId ? [refereeId] : [],
+                          });
+                          setRefereePickerStationId("");
+                        }}
+                        onChangeAssignmentMode={(value) =>
+                          setStationDraft(stationId, {
+                            assignmentMode: value,
+                          })
+                        }
+                        onChangePickerQuery={(value) =>
+                          setStationPickerQuery(stationId, value)
+                        }
+                        onTogglePickerMatch={(matchId) =>
+                          setStationDraft(
+                            stationId,
+                            (currentDraft) => {
+                              const currentPicked = Array.isArray(
+                                currentDraft.pickerMatchIds,
+                              )
+                                ? currentDraft.pickerMatchIds
+                                : [];
+                              return {
+                                ...currentDraft,
+                                pickerMatchIds: currentPicked.includes(matchId)
+                                  ? currentPicked.filter(
+                                      (value) => value !== matchId,
+                                    )
+                                  : [...currentPicked, matchId],
+                              };
+                            },
+                            { markDirty: false },
+                          )
+                        }
+                        onAddQueueMatches={() => addQueueMatches(stationId)}
+                        onRemoveQueueMatch={(matchId) =>
+                          removeQueueMatch(stationId, matchId)
+                        }
+                        onReorderQueue={(fromIndex, toIndex) =>
+                          reorderStationQueue(stationId, fromIndex, toIndex)
+                        }
+                        onSaveConfig={() => saveStationConfig(station)}
+                        onFreeCurrent={() => freeCurrentStation(stationId)}
+                        onOpenViewer={(matchId) => setViewerMatchId(matchId)}
+                      />
                     );
-                    const queueItems = Array.isArray(station?.queueItems)
-                      ? station.queueItems
+                  })}
+                </View>
+              )}
+            </View>
+          ) : null}
+
+          {!isClusterRuntimeMode ? (
+            <>
+              <View
+                style={[
+                  styles.infoBox,
+                  {
+                    backgroundColor: t.chipWarnBg,
+                    borderColor: t.colors.border,
+                    marginBottom: 8,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: t.chipWarnFg,
+                    fontWeight: "700",
+                    marginBottom: 4,
+                  }}
+                >
+                  Giải này chưa bật quản lý sân theo cụm
+                </Text>
+                <Text style={{ color: t.chipWarnFg }}>
+                  Mobile chỉ giữ các thao tác từng sân. Thiết lập số lượng sân
+                  hoặc tạo cụm sân nên làm trên web/admin.
+                </Text>
+              </View>
+
+              <Row style={{ alignItems: "center", gap: 8 }}>
+                <Text style={[styles.cardTitle, { color: t.colors.text }]}>
+                  Danh sách sân hiện có ({courts.length})
+                </Text>
+              </Row>
+
+              {courts.length === 0 ? (
+                <View
+                  style={[
+                    styles.infoBox,
+                    {
+                      backgroundColor: t.chipInfoBg,
+                      borderColor: t.chipInfoBd,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: t.chipInfoFg }}>
+                    Chưa có sân nào cho giải này.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {courts.map((c) => {
+                    const m = getMatchForCourt(c);
+                    const hasMatch = Boolean(m);
+                    const code = getMatchCodeForCourt(c);
+                    const teams = getTeamsForCourt(c);
+                    const cs = courtStatus(c);
+                    const tone =
+                      cs === "idle"
+                        ? "default"
+                        : cs === "live"
+                          ? "success"
+                          : cs === "maintenance"
+                            ? "warn"
+                            : "info";
+                    const cid = String(c._id || c.id);
+                    const deletingThis = busyDelete.has(cid) || deletingOne;
+                    const nextMatch = c?.listEnabled
+                      ? c?.nextMatch || null
+                      : null;
+                    const previewItems = c?.listEnabled
+                      ? getListPreviewItems(c)
                       : [];
-                    const queuePreview = queueItems
-                      .map((item) => normalizedMatch(item?.match))
-                      .filter(Boolean)
-                      .slice(0, 2);
-                    const assignmentMode = String(
-                      station?.assignmentMode || "manual"
-                    ).toLowerCase();
-                    const occupiedByAnotherTournament = Boolean(
-                      toIdString(
-                        station?.currentMatch?.tournament?._id ||
-                          station?.currentTournament?._id ||
-                          station?.currentTournamentId
-                      ) &&
-                        toIdString(
-                          station?.currentMatch?.tournament?._id ||
-                            station?.currentTournament?._id ||
-                            station?.currentTournamentId
-                        ) !== String(tournamentId)
-                    );
 
                     return (
                       <View
-                        key={stationId}
+                        key={cid}
                         style={[
                           styles.paperRow,
                           {
@@ -1954,7 +3409,7 @@ export default function CourtManagerSheet({
                           },
                         ]}
                       >
-                        <View style={{ gap: 8, flex: 1 }}>
+                        <View style={{ gap: 6, flex: 1 }}>
                           <Row
                             style={{
                               alignItems: "center",
@@ -1962,124 +3417,87 @@ export default function CourtManagerSheet({
                               flexWrap: "wrap",
                             }}
                           >
-                            <Chip tone="default">
-                              {station?.name || station?.code || "Sân"}
+                            <Chip tone={tone}>
+                              {c.name || c.label || c.title || c.code || "Sân"}
                             </Chip>
                             <Text style={{ color: t.colors.text }}>
-                              {viCourtStatus(station?.status)}
+                              {viCourtStatus(cs)}
                             </Text>
-                            <Chip tone="default">
-                              {assignmentMode === "queue"
-                                ? "Tự động theo danh sách"
-                                : "Gán tay"}
-                            </Chip>
-                            {station?.queueCount > 0 ? (
-                              <Pressable
-                                onPress={() => openListSheet(station)}
-                                style={({ pressed }) => [pressed && { opacity: 0.9 }]}
-                              >
-                                <Chip tone="info">
-                                  {`${station.queueCount} trận chờ`}
-                                </Chip>
-                              </Pressable>
+                            {c?.listEnabled ? (
+                              <Chip tone="default">
+                                {`Còn ${c?.remainingCount || 0} trận trong danh sách`}
+                              </Chip>
                             ) : null}
+                            {hasMatch && (
+                              <Chip
+                                tone={
+                                  m.status === "live"
+                                    ? "warn"
+                                    : m.status === "finished"
+                                      ? "success"
+                                      : "info"
+                                }
+                              >
+                                {`Trận: ${viMatchStatus(m.status)}`}
+                              </Chip>
+                            )}
                           </Row>
 
-                          {currentMatch ? (
-                            <Pressable
-                              onPress={() =>
-                                setViewerMatchId(
-                                  toIdString(currentMatch?._id || currentMatch?.id)
-                                )
-                              }
-                              style={({ pressed }) => [pressed && { opacity: 0.9 }]}
+                          {hasMatch && (
+                            <Row
+                              style={{
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
                             >
-                              <Text
-                                style={{
-                                  color: t.muted,
-                                  fontSize: 12,
-                                  marginBottom: 2,
-                                }}
-                              >
-                                Đang phát
-                              </Text>
-                              <Text
-                                style={{
-                                  color: t.muted,
-                                  fontSize: 12,
-                                  marginBottom: 2,
-                                }}
-                              >
-                                {tournamentTitle(currentMatch)}
-                              </Text>
-                              <Text
-                                style={{ color: t.colors.text, fontWeight: "700" }}
-                              >
-                                {teamLine(currentMatch)}
-                              </Text>
-                              <Text style={{ color: t.colors.text }}>
-                                {buildMatchCode(currentMatch)}
-                              </Text>
-                            </Pressable>
-                          ) : (
-                            <Text style={{ color: t.muted }}>Sân đang trống.</Text>
+                              {code ? (
+                                <Chip tone="default">Mã: {code}</Chip>
+                              ) : null}
+                              {teams.A || teams.B ? (
+                                <Text style={{ color: t.colors.text }}>
+                                  {teams.A || "Đội A"}{" "}
+                                  <Text
+                                    style={{
+                                      fontWeight: "700",
+                                      color: t.colors.text,
+                                    }}
+                                  >
+                                    vs
+                                  </Text>{" "}
+                                  {teams.B || "Đội B"}
+                                </Text>
+                              ) : null}
+                              {isGroupLike(m) && (
+                                <Chip tone="default">
+                                  Bảng {poolBoardLabel(m)}
+                                </Chip>
+                              )}
+                              {isGroupLike(m) && isNum(m?.rrRound) && (
+                                <Chip tone="default">Lượt {m.rrRound}</Chip>
+                              )}
+                            </Row>
                           )}
-
-                          {nextQueuedMatch ? (
-                            <Pressable
-                              onPress={() =>
-                                setViewerMatchId(
-                                  toIdString(
-                                    nextQueuedMatch?._id || nextQueuedMatch?.id
-                                  )
-                                )
-                              }
-                              style={({ pressed }) => [
-                                {
-                                  borderWidth: 1,
-                                  borderColor: t.colors.border,
-                                  borderRadius: 10,
-                                  padding: 10,
-                                },
-                                pressed && { opacity: 0.9 },
-                              ]}
-                            >
-                              <Text style={{ color: t.muted, fontSize: 12 }}>
-                                Kế tiếp
-                              </Text>
-                              <Text style={{ color: t.muted, fontSize: 12 }}>
-                                {tournamentTitle(nextQueuedMatch)}
-                              </Text>
-                              <Text
-                                style={{ color: t.colors.text, fontWeight: "700" }}
-                              >
-                                Tiếp theo: {buildMatchCode(nextQueuedMatch)}
-                              </Text>
-                              <Text style={{ color: t.muted }}>
-                                {teamLine(nextQueuedMatch)}
-                              </Text>
-                            </Pressable>
-                          ) : null}
-
-                          {!nextQueuedMatch && queuePreview.length ? (
+                          {nextMatch ? (
                             <Text style={{ color: t.muted, fontSize: 12 }}>
-                              Có {queuePreview.length} trận chờ. Bấm Hàng chờ để xem và sắp thứ tự.
+                              {`Kế tiếp: ${matchListLabel(nextMatch)}`}
                             </Text>
                           ) : null}
-
-                          {occupiedByAnotherTournament ? (
-                            <Text style={{ color: t.chipWarnFg, fontSize: 12 }}>
-                              Sân này đang được giải khác sử dụng.
+                          {!nextMatch && previewItems.length > 0 ? (
+                            <Text style={{ color: t.muted, fontSize: 12 }}>
+                              {`Hàng chờ: ${previewItems
+                                .map((item) => buildMatchCode(item))
+                                .join(" • ")}`}
                             </Text>
                           ) : null}
-
-                          {(currentMatch || nextQueuedMatch || queuePreview.length) ? (
+                          {hasMatch || nextMatch || previewItems.length > 0 ? (
                             <Text style={{ color: t.muted, fontSize: 12 }}>
-                              Chạm vào thẻ trận để xem chi tiết.
+                              Chạm vào nút để chỉnh sân hoặc danh sách chờ.
                             </Text>
                           ) : null}
                         </View>
 
+                        {/* Actions — LUÔN là 1 dòng riêng, full width */}
                         <View style={{ width: "100%", marginTop: 6 }}>
                           <Text
                             style={{
@@ -2100,31 +3518,45 @@ export default function CourtManagerSheet({
                           >
                             <Btn
                               variant="outline"
-                              onPress={() => openListSheet(station)}
+                              onPress={() => openListSheet(c)}
                             >
                               Hàng chờ
                             </Btn>
                             <Btn
                               variant="outline"
                               danger
-                              onPress={() => handleClearCourtMatchList(station)}
-                              disabled={savingStationConfig}
+                              onPress={() => handleClearCourtMatchList(c)}
+                              disabled={!c?.listEnabled || clearingMatchList}
                             >
                               Xóa hàng chờ
                             </Btn>
                             <Btn
                               variant="outline"
-                              onPress={() => handleAdvanceCourtMatchList(station)}
-                              disabled={!currentMatch || freeingStation}
+                              onPress={() => handleAdvanceCourtMatchList(c)}
+                              disabled={!hasMatch || advancingMatchList}
                             >
                               Qua trận kế
                             </Btn>
                             <Btn
                               variant="outline"
-                              onPress={() => openAssignDlg(station)}
-                              disabled={occupiedByAnotherTournament}
+                              onPress={() => openAssignDlg(c)}
                             >
                               Đổi trận
+                            </Btn>
+                            <Btn
+                              variant="outline"
+                              onPress={() => handleAssignNext(c._id || c.id)}
+                              disabled={courtStatus(c) !== "idle"}
+                            >
+                              Gán trận kế
+                            </Btn>
+                            <Btn
+                              variant="outline"
+                              danger
+                              onPress={() => handleDeleteOneCourt(c)}
+                              disabled={deletingThis}
+                            >
+                              {deletingThis ? "Đang xoá..." : "Xoá sân"}
                             </Btn>
                           </Row>
                         </View>
@@ -2133,224 +3565,6 @@ export default function CourtManagerSheet({
                   })}
                 </View>
               )}
-            </View>
-          ) : null}
-
-          {!isClusterRuntimeMode ? (
-            <>
-          <View
-            style={[
-              styles.infoBox,
-              {
-                backgroundColor: t.chipWarnBg,
-                borderColor: t.colors.border,
-                marginBottom: 8,
-              },
-            ]}
-          >
-            <Text style={{ color: t.chipWarnFg, fontWeight: "700", marginBottom: 4 }}>
-              Giải này chưa bật quản lý sân theo cụm
-            </Text>
-            <Text style={{ color: t.chipWarnFg }}>
-              Mobile chỉ giữ các thao tác từng sân. Thiết lập số lượng sân hoặc tạo cụm sân nên làm trên web/admin.
-            </Text>
-          </View>
-
-          <Row style={{ alignItems: "center", gap: 8 }}>
-            <Text style={[styles.cardTitle, { color: t.colors.text }]}>
-              Danh sách sân hiện có ({courts.length})
-            </Text>
-          </Row>
-
-          {courts.length === 0 ? (
-            <View
-              style={[
-                styles.infoBox,
-                { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
-              ]}
-            >
-              <Text style={{ color: t.chipInfoFg }}>
-                Chưa có sân nào cho giải này.
-              </Text>
-            </View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {courts.map((c) => {
-                const m = getMatchForCourt(c);
-                const hasMatch = Boolean(m);
-                const code = getMatchCodeForCourt(c);
-                const teams = getTeamsForCourt(c);
-                const cs = courtStatus(c);
-                const tone =
-                  cs === "idle"
-                    ? "default"
-                    : cs === "live"
-                    ? "success"
-                    : cs === "maintenance"
-                    ? "warn"
-                    : "info";
-                const cid = String(c._id || c.id);
-                const deletingThis = busyDelete.has(cid) || deletingOne;
-                const nextMatch = c?.nextMatch || null;
-                const previewItems = getListPreviewItems(c);
-
-                return (
-                  <View
-                    key={cid}
-                    style={[
-                      styles.paperRow,
-                      {
-                        borderColor: t.colors.border,
-                        backgroundColor: t.colors.card,
-                      },
-                    ]}
-                  >
-                    <View style={{ gap: 6, flex: 1 }}>
-                      <Row
-                        style={{
-                          alignItems: "center",
-                          gap: 8,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <Chip tone={tone}>
-                          {c.name || c.label || c.title || c.code || "Sân"}
-                        </Chip>
-                        <Text style={{ color: t.colors.text }}>
-                          {viCourtStatus(cs)}
-                        </Text>
-                        {c?.listEnabled ? (
-                          <Chip tone="default">
-                            {`Còn ${c?.remainingCount || 0} trận trong danh sách`}
-                          </Chip>
-                        ) : null}
-                        {hasMatch && (
-                          <Chip
-                            tone={
-                              m.status === "live"
-                                ? "warn"
-                                : m.status === "finished"
-                                ? "success"
-                                : "info"
-                            }
-                          >
-                            {`Trận: ${viMatchStatus(m.status)}`}
-                          </Chip>
-                        )}
-                      </Row>
-
-                      {hasMatch && (
-                        <Row
-                          style={{
-                            alignItems: "center",
-                            gap: 8,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          {code ? <Chip tone="default">Mã: {code}</Chip> : null}
-                          {teams.A || teams.B ? (
-                            <Text style={{ color: t.colors.text }}>
-                              {teams.A || "Đội A"}{" "}
-                              <Text
-                                style={{
-                                  fontWeight: "700",
-                                  color: t.colors.text,
-                                }}
-                              >
-                                vs
-                              </Text>{" "}
-                              {teams.B || "Đội B"}
-                            </Text>
-                          ) : null}
-                          {isGroupLike(m) && (
-                            <Chip tone="default">Bảng {poolBoardLabel(m)}</Chip>
-                          )}
-                          {isGroupLike(m) && isNum(m?.rrRound) && (
-                            <Chip tone="default">Lượt {m.rrRound}</Chip>
-                          )}
-                        </Row>
-                      )}
-                      {nextMatch ? (
-                        <Text style={{ color: t.muted, fontSize: 12 }}>
-                          {`Kế tiếp: ${matchListLabel(nextMatch)}`}
-                        </Text>
-                      ) : null}
-                      {!nextMatch && previewItems.length > 0 ? (
-                        <Text style={{ color: t.muted, fontSize: 12 }}>
-                          {`Hàng chờ: ${previewItems
-                            .map((item) => buildMatchCode(item))
-                            .join(" • ")}`}
-                        </Text>
-                      ) : null}
-                      {(hasMatch || nextMatch || previewItems.length > 0) ? (
-                        <Text style={{ color: t.muted, fontSize: 12 }}>
-                          Chạm vào nút để chỉnh sân hoặc danh sách chờ.
-                        </Text>
-                      ) : null}
-                    </View>
-
-                    {/* Actions — LUÔN là 1 dòng riêng, full width */}
-                    <View style={{ width: "100%", marginTop: 6 }}>
-                      <Text
-                        style={{
-                          color: t.muted,
-                          fontSize: 12,
-                          fontWeight: "700",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Thao tác nhanh
-                      </Text>
-                      <Row
-                        style={{
-                          gap: 8,
-                          flexWrap: "wrap",
-                          justifyContent: "flex-start",
-                        }}
-                      >
-                        <Btn variant="outline" onPress={() => openListSheet(c)}>
-                          Hàng chờ
-                        </Btn>
-                        <Btn
-                          variant="outline"
-                          danger
-                          onPress={() => handleClearCourtMatchList(c)}
-                          disabled={!c?.listEnabled || clearingMatchList}
-                        >
-                          Xóa hàng chờ
-                        </Btn>
-                        <Btn
-                          variant="outline"
-                          onPress={() => handleAdvanceCourtMatchList(c)}
-                          disabled={!hasMatch || advancingMatchList}
-                        >
-                          Qua trận kế
-                        </Btn>
-                        <Btn variant="outline" onPress={() => openAssignDlg(c)}>
-                          Đổi trận
-                        </Btn>
-                        <Btn
-                          variant="outline"
-                          onPress={() => handleAssignNext(c._id || c.id)}
-                          disabled={courtStatus(c) !== "idle"}
-                        >
-                          Gán trận kế
-                        </Btn>
-                        <Btn
-                          variant="outline"
-                          danger
-                          onPress={() => handleDeleteOneCourt(c)}
-                          disabled={deletingThis}
-                        >
-                          {deletingThis ? "Đang xoá..." : "Xoá sân"}
-                        </Btn>
-                      </Row>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
             </>
           ) : null}
 
@@ -2370,10 +3584,13 @@ export default function CourtManagerSheet({
         matches={
           isRuntimeStation(assignCourt)
             ? selectableMatches.filter(
-                (match) => !getListDisableReason(match, assignCourt)
+                (match) => !getListDisableReason(match, assignCourt),
               )
             : selectableMatches.filter((match) => {
-                const courtBracketId = getCourtBracketId(assignCourt, bracketId);
+                const courtBracketId = getCourtBracketId(
+                  assignCourt,
+                  bracketId,
+                );
                 const matchBracketId = getMatchBracketId(match);
                 return (
                   !courtBracketId ||
@@ -2426,15 +3643,20 @@ export default function CourtManagerSheet({
         containerStyle={{ zIndex: 1100 }}
       >
         <BottomSheetScrollView contentContainerStyle={styles.container}>
-          <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={[styles.title, { color: t.colors.text }]}>Đổi cụm sân</Text>
+          <Row
+            style={{ justifyContent: "space-between", alignItems: "center" }}
+          >
+            <Text style={[styles.title, { color: t.colors.text }]}>
+              Đổi cụm sân
+            </Text>
             <IconBtn
               name="close"
               onPress={() => clusterPickerRef.current?.dismiss?.()}
             />
           </Row>
           <Text style={{ color: t.muted, marginTop: -4 }}>
-            Chọn cụm sân mà giải đang dùng trên mobile.
+            Chọn cụm sân để xem trước. Muốn áp dụng thật cho giải, hãy quay lại
+            sheet chính và bấm Lưu cụm sân.
           </Text>
 
           {allowedClusterOptions.map((cluster) => {
@@ -2465,9 +3687,22 @@ export default function CourtManagerSheet({
                   {cluster?.venueName ? (
                     <Text style={{ color: t.muted }}>{cluster.venueName}</Text>
                   ) : null}
+                  {clusterId === initialAllowedClusterId ? (
+                    <Text
+                      style={{
+                        color: t.colors.primary,
+                        fontSize: 12,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Cụm đang áp dụng cho giải
+                    </Text>
+                  ) : null}
                 </View>
                 <MaterialIcons
-                  name={picked ? "radio-button-checked" : "radio-button-unchecked"}
+                  name={
+                    picked ? "radio-button-checked" : "radio-button-unchecked"
+                  }
                   size={22}
                   color={picked ? t.colors.primary : t.muted}
                 />
@@ -2568,6 +3803,184 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  clusterStatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  clusterStatCard: {
+    minWidth: 92,
+    flexGrow: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  clusterStatLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  clusterStatValue: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  clusterStationStack: {
+    gap: 12,
+    flex: 1,
+  },
+  clusterStationHeader: {
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  clusterRefereeLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  liveMatchCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 8,
+  },
+  liveMatchHeader: {
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+  },
+  liveMatchTitleWrap: {
+    flex: 1,
+    minWidth: 160,
+    gap: 4,
+  },
+  liveMatchTournament: {
+    fontSize: 12,
+  },
+  liveMatchCode: {
+    fontSize: 28,
+    fontWeight: "800",
+  },
+  liveMatchTeams: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  idleStationCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  clusterControlsRow: {
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  clusterFieldBlock: {
+    flex: 1,
+    minWidth: 140,
+    gap: 8,
+  },
+  clusterFieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  clusterSegmentRow: {
+    flexWrap: "wrap",
+  },
+  segmentOption: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  selectorField: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectorFieldText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  selectorOptionsWrap: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  selectorOptionChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  clusterActionRow: {
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+  },
+  stationQueueSection: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  stationQueueHeader: {
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  stationQueueHelp: {
+    fontSize: 12,
+  },
+  queueCandidateList: {
+    gap: 8,
+  },
+  queueCandidateRow: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  queueCandidateContent: {
+    flex: 1,
+    gap: 4,
+  },
+  stationQueueAddRow: {
+    justifyContent: "flex-end",
+  },
+  stationQueueRow: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  stationQueueContent: {
+    flex: 1,
+    gap: 4,
+  },
+  stationQueueMeta: {
+    fontSize: 12,
+  },
+  stationQueueActions: {
+    alignItems: "center",
+    gap: 2,
+  },
+  manualModeHint: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
   },
 
   segment: {},

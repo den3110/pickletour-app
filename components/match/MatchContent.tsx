@@ -24,7 +24,7 @@ import {
 import Constants from "expo-constants";
 import { useSelector } from "react-redux";
 import { WebView } from "react-native-webview";
-import { Video } from "expo-av";
+import { CompatVideo as Video } from "@/lib/expoMediaCompat";
 import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -198,33 +198,38 @@ export const nameWithNick = (p, source) =>
   getPlayerDisplayName(p, source) || "—";
 
 /* ---------- seed/dep label ---------- */
-export const seedLabel = (seed) => {
+export const seedLabel = (seed, contextMatch = null) => {
   if (!seed || !seed.type) return "Chưa có đội";
-  if (seed.label) return seed.label;
+
+  const currentV = extractCurrentV(contextMatch);
+  const buildStageSeedLabel = (prefix) => {
+    const fallbackRound = seed.ref?.round ?? "?";
+    const displayRound =
+      Number.isFinite(currentV) && currentV > 1 ? currentV - 1 : fallbackRound;
+    const t = (seed.ref?.order ?? -1) + 1;
+    return `${prefix}-V${displayRound}-T${t}`;
+  };
 
   switch (seed.type) {
     case "groupRank": {
+      if (seed.label) return seed.label;
       const st = seed.ref?.stage ?? seed.ref?.stageIndex ?? "?";
       const g = seed.ref?.groupCode;
       const r = seed.ref?.rank ?? "?";
       return g ? `V${st}-B${g}-#${r}` : `V${st}-#${r}`;
     }
-    case "stageMatchWinner": {
-      const r = seed.ref?.round ?? "?";
-      const t = (seed.ref?.order ?? -1) + 1;
-      return `W-V${r}-T${t}`;
-    }
-    case "stageMatchLoser": {
-      const r = seed.ref?.round ?? "?";
-      const t = (seed.ref?.order ?? -1) + 1;
-      return `L-V${r}-T${t}`;
-    }
+    case "stageMatchWinner":
+      return buildStageSeedLabel("W");
+    case "stageMatchLoser":
+      return buildStageSeedLabel("L");
     case "matchWinner": {
+      if (seed.label) return seed.label;
       const r = seed.ref?.round ?? "?";
       const t = (seed.ref?.order ?? -1) + 1;
       return `W-R${r} #${t}`;
     }
     case "matchLoser": {
+      if (seed.label) return seed.label;
       const r = seed.ref?.round ?? "?";
       const t = (seed.ref?.order ?? -1) + 1;
       return `L-R${r} #${t}`;
@@ -234,14 +239,14 @@ export const seedLabel = (seed) => {
     case "registration":
       return "Registration";
     default:
-      return "TBD";
+      return seed.label || "TBD";
   }
 };
 
 const _num = (v) => (Number.isFinite(Number(v)) ? Number(v) : NaN);
 const _inferWL = (prev) => {
   const t = String(
-    prev?.type || prev?.source || prev?.from || ""
+    prev?.type || prev?.source || prev?.from || "",
   ).toLowerCase();
   if (prev?.loser === true || t.includes("loser")) return "L";
   return "W";
@@ -295,8 +300,8 @@ function smartDepLabel(m, prevDep) {
       currV != null
         ? Math.max(1, currV - 1)
         : m?.prevBracket?.type !== "group"
-        ? pv + 2
-        : pv + 1;
+          ? pv + 2
+          : pv + 1;
     return `${wl}-V${newV}-T${t}`;
   });
 }
@@ -655,7 +660,9 @@ function normalizeStreams(m) {
   };
 
   const pushCanonicalStream = (stream) => {
-    const playUrl = isNonEmptyString(stream?.playUrl) ? stream.playUrl.trim() : "";
+    const playUrl = isNonEmptyString(stream?.playUrl)
+      ? stream.playUrl.trim()
+      : "";
     if (!playUrl) return false;
     const dedupeKey =
       stream?.key && typeof stream.key === "string"
@@ -663,7 +670,9 @@ function normalizeStreams(m) {
         : `url:${playUrl}`;
     if (seen.has(dedupeKey) || seen.has(playUrl)) return true;
 
-    const kind = String(stream?.kind || "").trim().toLowerCase();
+    const kind = String(stream?.kind || "")
+      .trim()
+      .toLowerCase();
     const det =
       kind === "delayed_manifest"
         ? {
@@ -691,9 +700,7 @@ function normalizeStreams(m) {
       delaySeconds: Number(stream?.delaySeconds || 0),
       ready: stream?.ready !== false,
       disabledReason:
-        typeof stream?.disabledReason === "string"
-          ? stream.disabledReason
-          : "",
+        typeof stream?.disabledReason === "string" ? stream.disabledReason : "",
       status: typeof stream?.status === "string" ? stream.status : "",
       meta: stream?.meta || {},
       ...det,
@@ -708,16 +715,13 @@ function normalizeStreams(m) {
         (item) =>
           item &&
           typeof item === "object" &&
-          (isNonEmptyString(item?.playUrl) || isNonEmptyString(item?.openUrl))
+          (isNonEmptyString(item?.playUrl) || isNonEmptyString(item?.openUrl)),
       )
     : [];
   if (canonicalStreams.length > 0) {
     canonicalStreams
       .slice()
-      .sort(
-        (a, b) =>
-          Number(a?.priority || 99) - Number(b?.priority || 99)
-      )
+      .sort((a, b) => Number(a?.priority || 99) - Number(b?.priority || 99))
       .forEach((stream) => {
         pushCanonicalStream(stream);
       });
@@ -747,7 +751,8 @@ function normalizeStreams(m) {
       primary: true,
     });
   }
-  if (primaryVideo) pushUrl(primaryVideo, { primary: !preferFinishedFacebookVideo });
+  if (primaryVideo)
+    pushUrl(primaryVideo, { primary: !preferFinishedFacebookVideo });
 
   const singles = [
     ["Video", m?.videoUrl],
@@ -823,7 +828,7 @@ const AspectBox = memo(({ ratio = 16 / 9, children }) => {
 
 const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
   const [ratio, setRatio] = useState(
-    stream?.aspect === "9:16" ? 9 / 16 : 16 / 9
+    stream?.aspect === "9:16" ? 9 / 16 : 16 / 9,
   );
   const [items, setItems] = useState([]);
   const [currentUrl, setCurrentUrl] = useState("");
@@ -839,7 +844,9 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
     let timerId;
 
     const applyManifest = (manifest) => {
-      const segments = Array.isArray(manifest?.segments) ? manifest.segments : [];
+      const segments = Array.isArray(manifest?.segments)
+        ? manifest.segments
+        : [];
       const playable = segments
         .map((segment) => ({
           key: `segment:${segment?.index ?? ""}`,
@@ -863,7 +870,9 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
       });
       setLoading(false);
       if (!playable.length) {
-        setError(stream?.disabledReason || "Server 2 dang chuan bi du lieu tre.");
+        setError(
+          stream?.disabledReason || "Server 2 đang chuẩn bị dữ liệu trễ.",
+        );
       } else {
         setError("");
       }
@@ -881,7 +890,7 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
       } catch (fetchError) {
         if (cancelled) return;
         setLoading(false);
-        setError(fetchError?.message || "Khong tai duoc delayed manifest.");
+        setError(fetchError?.message || "Kh?ng t?i ???c delayed manifest.");
       } finally {
         if (!cancelled) {
           const refreshSeconds =
@@ -910,7 +919,7 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
       <View style={{ padding: 16, alignItems: "center" }}>
         <ActivityIndicator size="small" color="#fff" />
         <Text style={{ color: "#fff", marginTop: 8 }}>
-          Dang tai video tu PickleTour...
+          Đang tải video từ PickleTour...
         </Text>
       </View>
     );
@@ -920,7 +929,7 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
     return (
       <View style={{ padding: 16, alignItems: "center" }}>
         <Text style={{ color: "#fff" }}>
-          {error || "Server 2 dang chuan bi."}
+          {error || "Server 2 ?ang chu?n b?."}
         </Text>
       </View>
     );
@@ -939,7 +948,9 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
             if (!status?.isLoaded) return;
             if (status.didJustFinish) {
               setCurrentUrl((prev) => {
-                const currentIndex = items.findIndex((item) => item.url === prev);
+                const currentIndex = items.findIndex(
+                  (item) => item.url === prev,
+                );
                 if (currentIndex >= 0 && currentIndex < items.length - 1) {
                   return items[currentIndex + 1].url;
                 }
@@ -966,7 +977,7 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
 /* ---------- StreamPlayer (RN) ---------- */
 const StreamPlayer = memo(({ stream }) => {
   const [ratio, setRatio] = useState(
-    stream?.aspect === "9:16" ? 9 / 16 : 16 / 9
+    stream?.aspect === "9:16" ? 9 / 16 : 16 / 9,
   );
 
   useEffect(() => {
@@ -1032,16 +1043,16 @@ const StatusBanner = memo(({ status, hasStreams, expanded, onToggle }) => {
           : "Trận đang live (Bấm để xem video)."
         : "Trận đang live — chưa có link phát."
       : status === "finished"
-      ? "Trận đấu đã kết thúc."
-      : "Trận đấu chưa bắt đầu.";
+        ? "Trận đấu đã kết thúc."
+        : "Trận đấu chưa bắt đầu.";
 
   const sty = status === "live" ? T.banner.live : T.banner.info;
   const icon =
     status === "live"
       ? "fiber-manual-record"
       : status === "finished"
-      ? "flag"
-      : "schedule";
+        ? "flag"
+        : "schedule";
 
   return (
     <TouchableOpacity
@@ -1079,7 +1090,7 @@ const SegmentedStatus = memo(({ value, onChange, disabled }) => {
       { key: "live", label: "Live" },
       { key: "finished", label: "Kết thúc" },
     ],
-    []
+    [],
   );
 
   return (
@@ -1145,7 +1156,7 @@ const AdminBtn = memo(
         </Text>
       </TouchableOpacity>
     );
-  }
+  },
 );
 
 /* ============== LIVE UTILS (Giữ nguyên logic) ============== */
@@ -1424,11 +1435,11 @@ const LiveInfoSheet = memo(
     const overlayPref = data?.overlay_url || "";
     const studioParams = useMemo(
       () => buildStudioParams(baseOrigin, data, match, overlayPref),
-      [baseOrigin, data, match, overlayPref]
+      [baseOrigin, data, match, overlayPref],
     );
     const studioPath = useMemo(
       () => data?.studio_route || data?.studio_path || "/live/studio",
-      [data]
+      [data],
     );
 
     const closeSheetsThenGoStudio = useCallback(() => {
@@ -1449,7 +1460,7 @@ const LiveInfoSheet = memo(
           opacity={0.5}
         />
       ),
-      []
+      [],
     );
 
     const copy = useCallback(async (v) => {
@@ -1461,12 +1472,12 @@ const LiveInfoSheet = memo(
 
     const destinations = useMemo(
       () => extractDestinations(data, match),
-      [data, match]
+      [data, match],
     );
 
     const primaryLink = useMemo(
       () => data?.permalink_url || data?.watch_url || null,
-      [data]
+      [data],
     );
 
     const handleOpenPrimaryLink = useCallback(() => {
@@ -1574,7 +1585,7 @@ const LiveInfoSheet = memo(
         </BottomSheetScrollView>
       </BottomSheetModal>
     );
-  })
+  }),
 );
 
 /* ---------- Thanh công cụ quản trị (Redesigned) ---------- */
@@ -1605,10 +1616,10 @@ const AdminToolbar = memo(
               onPress: () => onSetWinner?.(side),
             },
           ],
-          { cancelable: true }
+          { cancelable: true },
         );
       },
-      [onSetWinner]
+      [onSetWinner],
     );
 
     return (
@@ -1715,7 +1726,7 @@ const AdminToolbar = memo(
         </View>
       </View>
     );
-  }
+  },
 );
 
 function _getIdLike(x) {
@@ -1810,7 +1821,7 @@ const MatchRulesSheet = memo(
           opacity={0.5}
         />
       ),
-      []
+      [],
     );
 
     return (
@@ -1845,7 +1856,7 @@ const MatchRulesSheet = memo(
               icon="layers" // Icon thể hiện các set đấu
               label="Thể thức (Best Of)"
               value={`Đấu ${r.bestOf ?? 3} thắng ${Math.ceil(
-                (r.bestOf ?? 3) / 2
+                (r.bestOf ?? 3) / 2,
               )}`}
             />
             <RuleRow
@@ -1878,8 +1889,45 @@ const MatchRulesSheet = memo(
         </BottomSheetScrollView>
       </BottomSheetModal>
     );
-  })
+  }),
 );
+
+function stripResolvedRealtimePatch(
+  patch,
+  { preserveGameScores = false } = {},
+) {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    return patch;
+  }
+
+  let changed = false;
+  const next = { ...patch };
+  [
+    "status",
+    "winner",
+    "currentGame",
+    "serve",
+    "rules",
+    "pairA",
+    "pairB",
+    "startedAt",
+    "finishedAt",
+    "assignedAt",
+  ].forEach((key) => {
+    if (key in next) {
+      delete next[key];
+      changed = true;
+    }
+  });
+
+  if (!preserveGameScores && "gameScores" in next) {
+    delete next.gameScores;
+    changed = true;
+  }
+
+  if (!changed) return patch;
+  return Object.keys(next).length ? next : null;
+}
 
 /* ===================== Component chính (Native) ===================== */
 function MatchContent({ m, isLoading, liveLoading, onSaved }) {
@@ -1899,16 +1947,16 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       new Set(
         [...(userInfo?.roles || []), ...(userInfo?.permissions || [])]
           .filter(Boolean)
-          .map((x) => String(x).toLowerCase())
+          .map((x) => String(x).toLowerCase()),
       ),
-    [userInfo]
+    [userInfo],
   );
 
   const tour =
     m?.tournament && typeof m.tournament === "object" ? m.tournament : null;
 
   const { data: verifyRes, isFetching: verifyingMgr } = useVerifyManagerQuery(
-    tour?._id ? tour?._id : skipToken
+    tour?._id ? tour?._id : skipToken,
   );
   const isManager = !!verifyRes?.isManager;
   const isAdmin = !!(
@@ -1954,8 +2002,52 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const merged = useMemo(
     () => (localPatch ? { ...(mm || {}), ...localPatch } : mm || null),
-    [mm, localPatch]
+    [mm, localPatch],
   );
+  const realtimeSyncSignature = useMemo(
+    () =>
+      [
+        mm?.status || "",
+        mm?.winner || "",
+        String(mm?.currentGame ?? ""),
+        String(mm?.liveVersion ?? mm?.version ?? ""),
+        mm?.startedAt || "",
+        mm?.finishedAt || "",
+        mm?.assignedAt || "",
+        mm?.pairA?._id || mm?.pairA?.id || "",
+        mm?.pairB?._id || mm?.pairB?.id || "",
+        Array.isArray(mm?.gameScores) ? mm.gameScores.length : 0,
+      ].join("|"),
+    [
+      mm?.status,
+      mm?.winner,
+      mm?.currentGame,
+      mm?.liveVersion,
+      mm?.version,
+      mm?.startedAt,
+      mm?.finishedAt,
+      mm?.assignedAt,
+      mm?.pairA?._id,
+      mm?.pairA?.id,
+      mm?.pairB?._id,
+      mm?.pairB?.id,
+      mm?.gameScores,
+    ],
+  );
+  const lastRealtimeSyncSignatureRef = useRef("");
+  useEffect(() => {
+    if (!realtimeSyncSignature) return;
+    if (lastRealtimeSyncSignatureRef.current === realtimeSyncSignature) return;
+    lastRealtimeSyncSignatureRef.current = realtimeSyncSignature;
+    setLocalPatch((previous) =>
+      stripResolvedRealtimePatch(previous, {
+        preserveGameScores: editMode,
+      }),
+    );
+  }, [editMode, realtimeSyncSignature]);
+  useEffect(() => {
+    lastRealtimeSyncSignatureRef.current = "";
+  }, [lockedId]);
 
   // giữ onSaved mới nhất cho debounce
   const onSavedRef = useRef(onSaved);
@@ -2021,7 +2113,10 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         next.streams = streamsArr;
         next.meta = { ...(next.meta || {}), streams: streamsArr };
       }
-      if (typeof snap.defaultStreamKey === "string" && snap.defaultStreamKey.trim()) {
+      if (
+        typeof snap.defaultStreamKey === "string" &&
+        snap.defaultStreamKey.trim()
+      ) {
         next.defaultStreamKey = snap.defaultStreamKey.trim();
       }
       return next;
@@ -2042,7 +2137,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       merged?.liveBy,
       merged?.referee,
       merged?.referees,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -2078,7 +2173,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           payload.scores ??
           payload.data?.gameScores ??
           payload.data?.scores ??
-          payload.snapshot?.gameScores
+          payload.snapshot?.gameScores,
       );
       if (!hasScores) debouncedRefresh();
     };
@@ -2130,7 +2225,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         userInfo?.userId ||
         userInfo?.uid ||
         userInfo?.email ||
-        ""
+        "",
     );
     if (!uid || !m) return false;
     const pool = new Set([
@@ -2153,7 +2248,13 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       p?.uid ||
       p) &&
     String(
-      p?.user?._id || p?.user?.id || p?._id || p?.id || p?.userId || p?.uid || p
+      p?.user?._id ||
+        p?.user?.id ||
+        p?._id ||
+        p?.id ||
+        p?.userId ||
+        p?.uid ||
+        p,
     );
 
   function _parseServeCode(x) {
@@ -2277,12 +2378,12 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const activeStream = useMemo(
     () =>
       activeIdx >= 0 && activeIdx < streams.length ? streams[activeIdx] : null,
-    [activeIdx, streams]
+    [activeIdx, streams],
   );
 
   const displayTime = useMemo(
     () => toDateSafe(pickDisplayTime(merged)),
-    [merged]
+    [merged],
   );
   const timeLabel = useMemo(() => {
     if (!displayTime) return null;
@@ -2313,13 +2414,13 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     Alert.alert(
       "Chi tiết trận đấu",
       lines.join("\n\n"), // Xuống dòng cho dễ đọc
-      [{ text: "Đóng", style: "cancel" }]
+      [{ text: "Đóng", style: "cancel" }],
     );
   }, [merged, timeLabel, status]);
 
   const overlayBase = useMemo(
     () => resolveWebBase(merged?.tournament, merged?.overlay),
-    [merged?.tournament, merged?.overlay]
+    [merged?.tournament, merged?.overlay],
   );
   const overlayUrl = useMemo(
     () =>
@@ -2329,7 +2430,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         showSets: true,
         autoNext: true,
       }),
-    [overlayBase, lockedId, T.scheme]
+    [overlayBase, lockedId, T.scheme],
   );
   // ===== Edit scores (Native) =====
   const [editMode, setEditMode] = useState(false);
@@ -2388,20 +2489,20 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         return arr;
       });
     },
-    [sanitizeInt]
+    [sanitizeInt],
   );
 
   const addSet = useCallback(
     () => setEditScores((old) => [...(old || []), { a: 0, b: 0 }]),
-    []
+    [],
   );
   const removeSet = useCallback(
     (idx) => setEditScores((old) => (old || []).filter((_, i) => i !== idx)),
-    []
+    [],
   );
   const resetEdits = useCallback(
     () => setEditScores([...(merged?.gameScores ?? [])]),
-    [merged?.gameScores]
+    [merged?.gameScores],
   );
 
   const [adminPatchMatch] = useAdminPatchMatchMutation();
@@ -2422,7 +2523,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         setBusy(false);
       }
     },
-    [adminPatchMatch, lockedId, onSaved]
+    [adminPatchMatch, lockedId, onSaved],
   );
 
   const handleSaveScores = useCallback(async () => {
@@ -2433,7 +2534,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           gameScores: editScores,
           ...(status !== "finished" ? { winner: "" } : {}),
         },
-        { successMsg: "Đã lưu tỉ số." }
+        { successMsg: "Đã lưu tỉ số." },
       );
       setLocalPatch((p) => ({ ...(p || {}), gameScores: editScores }));
       exitEdit();
@@ -2446,12 +2547,12 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       try {
         await doPatch(
           { winner: side, status: "finished" },
-          { successMsg: `Đã đặt đội ${side} thắng.` }
+          { successMsg: `Đã đặt đội ${side} thắng.` },
         );
         setLocalPatch((p) => ({ ...(p || {}), status: "finished" }));
       } catch {}
     },
-    [canManage, lockedId, doPatch]
+    [canManage, lockedId, doPatch],
   );
 
   const handleSetStatus = useCallback(
@@ -2466,12 +2567,12 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         setLocalPatch((p) => ({ ...(p || {}), status: newStatus }));
       } catch {}
     },
-    [canManage, lockedId, doPatch]
+    [canManage, lockedId, doPatch],
   );
 
   const { A: setsA, B: setsB } = useMemo(
     () => countGamesWon(shownGameScores),
-    [shownGameScores]
+    [shownGameScores],
   );
 
   const [createLive, { isLoading: creatingLive }] =
@@ -2559,11 +2660,11 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const isSingle = useMemo(
     () =>
       String(merged?.tournament?.eventType || "").toLowerCase() === "single",
-    [merged?.tournament?.eventType]
+    [merged?.tournament?.eventType],
   );
   const serveFlags = useMemo(
     () => resolveServeFlags(merged, { isSingle }),
-    [merged, isSingle]
+    [merged, isSingle],
   );
   const teamAName = useMemo(() => {
     if (merged?.pairA) {
@@ -2573,7 +2674,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         .join(" & ");
     }
     if (merged?.previousA) return smartDepLabel(merged, merged.previousA);
-    return seedLabel(merged?.seedA);
+    return seedLabel(merged?.seedA, merged);
   }, [merged, isSingle]);
 
   const teamBName = useMemo(() => {
@@ -2584,7 +2685,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         .join(" & ");
     }
     if (merged?.previousB) return smartDepLabel(merged, merged.previousB);
-    return seedLabel(merged?.seedB);
+    return seedLabel(merged?.seedB, merged);
   }, [merged, isSingle]);
 
   const togglePlayer = useCallback(() => setShowPlayer((v) => !v), []);
@@ -2689,7 +2790,9 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   {subtitle ? (
                     <Text
                       style={{
-                        color: selected ? "rgba(255,255,255,0.9)" : T.textSecondary,
+                        color: selected
+                          ? "rgba(255,255,255,0.9)"
+                          : T.textSecondary,
                         fontSize: 12,
                         marginTop: 2,
                       }}
@@ -2866,7 +2969,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                 >
                   {merged?.previousA
                     ? smartDepLabel(merged, merged.previousA)
-                    : seedLabel(merged?.seedA)}
+                    : seedLabel(merged?.seedA, merged)}
                 </Text>
               )}
             </View>
@@ -2912,7 +3015,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                 >
                   {merged?.previousB
                     ? smartDepLabel(merged, merged.previousB)
-                    : seedLabel(merged?.seedB)}
+                    : seedLabel(merged?.seedB, merged)}
                 </Text>
               )}
             </View>

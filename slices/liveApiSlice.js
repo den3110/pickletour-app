@@ -4,6 +4,26 @@ const LIMIT = 12;
 
 export const liveApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
+    getLiveClusters: builder.query({
+      query: () => "/api/live/clusters",
+      transformResponse: (resp) => resp?.items || [],
+      providesTags: (result = []) => [
+        ...result.map((item) => ({ type: "LiveCluster", id: item._id })),
+        { type: "LiveCluster", id: "LIST" },
+      ],
+    }),
+    getLiveCluster: builder.query({
+      query: (clusterId) => `/api/live/clusters/${clusterId}`,
+      providesTags: (result, error, clusterId) => [
+        { type: "LiveCluster", id: clusterId },
+      ],
+    }),
+    getLiveCourt: builder.query({
+      query: (courtStationId) => `/api/live/courts/${courtStationId}`,
+      providesTags: (result, error, courtStationId) => [
+        { type: "LiveCourt", id: courtStationId },
+      ],
+    }),
     getLiveMatches: builder.query({
       query: ({
         statuses = "scheduled,queued,assigned,live",
@@ -49,8 +69,31 @@ export const liveApiSlice = apiSlice.injectEndpoints({
           countLive: Number(resp?.countLive || 0),
         };
       },
+      providesTags: (result = {}) => {
+        const items = Array.isArray(result?.items) ? result.items : [];
+        return [
+          ...items.map((item) => ({ type: "LiveMatch", id: item?._id || item?.matchId })),
+          { type: "LiveMatches", id: "LIST" },
+        ];
+      },
+    }),
+    deleteLiveVideo: builder.mutation({
+      query: (matchId) => ({
+        url: `/api/live/matches/${matchId}/video`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, matchId) => [
+        { type: "LiveMatches", id: "LIST" },
+        { type: "LiveMatch", id: matchId },
+      ],
     }),
   }),
 });
 
-export const { useGetLiveMatchesQuery } = liveApiSlice;
+export const {
+  useGetLiveClustersQuery,
+  useGetLiveClusterQuery,
+  useGetLiveCourtQuery,
+  useGetLiveMatchesQuery,
+  useDeleteLiveVideoMutation,
+} = liveApiSlice;

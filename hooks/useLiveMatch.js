@@ -3,12 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSocket } from "@/context/SocketContext";
 import {
   extractMatchPayload,
+  extractMatchPatchPayload,
   getMatchPayloadId,
   isLightweightMatchPayload,
   isNewerOrEqualMatchPayload,
   mergeMatchPayload,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
+import { useRefereeLiveSyncMatch } from "@/hooks/useRefereeLiveSyncMatch";
 
 /**
  * Realtime match state over Socket.IO
@@ -17,24 +19,30 @@ import {
  * - Accepts `match:snapshot`, `match:update`, `score:updated`
  * - Lightweight payloads only trigger snapshot refresh; they never replace identity
  */
-export function useLiveMatch(matchId, token) {
+function useStandardLiveMatch(matchId, token, enabled = true) {
   const socket = useSocket();
   const [state, setState] = useState({ loading: true, data: null });
   const mountedRef = useRef(false);
 
   useEffect(() => {
+    if (!enabled) {
+      setState({ loading: false, data: null });
+      return;
+    }
     setState({ loading: Boolean(matchId), data: null });
-  }, [matchId]);
+  }, [enabled, matchId]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!socket) return;
     if (token && !socket.connected && !socket.active) {
       socket.auth = { ...(socket.auth || {}), token };
       socket.connect();
     }
-  }, [socket, token]);
+  }, [enabled, socket, token]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!socket || !matchId) return;
     mountedRef.current = true;
 
@@ -74,11 +82,38 @@ export function useLiveMatch(matchId, token) {
       applyIncoming(payload, { allowLightweight: true });
     const onUpdate = (payload) => applyIncoming(payload);
     const onScoreUpdated = (payload) => applyIncoming(payload);
+    const onPatched = (payload) => {
+      if (!mountedRef.current) return;
+      if (!isForThisMatch(payload)) return;
+      const patch = extractMatchPatchPayload(payload);
+      if (!patch) return;
+
+      setState((prev) => {
+        const next = prev.data
+          ? mergeMatchPayload(prev.data, patch, prev.data)
+          : normalizeMatchDisplay(patch);
+        if (!next) return prev;
+        return { loading: false, data: next };
+      });
+    };
 
     socket.emit("match:join", { matchId });
     socket.on("match:snapshot", onSnapshot);
     socket.on("match:update", onUpdate);
     socket.on("score:updated", onScoreUpdated);
+    socket.on("score:patched", onPatched);
+    socket.on("score:added", onScoreUpdated);
+    socket.on("score:undone", onScoreUpdated);
+    socket.on("score:reset", onScoreUpdated);
+    socket.on("match:patched", onPatched);
+    socket.on("match:started", onUpdate);
+    socket.on("match:finished", onUpdate);
+    socket.on("match:forfeited", onUpdate);
+    socket.on("status:updated", onUpdate);
+    socket.on("winner:updated", onUpdate);
+    socket.on("video:set", onPatched);
+    socket.on("stream:updated", onPatched);
+    socket.on("match:teamsUpdated", onPatched);
 
     return () => {
       mountedRef.current = false;
@@ -86,8 +121,21 @@ export function useLiveMatch(matchId, token) {
       socket.off("match:snapshot", onSnapshot);
       socket.off("match:update", onUpdate);
       socket.off("score:updated", onScoreUpdated);
+      socket.off("score:patched", onPatched);
+      socket.off("score:added", onScoreUpdated);
+      socket.off("score:undone", onScoreUpdated);
+      socket.off("score:reset", onScoreUpdated);
+      socket.off("match:patched", onPatched);
+      socket.off("match:started", onUpdate);
+      socket.off("match:finished", onUpdate);
+      socket.off("match:forfeited", onUpdate);
+      socket.off("status:updated", onUpdate);
+      socket.off("winner:updated", onUpdate);
+      socket.off("video:set", onPatched);
+      socket.off("stream:updated", onPatched);
+      socket.off("match:teamsUpdated", onPatched);
     };
-  }, [socket, matchId]);
+  }, [enabled, socket, matchId]);
 
   const api = useMemo(
     () => ({
@@ -96,6 +144,26 @@ export function useLiveMatch(matchId, token) {
         socket?.emit("match:point", { matchId, team: "A", step }),
       pointB: (step = 1) =>
         socket?.emit("match:point", { matchId, team: "B", step }),
+      setServe: ({ side, server, serverId = null, userMatch = false } = {}) =>
+        socket?.emit("serve:set", {
+          matchId,
+          side,
+          server,
+          serverId,
+          userMatch,
+        }),
+      setSlotsBase: ({ base, serve = null, userMatch = false } = {}) => {
+        socket?.emit("slots:setBase", { matchId, base, userMatch });
+        if (serve) {
+          socket?.emit("serve:set", {
+            matchId,
+            side: serve.side,
+            server: serve.server,
+            serverId: serve.serverId,
+            userMatch,
+          });
+        }
+      },
       undo: () => socket?.emit("match:undo", { matchId }),
       finish: (winner) => socket?.emit("match:finish", { matchId, winner }),
       forfeit: (winner, reason = "forfeit") =>
@@ -106,8 +174,18 @@ export function useLiveMatch(matchId, token) {
       scheduleAt: (datetimeISO) =>
         socket?.emit("match:schedule", { matchId, scheduledAt: datetimeISO }),
     }),
-    [socket, matchId]
+    [socket, matchId],
   );
 
   return { ...state, api };
+}
+
+export function useLiveMatch(matchId, token, options = {}) {
+  const offlineSync = Boolean(options?.offlineSync);
+  const standard = useStandardLiveMatch(matchId, token, !offlineSync);
+  const refereeSync = useRefereeLiveSyncMatch(matchId, token, {
+    enabled: offlineSync,
+    ...options,
+  });
+  return offlineSync ? refereeSync : standard;
 }

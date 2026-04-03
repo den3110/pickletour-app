@@ -20,8 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 import { PinchGestureHandler, State } from "react-native-gesture-handler";
 
-import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
+import { useCompatSfx } from "@/lib/expoMediaCompat";
 import torch_on from "../assets/sfx/click4.mp3";
 import torch_off from "../assets/sfx/click4.mp3";
 import mic_on from "../assets/sfx/click4.mp3";
@@ -33,7 +33,6 @@ const SFX = {
   micOn: mic_on,
   micOff: mic_off,
 } as const;
-type SfxKey = keyof typeof SFX;
 const SFX_VOLUME = 1;
 
 const COMPONENT_NAME = "RtmpPreviewView";
@@ -50,66 +49,7 @@ type Mode = "pre" | "countdown" | "live" | "stopping" | "ended";
 const DEFAULT_FB_SERVER = "rtmps://live-api-s.facebook.com:443/rtmp/";
 
 function useSfx() {
-  const soundsRef = useRef<Record<SfxKey, Audio.Sound | null>>({
-    torchOn: null,
-    torchOff: null,
-    micOn: null,
-    micOff: null,
-  });
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          allowsRecordingIOS: true,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-          staysActiveInBackground: false,
-        });
-        for (const key of Object.keys(SFX) as SfxKey[]) {
-          const { sound } = await Audio.Sound.createAsync(SFX[key], {
-            volume: SFX_VOLUME,
-            isLooping: false,
-            shouldPlay: false,
-          });
-          if (mounted) soundsRef.current[key] = sound;
-          else await sound.unloadAsync();
-        }
-      } catch {}
-    })();
-    return () => {
-      mounted = false;
-      const dict = soundsRef.current;
-      (async () => {
-        for (const k of Object.keys(dict) as SfxKey[]) {
-          try {
-            await dict[k]?.unloadAsync();
-          } catch {}
-          dict[k] = null;
-        }
-      })();
-    };
-  }, []);
-
-  const play = useCallback(async (key: SfxKey) => {
-    const s = soundsRef.current[key];
-    if (!s) return;
-    try {
-      await s.setVolumeAsync(SFX_VOLUME ?? 0.3);
-      await s.setPositionAsync(0);
-      await s.playAsync();
-    } catch {
-      try {
-        await s.stopAsync();
-        await s.playAsync();
-      } catch {}
-    }
-  }, []);
-  return play;
+  return useCompatSfx(SFX, SFX_VOLUME);
 }
 
 async function ensurePermissions() {

@@ -1,23 +1,38 @@
-// slices/chatApiSlice.js
 import { apiSlice } from "./apiSlice";
+
+function buildHistoryParams(arg = {}) {
+  if (typeof arg === "number") {
+    return { limit: String(arg) };
+  }
+
+  const params = {};
+
+  if (arg?.before) {
+    params.before = String(arg.before);
+  }
+
+  if (Number.isFinite(arg?.limit) && Number(arg.limit) > 0) {
+    params.limit = String(arg.limit);
+  }
+
+  return params;
+}
 
 export const chatApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    sendChatMessage: builder.mutation({
-      query: (message) => ({
+    sendMessage: builder.mutation({
+      query: (data) => ({
         url: "/api/chat",
         method: "POST",
-        body: { message },
+        body: data,
       }),
       invalidatesTags: [{ type: "ChatHistory", id: "LIST" }],
     }),
-    // LẤY LỊCH SỬ CHAT
     getChatHistory: builder.query({
-      // truyền tham số limit (optional), default = 100
-      query: (limit = 100) => ({
-        // ⚠️ SỬA LẠI path NÀY CHO KHỚP BACKEND CỦA BẠN
-        url: `/api/chat/history?limit=${limit}`,
+      query: (arg = {}) => ({
+        url: "/api/chat/history",
         method: "GET",
+        params: buildHistoryParams(arg),
       }),
       providesTags: (result) =>
         result?.messages
@@ -30,34 +45,53 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             ]
           : [{ type: "ChatHistory", id: "LIST" }],
     }),
-
-    // XOÁ TOÀN BỘ LỊCH SỬ CHAT
     clearChatHistory: builder.mutation({
       query: () => ({
-        // ⚠️ path delete history
         url: "/api/chat/history",
         method: "DELETE",
       }),
       invalidatesTags: [{ type: "ChatHistory", id: "LIST" }],
     }),
-
-    // GỬI FEEDBACK
+    clearLearningMemory: builder.mutation({
+      query: () => ({
+        url: "/api/chat/learning",
+        method: "DELETE",
+      }),
+    }),
     sendChatFeedback: builder.mutation({
-      // payload tuỳ bạn shape thế nào
-      query: (payload) => ({
-        // ⚠️ chỉnh path nếu cần
+      query: (data) => ({
         url: "/api/chat/feedback",
         method: "POST",
-        body: payload,
+        body: data,
+      }),
+    }),
+    sendChatTelemetryEvent: builder.mutation({
+      query: (data) => ({
+        url: "/api/chat/telemetry/event",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    commitChatMutation: builder.mutation({
+      query: (data) => ({
+        url: "/api/chat/mutation/commit",
+        method: "POST",
+        body: data,
       }),
     }),
   }),
-  overrideExisting: false,
+  overrideExisting: true,
 });
 
 export const {
-  useSendChatMessageMutation,
+  useSendMessageMutation,
   useGetChatHistoryQuery,
+  useLazyGetChatHistoryQuery,
   useClearChatHistoryMutation,
+  useClearLearningMemoryMutation,
   useSendChatFeedbackMutation,
+  useSendChatTelemetryEventMutation,
+  useCommitChatMutationMutation,
 } = chatApiSlice;
+
+export const useSendChatMessageMutation = useSendMessageMutation;

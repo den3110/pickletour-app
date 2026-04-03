@@ -22,8 +22,8 @@ import {
   TouchableWithoutFeedback,
   Linking,
 } from "react-native";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import MapboxGL from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -45,7 +45,21 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 
 // --- CONFIG ---
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
-MapboxGL.setAccessToken(MAPBOX_TOKEN || "");
+const isExpoGo = Constants.appOwnership === "expo";
+
+let MapboxGL: any = null;
+if (!isExpoGo) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mapboxModule = require("@rnmapbox/maps");
+    MapboxGL = mapboxModule.default ?? mapboxModule;
+    MapboxGL.setAccessToken(MAPBOX_TOKEN || "");
+  } catch (error) {
+    if (__DEV__) {
+      console.warn("Mapbox is not available in this build:", error);
+    }
+  }
+}
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.82;
@@ -198,7 +212,7 @@ const RadarPulse = () => {
       -1,
       false
     );
-  }, []);
+  }, [opacity, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -227,11 +241,79 @@ const StatusBubble = ({ message, emoji }) => {
   );
 };
 
+const RadarUnavailable = ({ isDark, onBack }) => (
+  <View
+    style={[
+      styles.centerFill,
+      {
+        paddingHorizontal: 24,
+        backgroundColor: isDark ? "#020617" : "#F8FAFC",
+      },
+    ]}
+  >
+    <MaterialCommunityIcons
+      name="map-marker-off-outline"
+      size={54}
+      color={THEME_COLOR}
+    />
+    <Text
+      style={{
+        marginTop: 16,
+        fontSize: 22,
+        fontWeight: "800",
+        textAlign: "center",
+        color: isDark ? "#FFF" : "#0F172A",
+      }}
+    >
+      Radar chưa chạy được trên Expo Go
+    </Text>
+    <Text
+      style={{
+        marginTop: 12,
+        fontSize: 14,
+        lineHeight: 22,
+        textAlign: "center",
+        color: isDark ? "#CBD5E1" : "#475569",
+      }}
+    >
+      Màn này dùng Mapbox native. Bạn cần chạy development build hoặc rebuild app
+      bằng `npx expo run:android` rồi mở lại.
+    </Text>
+    <TouchableOpacity
+      onPress={onBack}
+      style={{
+        marginTop: 20,
+        minWidth: 180,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        borderRadius: 16,
+        backgroundColor: THEME_COLOR,
+        alignItems: "center",
+      }}
+    >
+      <Text style={{ color: "#FFF", fontWeight: "800" }}>Quay lại</Text>
+    </TouchableOpacity>
+    <TouchableOpacity
+      onPress={() =>
+        Linking.openURL(
+          "https://docs.expo.dev/develop/development-builds/introduction/"
+        )
+      }
+      style={{ marginTop: 12 }}
+    >
+      <Text style={{ color: NEON_BLUE, fontWeight: "700" }}>
+        Xem hướng dẫn development build
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
+
 // --- MAIN SCREEN ---
 export default function PickleRadarScreen() {
   const router = useRouter();
   const theme = useColorScheme();
   const isDark = theme === "dark";
+  const mapboxAvailable = !!MapboxGL;
 
   // State
   const [myLocation, setMyLocation] = useState(null); // [lng, lat] | null
@@ -279,7 +361,7 @@ export default function PickleRadarScreen() {
       playType: playTypeFilter,
       types: typesParam,
     },
-    { skip: !shouldQuery }
+    { skip: !mapboxAvailable || !shouldQuery }
   );
 
   const [upsertPresence, { isLoading: isPresenceSaving }] =
@@ -350,6 +432,11 @@ export default function PickleRadarScreen() {
 
   // Init: không block map nếu denied
   useEffect(() => {
+    if (!mapboxAvailable) {
+      setBootLoading(false);
+      return;
+    }
+
     (async () => {
       const { status } = await Location.getForegroundPermissionsAsync();
       const granted = status === "granted";
@@ -360,7 +447,11 @@ export default function PickleRadarScreen() {
       }
       setBootLoading(false);
     })();
-  }, [ensureLocationAndFetch]);
+  }, [ensureLocationAndFetch, mapboxAvailable]);
+
+  if (!mapboxAvailable) {
+    return <RadarUnavailable isDark={isDark} onBack={() => router.back()} />;
+  }
 
   // --- ACTIONS ---
   const zoomToRadius = (center, rKm) => {

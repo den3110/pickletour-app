@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert as RNAlert,
@@ -8,6 +14,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useColorScheme,
   View,
 } from "react-native";
 import {
@@ -30,23 +37,23 @@ import {
 } from "@/slices/courtClustersAdminApiSlice";
 import { useAdminListMatchesByTournamentQuery } from "@/slices/tournamentsApiSlice";
 
-const sid = (value: any) => String(value?._id || value?.id || value || "").trim();
+const sid = (value: any) =>
+  String(value?._id || value?.id || value || "").trim();
 
 const buildQuery = (obj: Record<string, string | number | null | undefined>) =>
   Object.entries(obj)
     .filter(
       ([, value]) =>
-        value !== undefined &&
-        value !== null &&
-        String(value).trim() !== ""
+        value !== undefined && value !== null && String(value).trim() !== "",
     )
     .map(
       ([key, value]) =>
-        `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`
+        `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
     )
     .join("&");
 
-const looksLikeRTMP = (url: string) => /^rtmps?:\/\//i.test(String(url || "").trim());
+const looksLikeRTMP = (url: string) =>
+  /^rtmps?:\/\//i.test(String(url || "").trim());
 
 const getMatchId = (match: any) => {
   const candidates = [
@@ -65,12 +72,17 @@ const getMatchId = (match: any) => {
 
 const pickPreferredStudioMatchId = (matches: any[] = []) => {
   const liveMatch = matches.find(
-    (match) => String(match?.status || "").trim().toLowerCase() === "live"
+    (match) =>
+      String(match?.status || "")
+        .trim()
+        .toLowerCase() === "live",
   );
   if (liveMatch) return getMatchId(liveMatch);
 
   const activeMatch = matches.find((match) => {
-    const status = String(match?.status || "").trim().toLowerCase();
+    const status = String(match?.status || "")
+      .trim()
+      .toLowerCase();
     return status && !["finished", "cancelled", "canceled"].includes(status);
   });
   if (activeMatch) return getMatchId(activeMatch);
@@ -108,8 +120,9 @@ const normalizeLiveConfig = (config: any = {}) => ({
       ? config.advancedSettingEnabled
       : !!config?.advancedRandomEnabled,
   pageMode:
-    String(config?.pageMode || config?.randomPageMode || "default").toLowerCase() ===
-    "custom"
+    String(
+      config?.pageMode || config?.randomPageMode || "default",
+    ).toLowerCase() === "custom"
       ? "custom"
       : "default",
   pageConnectionId:
@@ -123,7 +136,9 @@ const countByStatus = (matches: any[] = []) => {
   let live = 0;
   let notFinished = 0;
   matches.forEach((match) => {
-    const status = String(match?.status || "").trim().toLowerCase();
+    const status = String(match?.status || "")
+      .trim()
+      .toLowerCase();
     if (status === "live") live += 1;
     if (status && !["finished", "cancelled", "canceled"].includes(status)) {
       notFinished += 1;
@@ -133,7 +148,9 @@ const countByStatus = (matches: any[] = []) => {
 };
 
 const fallbackCountsForStation = (item: any) => {
-  const queueLength = Array.isArray(item?.queueItems) ? item.queueItems.length : 0;
+  const queueLength = Array.isArray(item?.queueItems)
+    ? item.queueItems.length
+    : 0;
   const currentCount = item?.currentMatch ? 1 : 0;
   const total = currentCount + queueLength;
   const live = String(item?.status || "").toLowerCase() === "live" ? 1 : 0;
@@ -165,6 +182,46 @@ const toStationItem = (station: any) => ({
   liveConfig: normalizeLiveConfig(station?.liveConfig),
 });
 
+function useSheetTokens() {
+  const navTheme = useTheme?.();
+  const scheme = useColorScheme?.() ?? "light";
+  const isDark =
+    typeof navTheme?.dark === "boolean" ? navTheme.dark : scheme === "dark";
+  const primary = navTheme?.colors?.primary ?? (isDark ? "#7cb8ff" : "#0a84ff");
+
+  return {
+    isDark,
+    primary,
+    textPrimary: navTheme?.colors?.text ?? (isDark ? "#f8fafc" : "#0f172a"),
+    textSecondary: isDark ? "#9aa7ba" : "#64748b",
+    textMuted: isDark ? "#8090a7" : "#475569",
+    sheetBg: navTheme?.colors?.card ?? (isDark ? "#171a20" : "#ffffff"),
+    panelBg: isDark ? "#1b2028" : "#ffffff",
+    panelAltBg: isDark ? "#141a22" : "#f8fafc",
+    border: navTheme?.colors?.border ?? (isDark ? "#2b3544" : "#e2e8f0"),
+    borderSoft: isDark ? "#344154" : "#cbd5e1",
+    primarySoftBg: isDark ? "#17263a" : "#eaf2ff",
+    primarySoftFg: isDark ? "#93c5fd" : "#1d4ed8",
+    successBg: isDark ? "#16261c" : "#dcfce7",
+    successFg: isDark ? "#92dfaf" : "#166534",
+    mutedBg: isDark ? "#222b36" : "#f1f5f9",
+    mutedFg: isDark ? "#adbacb" : "#475569",
+    warnBg: isDark ? "#2a2119" : "#fff7ed",
+    warnFg: isDark ? "#f4c28d" : "#c2410c",
+    errorBg: isDark ? "#2d1d1f" : "#fef2f2",
+    errorFg: isDark ? "#f2a2aa" : "#b91c1c",
+    hintBg: isDark ? "#121821" : "#f8fafc",
+    hintBorder: isDark ? "#273241" : "#e2e8f0",
+    hintIcon: isDark ? "#8ca2bc" : "#64748b",
+    outlineBtnBg: isDark ? "#121822" : "transparent",
+    outlineBtnTint: isDark ? "#93c5fd" : primary,
+    primaryBtnBg: isDark ? "#5b8fcb" : primary,
+    disabledBg: isDark ? "#3a4658" : "#94a3b8",
+    handle: isDark ? "#4a5568" : "#cbd5e1",
+    switchThumbOff: isDark ? "#e2e8f0" : "#f4f3f4",
+  };
+}
+
 function StatChip({
   label,
   tone = "default",
@@ -172,21 +229,23 @@ function StatChip({
   label: string;
   tone?: "default" | "success" | "muted" | "warn";
 }) {
+  const T = useSheetTokens();
   const tones = {
-    default: { bg: "#eef2ff", fg: "#3730a3" },
-    success: { bg: "#dcfce7", fg: "#166534" },
-    muted: { bg: "#f1f5f9", fg: "#475569" },
-    warn: { bg: "#fff7ed", fg: "#c2410c" },
+    default: { bg: T.primarySoftBg, fg: T.primarySoftFg, border: T.borderSoft },
+    success: { bg: T.successBg, fg: T.successFg, border: T.borderSoft },
+    muted: { bg: T.mutedBg, fg: T.mutedFg, border: T.borderSoft },
+    warn: { bg: T.warnBg, fg: T.warnFg, border: T.borderSoft },
   };
   const picked = tones[tone] || tones.default;
   return (
     <View
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 999,
-        backgroundColor: picked.bg,
-      }}
+      style={[
+        styles.statChip,
+        {
+          backgroundColor: picked.bg,
+          borderColor: picked.border,
+        },
+      ]}
     >
       <Text style={{ color: picked.fg, fontSize: 11, fontWeight: "700" }}>
         {label}
@@ -206,6 +265,7 @@ function BtnPrimary({
   disabled?: boolean;
   tint?: string;
 }) {
+  const T = useSheetTokens();
   return (
     <Pressable
       onPress={onPress}
@@ -213,7 +273,9 @@ function BtnPrimary({
       style={({ pressed }) => [
         styles.btnBase,
         styles.btnPrimary,
-        { backgroundColor: disabled ? "#94a3b8" : tint || "#0a84ff" },
+        {
+          backgroundColor: disabled ? T.disabledBg : tint || T.primaryBtnBg,
+        },
         pressed && !disabled && styles.btnPressed,
       ]}
     >
@@ -233,7 +295,8 @@ function BtnOutline({
   tint?: string;
   disabled?: boolean;
 }) {
-  const color = disabled ? "#94a3b8" : tint || "#0a84ff";
+  const T = useSheetTokens();
+  const color = disabled ? T.disabledBg : tint || T.outlineBtnTint;
   return (
     <Pressable
       onPress={onPress}
@@ -241,7 +304,11 @@ function BtnOutline({
       style={({ pressed }) => [
         styles.btnBase,
         styles.btnOutline,
-        { borderColor: color, opacity: disabled ? 0.6 : pressed ? 0.88 : 1 },
+        {
+          borderColor: color,
+          backgroundColor: T.outlineBtnBg,
+          opacity: disabled ? 0.6 : pressed ? 0.88 : 1,
+        },
       ]}
     >
       <Text style={[styles.btnOutlineLabel, { color }]}>{children}</Text>
@@ -265,13 +332,13 @@ export default function LiveSetupSheet({
   allowedClusters?: any[];
 }) {
   const sheetRef = useRef<BottomSheetModal>(null);
-  const { colors } = useTheme();
+  const T = useSheetTokens();
   const insets = useSafeAreaInsets();
   const snapPoints = useMemo(() => ["90%"], []);
 
   const clusterOptions = useMemo(
     () => normalizeAllowedClusters(allowedClusters),
-    [allowedClusters]
+    [allowedClusters],
   );
   const hasClusterMode = clusterOptions.length > 0;
 
@@ -281,7 +348,8 @@ export default function LiveSetupSheet({
     if (!open) return;
     setSelectedClusterId((current) => {
       if (!hasClusterMode) return "";
-      if (current && clusterOptions.some((item) => item._id === current)) return current;
+      if (current && clusterOptions.some((item) => item._id === current))
+        return current;
       return clusterOptions[0]?._id || "";
     });
   }, [open, hasClusterMode, clusterOptions]);
@@ -293,7 +361,7 @@ export default function LiveSetupSheet({
     refetch: refetchCourts,
   } = useAdminListCourtsByTournamentQuery(
     { tid: tournamentId },
-    { skip: !open || hasClusterMode }
+    { skip: !open || hasClusterMode },
   );
 
   const {
@@ -304,7 +372,7 @@ export default function LiveSetupSheet({
     refetch: refetchRuntime,
   } = useGetTournamentCourtClusterRuntimeQuery(
     { tournamentId, clusterId: selectedClusterId },
-    { skip: !open || !hasClusterMode || !selectedClusterId }
+    { skip: !open || !hasClusterMode || !selectedClusterId },
   );
 
   const {
@@ -313,15 +381,15 @@ export default function LiveSetupSheet({
     refetch: refetchMatches,
   } = useAdminListMatchesByTournamentQuery(
     { tid: tournamentId, page: 1, pageSize: 1000 },
-    { skip: !open }
+    { skip: !open },
   );
 
   const [setCourtCfg] = useAdminSetCourtLiveConfigMutation();
   const [updateStation] = useUpdateAdminCourtStationMutation();
 
-  const [form, setForm] = useState<Record<string, ReturnType<typeof normalizeLiveConfig>>>(
-    {}
-  );
+  const [form, setForm] = useState<
+    Record<string, ReturnType<typeof normalizeLiveConfig>>
+  >({});
   const [busy, setBusy] = useState(new Set<string>());
 
   useEffect(() => {
@@ -348,7 +416,9 @@ export default function LiveSetupSheet({
 
   const items = useMemo(() => {
     if (hasClusterMode) {
-      return (Array.isArray(runtime?.stations) ? runtime.stations : []).map(toStationItem);
+      return (Array.isArray(runtime?.stations) ? runtime.stations : []).map(
+        toStationItem,
+      );
     }
     const legacy = Array.isArray(courtsResp)
       ? courtsResp
@@ -360,7 +430,7 @@ export default function LiveSetupSheet({
 
   const matchesAll = useMemo(
     () => (Array.isArray(matchPage?.list) ? matchPage.list : []),
-    [matchPage]
+    [matchPage],
   );
 
   const matchesByItemId = useMemo(() => {
@@ -429,13 +499,21 @@ export default function LiveSetupSheet({
         setForm((current) => ({ ...current, [itemId]: previous }));
         RNAlert.alert(
           "Không lưu được",
-          error?.data?.message || "Cập nhật LIVE cho sân thất bại."
+          error?.data?.message || "Cập nhật LIVE cho sân thất bại.",
         );
       } finally {
         setItemBusy(itemId, false);
       }
     },
-    [form, setItemBusy, updateStation, selectedClusterId, refetchRuntime, setCourtCfg, refetchCourts]
+    [
+      form,
+      setItemBusy,
+      updateStation,
+      selectedClusterId,
+      refetchRuntime,
+      setCourtCfg,
+      refetchCourts,
+    ],
   );
 
   const openLiveStudio = useCallback(
@@ -504,7 +582,7 @@ export default function LiveSetupSheet({
         RNAlert.alert("Không mở được", "Không tìm thấy đường dẫn mở app live.");
       }
     },
-    [buildCourtLiveUrl, form, matchesByItemId, tournamentId]
+    [buildCourtLiveUrl, form, matchesByItemId, tournamentId],
   );
 
   const summary = useMemo(() => {
@@ -551,20 +629,20 @@ export default function LiveSetupSheet({
         style={[
           styles.courtCard,
           {
-            borderColor: colors.border,
-            backgroundColor: colors.card,
+            borderColor: T.border,
+            backgroundColor: T.panelBg,
           },
         ]}
       >
         <View style={styles.courtHeader}>
           <View style={{ flex: 1 }}>
             <View style={styles.courtTitleRow}>
-              <MaterialIcons name="videocam" size={18} color={colors.text} />
-              <Text style={[styles.courtTitle, { color: colors.text }]}>
+              <MaterialIcons name="videocam" size={18} color={T.textPrimary} />
+              <Text style={[styles.courtTitle, { color: T.textPrimary }]}>
                 {item.displayLabel}
               </Text>
             </View>
-            <Text style={styles.courtSubtitle}>
+            <Text style={[styles.courtSubtitle, { color: T.textSecondary }]}>
               {counts.notFinished} trận đang vận hành • {counts.live} trận live
             </Text>
           </View>
@@ -579,36 +657,44 @@ export default function LiveSetupSheet({
           </View>
         </View>
 
-        <View style={styles.toggleRow}>
+        <View style={[styles.toggleRow, { borderTopColor: T.border }]}>
           <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={[styles.toggleTitle, { color: colors.text }]}>
+            <Text style={[styles.toggleTitle, { color: T.textPrimary }]}>
               Bật LIVE cho sân này
             </Text>
-            <Text style={styles.toggleHint}>
+            <Text style={[styles.toggleHint, { color: T.textSecondary }]}>
               Gạt công tắc là lưu ngay. Sau đó bấm mở app live để vận hành.
             </Text>
           </View>
           {isBusy ? (
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={T.primaryBtnBg} />
           ) : (
             <Switch
               value={!!current.enabled}
               onValueChange={(value) => saveEnabled(item, value)}
-              trackColor={{ false: colors.border, true: colors.primary }}
+              trackColor={{ false: T.borderSoft, true: T.primaryBtnBg }}
               thumbColor={
                 Platform.OS === "android"
                   ? current.enabled
-                    ? colors.primary
-                    : "#f4f3f4"
+                    ? T.primarySoftFg
+                    : T.switchThumbOff
                   : undefined
               }
             />
           )}
         </View>
 
-        <View style={styles.quickHint}>
-          <MaterialIcons name="info-outline" size={16} color="#64748b" />
-          <Text style={styles.quickHintText}>
+        <View
+          style={[
+            styles.quickHint,
+            {
+              backgroundColor: T.hintBg,
+              borderColor: T.hintBorder,
+            },
+          ]}
+        >
+          <MaterialIcons name="info-outline" size={16} color={T.hintIcon} />
+          <Text style={[styles.quickHintText, { color: T.textMuted }]}>
             {hasClusterMode
               ? "Sân này đang lấy từ cụm sân hiện tại. Live app sẽ mở trực tiếp theo mã sân trong cụm."
               : "Giải này vẫn đang dùng sân legacy. Công tắc chỉ lưu bật/tắt LIVE cho sân."}
@@ -619,7 +705,7 @@ export default function LiveSetupSheet({
           <BtnPrimary
             onPress={() => openLiveStudio(item)}
             disabled={isBusy}
-            tint={colors.primary}
+            tint={T.primaryBtnBg}
           >
             Mở app live
           </BtnPrimary>
@@ -633,18 +719,18 @@ export default function LiveSetupSheet({
       style={[
         styles.headerCard,
         {
-          borderColor: colors.border,
-          backgroundColor: colors.card,
+          borderColor: T.border,
+          backgroundColor: T.panelBg,
         },
       ]}
     >
-      <Text style={[styles.headerTitle, { color: colors.text }]}>
+      <Text style={[styles.headerTitle, { color: T.textPrimary }]}>
         Thiết lập LIVE
         {tournamentName ? ` • ${tournamentName}` : ""}
       </Text>
-      <Text style={styles.headerSubtitle}>
-        Trên mobile chỉ giữ 2 thao tác chính: bật hoặc tắt LIVE cho từng sân, rồi mở
-        app live để vận hành ngay.
+      <Text style={[styles.headerSubtitle, { color: T.textSecondary }]}>
+        Trên mobile chỉ giữ 2 thao tác chính: bật hoặc tắt LIVE cho từng sân,
+        rồi mở app live để vận hành ngay.
       </Text>
 
       <View style={styles.summaryRow}>
@@ -654,8 +740,16 @@ export default function LiveSetupSheet({
       </View>
 
       {hasClusterMode && (
-        <View style={styles.clusterCard}>
-          <Text style={[styles.clusterTitle, { color: colors.text }]}>
+        <View
+          style={[
+            styles.clusterCard,
+            {
+              backgroundColor: T.panelAltBg,
+              borderColor: T.border,
+            },
+          ]}
+        >
+          <Text style={[styles.clusterTitle, { color: T.textPrimary }]}>
             Cụm sân đang dùng
           </Text>
           <View style={styles.clusterList}>
@@ -668,17 +762,22 @@ export default function LiveSetupSheet({
                   style={[
                     styles.clusterChip,
                     {
-                      backgroundColor: active ? colors.primary : "#e2e8f0",
+                      backgroundColor: active ? T.primarySoftBg : T.mutedBg,
+                      borderColor: T.borderSoft,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.clusterChipLabel,
-                      { color: active ? "#fff" : "#0f172a" },
+                      {
+                        color: active ? T.primarySoftFg : T.textSecondary,
+                      },
                     ]}
                   >
-                    {[cluster.name, cluster.venueName].filter(Boolean).join(" · ")}
+                    {[cluster.name, cluster.venueName]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </Text>
                 </Pressable>
               );
@@ -688,39 +787,58 @@ export default function LiveSetupSheet({
       )}
 
       <View style={styles.headerActions}>
-        <BtnOutline onPress={refreshAll} tint={colors.primary}>
+        <BtnOutline onPress={refreshAll} tint={T.outlineBtnTint}>
           Tải lại
         </BtnOutline>
-        <BtnOutline onPress={() => sheetRef.current?.dismiss()} tint={colors.primary}>
+        <BtnOutline
+          onPress={() => sheetRef.current?.dismiss()}
+          tint={T.outlineBtnTint}
+        >
           Đóng
         </BtnOutline>
       </View>
     </View>
   );
 
-  const listEmpty = hasClusterMode && runtimeError ? (
-    <View style={styles.alertBox}>
-      <Text style={styles.alertError}>
-        {runtimeError?.data?.message || "Không tải được runtime cụm sân."}
-      </Text>
-    </View>
-  ) : courtsErr ? (
-    <View style={styles.alertBox}>
-      <Text style={styles.alertError}>Không tải được danh sách sân.</Text>
-    </View>
-  ) : loadingAny ? (
-    <View style={[styles.center, { paddingVertical: 28 }]}>
-      <ActivityIndicator size="large" color={colors.primary} />
-    </View>
-  ) : (
-    <View style={styles.alertBox}>
-      <Text style={styles.alertWarn}>
-        {hasClusterMode
-          ? "Cụm sân này chưa có sân nào."
-          : "Giải này chưa có sân nào."}
-      </Text>
-    </View>
-  );
+  const listEmpty =
+    hasClusterMode && runtimeError ? (
+      <View
+        style={[
+          styles.alertBox,
+          { backgroundColor: T.errorBg, borderColor: T.border },
+        ]}
+      >
+        <Text style={[styles.alertError, { color: T.errorFg }]}>
+          {runtimeError?.data?.message || "Không tải được runtime cụm sân."}
+        </Text>
+      </View>
+    ) : courtsErr ? (
+      <View
+        style={[
+          styles.alertBox,
+          { backgroundColor: T.errorBg, borderColor: T.border },
+        ]}
+      >
+        <Text style={styles.alertError}>Không tải được danh sách sân.</Text>
+      </View>
+    ) : loadingAny ? (
+      <View style={[styles.center, { paddingVertical: 28 }]}>
+        <ActivityIndicator size="large" color={T.primaryBtnBg} />
+      </View>
+    ) : (
+      <View
+        style={[
+          styles.alertBox,
+          { backgroundColor: T.warnBg, borderColor: T.border },
+        ]}
+      >
+        <Text style={[styles.alertWarn, { color: T.warnFg }]}>
+          {hasClusterMode
+            ? "Cụm sân này chưa có sân nào."
+            : "Giải này chưa có sân nào."}
+        </Text>
+      </View>
+    );
 
   return (
     <BottomSheetModal
@@ -732,15 +850,17 @@ export default function LiveSetupSheet({
           {...props}
           appearsOnIndex={0}
           disappearsOnIndex={-1}
+          opacity={0.5}
           style={{ zIndex: 1000 }}
         />
       )}
-      handleIndicatorStyle={{ backgroundColor: colors.border }}
+      handleIndicatorStyle={{ backgroundColor: T.handle }}
       backgroundStyle={{
-        backgroundColor: colors.card,
+        backgroundColor: T.sheetBg,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
       }}
+      containerStyle={{ zIndex: 1000, elevation: 1000 }}
     >
       <BottomSheetFlatList
         data={items}
@@ -761,6 +881,12 @@ export default function LiveSetupSheet({
 }
 
 const styles = StyleSheet.create({
+  statChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
   headerCard: {
     borderWidth: 1,
     borderRadius: 18,
@@ -786,7 +912,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: "#f8fafc",
+    borderWidth: 1,
   },
   clusterTitle: {
     fontSize: 15,
@@ -802,6 +928,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
+    borderWidth: 1,
   },
   clusterChipLabel: {
     fontSize: 12,
@@ -861,9 +988,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     alignItems: "flex-start",
-    backgroundColor: "#f8fafc",
     borderRadius: 12,
     padding: 12,
+    borderWidth: 1,
   },
   quickHintText: {
     flex: 1,
@@ -900,8 +1027,8 @@ const styles = StyleSheet.create({
   alertBox: {
     borderRadius: 16,
     padding: 16,
-    backgroundColor: "#fff7ed",
     marginBottom: 12,
+    borderWidth: 1,
   },
   alertError: {
     color: "#b91c1c",

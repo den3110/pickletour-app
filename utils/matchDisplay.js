@@ -1,4 +1,23 @@
 const trim = (value) => (value && String(value).trim()) || "";
+const textValue = (value) => {
+  if (value == null) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value).trim();
+  }
+  if (typeof value === "object") {
+    return (
+      trim(value?.name) ||
+      trim(value?.label) ||
+      trim(value?.title) ||
+      ""
+    );
+  }
+  return "";
+};
 
 export const resolveDisplayMode = (...sources) => {
   for (const source of sources) {
@@ -95,6 +114,72 @@ export const getPairDisplayName = (pair, source) => {
   );
 };
 
+export const getMatchDisplayStatus = (match = {}) => {
+  const raw = trim(match?.status || match?.state || match?.match_status).toLowerCase();
+  if (
+    ["live", "ongoing", "playing", "inprogress", "on_court", "oncourt"].includes(raw)
+  ) {
+    return "live";
+  }
+  if (["assigned"].includes(raw)) return "assigned";
+  if (["finished", "done", "completed", "final", "ended", "over", "closed"].includes(raw)) {
+    return "finished";
+  }
+  if (["queued", "queue"].includes(raw)) return "queued";
+  if (["scheduled", "pending", "created", "assigning", "upcoming"].includes(raw)) {
+    return "scheduled";
+  }
+  return raw;
+};
+
+export const shouldShowMatchCourt = (match = {}) => {
+  const status = getMatchDisplayStatus(match);
+  return !["scheduled", "queued", ""].includes(status);
+};
+
+export const getMatchCourtParts = (match = {}) => {
+  if (!shouldShowMatchCourt(match)) {
+    return {
+      cluster: "",
+      station: "",
+    };
+  }
+
+  const station = textValue(
+    match?.courtStationName ||
+      match?.courtStationLabel ||
+      match?.courtStation ||
+      match?.courtName ||
+      match?.court?.name ||
+      match?.court?.label ||
+      match?.court?.title
+  );
+  const cluster = textValue(
+    match?.courtClusterName ||
+      match?.courtClusterLabel ||
+      match?.courtCluster ||
+      match?.court?.cluster
+  );
+  const legacy = textValue(match?.courtLabel);
+  const stationName = station || legacy;
+  const clusterName =
+    cluster && cluster.toLowerCase() !== stationName.toLowerCase() ? cluster : "";
+
+  return {
+    cluster: clusterName,
+    station: stationName,
+  };
+};
+
+export const getMatchCourtStationName = (match = {}) =>
+  getMatchCourtParts(match).station;
+
+export const getMatchCourtDisplayText = (match = {}) => {
+  const { cluster, station } = getMatchCourtParts(match);
+  if (cluster && station) return `${cluster} · ${station}`;
+  return cluster || station || "";
+};
+
 export const normalizePairDisplay = (pair, source) => {
   if (!pair || typeof pair !== "object") return pair;
   const mode = resolveDisplayMode(pair, source);
@@ -138,6 +223,162 @@ const normalizeRefEntity = (entity) => {
     ...entity,
     _id: entity?._id ?? entity?.id ?? entity,
   };
+};
+
+const MATCH_CODE_GROUP_LIKE = new Set([
+  "group",
+  "round_robin",
+  "roundrobin",
+  "rr",
+  "gsl",
+]);
+const MATCH_CODE_KO = new Set([
+  "ko",
+  "knockout",
+  "elimination",
+  "single_elimination",
+  "double_elimination",
+  "playoff",
+  "play_off",
+]);
+const matchCodeNorm = (value) => trim(value).toLowerCase();
+const toPositiveInt = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? Math.trunc(num) : null;
+};
+const letterToIndex = (value) => {
+  const raw = trim(value).toUpperCase();
+  if (/^[A-Z]$/.test(raw)) return raw.charCodeAt(0) - 64;
+  return null;
+};
+const isGlobalDisplayCode = (value) =>
+  /^V\d+(?:-B[A-Z0-9]+)?-T\d+$/i.test(trim(value));
+const normalizeMatchCodeCandidate = (value) => {
+  const raw = trim(value).toUpperCase();
+  if (!raw) return "";
+  if (isGlobalDisplayCode(raw)) return raw;
+
+  const legacyGroup = raw.match(/^#?V(\d+)-B([A-Z0-9]+)#(\d+)$/i);
+  if (legacyGroup) {
+    return `V${legacyGroup[1]}-B${legacyGroup[2]}-T${legacyGroup[3]}`;
+  }
+
+  const knockout = raw.match(/^V(\d+)\s*-\s*T(\d+)$/i);
+  if (knockout) return `V${knockout[1]}-T${knockout[2]}`;
+
+  return "";
+};
+const codeFromLabelKeyish = (value) => {
+  const raw = trim(value).toUpperCase();
+  if (!raw) return "";
+  const nums = raw.match(/\d+/g);
+  if (!nums || nums.length < 2) return "";
+  const v = Number(nums[0]);
+  if (!Number.isFinite(v) || v <= 0) return "";
+  if (/#?B\d+/i.test(raw)) {
+    const b = nums.length >= 3 ? Number(nums[1]) : 1;
+    const t = Number(nums[nums.length - 1]);
+    if (!Number.isFinite(b) || !Number.isFinite(t) || b <= 0 || t <= 0) return "";
+    return `V${v}-B${b}-T${t}`;
+  }
+  const t = Number(nums[nums.length - 1]);
+  if (!Number.isFinite(t) || t <= 0) return "";
+  return `V${v}-T${t}`;
+};
+const isGroupLikeForDisplayCode = (match = {}) => {
+  const bracketType = matchCodeNorm(match?.bracketType || match?.bracket?.type);
+  const type = matchCodeNorm(match?.type);
+  const format = matchCodeNorm(match?.format);
+  const phase = matchCodeNorm(match?.phase || match?.branch);
+
+  if (MATCH_CODE_GROUP_LIKE.has(bracketType)) return true;
+  if (MATCH_CODE_KO.has(bracketType)) return false;
+  if (MATCH_CODE_GROUP_LIKE.has(type) || MATCH_CODE_GROUP_LIKE.has(format)) return true;
+  if (MATCH_CODE_KO.has(type) || MATCH_CODE_KO.has(format)) return false;
+  if (MATCH_CODE_KO.has(phase)) return false;
+
+  return Boolean(
+    match?.pool ||
+      match?.group ||
+      match?.groupNo != null ||
+      match?.groupIndex != null ||
+      match?.rrRound != null
+  );
+};
+const resolvePoolIndex = (match = {}) => {
+  const pool =
+    match?.pool && typeof match.pool === "object"
+      ? match.pool
+      : {
+          name: match?.pool ?? match?.group ?? "",
+          code: match?.poolCode ?? "",
+          index: match?.groupIndex ?? match?.groupNo ?? null,
+        };
+
+  const byOrder = toPositiveInt(pool?.order);
+  if (byOrder) return byOrder;
+
+  const byIndex = toPositiveInt(pool?.index);
+  if (byIndex) return byIndex;
+
+  const byGroupNo = toPositiveInt(match?.groupNo);
+  if (byGroupNo) return byGroupNo;
+
+  const byLetter = letterToIndex(pool?.name || pool?.code);
+  if (byLetter) return byLetter;
+
+  const explicit = trim(pool?.name || pool?.code);
+  const explicitMatch = explicit.match(/^B(\d+)$/i) || explicit.match(/^(\d+)$/);
+  if (explicitMatch) return Number(explicitMatch[1]);
+
+  return 1;
+};
+const buildFallbackMatchDisplayCode = (match = {}, fallbackIndex = undefined) => {
+  const orderBase = Number.isFinite(Number(match?.order))
+    ? Number(match.order)
+    : Number.isFinite(Number(fallbackIndex))
+      ? Number(fallbackIndex)
+      : 0;
+  const matchOrder = Math.max(1, Math.trunc(orderBase) + 1);
+
+  if (isGroupLikeForDisplayCode(match)) {
+    return `V1-B${resolvePoolIndex(match)}-T${matchOrder}`;
+  }
+
+  const round =
+    toPositiveInt(match?.globalRound) ||
+    toPositiveInt(match?.stageIndex) ||
+    toPositiveInt(match?.round) ||
+    1;
+  return `V${round}-T${matchOrder}`;
+};
+
+export const getMatchDisplayCode = (match, fallbackIndex = undefined) => {
+  if (!match || typeof match !== "object") return "";
+
+  const directCandidates = [
+    match?.displayCode,
+    match?.codeDisplay,
+    match?.codeResolved,
+    match?.codeGroup,
+    match?.globalCodeV,
+    match?.globalCode,
+    match?.matchCode,
+    match?.code,
+    match?.slotCode,
+    match?.bracketCode,
+  ];
+  for (const candidate of directCandidates) {
+    const normalized = normalizeMatchCodeCandidate(candidate);
+    if (normalized) return normalized;
+  }
+
+  const fromLabel =
+    codeFromLabelKeyish(match?.labelKeyDisplay) ||
+    codeFromLabelKeyish(match?.labelKey);
+  if (fromLabel) return fromLabel;
+
+  return buildFallbackMatchDisplayCode(match, fallbackIndex);
 };
 
 export const normalizeMatchDisplay = (match, fallbackSource = null) => {
@@ -209,6 +450,35 @@ export const normalizeMatchDisplay = (match, fallbackSource = null) => {
 
 export const extractMatchPayload = (raw) =>
   raw?.data ?? raw?.match ?? raw?.snapshot ?? raw;
+
+export const extractMatchPatchPayload = (raw) => {
+  const patch =
+    (raw?.payload && typeof raw.payload === "object" ? raw.payload : null) ||
+    (raw?.data?.payload && typeof raw.data.payload === "object"
+      ? raw.data.payload
+      : null) ||
+    (raw?.patch && typeof raw.patch === "object" ? raw.patch : null);
+
+  if (!patch) return null;
+
+  const matchId =
+    patch?._id ??
+    patch?.id ??
+    patch?.matchId ??
+    raw?.matchId ??
+    raw?.id ??
+    raw?._id;
+
+  return {
+    ...(matchId
+      ? {
+          _id: String(matchId),
+          matchId: String(matchId),
+        }
+      : {}),
+    ...patch,
+  };
+};
 
 export const getMatchPayloadId = (raw) => {
   const payload = extractMatchPayload(raw);

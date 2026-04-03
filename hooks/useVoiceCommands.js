@@ -1,296 +1,154 @@
-import { useEffect, useRef, useCallback, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import * as Haptics from "expo-haptics";
 import NetInfo from "@react-native-community/netinfo";
 import Constants from "expo-constants";
 
-// expo-speech-recognition: native-only, không chạy được trên Expo Go
-let ExpoSpeechRecognitionModule = null;
-let useSpeechRecognitionEvent = (_event, _cb) => {}; // no-op fallback
+import {
+  looksLikeVoiceCommand,
+  normalizeVoiceTranscript,
+  parseVoiceCommand,
+} from "@/utils/voiceCommandParser";
 
-const _isExpoGo = Constants.appOwnership === "expo";
-if (!_isExpoGo) {
+let ExpoSpeechRecognitionModule = null;
+let useSpeechRecognitionEvent = (_event, _cb) => {};
+
+const isExpoGo = Constants.appOwnership === "expo";
+if (!isExpoGo) {
   try {
     const mod = require("expo-speech-recognition");
     ExpoSpeechRecognitionModule = mod.ExpoSpeechRecognitionModule;
     useSpeechRecognitionEvent = mod.useSpeechRecognitionEvent;
-  } catch (e) {
-    if (__DEV__) console.warn("expo-speech-recognition not available:", e);
+  } catch (error) {
+    if (__DEV__) {
+      console.warn("expo-speech-recognition not available:", error);
+    }
   }
 }
 
-// ============ CONFIG ============
 const CONFIG = {
-  // Timing
-  DEBOUNCE_MS: 800,
-  API_TIMEOUT_MS: 5000,
-  RESTART_DELAY_MS: 300,
+  DEBOUNCE_MS: 700,
+  DUPLICATE_WINDOW_MS: 1400,
+  API_TIMEOUT_MS: 3500,
+  RESTART_DELAY_MS: 250,
   MAX_RESTART_ATTEMPTS: 5,
-  RESTART_BACKOFF_MS: 1000,
-
-  // API
-  MAX_API_RETRIES: 2,
-  API_RETRY_DELAY_MS: 500,
-
-  // Filtering
-  MAX_WORDS: 8,
-  MIN_LENGTH: 1,
+  RESTART_BACKOFF_MS: 800,
+  MAX_API_RETRIES: 1,
+  API_RETRY_DELAY_MS: 400,
+  MAX_WORDS: 10,
 };
 
-// ============ KEYWORD CONFIG ============
-const COMMANDS = [
-  {
-    action: "INC_POINT",
-    exact: [
-      "điểm",
-      "diem",
-      "có",
-      "co",
-      "point",
-      "yes",
-      "được",
-      "duoc",
-      "vào",
-      "vao",
-    ],
-    feedback: "Điểm",
-  },
-  {
-    action: "SIDE_OUT",
-    exact: ["đổi", "doi", "mất", "mat", "side", "out"],
-    contains: ["đổi giao", "mất giao", "side out"],
-    feedback: "Đổi giao",
-  },
-  {
-    action: "TOGGLE_SERVER",
-    exact: ["tay", "hai", "2"],
-    contains: ["đổi tay", "doi tay"],
-    feedback: "Đổi tay",
-  },
-  {
-    action: "SWAP_SIDES",
-    exact: ["bên", "ben"],
-    contains: ["đổi bên", "doi ben"],
-    feedback: "Đổi bên",
-  },
-  {
-    action: "UNDO",
-    exact: ["lại", "lai", "sai", "nhầm", "nham"],
-    contains: ["hoàn tác", "hoan tac", "quay lại"],
-    feedback: "Hoàn tác",
-  },
-  {
-    action: "TIMEOUT",
-    exact: ["nghỉ", "nghi", "timeout", "time"],
-    feedback: "Timeout",
-  },
-  {
-    action: "CONTINUE",
-    exact: ["tiếp", "tiep", "chơi", "choi", "đi", "di"],
-    contains: ["tiếp tục", "tiep tuc"],
-    feedback: "Tiếp tục",
-  },
-];
-
-const HINT_WORDS = [
-  "điểm",
-  "diem",
-  "ghi",
-  "cho",
-  "được",
-  "vào",
-  "đổi",
-  "doi",
-  "mất",
-  "mat",
-  "chuyển",
-  "tay",
-  "bên",
-  "ben",
-  "lại",
-  "lai",
-  "sai",
-  "nhầm",
-  "hủy",
-  "nghỉ",
-  "nghi",
-  "timeout",
-  "tiếp",
-  "tiep",
-  "tục",
-  "chơi",
-];
-
-// ============ LOGGER ============
 const LOG_ENABLED = __DEV__;
-
 const log = {
   info: (...args) => LOG_ENABLED && console.log("[Voice]", ...args),
   warn: (...args) => LOG_ENABLED && console.warn("[Voice]", ...args),
   error: (...args) => console.error("[Voice]", ...args),
 };
 
-// ============ HELPERS ============
-const normalize = (text) => {
-  if (!text) return "";
-  return text
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[.,!?]/g, "");
-};
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// ============ KEYWORD MATCHING ============
-function matchKeyword(text) {
-  if (!text || text.length < CONFIG.MIN_LENGTH) return null;
-
-  const lower = text.toLowerCase().trim();
-  const normalized = normalize(text);
-  const words = lower.split(/\s+/);
-  const firstWord = words[0];
-
-  for (const cmd of COMMANDS) {
-    // Exact match
-    if (cmd.exact) {
-      for (const kw of cmd.exact) {
-        if (
-          lower === kw ||
-          firstWord === kw ||
-          normalized === normalize(kw) ||
-          normalize(firstWord) === normalize(kw)
-        ) {
-          return {
-            action: cmd.action,
-            feedback: cmd.feedback,
-            matched: kw,
-            method: "keyword",
-          };
-        }
-      }
-    }
-    // Contains match
-    if (cmd.contains) {
-      for (const kw of cmd.contains) {
-        if (lower.includes(kw) || normalized.includes(normalize(kw))) {
-          return {
-            action: cmd.action,
-            feedback: cmd.feedback,
-            matched: kw,
-            method: "keyword",
-          };
-        }
-      }
-    }
-  }
-
-  return null;
+function canUseSpeechModule() {
+  return Boolean(
+    ExpoSpeechRecognitionModule &&
+      typeof ExpoSpeechRecognitionModule.start === "function" &&
+      typeof ExpoSpeechRecognitionModule.abort === "function" &&
+      typeof ExpoSpeechRecognitionModule.requestPermissionsAsync === "function"
+  );
 }
 
-function looksLikeCommand(text) {
-  if (!text) return false;
-
-  const lower = text.toLowerCase();
-  const normalized = normalize(text);
-  const words = lower.split(/\s+/);
-
-  if (words.length > CONFIG.MAX_WORDS) return false;
-  if (text.length < CONFIG.MIN_LENGTH) return false;
-
-  for (const hint of HINT_WORDS) {
-    if (lower.includes(hint) || normalized.includes(normalize(hint))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// ============ API CALL WITH RETRY ============
 async function callAPIWithRetry(
   apiUrl,
   transcript,
+  context,
   retries = CONFIG.MAX_API_RETRIES
 ) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT_MS);
 
   try {
-    const startTime = Date.now();
-
-    const res = await fetch(apiUrl, {
+    const startedAt = Date.now();
+    const response = await fetch(apiUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transcript,
+        context,
+      }),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      throw new Error(`API ${res.status}`);
+    if (!response.ok) {
+      throw new Error(`API ${response.status}`);
     }
 
-    const data = await res.json();
-    const latency = Date.now() - startTime;
+    const data = await response.json();
+    const latency = Date.now() - startedAt;
+    log.info(
+      `API ${latency}ms | "${transcript}" -> ${data.intent || "null"}`
+    );
 
-    log.info(`API ${latency}ms | "${transcript}" → ${data.intent || "null"}`);
-
-    if (data.intent && data.feedback) {
-      return { action: data.intent, feedback: data.feedback, method: "ai" };
+    if (!data.intent) {
+      return null;
     }
 
-    return null;
-  } catch (err) {
+    return {
+      action: data.intent,
+      feedback: data.feedback || "",
+      method: data.method || "server_rule",
+      confidence: Number(data.confidence || 0),
+      teamKey: data.teamKey || undefined,
+      teamUiSide: data.teamUiSide || undefined,
+    };
+  } catch (error) {
     clearTimeout(timeoutId);
 
-    if (err.name === "AbortError") {
+    if (error?.name === "AbortError") {
       log.warn("API timeout");
     } else {
-      log.warn("API error:", err.message);
+      log.warn("API error:", error?.message || error);
     }
 
     if (retries > 0) {
       await sleep(CONFIG.API_RETRY_DELAY_MS);
-      return callAPIWithRetry(apiUrl, transcript, retries - 1);
+      return callAPIWithRetry(apiUrl, transcript, context, retries - 1);
     }
 
     return null;
   }
 }
 
-// ============ MAIN HOOK ============
 export function useVoiceCommands({
   enabled = false,
   onCommand,
   onError,
   onStatusChange,
-  apiUrl,
+  apiUrl = "",
+  context = {},
   hapticFeedback = true,
   language = "vi-VN",
+  trackTranscript = true,
 }) {
-  // ===== STATE =====
-  const [status, setStatus] = useState("idle"); // idle | starting | listening | processing | error
+  const [status, setStatus] = useState("idle");
   const [lastCommand, setLastCommand] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [permissionGranted, setPermissionGranted] = useState(null);
 
-  // ===== REFS =====
   const isActiveRef = useRef(false);
   const isMountedRef = useRef(true);
   const lastCommandTimeRef = useRef(0);
+  const lastProcessedRef = useRef({ normalized: "", at: 0 });
   const restartTimeoutRef = useRef(null);
   const restartAttemptsRef = useRef(0);
   const processingRef = useRef(false);
   const pendingTranscriptRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
 
-  // ===== HELPERS =====
   const safeSetState = useCallback((setter, value) => {
     if (isMountedRef.current) {
       setter(value);
@@ -298,11 +156,30 @@ export function useVoiceCommands({
   }, []);
 
   const updateStatus = useCallback(
-    (newStatus) => {
-      safeSetState(setStatus, newStatus);
-      onStatusChange?.(newStatus);
+    (nextStatus) => {
+      safeSetState(setStatus, nextStatus);
+      onStatusChange?.(nextStatus);
     },
     [onStatusChange, safeSetState]
+  );
+
+  const emitCommand = useCallback(
+    async (command) => {
+      if (!command) return;
+      lastCommandTimeRef.current = Date.now();
+      safeSetState(setLastCommand, command);
+
+      if (hapticFeedback) {
+        try {
+          await Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          );
+        } catch {}
+      }
+
+      onCommand?.(command);
+    },
+    [hapticFeedback, onCommand, safeSetState]
   );
 
   const clearRestartTimeout = useCallback(() => {
@@ -312,9 +189,9 @@ export function useVoiceCommands({
     }
   }, []);
 
-  // ===== PROCESS TRANSCRIPT =====
   const processTranscript = useCallback(
-    async (text) => {
+    async (rawText) => {
+      const text = String(rawText || "").trim();
       if (!text || !isMountedRef.current) return;
 
       if (processingRef.current) {
@@ -322,80 +199,75 @@ export function useVoiceCommands({
         return;
       }
 
+      const normalized = normalizeVoiceTranscript(text);
+      if (!normalized) return;
+
+      const words = normalized.split(/\s+/).filter(Boolean);
+      if (words.length > CONFIG.MAX_WORDS) {
+        log.info("Skip long transcript:", normalized);
+        return;
+      }
+
       const now = Date.now();
+      if (
+        normalized === lastProcessedRef.current.normalized &&
+        now - lastProcessedRef.current.at < CONFIG.DUPLICATE_WINDOW_MS
+      ) {
+        log.info("Duplicate transcript ignored:", normalized);
+        return;
+      }
+      lastProcessedRef.current = { normalized, at: now };
+
       if (now - lastCommandTimeRef.current < CONFIG.DEBOUNCE_MS) {
         log.info("Debounced");
         return;
       }
 
-      log.info("📝", text);
+      log.info("Transcript:", text);
 
-      // === STEP 1: KEYWORD MATCH ===
-      const keywordResult = matchKeyword(text);
-
-      if (keywordResult) {
-        log.info("✅ Keyword:", keywordResult.action);
-        lastCommandTimeRef.current = Date.now();
-
-        const command = { ...keywordResult, transcript: text };
-        safeSetState(setLastCommand, command);
-
-        if (hapticFeedback) {
-          try {
-            await Haptics.notificationAsync(
-              Haptics.NotificationFeedbackType.Success
-            );
-          } catch {}
-        }
-
-        onCommand?.(command);
+      const localResult = parseVoiceCommand(text, context);
+      if (localResult) {
+        log.info("Local:", localResult.action);
+        await emitCommand({
+          ...localResult,
+          method: "local_rule",
+          transcript: text,
+          normalizedTranscript: normalized,
+        });
         return;
       }
 
-      // === STEP 2: CHECK HINT WORDS ===
-      if (!looksLikeCommand(text)) {
-        log.info("⏭️ Skip noise");
+      if (!looksLikeVoiceCommand(text)) {
+        log.info("Skip non-command transcript");
         return;
       }
 
-      // === STEP 3: API (nếu có + online) ===
       if (!apiUrl) {
-        log.info("❓ No match, no API");
+        log.info("No API fallback configured");
         return;
       }
 
       if (!isOnline) {
-        log.warn("📴 Offline, skip API");
+        log.warn("Offline, skip API fallback");
         return;
       }
 
-      log.info("🤖 Calling API...");
       processingRef.current = true;
       safeSetState(setIsProcessing, true);
       updateStatus("processing");
 
       try {
-        const result = await callAPIWithRetry(apiUrl, text);
-
+        const result = await callAPIWithRetry(apiUrl, text, context);
         if (result && isMountedRef.current) {
-          lastCommandTimeRef.current = Date.now();
-
-          const command = { ...result, transcript: text };
-          log.info("✅ API:", result.action);
-          safeSetState(setLastCommand, command);
-
-          if (hapticFeedback) {
-            try {
-              await Haptics.notificationAsync(
-                Haptics.NotificationFeedbackType.Success
-              );
-            } catch {}
-          }
-
-          onCommand?.(command);
+          log.info("Server:", result.action);
+          await emitCommand({
+            ...result,
+            transcript: text,
+            normalizedTranscript: normalized,
+          });
         }
-      } catch (err) {
-        log.error("Process error:", err);
+      } catch (error) {
+        log.error("Process transcript error:", error);
       } finally {
         processingRef.current = false;
         safeSetState(setIsProcessing, false);
@@ -411,16 +283,23 @@ export function useVoiceCommands({
         }
       }
     },
-    [apiUrl, isOnline, hapticFeedback, onCommand, safeSetState, updateStatus]
+    [
+      apiUrl,
+      context,
+      emitCommand,
+      isOnline,
+      safeSetState,
+      updateStatus,
+    ]
   );
 
-  // ===== RESTART LISTENING =====
   const restartListening = useCallback(async () => {
     if (!enabled || !isActiveRef.current || !isMountedRef.current) return;
+    if (!canUseSpeechModule()) return;
 
     clearRestartTimeout();
 
-    const backoff = Math.min(
+    const delayMs = Math.min(
       CONFIG.RESTART_DELAY_MS +
         restartAttemptsRef.current * CONFIG.RESTART_BACKOFF_MS,
       3000
@@ -430,148 +309,155 @@ export function useVoiceCommands({
       if (!isActiveRef.current || !isMountedRef.current) return;
 
       try {
-        ExpoSpeechRecognitionModule?.start({
+        ExpoSpeechRecognitionModule.start({
           lang: language,
           interimResults: true,
           continuous: true,
+          androidIntentOptions: {
+            EXTRA_LANGUAGE_MODEL: "web_search",
+          },
         });
-
         restartAttemptsRef.current = 0;
-        log.info("🔄 Restarted");
-      } catch (err) {
-        restartAttemptsRef.current++;
+        log.info("Restarted");
+      } catch (error) {
+        restartAttemptsRef.current += 1;
 
         if (restartAttemptsRef.current >= CONFIG.MAX_RESTART_ATTEMPTS) {
-          log.error("Max restart attempts reached");
           updateStatus("error");
           onError?.({
             code: "MAX_RESTART",
-            message: "Không thể khởi động lại voice",
+            message: "Không thể khởi động lại voice command.",
           });
           return;
         }
 
-        log.warn(`Restart failed (${restartAttemptsRef.current}), retrying...`);
+        log.warn(
+          `Restart failed (${restartAttemptsRef.current}), retrying...`,
+          error
+        );
         restartListening();
       }
-    }, backoff);
-  }, [enabled, language, clearRestartTimeout, updateStatus, onError]);
+    }, delayMs);
+  }, [clearRestartTimeout, enabled, language, onError, updateStatus]);
 
-  // ===== SPEECH RECOGNITION EVENTS =====
   useSpeechRecognitionEvent("start", () => {
-    log.info("🎤 Started");
+    log.info("Started");
     updateStatus("listening");
   });
 
   useSpeechRecognitionEvent("end", () => {
-    log.info("🔇 Ended");
+    log.info("Ended");
     if (isActiveRef.current && isMountedRef.current) {
       restartListening();
     }
   });
 
   useSpeechRecognitionEvent("result", (event) => {
-    const result = event.results[event.resultIndex];
-    if (result) {
-      const text = result[0]?.transcript || "";
-      safeSetState(setTranscript, text);
+    const result = event?.results?.[event?.resultIndex];
+    if (!result) return;
 
-      // Process khi có kết quả final
-      if (result.isFinal && text) {
-        processTranscript(text);
-      }
+    const text = result?.[0]?.transcript || "";
+    if (trackTranscript) {
+      safeSetState(setTranscript, text);
+    }
+
+    if (result?.isFinal && text) {
+      processTranscript(text);
     }
   });
 
   useSpeechRecognitionEvent("error", (event) => {
-    const errorType = event.error;
-
-    // Các lỗi có thể bỏ qua và restart
-    const ignorableErrors = [
+    const code = event?.error || "unknown";
+    const ignorableErrors = new Set([
       "no-speech",
       "aborted",
       "network",
       "audio-capture",
-    ];
+    ]);
 
-    if (ignorableErrors.includes(errorType)) {
-      log.info(`Ignorable error: ${errorType}, restarting...`);
+    if (ignorableErrors.has(code)) {
+      log.info(`Ignorable error: ${code}`);
       restartListening();
       return;
     }
 
-    log.error("Error:", errorType, event.message);
-    onError?.({ code: errorType, message: event.message });
+    log.error("Speech error:", code, event?.message || "");
+    onError?.({
+      code,
+      message: event?.message || "Voice command failed",
+    });
     restartListening();
   });
 
-  // ===== NETWORK LISTENER =====
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const online = state.isConnected && state.isInternetReachable !== false;
+      const online = Boolean(
+        state.isConnected && state.isInternetReachable !== false
+      );
       safeSetState(setIsOnline, online);
-      log.info(online ? "🌐 Online" : "📴 Offline");
     });
 
     return () => unsubscribe();
   }, [safeSetState]);
 
-  // ===== APP STATE LISTENER =====
   useEffect(() => {
-    const subscription = AppState.addEventListener(
-      "change",
-      async (nextState) => {
-        const prevState = appStateRef.current;
-        appStateRef.current = nextState;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
 
-        if (prevState.match(/inactive|background/) && nextState === "active") {
-          log.info("App active, restarting voice...");
-          if (enabled && isActiveRef.current) {
-            restartListening();
-          }
-        }
-
-        if (nextState.match(/inactive|background/)) {
-          log.info("App background, stopping voice...");
-          clearRestartTimeout();
-          try {
-            ExpoSpeechRecognitionModule?.abort();
-          } catch {}
+      if (prevState.match(/inactive|background/) && nextState === "active") {
+        if (enabled && isActiveRef.current) {
+          restartListening();
         }
       }
-    );
+
+      if (nextState.match(/inactive|background/)) {
+        clearRestartTimeout();
+        try {
+          ExpoSpeechRecognitionModule?.abort?.();
+        } catch {}
+      }
+    });
 
     return () => subscription.remove();
-  }, [enabled, restartListening, clearRestartTimeout]);
+  }, [clearRestartTimeout, enabled, restartListening]);
 
-  // ===== START LISTENING =====
   const startListening = useCallback(async () => {
     if (!enabled || !isMountedRef.current) return;
 
-    log.info("Starting...");
+    if (!canUseSpeechModule()) {
+      safeSetState(setPermissionGranted, false);
+      updateStatus("error");
+      onError?.({
+        code: "VOICE_UNAVAILABLE",
+        message: isExpoGo
+          ? "Voice command chỉ hoạt động trên dev build hoặc bản native, không chạy trong Expo Go."
+          : "Thiết bị chưa có speech recognition module khả dụng.",
+      });
+      return;
+    }
+
     updateStatus("starting");
 
-    // Request permission
     try {
-      const result =
-        await ExpoSpeechRecognitionModule?.requestPermissionsAsync();
+      const permission =
+        await ExpoSpeechRecognitionModule.requestPermissionsAsync();
 
-      if (!result?.granted) {
-        log.error("Permission denied");
+      if (!permission?.granted) {
         safeSetState(setPermissionGranted, false);
         updateStatus("error");
         onError?.({
           code: "PERMISSION_DENIED",
-          message: "Không có quyền microphone hoặc speech recognition",
+          message:
+            "Không có quyền microphone hoặc speech recognition cho voice command.",
         });
         return;
       }
 
       safeSetState(setPermissionGranted, true);
-    } catch (err) {
-      log.error("Permission error:", err);
+    } catch (error) {
       updateStatus("error");
-      onError?.(err);
+      onError?.(error);
       return;
     }
 
@@ -579,48 +465,47 @@ export function useVoiceCommands({
       isActiveRef.current = true;
       restartAttemptsRef.current = 0;
 
-      ExpoSpeechRecognitionModule?.start({
+      ExpoSpeechRecognitionModule.start({
         lang: language,
         interimResults: true,
-        continuous: true, // Continuous mode để tránh beep và auto-restart
-        // Android specific - dùng web_search model cho accuracy tốt hơn với single words
+        continuous: true,
         androidIntentOptions: {
           EXTRA_LANGUAGE_MODEL: "web_search",
         },
       });
-
-      log.info("🟢 Started", apiUrl ? "(+API)" : "");
-    } catch (err) {
-      log.error("Start error:", err);
+      log.info("Listening", apiUrl ? "(+server fallback)" : "(local only)");
+    } catch (error) {
+      log.error("Start error:", error);
       updateStatus("error");
-      onError?.(err);
-
-      setTimeout(() => {
-        if (enabled && isMountedRef.current) {
-          startListening();
-        }
-      }, 1000);
+      onError?.(error);
     }
-  }, [enabled, language, apiUrl, updateStatus, onError, safeSetState]);
+  }, [
+    apiUrl,
+    enabled,
+    language,
+    onError,
+    safeSetState,
+    updateStatus,
+  ]);
 
-  // ===== STOP LISTENING =====
   const stopListening = useCallback(async () => {
-    log.info("Stopping...");
-
     isActiveRef.current = false;
     clearRestartTimeout();
+    pendingTranscriptRef.current = null;
+    processingRef.current = false;
+    safeSetState(setIsProcessing, false);
 
     try {
-      ExpoSpeechRecognitionModule?.abort();
+      ExpoSpeechRecognitionModule?.abort?.();
     } catch {}
 
-    safeSetState(setTranscript, "");
+    if (trackTranscript) {
+      safeSetState(setTranscript, "");
+    }
+
     updateStatus("idle");
+  }, [clearRestartTimeout, safeSetState, trackTranscript, updateStatus]);
 
-    log.info("🔴 Stopped");
-  }, [clearRestartTimeout, safeSetState, updateStatus]);
-
-  // ===== ENABLE/DISABLE =====
   useEffect(() => {
     if (enabled) {
       startListening();
@@ -629,7 +514,6 @@ export function useVoiceCommands({
     }
   }, [enabled, startListening, stopListening]);
 
-  // ===== CLEANUP =====
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -638,25 +522,19 @@ export function useVoiceCommands({
       isActiveRef.current = false;
       clearRestartTimeout();
       try {
-        ExpoSpeechRecognitionModule?.abort();
+        ExpoSpeechRecognitionModule?.abort?.();
       } catch {}
     };
   }, [clearRestartTimeout]);
 
-  // ===== RETURN =====
   return {
-    // Status
     status,
     isListening: status === "listening",
     isProcessing,
     isOnline,
     permissionGranted,
-
-    // Data
     lastCommand,
     transcript,
-
-    // Actions
     start: startListening,
     stop: stopListening,
   };

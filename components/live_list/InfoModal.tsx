@@ -1,120 +1,60 @@
-// InfoModalBottomSheet.jsx (Expo SDK 54)
-// Uses @gorhom/bottom-sheet modal (portal) + sticky footer + safe-area
-
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   useColorScheme,
 } from "react-native";
+import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  BottomSheetModal,
   BottomSheetBackdrop,
+  BottomSheetModal,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { useTheme } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
-const { height } = Dimensions.get("window");
+import {
+  getLiveStatusLabel,
+  hostOf,
+  sid,
+  timeAgo,
+} from "./liveUtils";
 
-/* ============================
- * THEME TOKENS
- * ============================ */
 function useThemeTokens() {
-  // Ưu tiên theme từ react-navigation; fallback hệ thống
   const navTheme = useTheme?.();
   const sysScheme = useColorScheme?.() ?? "light";
-  const isDark =
-    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
-  const scheme = isDark ? "dark" : "light";
-
-  const tint = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
-  const textPrimary =
-    navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a");
-  const textSecondary = isDark ? "#cbd5e1" : "#475569";
-  const muted = isDark ? "#9aa4b2" : "#666";
-
-  // Dùng màu 'card' & 'border' của navigation cho sheet để đồng bộ toàn app
-  const sheetBg = navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff");
-  const sheetBorder =
-    navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e0e0e0");
-  const handle = isDark ? "#6b7280" : "#ddd";
-
-  const softBg = isDark ? "#1e1f23" : "#eef3f8";
+  const isDark = typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
 
   return {
-    scheme,
-    tint,
-    textPrimary,
-    textSecondary,
-    muted,
-    sheetBg,
-    sheetBorder,
-    handle,
-    softBg,
+    isDark,
+    tint: navTheme?.colors?.primary ?? (isDark ? "#6ee7d8" : "#0f766e"),
+    textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#102a26"),
+    textSecondary: isDark ? "#b8c4c2" : "#536865",
+    sheetBg: navTheme?.colors?.card ?? (isDark ? "#10201d" : "#fffdf8"),
+    border: navTheme?.colors?.border ?? (isDark ? "#23403a" : "#dce8e4"),
+    softBg: isDark ? "#18302c" : "#f1f7f5",
+    handle: isDark ? "#4e6b65" : "#b3c8c3",
   };
 }
 
-// ---------- utils ----------
-function timeAgo(date) {
-  if (!date) return "";
-  const d = new Date(date);
-  const diff = Math.max(0, Date.now() - d.getTime());
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s trước`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m trước`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h trước`;
-  const day = Math.floor(hr / 24);
-  return `${day}d trước`;
+function formatDate(value: any) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "-";
+  return date.toLocaleString("vi-VN");
 }
 
-const providerMeta = (p) =>
-  p === "youtube"
-    ? { label: "YouTube", icon: "▶️" }
-    : p === "facebook"
-    ? { label: "Facebook", icon: "👥" }
-    : { label: p || "Stream", icon: "📺" };
-
-function hostOf(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
+function providerLabel(session: any) {
+  const key = String(session?.provider || session?.kind || "").toLowerCase();
+  if (key.includes("facebook")) return "Facebook";
+  if (key.includes("youtube")) return "YouTube";
+  if (key.includes("server2")) return "PickleTour CDN";
+  if (key.includes("file") || key.includes("hls")) return "PickleTour";
+  return session?.providerLabel || session?.label || "Stream";
 }
 
-const VI_STATUS_LABELS = {
-  scheduled: "Đã lên lịch",
-  queued: "Chờ thi đấu",
-  assigned: "Đã gán sân",
-  finished: "Đã kết thúc",
-  ended: "Đã kết thúc",
-  paused: "Tạm dừng",
-  canceled: "Đã hủy",
-};
-
-function viStatus(s) {
-  if (!s) return "-";
-  const key = String(s).toLowerCase();
-  if (key === "live") return "LIVE";
-  return VI_STATUS_LABELS[key] || s;
-}
-
-// ---------- component ----------
-/**
- * Props:
- * - visible: boolean
- * - onClose: () => void
- * - match: object
- * - sessions: array
- * - onCopy: (text: string, toast?: string) => void
- * - onOpenUrl: (url: string) => void
- */
 export default function InfoModal({
   visible,
   onClose,
@@ -122,27 +62,24 @@ export default function InfoModal({
   sessions = [],
   onCopy,
   onOpenUrl,
-}) {
+}: any) {
   const T = useThemeTokens();
   const insets = useSafeAreaInsets();
-  const modalRef = React.useRef(null);
-  const [footerH, setFooterH] = React.useState(0);
+  const modalRef = useRef<BottomSheetModal>(null);
+  const snapPoints = useMemo(() => ["82%"], []);
 
-  // default 80% height
-  const snapPoints = React.useMemo(() => ["80%"], []);
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) modalRef.current?.present();
     else modalRef.current?.dismiss();
   }, [visible]);
 
-  const renderBackdrop = React.useCallback(
-    (props) => (
+  const renderBackdrop = useCallback(
+    (props: any) => (
       <BottomSheetBackdrop
         {...props}
-        disappearsOnIndex={-1}
         appearsOnIndex={0}
-        opacity={0.5}
+        disappearsOnIndex={-1}
+        opacity={0.48}
       />
     ),
     []
@@ -153,320 +90,250 @@ export default function InfoModal({
       ref={modalRef}
       snapPoints={snapPoints}
       enablePanDownToClose
-      backgroundStyle={[
-        styles.sheetBg,
-        { backgroundColor: T.sheetBg, borderTopColor: T.sheetBorder },
-      ]}
-      handleIndicatorStyle={[
-        styles.handleIndicator,
-        { backgroundColor: T.handle },
-      ]}
-      backdropComponent={renderBackdrop}
       topInset={insets.top}
       onDismiss={onClose}
+      backdropComponent={renderBackdrop}
+      handleIndicatorStyle={[styles.handle, { backgroundColor: T.handle }]}
+      backgroundStyle={[
+        styles.sheet,
+        {
+          backgroundColor: T.sheetBg,
+          borderTopColor: T.border,
+        },
+      ]}
       android_keyboardInputMode="adjustResize"
     >
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: T.sheetBorder }]}>
-        <Text style={[styles.title, { color: T.textPrimary }]}>
-          Thông tin trận
-        </Text>
+      <View style={[styles.header, { borderBottomColor: T.border }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.eyebrow, { color: T.tint }]}>Thông tin phát sóng</Text>
+          <Text style={[styles.title, { color: T.textPrimary }]} numberOfLines={2}>
+            {match?.displayCode || match?.code || "Trận đấu"}
+          </Text>
+        </View>
         <TouchableOpacity
           onPress={() => modalRef.current?.dismiss()}
-          style={styles.closeBtn}
+          style={[styles.closeBtn, { backgroundColor: T.softBg, borderColor: T.border }]}
         >
-          <Text style={[styles.closeIcon, { color: T.textSecondary }]}>✕</Text>
+          <Ionicons name="close" size={18} color={T.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
       <BottomSheetScrollView
-        style={styles.content}
         contentContainerStyle={{
-          paddingBottom: (insets.bottom || 0) + footerH + 12,
+          paddingHorizontal: 18,
+          paddingTop: 18,
+          paddingBottom: insets.bottom + 24,
+          gap: 18,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Match Info */}
-        <View style={styles.section}>
+        <View style={[styles.panel, { backgroundColor: T.softBg, borderColor: T.border }]}>
           <InfoRow
-            label="Mã VT/VBT"
-            value={match.code || "-"}
-            onCopy={
-              match.code ? () => onCopy?.(match.code, "Đã copy mã trận!") : null
-            }
+            label="Mã trận"
+            value={match?.displayCode || match?.code || "-"}
             T={T}
+            onCopy={
+              match?.displayCode || match?.code
+                ? () => onCopy?.(match?.displayCode || match?.code, "Đã sao chép mã trận")
+                : undefined
+            }
           />
-
-          {match.labelKey ? (
-            <InfoRow label="Label Key" value={match.labelKey} T={T} />
-          ) : null}
-
-          <InfoRow label="Trạng thái" value={viStatus(match.status)} T={T} />
-          <InfoRow label="Sân" value={match.courtLabel || "-"} T={T} />
-
-          {match.startedAt ? (
-            <InfoRow
-              label="Bắt đầu"
-              value={new Date(match.startedAt).toLocaleString("vi-VN")}
-              T={T}
-            />
-          ) : null}
-
-          {match.scheduledAt ? (
-            <InfoRow
-              label="Lịch"
-              value={new Date(match.scheduledAt).toLocaleString("vi-VN")}
-              T={T}
-            />
-          ) : null}
-
-          {match.updatedAt ? (
-            <InfoRow label="Cập nhật" value={timeAgo(match.updatedAt)} T={T} />
-          ) : null}
+          <InfoRow label="Trạng thái" value={getLiveStatusLabel(match?.status)} T={T} />
+          <InfoRow label="Sân" value={match?.courtLabel || "-"} T={T} />
+          <InfoRow label="Giải đấu" value={match?.tournament?.name || "-"} T={T} />
+          <InfoRow label="Cập nhật" value={timeAgo(match?.updatedAt) || "-"} T={T} />
+          <InfoRow label="Lịch" value={formatDate(match?.scheduledAt)} T={T} />
+          <InfoRow label="Bắt đầu" value={formatDate(match?.startedAt)} T={T} />
         </View>
 
-        {/* Platforms */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-            Nền tảng
-          </Text>
-
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Nguồn xem</Text>
           {Array.isArray(sessions) && sessions.length > 0 ? (
-            sessions.map((session, i) => {
-              const meta = providerMeta(session.provider);
+            sessions.map((session: any) => {
+              const key = sid(session?.key || session?.watchUrl || session?.openUrl);
+              const label = providerLabel(session);
+              const targetUrl = session?.watchUrl || session?.openUrl || "";
+
               return (
                 <View
-                  key={`${session.provider}-${i}`}
-                  style={[
-                    styles.platformRow,
-                    { borderBottomColor: T.sheetBorder },
-                  ]}
+                  key={key || label}
+                  style={[styles.sessionCard, { backgroundColor: T.softBg, borderColor: T.border }]}
                 >
-                  <View style={styles.platformInfo}>
-                    <Text
-                      style={[styles.platformIcon, { color: T.textPrimary }]}
-                    >
-                      {meta.icon}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.sessionTitle, { color: T.textPrimary }]}>
+                      {session?.label || label}
                     </Text>
-                    <View style={styles.platformText}>
-                      <Text
-                        style={[styles.platformName, { color: T.textPrimary }]}
-                      >
-                        {meta.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.platformHost,
-                          { color: T.textSecondary },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {hostOf(session.watchUrl)}
-                      </Text>
-                    </View>
+                    <Text
+                      style={[styles.sessionMeta, { color: T.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {label}
+                      {hostOf(targetUrl) ? ` • ${hostOf(targetUrl)}` : ""}
+                    </Text>
                   </View>
 
-                  <View style={styles.platformActions}>
-                    <TouchableOpacity
-                      style={[styles.openBtn, { borderColor: T.tint }]}
-                      onPress={() => onOpenUrl?.(session.watchUrl)}
-                    >
-                      <Text style={[styles.openBtnText, { color: T.tint }]}>
-                        🔗 Mở
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.copyBtn,
-                        {
-                          borderColor: T.sheetBorder,
-                          backgroundColor: T.softBg,
-                        },
-                      ]}
-                      onPress={() => onCopy?.(session.watchUrl)}
-                    >
-                      <Text
-                        style={[styles.copyBtnText, { color: T.textPrimary }]}
+                  <View style={styles.sessionActions}>
+                    {!!targetUrl && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
+                        onPress={() => onOpenUrl?.(targetUrl)}
                       >
-                        📋
-                      </Text>
-                    </TouchableOpacity>
+                        <Ionicons name="open-outline" size={16} color={T.textPrimary} />
+                      </TouchableOpacity>
+                    )}
+                    {!!targetUrl && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
+                        onPress={() => onCopy?.(targetUrl, "Đã sao chép liên kết")}
+                      >
+                        <Ionicons name="copy-outline" size={16} color={T.textPrimary} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
             })
           ) : (
-            <Text style={[styles.noSessions, { color: T.muted }]}>
-              Không có URL phát hợp lệ.
-            </Text>
+            <View style={[styles.emptyBox, { backgroundColor: T.softBg, borderColor: T.border }]}>
+              <Text style={[styles.emptyText, { color: T.textSecondary }]}>
+                Trận này chưa có liên kết phát công khai.
+              </Text>
+            </View>
           )}
         </View>
       </BottomSheetScrollView>
-
-      {/* Sticky Footer */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: (insets.bottom || 0) + 16,
-            borderTopColor: T.sheetBorder,
-            backgroundColor: T.sheetBg,
-          },
-        ]}
-        onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
-      >
-        <View style={styles.footerRow}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: T.softBg }]}
-            onPress={() => modalRef.current?.dismiss()}
-          >
-            <Text style={[styles.secondaryText, { color: T.tint }]}>Hủy</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: T.tint }]}
-            onPress={() => modalRef.current?.dismiss()}
-          >
-            <Text style={styles.primaryText}>Đóng</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </BottomSheetModal>
   );
 }
 
-// ---------- sub components ----------
-function InfoRow({ label, value, onCopy, T }) {
+function InfoRow({ label, value, onCopy, T }: any) {
   return (
-    <View style={[styles.infoRow, { borderBottomColor: T.sheetBorder }]}>
-      <Text style={[styles.infoLabel, { color: T.textSecondary }]}>
-        {label}
-      </Text>
-      <View style={styles.infoValueContainer}>
-        <Text
-          style={[styles.infoValue, { color: T.textPrimary }]}
-          numberOfLines={2}
-        >
-          {value}
+    <View style={styles.infoRow}>
+      <Text style={[styles.infoLabel, { color: T.textSecondary }]}>{label}</Text>
+      <View style={styles.infoValueWrap}>
+        <Text style={[styles.infoValue, { color: T.textPrimary }]} numberOfLines={2}>
+          {value || "-"}
         </Text>
-        {!!onCopy && (
-          <TouchableOpacity style={styles.infoCopyBtn} onPress={onCopy}>
-            <Text style={[styles.infoCopyIcon, { color: T.textSecondary }]}>
-              📋
-            </Text>
+        {onCopy ? (
+          <TouchableOpacity onPress={onCopy} style={styles.inlineCopy}>
+            <Ionicons name="copy-outline" size={15} color={T.textSecondary} />
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
 }
 
-// ---------- styles ----------
 const styles = StyleSheet.create({
-  sheetBg: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  handleIndicator: {
-    width: 40,
+  handle: {
+    width: 44,
     height: 4,
     borderRadius: 999,
-    alignSelf: "center",
-    marginTop: 8,
   },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: { fontSize: 20, fontWeight: "700" },
-  closeBtn: { padding: 4 },
-  closeIcon: { fontSize: 24 },
-
-  // Content
-  content: { paddingHorizontal: 16 },
-  section: { marginBottom: 24 },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
   },
-
-  // Info rows
-  infoRow: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
   },
-  infoLabel: {
-    width: 100,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  infoValueContainer: { flex: 1, flexDirection: "row", alignItems: "center" },
-  infoValue: { flex: 1, fontSize: 14 },
-  infoCopyBtn: { marginLeft: 8, padding: 4 },
-  infoCopyIcon: { fontSize: 16 },
-
-  // Platform rows
-  platformRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  platformInfo: { flex: 1, flexDirection: "row", alignItems: "center" },
-  platformIcon: { fontSize: 20, marginRight: 12 },
-  platformText: { flex: 1 },
-  platformName: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  platformHost: { fontSize: 12 },
-  platformActions: { flexDirection: "row", gap: 8 },
-  openBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  openBtnText: { fontSize: 12, fontWeight: "600" },
-  copyBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  copyBtnText: { fontSize: 14 },
-  noSessions: {
-    fontSize: 14,
-    textAlign: "center",
-    paddingVertical: 20,
-  },
-
-  // Footer
-  footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  footerRow: { flexDirection: "row", gap: 12 },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+  closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
-  primaryText: { fontSize: 16, color: "#fff", fontWeight: "700" },
-  secondaryText: { fontSize: 16, fontWeight: "700" },
+  panel: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  infoRow: {
+    paddingVertical: 10,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  infoValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  infoValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  inlineCopy: {
+    padding: 4,
+  },
+  section: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  sessionCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  sessionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  sessionMeta: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  sessionActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  emptyBox: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
 });

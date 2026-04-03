@@ -37,6 +37,7 @@ import {
 import { useSocket } from "@/context/SocketContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
+  getMatchCourtStationName,
   getMatchPayloadId,
   getPairDisplayName,
   isNewerOrEqualMatchPayload,
@@ -140,6 +141,8 @@ function scoreText(m) {
   return "";
 }
 function courtNameOf(m) {
+  const stationName = getMatchCourtStationName(m);
+  if (stationName) return stationName;
   return (
     (m?.courtName && m.courtName.trim()) ||
     m?.court?.name ||

@@ -613,7 +613,7 @@ export default function AssignCourtSheet({
           <View style={styles.stationChipWrap}>
             <Chip text={stationStatusLabel(station?.status)} outlined />
             <Chip text={assignmentModeLabel(assignmentMode)} tone="secondary" outlined />
-            {queueItems.length ? (
+            {assignmentMode === "queue" && queueItems.length ? (
               <Chip
                 text={`${queueItems.length} trận chờ`}
                 tone="info"
@@ -642,7 +642,7 @@ export default function AssignCourtSheet({
           <Text style={{ color: t.muted }}>Sân đang trống.</Text>
         )}
 
-        {nextQueuedMatch ? (
+        {assignmentMode === "queue" && nextQueuedMatch ? (
           <Pressable
             onPress={() => setViewerMatchId(sid(nextQueuedMatch?._id || nextQueuedMatch?.id))}
             style={({ pressed }) => [
@@ -668,7 +668,7 @@ export default function AssignCourtSheet({
           </Text>
         ) : null}
 
-        {(current || nextQueuedMatch || queueMatches.length) ? (
+        {(current || (assignmentMode === "queue" && (nextQueuedMatch || queueMatches.length))) ? (
           <Text style={{ color: t.muted, fontSize: 12 }}>
             Chạm vào thẻ trận để xem chi tiết.
           </Text>

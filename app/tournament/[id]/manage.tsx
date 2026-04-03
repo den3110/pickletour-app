@@ -61,6 +61,7 @@ import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
+import { getMatchCourtStationName, getMatchDisplayCode } from "@/utils/matchDisplay";
 
 const normalizeGroupCode = (code) => {
   const s = String(code || "")
@@ -170,7 +171,8 @@ const pairLabel = (pair) => {
   const ps = [pair.player1, pair.player2].filter(Boolean).map(playerName);
   return ps.join(" / ") || "—";
 };
-const matchCode = (m) => m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
+const matchCode = (m) =>
+  getMatchDisplayCode(m) || m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
 const pairIdOf = (p) => {
   if (!p) return "";
   if (typeof p === "string") return p;
@@ -185,23 +187,21 @@ const pairIdOf = (p) => {
   );
 };
 const scoreText = (m) => {
-  if (typeof m?.scoreText === "string" && m.scoreText.trim())
-    return m.scoreText;
   const arr =
     (Array.isArray(m?.gameScores) && m.gameScores) ||
     (Array.isArray(m?.sets) && m.sets) ||
     (Array.isArray(m?.scores) && m.scores) ||
     [];
-  if (!arr.length) return "";
-  return arr
-    .map((s) => `${s?.a ?? s?.home ?? 0}-${s?.b ?? s?.away ?? 0}`)
-    .join(", ");
+  if (arr.length) {
+    return arr
+      .map((s) => `${s?.a ?? s?.home ?? 0}-${s?.b ?? s?.away ?? 0}`)
+      .join(", ");
+  }
+  if (typeof m?.scoreText === "string" && m.scoreText.trim())
+    return m.scoreText;
+  return "";
 };
-const courtNameOf = (m) =>
-  (typeof m?.court?.name === "string" && m.court.name) ||
-  (typeof m?.courtLabel === "string" && m.courtLabel) ||
-  (typeof m?.courtName === "string" && m.courtName) ||
-  "";
+const courtNameOf = (m) => getMatchCourtStationName(m) || "";
 const normStatus = (s) => {
   const k = String(s || "").toLowerCase();
   if (
@@ -613,26 +613,30 @@ const StatusPill = memo(({ status }) => {
 });
 
 const BusyChip = memo(({ court }) => (
-  <View
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      backgroundColor: "#fef3c7",
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 999,
-    }}
-  >
+  <View style={styles.busyChip}>
     <MaterialIcons name="warning" size={12} color="#b45309" />
-    <Text style={{ color: "#b45309", fontSize: 11, fontWeight: "600" }}>
+    <Text
+      style={styles.busyChipText}
+      numberOfLines={2}
+      ellipsizeMode="tail"
+    >
       Đội này đang chơi ở{court ? ` (${court})` : " một trận khác"}
     </Text>
   </View>
 ));
 
-const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => {
+const MiniChipBtn = memo(({ icon, label, onPress, color }) => {
+  const { colors, dark } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
+  const accent = color || (dark ? "#7fb0eb" : colors.primary);
+  const borderColor =
+    dark && !color ? "rgba(127, 176, 235, 0.34)" : accent;
+  const textColor = dark && !color ? "#93c5fd" : accent;
+  const blurTint = dark ? "dark" : "light";
+  const surfaceBg = dark ? "rgba(15, 23, 42, 0.72)" : "rgba(255,255,255,0.04)";
+  const gradientColors = dark
+    ? ["rgba(148,163,184,0.10)", "rgba(15,23,42,0.02)"]
+    : ["rgba(255,255,255,0.26)", "rgba(255,255,255,0.02)"];
   const handlePressIn = () => {
     Animated.spring(scale, {
       toValue: 0.94,
@@ -662,7 +666,7 @@ const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => {
             {
               borderRadius: 999,
               borderWidth: 1,
-              borderColor: color,
+              borderColor,
               overflow: "hidden",
               transform: [{ scale }],
               opacity: pressed ? 0.9 : 1,
@@ -671,12 +675,12 @@ const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => {
           ]}
         >
           <BlurView
-            intensity={35}
-            tint="light"
+            intensity={dark ? 18 : 35}
+            tint={blurTint}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
-            colors={["rgba(255,255,255,0.26)", "rgba(255,255,255,0.02)"]}
+            colors={gradientColors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -684,12 +688,15 @@ const MiniChipBtn = memo(({ icon, label, onPress, color = "#0a84ff" }) => {
           <View
             style={[
               styles.miniBtn,
-              { borderWidth: 0, backgroundColor: "rgba(255,255,255,0.04)" },
+              {
+                borderWidth: 0,
+                backgroundColor: surfaceBg,
+              },
             ]}
           >
-            <MaterialIcons name={icon} size={16} color={color} />
+            <MaterialIcons name={icon} size={16} color={textColor} />
             <Text
-              style={{ color, fontSize: 12, fontWeight: "700" }}
+              style={{ color: textColor, fontSize: 12, fontWeight: "700" }}
               numberOfLines={1}
             >
               {label}
@@ -961,6 +968,134 @@ const ActionButtons = memo(
     );
   }
 );
+
+const MatchRowSeparator = memo(function MatchRowSeparator() {
+  return <View style={styles.matchRowSeparator} />;
+});
+
+function isMatchRowCardEqual(prev, next) {
+  return (
+    prev.match === next.match &&
+    prev.selected === next.selected &&
+    prev.busyCourtA === next.busyCourtA &&
+    prev.busyCourtB === next.busyCourtB &&
+    prev.tour === next.tour &&
+    prev.me === next.me &&
+    prev.canManage === next.canManage
+  );
+}
+
+const MatchRowCard = memo(function MatchRowCard({
+  match,
+  selected,
+  busyCourtA = "",
+  busyCourtB = "",
+  tour,
+  me,
+  canManage,
+  onOpenMatch,
+  onToggleSelect,
+  onOpenVideoDlg,
+  onOpenSheet,
+  onOpenRefReport,
+}) {
+  const { colors, dark } = useTheme();
+  const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
+  const hasVideo = !!match?.video;
+  const score = scoreText(match);
+  const courtLabel = courtNameOf(match);
+  const ordNum =
+    typeof match?.order === "number"
+      ? match.order
+      : match?.order != null
+      ? parseInt(String(match?.order), 10)
+      : null;
+
+  const handleOpenMatch = useCallback(() => {
+    onOpenMatch(match?._id);
+  }, [onOpenMatch, match?._id]);
+
+  const handleToggleSelect = useCallback(
+    (e) => {
+      e?.stopPropagation?.();
+      onToggleSelect(match?._id);
+    },
+    [onToggleSelect, match?._id]
+  );
+
+  return (
+    <Pressable
+      onPress={handleOpenMatch}
+      style={({ pressed }) => [
+        styles.matchRow,
+        { borderColor: colors.border, backgroundColor: colors.card },
+        pressed && { opacity: 0.95 },
+      ]}
+    >
+      <Pressable
+        onPress={handleToggleSelect}
+        style={({ pressed }) => [
+          styles.selectRow,
+          { borderColor: colors.border },
+          pressed && { opacity: 0.9 },
+        ]}
+      >
+        <MaterialIcons
+          name={selected ? "check-box" : "check-box-outline-blank"}
+          size={20}
+          color={selected ? colors.primary : t.muted}
+        />
+        <Text style={{ color: colors.text, fontWeight: "700" }}>
+          {selected ? "Đã chọn" : ""}
+        </Text>
+        <View style={{ flex: 1 }} />
+        <Text style={{ color: t.muted, fontSize: 12 }}>{matchCode(match)}</Text>
+      </Pressable>
+      <ActionButtons
+        m={match}
+        tour={tour}
+        me={me}
+        canManage={canManage}
+        onOpenVideoDlg={onOpenVideoDlg}
+        onOpenSheet={onOpenSheet}
+        onOpenRefReport={onOpenRefReport}
+      />
+      <View style={styles.contentBlock}>
+        <Text style={[styles.code, { color: colors.text }]} numberOfLines={1}>
+          {matchCode(match)}
+        </Text>
+        <View style={styles.teamRow}>
+          <Text
+            style={[styles.teamLabel, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {pairLabel(match?.pairA)}
+          </Text>
+          {busyCourtA ? <BusyChip court={busyCourtA} /> : null}
+        </View>
+        <View style={styles.teamRow}>
+          <Text
+            style={[styles.teamLabel, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {pairLabel(match?.pairB)}
+          </Text>
+          {busyCourtB ? <BusyChip court={busyCourtB} /> : null}
+        </View>
+        <View style={styles.metaRow}>
+          <StatusPill status={match?.status} />
+          <CourtPill name={courtLabel} />
+          <ScorePill textVal={score} />
+          <Text style={{ color: t.muted, fontSize: 12 }}>
+            {getRoundText(match)} • Thứ tự{" "}
+            {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
+          </Text>
+          <VideoPill has={hasVideo} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}, isMatchRowCardEqual);
 
 /* ---------------- SKELETON COMPONENTS ---------------- */
 const SkeletonItem = memo(({ width, height, borderRadius = 4, style }) => {
@@ -1249,6 +1384,12 @@ export default function ManageScreen() {
         [
           String(m?._id || ""),
           String(m?.liveVersion ?? m?.version ?? m?.updatedAt ?? ""),
+          String(m?.status || ""),
+          String(m?.courtStationId || m?.courtStation?._id || ""),
+          String(m?.courtStationName || m?.courtStationLabel || ""),
+          String(m?.court?._id || m?.court || ""),
+          String(m?.court?.name || m?.courtName || ""),
+          String(m?.courtLabel || ""),
         ].join(":")
       )
       .join("|");
@@ -1504,6 +1645,21 @@ export default function ManageScreen() {
     [q, courtFilter, showBye, isByeMatch, secondaryCmp, mergedAllMatches]
   );
 
+  const matchesByBracketId = useMemo(() => {
+    const buckets = new Map();
+    for (const match of mergedAllMatches) {
+      const bid = String(match?.bracket?._id || match?.bracket || "");
+      if (!bid) continue;
+      const list = buckets.get(bid) || [];
+      list.push(match);
+      buckets.set(bid, list);
+    }
+    buckets.forEach((list, bid) => {
+      buckets.set(bid, filterSortMatches(list));
+    });
+    return buckets;
+  }, [mergedAllMatches, filterSortMatches]);
+
   const [viewer, setViewer] = useState({ open: false, matchId: null });
   const openMatch = useCallback(
     (mid) => setViewer({ open: true, matchId: mid }),
@@ -1681,6 +1837,7 @@ export default function ManageScreen() {
     open: false,
     bracket: null,
   });
+  const handleOpenRefReportRef = useRef(null);
   const handleOpenSheet = useCallback((type, m) => {
     if (type === "court") setAssignCourtSheet({ open: true, match: m });
     else if (type === "ref") setAssignRefSheet({ open: true, match: m });
@@ -1688,15 +1845,6 @@ export default function ManageScreen() {
 
   const renderMatchRow = useCallback(
     ({ item: m }) => {
-      const hasVideo = !!m?.video;
-      const score = scoreText(m);
-      const courtLabel = courtNameOf(m);
-      const ordNum =
-        typeof m?.order === "number"
-          ? m.order
-          : m?.order != null
-          ? parseInt(String(m?.order), 10)
-          : null;
       const isThisMatchLive = isLive(m);
       const isThisMatchFinished = isFinished(m);
       const pAId = pairIdOf(m?.pairA);
@@ -1715,89 +1863,28 @@ export default function ManageScreen() {
         liveBusyByPairId.has(pBId)
           ? liveBusyByPairId.get(pBId).find((x) => x.matchId !== String(m._id))
           : null;
-      const checked = selectedMatchIds.has(String(m._id));
+
       return (
-        <Pressable
-          onPress={() => openMatch(m._id)}
-          style={({ pressed }) => [
-            styles.matchRow,
-            { borderColor: colors.border, backgroundColor: colors.card },
-            pressed && { opacity: 0.95 },
-          ]}
-        >
-          <Pressable
-            onPress={(e) => {
-              e?.stopPropagation?.();
-              toggleSelectMatch(m._id);
-            }}
-            style={({ pressed }) => [
-              styles.selectRow,
-              { borderColor: colors.border },
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <MaterialIcons
-              name={checked ? "check-box" : "check-box-outline-blank"}
-              size={20}
-              color={checked ? colors.primary : t.muted}
-            />
-            <Text style={{ color: colors.text, fontWeight: "700" }}>
-              {checked ? "Đã chọn" : ""}
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Text style={{ color: t.muted, fontSize: 12 }}>{matchCode(m)}</Text>
-          </Pressable>
-          <ActionButtons
-            m={m}
-            tour={tour}
-            me={me}
-            canManage={canManage}
-            onOpenVideoDlg={openVideoDlg}
-            onOpenSheet={handleOpenSheet}
-            onOpenRefReport={handleOpenRefReport} // THÊM DÒNG NÀY
-          />
-          <View style={styles.contentBlock}>
-            <Text
-              style={[styles.code, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {matchCode(m)}
-            </Text>
-            <View
-              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
-            >
-              <Text style={{ color: colors.text }} numberOfLines={1}>
-                {pairLabel(m?.pairA)}
-              </Text>
-              {busyInfoA ? <BusyChip court={busyInfoA.court} /> : null}
-            </View>
-            <View
-              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
-            >
-              <Text style={{ color: colors.text }} numberOfLines={1}>
-                {pairLabel(m?.pairB)}
-              </Text>
-              {busyInfoB ? <BusyChip court={busyInfoB.court} /> : null}
-            </View>
-            <View style={styles.metaRow}>
-              <StatusPill status={m?.status} />
-              <CourtPill name={courtLabel} />
-              <ScorePill textVal={score} />
-              <Text style={{ color: t.muted, fontSize: 12 }}>
-                {getRoundText(m)} • Thứ tự{" "}
-                {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
-              </Text>
-              <VideoPill has={hasVideo} />
-            </View>
-          </View>
-        </Pressable>
+        <MatchRowCard
+          match={m}
+          selected={selectedMatchIds.has(String(m._id))}
+          busyCourtA={busyInfoA?.court || ""}
+          busyCourtB={busyInfoB?.court || ""}
+          tour={tour}
+          me={me}
+          canManage={canManage}
+          onOpenMatch={openMatch}
+          onToggleSelect={toggleSelectMatch}
+          onOpenVideoDlg={openVideoDlg}
+          onOpenSheet={handleOpenSheet}
+          onOpenRefReport={handleOpenRefReportRef.current}
+        />
       );
     },
     [
-      colors,
-      t,
       tour,
       me,
+      canManage,
       liveBusyByPairId,
       selectedMatchIds,
       openMatch,
@@ -1810,11 +1897,7 @@ export default function ManageScreen() {
   const renderBracket = useCallback(
     ({ item: b }) => {
       const bid = String(b?._id);
-      const matches = mergedAllMatches.filter(
-        (m) => String(m?.bracket?._id || m?.bracket) === bid
-      );
-      const list = filterSortMatches(matches);
-      const listVersion = `${sortKey}|${sortDir}|${q}|${liveBump}|${selBump}|${courtFilter}|${showBye}`;
+      const list = matchesByBracketId.get(bid) || [];
       const allSelected = isAllSelectedIn(list);
       const selectedCount = list.filter((m) =>
         selectedMatchIds.has(String(m._id))
@@ -1885,9 +1968,9 @@ export default function ManageScreen() {
               data={list}
               keyExtractor={(m) => String(m._id)}
               renderItem={renderMatchRow}
-              ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+              ItemSeparatorComponent={MatchRowSeparator}
               scrollEnabled={false}
-              extraData={listVersion}
+              extraData={`${liveBump}|${selBump}`}
               removeClippedSubviews={Platform.OS === "android"}
               maxToRenderPerBatch={5}
               windowSize={5}
@@ -1899,15 +1982,9 @@ export default function ManageScreen() {
     [
       colors,
       t,
-      mergedAllMatches,
-      filterSortMatches,
-      sortKey,
-      sortDir,
-      q,
+      matchesByBracketId,
       liveBump,
       selBump,
-      courtFilter,
-      showBye,
       isAllSelectedIn,
       selectedMatchIds,
       toggleSelectAllIn,
@@ -2028,7 +2105,7 @@ export default function ManageScreen() {
       // Tạo tên file
       const safeName = (tour?.name || "giai_dau")
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[̀-ͯ]/g, "")
         .replace(/đ/g, "d")
         .replace(/Đ/g, "D")
         .replace(/[^a-zA-Z0-9\s]/g, "")
@@ -2090,7 +2167,7 @@ export default function ManageScreen() {
       // Tạo tên file
       const safeName = (tour?.name || "giai_dau")
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[̀-ͯ]/g, "")
         .replace(/đ/g, "d")
         .replace(/Đ/g, "D")
         .replace(/[^a-zA-Z0-9\s]/g, "")
@@ -2125,7 +2202,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
 </body>
 </html>`;
 
-      const content = "\ufeff" + wordContent;
+      const content = "\uFEFF" + wordContent;
       const fileUri = FileSystem.cacheDirectory + fileName;
 
       // Dùng Legacy API
@@ -2260,7 +2337,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
 
         const safeTourName = (tour?.name || "giai")
           .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[̀-ͯ]/g, "")
           .replace(/đ/g, "d")
           .replace(/Đ/g, "D")
           .replace(/[^a-zA-Z0-9\s]/g, "")
@@ -2290,6 +2367,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
     },
     [tour]
   );
+  handleOpenRefReportRef.current = handleOpenRefReport;
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const [headerHeight, setHeaderHeight] = useState(150);
@@ -3726,6 +3804,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     position: "relative",
+    overflow: "hidden",
   },
   selectRow: {
     flexDirection: "row",
@@ -3736,13 +3815,42 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     marginBottom: 8,
   },
-  contentBlock: { gap: 6, marginTop: 6 },
+  contentBlock: { gap: 6, marginTop: 6, minWidth: 0 },
   code: { fontSize: 14, fontWeight: "800" },
+  teamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+    minWidth: 0,
+  },
+  teamLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
+  },
+  busyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    flexShrink: 1,
+    maxWidth: "100%",
+    alignSelf: "flex-start",
+  },
+  busyChipText: {
+    color: "#b45309",
+    fontSize: 11,
+    fontWeight: "600",
+    flexShrink: 1,
   },
   miniBtn: {
     flexDirection: "row",

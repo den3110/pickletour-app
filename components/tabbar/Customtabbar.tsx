@@ -20,7 +20,7 @@ import Svg, { Path } from "react-native-svg";
 // Bỏ dòng khai báo SCREEN_WIDTH ở ngoài này đi nhé
 // const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const TAB_BAR_HEIGHT = 65;
+export const TAB_BAR_HEIGHT = 65;
 const FLOATING_BUTTON_SIZE = 60;
 const CURVE_WIDTH = 100;
 const CURVE_HEIGHT = 20;

@@ -1,23 +1,18 @@
 // hooks/useExpoPushToken.ts
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
-import * as SecureStore from "expo-secure-store";
-import * as Crypto from "expo-crypto";
 import * as Application from "expo-application";
+import Constants from "expo-constants";
+import * as Crypto from "expo-crypto";
+import * as Device from "expo-device";
+import * as SecureStore from "expo-secure-store";
 import { useSelector } from "react-redux";
-import { useRegisterPushTokenMutation } from "@/slices/pushApiSlice";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+import {
+  loadExpoNotifications,
+  notificationsRequireNativeBuild,
+} from "@/lib/expoNotifications";
+import { useRegisterPushTokenMutation } from "@/slices/pushApiSlice";
 
 export const LEGACY_DEVICE_ID_KEY = "PT_DEVICE_ID";
 export const DEVICE_ID_KEY = "deviceId";
@@ -49,52 +44,77 @@ export function useExpoPushToken() {
   const auth = useSelector((s: any) => s.auth?.userInfo);
   const [registerPushToken] = useRegisterPushTokenMutation();
 
-  const syncPushToken = async (token: string | null) => {
-    if (!token) return;
-    if (!auth?._id) return;
+  const syncPushToken = useCallback(
+    async (token: string | null) => {
+      if (!token) return;
+      if (!auth?._id) return;
 
-    try {
-      const deviceId = await getOrCreateDeviceId();
-      const appVersion = `${Application.nativeApplicationVersion ?? "0"}.${
-        Application.nativeBuildVersion ?? "0"
-      }`;
-      const platform = Platform.OS === "ios" ? "ios" : "android";
+      try {
+        const deviceId = await getOrCreateDeviceId();
+        const appVersion = `${Application.nativeApplicationVersion ?? "0"}.${
+          Application.nativeBuildVersion ?? "0"
+        }`;
+        const platform = Platform.OS === "ios" ? "ios" : "android";
 
-      await registerPushToken({
-        token,
-        platform,
-        deviceId,
-        appVersion,
-      }).unwrap();
-      
-      if (__DEV__) {
-        console.log("✅ Push token registered:", token);
+        await registerPushToken({
+          token,
+          platform,
+          deviceId,
+          appVersion,
+        }).unwrap();
+
+        if (__DEV__) {
+          console.log("Push token registered:", token);
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.log("registerPushToken failed", error);
+        }
       }
-    } catch (e) {
-      if (__DEV__) console.log("❌ registerPushToken failed", e);
-    }
-  };
+    },
+    [auth?._id, registerPushToken]
+  );
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    let receivedSub: { remove: () => void } | null = null;
+    let responseSub: { remove: () => void } | null = null;
+
+    void (async () => {
       if (Platform.OS === "web") {
-        console.log("⚠️ Push notifications not supported on web");
+        console.log("Push notifications are not supported on web.");
         return;
       }
-      
+
       if (!Device.isDevice) {
-        console.log("⚠️ Must use physical device for push notifications");
+        console.log("Push notifications require a physical device.");
         return;
       }
 
-      // ✅ Check nếu đang chạy trong Expo Go
-      const isExpoGo = Constants.appOwnership === "expo";
-      if (isExpoGo && Platform.OS === "android") {
-        console.warn("⚠️ Push notifications require a development build. Run 'eas build --profile development --platform android'");
+      if (notificationsRequireNativeBuild) {
+        console.warn(
+          "Push notifications require a development build. Expo Go does not support this flow."
+        );
         return;
       }
 
-      // Android: Setup notification channel
+      const Notifications = await loadExpoNotifications();
+      if (!Notifications || cancelled) {
+        return;
+      }
+
+      receivedSub = Notifications.addNotificationReceivedListener(
+        (notification) => {
+          console.log("Notification received:", notification);
+        }
+      );
+
+      responseSub = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+          console.log("Notification tapped:", response);
+        }
+      );
+
       if (Platform.OS === "android") {
         try {
           await Notifications.setNotificationChannelAsync("default", {
@@ -103,85 +123,79 @@ export function useExpoPushToken() {
             vibrationPattern: [0, 250, 250, 250],
             lightColor: "#FF231F7C",
           });
-          console.log("✅ Android notification channel created");
-        } catch (e) {
-          console.error("❌ Failed to create notification channel:", e);
+          console.log("Android notification channel created");
+        } catch (error) {
+          console.error("Failed to create notification channel:", error);
         }
       }
 
-      // ✅ Request permissions với logs chi tiết
-      console.log("📱 Checking notification permissions...");
+      console.log("Checking notification permissions...");
       const { status: existing } = await Notifications.getPermissionsAsync();
-      console.log("   Current permission status:", existing);
-      
+      console.log("Current permission status:", existing);
+
       let finalStatus = existing;
-      
       if (existing !== "granted") {
-        console.log("📱 Requesting notification permissions...");
+        console.log("Requesting notification permissions...");
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
-        console.log("   New permission status:", finalStatus);
+        console.log("New permission status:", finalStatus);
+      }
+
+      if (cancelled) {
+        return;
       }
 
       if (finalStatus !== "granted") {
-        console.warn("❌ Notification permission denied");
+        console.warn("Notification permission denied");
         await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
         setToken(null);
         return;
       }
 
-      console.log("✅ Notification permission granted");
-
-      // Get project ID
       const projectId =
         (Constants?.expoConfig?.extra as any)?.eas?.projectId ??
         (Constants as any)?.easConfig?.projectId;
-        
+
       if (!projectId) {
-        console.error("❌ Missing EAS projectId. Run 'eas build:configure'");
+        console.error("Missing EAS projectId. Run 'eas build:configure'.");
         return;
       }
 
-      console.log("📱 Getting Expo push token...");
-      console.log("   Project ID:", projectId);
+      console.log("Getting Expo push token for project:", projectId);
 
       try {
-        const tokenData = await Notifications.getExpoPushTokenAsync({ 
-          projectId 
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId,
         });
-        const tokenDeviceData= await Notifications.getDevicePushTokenAsync()
+        const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+
+        if (cancelled) {
+          return;
+        }
+
         const token = tokenData.data;
-        const tokenDevice= tokenDeviceData.data
-        
-        console.log("✅ Got push token:", token);
-        console.log("✅ Got push token device:", tokenDevice)
+        console.log("Got Expo push token:", token);
+        console.log("Got device push token:", deviceTokenData.data);
         setToken(token);
         await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
         await syncPushToken(token);
-      } catch (e) {
-        console.error("❌ Failed to get push token:", e);
+      } catch (error) {
+        console.error("Failed to get push token:", error);
       }
     })();
 
-    const sub1 = Notifications.addNotificationReceivedListener((notification) => {
-      console.log("📬 Notification received:", notification);
-    });
-    
-    const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log("👆 Notification tapped:", response);
-    });
-    
     return () => {
-      sub1.remove();
-      sub2.remove();
+      cancelled = true;
+      receivedSub?.remove();
+      responseSub?.remove();
     };
-  }, []);
+  }, [syncPushToken]);
 
   useEffect(() => {
     if (expoPushToken && auth?._id) {
       syncPushToken(expoPushToken);
     }
-  }, [auth?._id, expoPushToken]);
+  }, [auth?._id, expoPushToken, syncPushToken]);
 
   return expoPushToken;
 }

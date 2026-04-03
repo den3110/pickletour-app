@@ -1,20 +1,40 @@
-import React, { useState, useCallback, memo } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Alert,
+  Linking,
   Modal,
-  useColorScheme,
+  Platform,
   SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  ToastAndroid,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from "react-native";
-import { Image as ExpoImage } from "expo-image";
 import { useTheme } from "@react-navigation/native";
+import { Image as ExpoImage } from "expo-image";
 import { WebView } from "react-native-webview";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { Video } from "expo-av";
+
+import { CompatVideo as Video } from "@/lib/expoMediaCompat";
 import { normalizeUrl } from "@/utils/normalizeUri";
+
 import { getLiveMatchCourtText } from "./courtDisplay";
+import InfoModal from "./InfoModal";
+import {
+  buildLiveInfoMatch,
+  getLiveMatchSubtitle,
+  getLiveMatchTitle,
+  getLiveSessions,
+  getLiveStatusLabel,
+  getPreferredLiveSession,
+  hostOf,
+  sid,
+  timeAgo,
+} from "./liveUtils";
 
 const BLURHASH = "|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXo";
 
@@ -25,184 +45,201 @@ function useThemeTokens() {
 
   return {
     isDark,
-    textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#0f172a"),
-    textSecondary: isDark ? "#cbd5e1" : "#475569",
-    cardBg: navTheme?.colors?.card ?? (isDark ? "#111214" : "#ffffff"),
-    cardBorder: navTheme?.colors?.border ?? (isDark ? "#3a3b40" : "#e5e7eb"),
+    accent: navTheme?.colors?.primary ?? (isDark ? "#6ee7d8" : "#0f766e"),
+    textPrimary: navTheme?.colors?.text ?? (isDark ? "#ffffff" : "#102a26"),
+    textSecondary: isDark ? "#b8c4c2" : "#5b6f6a",
+    cardBg: navTheme?.colors?.card ?? (isDark ? "#10201d" : "#fffdf8"),
+    pageBg: navTheme?.colors?.background ?? (isDark ? "#091513" : "#f5f3ec"),
+    cardBorder: navTheme?.colors?.border ?? (isDark ? "#25423d" : "#d9e7e2"),
+    softBg: isDark ? "#17312d" : "#eef6f3",
+    liveBg: "rgba(220, 38, 38, 0.92)",
+    liveText: "#ffffff",
+    shadow: {
+      shadowColor: "#08110f",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.32 : 0.08,
+      shadowRadius: 16,
+      elevation: 4,
+    },
   };
 }
 
-const parseVT = (code) => {
-  if (!code) return { v: null, b: null, t: null };
-  const m1 = String(code).match(/^V(\d+)-T(\d+)$/i);
-  if (m1) return { v: Number(m1[1]), b: null, t: Number(m1[2]) };
-  const m2 = String(code).match(/^V(\d+)-B(\d+)-T(\d+)$/i);
-  if (m2) return { v: Number(m2[1]), b: Number(m2[2]), t: Number(m2[3]) };
-  return { v: null, b: null, t: null };
-};
+function showNotice(message: string) {
+  if (Platform.OS === "android") {
+    ToastAndroid.show(message, ToastAndroid.SHORT);
+    return;
+  }
+  Alert.alert("Thông báo", message);
+}
 
-const buildFbPluginUrl = (watchUrl) => {
-  if (!watchUrl) return null;
-  return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(watchUrl)}&show_text=0&width=560&autoplay=1&mute=0`;
-};
+function buildPlayerHtml(embedHtml: string) {
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      <style>
+        html, body {
+          margin: 0;
+          padding: 0;
+          background: #000;
+          height: 100%;
+          overflow: hidden;
+        }
+        body {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        iframe, video {
+          width: 100%;
+          height: 100%;
+          border: 0;
+        }
+      </style>
+    </head>
+    <body>${embedHtml}</body>
+  </html>`;
+}
 
-const getStatusText = (status) => {
-  const statusMap = {
-    scheduled: "ÄÃ£ lÃªn lá»‹ch",
-    queued: "Chá» thi Ä‘áº¥u",
-    assigned: "ÄÃ£ gÃ¡n sÃ¢n",
-    live: "Äang phÃ¡t",
-    finished: "ÄÃ£ káº¿t thÃºc",
-    ended: "ÄÃ£ káº¿t thÃºc",
-    paused: "Táº¡m dá»«ng",
-    canceled: "ÄÃ£ há»§y",
-  };
-  return statusMap[String(status || "").toLowerCase()] || status;
-};
+function renderPlayer(activeSession: any) {
+  if (!activeSession) return null;
 
-function buildCanonicalSessions(match = {}) {
-  const defaultStreamKey =
-    typeof match?.defaultStreamKey === "string" ? match.defaultStreamKey : "";
-  const streams = Array.isArray(match?.streams) ? match.streams : [];
-  return streams
-    .filter(
-      (stream) =>
-        stream &&
-        typeof stream === "object" &&
-        (typeof stream?.playUrl === "string" || typeof stream?.openUrl === "string")
-    )
-    .sort((a, b) => Number(a?.priority || 99) - Number(b?.priority || 99))
-    .map((stream) => {
-      const playUrl =
-        typeof stream?.playUrl === "string" ? stream.playUrl.trim() : "";
-      const openUrl =
-        typeof stream?.openUrl === "string" ? stream.openUrl.trim() : "";
-      const url = playUrl || openUrl;
-      const kind = String(stream?.kind || "").trim().toLowerCase();
-      const primary =
-        (defaultStreamKey && String(stream?.key || "") === defaultStreamKey) ||
-        Boolean(stream?.primary);
-      if (!url) return null;
-      if (kind === "facebook") {
-        return {
-          key: stream?.key || "server1",
-          label: stream?.displayLabel || "Server 1",
-          providerLabel: stream?.providerLabel || "Facebook",
-          watchUrl: url,
-          pluginUrl: buildFbPluginUrl(url),
-          canInlineEmbed: true,
-          primary,
-          ready: stream?.ready !== false,
-          delaySeconds: Number(stream?.delaySeconds || 0),
-        };
-      }
-      if (kind === "file" || kind === "hls") {
-        return {
-          key: stream?.key || "stream",
-          label: stream?.displayLabel || "Video",
-          providerLabel: stream?.providerLabel || "PickleTour",
-          watchUrl: openUrl || url,
-          directUrl: url,
-          canInlineEmbed: true,
-          primary,
-          ready: stream?.ready !== false,
-          delaySeconds: Number(stream?.delaySeconds || 0),
-        };
-      }
-      if (kind === "delayed_manifest") {
-        return {
-          key: stream?.key || "server2",
-          label: stream?.displayLabel || "Server 2",
-          providerLabel: stream?.providerLabel || "PickleTour CDN",
-          watchUrl: openUrl || "",
-          manifestUrl: url,
-          canInlineEmbed: false,
-          primary,
-          ready: stream?.ready !== false,
-          delaySeconds: Number(stream?.delaySeconds || 0),
-        };
-      }
-      return {
-        key: stream?.key || "stream",
-        label: stream?.displayLabel || "Stream",
-        providerLabel: stream?.providerLabel || "Stream",
-        watchUrl: openUrl || url,
-        directUrl: url,
-        canInlineEmbed: false,
-        primary,
-        ready: stream?.ready !== false,
-        delaySeconds: Number(stream?.delaySeconds || 0),
-      };
-    })
-    .filter(Boolean);
+  if (activeSession?.embedHtml) {
+    return (
+      <WebView
+        source={{ html: buildPlayerHtml(activeSession.embedHtml) }}
+        style={styles.player}
+        javaScriptEnabled
+        domStorageEnabled
+        allowsFullscreenVideo
+        mediaPlaybackRequiresUserAction={false}
+      />
+    );
+  }
+
+  if (activeSession?.pluginUrl) {
+    return (
+      <WebView
+        source={{ uri: activeSession.pluginUrl }}
+        style={styles.player}
+        javaScriptEnabled
+        domStorageEnabled
+        allowsFullscreenVideo
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+      />
+    );
+  }
+
+  const directUrl = activeSession?.directUrl || activeSession?.manifestUrl;
+  if (directUrl) {
+    return (
+      <Video
+        style={styles.player}
+        source={{ uri: directUrl }}
+        useNativeControls
+        shouldPlay
+        resizeMode="contain"
+      />
+    );
+  }
+
+  return null;
 }
 
 const LiveMatchCard = memo(
-  function LiveMatchCard({ item = {} }) {
+  function LiveMatchCard({ item = {} }: any) {
     const T = useThemeTokens();
+    const match = useMemo(() => item || {}, [item]);
+    const fb = match?.facebookLive || {};
+    const courtText = getLiveMatchCourtText(match);
+    const sessions = useMemo(() => getLiveSessions(match), [match]);
+    const preferredSession = useMemo(
+      () => getPreferredLiveSession(match, sessions),
+      [match, sessions]
+    );
+    const [activeSessionKey, setActiveSessionKey] = useState(preferredSession?.key || "");
     const [playerVisible, setPlayerVisible] = useState(false);
+    const [infoVisible, setInfoVisible] = useState(false);
 
-    const m = item || {};
-    const fb = m.facebookLive || {};
-    const canonicalSessions = buildCanonicalSessions(m);
-    const baseWatchUrl =
-      fb.video_permalink_url ||
-      fb.permalink_url ||
-      fb.watch_url ||
-      fb.embed_url ||
-      (fb.videoId ? `https://www.facebook.com/watch/?v=${fb.videoId}` : "");
-    const sessions =
-      canonicalSessions.length > 0
-        ? canonicalSessions
-        : baseWatchUrl
-        ? [
-            {
-              key: "server1",
-              label: "Server 1",
-              providerLabel: "Facebook",
-              watchUrl: baseWatchUrl,
-              pluginUrl: buildFbPluginUrl(baseWatchUrl),
-              canInlineEmbed: true,
-              primary: true,
-              ready: true,
-              delaySeconds: 0,
-            },
-          ]
-        : [];
-    const primarySession =
-      sessions.find((session) => session.primary) || sessions[0] || null;
-    const courtText = getLiveMatchCourtText(m);
+    useEffect(() => {
+      if (!sessions.length) {
+        setActiveSessionKey("");
+        return;
+      }
 
+      const currentSession = sessions.find((session) => session?.key === activeSessionKey);
+      if (!currentSession) {
+        setActiveSessionKey(preferredSession?.key || sessions[0]?.key || "");
+      }
+    }, [activeSessionKey, preferredSession, sessions]);
+
+    const activeSession =
+      sessions.find((session) => session?.key === activeSessionKey) || preferredSession || null;
+    const isLive = String(match?.status || "").toLowerCase() === "live";
+    const title = getLiveMatchTitle(match);
+    const subtitle = getLiveMatchSubtitle(match);
+    const updatedText = timeAgo(match?.updatedAt);
     const thumbnail =
-      m.embed_thumbnail ||
-      fb.embed_thumbnail ||
-      fb.thumbnail_url ||
-      fb.picture ||
-      (fb.id ? `https://graph.facebook.com/${fb.id}/picture?type=large` : null);
+      match?.embed_thumbnail ||
+      fb?.embed_thumbnail ||
+      fb?.thumbnail_url ||
+      fb?.picture ||
+      (fb?.id ? `https://graph.facebook.com/${fb.id}/picture?type=large` : null);
 
-    const pluginUrl = primarySession?.pluginUrl || null;
-    const vt = parseVT(m.code);
-    const isLive = String(m.status || "").toLowerCase() === "live";
+    const handleCopy = useCallback(async (text: string, message = "Đã sao chép") => {
+      if (!text) return;
+      await Clipboard.setStringAsync(text);
+      showNotice(message);
+    }, []);
+
+    const handleOpenExternal = useCallback(async (url?: string | null) => {
+      if (!url) return;
+      try {
+        await Linking.openURL(url);
+      } catch {
+        showNotice("Không mở được liên kết");
+      }
+    }, []);
 
     const handleOpenPlayer = useCallback(() => {
-      if (primarySession?.pluginUrl || primarySession?.directUrl) {
-        setPlayerVisible(true);
-      }
-    }, [primarySession]);
+      const playable =
+        activeSession?.embedHtml ||
+        activeSession?.pluginUrl ||
+        activeSession?.directUrl ||
+        activeSession?.manifestUrl;
 
-    const handleClosePlayer = useCallback(() => {
-      setPlayerVisible(false);
-    }, []);
+      if (playable) {
+        setPlayerVisible(true);
+        return;
+      }
+
+      if (activeSession?.watchUrl || activeSession?.openUrl) {
+        handleOpenExternal(activeSession?.watchUrl || activeSession?.openUrl);
+      }
+    }, [activeSession, handleOpenExternal]);
+
+    const playerNode = renderPlayer(activeSession);
+    const watchUrl = activeSession?.watchUrl || activeSession?.openUrl || "";
+    const cardMeta = [getLiveStatusLabel(match?.status), courtText, updatedText && `Cập nhật ${updatedText}`]
+      .filter(Boolean)
+      .join(" • ");
 
     return (
       <>
         <TouchableOpacity
-          style={[styles.card, { backgroundColor: T.cardBg, borderColor: T.cardBorder }]}
+          activeOpacity={0.9}
           onPress={handleOpenPlayer}
-          activeOpacity={0.8}
+          style={[
+            styles.card,
+            {
+              backgroundColor: T.cardBg,
+              borderColor: T.cardBorder,
+              ...T.shadow,
+            },
+          ]}
         >
-          {/* Thumbnail */}
-          <View style={styles.thumbnailWrapper}>
+          <View style={styles.thumbnailWrap}>
             {thumbnail ? (
               <ExpoImage
                 source={{ uri: normalizeUrl(thumbnail) }}
@@ -210,341 +247,524 @@ const LiveMatchCard = memo(
                 contentFit="cover"
                 cachePolicy="memory-disk"
                 placeholder={{ blurhash: BLURHASH }}
-                transition={100}
+                transition={120}
               />
             ) : (
-              <View style={[styles.noThumb, { backgroundColor: T.isDark ? "#1a1a1a" : "#e0e0e0" }]}>
-                <Ionicons name="videocam-outline" size={40} color={T.textSecondary} />
+              <View style={[styles.thumbnailFallback, { backgroundColor: T.softBg }]}>
+                <Ionicons name="videocam-outline" size={34} color={T.textSecondary} />
               </View>
             )}
 
-            {/* Play Icon */}
-            <View style={styles.playOverlay}>
-              <View style={styles.playButton}>
-                <Ionicons name="play" size={28} color="#fff" />
+            <View style={styles.overlay} />
+
+            <View style={styles.topBadges}>
+              <View style={[styles.badge, styles.liveBadge, isLive ? null : styles.defaultBadge]}>
+                <View style={[styles.liveDot, !isLive && styles.offDot]} />
+                <Text style={styles.liveBadgeText}>{isLive ? "LIVE" : getLiveStatusLabel(match?.status)}</Text>
               </View>
+
+              {sessions.length > 0 ? (
+                <View style={[styles.badge, styles.sessionBadge]}>
+                  <Ionicons name="layers-outline" size={13} color="#ffffff" />
+                  <Text style={styles.sessionBadgeText}>{sessions.length} nguồn</Text>
+                </View>
+              ) : null}
             </View>
 
-            {/* LIVE Badge */}
-            {isLive && (
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveBadgeText}>LIVE</Text>
+            <View style={styles.playHalo}>
+              <View style={styles.playButton}>
+                <Ionicons name="play" size={24} color="#ffffff" />
               </View>
-            )}
+            </View>
           </View>
 
-          {/* Info */}
-          <View style={styles.cardContent}>
+          <View style={styles.body}>
             <View style={styles.titleRow}>
-              <Text style={[styles.matchCode, { color: T.textPrimary }]} numberOfLines={1}>
-                {m.code || "Match"}
-              </Text>
-              {(vt.v || vt.t) && (
-                <View style={styles.vtChips}>
-                  {vt.v && <Text style={[styles.vtText, { color: T.textSecondary }]}>V{vt.v}</Text>}
-                  {vt.t && <Text style={[styles.vtText, { color: T.textSecondary }]}>T{vt.t}</Text>}
-                </View>
-              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.title, { color: T.textPrimary }]} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Text style={[styles.subtitle, { color: T.textSecondary }]} numberOfLines={2}>
+                  {subtitle}
+                </Text>
+              </View>
+
+              <View style={styles.iconRow}>
+                <TouchableOpacity
+                  onPress={() => setInfoVisible(true)}
+                  style={[styles.iconBtn, { backgroundColor: T.softBg, borderColor: T.cardBorder }]}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color={T.textPrimary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleCopy(title, "Đã sao chép mã trận")}
+                  style={[styles.iconBtn, { backgroundColor: T.softBg, borderColor: T.cardBorder }]}
+                >
+                  <Ionicons name="copy-outline" size={17} color={T.textPrimary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {courtText && (
-              <Text style={[styles.courtText, { color: T.textSecondary }]} numberOfLines={1}>
-                ðŸŸï¸ {courtText}
-              </Text>
-            )}
-
-            <Text style={[styles.statusText, { color: T.textSecondary }]}>
-              {isLive ? "ðŸ”´ Äang phÃ¡t trá»±c tiáº¿p" : getStatusText(m.status)}
+            <Text style={[styles.meta, { color: T.textSecondary }]} numberOfLines={2}>
+              {cardMeta}
             </Text>
+
             {sessions.length > 0 ? (
-              <View style={styles.serverRow}>
-                {sessions.map((session) => (
-                  <View
-                    key={session.key || session.watchUrl || session.manifestUrl}
-                    style={[
-                      styles.serverBadge,
-                      {
-                        backgroundColor: T.isDark ? "rgba(124,192,255,0.12)" : "#e3f2fd",
-                        borderColor: T.cardBorder,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: T.textPrimary, fontSize: 12, fontWeight: "700" }}>
-                      {session.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.sessionList}
+              >
+                {sessions.map((session) => {
+                  const active = activeSession?.key && session?.key === activeSession.key;
+                  return (
+                    <TouchableOpacity
+                      key={sid(session?.key || session?.watchUrl)}
+                      onPress={() => setActiveSessionKey(session?.key || "")}
+                      style={[
+                        styles.sessionChip,
+                        {
+                          backgroundColor: active ? T.accent : T.softBg,
+                          borderColor: active ? T.accent : T.cardBorder,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.sessionChipText,
+                          { color: active ? "#ffffff" : T.textPrimary },
+                        ]}
+                      >
+                        {session?.label || session?.providerLabel || "Nguồn xem"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             ) : null}
+
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                onPress={handleOpenPlayer}
+                style={[styles.primaryBtn, { backgroundColor: T.accent }]}
+              >
+                <Ionicons name="play-circle-outline" size={18} color="#ffffff" />
+                <Text style={styles.primaryBtnText}>Xem ngay</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleOpenExternal(watchUrl)}
+                disabled={!watchUrl}
+                style={[
+                  styles.secondaryBtn,
+                  {
+                    opacity: watchUrl ? 1 : 0.45,
+                    backgroundColor: T.softBg,
+                    borderColor: T.cardBorder,
+                  },
+                ]}
+              >
+                <Ionicons name="open-outline" size={17} color={T.textPrimary} />
+                <Text style={[styles.secondaryBtnText, { color: T.textPrimary }]}>Mở ngoài</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
 
-        {/* Player Modal */}
         <Modal
           visible={playerVisible}
-          animationType="fade"
+          animationType="slide"
           presentationStyle="fullScreen"
-          onRequestClose={handleClosePlayer}
+          onRequestClose={() => setPlayerVisible(false)}
           statusBarTranslucent
         >
-          <SafeAreaView style={styles.modal}>
-            {/* Header */}
+          <SafeAreaView style={[styles.modalRoot, { backgroundColor: "#050505" }]}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={handleClosePlayer} style={styles.closeBtn}>
-                <Ionicons name="close-circle" size={36} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.modalTitle} numberOfLines={1}>
-                {m.code}
-              </Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                  {watchUrl ? hostOf(watchUrl) || "Nguồn phát" : "Không có liên kết công khai"}
+                </Text>
+              </View>
+
+              <View style={styles.modalActions}>
+                {watchUrl ? (
+                  <TouchableOpacity
+                    style={styles.modalIconBtn}
+                    onPress={() => handleCopy(watchUrl, "Đã sao chép liên kết")}
+                  >
+                    <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                  </TouchableOpacity>
+                ) : null}
+                {watchUrl ? (
+                  <TouchableOpacity
+                    style={styles.modalIconBtn}
+                    onPress={() => handleOpenExternal(watchUrl)}
+                  >
+                    <Ionicons name="open-outline" size={20} color="#ffffff" />
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.modalIconBtn}
+                  onPress={() => setPlayerVisible(false)}
+                >
+                  <Ionicons name="close" size={22} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Player */}
-            <View style={styles.playerContainer}>
-              {pluginUrl ? (
-                <WebView
-                  source={{ uri: pluginUrl }}
-                  style={styles.webview}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  allowsFullscreenVideo
-                  allowsInlineMediaPlayback
-                  mediaPlaybackRequiresUserAction={false}
-                />
-              ) : primarySession?.directUrl ? (
-                <Video
-                  style={styles.webview}
-                  source={{ uri: primarySession.directUrl }}
-                  useNativeControls
-                  shouldPlay
-                  resizeMode="contain"
-                />
+            <View style={styles.playerWrap}>
+              {playerNode ? (
+                playerNode
+              ) : activeSession?.disabledReason ? (
+                <View style={styles.emptyPlayer}>
+                  <Ionicons name="alert-circle-outline" size={54} color="rgba(255,255,255,0.72)" />
+                  <Text style={styles.emptyPlayerTitle}>Nguồn phát chưa sẵn sàng</Text>
+                  <Text style={styles.emptyPlayerText}>{activeSession.disabledReason}</Text>
+                </View>
               ) : (
-                <View style={styles.noVideo}>
-                  <Ionicons name="videocam-off" size={64} color="rgba(255,255,255,0.5)" />
-                  <Text style={styles.noVideoText}>Video khÃ´ng kháº£ dá»¥ng</Text>
+                <View style={styles.emptyPlayer}>
+                  <Ionicons name="videocam-off-outline" size={54} color="rgba(255,255,255,0.72)" />
+                  <Text style={styles.emptyPlayerTitle}>Không phát được trong ứng dụng</Text>
+                  <Text style={styles.emptyPlayerText}>
+                    Hãy mở liên kết ngoài để xem nếu nguồn này không hỗ trợ nhúng.
+                  </Text>
                 </View>
               )}
             </View>
 
-            {/* Footer */}
-            {courtText && (
-              <View style={styles.modalFooter}>
-                <Text style={styles.footerText}>ðŸŸï¸ {courtText}</Text>
-                {isLive && <Text style={styles.footerLive}>ðŸ”´ LIVE</Text>}
+            <View style={styles.modalFooter}>
+              {sessions.length > 1 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.modalSessionList}
+                >
+                  {sessions.map((session) => {
+                    const active = activeSession?.key && session?.key === activeSession.key;
+                    return (
+                      <TouchableOpacity
+                        key={sid(session?.key || session?.watchUrl)}
+                        onPress={() => setActiveSessionKey(session?.key || "")}
+                        style={[
+                          styles.modalSessionChip,
+                          { backgroundColor: active ? "#ffffff" : "rgba(255,255,255,0.08)" },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.modalSessionText,
+                            { color: active ? "#041412" : "#ffffff" },
+                          ]}
+                        >
+                          {session?.label || session?.providerLabel || "Nguồn xem"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
+              <View style={styles.footerMetaWrap}>
+                <Text style={styles.footerMeta}>{cardMeta || "Trận phát trực tiếp"}</Text>
+                {watchUrl ? (
+                  <TouchableOpacity onPress={() => setInfoVisible(true)}>
+                    <Text style={styles.footerLink}>Xem chi tiết</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            )}
+            </View>
           </SafeAreaView>
         </Modal>
+
+        <InfoModal
+          visible={infoVisible}
+          onClose={() => setInfoVisible(false)}
+          match={buildLiveInfoMatch(match)}
+          sessions={sessions}
+          onCopy={handleCopy}
+          onOpenUrl={handleOpenExternal}
+        />
       </>
     );
   },
   (prev, next) =>
-    prev.item._id === next.item._id &&
-    prev.item.code === next.item.code &&
-    prev.item.status === next.item.status &&
-    prev.item.updatedAt === next.item.updatedAt &&
-    getLiveMatchCourtText(prev.item) === getLiveMatchCourtText(next.item)
+    sid(prev?.item?._id || prev?.item?.matchId) === sid(next?.item?._id || next?.item?.matchId) &&
+    prev?.item?.status === next?.item?.status &&
+    prev?.item?.updatedAt === next?.item?.updatedAt &&
+    prev?.item?.defaultStreamKey === next?.item?.defaultStreamKey &&
+    getLiveMatchCourtText(prev?.item) === getLiveMatchCourtText(next?.item)
 );
 
 export default LiveMatchCard;
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: "hidden",
+    borderRadius: 24,
     borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: "hidden",
+    marginBottom: 16,
   },
-
-  thumbnailWrapper: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: "#000",
+  thumbnailWrap: {
     position: "relative",
+    aspectRatio: 16 / 9,
+    backgroundColor: "#071311",
   },
-
   thumbnail: {
     width: "100%",
     height: "100%",
   },
-
-  noThumb: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
+  thumbnailFallback: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
   },
-
-  playOverlay: {
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.25)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.18)",
   },
-
-  playButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-
-  liveBadge: {
+  topBadges: {
     position: "absolute",
-    top: 8,
-    left: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(244, 67, 54, 0.95)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    gap: 5,
-  },
-
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#fff",
-  },
-
-  liveBadgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  cardContent: {
-    padding: 12,
-  },
-
-  titleRow: {
+    top: 14,
+    left: 14,
+    right: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
+    gap: 8,
   },
-
-  matchCode: {
-    fontSize: 15,
-    fontWeight: "700",
-    flex: 1,
-    marginRight: 8,
-  },
-
-  vtChips: {
+  badge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
-
-  vtText: {
-    fontSize: 11,
-    fontWeight: "600",
+  liveBadge: {
+    backgroundColor: "rgba(220, 38, 38, 0.92)",
   },
-
-  courtText: {
-    fontSize: 12,
+  defaultBadge: {
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
+  },
+  offDot: {
+    backgroundColor: "#94a3b8",
+  },
+  liveBadgeText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  sessionBadge: {
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+  },
+  sessionBadgeText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  playHalo: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(4, 20, 18, 0.72)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.9)",
+  },
+  body: {
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    gap: 12,
+  },
+  titleRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
     marginBottom: 4,
   },
-
-  statusText: {
-    fontSize: 11,
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+  meta: {
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: "600",
   },
-  serverRow: {
+  iconRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
+    gap: 8,
   },
-  serverBadge: {
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  sessionList: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  sessionChip: {
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-
-  // Modal
-  modal: {
+  sessionChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  primaryBtn: {
+    flex: 1.15,
+    minHeight: 46,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  primaryBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  secondaryBtn: {
+    flex: 0.92,
+    minHeight: 46,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  modalRoot: {
     flex: 1,
-    backgroundColor: "#000",
   },
-
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    paddingTop: 6,
+    paddingBottom: 12,
   },
-
-  closeBtn: {
-    marginRight: 12,
-  },
-
   modalTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 2,
   },
-
-  playerContainer: {
-    flex: 1,
-    justifyContent: "center",
+  modalSubtitle: {
+    color: "rgba(255,255,255,0.64)",
+    fontSize: 12,
+    fontWeight: "600",
   },
-
-  webview: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-
-  noVideo: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
-  },
-
-  noVideoText: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 16,
-    marginTop: 16,
-  },
-
-  modalFooter: {
+  modalActions: {
     flexDirection: "row",
+    gap: 8,
+  },
+  modalIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
-
-  footerText: {
-    color: "rgba(255, 255, 255, 0.9)",
+  playerWrap: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  player: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  emptyPlayer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  emptyPlayerTitle: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 16,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  emptyPlayerText: {
+    color: "rgba(255,255,255,0.72)",
     fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
   },
-
-  footerLive: {
-    color: "#f44336",
+  modalFooter: {
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 18,
+    backgroundColor: "#050505",
+  },
+  modalSessionList: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  modalSessionChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  modalSessionText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  footerMetaWrap: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  footerMeta: {
+    flex: 1,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  footerLink: {
+    color: "#6ee7d8",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

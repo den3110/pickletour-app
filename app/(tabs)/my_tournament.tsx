@@ -126,7 +126,7 @@ const dateFmt = (s) => {
 const stripVN = (s = "") =>
   String(s)
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .trim();
 const nameWithNick = (p) => {

@@ -64,7 +64,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const bid = asId(bracket);
         return {
           url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
-            cid
+            cid,
           )}/assign-next`,
           method: "POST",
           body: { bracket: bid },
@@ -97,7 +97,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const bid = asId(bracket);
         return {
           url: `/api/admin/tournaments/${enc(tid)}/scheduler/state?bracket=${enc(
-            bid
+            bid,
           )}`,
           method: "GET",
         };
@@ -128,7 +128,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
 
         // chỉ đẩy primitive params hợp lệ
         const params = {};
-        if (!bid && tid) params.tournamentId = tid; // nếu dùng route tournaments
+        if (!bid && tid) params.tournament = tid;
         if (status) params.status = String(status);
         if (Number.isFinite(page)) params.page = Number(page);
         if (Number.isFinite(limit)) params.limit = Number(limit);
@@ -143,14 +143,14 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
           // có bracket -> route theo bracket
           url = `/api/admin/brackets/${enc(bid)}/matches`;
         } else if (tid) {
-          // không có bracket -> route theo tournament
-          url = `/api/admin/tournaments/${enc(tid)}/matches`;
+          // không có bracket -> backend chỉ có route tổng /api/admin/matches?tournament=...
+          url = "/api/admin/matches";
         }
 
         return { url, method: "GET", params };
       },
       transformResponse: (res) =>
-        res?.items ?? res?.results ?? res?.rows ?? res ?? [],
+        res?.items ?? res?.results ?? res?.rows ?? res?.list ?? res ?? [],
       keepUnusedDataFor: 0, // bỏ cache khi unmount
       forceRefetch: () => true, // luôn refetch khi có subscriber mới
       providesTags: () => [{ type: "ADMIN_MATCHES", id: "LIST" }],
@@ -172,7 +172,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const bid = asId(bracket);
         return {
           url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
-            cid
+            cid,
           )}/match-list`,
           method: "PUT",
           body: {
@@ -183,7 +183,11 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
           },
         };
       },
-      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
+      invalidatesTags: [
+        "ADMIN_QUEUE",
+        "ADMIN_COURTS",
+        { type: "Scheduler", id: "STATE" },
+      ],
     }),
     clearCourtMatchList: builder.mutation({
       query: ({ tournamentId, courtId, bracket }) => {
@@ -192,7 +196,7 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
         const bid = asId(bracket);
         return {
           url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
-            cid
+            cid,
           )}/match-list`,
           method: "DELETE",
           body: {
@@ -200,21 +204,20 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
           },
         };
       },
-      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
+      invalidatesTags: [
+        "ADMIN_QUEUE",
+        "ADMIN_COURTS",
+        { type: "Scheduler", id: "STATE" },
+      ],
     }),
     advanceCourtMatchList: builder.mutation({
-      query: ({
-        tournamentId,
-        courtId,
-        bracket,
-        action = "skip_current",
-      }) => {
+      query: ({ tournamentId, courtId, bracket, action = "skip_current" }) => {
         const tid = asId(tournamentId);
         const cid = asId(courtId);
         const bid = asId(bracket);
         return {
           url: `/api/admin/tournaments/${enc(tid)}/courts/${enc(
-            cid
+            cid,
           )}/match-list/advance`,
           method: "POST",
           body: {
@@ -223,7 +226,11 @@ export const adminCourtApiSlice = apiSlice.injectEndpoints({
           },
         };
       },
-      invalidatesTags: ["ADMIN_QUEUE", "ADMIN_COURTS", { type: "Scheduler", id: "STATE" }],
+      invalidatesTags: [
+        "ADMIN_QUEUE",
+        "ADMIN_COURTS",
+        { type: "Scheduler", id: "STATE" },
+      ],
     }),
 
     // ⭐ NEW: Reset tất cả sân & gỡ gán
@@ -337,5 +344,5 @@ export const {
   useLazyGetSchedulerMatchesLiteQuery,
   useAdminListCourtsQuery,
   useDeleteCourtMutation,
-  useDeleteCourtsMutation
+  useDeleteCourtsMutation,
 } = adminCourtApiSlice;

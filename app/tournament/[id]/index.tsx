@@ -38,7 +38,11 @@ import {
   useGetRegistrationsQuery,
 } from "@/slices/tournamentsApiSlice";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { getPairDisplayName, normalizeMatchDisplay } from "@/utils/matchDisplay";
+import {
+  getMatchCourtStationName,
+  getPairDisplayName,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 /* -------------------- helpers (nhẹ, đủ dùng cho overview) -------------------- */
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v || 0));
@@ -87,6 +91,8 @@ function scoreText(m) {
   return "";
 }
 function courtNameOf(m) {
+  const stationName = getMatchCourtStationName(m);
+  if (stationName) return stationName;
   return (
     (m?.courtName && m.courtName.trim()) ||
     m?.court?.name ||

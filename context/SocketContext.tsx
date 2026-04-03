@@ -1,4 +1,3 @@
-// context/SocketContext.js
 import React, {
   createContext,
   useContext,
@@ -8,20 +7,18 @@ import React, {
 } from "react";
 import { AppState, Platform } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
-import { socket, setSocketToken } from "../lib/socket";
 import { useSelector } from "react-redux";
+import {
+  socket,
+  setSocketDeviceContext,
+  setSocketToken,
+} from "../lib/socket";
+import { getDeviceId, getDeviceName } from "@/slices/apiSlice";
 
 const SocketContext = createContext(socket);
 
-/** Suy luận loại client cho mobile app */
 function detectClientType() {
-  try {
-    // Có thể dựa vào navigation state hoặc screen name hiện tại
-    // Tạm thời return "app" để phân biệt với web
-    return "app"; // hoặc "mobile"
-  } catch {
-    return "app";
-  }
+  return "app";
 }
 
 export function SocketProvider({ children }) {
@@ -30,38 +27,37 @@ export function SocketProvider({ children }) {
   const clientType = useMemo(detectClientType, []);
   const heartbeatRef = useRef(null);
 
-  // Kết nối khi có token (tránh Unauthorized)
   useEffect(() => {
-    // inject opts TRƯỚC khi connect
-    try {
-      socket.auth = { ...(socket.auth || {}), token };
-      socket.io.opts.query = {
-        ...(socket.io.opts.query || {}),
-        client: clientType,
-        platform: Platform.OS, // thêm info platform: ios/android
-      };
+    let cancelled = false;
 
-      // Mobile app nên dùng websocket để tối ưu
-      // Nếu muốn cho phép cả polling: bỏ comment dòng dưới
-      // socket.io.opts.transports = ["websocket", "polling"];
-    } catch (e) {
-      console.error("[SocketProvider] set opts error:", e);
-    }
+    const setupSocket = async () => {
+      try {
+        const [deviceId, deviceName] = await Promise.all([
+          getDeviceId(),
+          getDeviceName(),
+        ]);
+        if (cancelled) return;
 
-    if (!token) {
-      // Không connect nếu chưa có token (server đang yêu cầu JWT)
-      return;
-    }
+        setSocketDeviceContext(deviceId, deviceName);
+        socket.io.opts.query = {
+          ...(socket.io.opts.query || {}),
+          client: clientType,
+          platform: Platform.OS,
+        };
 
-    try {
-      setSocketToken(token);
-      if (!socket.connected) socket.connect();
-    } catch (e) {
-      console.error("[SocketProvider] connect error:", e);
-    }
+        if (!token) return;
+
+        setSocketToken(token, { deviceId, deviceName });
+        if (!socket.connected) socket.connect();
+      } catch (e) {
+        console.error("[SocketProvider] setup error:", e);
+      }
+    };
+
+    void setupSocket();
 
     return () => {
-      // Giữ kết nối xuyên app: không disconnect ở đây
+      cancelled = true;
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
@@ -69,7 +65,6 @@ export function SocketProvider({ children }) {
     };
   }, [token, clientType]);
 
-  // Heartbeat + listeners (giống web)
   useEffect(() => {
     const onConnect = () => {
       console.log("[socket] connected");
@@ -80,7 +75,7 @@ export function SocketProvider({ children }) {
         } catch (e) {
           console.log("[socket] heartbeat error:", e);
         }
-      }, 10000); // ping mỗi 10s
+      }, 10000);
     };
 
     const onDisconnect = () => {
@@ -120,7 +115,6 @@ export function SocketProvider({ children }) {
     };
   }, []);
 
-  // Auto-reconnect khi app active hoặc có network (giữ logic cũ của mobile)
   useEffect(() => {
     const subApp = AppState.addEventListener("change", (state) => {
       if (state === "active" && !socket.connected && token) {
@@ -142,16 +136,13 @@ export function SocketProvider({ children }) {
     };
   }, [token]);
 
-  // GIỮ NGUYÊN value = socket để code cũ vẫn dùng được
   return (
     <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
   );
 }
 
-/** BACK-COMPAT: trả trực tiếp instance socket (giống code cũ) */
 export const useSocket = () => {
   const ctx = useContext(SocketContext);
-  // nếu ai đó đã lỡ cung cấp {socket} thì vẫn cố gắng lấy ra
   if (ctx && typeof ctx.emit !== "function" && ctx?.socket) return ctx.socket;
   return ctx || socket;
 };

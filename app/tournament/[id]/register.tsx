@@ -133,7 +133,7 @@ const maskPhone = (phone?: string) => {
 const normalizeNoAccent = (s?: string) =>
   (s || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^\w\s-]/g, " ")
     .trim();
 const getQrProviderConfig = (tour: any) => ({

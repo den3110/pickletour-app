@@ -12,7 +12,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-
       "buildNumber": "28",
       "associatedDomains": [
         "applinks:pickletour.vn",
@@ -32,11 +31,15 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           },
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -88,7 +91,10 @@
               "scheme": "pickletour"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -128,7 +134,9 @@
           "locationAlwaysAndWhenInUsePermission": "Cho phép PickleTour cập nhật vị trí của bạn để gợi ý hoạt động quanh bạn."
         }
       ],
-      ["@rnmapbox/maps"],
+      [
+        "@rnmapbox/maps"
+      ],
       [
         "expo-calendar",
         {
@@ -179,7 +187,10 @@
         {
           "channel": "production"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

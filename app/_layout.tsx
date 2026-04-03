@@ -16,13 +16,15 @@ import {
   Platform,
   BackHandler,
   Alert,
+  Text,
+  TextInput,
   TouchableOpacity,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
-import * as Notifications from "expo-notifications";
 import * as Linking from "expo-linking";
+import * as Device from "expo-device";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { setCredentials } from "@/slices/authSlice";
@@ -32,7 +34,12 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Provider, useSelector } from "react-redux";
 import { SocketProvider } from "../context/SocketContext";
+import { ChatBotPageContextProvider } from "@/context/ChatBotPageContext";
+import { PikoraHost } from "@/components/chatbot/PikoraHost";
+import { PikoraProvider } from "@/components/chatbot/PikoraProvider";
+import { resolvePikoraNavigationTarget } from "@/components/chatbot/pikoraNavigation";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
+import { loadExpoNotifications } from "@/lib/expoNotifications";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
@@ -60,6 +67,18 @@ if (__DEV__) {
   require("../dev/ws-logger");
 }
 
+// Keep app typography stable when the device uses larger accessibility text.
+if (!Text.defaultProps) {
+  Text.defaultProps = {};
+}
+if (!TextInput.defaultProps) {
+  TextInput.defaultProps = {};
+}
+Text.defaultProps.allowFontScaling = false;
+Text.defaultProps.maxFontSizeMultiplier = 1;
+TextInput.defaultProps.allowFontScaling = false;
+TextInput.defaultProps.maxFontSizeMultiplier = 1;
+
 console.log("Is Fabric Enabled:", global.nativeFabricUIManager ? "YES" : "NO");
 
 const SPLASH_FONT_FAILSAFE_MS = 1500;
@@ -67,6 +86,187 @@ const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
 const HOT_UPDATE_NOTIFY_EVENT = "hotupdater:notify";
 const HOT_UPDATE_NOTIFY_KEY = "__PICKLETOUR_HOTUPDATE_NOTIFY__";
+const HOT_UPDATE_PENDING_KEY = "__PICKLETOUR_HOTUPDATE_PENDING__";
+const HOT_UPDATE_TELEMETRY_PATH = "/api/ota/report-status";
+const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn/api";
+
+type HotUpdateTelemetryStatus =
+  | "update_available"
+  | "dismissed"
+  | "downloading"
+  | "downloaded"
+  | "promoted"
+  | "recovered"
+  | "failed";
+
+type PendingHotUpdatePayload = {
+  bundleId: string;
+  platform: "ios" | "android";
+  appVersion: string;
+  channel: string;
+  currentBundleId?: string;
+  message?: string;
+  downloadedAt: string;
+};
+
+const normalizeBaseUrl = (value?: string | null) =>
+  String(value || "")
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .replace(/\/+$/, "");
+
+const HOT_UPDATE_API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+const createHotUpdateEventId = () =>
+  `hu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
+const getHotUpdateDeviceId = async () => {
+  let deviceId = await SecureStore.getItemAsync("deviceId");
+  if (!deviceId) {
+    deviceId = Math.random().toString(36).slice(2);
+    await SecureStore.setItemAsync("deviceId", deviceId);
+  }
+  return deviceId;
+};
+
+const getHotUpdateAppVersion = () =>
+  String(
+    Constants.expoConfig?.version ||
+      Constants.expoConfig?.extra?.APP_VERSION ||
+      "0.0.0",
+  );
+
+const savePendingHotUpdate = async (payload: PendingHotUpdatePayload) => {
+  await SecureStore.setItemAsync(
+    HOT_UPDATE_PENDING_KEY,
+    JSON.stringify(payload),
+  );
+};
+
+const getPendingHotUpdate =
+  async (): Promise<PendingHotUpdatePayload | null> => {
+    try {
+      const raw = await SecureStore.getItemAsync(HOT_UPDATE_PENDING_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as PendingHotUpdatePayload;
+    } catch {
+      return null;
+    }
+  };
+
+const clearPendingHotUpdate = async () => {
+  await SecureStore.deleteItemAsync(HOT_UPDATE_PENDING_KEY);
+};
+
+const reportHotUpdateTelemetry = async ({
+  status,
+  bundleId,
+  currentBundleId,
+  channel,
+  appVersion,
+  message,
+  errorMessage,
+  errorCode,
+  duration,
+}: {
+  status: HotUpdateTelemetryStatus;
+  bundleId?: string | null;
+  currentBundleId?: string | null;
+  channel?: string | null;
+  appVersion?: string | null;
+  message?: string | null;
+  errorMessage?: string | null;
+  errorCode?: string | null;
+  duration?: number | null;
+}) => {
+  try {
+    const deviceId = await getHotUpdateDeviceId();
+    const response = await fetch(
+      `${HOT_UPDATE_API_BASE_URL}${HOT_UPDATE_TELEMETRY_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: createHotUpdateEventId(),
+          platform: Platform.OS,
+          bundleId: bundleId || undefined,
+          currentBundleId: currentBundleId || undefined,
+          appVersion: appVersion || getHotUpdateAppVersion(),
+          channel: channel || "production",
+          status,
+          message: message || undefined,
+          errorMessage: errorMessage || undefined,
+          errorCode: errorCode || undefined,
+          duration:
+            typeof duration === "number" && Number.isFinite(duration)
+              ? duration
+              : undefined,
+          deviceInfo: {
+            deviceId,
+            model: Device.modelName || Device.deviceName || undefined,
+            osVersion: Device.osVersion || undefined,
+            brand: Device.brand || undefined,
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.warn(
+        "[HotUpdater] Telemetry request failed:",
+        response.status,
+        text,
+      );
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("[HotUpdater] Telemetry error:", error);
+    return false;
+  }
+};
+
+const handleHotUpdateNotifyTelemetry = async (payload: {
+  status: "PROMOTED" | "RECOVERED" | "STABLE";
+  crashedBundleId?: string;
+}) => {
+  const pending = await getPendingHotUpdate();
+
+  if (payload.status === "RECOVERED") {
+    await reportHotUpdateTelemetry({
+      status: "recovered",
+      bundleId: payload.crashedBundleId || pending?.bundleId,
+      currentBundleId: pending?.currentBundleId,
+      channel: pending?.channel,
+      appVersion: pending?.appVersion,
+      errorMessage: "Ứng dụng đã tự khôi phục về bundle ổn định sau lỗi OTA.",
+    });
+    await clearPendingHotUpdate();
+    return;
+  }
+
+  if (!pending?.bundleId) {
+    return;
+  }
+
+  if (payload.status === "PROMOTED" || payload.status === "STABLE") {
+    const success = await reportHotUpdateTelemetry({
+      status: "promoted",
+      bundleId: pending.bundleId,
+      channel: pending.channel,
+      appVersion: pending.appVersion,
+      message: pending.message,
+    });
+
+    if (success) {
+      await clearPendingHotUpdate();
+    }
+  }
+};
 
 const publishHotUpdateNotify = (payload: {
   status: "PROMOTED" | "RECOVERED" | "STABLE";
@@ -207,7 +407,7 @@ function RootLayout() {
     "downloading" | "done" | "error"
   >("downloading");
   const [hotUpdateMessage, setHotUpdateMessage] = React.useState<string | null>(
-    null
+    null,
   );
 
   // Initialize analytics
@@ -219,20 +419,53 @@ function RootLayout() {
   const startHotUpdate = React.useCallback(async (updateInfo: any) => {
     if (!HotUpdater || !updateInfo?.updateBundle) return;
 
+    const startedAt = Date.now();
+    const pendingPayload: PendingHotUpdatePayload = {
+      bundleId: String(updateInfo?.id || ""),
+      platform: Platform.OS as "ios" | "android",
+      appVersion: getHotUpdateAppVersion(),
+      channel: String(updateInfo?.channel || "production"),
+      currentBundleId: updateInfo?.currentBundleId
+        ? String(updateInfo.currentBundleId)
+        : undefined,
+      message: updateInfo?.message ? String(updateInfo.message) : undefined,
+      downloadedAt: new Date().toISOString(),
+    };
+
     otaCheckInFlightRef.current = true;
     otaIgnoredUpdateIdRef.current = null;
     setHotUpdateVisible(true);
     setHotUpdateStatus("downloading");
     setHotUpdateProgress(0);
     setHotUpdateMessage(
-      updateInfo?.message || "Đang tải bản cập nhật mới cho ứng dụng."
+      updateInfo?.message || "Đang tải bản cập nhật mới cho ứng dụng.",
     );
 
     try {
+      void reportHotUpdateTelemetry({
+        status: "downloading",
+        bundleId: pendingPayload.bundleId,
+        currentBundleId: pendingPayload.currentBundleId,
+        channel: pendingPayload.channel,
+        appVersion: pendingPayload.appVersion,
+        message: pendingPayload.message,
+      });
+
       const success = await updateInfo.updateBundle();
       if (!success) {
         throw new Error("Không thể tải bản cập nhật.");
       }
+
+      await savePendingHotUpdate(pendingPayload);
+      await reportHotUpdateTelemetry({
+        status: "downloaded",
+        bundleId: pendingPayload.bundleId,
+        currentBundleId: pendingPayload.currentBundleId,
+        channel: pendingPayload.channel,
+        appVersion: pendingPayload.appVersion,
+        message: pendingPayload.message,
+        duration: Date.now() - startedAt,
+      });
 
       setHotUpdateProgress(1);
       setHotUpdateStatus("done");
@@ -241,14 +474,40 @@ function RootLayout() {
       setTimeout(() => {
         HotUpdater.reload().catch((error: unknown) => {
           console.error("[HotUpdater] Reload error:", error);
+          void clearPendingHotUpdate();
+          void reportHotUpdateTelemetry({
+            status: "failed",
+            bundleId: pendingPayload.bundleId,
+            currentBundleId: pendingPayload.currentBundleId,
+            channel: pendingPayload.channel,
+            appVersion: pendingPayload.appVersion,
+            message: pendingPayload.message,
+            errorMessage:
+              error instanceof Error
+                ? error.message
+                : "Không thể reload ứng dụng sau OTA.",
+            duration: Date.now() - startedAt,
+          });
           setHotUpdateStatus("error");
           setHotUpdateMessage(
-            "Tải xong bản cập nhật nhưng không thể mở lại ứng dụng."
+            "Tải xong bản cập nhật nhưng không thể mở lại ứng dụng.",
           );
         });
       }, 700);
     } catch (error) {
       console.error("[HotUpdater] Download error:", error);
+      await clearPendingHotUpdate();
+      await reportHotUpdateTelemetry({
+        status: "failed",
+        bundleId: pendingPayload.bundleId,
+        currentBundleId: pendingPayload.currentBundleId,
+        channel: pendingPayload.channel,
+        appVersion: pendingPayload.appVersion,
+        message: pendingPayload.message,
+        errorMessage:
+          error instanceof Error ? error.message : "Không thể tải bundle OTA.",
+        duration: Date.now() - startedAt,
+      });
       setHotUpdateStatus("error");
       setHotUpdateMessage("Không thể tải bản cập nhật. Vui lòng thử lại sau.");
       otaCheckInFlightRef.current = false;
@@ -264,6 +523,27 @@ function RootLayout() {
     otaCheckInFlightRef.current = true;
 
     try {
+      try {
+        const killSwitchRes = await fetch(
+          `${HOT_UPDATE_API_BASE_URL}/api/settings/ota-allowed`,
+          {
+            headers: { "Cache-Control": "no-cache" },
+          },
+        );
+        if (killSwitchRes.ok) {
+          const killSwitchData = await killSwitchRes.json();
+          if (killSwitchData && killSwitchData.allowed === false) {
+            if (__DEV__)
+              console.log("[HotUpdater] OTA updates disabled remotely.");
+            otaCheckInFlightRef.current = false;
+            return;
+          }
+        }
+      } catch (err) {
+        if (__DEV__)
+          console.warn("[HotUpdater] Failed to fetch OTA kill switch", err);
+      }
+
       const updateInfo = await HotUpdater.checkForUpdate({
         updateStrategy: "appVersion",
         requestTimeout: 8000,
@@ -301,6 +581,14 @@ function RootLayout() {
               style: "cancel" as const,
               onPress: () => {
                 otaIgnoredUpdateIdRef.current = updateInfo.id;
+                void reportHotUpdateTelemetry({
+                  status: "dismissed",
+                  bundleId: updateInfo?.id,
+                  currentBundleId: updateInfo?.currentBundleId,
+                  channel: updateInfo?.channel,
+                  appVersion: getHotUpdateAppVersion(),
+                  message: updateInfo?.message,
+                });
                 otaCheckInFlightRef.current = false;
               },
             },
@@ -312,6 +600,14 @@ function RootLayout() {
             },
           ];
 
+      void reportHotUpdateTelemetry({
+        status: "update_available",
+        bundleId: updateInfo?.id,
+        currentBundleId: updateInfo?.currentBundleId,
+        channel: updateInfo?.channel,
+        appVersion: getHotUpdateAppVersion(),
+        message: updateInfo?.message,
+      });
       Alert.alert(title, message, buttons, { cancelable: false });
       otaCheckInFlightRef.current = false;
     } catch (error) {
@@ -327,7 +623,7 @@ function RootLayout() {
       "onProgress",
       ({ progress }: { progress: number }) => {
         setHotUpdateProgress(progress || 0);
-      }
+      },
     );
 
     return unsubscribe;
@@ -364,7 +660,7 @@ function RootLayout() {
 
     const sub = DeviceEventEmitter.addListener(
       HOT_UPDATE_NOTIFY_EVENT,
-      showNotify
+      showNotify,
     );
     return () => sub.remove();
   }, []);
@@ -380,13 +676,13 @@ function RootLayout() {
   const systemScheme = useColorScheme(); // "light" | "dark"
   // 2) Pref đọc từ SecureStore
   const [prefTheme, setPrefTheme] = React.useState<"system" | "light" | "dark">(
-    "system"
+    "system",
   );
 
   // 🔄 Overlay khi đổi theme
   const [themeApplying, setThemeApplying] = React.useState(false);
   const themeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   // Đọc PREF_THEME lúc boot + khi app active
@@ -421,7 +717,7 @@ function RootLayout() {
         try {
           await SecureStore.setItemAsync(PREF_THEME_KEY, mode);
         } catch {}
-      }
+      },
     );
     return () => sub.remove();
   }, []);
@@ -433,7 +729,7 @@ function RootLayout() {
 
   const navTheme = React.useMemo(
     () => (isDark ? AppDarkTheme : AppLightTheme),
-    [isDark]
+    [isDark],
   );
   const bg = navTheme.colors.background;
 
@@ -604,7 +900,7 @@ function RootLayout() {
           { text: "Thoát", onPress: () => BackHandler.exitApp() },
         ]);
         return true;
-      }
+      },
     );
 
     return () => backHandler.remove();
@@ -621,7 +917,7 @@ function RootLayout() {
         }
       }
     },
-    [lifecycle.phase]
+    [lifecycle.phase],
   );
 
   // Process queue when ready
@@ -677,51 +973,66 @@ function RootLayout() {
   /* -------------------- Notification routing -------------------- */
   const lastHandledIdRef = React.useRef<string | null>(null);
 
-  const extractUrl = React.useCallback(
-    (n?: Notifications.Notification | null) => {
-      const data: any = n?.request?.content?.data ?? {};
-      return (
-        data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null)
-      );
-    },
-    []
-  );
+  const extractUrl = React.useCallback((n?: any | null) => {
+    const data: any = n?.request?.content?.data ?? {};
+    return data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null);
+  }, []);
 
   React.useEffect(() => {
-    let sub: Notifications.Subscription | null = null;
+    let active = true;
+    let sub: { remove: () => void } | null = null;
 
-    (async () => {
+    void (async () => {
+      const Notifications = await loadExpoNotifications();
+      if (!Notifications || !active) {
+        return;
+      }
+
       if (Platform.OS === "ios") {
         await new Promise((resolve) => setImmediate(resolve));
       }
 
-      const resp = await Notifications.getLastNotificationResponseAsync();
-      const n = resp?.notification;
-      const id = n?.request?.identifier ?? "";
+      try {
+        const resp = await Notifications.getLastNotificationResponseAsync();
+        if (!active) {
+          return;
+        }
 
-      if (id && id !== lastHandledIdRef.current) {
-        lastHandledIdRef.current = id;
+        const n = resp?.notification;
+        const id = n?.request?.identifier ?? "";
+
+        if (id && id !== lastHandledIdRef.current) {
+          lastHandledIdRef.current = id;
+          const url = extractUrl(n);
+          if (url) {
+            queueNavigation(url);
+          }
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.warn(
+            "[Notifications] Failed to read initial response:",
+            error,
+          );
+        }
+      }
+
+      sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+        const n = resp?.notification;
+        const id = n?.request?.identifier ?? "";
+
+        if (id && id === lastHandledIdRef.current) return;
+
+        lastHandledIdRef.current = id || String(Date.now());
         const url = extractUrl(n);
         if (url) {
           queueNavigation(url);
         }
-      }
+      });
     })();
 
-    sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const n = resp?.notification;
-      const id = n?.request?.identifier ?? "";
-
-      if (id && id === lastHandledIdRef.current) return;
-
-      lastHandledIdRef.current = id || String(Date.now());
-      const url = extractUrl(n);
-      if (url) {
-        queueNavigation(url);
-      }
-    });
-
     return () => {
+      active = false;
       if (sub) sub.remove();
     };
   }, [queueNavigation, extractUrl]);
@@ -743,55 +1054,8 @@ function RootLayout() {
         });
       }
 
-      if (path) {
-        if (path.startsWith("tournament/")) {
-          const segments = path.split("/");
-          const id = segments[1];
-          if (id) {
-            if (segments[2] === "register") {
-              return `/tournament/${id}/register`;
-            } else if (segments[2] === "checkin") {
-              return `/tournament/${id}/checkin`;
-            } else if (segments[2] === "bracket") {
-              return `/tournament/${id}/bracket`;
-            } else if (segments[2] === "schedule") {
-              return `/tournament/${id}/schedule`;
-            } else if (segments[2] === "home") {
-              return `/tournament/${id}/home`;
-            } else {
-              return `/tournament/${id}/home`;
-            }
-          }
-        } else if (path.startsWith("match/")) {
-          const segments = path.split("/");
-          const id = segments[1];
-          if (id) {
-            if (segments[2] === "referee") {
-              return `/match/${id}/referee`;
-            } else {
-              return `/match/${id}/home`;
-            }
-          }
-        } else if (path.startsWith("live/")) {
-          const id = path.split("/")[1];
-          if (id) {
-            return `/live/${id}`;
-          } else {
-            return "/live/home";
-          }
-        } else if (path.startsWith("profile/")) {
-          const username = path.split("/")[1];
-          if (username) {
-            return `/profile/${username}`;
-          }
-        } else if (path.startsWith("clubs")) {
-          return "/clubs";
-        } else if (path.startsWith("levelpoint")) {
-          return "/levelpoint";
-        }
-      }
-
-      return "/(tabs)";
+      const resolved = resolvePikoraNavigationTarget(url);
+      return resolved.internalPath || "/(tabs)";
     } catch (error) {
       console.error("Deep Link Parse Error:", error);
       return null;
@@ -901,282 +1165,288 @@ function RootLayout() {
                     collapsable={false}
                   >
                     <ThemeProvider value={navTheme}>
-                      <Stack
-                        screenOptions={{
-                          headerStyle: {
-                            backgroundColor: navTheme.colors.card,
-                          },
-                          headerTintColor: navTheme.colors.text,
-                          contentStyle: {
-                            backgroundColor: bg,
-                          },
+                      <ChatBotPageContextProvider>
+                        <PikoraProvider>
+                          <Stack
+                            screenOptions={{
+                              headerStyle: {
+                                backgroundColor: navTheme.colors.card,
+                              },
+                              headerTintColor: navTheme.colors.text,
+                              contentStyle: {
+                                backgroundColor: bg,
+                              },
 
-                          // ✅ GLOBAL: tất cả chevron-back tự ăn theme (theo tintColor)
-                          headerLeft: ({ canGoBack, tintColor }) => {
-                            if (!canGoBack) return null;
-                            return (
-                              <TouchableOpacity
-                                onPress={() => router.back()}
-                                style={{
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                }}
-                                hitSlop={{
-                                  top: 10,
-                                  bottom: 10,
-                                  left: 10,
-                                  right: 10,
-                                }}
-                              >
-                                <Ionicons
-                                  name="chevron-back"
-                                  size={24}
-                                  color={tintColor ?? navTheme.colors.text}
-                                />
-                              </TouchableOpacity>
-                            );
-                          },
-                        }}
-                      >
-                        <Stack.Screen
-                          name="(tabs)"
-                          options={{ headerShown: false }}
-                        />
+                              // ✅ GLOBAL: tất cả chevron-back tự ăn theme (theo tintColor)
+                              headerLeft: ({ canGoBack, tintColor }) => {
+                                if (!canGoBack) return null;
+                                return (
+                                  <TouchableOpacity
+                                    onPress={() => router.back()}
+                                    style={{
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 4,
+                                    }}
+                                    hitSlop={{
+                                      top: 10,
+                                      bottom: 10,
+                                      left: 10,
+                                      right: 10,
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="chevron-back"
+                                      size={24}
+                                      color={tintColor ?? navTheme.colors.text}
+                                    />
+                                  </TouchableOpacity>
+                                );
+                              },
+                            }}
+                          >
+                            <Stack.Screen
+                              name="(tabs)"
+                              options={{ headerShown: false }}
+                            />
 
-                        <Stack.Screen
-                          name="register"
-                          options={{
-                            title: "Đăng ký",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="register"
+                              options={{
+                                title: "Đăng ký",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="forgot-password"
-                          options={{
-                            title: "Quên mật khẩu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="forgot-password"
+                              options={{
+                                title: "Quên mật khẩu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="levelpoint"
-                          options={{
-                            title: "Tự chấm trình",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="levelpoint"
+                              options={{
+                                title: "Tự chấm trình",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/checkin"
-                          options={{
-                            title: "Check-in giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/checkin"
+                              options={{
+                                title: "Check-in giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/register"
-                          options={{
-                            title: "Đăng ký giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/register"
+                              options={{
+                                title: "Đăng ký giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          options={{
-                            title: "Duyệt định danh",
-                          }}
-                          name="user/[id]/kyc"
-                        />
+                            <Stack.Screen
+                              options={{
+                                title: "Duyệt định danh",
+                              }}
+                              name="user/[id]/kyc"
+                            />
 
-                        <Stack.Screen
-                          options={{
-                            title: "Chấm trình",
-                          }}
-                          name="user/[id]/grade"
-                        />
+                            <Stack.Screen
+                              options={{
+                                title: "Chấm trình",
+                              }}
+                              name="user/[id]/grade"
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/draw"
-                          options={{
-                            title: "Bốc thăm giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/draw"
+                              options={{
+                                title: "Bốc thăm giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/bracket"
-                          options={{
-                            title: "Sơ đồ giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/bracket"
+                              options={{
+                                title: "Sơ đồ giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/home"
-                          options={{
-                            title: "Tổng quan giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/home"
+                              options={{
+                                title: "Tổng quan giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/index"
-                          options={{
-                            title: "Giải đấu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/index"
+                              options={{
+                                title: "Giải đấu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/manage"
-                          options={{
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/manage"
+                              options={{
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/schedule"
-                          options={{
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/schedule"
+                              options={{
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="tournament/[id]/referee"
-                          options={{
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="tournament/[id]/referee"
+                              options={{
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="match/[id]/referee"
-                          options={{ headerShown: false }}
-                        />
+                            <Stack.Screen
+                              name="match/[id]/referee"
+                              options={{ headerShown: false }}
+                            />
 
-                        <Stack.Screen
-                          name="contact"
-                          options={{
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="contact"
+                              options={{
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="live/home"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="live/home"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="admin/home"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="admin/home"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="clubs"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="clubs"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="login"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="login"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="radar/index"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="radar/index"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="clubs/[id]/index"
-                          options={{
-                            headerShown: false,
-                          }}
-                        />
+                            <Stack.Screen
+                              name="clubs/[id]/index"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="guide/index"
-                          options={{
-                            headerTitleAlign: "center",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
-                          }}
-                        />
+                            <Stack.Screen
+                              name="guide/index"
+                              options={{
+                                headerTitleAlign: "center",
+                                headerTintColor: navTheme.colors.primary,
+                                headerTitleStyle: {
+                                  color: navTheme.colors.text,
+                                  fontWeight: "700",
+                                },
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="reset-password"
-                          options={{
-                            title: "Đặt lại mật khẩu",
-                            headerTitleAlign: "center",
-                          }}
-                        />
+                            <Stack.Screen
+                              name="reset-password"
+                              options={{
+                                title: "Đặt lại mật khẩu",
+                                headerTitleAlign: "center",
+                              }}
+                            />
 
-                        <Stack.Screen
-                          name="404"
-                          options={{
-                            headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
-                          }}
-                        />
-                        <Stack.Screen name="+not-found" />
-                        <Stack.Screen
-                          name="403"
-                          options={{
-                            headerTitleAlign: "center",
-                            headerBackTitle: "Quay lại",
-                            headerTintColor: navTheme.colors.primary,
-                            headerTitleStyle: {
-                              color: navTheme.colors.text,
-                              fontWeight: "700",
-                            },
-                          }}
-                        />
-                      </Stack>
+                            <Stack.Screen
+                              name="404"
+                              options={{
+                                headerTitleAlign: "center",
+                                headerBackTitle: "Quay lại",
+                                headerTintColor: navTheme.colors.primary,
+                                headerTitleStyle: {
+                                  color: navTheme.colors.text,
+                                  fontWeight: "700",
+                                },
+                              }}
+                            />
+                            <Stack.Screen name="+not-found" />
+                            <Stack.Screen
+                              name="403"
+                              options={{
+                                headerTitleAlign: "center",
+                                headerBackTitle: "Quay lại",
+                                headerTintColor: navTheme.colors.primary,
+                                headerTitleStyle: {
+                                  color: navTheme.colors.text,
+                                  fontWeight: "700",
+                                },
+                              }}
+                            />
+                          </Stack>
 
-                      <StatusBar
-                        style={isDark ? "light" : "dark"}
-                        backgroundColor={bg}
-                        animated
-                      />
+                          <PikoraHost />
 
-                      {themeApplying && (
-                        <View
-                          pointerEvents="auto"
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            right: 0,
-                            top: 0,
-                            bottom: 0,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: "rgba(0,0,0,0.25)",
-                          }}
-                        >
-                          <ActivityIndicator
-                            size="large"
-                            color={navTheme.colors.primary}
+                          <StatusBar
+                            style={isDark ? "light" : "dark"}
+                            backgroundColor={bg}
+                            animated
                           />
-                        </View>
-                      )}
+
+                          {themeApplying && (
+                            <View
+                              pointerEvents="auto"
+                              style={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "rgba(0,0,0,0.25)",
+                              }}
+                            >
+                              <ActivityIndicator
+                                size="large"
+                                color={navTheme.colors.primary}
+                              />
+                            </View>
+                          )}
+                        </PikoraProvider>
+                      </ChatBotPageContextProvider>
                     </ThemeProvider>
                   </View>
                 </SafeAreaView>
@@ -1216,6 +1486,7 @@ const ExportedLayout = HotUpdater
         status: "PROMOTED" | "RECOVERED" | "STABLE";
         crashedBundleId?: string;
       }) => {
+        void handleHotUpdateNotifyTelemetry(result);
         publishHotUpdateNotify(result);
       },
     })(RootLayout)

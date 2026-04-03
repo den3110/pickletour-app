@@ -426,6 +426,24 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       transformResponse: (res) => res?.list || res || [],
       providesTags: ["ADMIN_BRACKETS"],
     }),
+    listRefereeMatchesByTournament: builder.query({
+      query: ({ tid, ...params }) => {
+        const qs = new URLSearchParams(params).toString();
+        return {
+          url: `/api/referee/tournaments/${tid}/matches${qs ? `?${qs}` : ""}`,
+          method: "GET",
+        };
+      },
+      transformResponse: (res) => ({
+        items: Array.isArray(res?.items) ? res.items : [],
+        stationTabs: Array.isArray(res?.stationTabs) ? res.stationTabs : [],
+        total: Number(res?.total) || 0,
+        page: Number(res?.page) || 1,
+        pageSize: Number(res?.pageSize) || 0,
+        totalPages: Number(res?.totalPages) || 1,
+      }),
+      providesTags: ["REFEREE_MATCHES"],
+    }),
     adminListMatchesByTournament: builder.query({
       // args: { tid, page, pageSize, status, bracketId, q }
       query: ({ tid, ...params }) => {
@@ -852,6 +870,7 @@ export const {
   useManagerReplaceRegPlayerMutation,
   useListPublicMatchesByTournamentQuery,
   useAdminGetBracketsQuery,
+  useListRefereeMatchesByTournamentQuery,
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
   useListMyTournamentsQuery,
