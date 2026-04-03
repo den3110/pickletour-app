@@ -44,6 +44,44 @@ function buildRequestError(payload, fallback = "Request failed") {
   return error;
 }
 
+function normalizeTimestamp(value) {
+  const raw = trim(value);
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function normalizeLiveSyncRuntimePayload(payload = {}, fallback = {}) {
+  const featureEnabled =
+    typeof payload?.featureEnabled === "boolean"
+      ? payload.featureEnabled
+      : typeof payload?.referee?.matchControlLockEnabled === "boolean"
+        ? payload.referee.matchControlLockEnabled
+        : fallback?.featureEnabled !== false;
+
+  const normalizedFeatureEnabled = featureEnabled !== false;
+  const mode =
+    trim(payload?.mode) ||
+    (normalizedFeatureEnabled ? "offline_sync_v1" : "legacy_realtime_v1");
+
+  return {
+    featureEnabled: normalizedFeatureEnabled,
+    mode: normalizedFeatureEnabled ? mode : "legacy_realtime_v1",
+    settingsUpdatedAt: normalizeTimestamp(
+      payload?.settingsUpdatedAt || payload?.updatedAt || fallback?.settingsUpdatedAt
+    ),
+  };
+}
+
+function shouldApplyLiveSyncRuntime(nextRuntime = {}, currentRuntime = {}) {
+  const nextUpdatedAt = normalizeTimestamp(nextRuntime?.settingsUpdatedAt);
+  const currentUpdatedAt = normalizeTimestamp(currentRuntime?.settingsUpdatedAt);
+  if (!nextUpdatedAt || !currentUpdatedAt) return true;
+  return (
+    new Date(nextUpdatedAt).getTime() >= new Date(currentUpdatedAt).getTime()
+  );
+}
+
 export function useRefereeLiveSyncMatch(
   matchId,
   tokenFromArg,
@@ -67,6 +105,9 @@ export function useRefereeLiveSyncMatch(
     loading: enabled && Boolean(matchId),
     data: null,
     error: null,
+    featureEnabled: true,
+    mode: "offline_sync_v1",
+    settingsUpdatedAt: null,
     owner: null,
     pendingCount: 0,
     online: true,
@@ -120,6 +161,59 @@ export function useRefereeLiveSyncMatch(
       };
     },
     [userInfo?._id]
+  );
+
+  const readCurrentRuntime = useCallback(
+    () =>
+      normalizeLiveSyncRuntimePayload(persistRef.current, {
+        featureEnabled: true,
+        mode: "offline_sync_v1",
+        settingsUpdatedAt: null,
+      }),
+    []
+  );
+
+  const resolveRuntimeFromPayload = useCallback(
+    (payload = {}) => {
+      const currentRuntime = readCurrentRuntime();
+      const nextRuntime = normalizeLiveSyncRuntimePayload(
+        payload,
+        currentRuntime
+      );
+      return shouldApplyLiveSyncRuntime(nextRuntime, currentRuntime)
+        ? nextRuntime
+        : currentRuntime;
+    },
+    [readCurrentRuntime]
+  );
+
+  const ownerForRuntime = useCallback(
+    (owner, runtime) =>
+      runtime?.featureEnabled === false ? null : decorateOwner(owner || null),
+    [decorateOwner]
+  );
+
+  const buildRuntimeState = useCallback(
+    (payload = {}, options = {}) => {
+      const runtime = resolveRuntimeFromPayload(payload);
+      const ownerSource = Object.prototype.hasOwnProperty.call(options, "owner")
+        ? options.owner
+        : payload?.owner;
+      const nextRejectedBatch = runtime.featureEnabled
+        ? Array.isArray(options.lastRejectedBatch)
+          ? options.lastRejectedBatch
+          : Array.isArray(persistRef.current.lastRejectedBatch)
+            ? persistRef.current.lastRejectedBatch
+            : []
+        : [];
+
+      return {
+        runtime,
+        owner: ownerForRuntime(ownerSource, runtime),
+        lastRejectedBatch: nextRejectedBatch,
+      };
+    },
+    [ownerForRuntime, resolveRuntimeFromPayload]
   );
 
   const httpRequest = useCallback(
@@ -307,13 +401,30 @@ export function useRefereeLiveSyncMatch(
             socketEvent: "match:live:bootstrap",
           }
         );
-        const owner = decorateOwner(result?.owner || null);
+        const runtimeState = buildRuntimeState(result, {
+          owner: result?.owner || null,
+        });
         await persistState({
           snapshot: normalizeMatchDisplay(result?.snapshot || null),
           lastAckedServerVersion: Number(result?.serverVersion || 0),
-          owner,
+          owner: runtimeState.owner,
+          featureEnabled: runtimeState.runtime.featureEnabled,
+          mode: runtimeState.runtime.mode,
+          settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+          lastRejectedBatch: runtimeState.lastRejectedBatch,
         });
-        await applyRemoteSnapshot(result?.snapshot, { owner });
+        setDerivedState((prev) => ({
+          ...prev,
+          featureEnabled: runtimeState.runtime.featureEnabled,
+          mode: runtimeState.runtime.mode,
+          settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+          owner: runtimeState.owner,
+          lastRejectedBatch: runtimeState.lastRejectedBatch,
+          claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+        }));
+        await applyRemoteSnapshot(result?.snapshot, {
+          owner: runtimeState.owner,
+        });
         return result;
       } catch (error) {
         if (!mountedRef.current) return null;
@@ -327,7 +438,7 @@ export function useRefereeLiveSyncMatch(
     bootstrapInFlightRef.current = run;
     return run;
   }, [
-    decorateOwner,
+    buildRuntimeState,
     enabled,
     matchId,
     token,
@@ -351,9 +462,11 @@ export function useRefereeLiveSyncMatch(
             socketEvent: "match:live:claim",
           }
         );
-        const owner = decorateOwner(result?.owner || null);
+        const runtimeState = buildRuntimeState(result, {
+          owner: result?.owner || null,
+        });
         await persistState({
-          owner,
+          owner: runtimeState.owner,
           snapshot: normalizeMatchDisplay(
             result?.snapshot || persistRef.current.snapshot
           ),
@@ -362,20 +475,66 @@ export function useRefereeLiveSyncMatch(
               persistRef.current.lastAckedServerVersion ||
               0
           ),
+          featureEnabled: runtimeState.runtime.featureEnabled,
+          mode: runtimeState.runtime.mode,
+          settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+          lastRejectedBatch: runtimeState.lastRejectedBatch,
         });
-        await applyRemoteSnapshot(result?.snapshot, { owner });
+        setDerivedState((prev) => ({
+          ...prev,
+          featureEnabled: runtimeState.runtime.featureEnabled,
+          mode: runtimeState.runtime.mode,
+          settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+          owner: runtimeState.owner,
+          lastRejectedBatch: runtimeState.lastRejectedBatch,
+          claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+        }));
+        await applyRemoteSnapshot(result?.snapshot, { owner: runtimeState.owner });
         return result;
       } catch (error) {
-        const owner = decorateOwner(error?.data?.owner || null);
+        const runtimeState = buildRuntimeState(error?.data || {}, {
+          owner: error?.data?.owner || null,
+        });
         const snapshot = error?.data?.snapshot || null;
         if (snapshot) {
           await persistState({
-            owner,
+            owner: runtimeState.owner,
             snapshot: normalizeMatchDisplay(snapshot),
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
           });
-          await applyRemoteSnapshot(snapshot, { owner, force: false });
+          setDerivedState((prev) => ({
+            ...prev,
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            owner: runtimeState.owner,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
+            claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+          }));
+          await applyRemoteSnapshot(snapshot, {
+            owner: runtimeState.owner,
+            force: false,
+          });
         } else {
-          setDerivedState((prev) => ({ ...prev, owner }));
+          await persistState({
+            owner: runtimeState.owner,
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
+          });
+          setDerivedState((prev) => ({
+            ...prev,
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            owner: runtimeState.owner,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
+            claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+          }));
         }
         return null;
       } finally {
@@ -389,7 +548,7 @@ export function useRefereeLiveSyncMatch(
     claimInFlightRef.current = run;
     return run;
   }, [
-    decorateOwner,
+    buildRuntimeState,
     enabled,
     matchId,
     token,
@@ -402,14 +561,34 @@ export function useRefereeLiveSyncMatch(
   const release = useCallback(async () => {
     if (!enabled || !matchId || !token) return null;
     try {
-      return await request(`/api/referee/matches/${matchId}/live-sync/release`, {
+      const result = await request(`/api/referee/matches/${matchId}/live-sync/release`, {
         method: "POST",
         socketEvent: "match:live:release",
       });
+      const runtimeState = buildRuntimeState(result, {
+        owner: result?.owner ?? null,
+      });
+      await persistState({
+        owner: runtimeState.owner,
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
+      });
+      setDerivedState((prev) => ({
+        ...prev,
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        owner: runtimeState.owner,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
+        claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+      }));
+      return result;
     } catch {
       return null;
     }
-  }, [enabled, matchId, token, request]);
+  }, [buildRuntimeState, enabled, matchId, token, persistState, request, setDerivedState]);
 
   const discardRejected = useCallback(async () => {
     const snapshot = persistRef.current.snapshot;
@@ -474,14 +653,17 @@ export function useRefereeLiveSyncMatch(
           const rejected = Array.isArray(result?.rejectedEvents)
             ? result.rejectedEvents
             : [];
-          const hasOwnershipConflict = rejected.some(
-            (item) => item?.code === "ownership_conflict"
-          );
-          const owner = decorateOwner(result?.owner || null);
+          const runtimeState = buildRuntimeState(result, {
+            owner: result?.owner || null,
+            lastRejectedBatch: rejected,
+          });
+          const hasOwnershipConflict =
+            runtimeState.runtime.featureEnabled &&
+            rejected.some((item) => item?.code === "ownership_conflict");
 
           const nextPersist = {
             queue: remainingQueue,
-            owner,
+            owner: runtimeState.owner,
             lastAckedServerVersion: Number(
               result?.serverVersion ||
                 persistRef.current.lastAckedServerVersion ||
@@ -490,30 +672,41 @@ export function useRefereeLiveSyncMatch(
             snapshot: normalizeMatchDisplay(
               result?.snapshot || persistRef.current.snapshot
             ),
-            lastRejectedBatch: rejected,
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
           };
 
           await persistState(nextPersist);
 
           if (result?.snapshot) {
             await applyRemoteSnapshot(result.snapshot, {
-              owner,
+              owner: runtimeState.owner,
               force: hasOwnershipConflict,
             });
           } else {
             setDerivedState((prev) => ({
               ...prev,
-              owner,
+              featureEnabled: runtimeState.runtime.featureEnabled,
+              mode: runtimeState.runtime.mode,
+              settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+              owner: runtimeState.owner,
               pendingCount: remainingQueue.length,
-              lastRejectedBatch: rejected,
+              lastRejectedBatch: runtimeState.lastRejectedBatch,
+              claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
             }));
           }
 
           setDerivedState((prev) => ({
             ...prev,
-            owner,
+            featureEnabled: runtimeState.runtime.featureEnabled,
+            mode: runtimeState.runtime.mode,
+            settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+            owner: runtimeState.owner,
             pendingCount: remainingQueue.length,
-            lastRejectedBatch: rejected,
+            lastRejectedBatch: runtimeState.lastRejectedBatch,
+            claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
           }));
 
           lastResult = result;
@@ -539,7 +732,7 @@ export function useRefereeLiveSyncMatch(
     syncInFlightRef.current = run;
     return run;
   }, [
-    decorateOwner,
+    buildRuntimeState,
     enabled,
     matchId,
     token,
@@ -552,13 +745,18 @@ export function useRefereeLiveSyncMatch(
   const refreshOwnership = useCallback(async () => {
     if (!enabled || !matchId || !token) return null;
     await bootstrap();
+    const runtime = readCurrentRuntime();
+    if (!runtime.featureEnabled) {
+      await syncNow();
+      return null;
+    }
     const owner = persistRef.current.owner;
     if (!owner || owner.isSelf) {
       await claim();
     }
     await syncNow();
     return persistRef.current.owner;
-  }, [enabled, matchId, token, bootstrap, claim, syncNow]);
+  }, [enabled, matchId, token, bootstrap, claim, readCurrentRuntime, syncNow]);
 
   const takeover = useCallback(async () => {
     if (!enabled || !matchId || !token) return null;
@@ -571,16 +769,31 @@ export function useRefereeLiveSyncMatch(
           socketEvent: "match:live:takeover",
         }
       );
-      const owner = decorateOwner(result?.owner || null);
+      const runtimeState = buildRuntimeState(result, {
+        owner: result?.owner || null,
+      });
       await persistState({
-        owner,
+        owner: runtimeState.owner,
         snapshot: normalizeMatchDisplay(result?.snapshot || persistRef.current.snapshot),
         lastAckedServerVersion: Number(
           result?.serverVersion || persistRef.current.lastAckedServerVersion || 0
         ),
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
       });
+      setDerivedState((prev) => ({
+        ...prev,
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        owner: runtimeState.owner,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
+        claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+      }));
       await applyRemoteSnapshot(result?.snapshot, {
-        owner,
+        owner: runtimeState.owner,
         force: true,
       });
       await syncNow();
@@ -591,7 +804,7 @@ export function useRefereeLiveSyncMatch(
       }
     }
   }, [
-    decorateOwner,
+    buildRuntimeState,
     enabled,
     matchId,
     token,
@@ -648,6 +861,9 @@ export function useRefereeLiveSyncMatch(
         loading: false,
         data: null,
         error: null,
+        featureEnabled: true,
+        mode: "offline_sync_v1",
+        settingsUpdatedAt: null,
         owner: null,
         pendingCount: 0,
         online: true,
@@ -668,7 +884,20 @@ export function useRefereeLiveSyncMatch(
       deviceRef.current = { deviceId, deviceName };
       const stored = await loadRefereeLiveSyncState(matchId);
       if (!mountedRef.current) return;
-      persistRef.current = stored;
+      const storedRuntime = resolveRuntimeFromPayload(stored);
+      const storedOwner = ownerForRuntime(stored.owner || null, storedRuntime);
+      persistRef.current = {
+        ...stored,
+        featureEnabled: storedRuntime.featureEnabled,
+        mode: storedRuntime.mode,
+        settingsUpdatedAt: storedRuntime.settingsUpdatedAt,
+        owner: storedOwner,
+        lastRejectedBatch: storedRuntime.featureEnabled
+          ? Array.isArray(stored.lastRejectedBatch)
+            ? stored.lastRejectedBatch
+            : []
+          : [],
+      };
       dataRef.current = stored.snapshot
         ? rebuildLiveSyncSnapshot(stored.snapshot, stored.queue)
         : null;
@@ -676,10 +905,15 @@ export function useRefereeLiveSyncMatch(
         ...prev,
         loading: true,
         data: dataRef.current,
-        owner: decorateOwner(stored.owner || null),
+        featureEnabled: storedRuntime.featureEnabled,
+        mode: storedRuntime.mode,
+        settingsUpdatedAt: storedRuntime.settingsUpdatedAt,
+        owner: storedOwner,
         pendingCount: Array.isArray(stored.queue) ? stored.queue.length : 0,
-        lastRejectedBatch: Array.isArray(stored.lastRejectedBatch)
-          ? stored.lastRejectedBatch
+        lastRejectedBatch: storedRuntime.featureEnabled
+          ? Array.isArray(stored.lastRejectedBatch)
+            ? stored.lastRejectedBatch
+            : []
           : [],
       }));
       await refreshOwnership();
@@ -688,7 +922,7 @@ export function useRefereeLiveSyncMatch(
     return () => {
       mountedRef.current = false;
     };
-  }, [decorateOwner, enabled, matchId, refreshOwnership]);
+  }, [enabled, matchId, ownerForRuntime, refreshOwnership, resolveRuntimeFromPayload]);
 
   useEffect(() => {
     if (!enabled || !matchId) return;
@@ -799,9 +1033,42 @@ export function useRefereeLiveSyncMatch(
     };
     const onOwnershipChanged = (payload = {}) => {
       if (String(payload?.matchId || "") !== String(matchId)) return;
-      const owner = decorateOwner(payload?.owner || null);
-      persistRef.current = { ...persistRef.current, owner };
+      const runtime = readCurrentRuntime();
+      const owner = ownerForRuntime(payload?.owner || null, runtime);
+      persistRef.current = {
+        ...persistRef.current,
+        owner,
+      };
       setDerivedState((prev) => ({ ...prev, owner }));
+    };
+    const onSystemSettingsUpdate = async (payload = {}) => {
+      if (typeof payload?.referee?.matchControlLockEnabled !== "boolean") return;
+
+      const runtimeState = buildRuntimeState(payload, {
+        owner: persistRef.current.owner,
+      });
+
+      await persistState({
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        owner: runtimeState.owner,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
+      });
+
+      setDerivedState((prev) => ({
+        ...prev,
+        featureEnabled: runtimeState.runtime.featureEnabled,
+        mode: runtimeState.runtime.mode,
+        settingsUpdatedAt: runtimeState.runtime.settingsUpdatedAt,
+        owner: runtimeState.owner,
+        lastRejectedBatch: runtimeState.lastRejectedBatch,
+        claiming: runtimeState.runtime.featureEnabled ? prev.claiming : false,
+      }));
+
+      if (runtimeState.runtime.featureEnabled) {
+        await refreshOwnership();
+      }
     };
 
     socket.emit("match:join", { matchId });
@@ -810,6 +1077,7 @@ export function useRefereeLiveSyncMatch(
     socket.on("score:updated", onScore);
     socket.on("match:patched", onPatched);
     socket.on("match:ownership_changed", onOwnershipChanged);
+    socket.on("system-settings:update", onSystemSettingsUpdate);
     return () => {
       socket.emit("match:leave", { matchId });
       socket.off("match:snapshot", onSnapshot);
@@ -817,18 +1085,29 @@ export function useRefereeLiveSyncMatch(
       socket.off("score:updated", onScore);
       socket.off("match:patched", onPatched);
       socket.off("match:ownership_changed", onOwnershipChanged);
+      socket.off("system-settings:update", onSystemSettingsUpdate);
     };
-  }, [decorateOwner, enabled, matchId, socket, persistState, setDerivedState]);
+  }, [
+    buildRuntimeState,
+    enabled,
+    matchId,
+    ownerForRuntime,
+    persistState,
+    readCurrentRuntime,
+    refreshOwnership,
+    setDerivedState,
+    socket,
+  ]);
 
   useEffect(() => {
-    if (!enabled || !matchId || !state.online || !token) return;
+    if (!enabled || !matchId || !state.online || !token || !state.featureEnabled) return;
     const owner = persistRef.current.owner;
     if (!owner?.isSelf) return;
     const interval = setInterval(() => {
       claim();
     }, 10000);
     return () => clearInterval(interval);
-  }, [enabled, matchId, state.online, token, claim, state.owner]);
+  }, [enabled, matchId, state.featureEnabled, state.online, token, claim, state.owner]);
 
   const api = useMemo(
     () => ({
@@ -911,16 +1190,19 @@ export function useRefereeLiveSyncMatch(
   const sync = useMemo(
     () => ({
       enabled: true,
-      owner: state.owner,
-      isOwner: Boolean(state.owner?.isSelf),
+      featureEnabled: state.featureEnabled,
+      mode: state.mode,
+      settingsUpdatedAt: state.settingsUpdatedAt,
+      owner: state.featureEnabled ? state.owner : null,
+      isOwner: state.featureEnabled ? Boolean(state.owner?.isSelf) : true,
       pendingCount: state.pendingCount,
       online: state.online,
       syncing: state.syncing,
       claiming: state.claiming,
       lastRejectedBatch: state.lastRejectedBatch,
-      hasConflict: state.lastRejectedBatch.some(
-        (item) => item?.code === "ownership_conflict"
-      ),
+      hasConflict:
+        state.featureEnabled &&
+        state.lastRejectedBatch.some((item) => item?.code === "ownership_conflict"),
       claim,
       takeover,
       syncNow,
@@ -928,6 +1210,9 @@ export function useRefereeLiveSyncMatch(
       release,
     }),
     [
+      state.featureEnabled,
+      state.mode,
+      state.settingsUpdatedAt,
       state.owner,
       state.pendingCount,
       state.online,

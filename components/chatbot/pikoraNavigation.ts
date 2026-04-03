@@ -40,7 +40,7 @@ function createStudioCourtPath(
 
   const base =
     Platform.OS === "ios"
-      ? "/live/studio_court_ios"
+      ? "pickletour-live://stream"
       : "/live/studio_court_android";
   const query = params.toString();
   return query ? `${base}?${query}` : base;
@@ -234,6 +234,14 @@ function normalizeCustomScheme(rawValue: string) {
   return normalizeBrowserPath(path);
 }
 
+function createResolutionFromPath(path: string): NavigationResolution {
+  if (/^pickletour-live:\/\//i.test(path)) {
+    return { internalPath: null, externalUrl: path };
+  }
+
+  return { internalPath: path, externalUrl: null };
+}
+
 function normalizeExpoDevLink(rawValue: string) {
   try {
     const parsed = Linking.parse(rawValue);
@@ -275,9 +283,13 @@ export function resolvePikoraNavigationTarget(
   }
 
   if (/^pickletour:\/\//i.test(value)) {
+    return createResolutionFromPath(normalizeCustomScheme(value));
+  }
+
+  if (/^pickletour-live:\/\//i.test(value)) {
     return {
-      internalPath: normalizeCustomScheme(value),
-      externalUrl: null,
+      internalPath: null,
+      externalUrl: value,
     };
   }
 
@@ -292,12 +304,11 @@ export function resolvePikoraNavigationTarget(
     try {
       const parsed = new URL(value);
       if (/(^|\.)pickletour\.vn$/i.test(parsed.hostname)) {
-        return {
-          internalPath: normalizeBrowserPath(
+        return createResolutionFromPath(
+          normalizeBrowserPath(
             `${parsed.pathname}${parsed.search}${parsed.hash}`,
           ),
-          externalUrl: null,
-        };
+        );
       }
     } catch {
       return { internalPath: null, externalUrl: value };
@@ -306,10 +317,7 @@ export function resolvePikoraNavigationTarget(
     return { internalPath: null, externalUrl: value };
   }
 
-  return {
-    internalPath: normalizeBrowserPath(value),
-    externalUrl: null,
-  };
+  return createResolutionFromPath(normalizeBrowserPath(value));
 }
 
 async function openResolvedTarget(
@@ -331,6 +339,9 @@ async function openResolvedTarget(
   }
 
   if (resolved.externalUrl) {
+    if (presentation === "overlay") {
+      closeOverlay?.();
+    }
     await Linking.openURL(resolved.externalUrl);
     return { status: "executed", detail: resolved.externalUrl };
   }

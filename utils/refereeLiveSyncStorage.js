@@ -10,6 +10,9 @@ export function createEmptyLiveSyncState(matchId) {
   return {
     matchId: String(matchId || ""),
     snapshot: null,
+    featureEnabled: true,
+    mode: "offline_sync_v1",
+    settingsUpdatedAt: null,
     lastAckedServerVersion: 0,
     queue: [],
     owner: null,

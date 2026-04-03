@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useSelector } from "react-redux";
+
 import { useIssueOsAuthTokenMutation } from "@/slices/usersApiSlice";
 
 function normalizeParam(value: string | string[] | undefined, fallback = "") {
@@ -30,29 +31,42 @@ function appendQuery(url: string, key: string, value: string) {
 export default function LiveAuthScreen() {
   const params = useLocalSearchParams<{
     continueUrl?: string | string[];
+    targetUrl?: string | string[];
     callbackUri?: string | string[];
   }>();
+
   const continueUrl = useMemo(
     () => normalizeParam(params.continueUrl),
-    [params.continueUrl]
+    [params.continueUrl],
+  );
+  const targetUrl = useMemo(
+    () => normalizeParam(params.targetUrl),
+    [params.targetUrl],
   );
   const callbackUri = useMemo(
     () => normalizeParam(params.callbackUri, "pickletour-live://auth-init"),
-    [params.callbackUri]
+    [params.callbackUri],
   );
+
   const userInfo = useSelector((state: any) => state.auth?.userInfo);
   const [issueOsAuthToken, { isLoading }] = useIssueOsAuthTokenMutation();
   const [message, setMessage] = useState(
-    "Đang chuẩn bị xác thực PickleTour Live..."
+    "Đang chuẩn bị xác thực PickleTour Live...",
   );
   const [error, setError] = useState("");
 
   const returnTo = useMemo(() => {
     if (!continueUrl) return "/login";
-    return `/live-auth?continueUrl=${encodeURIComponent(
-      continueUrl
-    )}&callbackUri=${encodeURIComponent(callbackUri)}`;
-  }, [callbackUri, continueUrl]);
+
+    const nextParams = new URLSearchParams();
+    nextParams.set("continueUrl", continueUrl);
+    nextParams.set("callbackUri", callbackUri);
+    if (targetUrl) {
+      nextParams.set("targetUrl", targetUrl);
+    }
+    return `/live-auth?${nextParams.toString()}`;
+  }, [callbackUri, continueUrl, targetUrl]);
+
   const openWebFallback = async (fallbackMessage?: string) => {
     if (!continueUrl) {
       setError("Không thể mở luồng xác thực web.");
@@ -92,19 +106,23 @@ export default function LiveAuthScreen() {
           throw new Error("Không lấy được phiên xác thực PickleTour.");
         }
 
-        const callbackUrl = appendQuery(
-          appendQuery(callbackUri, "continueUrl", continueUrl),
-          "osAuthToken",
-          osAuthToken
-        );
+        let callbackUrl = appendQuery(callbackUri, "osAuthToken", osAuthToken);
+        if (targetUrl) {
+          callbackUrl = appendQuery(callbackUrl, "targetUrl", targetUrl);
+        }
+        if (continueUrl) {
+          callbackUrl = appendQuery(callbackUrl, "continueUrl", continueUrl);
+        }
+
         if (cancelled) return;
+
         setMessage("Đang quay lại PickleTour Live...");
         try {
           await Linking.openURL(callbackUrl);
         } catch {
           if (cancelled) return;
           await openWebFallback(
-            "Không mở lại được PickleTour Live. Chuyển sang xác thực web..."
+            "Không mở lại được PickleTour Live. Chuyển sang xác thực web...",
           );
         }
       } catch (e: any) {
@@ -113,8 +131,8 @@ export default function LiveAuthScreen() {
           String(
             e?.data?.message ||
               e?.message ||
-              "Không thể chuyển phiên đăng nhập sang PickleTour Live."
-          )
+              "Không thể chuyển phiên đăng nhập sang PickleTour Live.",
+          ),
         );
       }
     })();
@@ -122,9 +140,7 @@ export default function LiveAuthScreen() {
     return () => {
       cancelled = true;
     };
-  }, [callbackUri, continueUrl, issueOsAuthToken, returnTo, userInfo?.token]);
-
-
+  }, [callbackUri, continueUrl, issueOsAuthToken, returnTo, targetUrl, userInfo?.token]);
 
   return (
     <View style={styles.page}>
@@ -237,4 +253,3 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 });
-

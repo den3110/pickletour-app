@@ -103,6 +103,21 @@ const buildNativeLiveStudioUrl = ({
   return qs ? `pickletour-live://stream?${qs}` : "pickletour-live://stream";
 };
 
+const buildIosLiveAuthHref = (nativeUrl: string) => {
+  const authQuery = [
+    `client_id=${encodeURIComponent("pickletour-live-app")}`,
+    `redirect_uri=${encodeURIComponent("pickletour-live://auth")}`,
+    `scope=${encodeURIComponent("live_app_access")}`,
+  ].join("&");
+
+  const continueUrl = `https://pickletour.vn/oauth/authorize?response_type=code&${authQuery}`;
+  return `/live-auth?continueUrl=${encodeURIComponent(
+    continueUrl,
+  )}&targetUrl=${encodeURIComponent(nativeUrl)}&callbackUri=${encodeURIComponent(
+    "pickletour-live://auth-init",
+  )}`;
+};
+
 const normalizeAllowedClusters = (clusters: any[] = []) =>
   (Array.isArray(clusters) ? clusters : [])
     .map((item) => ({
@@ -544,24 +559,26 @@ export default function LiveSetupSheet({
         params.fullUrl = guessUrl;
       }
 
+      const nativeUrl = buildNativeLiveStudioUrl({
+        courtId: itemId,
+        matchId: preferredMatchId,
+        pageId,
+      });
       const qs = buildQuery(params);
       const fallbackHref =
         Platform.OS === "android"
           ? `/live/studio_court_android?${qs}`
-          : `/live/studio_court_ios?${qs}`;
+          : buildIosLiveAuthHref(nativeUrl);
 
       try {
-        const finalUrl = buildCourtLiveUrl
-          ? buildCourtLiveUrl(tournamentId, null, item) || fallbackHref
-          : fallbackHref;
+        const finalUrl =
+          Platform.OS === "ios"
+            ? fallbackHref
+            : buildCourtLiveUrl
+              ? buildCourtLiveUrl(tournamentId, null, item) || fallbackHref
+              : fallbackHref;
 
-        if (Platform.OS === "android") {
-          const nativeUrl = buildNativeLiveStudioUrl({
-            courtId: itemId,
-            matchId: preferredMatchId,
-            pageId,
-          });
-
+        if (Platform.OS === "android" || Platform.OS === "ios") {
           try {
             let supported: boolean | null = null;
             try {
