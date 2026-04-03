@@ -578,7 +578,15 @@ export default function LiveSetupSheet({
               ? buildCourtLiveUrl(tournamentId, null, item) || fallbackHref
               : fallbackHref;
 
-        if (Platform.OS === "android" || Platform.OS === "ios") {
+        if (Platform.OS === "ios") {
+          try {
+            await Linking.openURL(nativeUrl);
+            sheetRef.current?.dismiss();
+            return;
+          } catch {}
+        }
+
+        if (Platform.OS === "android") {
           try {
             let supported: boolean | null = null;
             try {
