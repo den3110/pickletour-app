@@ -949,11 +949,13 @@ export default function TournamentScheduleNative() {
     data: tournament,
     isLoading: tLoading,
     error: tError,
+    refetch: refetchTournament,
   } = useGetTournamentQuery(id);
   const {
     data: matchesResp,
     isLoading: mLoading,
     error: mError,
+    refetch: refetchMatches,
   } = useListPublicMatchesByTournamentQuery({
     tid: id,
   });
@@ -1047,6 +1049,12 @@ export default function TournamentScheduleNative() {
   useEffect(() => {
     if (!socket) return;
     const onUpsert = (p) => queueUpsert(p);
+    const onInvalidate = (payload) => {
+      const tournamentId = String(payload?.tournamentId || "").trim();
+      if (tournamentId && tournamentId !== String(id || "").trim()) return;
+      refetchTournament?.();
+      refetchMatches?.();
+    };
     const onRemove = (payload) => {
       const id = String(payload?.id ?? payload?._id ?? "");
       if (!id) return;
@@ -1057,16 +1065,18 @@ export default function TournamentScheduleNative() {
     };
 
     socket.on("tournament:match:update", onUpsert);
+    socket.on("tournament:invalidate", onInvalidate);
     socket.on("match:deleted", onRemove);
     return () => {
       socket.off("tournament:match:update", onUpsert);
+      socket.off("tournament:invalidate", onInvalidate);
       socket.off("match:deleted", onRemove);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert]);
+  }, [socket, queueUpsert, id, refetchMatches, refetchTournament]);
 
   const bracketsKey = useMemo(
     () =>

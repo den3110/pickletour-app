@@ -964,6 +964,11 @@ export default function MyTournament() {
         .filter(Boolean),
     [tournamentsRaw]
   );
+  const tournamentRoomIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    tournamentRoomIdsRef.current = new Set(tournamentRoomIds);
+  }, [tournamentRoomIds]);
 
   useSocketRoomSet(socket, tournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
@@ -975,6 +980,13 @@ export default function MyTournament() {
     if (!socket) return;
 
     const onUpsert = (payload) => queueUpsert(payload);
+    const onInvalidate = (payload: any) => {
+      const tournamentId = String(payload?.tournamentId || "").trim();
+      if (tournamentId && !tournamentRoomIdsRef.current.has(tournamentId)) {
+        return;
+      }
+      refetch?.();
+    };
     const onRemove = (payload) => {
       const id = String(payload?.id ?? payload?._id ?? "");
       if (!id) return;
@@ -985,17 +997,19 @@ export default function MyTournament() {
     };
 
     socket.on("tournament:match:update", onUpsert);
+    socket.on("tournament:invalidate", onInvalidate);
     socket.on("match:deleted", onRemove);
 
     return () => {
       socket.off("tournament:match:update", onUpsert);
+      socket.off("tournament:invalidate", onInvalidate);
       socket.off("match:deleted", onRemove);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert]);
+  }, [socket, queueUpsert, refetch]);
 
   useEffect(() => {
     subscribedBracketsRef.current = new Set();
