@@ -30,6 +30,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { useLiveMatch } from "@/hooks/useLiveMatch";
+import { useMatchLiveActivity } from "@/hooks/useMatchLiveActivity";
 import {
   useGetMatchPublicQuery,
   useListTournamentBracketsQuery,
@@ -544,6 +545,14 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
 
   const code = mm ? makeMatchCode(mm, brackets) : "";
   const status = mm?.status || "scheduled";
+
+  useMatchLiveActivity(mm, {
+    enabled: Boolean(open && mm?._id),
+    cleanupOnUnmount: true,
+    cleanupOnDisable: true,
+    preserveLiveOnUnmount: true,
+    source: "match-viewer",
+  });
 
   // Điều khiển mở/đóng an toàn theo prop `open`
   useEffect(() => {

@@ -10,6 +10,7 @@ import {
 type UseMatchLiveActivityOptions = {
   enabled?: boolean;
   cleanupOnUnmount?: boolean;
+  cleanupOnDisable?: boolean;
   preserveLiveOnUnmount?: boolean;
   rules?: {
     bestOf?: number | null;
@@ -39,6 +40,7 @@ export function useMatchLiveActivity(
 ) {
   const enabled = options.enabled ?? true;
   const cleanupOnUnmount = options.cleanupOnUnmount ?? true;
+  const cleanupOnDisable = options.cleanupOnDisable ?? false;
   const preserveLiveOnUnmount = options.preserveLiveOnUnmount ?? true;
   const debounceMs = Math.max(0, options.debounceMs ?? 180);
 
@@ -67,10 +69,30 @@ export function useMatchLiveActivity(
     [payload],
   );
   const latestPayloadRef = useRef(payload);
+  const wasEnabledRef = useRef(enabled);
 
   useEffect(() => {
     latestPayloadRef.current = payload;
   }, [payload]);
+
+  useEffect(() => {
+    const wasEnabled = wasEnabledRef.current;
+    wasEnabledRef.current = enabled;
+
+    if (SHOULD_SKIP || !cleanupOnDisable) return;
+    if (!wasEnabled || enabled) return;
+
+    const current = latestPayloadRef.current;
+    if (!current?.matchId) return;
+
+    if (preserveLiveOnUnmount && current.status === "live") {
+      return;
+    }
+
+    void endMatchLiveActivity(current.matchId, current, {
+      dismissalPolicy: "immediate",
+    });
+  }, [enabled, cleanupOnDisable, preserveLiveOnUnmount]);
 
   useEffect(() => {
     if (SHOULD_SKIP || !enabled || !payload?.matchId) return;

@@ -41,6 +41,18 @@ function replaceOnce(searchValue, replaceValue, label) {
   };
 }
 
+function ensurePatchedOrThrow(contents, next, relativePath, label, legacyTokens) {
+  if (next !== contents) {
+    return next;
+  }
+
+  if (legacyTokens.some((token) => contents.includes(token))) {
+    throw new Error(`[patch-ios-deps] Could not find ${label} in ${relativePath}`);
+  }
+
+  return contents;
+}
+
 patchFile("node_modules/expo-image/ios/ExpoImage.podspec", [
   replaceOnce(
     "  s.dependency 'SDWebImageWebPCoder', '~> 0.14.6'\n",
@@ -50,9 +62,12 @@ patchFile("node_modules/expo-image/ios/ExpoImage.podspec", [
 ]);
 
 patchFile("node_modules/expo-image/ios/Coders/WebPCoder.swift", [
-  replaceOnce(
-    "internal import SDWebImage\ninternal import SDWebImageWebPCoder\n",
-    `internal import SDWebImage
+  (contents, relativePath) => {
+    let next = contents;
+
+    next = next.replace(
+      "internal import SDWebImage\ninternal import SDWebImageWebPCoder\n",
+      `internal import SDWebImage
 
 internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "useAppleWebpCodec")
 
@@ -61,39 +76,82 @@ internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "u
  The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
  when this app links both expo-image and react-native-skia statically.
  */
+`
+    );
+
+    if (!next.includes('internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "useAppleWebpCodec")')) {
+      next = next.replace(
+        "internal import SDWebImage\n\n",
+        `internal import SDWebImage
+
+internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "useAppleWebpCodec")
+
+`
+      );
+    }
+
+    next = next.replace(
+      /\/\*\*\n A composite WebP coder[\s\S]*?\*\/\n/s,
+      `/**
+ Uses Apple's built-in animated WebP coder only.
+ The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
+ when this app links both expo-image and react-native-skia statically.
+ */
+`
+    );
+
+    next = next.replace(
+      `/**
+ Uses Apple's built-in animated WebP coder only.
+ The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
+ when this app links both expo-image and react-native-skia statically.
+ */
+
+/**
+ Uses Apple's built-in animated WebP coder only.
+ The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
+ when this app links both expo-image and react-native-skia statically.
+ */
 `,
-    "ExpoImage WebPCoder imports"
-  ),
-  replaceOnce(
-    "internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: \"useAppleWebpCodec\")\n",
-    "",
-    "ExpoImage WebPCoder option declaration"
-  ),
-  replaceOnce(
-    "  private var coder: SDAnimatedImageCoder {\n" +
-      "    if let instantiatedCoder {\n" +
-      "      return instantiatedCoder\n" +
-      "    }\n" +
-      "    return SDImageAWebPCoder.shared\n" +
-      "  }\n",
-    "  private var coder: SDAnimatedImageCoder {\n" +
-      "    if let instantiatedCoder {\n" +
-      "      return instantiatedCoder\n" +
-      "    }\n" +
-      "    return SDImageAWebPCoder.shared\n" +
-      "  }\n",
-    "ExpoImage WebPCoder default coder"
-  ),
-  replaceOnce(
-    "    self.instantiatedCoder = {\n" +
-      "      if options?[imageCoderOptionUseAppleWebpCodec] as? Bool ?? false {\n" +
-      "        return SDImageAWebPCoder(animatedImageData: data, options: options)\n" +
-      "      }\n" +
-      "      return SDImageWebPCoder(animatedImageData: data, options: options)\n" +
-      "    }()\n",
-    "    self.instantiatedCoder = SDImageAWebPCoder.init(animatedImageData: data, options: options)\n",
-    "ExpoImage WebPCoder instantiated coder"
-  ),
+      `/**
+ Uses Apple's built-in animated WebP coder only.
+ The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
+ when this app links both expo-image and react-native-skia statically.
+ */
+`
+    );
+
+    next = next.replace("  private var useAppleWebpCodec: Bool = true\n", "");
+
+    next = next.replace(
+      "    return self.useAppleWebpCodec ? SDImageAWebPCoder.shared : SDImageWebPCoder.shared\n",
+      "    return SDImageAWebPCoder.shared\n"
+    );
+
+    next = next.replace(
+      "    self.useAppleWebpCodec = options?[imageCoderOptionUseAppleWebpCodec] as? Bool ?? true\n",
+      ""
+    );
+
+    next = next.replace(
+      "    self.instantiatedCoder = self.useAppleWebpCodec\n" +
+        "      ? SDImageAWebPCoder.init(animatedImageData: data, options: options)\n" +
+        "      : SDImageWebPCoder.init(animatedImageData: data, options: options)\n",
+      "    self.instantiatedCoder = SDImageAWebPCoder.init(animatedImageData: data, options: options)\n"
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoImage WebPCoder source",
+      [
+        "internal import SDWebImageWebPCoder",
+        "SDImageWebPCoder.shared",
+        "SDImageWebPCoder.init(animatedImageData: data, options: options)",
+      ]
+    );
+  },
 ]);
 
 patchFile("node_modules/expo-image-manipulator/ios/ExpoImageManipulator.podspec", [
@@ -105,22 +163,43 @@ patchFile("node_modules/expo-image-manipulator/ios/ExpoImageManipulator.podspec"
 ]);
 
 patchFile("node_modules/expo-image-manipulator/ios/ImageManipulatorModule.swift", [
-  replaceOnce(
-    "import ExpoModulesCore\ninternal import SDWebImageWebPCoder\n",
-    "import ExpoModulesCore\n",
-    "ExpoImageManipulator WebPCoder import"
-  ),
+  (contents, relativePath) => {
+    const next = contents.replace(
+      "import ExpoModulesCore\ninternal import SDWebImageWebPCoder\n",
+      "import ExpoModulesCore\n"
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoImageManipulator WebPCoder import",
+      ["internal import SDWebImageWebPCoder"]
+    );
+  },
 ]);
 
 patchFile("node_modules/expo-image-manipulator/ios/ImageManipulatorUtils.swift", [
-  replaceOnce(
-    "internal import SDWebImageWebPCoder\n",
-    "internal import SDWebImage\n",
-    "ExpoImageManipulator utils import"
-  ),
-  replaceOnce(
-    "    return SDImageWebPCoder.shared.encodedData(with: image, format: .webP, options: [.encodeCompressionQuality: compression])\n",
-    "    return SDImageAWebPCoder.shared.encodedData(with: image, format: .webP, options: [.encodeCompressionQuality: compression])\n",
-    "ExpoImageManipulator WebP encoder"
-  ),
+  (contents, relativePath) => {
+    let next = contents.replace(
+      "internal import SDWebImageWebPCoder\n",
+      "internal import SDWebImage\n"
+    );
+
+    next = next.replace(
+      "    return SDImageWebPCoder.shared.encodedData(with: image, format: .webP, options: [.encodeCompressionQuality: compression])\n",
+      "    return SDImageAWebPCoder.shared.encodedData(with: image, format: .webP, options: [.encodeCompressionQuality: compression])\n"
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoImageManipulator WebP source",
+      [
+        "internal import SDWebImageWebPCoder",
+        "SDImageWebPCoder.shared.encodedData",
+      ]
+    );
+  },
 ]);
