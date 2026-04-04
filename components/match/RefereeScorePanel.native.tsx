@@ -2516,39 +2516,15 @@ export default function RefereeJudgePanel({ matchId }) {
   const timeoutPerGame = match?.timeoutPerGame ?? 2;
   const timeoutMinutes = match?.timeoutMinutes ?? 1;
   const medicalLimit = match?.medicalTimeouts ?? 1;
-
-  // 2. State đếm số lượng còn lại
   const [toA, setToA] = useState(timeoutPerGame);
   const [toB, setToB] = useState(timeoutPerGame);
   const [medA, setMedA] = useState(medicalLimit);
   const [medB, setMedB] = useState(medicalLimit);
-
-  // 3. State quản lý trạng thái nghỉ cục bộ (Local Break)
-  // localBreak = null hoặc { type: 'timeout'|'medical', endTime: number }
-  const [localBreak, setLocalBreak] = useState(null);
-<<<<<<< Updated upstream
-  const parseBreakType = useCallback((typeValue, noteValue = "") => {
-    const rawType = String(typeValue || "")
-      .trim()
-      .toLowerCase();
-    if (rawType === "timeout" || rawType === "medical") return rawType;
-    const notePrefix = String(noteValue || "")
-      .split(":")[0]
-      ?.trim()
-      .toLowerCase();
-    return notePrefix === "timeout" || notePrefix === "medical"
-      ? notePrefix
-      : "";
-  }, []);
-  const parseBreakTeamKey = useCallback((noteValue = "") => {
-    const token = String(noteValue || "")
-      .split(":")[1]
-      ?.trim()
-      .toUpperCase();
-    return token === "A" || token === "B" ? token : "";
-  }, []);
-  // const [timerStr, setTimerStr] = useState("00:00");
-=======
+  const [localBreak, setLocalBreak] = useState<{
+    type: "timeout" | "medical";
+    endTime: number;
+    teamKey: "A" | "B" | "";
+  } | null>(null);
   const syncedTimedBreak = useMemo(() => {
     if (!breakState?.active) return null;
     const type = breakState?.type;
@@ -2562,269 +2538,130 @@ export default function RefereeJudgePanel({ matchId }) {
         Number.isFinite(expectedResumeAtMs) && expectedResumeAtMs > 0
           ? expectedResumeAtMs
           : Date.now(),
-      teamKey: textOf(breakState?.note).split(":")[1] || "",
+      teamKey: (textOf(breakState?.note).split(":")[1] || "") as "A" | "B" | "",
     };
-  }, [breakState?.active, breakState?.expectedResumeAt, breakState?.note, breakState?.type]);
+  }, [
+    breakState?.active,
+    breakState?.expectedResumeAt,
+    breakState?.note,
+    breakState?.type,
+  ]);
   const activeBreak = localBreak || syncedTimedBreak;
->>>>>>> Stashed changes
-
-  // Reset counter khi sang game mới
   useEffect(() => {
     setToA(timeoutPerGame);
     setToB(timeoutPerGame);
-    setLocalBreak(null); // Reset trạng thái nghỉ nếu sang game mới
-  }, [curIdx, timeoutPerGame]);
-
+    setMedA(medicalLimit);
+    setMedB(medicalLimit);
+    setLocalBreak(null);
+  }, [curIdx, medicalLimit, timeoutPerGame]);
   useEffect(() => {
-<<<<<<< Updated upstream
-    const rawBreak = match?.isBreak;
-    const active = Boolean(rawBreak?.active);
-    const type = parseBreakType(rawBreak?.type, rawBreak?.note);
-    const resumeMs = rawBreak?.expectedResumeAt
-      ? new Date(rawBreak.expectedResumeAt).getTime()
-      : 0;
-
-    if (!active || !["timeout", "medical"].includes(type) || resumeMs <= 0) {
-      setLocalBreak((prev) => (prev?.source === "remote" ? null : prev));
-      return;
-    }
-
-    const teamKey = parseBreakTeamKey(rawBreak?.note);
-    setLocalBreak((prev) => {
-      if (
-        prev?.type === type &&
-        prev?.teamKey === teamKey &&
-        Number(prev?.endTime || 0) === resumeMs
-      ) {
-        return prev;
-      }
-
-      return {
-        type,
-        teamKey,
-        endTime: resumeMs,
-        source: "remote",
-      };
-    });
-  }, [
-    match?.isBreak,
-    match?.isBreak?.active,
-    match?.isBreak?.type,
-    match?.isBreak?.note,
-    match?.isBreak?.expectedResumeAt,
-    parseBreakTeamKey,
-    parseBreakType,
-  ]);
-=======
     if (breakState?.active) {
       setLocalBreak(null);
     }
   }, [breakState?.active, breakState?.expectedResumeAt, breakState?.type]);
->>>>>>> Stashed changes
-
-  // 4. Timer đếm ngược (Chạy khi localBreak != null)
-  // useEffect(() => {
-  //   let interval;
-  //   if (localBreak) {
-  //     const updateTimer = () => {
-  //       const remaining = localBreak.endTime - Date.now();
-  //       if (remaining <= 0) {
-  //         setTimerStr("00:00");
-  //         // Tự động kết thúc nghỉ khi hết giờ (tuỳ chọn, ở đây mình để user bấm Tiếp tục)
-  //       } else {
-  //         // Format mm:ss (02:05)
-  //         const m = Math.floor(remaining / 60000)
-  //           .toString()
-  //           .padStart(2, "0");
-  //         const s = Math.floor((remaining % 60000) / 1000)
-  //           .toString()
-  //           .padStart(2, "0");
-  //         setTimerStr(`${m}:${s}`);
-  //       }
-  //     };
-  //     updateTimer();
-  //     interval = setInterval(updateTimer, 1000);
-  //   } else {
-  //     setTimerStr("00:00");
-  //   }
-  //   return () => clearInterval(interval);
-  // }, [localBreak]);
-
-  // 5. Hàm xử lý gọi Timeout/Y tế (cập nhật local ngay và sync server để island/widget cùng đổi)
-  const handleCallTimeout = useCallback(async (teamSideUI) => {
-    if (!ensureLiveOwner()) return;
-    if (activeBreak) return; // Đang nghỉ thì không bấm được
-    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
-    const currentVal = teamKey === "A" ? toA : toB;
-    if (currentVal <= 0) return;
-
-    const durationMs = timeoutMinutes * 60 * 1000;
-    const endTime = Date.now() + durationMs;
-
-    if (teamKey === "A") setToA((p) => p - 1);
-    else setToB((p) => p - 1);
-
-<<<<<<< Updated upstream
-    setLocalBreak({
-=======
-    // Kích hoạt timer cục bộ (Thời gian từ config)
-    const durationMs = timeoutMinutes * 60 * 1000;
-    const nextBreak = {
->>>>>>> Stashed changes
-      type: "timeout",
-      endTime,
-      teamKey,
-<<<<<<< Updated upstream
-      source: "local",
-    });
-=======
-    };
-    setLocalBreak(nextBreak);
->>>>>>> Stashed changes
-
-    try {
-      await liveApi.setBreak({
-        active: true,
-        note: `timeout:${teamKey}`,
-        type: "timeout",
-        afterGame: curIdx,
-<<<<<<< Updated upstream
-        expectedResumeAt: new Date(endTime).toISOString(),
-        userMatch: isUserMatch,
-      });
-    } catch (e) {
-=======
-        expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
-        userMatch: isUserMatch,
-      });
-    } catch (error) {
->>>>>>> Stashed changes
-      setLocalBreak(null);
-      if (teamKey === "A") setToA((p) => p + 1);
-      else setToB((p) => p + 1);
-      Toast.show({
-        type: "error",
-        text1: "Lỗi",
-        text2:
-<<<<<<< Updated upstream
-          textOf(e?.data?.message) ||
-          textOf(e?.error) ||
-          "Không thể bắt đầu timeout",
-      });
-    }
-  }, [
-    curIdx,
-    ensureLiveOwner,
-    isUserMatch,
-    localBreak,
-=======
-          textOf(error?.data?.message) ||
-          textOf(error?.message) ||
-          "Không thể bật timeout",
-      });
-    }
-  }, [
-    activeBreak,
-    curIdx,
-    ensureLiveOwner,
-    isUserMatch,
->>>>>>> Stashed changes
-    leftSide,
-    liveApi,
-    rightSide,
-    toA,
-    toB,
-    timeoutMinutes,
-  ]);
-
-  const handleCallMedical = useCallback(async (teamSideUI) => {
-    if (!ensureLiveOwner()) return;
-    if (activeBreak) return;
-    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
-    const currentVal = teamKey === "A" ? medA : medB;
-    if (currentVal <= 0) return;
-
-    const durationMs = 5 * 60 * 1000;
-    const endTime = Date.now() + durationMs;
-
-    if (teamKey === "A") setMedA((p) => p - 1);
-    else setMedB((p) => p - 1);
-
-<<<<<<< Updated upstream
-    setLocalBreak({
-=======
-    const durationMs = 5 * 60 * 1000;
-    const nextBreak = {
->>>>>>> Stashed changes
-      type: "medical",
-      endTime,
-      teamKey,
-<<<<<<< Updated upstream
-      source: "local",
-    });
-
-    try {
-      await liveApi.setBreak({
-        active: true,
-        note: `medical:${teamKey}`,
-        type: "medical",
-        afterGame: curIdx,
-        expectedResumeAt: new Date(endTime).toISOString(),
-        userMatch: isUserMatch,
-      });
-    } catch (e) {
-      setLocalBreak(null);
-      if (teamKey === "A") setMedA((p) => p + 1);
-      else setMedB((p) => p + 1);
-      Toast.show({
-        type: "error",
-        text1: "Lỗi",
-        text2:
-          textOf(e?.data?.message) ||
-          textOf(e?.error) ||
-          "Không thể bắt đầu nghỉ y tế",
-      });
-    }
-  }, [
-    curIdx,
-    ensureLiveOwner,
-    isUserMatch,
-    leftSide,
-    liveApi,
-    localBreak,
-    medA,
-    medB,
-    rightSide,
-  ]);
-
-=======
-    };
-    setLocalBreak(nextBreak);
-    try {
-      await liveApi.setBreak({
-        active: true,
-        note: `medical:${teamKey}`,
-        type: "medical",
-        afterGame: curIdx,
-        expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
-        userMatch: isUserMatch,
-      });
-    } catch (error) {
-      setLocalBreak(null);
-      if (teamKey === "A") setMedA((p) => p + 1);
-      else setMedB((p) => p + 1);
-      Toast.show({
-        type: "error",
-        text1: "Lỗi",
-        text2:
-          textOf(error?.data?.message) ||
-          textOf(error?.message) ||
-          "Không thể bật nghỉ y tế",
-      });
-    }
-  }, [activeBreak, curIdx, ensureLiveOwner, isUserMatch, leftSide, liveApi, medA, medB, rightSide]);
-
->>>>>>> Stashed changes
+  const handleCallTimeout = useCallback(
+    async (teamSideUI) => {
+      if (!ensureLiveOwner()) return;
+      if (activeBreak) return;
+      const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+      const currentVal = teamKey === "A" ? toA : toB;
+      if (currentVal <= 0) return;
+      const durationMs = timeoutMinutes * 60 * 1000;
+      const nextBreak = {
+        type: "timeout" as const,
+        endTime: Date.now() + durationMs,
+        teamKey,
+      };
+      if (teamKey === "A") setToA((prev) => prev - 1);
+      else setToB((prev) => prev - 1);
+      setLocalBreak(nextBreak);
+      try {
+        await liveApi.setBreak({
+          active: true,
+          note: `timeout:${teamKey}`,
+          type: "timeout",
+          afterGame: curIdx,
+          expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
+          userMatch: isUserMatch,
+        });
+      } catch (error) {
+        setLocalBreak(null);
+        if (teamKey === "A") setToA((prev) => prev + 1);
+        else setToB((prev) => prev + 1);
+        Toast.show({
+          type: "error",
+          text1: "Lỗi",
+          text2:
+            textOf(error?.data?.message) ||
+            textOf(error?.message) ||
+            "Không thể bật timeout",
+        });
+      }
+    },
+    [
+      activeBreak,
+      curIdx,
+      ensureLiveOwner,
+      isUserMatch,
+      leftSide,
+      liveApi,
+      rightSide,
+      timeoutMinutes,
+      toA,
+      toB,
+    ],
+  );
+  const handleCallMedical = useCallback(
+    async (teamSideUI) => {
+      if (!ensureLiveOwner()) return;
+      if (activeBreak) return;
+      const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+      const currentVal = teamKey === "A" ? medA : medB;
+      if (currentVal <= 0) return;
+      const durationMs = 5 * 60 * 1000;
+      const nextBreak = {
+        type: "medical" as const,
+        endTime: Date.now() + durationMs,
+        teamKey,
+      };
+      if (teamKey === "A") setMedA((prev) => prev - 1);
+      else setMedB((prev) => prev - 1);
+      setLocalBreak(nextBreak);
+      try {
+        await liveApi.setBreak({
+          active: true,
+          note: `medical:${teamKey}`,
+          type: "medical",
+          afterGame: curIdx,
+          expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
+          userMatch: isUserMatch,
+        });
+      } catch (error) {
+        setLocalBreak(null);
+        if (teamKey === "A") setMedA((prev) => prev + 1);
+        else setMedB((prev) => prev + 1);
+        Toast.show({
+          type: "error",
+          text1: "Lỗi",
+          text2:
+            textOf(error?.data?.message) ||
+            textOf(error?.message) ||
+            "Không thể bật nghỉ y tế",
+        });
+      }
+    },
+    [
+      activeBreak,
+      curIdx,
+      ensureLiveOwner,
+      isUserMatch,
+      leftSide,
+      liveApi,
+      medA,
+      medB,
+      rightSide,
+    ],
+  );
   const handleContinue = useCallback(async () => {
     if (!ensureLiveOwner()) return;
     setLocalBreak(null);
@@ -2835,28 +2672,17 @@ export default function RefereeJudgePanel({ matchId }) {
         afterGame: curIdx,
         userMatch: isUserMatch,
       });
-<<<<<<< Updated upstream
-    } catch (e) {
-=======
     } catch (error) {
->>>>>>> Stashed changes
       Toast.show({
         type: "error",
         text1: "Lỗi",
         text2:
-<<<<<<< Updated upstream
-          textOf(e?.data?.message) ||
-          textOf(e?.error) ||
-=======
           textOf(error?.data?.message) ||
           textOf(error?.message) ||
->>>>>>> Stashed changes
           "Không thể tiếp tục trận",
       });
     }
-  }, [curIdx, ensureLiveOwner, isUserMatch, liveApi]);
-
-  // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
+  }, [curIdx, ensureLiveOwner, isUserMatch, liveApi]);  // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
   const canScoreByMatchState =
     match?.status === "live" &&
     !waitingStartActive &&
@@ -3408,7 +3234,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
   const shouldDockBottomCta = Boolean(cta) && (!isTightLandscape || !isPreMatch);
   const breakPalette =
-    localBreak?.type === "medical"
+    activeBreak?.type === "medical"
       ? {
           label: t.dark ? "#fca5a5" : "#dc2626",
           timer: t.dark ? "#fecaca" : "#dc2626",
@@ -4120,52 +3946,6 @@ export default function RefereeJudgePanel({ matchId }) {
             isTightLandscape && s.bottomBarCompact,
             needsStartAction && { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 12 },
           ]}>
-<<<<<<< Updated upstream
-	            {/* Clock / Break label — always on the left */}
-	            {localBreak ? (
-	              <Text
-	                style={[
-	                  s.clockText,
-	                  !needsStartAction && s.clockAbsolute,
-	                  !needsStartAction && isTightLandscape && s.clockInline,
-	                  {
-	                    color: breakPalette.label,
-	                    fontSize: 20,
-	                    fontWeight: "900",
-	                    textTransform: "uppercase",
-	                    letterSpacing: 0.5,
-	                  },
-	                ]}
-	              >
-	                {localBreak.type === "medical" ? "Nghỉ y tế" : "Timeout"}
-	              </Text>
-	            ) : (
-	              <LiveClock
-	                style={[
-	                  s.clockText,
-	                  !needsStartAction && s.clockAbsolute,
-	                  !needsStartAction && isTightLandscape && s.clockInline,
-	                  { color: t.colors.text },
-	                ]}
-	              />
-	            )}
-
-	            {localBreak ? (
-	              <View
-	                style={[
-	                  s.breakOverlay,
-	                  {
-	                    backgroundColor: breakPalette.overlayBg,
-	                    borderColor: breakPalette.overlayBorder,
-	                    borderWidth: 1,
-	                  },
-	                ]}
-	              >
-	                <BreakTimer
-	                  endTime={localBreak.endTime}
-	                  style={[s.breakTimer, { color: breakPalette.timer }]}
-	                />
-=======
             {/* Clock / Break label — always on the left */}
             {activeBreak ? (
               <Text
@@ -4199,7 +3979,6 @@ export default function RefereeJudgePanel({ matchId }) {
             {activeBreak ? (
               <View style={s.breakOverlay}>
                 <BreakTimer endTime={activeBreak.endTime} style={s.breakTimer} />
->>>>>>> Stashed changes
 
 	                <Ripple
 	                  onPress={handleContinue}
