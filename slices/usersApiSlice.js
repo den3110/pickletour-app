@@ -112,6 +112,13 @@ export const userApiSlice = apiSlice.injectEndpoints({
         method: "POST",
       }),
     }),
+    getOAuthAuthorizeContext: builder.query({
+      query: (search = "") => ({
+        url: `/api/oauth/authorize/context${search ? `?${search}` : ""}`,
+        method: "GET",
+      }),
+      keepUnusedDataFor: 0,
+    }),
     // ... login, register đang có
     forgotPassword: builder.mutation({
       query: (body) => ({
@@ -224,6 +231,7 @@ export const {
   useDeleteRatingHistoryMutation,
   useGetUserAchievementsQuery,
   useIssueOsAuthTokenMutation,
+  useLazyGetOAuthAuthorizeContextQuery,
   useReauthQuery,
   useGetKycCheckDataQuery,
   useUpdateKycStatusMutation,

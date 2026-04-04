@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -10,7 +11,47 @@ import {
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useSelector } from "react-redux";
 
-import { useIssueOsAuthTokenMutation } from "@/slices/usersApiSlice";
+import {
+  useIssueOsAuthTokenMutation,
+  useLazyGetOAuthAuthorizeContextQuery,
+} from "@/slices/usersApiSlice";
+
+type LiveAuthParams = {
+  continueUrl?: string | string[];
+  targetUrl?: string | string[];
+  callbackUri?: string | string[];
+};
+
+type OAuthAuthorizeRequest = {
+  client_id: string;
+  redirect_uri: string;
+  response_type: string;
+  scope: string;
+  state: string;
+  code_challenge: string;
+  code_challenge_method: string;
+};
+
+type OAuthAuthorizeContext = {
+  authenticated?: boolean;
+  canAuthorize?: boolean;
+  message?: string;
+  reason?: string;
+  user?: {
+    name?: string;
+    nickname?: string;
+    email?: string;
+  };
+  app?: {
+    name?: string;
+  };
+  manageableTournaments?: {
+    _id?: string;
+    name?: string;
+    status?: string;
+  }[];
+  roleSummary?: string;
+};
 
 function normalizeParam(value: string | string[] | undefined, fallback = "") {
   if (Array.isArray(value)) {
@@ -28,12 +69,82 @@ function appendQuery(url: string, key: string, value: string) {
   }
 }
 
+function parseAuthorizeRequest(continueUrl: string) {
+  if (!continueUrl) {
+    return {
+      error: "Thiếu yêu cầu xác thực từ PickleTour Live.",
+      request: null as OAuthAuthorizeRequest | null,
+    };
+  }
+
+  try {
+    const url = new URL(continueUrl);
+    const params = url.searchParams;
+    const request: OAuthAuthorizeRequest = {
+      client_id: String(params.get("client_id") || "").trim(),
+      redirect_uri: String(params.get("redirect_uri") || "").trim(),
+      response_type: String(params.get("response_type") || "").trim(),
+      scope: String(params.get("scope") || "openid profile").trim(),
+      state: String(params.get("state") || "").trim(),
+      code_challenge: String(params.get("code_challenge") || "").trim(),
+      code_challenge_method: String(
+        params.get("code_challenge_method") || "S256",
+      ).trim(),
+    };
+
+    const missing = [
+      "client_id",
+      "redirect_uri",
+      "response_type",
+      "state",
+      "code_challenge",
+      "code_challenge_method",
+    ].filter((key) => {
+      const value = request[key as keyof OAuthAuthorizeRequest];
+      return !String(value || "").trim();
+    });
+
+    if (missing.length > 0) {
+      return {
+        error: `Yêu cầu cấp quyền không hợp lệ. Thiếu ${missing.join(", ")}.`,
+        request: null as OAuthAuthorizeRequest | null,
+      };
+    }
+
+    if (request.response_type !== "code") {
+      return {
+        error: "Yêu cầu cấp quyền không hợp lệ. response_type phải là code.",
+        request: null as OAuthAuthorizeRequest | null,
+      };
+    }
+
+    return { error: "", request };
+  } catch {
+    return {
+      error: "Không đọc được yêu cầu xác thực từ PickleTour Live.",
+      request: null as OAuthAuthorizeRequest | null,
+    };
+  }
+}
+
+function buildAuthorizeSearch(
+  request: OAuthAuthorizeRequest,
+  osAuthToken: string,
+) {
+  const search = new URLSearchParams();
+  search.set("client_id", request.client_id);
+  search.set("redirect_uri", request.redirect_uri);
+  search.set("response_type", request.response_type);
+  search.set("scope", request.scope || "openid profile");
+  search.set("state", request.state);
+  search.set("code_challenge", request.code_challenge);
+  search.set("code_challenge_method", request.code_challenge_method || "S256");
+  search.set("os_auth_token", osAuthToken);
+  return search.toString();
+}
+
 export default function LiveAuthScreen() {
-  const params = useLocalSearchParams<{
-    continueUrl?: string | string[];
-    targetUrl?: string | string[];
-    callbackUri?: string | string[];
-  }>();
+  const params = useLocalSearchParams<LiveAuthParams>();
 
   const continueUrl = useMemo(
     () => normalizeParam(params.continueUrl),
@@ -48,12 +159,25 @@ export default function LiveAuthScreen() {
     [params.callbackUri],
   );
 
+  const authorizePayload = useMemo(
+    () => parseAuthorizeRequest(continueUrl),
+    [continueUrl],
+  );
+  const authorizeRequest = authorizePayload.request;
+
   const userInfo = useSelector((state: any) => state.auth?.userInfo);
-  const [issueOsAuthToken, { isLoading }] = useIssueOsAuthTokenMutation();
+  const [issueOsAuthToken] = useIssueOsAuthTokenMutation();
+  const [fetchAuthorizeContext] = useLazyGetOAuthAuthorizeContextQuery();
+
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [message, setMessage] = useState(
-    "Đang chuẩn bị xác thực PickleTour Live...",
+    "Đang chuẩn bị màn cấp quyền cho PickleTour Live...",
   );
   const [error, setError] = useState("");
+  const [contextData, setContextData] = useState<OAuthAuthorizeContext | null>(
+    null,
+  );
 
   const returnTo = useMemo(() => {
     if (!continueUrl) return "/login";
@@ -85,8 +209,13 @@ export default function LiveAuthScreen() {
   };
 
   useEffect(() => {
-    if (!continueUrl) {
-      setError("Thiếu yêu cầu xác thực từ PickleTour Live.");
+    if (authorizePayload.error) {
+      setError(authorizePayload.error);
+      setContextData(null);
+      return;
+    }
+
+    if (!authorizeRequest) {
       return;
     }
 
@@ -99,30 +228,32 @@ export default function LiveAuthScreen() {
 
     (async () => {
       try {
-        setMessage("Đang lấy phiên xác thực PickleTour...");
-        const res = await issueOsAuthToken().unwrap();
-        const osAuthToken = String(res?.osAuthToken || "").trim();
+        setError("");
+        setContextData(null);
+        setIsPreparing(true);
+        setMessage("Đang kiểm tra quyền dùng PickleTour Live...");
+
+        const tokenResponse = await issueOsAuthToken().unwrap();
+        const osAuthToken = String(tokenResponse?.osAuthToken || "").trim();
         if (!osAuthToken) {
           throw new Error("Không lấy được phiên xác thực PickleTour.");
         }
 
-        let callbackUrl = appendQuery(callbackUri, "osAuthToken", osAuthToken);
-        if (targetUrl) {
-          callbackUrl = appendQuery(callbackUrl, "targetUrl", targetUrl);
-        }
-        if (continueUrl) {
-          callbackUrl = appendQuery(callbackUrl, "continueUrl", continueUrl);
-        }
+        const context = await fetchAuthorizeContext(
+          buildAuthorizeSearch(authorizeRequest, osAuthToken),
+          false,
+        ).unwrap();
 
         if (cancelled) return;
 
-        setMessage("Đang quay lại PickleTour Live...");
-        try {
-          await Linking.openURL(callbackUrl);
-        } catch {
-          if (cancelled) return;
-          await openWebFallback(
-            "Không mở lại được PickleTour Live. Chuyển sang xác thực web...",
+        setContextData(context);
+
+        if (context?.canAuthorize) {
+          setMessage("PickleTour Live đang chờ bạn cấp quyền.");
+        } else {
+          setMessage(
+            context?.message ||
+              "Tài khoản này hiện chưa thể cấp quyền cho PickleTour Live.",
           );
         }
       } catch (e: any) {
@@ -131,49 +262,194 @@ export default function LiveAuthScreen() {
           String(
             e?.data?.message ||
               e?.message ||
-              "Không thể chuyển phiên đăng nhập sang PickleTour Live.",
+              "Không thể tải thông tin cấp quyền PickleTour Live.",
           ),
         );
+      } finally {
+        if (!cancelled) {
+          setIsPreparing(false);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [callbackUri, continueUrl, issueOsAuthToken, returnTo, targetUrl, userInfo?.token]);
+  }, [
+    authorizePayload.error,
+    authorizeRequest,
+    fetchAuthorizeContext,
+    issueOsAuthToken,
+    returnTo,
+    userInfo?.token,
+  ]);
+
+  const manageableTournaments = contextData?.manageableTournaments || [];
+  const canAuthorize = Boolean(contextData?.canAuthorize);
+  const accountName =
+    contextData?.user?.name ||
+    contextData?.user?.nickname ||
+    contextData?.user?.email ||
+    "PickleTour User";
+
+  const handleApprove = async () => {
+    if (!authorizeRequest) {
+      setError("Thiếu yêu cầu cấp quyền từ PickleTour Live.");
+      return;
+    }
+
+    try {
+      setError("");
+      setIsAuthorizing(true);
+      setMessage("Đang cấp quyền và quay lại PickleTour Live...");
+
+      const tokenResponse = await issueOsAuthToken().unwrap();
+      const osAuthToken = String(tokenResponse?.osAuthToken || "").trim();
+      if (!osAuthToken) {
+        throw new Error("Không lấy được phiên xác thực PickleTour.");
+      }
+
+      let callbackUrl = appendQuery(callbackUri, "osAuthToken", osAuthToken);
+      if (targetUrl) {
+        callbackUrl = appendQuery(callbackUrl, "targetUrl", targetUrl);
+      }
+      if (continueUrl) {
+        callbackUrl = appendQuery(callbackUrl, "continueUrl", continueUrl);
+      }
+
+      try {
+        await Linking.openURL(callbackUrl);
+      } catch {
+        await openWebFallback(
+          "Không mở lại được PickleTour Live. Chuyển sang xác thực web...",
+        );
+      }
+    } catch (e: any) {
+      setError(
+        String(
+          e?.data?.message ||
+            e?.message ||
+            "Không thể hoàn tất cấp quyền cho PickleTour Live.",
+        ),
+      );
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
 
   return (
     <View style={styles.page}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>PICKLETOUR</Text>
-        <Text style={styles.title}>Tiếp tục với PickleTour</Text>
-        <Text style={styles.body}>
-          Dùng phiên đăng nhập hiện tại của PickleTour để cấp quyền cho
-          PickleTour Live.
-        </Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PICKLETOUR</Text>
+          <Text style={styles.title}>Ủy quyền PickleTour Live</Text>
+          <Text style={styles.body}>
+            Xác nhận cho phép PickleTour Live dùng phiên đăng nhập hiện tại để
+            vào app live và quản lý các giải bạn được cấp quyền.
+          </Text>
 
-        {error ? (
-          <View style={styles.alert}>
-            <Text style={styles.alertText}>{error}</Text>
-          </View>
-        ) : (
-          <View style={styles.progressRow}>
-            <ActivityIndicator color="#25c2a0" />
-            <Text style={styles.body}>
-              {isLoading ? "Đang xác thực..." : message}
-            </Text>
-          </View>
-        )}
+          {error ? (
+            <View style={styles.alert}>
+              <Text style={styles.alertText}>{error}</Text>
+            </View>
+          ) : null}
 
-        <Pressable onPress={() => openWebFallback()} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Mở web thay thế</Text>
-        </Pressable>
+          {isPreparing ? (
+            <View style={styles.progressBlock}>
+              <ActivityIndicator color="#25c2a0" />
+              <Text style={styles.body}>{message}</Text>
+            </View>
+          ) : null}
 
-        <Pressable onPress={() => router.replace("/(tabs)")} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Quay lại PickleTour</Text>
-        </Pressable>
-      </View>
+          {!isPreparing && contextData ? (
+            <>
+              <View style={styles.metaRow}>
+                <View style={styles.metaTile}>
+                  <Text style={styles.metaLabel}>Tài khoản</Text>
+                  <Text style={styles.metaValue}>{accountName}</Text>
+                </View>
+                <View style={styles.metaTile}>
+                  <Text style={styles.metaLabel}>Quyền</Text>
+                  <Text style={styles.metaValue}>
+                    {contextData?.roleSummary || "PickleTour Live"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Giải được phép live</Text>
+                {manageableTournaments.length > 0 ? (
+                  manageableTournaments.slice(0, 6).map((tournament) => (
+                    <View key={tournament._id || tournament.name} style={styles.tournamentCard}>
+                      <Text style={styles.tournamentName}>
+                        {tournament.name || "Giải đấu"}
+                      </Text>
+                      <Text style={styles.tournamentStatus}>
+                        {tournament.status || "active"}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.body}>
+                    {contextData?.message ||
+                      "Tài khoản admin sẽ dùng danh sách giải hiện có của hệ thống."}
+                  </Text>
+                )}
+              </View>
+
+              {canAuthorize ? (
+                <View style={styles.actionStack}>
+                  <Pressable
+                    onPress={handleApprove}
+                    disabled={isAuthorizing}
+                    style={[
+                      styles.primaryButton,
+                      isAuthorizing && styles.buttonDisabled,
+                    ]}
+                  >
+                    {isAuthorizing ? (
+                      <ActivityIndicator color="#04110b" />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>Cho phép</Text>
+                    )}
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => router.replace("/(tabs)")}
+                    style={styles.ghostButton}
+                  >
+                    <Text style={styles.ghostButtonText}>Hủy</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.actionStack}>
+                  <Text style={styles.body}>
+                    {contextData?.message ||
+                      "Tài khoản này hiện chưa thể dùng PickleTour Live."}
+                  </Text>
+                  <Pressable
+                    onPress={() => router.replace("/(tabs)")}
+                    style={styles.ghostButton}
+                  >
+                    <Text style={styles.ghostButtonText}>Quay lại PickleTour</Text>
+                  </Pressable>
+                </View>
+              )}
+            </>
+          ) : null}
+
+          <Pressable
+            onPress={() => openWebFallback()}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Mở web thay thế</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -182,17 +458,20 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: "#071018",
+  },
+  scrollContent: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
   card: {
     width: "100%",
-    maxWidth: 420,
+    maxWidth: 460,
     borderRadius: 28,
     backgroundColor: "#101820",
     padding: 24,
-    gap: 16,
+    gap: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -212,10 +491,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  progressRow: {
+  progressBlock: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    minHeight: 48,
   },
   alert: {
     borderRadius: 18,
@@ -227,15 +507,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  secondaryButton: {
+  metaRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  metaTile: {
+    flex: 1,
+    borderRadius: 18,
+    backgroundColor: "#13202a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    padding: 14,
+    gap: 6,
+  },
+  metaLabel: {
+    color: "#7cc0ff",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  metaValue: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  section: {
+    gap: 10,
+  },
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  tournamentCard: {
+    borderRadius: 16,
+    backgroundColor: "#13202a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    padding: 14,
+    gap: 4,
+  },
+  tournamentName: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  tournamentStatus: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 13,
+  },
+  actionStack: {
+    gap: 12,
+  },
+  primaryButton: {
     height: 52,
     borderRadius: 999,
     backgroundColor: "#25c2a0",
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryButtonText: {
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
     color: "#04110b",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  secondaryButton: {
+    height: 52,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(37,194,160,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonText: {
+    color: "#25c2a0",
     fontWeight: "800",
     fontSize: 15,
   },
