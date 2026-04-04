@@ -2520,169 +2520,104 @@ export default function RefereeJudgePanel({ matchId }) {
   const [toB, setToB] = useState(timeoutPerGame);
   const [medA, setMedA] = useState(medicalLimit);
   const [medB, setMedB] = useState(medicalLimit);
-  const [localBreak, setLocalBreak] = useState<{
-    type: "timeout" | "medical";
-    endTime: number;
-    teamKey: "A" | "B" | "";
-  } | null>(null);
-  const syncedTimedBreak = useMemo(() => {
-    if (!breakState?.active) return null;
-    const type = breakState?.type;
-    if (type !== "timeout" && type !== "medical") return null;
-    const expectedResumeAtMs = breakState?.expectedResumeAt
-      ? new Date(breakState.expectedResumeAt).getTime()
-      : null;
-    return {
-      type,
-      endTime:
-        Number.isFinite(expectedResumeAtMs) && expectedResumeAtMs > 0
-          ? expectedResumeAtMs
-          : Date.now(),
-      teamKey: (textOf(breakState?.note).split(":")[1] || "") as "A" | "B" | "",
-    };
-  }, [
-    breakState?.active,
-    breakState?.expectedResumeAt,
-    breakState?.note,
-    breakState?.type,
-  ]);
-  const activeBreak = localBreak || syncedTimedBreak;
+
+  // 3. State quản lý trạng thái nghỉ cục bộ (Local Break)
+  // localBreak = null hoặc { type: 'timeout'|'medical', endTime: number }
+  const [localBreak, setLocalBreak] = useState(null);
+  // const [timerStr, setTimerStr] = useState("00:00");
+
+  // Reset counter khi sang game mới
   useEffect(() => {
     setToA(timeoutPerGame);
     setToB(timeoutPerGame);
-    setMedA(medicalLimit);
-    setMedB(medicalLimit);
-    setLocalBreak(null);
-  }, [curIdx, medicalLimit, timeoutPerGame]);
-  useEffect(() => {
-    if (breakState?.active) {
-      setLocalBreak(null);
-    }
-  }, [breakState?.active, breakState?.expectedResumeAt, breakState?.type]);
-  const handleCallTimeout = useCallback(
-    async (teamSideUI) => {
-      if (!ensureLiveOwner()) return;
-      if (activeBreak) return;
-      const teamKey = teamSideUI === "left" ? leftSide : rightSide;
-      const currentVal = teamKey === "A" ? toA : toB;
-      if (currentVal <= 0) return;
-      const durationMs = timeoutMinutes * 60 * 1000;
-      const nextBreak = {
-        type: "timeout" as const,
-        endTime: Date.now() + durationMs,
-        teamKey,
-      };
-      if (teamKey === "A") setToA((prev) => prev - 1);
-      else setToB((prev) => prev - 1);
-      setLocalBreak(nextBreak);
-      try {
-        await liveApi.setBreak({
-          active: true,
-          note: `timeout:${teamKey}`,
-          type: "timeout",
-          afterGame: curIdx,
-          expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
-          userMatch: isUserMatch,
-        });
-      } catch (error) {
-        setLocalBreak(null);
-        if (teamKey === "A") setToA((prev) => prev + 1);
-        else setToB((prev) => prev + 1);
-        Toast.show({
-          type: "error",
-          text1: "Lỗi",
-          text2:
-            textOf(error?.data?.message) ||
-            textOf(error?.message) ||
-            "Không thể bật timeout",
-        });
-      }
-    },
-    [
-      activeBreak,
-      curIdx,
-      ensureLiveOwner,
-      isUserMatch,
-      leftSide,
-      liveApi,
-      rightSide,
-      timeoutMinutes,
-      toA,
-      toB,
-    ],
-  );
-  const handleCallMedical = useCallback(
-    async (teamSideUI) => {
-      if (!ensureLiveOwner()) return;
-      if (activeBreak) return;
-      const teamKey = teamSideUI === "left" ? leftSide : rightSide;
-      const currentVal = teamKey === "A" ? medA : medB;
-      if (currentVal <= 0) return;
-      const durationMs = 5 * 60 * 1000;
-      const nextBreak = {
-        type: "medical" as const,
-        endTime: Date.now() + durationMs,
-        teamKey,
-      };
-      if (teamKey === "A") setMedA((prev) => prev - 1);
-      else setMedB((prev) => prev - 1);
-      setLocalBreak(nextBreak);
-      try {
-        await liveApi.setBreak({
-          active: true,
-          note: `medical:${teamKey}`,
-          type: "medical",
-          afterGame: curIdx,
-          expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
-          userMatch: isUserMatch,
-        });
-      } catch (error) {
-        setLocalBreak(null);
-        if (teamKey === "A") setMedA((prev) => prev + 1);
-        else setMedB((prev) => prev + 1);
-        Toast.show({
-          type: "error",
-          text1: "Lỗi",
-          text2:
-            textOf(error?.data?.message) ||
-            textOf(error?.message) ||
-            "Không thể bật nghỉ y tế",
-        });
-      }
-    },
-    [
-      activeBreak,
-      curIdx,
-      ensureLiveOwner,
-      isUserMatch,
-      leftSide,
-      liveApi,
-      medA,
-      medB,
-      rightSide,
-    ],
-  );
-  const handleContinue = useCallback(async () => {
+    setLocalBreak(null); // Reset trạng thái nghỉ nếu sang game mới
+  }, [curIdx, timeoutPerGame]);
+
+  // 4. Timer đếm ngược (Chạy khi localBreak != null)
+  // useEffect(() => {
+  //   let interval;
+  //   if (localBreak) {
+  //     const updateTimer = () => {
+  //       const remaining = localBreak.endTime - Date.now();
+  //       if (remaining <= 0) {
+  //         setTimerStr("00:00");
+  //         // Tự động kết thúc nghỉ khi hết giờ (tuỳ chọn, ở đây mình để user bấm Tiếp tục)
+  //       } else {
+  //         // Format mm:ss (02:05)
+  //         const m = Math.floor(remaining / 60000)
+  //           .toString()
+  //           .padStart(2, "0");
+  //         const s = Math.floor((remaining % 60000) / 1000)
+  //           .toString()
+  //           .padStart(2, "0");
+  //         setTimerStr(`${m}:${s}`);
+  //       }
+  //     };
+  //     updateTimer();
+  //     interval = setInterval(updateTimer, 1000);
+  //   } else {
+  //     setTimerStr("00:00");
+  //   }
+  //   return () => clearInterval(interval);
+  // }, [localBreak]);
+
+  // 5. Hàm xử lý gọi Timeout/Y tế (Chỉ trừ số & bật local timer)
+  const handleCallTimeout = useCallback(async (teamSideUI) => {
     if (!ensureLiveOwner()) return;
-    setLocalBreak(null);
-    try {
-      await liveApi.setBreak({
-        active: false,
-        note: "",
-        afterGame: curIdx,
-        userMatch: isUserMatch,
-      });
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Lỗi",
-        text2:
-          textOf(error?.data?.message) ||
-          textOf(error?.message) ||
-          "Không thể tiếp tục trận",
-      });
-    }
-  }, [curIdx, ensureLiveOwner, isUserMatch, liveApi]);  // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
+    if (localBreak) return; // Đang nghỉ thì không bấm được
+    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+    const currentVal = teamKey === "A" ? toA : toB;
+    if (currentVal <= 0) return;
+
+    // Trừ số lượng (LOCAL STATE)
+    if (teamKey === "A") setToA((p) => p - 1);
+    else setToB((p) => p - 1);
+
+    // Kích hoạt timer cục bộ (Thời gian từ config)
+    const durationMs = timeoutMinutes * 60 * 1000;
+    setLocalBreak({
+      type: "timeout",
+      endTime: Date.now() + durationMs,
+      teamKey,
+    });
+
+    // API Call (Tùy chọn, nếu bạn vẫn muốn log lên server)
+    // socket?.emit('timeout:called', { matchId: match._id, teamKey });
+  }, [
+    ensureLiveOwner,
+    localBreak,
+    leftSide,
+    rightSide,
+    toA,
+    toB,
+    timeoutMinutes,
+  ]);
+
+  const handleCallMedical = useCallback(async (teamSideUI) => {
+    if (!ensureLiveOwner()) return;
+    if (localBreak) return;
+    const teamKey = teamSideUI === "left" ? leftSide : rightSide;
+    const currentVal = teamKey === "A" ? medA : medB;
+    if (currentVal <= 0) return;
+
+    if (teamKey === "A") setMedA((p) => p - 1);
+    else setMedB((p) => p - 1);
+
+    // Y tế nghỉ 5 phút (ví dụ)
+    const durationMs = 5 * 60 * 1000;
+    setLocalBreak({
+      type: "medical",
+      endTime: Date.now() + durationMs,
+      teamKey,
+    });
+  }, [ensureLiveOwner, localBreak, leftSide, rightSide, medA, medB]);
+
+  const handleContinue = useCallback(() => {
+    if (!ensureLiveOwner()) return;
+    setLocalBreak(null); // Tắt màn hình nghỉ
+  }, [ensureLiveOwner]);
+
+  // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
   const canScoreByMatchState =
     match?.status === "live" &&
     !waitingStartActive &&
