@@ -1,5 +1,15 @@
 import { getLiveMatchCourtText } from "./courtDisplay";
 
+function getLiveTeamName(match: any = {}, side: "A" | "B") {
+  return (
+    match?.[`team${side}Name`] ||
+    match?.teams?.[side]?.name ||
+    match?.[`pair${side}`]?.displayName ||
+    match?.[`pair${side}`]?.name ||
+    `Đội ${side}`
+  );
+}
+
 export function sid(value: any) {
   if (!value) return "";
   if (typeof value === "string" || typeof value === "number") {
@@ -56,8 +66,8 @@ export function getLiveStatusLabel(status?: string | null) {
 }
 
 export function getLiveTeamLine(match: any = {}) {
-  const teamA = match?.pairA?.name || "Đội A";
-  const teamB = match?.pairB?.name || "Đội B";
+  const teamA = getLiveTeamName(match, "A");
+  const teamB = getLiveTeamName(match, "B");
   return `${teamA} vs ${teamB}`;
 }
 

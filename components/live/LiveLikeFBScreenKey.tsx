@@ -56,6 +56,7 @@ import GapWarningOverlay from "./components/GapWarningOverlay";
 import StoppingOverlay from "./components/StoppingOverlay";
 // import LiveTimerBar from "./components/LiveTimerBar";
 import { videoUploader } from "@/utils/videoUploader";
+import { getPairDisplayName } from "@/utils/matchDisplay";
 
 /* ====== Native camera/rtmp ====== */
 const COMPONENT_NAME = "RtmpPreviewView";
@@ -1297,22 +1298,13 @@ export default function LiveLikeFBScreenKey({
           // Logic lấy tên hiển thị
           const getNm = (p: any, def: string) => {
             if (!p) return def;
-            if (p.name) return p.name; // structure teams.A.name
-            if (p.teamName) return p.teamName;
-            // structure pairA.player1...
-            const pl1 =
-              p.player1?.nickName ||
-              p.player1?.fullName ||
-              p.player1?.displayName ||
-              "";
-            const pl2 =
-              p.player2?.nickName ||
-              p.player2?.fullName ||
-              p.player2?.displayName ||
-              "";
-            if (p.player2)
-              return pl1 && pl2 ? `${pl1} / ${pl2}` : pl1 || pl2 || def;
-            return pl1 || def;
+            return (
+              getPairDisplayName(p, finalData) ||
+              p.teamName ||
+              p.displayName ||
+              p.name ||
+              def
+            );
           };
 
           const teamAName = getNm(p1, "Team A");
