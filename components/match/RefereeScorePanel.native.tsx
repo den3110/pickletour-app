@@ -234,7 +234,7 @@ const NameBadge = memo(
   }) {
     const t = useTokens();
     const [imgError, setImgError] = useState(false);
-    const mode = resolveDisplayMode(user, source);
+    const mode = resolveDisplayMode(source, user);
     const primaryName = getPlayerDisplayName(user, source) || "—";
     const secondaryName =
       mode === "fullName"
