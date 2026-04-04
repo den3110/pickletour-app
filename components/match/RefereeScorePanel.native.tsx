@@ -567,6 +567,15 @@ const TimeoutHeader = memo(function TimeoutHeader({
 }) {
   const t = useTokens();
   const isDisabled = disabled;
+  const usedBubbleTone = t.dark
+    ? { backgroundColor: "#1f2937", borderColor: "#334155", foreground: "#94a3b8" }
+    : { backgroundColor: "#e2e8f0", borderColor: "#cbd5e1", foreground: "#475569" };
+  const timeoutBubbleTone = t.dark
+    ? { backgroundColor: "#92400e", borderColor: "#f59e0b", foreground: "#fef3c7" }
+    : { backgroundColor: "#fbbf24", borderColor: "#f59e0b", foreground: "#111827" };
+  const medicalBubbleTone = t.dark
+    ? { backgroundColor: "#7f1d1d", borderColor: "#ef4444", foreground: "#fee2e2" }
+    : { backgroundColor: "#ef4444", borderColor: "#dc2626", foreground: "#ffffff" };
 
   const leftScrollRef = useRef(null);
   const rightScrollRef = useRef(null);
@@ -582,8 +591,11 @@ const TimeoutHeader = memo(function TimeoutHeader({
       const isUsed = i >= remaining;
       const isMed = type === "med";
 
-      // Màu xám đậm cho trạng thái đã dùng
-      const usedColor = "#475569";
+      const tone = isUsed
+        ? usedBubbleTone
+        : isMed
+          ? medicalBubbleTone
+          : timeoutBubbleTone;
 
       buttons.push(
         <Ripple
@@ -599,7 +611,10 @@ const TimeoutHeader = memo(function TimeoutHeader({
             style={[
               isMed ? s.winAdjustBubble : s.winDigitBubble,
               compact && (isMed ? s.winAdjustBubbleCompact : s.winDigitBubbleCompact),
-              isUsed ? s.bubbleUsed : isMed ? s.winAdjustPlus : {},
+              {
+                backgroundColor: tone.backgroundColor,
+                borderColor: tone.borderColor,
+              },
               isDisabled && !isUsed && { opacity: 0.5 },
             ]}
           >
@@ -607,14 +622,14 @@ const TimeoutHeader = memo(function TimeoutHeader({
               <MaterialIcons
                 name="add"
                 size={compact ? 12 : 14}
-                color={isUsed ? usedColor : "#fff"}
+                color={tone.foreground}
               />
             ) : (
               <Text
                 style={[
                   s.winDigitText,
                   compact && s.winDigitTextCompact,
-                  isUsed && { color: usedColor },
+                  { color: tone.foreground },
                 ]}
               >
                 {timeoutMinutes || 1}
@@ -3248,6 +3263,28 @@ export default function RefereeJudgePanel({ matchId }) {
   const midIcon = isServer1 ? "swap-vert" : "swap-calls";
   const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
   const shouldDockBottomCta = Boolean(cta) && (!isTightLandscape || !isPreMatch);
+  const breakPalette =
+    localBreak?.type === "medical"
+      ? {
+          label: t.dark ? "#fca5a5" : "#dc2626",
+          timer: t.dark ? "#fecaca" : "#dc2626",
+          overlayBg: t.dark ? "rgba(45, 16, 16, 0.96)" : "rgba(255, 245, 245, 0.96)",
+          overlayBorder: t.dark ? "#7f1d1d" : "#fecaca",
+          buttonBg: t.dark ? "#b91c1c" : "#dc2626",
+          buttonBorder: t.dark ? "#f87171" : "#ef4444",
+          buttonText: "#ffffff",
+          buttonShadow: t.dark ? "#ef4444" : "#dc2626",
+        }
+      : {
+          label: t.dark ? "#fbbf24" : "#d97706",
+          timer: t.dark ? "#fde68a" : "#b45309",
+          overlayBg: t.dark ? "rgba(43, 29, 10, 0.96)" : "rgba(255, 251, 235, 0.96)",
+          overlayBorder: t.dark ? "#92400e" : "#fcd34d",
+          buttonBg: t.dark ? "#b45309" : "#d97706",
+          buttonBorder: t.dark ? "#fbbf24" : "#f59e0b",
+          buttonText: "#ffffff",
+          buttonShadow: t.dark ? "#f59e0b" : "#d97706",
+        };
 
   // ====== Ask-once-at-half-set per game ======
   useEffect(() => {
@@ -3939,50 +3976,80 @@ export default function RefereeJudgePanel({ matchId }) {
             isTightLandscape && s.bottomBarCompact,
             needsStartAction && { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 12 },
           ]}>
-            {/* Clock / Break label — always on the left */}
-            {localBreak ? (
-              <Text
-                style={[
-                  s.clockText,
-                  !needsStartAction && s.clockAbsolute,
-                  !needsStartAction && isTightLandscape && s.clockInline,
-                  {
-                    color:
-                      localBreak.type === "medical" ? "#dc2626" : "#d97706",
-                    fontSize: 20,
-                    fontWeight: "900",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  },
-                ]}
-              >
-                {localBreak.type === "medical" ? "Nghỉ y tế" : "Timeout"}
-              </Text>
-            ) : (
-              <LiveClock
-                style={[
-                  s.clockText,
-                  !needsStartAction && s.clockAbsolute,
-                  !needsStartAction && isTightLandscape && s.clockInline,
-                  { color: t.colors.text },
-                ]}
-              />
-            )}
+	            {/* Clock / Break label — always on the left */}
+	            {localBreak ? (
+	              <Text
+	                style={[
+	                  s.clockText,
+	                  !needsStartAction && s.clockAbsolute,
+	                  !needsStartAction && isTightLandscape && s.clockInline,
+	                  {
+	                    color: breakPalette.label,
+	                    fontSize: 20,
+	                    fontWeight: "900",
+	                    textTransform: "uppercase",
+	                    letterSpacing: 0.5,
+	                  },
+	                ]}
+	              >
+	                {localBreak.type === "medical" ? "Nghỉ y tế" : "Timeout"}
+	              </Text>
+	            ) : (
+	              <LiveClock
+	                style={[
+	                  s.clockText,
+	                  !needsStartAction && s.clockAbsolute,
+	                  !needsStartAction && isTightLandscape && s.clockInline,
+	                  { color: t.colors.text },
+	                ]}
+	              />
+	            )}
 
-            {localBreak ? (
-              <View style={s.breakOverlay}>
-                <BreakTimer endTime={localBreak.endTime} style={s.breakTimer} />
+	            {localBreak ? (
+	              <View
+	                style={[
+	                  s.breakOverlay,
+	                  {
+	                    backgroundColor: breakPalette.overlayBg,
+	                    borderColor: breakPalette.overlayBorder,
+	                    borderWidth: 1,
+	                  },
+	                ]}
+	              >
+	                <BreakTimer
+	                  endTime={localBreak.endTime}
+	                  style={[s.breakTimer, { color: breakPalette.timer }]}
+	                />
 
-                <Ripple
-                  onPress={handleContinue}
-                  style={s.btnContinue}
-                  rippleContainerBorderRadius={12}
-                >
-                  <Text style={s.btnContinueText}>Tiếp tục</Text>
-                  <MaterialIcons name="play-arrow" size={24} color="#fff" />
-                </Ripple>
-              </View>
-            ) : needsStartAction ? (
+	                <Ripple
+	                  onPress={handleContinue}
+	                  style={[
+	                    s.btnContinue,
+	                    {
+	                      backgroundColor: breakPalette.buttonBg,
+	                      borderColor: breakPalette.buttonBorder,
+	                      borderWidth: 1,
+	                      shadowColor: breakPalette.buttonShadow,
+	                    },
+	                  ]}
+	                  rippleContainerBorderRadius={12}
+	                >
+	                  <Text
+	                    style={[
+	                      s.btnContinueText,
+	                      { color: breakPalette.buttonText },
+	                    ]}
+	                  >
+	                    Tiếp tục
+	                  </Text>
+	                  <MaterialIcons
+	                    name="play-arrow"
+	                    size={24}
+	                    color={breakPalette.buttonText}
+	                  />
+	                </Ripple>
+	              </View>
+	            ) : needsStartAction ? (
               /* Pre-match: CTA buttons inline in 1 row */
               <View style={[s.row, { gap: 8 }]}>
                 {cta && (
