@@ -143,6 +143,37 @@ const isGameWin = (a = 0, b = 0, ptw = 11, wbt = true) => {
 };
 const currentSlotFromBase = (base, teamScore) =>
   Number(teamScore) % 2 === 0 ? base : base === 1 ? 2 : 1;
+
+const breakTypeFromNote = (note) => {
+  const prefix = textOf(note).split(":")[0].trim().toLowerCase();
+  return prefix === "medical" || prefix === "timeout" ? prefix : "";
+};
+
+const normalizeBreakState = (rawBreak) => {
+  if (!rawBreak) return null;
+  if (typeof rawBreak === "object") {
+    const note = textOf(rawBreak.note);
+    return {
+      active:
+        rawBreak.active === true ||
+        rawBreak.isActive === true ||
+        rawBreak.enabled === true,
+      afterGame:
+        typeof rawBreak.afterGame === "number" ? rawBreak.afterGame : null,
+      note,
+      startedAt: rawBreak.startedAt || rawBreak.startAt || null,
+      expectedResumeAt:
+        rawBreak.expectedResumeAt || rawBreak.resumeAt || rawBreak.endTime || null,
+      type: textOf(rawBreak.type).toLowerCase() || breakTypeFromNote(note),
+    };
+  }
+  const normalized = String(rawBreak).toLowerCase();
+  if (normalized === "1" || normalized === "true") {
+    return { active: true, note: "", expectedResumeAt: null, type: "timeout" };
+  }
+  return null;
+};
+
 const getCurrentSlotOfUser = ({
   user,
   teamKey,
@@ -1649,7 +1680,6 @@ export default function RefereeJudgePanel({ matchId }) {
   const isPreMatch =
     (match?.status !== "live" && gs.length === 0) ||
     match?.status === "scheduled";
-  const needsStartAction = isPreMatch || waitingStart;
   const [leftRight, setLeftRight] = useState({ left: "A", right: "B" });
   const leftSide = leftRight.left;
   const rightSide = leftRight.right;
@@ -1682,6 +1712,19 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const curB =
     guardOn && typeof g.b === "number" ? Math.max(serverB, g.b) : serverB;
+
+  const breakState = useMemo(
+    () => normalizeBreakState(match?.isBreak || match?.break || match?.pause),
+    [match?.break, match?.isBreak, match?.pause],
+  );
+  const syncedWaitingStart = useMemo(() => {
+    if (!breakState?.active) return false;
+    if (!Number.isInteger(breakState?.afterGame)) return false;
+    if (Number(breakState.afterGame) >= Number(curIdx)) return false;
+    return Number(curA) === 0 && Number(curB) === 0;
+  }, [breakState?.active, breakState?.afterGame, curA, curB, curIdx]);
+  const waitingStartActive = waitingStart || syncedWaitingStart;
+  const needsStartAction = isPreMatch || waitingStartActive;
 
   const playersA = useMemo(
     () => playersOf(match?.pairA, eventType),
@@ -1911,7 +1954,7 @@ export default function RefereeJudgePanel({ matchId }) {
     const isUserMatch = String(userMatch) === "true";
 
     // Nếu không phải 0-0 (đang đánh dở) hoặc đã init phiên này rồi thì thôi
-    if ((!is000 && !waitingStart) || inited) return;
+    if ((!is000 && !waitingStartActive) || inited) return;
 
     const currentServerId = serve?.serverId ? String(serve.serverId) : "";
 
@@ -1987,7 +2030,7 @@ export default function RefereeJudgePanel({ matchId }) {
     baseB,
     getUidAtSlotNow,
     userMatch,
-    waitingStart,
+    waitingStartActive,
     leftSide,
   ]);
 
@@ -2483,6 +2526,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // 3. State quản lý trạng thái nghỉ cục bộ (Local Break)
   // localBreak = null hoặc { type: 'timeout'|'medical', endTime: number }
   const [localBreak, setLocalBreak] = useState(null);
+<<<<<<< Updated upstream
   const parseBreakType = useCallback((typeValue, noteValue = "") => {
     const rawType = String(typeValue || "")
       .trim()
@@ -2504,6 +2548,25 @@ export default function RefereeJudgePanel({ matchId }) {
     return token === "A" || token === "B" ? token : "";
   }, []);
   // const [timerStr, setTimerStr] = useState("00:00");
+=======
+  const syncedTimedBreak = useMemo(() => {
+    if (!breakState?.active) return null;
+    const type = breakState?.type;
+    if (type !== "timeout" && type !== "medical") return null;
+    const expectedResumeAtMs = breakState?.expectedResumeAt
+      ? new Date(breakState.expectedResumeAt).getTime()
+      : null;
+    return {
+      type,
+      endTime:
+        Number.isFinite(expectedResumeAtMs) && expectedResumeAtMs > 0
+          ? expectedResumeAtMs
+          : Date.now(),
+      teamKey: textOf(breakState?.note).split(":")[1] || "",
+    };
+  }, [breakState?.active, breakState?.expectedResumeAt, breakState?.note, breakState?.type]);
+  const activeBreak = localBreak || syncedTimedBreak;
+>>>>>>> Stashed changes
 
   // Reset counter khi sang game mới
   useEffect(() => {
@@ -2513,6 +2576,7 @@ export default function RefereeJudgePanel({ matchId }) {
   }, [curIdx, timeoutPerGame]);
 
   useEffect(() => {
+<<<<<<< Updated upstream
     const rawBreak = match?.isBreak;
     const active = Boolean(rawBreak?.active);
     const type = parseBreakType(rawBreak?.type, rawBreak?.note);
@@ -2551,6 +2615,12 @@ export default function RefereeJudgePanel({ matchId }) {
     parseBreakTeamKey,
     parseBreakType,
   ]);
+=======
+    if (breakState?.active) {
+      setLocalBreak(null);
+    }
+  }, [breakState?.active, breakState?.expectedResumeAt, breakState?.type]);
+>>>>>>> Stashed changes
 
   // 4. Timer đếm ngược (Chạy khi localBreak != null)
   // useEffect(() => {
@@ -2583,7 +2653,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // 5. Hàm xử lý gọi Timeout/Y tế (cập nhật local ngay và sync server để island/widget cùng đổi)
   const handleCallTimeout = useCallback(async (teamSideUI) => {
     if (!ensureLiveOwner()) return;
-    if (localBreak) return; // Đang nghỉ thì không bấm được
+    if (activeBreak) return; // Đang nghỉ thì không bấm được
     const teamKey = teamSideUI === "left" ? leftSide : rightSide;
     const currentVal = teamKey === "A" ? toA : toB;
     if (currentVal <= 0) return;
@@ -2594,12 +2664,23 @@ export default function RefereeJudgePanel({ matchId }) {
     if (teamKey === "A") setToA((p) => p - 1);
     else setToB((p) => p - 1);
 
+<<<<<<< Updated upstream
     setLocalBreak({
+=======
+    // Kích hoạt timer cục bộ (Thời gian từ config)
+    const durationMs = timeoutMinutes * 60 * 1000;
+    const nextBreak = {
+>>>>>>> Stashed changes
       type: "timeout",
       endTime,
       teamKey,
+<<<<<<< Updated upstream
       source: "local",
     });
+=======
+    };
+    setLocalBreak(nextBreak);
+>>>>>>> Stashed changes
 
     try {
       await liveApi.setBreak({
@@ -2607,10 +2688,17 @@ export default function RefereeJudgePanel({ matchId }) {
         note: `timeout:${teamKey}`,
         type: "timeout",
         afterGame: curIdx,
+<<<<<<< Updated upstream
         expectedResumeAt: new Date(endTime).toISOString(),
         userMatch: isUserMatch,
       });
     } catch (e) {
+=======
+        expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
+        userMatch: isUserMatch,
+      });
+    } catch (error) {
+>>>>>>> Stashed changes
       setLocalBreak(null);
       if (teamKey === "A") setToA((p) => p + 1);
       else setToB((p) => p + 1);
@@ -2618,6 +2706,7 @@ export default function RefereeJudgePanel({ matchId }) {
         type: "error",
         text1: "Lỗi",
         text2:
+<<<<<<< Updated upstream
           textOf(e?.data?.message) ||
           textOf(e?.error) ||
           "Không thể bắt đầu timeout",
@@ -2628,6 +2717,18 @@ export default function RefereeJudgePanel({ matchId }) {
     ensureLiveOwner,
     isUserMatch,
     localBreak,
+=======
+          textOf(error?.data?.message) ||
+          textOf(error?.message) ||
+          "Không thể bật timeout",
+      });
+    }
+  }, [
+    activeBreak,
+    curIdx,
+    ensureLiveOwner,
+    isUserMatch,
+>>>>>>> Stashed changes
     leftSide,
     liveApi,
     rightSide,
@@ -2638,7 +2739,7 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const handleCallMedical = useCallback(async (teamSideUI) => {
     if (!ensureLiveOwner()) return;
-    if (localBreak) return;
+    if (activeBreak) return;
     const teamKey = teamSideUI === "left" ? leftSide : rightSide;
     const currentVal = teamKey === "A" ? medA : medB;
     if (currentVal <= 0) return;
@@ -2649,10 +2750,16 @@ export default function RefereeJudgePanel({ matchId }) {
     if (teamKey === "A") setMedA((p) => p - 1);
     else setMedB((p) => p - 1);
 
+<<<<<<< Updated upstream
     setLocalBreak({
+=======
+    const durationMs = 5 * 60 * 1000;
+    const nextBreak = {
+>>>>>>> Stashed changes
       type: "medical",
       endTime,
       teamKey,
+<<<<<<< Updated upstream
       source: "local",
     });
 
@@ -2690,6 +2797,34 @@ export default function RefereeJudgePanel({ matchId }) {
     rightSide,
   ]);
 
+=======
+    };
+    setLocalBreak(nextBreak);
+    try {
+      await liveApi.setBreak({
+        active: true,
+        note: `medical:${teamKey}`,
+        type: "medical",
+        afterGame: curIdx,
+        expectedResumeAt: new Date(nextBreak.endTime).toISOString(),
+        userMatch: isUserMatch,
+      });
+    } catch (error) {
+      setLocalBreak(null);
+      if (teamKey === "A") setMedA((p) => p + 1);
+      else setMedB((p) => p + 1);
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2:
+          textOf(error?.data?.message) ||
+          textOf(error?.message) ||
+          "Không thể bật nghỉ y tế",
+      });
+    }
+  }, [activeBreak, curIdx, ensureLiveOwner, isUserMatch, leftSide, liveApi, medA, medB, rightSide]);
+
+>>>>>>> Stashed changes
   const handleContinue = useCallback(async () => {
     if (!ensureLiveOwner()) return;
     setLocalBreak(null);
@@ -2700,13 +2835,22 @@ export default function RefereeJudgePanel({ matchId }) {
         afterGame: curIdx,
         userMatch: isUserMatch,
       });
+<<<<<<< Updated upstream
     } catch (e) {
+=======
+    } catch (error) {
+>>>>>>> Stashed changes
       Toast.show({
         type: "error",
         text1: "Lỗi",
         text2:
+<<<<<<< Updated upstream
           textOf(e?.data?.message) ||
           textOf(e?.error) ||
+=======
+          textOf(error?.data?.message) ||
+          textOf(error?.message) ||
+>>>>>>> Stashed changes
           "Không thể tiếp tục trận",
       });
     }
@@ -2715,10 +2859,10 @@ export default function RefereeJudgePanel({ matchId }) {
   // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
   const canScoreByMatchState =
     match?.status === "live" &&
-    !waitingStart &&
+    !waitingStartActive &&
     !matchDecided &&
     !gameLocked &&
-    !localBreak;
+    !activeBreak;
   const canScoreNow = isLiveOwner && canScoreByMatchState;
   const canUndoLive = useMemo(() => {
     const entries = Array.isArray(match?.liveLog) ? match.liveLog : [];
@@ -2873,7 +3017,7 @@ export default function RefereeJudgePanel({ matchId }) {
     );
 
     const preStart =
-      waitingStart ||
+      waitingStartActive ||
       match?.status !== "live" ||
       (Number(curA) === 0 && Number(curB) === 0 && Boolean(serve?.opening));
     const isDouble = eventType !== "single";
@@ -2922,7 +3066,7 @@ export default function RefereeJudgePanel({ matchId }) {
     const isDouble = eventType !== "single";
     const preStartOpening =
       isDouble &&
-      (waitingStart ||
+      (waitingStartActive ||
         match?.status !== "live" ||
         (Number(curA) === 0 && Number(curB) === 0 && Boolean(serve?.opening)));
     const nextOrder = preStartOpening ? 1 : activeServerNum === 1 ? 2 : 1;
@@ -2964,7 +3108,7 @@ export default function RefereeJudgePanel({ matchId }) {
     curA,
     curB,
     serve?.opening,
-    waitingStart,
+    waitingStartActive,
     eventType,
     ensureLiveOwner,
     liveApi,
@@ -3102,7 +3246,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const rightEnabled = canScoreByMatchState && rightServing && !incBusy && !undoBusy;
   const preStartServeSideLabel =
     activeSide === leftSide ? "Đội bên trái" : "Đội bên phải";
-  const preStartServeHint = waitingStart
+  const preStartServeHint = waitingStartActive
     ? "Chạm để đổi đội giao trước game này"
     : "Chạm để chọn đội giao trước trận";
 
@@ -3219,10 +3363,10 @@ export default function RefereeJudgePanel({ matchId }) {
       leftSide,
       rightSide,
       canUndo: canUndoLive,
-      localBreak: Boolean(localBreak),
+      localBreak: Boolean(activeBreak),
       ctaLabel: cta?.label || "",
     }),
-    [activeSide, leftSide, rightSide, canUndoLive, localBreak, cta?.label],
+    [activeSide, activeBreak, leftSide, rightSide, canUndoLive, cta?.label],
   );
 
   const {
@@ -3247,7 +3391,7 @@ export default function RefereeJudgePanel({ matchId }) {
     inc,
     incBusy,
     leftSide,
-    localBreak,
+    localBreak: activeBreak,
     onUndo,
     primaryCtaLabel: cta?.label || "",
     primaryCtaPress: cta?.onPress,
@@ -3288,14 +3432,14 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // ====== Ask-once-at-half-set per game ======
   useEffect(() => {
-    if (match?.status !== "live" || waitingStart || midPoint == null) return;
+    if (match?.status !== "live" || waitingStartActive || midPoint == null) return;
     const asked = !!midAskedRef.current[curIdx];
     const isAtMidNow = curA === midPoint || curB === midPoint;
     if (!asked && isAtMidNow) {
       setMidPromptOpen(true);
       midAskedRef.current[curIdx] = true; // mark asked for this game
     }
-  }, [match?.status, waitingStart, curIdx, curA, curB, midPoint]);
+  }, [match?.status, waitingStartActive, curIdx, curA, curB, midPoint]);
 
   useEffect(() => {
     const f = forcedServerRef.current;
@@ -3846,7 +3990,7 @@ export default function RefereeJudgePanel({ matchId }) {
                       timeoutMinutes={timeoutMinutes}
                       onTimeout={handleCallTimeout}
                       onMedical={handleCallMedical}
-                      disabled={!canScoreByMatchState && !localBreak}
+                      disabled={!canScoreByMatchState && !activeBreak}
                       compact={isCompactLandscape}
                     />
                     <Text
@@ -3976,6 +4120,7 @@ export default function RefereeJudgePanel({ matchId }) {
             isTightLandscape && s.bottomBarCompact,
             needsStartAction && { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 12 },
           ]}>
+<<<<<<< Updated upstream
 	            {/* Clock / Break label — always on the left */}
 	            {localBreak ? (
 	              <Text
@@ -4020,6 +4165,41 @@ export default function RefereeJudgePanel({ matchId }) {
 	                  endTime={localBreak.endTime}
 	                  style={[s.breakTimer, { color: breakPalette.timer }]}
 	                />
+=======
+            {/* Clock / Break label — always on the left */}
+            {activeBreak ? (
+              <Text
+                style={[
+                  s.clockText,
+                  !needsStartAction && s.clockAbsolute,
+                  !needsStartAction && isTightLandscape && s.clockInline,
+                  {
+                    color:
+                      activeBreak.type === "medical" ? "#dc2626" : "#d97706",
+                    fontSize: 20,
+                    fontWeight: "900",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  },
+                ]}
+              >
+                {activeBreak.type === "medical" ? "Nghỉ y tế" : "Timeout"}
+              </Text>
+            ) : (
+              <LiveClock
+                style={[
+                  s.clockText,
+                  !needsStartAction && s.clockAbsolute,
+                  !needsStartAction && isTightLandscape && s.clockInline,
+                  { color: t.colors.text },
+                ]}
+              />
+            )}
+
+            {activeBreak ? (
+              <View style={s.breakOverlay}>
+                <BreakTimer endTime={activeBreak.endTime} style={s.breakTimer} />
+>>>>>>> Stashed changes
 
 	                <Ripple
 	                  onPress={handleContinue}
