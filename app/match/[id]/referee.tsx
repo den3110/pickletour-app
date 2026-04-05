@@ -1,10 +1,13 @@
 import React, { useCallback, useMemo, useRef } from "react";
-import { AppState, InteractionManager } from "react-native";
+import { AppState, DeviceEventEmitter, InteractionManager } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 import RefereeJudgePanel from "@/components/match/RefereeScorePanel.native";
+
+const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
+const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
 
 export default function RefereeScreen() {
   const params = useLocalSearchParams();
@@ -13,11 +16,29 @@ export default function RefereeScreen() {
 
   const appState = useRef(AppState.currentState);
   const isUnmounting = useRef(false);
+  const skipOrientationRestore = useRef(
+    Boolean((globalThis as any)[HOT_UPDATE_RELOAD_KEY]),
+  );
   const orientationTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  React.useEffect(() => {
+    if ((globalThis as any)[HOT_UPDATE_RELOAD_KEY]) {
+      skipOrientationRestore.current = true;
+    }
+
+    const sub = DeviceEventEmitter.addListener(HOT_UPDATE_RELOAD_EVENT, () => {
+      skipOrientationRestore.current = true;
+    });
+
+    return () => sub.remove();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       isUnmounting.current = false;
+      skipOrientationRestore.current = Boolean(
+        (globalThis as any)[HOT_UPDATE_RELOAD_KEY],
+      );
       orientationTimeouts.current.forEach(clearTimeout);
       orientationTimeouts.current = [];
 
@@ -60,6 +81,13 @@ export default function RefereeScreen() {
 
         orientationTimeouts.current.forEach(clearTimeout);
         orientationTimeouts.current = [];
+
+        if (
+          skipOrientationRestore.current ||
+          (globalThis as any)[HOT_UPDATE_RELOAD_KEY]
+        ) {
+          return;
+        }
 
         InteractionManager.runAfterInteractions(() => {
           if (!isUnmounting.current) return;

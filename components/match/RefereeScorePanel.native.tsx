@@ -2873,26 +2873,20 @@ export default function RefereeJudgePanel({ matchId }) {
     if (!match?._id) return;
 
     const nextSide = activeSide === "A" ? "B" : "A";
-
-    const nextTeamScore = nextSide === "A" ? curA : curB;
-    const rightSlot = preStartRightSlotForSide(nextSide, leftSide);
-    const targetSlot =
-      Number(nextTeamScore) % 2 === 0 ? rightSlot : oppositeSlot(rightSlot);
-    const nextSlotsMap = nextSide === "A" ? slotsNowA : slotsNowB;
-    const uidFound = Object.keys(nextSlotsMap).find(
-      (uid) => Number(nextSlotsMap[uid]) === targetSlot,
-    );
-
-    const preStart =
-      waitingStartActive ||
-      match?.status !== "live" ||
-      (Number(curA) === 0 && Number(curB) === 0 && Boolean(serve?.opening));
+    const preStart = waitingStartActive || match?.status !== "live";
     const isDouble = eventType !== "single";
     const wantOrder = 1;
     const wantOpening = preStart && isDouble;
-
-    // Code fix trước đó
-    const uidRight = uidFound || Object.keys(nextSlotsMap)[0] || "";
+    const nextTeamScore = nextSide === "A" ? curA : curB;
+    const targetSlot = wantOpening
+      ? preStartRightSlotForSide(nextSide, leftSide)
+      : currentSlotFromBase(1, nextTeamScore);
+    const uidFound =
+      getUidAtSlotNow(nextSide, targetSlot) ||
+      getUidAtSlotNow(nextSide, oppositeSlot(targetSlot)) ||
+      "";
+    const nextTeam = nextSide === "A" ? playersA : playersB;
+    const uidRight = uidFound || nextTeam.map(userIdOf).find(Boolean) || "";
 
     lastServerUidRef.current = uidRight;
 
@@ -3269,10 +3263,15 @@ export default function RefereeJudgePanel({ matchId }) {
     undoBusy,
   };
 
-  const isServer1 = activeServerNum === 1;
-  const midLabel = isServer1 ? "Đổi tay" : "Đổi giao";
-  const midIcon = isServer1 ? "swap-vert" : "swap-calls";
-  const onMidPress = isServer1 ? toggleServerNum : toggleServeSide;
+  const midUsesServeToggle =
+    eventType === "single" ||
+    waitingStartActive ||
+    match?.status !== "live" ||
+    isOpeningServe ||
+    activeServerNum !== 1;
+  const midLabel = midUsesServeToggle ? "Đổi giao" : "Đổi tay";
+  const midIcon = midUsesServeToggle ? "swap-calls" : "swap-vert";
+  const onMidPress = midUsesServeToggle ? toggleServeSide : toggleServerNum;
   const shouldDockBottomCta = Boolean(cta) && (!isTightLandscape || !isPreMatch);
   const breakPalette =
     activeBreak?.type === "medical"

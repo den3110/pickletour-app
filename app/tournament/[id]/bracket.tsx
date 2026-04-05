@@ -40,6 +40,7 @@ import {
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import {
+  getMatchCourtDisplayText,
   getMatchPayloadId,
   getPairDisplayName,
   getPlayerDisplayName,
@@ -369,7 +370,8 @@ const kickoffTime = (m) => {
     return m?.startedAt || m?.scheduledAt || m?.assignedAt || null;
   return m?.scheduledAt || m?.assignedAt || null;
 };
-const courtName = (m) => m?.venue?.name || m?.court?.name || m?.court || "";
+const courtName = (m) =>
+  getMatchCourtDisplayText(m) || m?.venue?.name || m?.court?.name || m?.court || "";
 const getVideoUrl = (m) =>
   m?.streamUrl || m?.videoUrl || m?.stream?.url || m?.broadcast?.url || null;
 const hasVideo = (m) => !!getVideoUrl(m);
@@ -2597,7 +2599,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       const seq = seqIndexByMatchId.get(String(m._id)) ?? "?";
       const code = groupCodeOf(m, `V${stageNo}-B${bIndex}-T${seq}`);
       const time = formatTime(pickGroupKickoffTime(m));
-      const court = m?.venue?.name || m?.court?.name || m?.court || "";
+      const court = courtName(m);
       const score = scoreLabel(m);
       return {
         id: String(m._id),
@@ -2819,7 +2821,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
               const aName = resolveSideLabel(m, "A");
               const bName = resolveSideLabel(m, "B");
               const time = formatTime(pickGroupKickoffTime(m));
-              const court = m?.venue?.name || m?.court?.name || m?.court || "";
+              const court = courtName(m);
               const score = scoreLabel(m);
               return {
                 _id: String(m._id),

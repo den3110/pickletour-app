@@ -141,6 +141,15 @@ interface DayData {
   hasMultipleBrackets: boolean;
 }
 
+const matchCourtLabel = (match: any): string =>
+  String(
+    match?.courtStationName ||
+      match?.courtStationLabel ||
+      match?.courtLabel ||
+      match?.court?.name ||
+      ""
+  ).trim();
+
 const VI_WEEKDAYS = [
   "Thứ hai",
   "Thứ ba",
@@ -951,10 +960,10 @@ const EnhancedMatchCard = ({
           {/* Footer */}
           <View style={styles.matchCardFooter}>
             <View style={styles.matchMetaRow}>
-              {match.courtLabel && (
+              {matchCourtLabel(match) && (
                 <View style={styles.metaBadge}>
                   <Icon name="map-marker" size={14} color="#6B7280" />
-                  <Text style={styles.metaText}>{match.courtLabel}</Text>
+                  <Text style={styles.metaText}>{matchCourtLabel(match)}</Text>
                 </View>
               )}
               {match.isUpcoming && (

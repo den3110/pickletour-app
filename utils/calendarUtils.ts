@@ -34,6 +34,15 @@ export interface CalendarEventDetails {
   alarms?: Array<{ relativeOffset: number }>; // minutes before event
 }
 
+const matchCourtLabel = (match: any): string =>
+  String(
+    match?.courtStationName ||
+      match?.courtStationLabel ||
+      match?.courtLabel ||
+      match?.court?.name ||
+      ""
+  ).trim();
+
 function dateToCalshowSeconds(date: Date) {
   return Math.floor((date.getTime() - APPLE_EPOCH_MS) / 1000);
 }
@@ -186,7 +195,7 @@ export async function addMatchToCalendar(match: Match): Promise<string | null> {
       `🎾 ${teamName}`,
       `VS`,
       `🎾 ${opponentName}`,
-      match.courtLabel ? `\nSân: ${match.courtLabel}` : "",
+      matchCourtLabel(match) ? `\nSân: ${matchCourtLabel(match)}` : "",
       match.tournament.location
         ? `\nĐịa điểm: ${match.tournament.location}`
         : "",
@@ -199,7 +208,7 @@ export async function addMatchToCalendar(match: Match): Promise<string | null> {
       title,
       startDate,
       endDate,
-      location: match.tournament.location || match.courtLabel || "",
+      location: match.tournament.location || matchCourtLabel(match) || "",
       notes,
       timeZone: "Asia/Ho_Chi_Minh",
       alarms: [
@@ -305,7 +314,7 @@ export async function updateMatchInCalendar(match: Match): Promise<boolean> {
       `🎾 ${teamName}`,
       `VS`,
       `🎾 ${opponentName}`,
-      match.courtLabel ? `\nSân: ${match.courtLabel}` : "",
+      matchCourtLabel(match) ? `\nSân: ${matchCourtLabel(match)}` : "",
       match.tournament.location
         ? `\nĐịa điểm: ${match.tournament.location}`
         : "",
@@ -317,7 +326,7 @@ export async function updateMatchInCalendar(match: Match): Promise<boolean> {
       title,
       startDate,
       endDate,
-      location: match.tournament.location || match.courtLabel || "",
+      location: match.tournament.location || matchCourtLabel(match) || "",
       notes,
       timeZone: "Asia/Ho_Chi_Minh",
     });

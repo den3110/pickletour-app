@@ -21,6 +21,7 @@ import {
   sid,
   timeAgo,
 } from "./liveUtils";
+import { getLiveMatchCourtText } from "./courtDisplay";
 
 function useThemeTokens() {
   const navTheme = useTheme?.();
@@ -139,7 +140,7 @@ export default function InfoModal({
             }
           />
           <InfoRow label="Trạng thái" value={getLiveStatusLabel(match?.status)} T={T} />
-          <InfoRow label="Sân" value={match?.courtLabel || "-"} T={T} />
+          <InfoRow label="Sân" value={getLiveMatchCourtText(match) || "-"} T={T} />
           <InfoRow label="Giải đấu" value={match?.tournament?.name || "-"} T={T} />
           <InfoRow label="Cập nhật" value={timeAgo(match?.updatedAt) || "-"} T={T} />
           <InfoRow label="Lịch" value={formatDate(match?.scheduledAt)} T={T} />

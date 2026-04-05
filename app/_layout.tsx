@@ -87,6 +87,8 @@ const SPLASH_GLOBAL_FAILSAFE_MS = 5000;
 const PREF_THEME_KEY = "PREF_THEME"; // "system" | "light" | "dark"
 const HOT_UPDATE_NOTIFY_EVENT = "hotupdater:notify";
 const HOT_UPDATE_NOTIFY_KEY = "__PICKLETOUR_HOTUPDATE_NOTIFY__";
+const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
+const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
 const HOT_UPDATE_PENDING_KEY = "__PICKLETOUR_HOTUPDATE_PENDING__";
 const HOT_UPDATE_TELEMETRY_PATH = "/api/ota/report-status";
 const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn/api";
@@ -473,7 +475,10 @@ function RootLayout() {
       setHotUpdateMessage("Bản cập nhật đã tải xong. Đang mở lại ứng dụng...");
 
       setTimeout(() => {
+        (globalThis as any)[HOT_UPDATE_RELOAD_KEY] = true;
+        DeviceEventEmitter.emit(HOT_UPDATE_RELOAD_EVENT);
         HotUpdater.reload().catch((error: unknown) => {
+          (globalThis as any)[HOT_UPDATE_RELOAD_KEY] = false;
           console.error("[HotUpdater] Reload error:", error);
           void clearPendingHotUpdate();
           void reportHotUpdateTelemetry({

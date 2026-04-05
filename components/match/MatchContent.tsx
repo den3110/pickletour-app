@@ -1956,7 +1956,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     m?.tournament && typeof m.tournament === "object" ? m.tournament : null;
 
   const { data: verifyRes, isFetching: verifyingMgr } = useVerifyManagerQuery(
-    tour?._id ? tour?._id : skipToken,
+    userInfo?.token && tour?._id ? tour._id : skipToken,
   );
   const isManager = !!verifyRes?.isManager;
   const isAdmin = !!(

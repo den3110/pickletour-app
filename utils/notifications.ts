@@ -43,6 +43,15 @@ export interface ScheduleNotificationParams {
   badge?: number;
 }
 
+const matchCourtLabel = (match: any): string =>
+  String(
+    match?.courtStationName ||
+      match?.courtStationLabel ||
+      match?.courtLabel ||
+      match?.court?.name ||
+      ""
+  ).trim();
+
 // ===== INITIALIZATION =====
 export const initializeNotificationChannels = async () => {
   try {
@@ -272,7 +281,7 @@ export const scheduleMatchReminders = async (
           id: `match_${match._id}_1h`,
           title: "⚡ Trận đấu sắp bắt đầu trong 1 giờ!",
           body: `${match.tournament.name} - ${match.bracket.name}\nSân: ${
-            match.courtLabel || "TBA"
+            matchCourtLabel(match) || "TBA"
           }`,
           date: oneHourBefore,
           data: {
@@ -295,7 +304,7 @@ export const scheduleMatchReminders = async (
         const id = await scheduleNotification({
           id: `match_${match._id}_30m`,
           title: "🔥 Trận đấu sắp bắt đầu trong 30 phút!",
-          body: `Chuẩn bị khởi động nhé!\nSân: ${match.courtLabel || "TBA"}`,
+          body: `Chuẩn bị khởi động nhé!\nSân: ${matchCourtLabel(match) || "TBA"}`,
           date: thirtyMinBefore,
           data: {
             matchId: match._id,
@@ -317,7 +326,7 @@ export const scheduleMatchReminders = async (
         const id = await scheduleNotification({
           id: `match_${match._id}_15m`,
           title: "🏓 Trận đấu sắp bắt đầu trong 15 phút!",
-          body: `Đến sân ngay bây giờ!\nSân: ${match.courtLabel || "TBA"}`,
+          body: `Đến sân ngay bây giờ!\nSân: ${matchCourtLabel(match) || "TBA"}`,
           date: fifteenMinBefore,
           data: {
             matchId: match._id,
@@ -337,7 +346,7 @@ export const scheduleMatchReminders = async (
       const id = await scheduleNotification({
         id: `match_${match._id}_start`,
         title: "🎯 Trận đấu BẮT ĐẦU!",
-        body: `${match.tournament.name}\nSân: ${match.courtLabel || "TBA"}`,
+        body: `${match.tournament.name}\nSân: ${matchCourtLabel(match) || "TBA"}`,
         date: scheduledAt,
         data: {
           matchId: match._id,
