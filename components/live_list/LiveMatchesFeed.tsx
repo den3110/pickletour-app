@@ -222,6 +222,9 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
+    onResync: () => {
+      scheduleRealtimeRefetch(150);
+    },
   });
 
   useEffect(() => {

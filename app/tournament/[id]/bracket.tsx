@@ -2250,6 +2250,9 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     subscribeEvent: "draw:subscribe",
     unsubscribeEvent: "draw:unsubscribe",
     payloadKey: "bracketId",
+    onResync: () => {
+      handleRefresh();
+    },
   });
   const initialSeededRef = useRef(false);
 

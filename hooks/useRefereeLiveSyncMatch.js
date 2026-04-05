@@ -936,11 +936,16 @@ export function useRefereeLiveSyncMatch(
       setDerivedState((prev) => ({ ...prev, online }));
       if (prevOnline === null) return;
       if (!prevOnline && online) {
+        if (socket?.connected) {
+          socket.emit?.("match:snapshot:request", { matchId });
+        } else {
+          socket?.connect?.();
+        }
         refreshOwnership();
       }
     });
     return () => unsubscribe();
-  }, [enabled, matchId, refreshOwnership, setDerivedState]);
+  }, [enabled, matchId, refreshOwnership, setDerivedState, socket]);
 
   useEffect(() => {
     if (!enabled || !matchId) return;
@@ -948,6 +953,11 @@ export function useRefereeLiveSyncMatch(
       const wasBackground = appStateRef.current !== "active";
       appStateRef.current = nextState;
       if (nextState === "active" && wasBackground) {
+        if (socket?.connected) {
+          socket.emit?.("match:snapshot:request", { matchId });
+        } else {
+          socket?.connect?.();
+        }
         refreshOwnership();
       }
       if (nextState !== "active") {
@@ -955,7 +965,7 @@ export function useRefereeLiveSyncMatch(
       }
     });
     return () => subscription.remove();
-  }, [enabled, matchId, refreshOwnership, release]);
+  }, [enabled, matchId, refreshOwnership, release, socket]);
 
   useEffect(() => {
     if (!enabled || !matchId || !socket) return;
@@ -1071,7 +1081,14 @@ export function useRefereeLiveSyncMatch(
       }
     };
 
+    const onConnect = () => {
+      socket.emit("match:join", { matchId });
+      requestSnapshot();
+      refreshOwnership();
+    };
+
     socket.emit("match:join", { matchId });
+    socket.on("connect", onConnect);
     socket.on("match:snapshot", onSnapshot);
     socket.on("match:update", onUpdate);
     socket.on("score:updated", onScore);
@@ -1080,6 +1097,7 @@ export function useRefereeLiveSyncMatch(
     socket.on("system-settings:update", onSystemSettingsUpdate);
     return () => {
       socket.emit("match:leave", { matchId });
+      socket.off("connect", onConnect);
       socket.off("match:snapshot", onSnapshot);
       socket.off("match:update", onUpdate);
       socket.off("score:updated", onScore);

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import {
   Alert,
+  AppState,
   Platform,
   Pressable,
   ScrollView,
@@ -1784,6 +1785,7 @@ export default function CourtManagerSheet({
     const room = bracketId
       ? { tournamentId, bracket: bracketId }
       : { tournamentId };
+    let appState = AppState.currentState;
 
     const onState = ({ courts, matches, queue }) => {
       setCourts(courts || []);
@@ -1799,31 +1801,57 @@ export default function CourtManagerSheet({
       notifQueueRef.current = [msg, ...notifQueueRef.current].slice(0, 20);
     };
     const reqState = () => socket.emit("scheduler:requestState", room);
+    const requestStateAndRefresh = () => {
+      reqState();
+      refetchAllMatches?.();
+    };
+    const joinAndSync = () => {
+      socket.emit("scheduler:join", room);
+      requestStateAndRefresh();
+    };
+    const onAppStateChange = (nextState) => {
+      const wasBackground = appState !== "active";
+      appState = nextState;
+      if (nextState !== "active" || !wasBackground) return;
+      if (socket.connected) {
+        requestStateAndRefresh();
+        return;
+      }
+      socket.connect?.();
+    };
 
-    socket.emit("scheduler:join", room);
     socket.on("scheduler:state", onState);
     socket.on("scheduler:notify", onNotify);
     socket.on?.("match:update", reqState);
     socket.on?.("match:finish", reqState);
+    socket.on("connect", joinAndSync);
 
-    reqState();
-    refetchAllMatches?.();
+    joinAndSync();
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      onAppStateChange
+    );
     const interval = setInterval(reqState, 45000);
 
     return () => {
       clearInterval(interval);
+      appStateSubscription.remove();
       socket.emit("scheduler:leave", room);
       socket.off("scheduler:state", onState);
       socket.off("scheduler:notify", onNotify);
       socket.off?.("match:update", reqState);
       socket.off?.("match:finish", reqState);
+      socket.off("connect", joinAndSync);
     };
   }, [open, socket, tournamentId, bracketId, refetchAllMatches]);
 
-  useSocketRoomSet(socket, selectedClusterId ? [selectedClusterId] : [], {
+  useSocketRoomSet(socket, open && selectedClusterId ? [selectedClusterId] : [], {
     subscribeEvent: "court-cluster:watch",
     unsubscribeEvent: "court-cluster:unwatch",
     payloadKey: "clusterId",
+    onResync: () => {
+      refetchClusterRuntime?.();
+    },
   });
 
   useEffect(() => {

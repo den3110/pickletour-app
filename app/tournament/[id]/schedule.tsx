@@ -1044,6 +1044,10 @@ export default function TournamentScheduleNative() {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
+    onResync: () => {
+      refetchTournament?.();
+      refetchMatches?.();
+    },
   });
 
   useEffect(() => {

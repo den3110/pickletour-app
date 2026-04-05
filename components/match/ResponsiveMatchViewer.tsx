@@ -510,6 +510,8 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
     refetch: refetchBase,
   } = useGetMatchPublicQuery(matchId, {
     skip: !matchId || !open,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
   const { loading: isLoadingLive, data: live } = useLiveMatch(
     open ? matchId : null,

@@ -414,11 +414,18 @@ export default function AssignCourtSheet({
     }
   }, [open]);
 
-  useSocketRoomSet(socket, selectedClusterId ? [selectedClusterId] : [], {
-    subscribeEvent: "court-cluster:watch",
-    unsubscribeEvent: "court-cluster:unwatch",
-    payloadKey: "clusterId",
-  });
+  useSocketRoomSet(
+    socket,
+    open && isClusterRuntimeMode && selectedClusterId ? [selectedClusterId] : [],
+    {
+      subscribeEvent: "court-cluster:watch",
+      unsubscribeEvent: "court-cluster:unwatch",
+      payloadKey: "clusterId",
+      onResync: () => {
+        refetchRuntime?.();
+      },
+    }
+  );
 
   useEffect(() => {
     if (!socket || !open || !selectedClusterId || !isClusterRuntimeMode) {

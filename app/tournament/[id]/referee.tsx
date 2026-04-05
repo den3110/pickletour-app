@@ -369,6 +369,11 @@ export default function RefereeCenterScreen() {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
+    onResync: () => {
+      refetchTour?.();
+      refetchBrackets?.();
+      refetchMatches?.();
+    },
   });
 
   const queueUpsertRef = useRef(null);
