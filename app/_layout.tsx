@@ -27,7 +27,7 @@ import * as Linking from "expo-linking";
 import * as Device from "expo-device";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
-import { setCredentials } from "@/slices/authSlice";
+import { logout, setCredentials } from "@/slices/authSlice";
 import store from "@/store";
 import { loadUserInfo } from "@/utils/authStorage";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -62,6 +62,7 @@ import {
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
+import { WebView } from "react-native-webview";
 // app/_layout.tsx
 if (__DEV__) {
   require("../dev/reactotron");
@@ -91,7 +92,18 @@ const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
 const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
 const HOT_UPDATE_PENDING_KEY = "__PICKLETOUR_HOTUPDATE_PENDING__";
 const HOT_UPDATE_TELEMETRY_PATH = "/api/ota/report-status";
-const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn/api";
+const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn";
+const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
+const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
+const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
+const EMPTY_SAFE_AREA_EDGES = [] as const;
+const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
+const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
+
+type MobileAppShellConfig = {
+  mode: "native" | "webview";
+  webViewUrl: string;
+};
 
 type HotUpdateTelemetryStatus =
   | "update_available"
@@ -117,6 +129,133 @@ const normalizeBaseUrl = (value?: string | null) =>
     .trim()
     .replace(/^['"]+|['"]+$/g, "")
     .replace(/\/+$/, "");
+
+const buildApiUrl = (baseUrl: string | undefined, path: string) => {
+  const base = normalizeBaseUrl(baseUrl) || HOT_UPDATE_API_FALLBACK;
+  const normalizedPath = String(path || "").trim().startsWith("/")
+    ? String(path || "").trim()
+    : `/${String(path || "").trim()}`;
+
+  if (base.endsWith("/api") && normalizedPath.startsWith("/api/")) {
+    return `${base}${normalizedPath.slice(4)}`;
+  }
+
+  return `${base}${normalizedPath}`;
+};
+
+const normalizeMobileAppShellConfig = (
+  value?: Partial<MobileAppShellConfig> | null,
+): MobileAppShellConfig => {
+  const webViewUrl = String(value?.webViewUrl || "").trim();
+  const isWebViewMode =
+    String(value?.mode || "").trim().toLowerCase() === "webview" &&
+    /^https?:\/\//i.test(webViewUrl);
+
+  return {
+    mode: isWebViewMode ? "webview" : "native",
+    webViewUrl: isWebViewMode ? webViewUrl : "",
+  };
+};
+
+const DEFAULT_MOBILE_APP_SHELL_CONFIG = normalizeMobileAppShellConfig();
+
+const normalizeWebViewBridgeUserInfo = (value: unknown) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const candidate = value as Record<string, unknown>;
+  const token = String(candidate.token || "").trim();
+  const hasIdentity = Boolean(
+    token ||
+      String(candidate._id || "").trim() ||
+      String(candidate.id || "").trim() ||
+      String(candidate.email || "").trim(),
+  );
+
+  if (!hasIdentity) return null;
+  return candidate;
+};
+
+const serializeWebViewBridgeUserInfo = (value: unknown) =>
+  JSON.stringify(normalizeWebViewBridgeUserInfo(value) || null);
+
+const buildWebViewAuthSyncScript = ({
+  apiBaseUrl,
+  userInfo,
+  clearSession = false,
+}: {
+  apiBaseUrl: string | undefined;
+  userInfo: unknown;
+  clearSession?: boolean;
+}) => {
+  const normalizedUserInfo = normalizeWebViewBridgeUserInfo(userInfo);
+  const serializedUserInfo = JSON.stringify(normalizedUserInfo);
+  const sessionSyncUrl = JSON.stringify(
+    buildApiUrl(apiBaseUrl, MOBILE_WEBVIEW_SESSION_SYNC_PATH),
+  );
+  const logoutUrl = JSON.stringify(
+    buildApiUrl(apiBaseUrl, MOBILE_WEBVIEW_LOGOUT_PATH),
+  );
+
+  return `
+    (function() {
+      try {
+        var payload = ${serializedUserInfo};
+        var shouldClear = ${clearSession ? "true" : "false"};
+        var storageKey = "userInfo";
+        var sessionSyncUrl = ${sessionSyncUrl};
+        var logoutUrl = ${logoutUrl};
+
+        var dispatchSyncEvent = function(nextUserInfo) {
+          try {
+            window.dispatchEvent(new CustomEvent("pickletour:native-auth-sync", {
+              detail: {
+                source: "native-app",
+                userInfo: nextUserInfo || null
+              }
+            }));
+          } catch (_) {}
+        };
+
+        if (payload && payload.token) {
+          try {
+            window.localStorage.setItem(storageKey, JSON.stringify(payload));
+          } catch (_) {}
+          try {
+            window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+          } catch (_) {}
+          dispatchSyncEvent(payload);
+
+          try {
+            fetch(sessionSyncUrl, {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                Authorization: "Bearer " + payload.token,
+                "Content-Type": "application/json"
+              }
+            }).catch(function() {});
+          } catch (_) {}
+        } else if (shouldClear) {
+          try {
+            window.localStorage.removeItem(storageKey);
+          } catch (_) {}
+          try {
+            window.sessionStorage.removeItem(storageKey);
+          } catch (_) {}
+          dispatchSyncEvent(null);
+
+          try {
+            fetch(logoutUrl, {
+              method: "POST",
+              credentials: "include"
+            }).catch(function() {});
+          } catch (_) {}
+        }
+      } catch (_) {}
+      true;
+    })();
+  `;
+};
 
 const HOT_UPDATE_API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -185,7 +324,7 @@ const reportHotUpdateTelemetry = async ({
   try {
     const deviceId = await getHotUpdateDeviceId();
     const response = await fetch(
-      `${HOT_UPDATE_API_BASE_URL}${HOT_UPDATE_TELEMETRY_PATH}`,
+      buildApiUrl(HOT_UPDATE_API_BASE_URL, HOT_UPDATE_TELEMETRY_PATH),
       {
         method: "POST",
         headers: {
@@ -403,6 +542,9 @@ function RootLayout() {
   const otaLastCheckAtRef = React.useRef(0);
   const otaIgnoredUpdateIdRef = React.useRef<string | null>(null);
   const otaInitialCheckDoneRef = React.useRef(false);
+  const mobileAppShellWebViewRef = React.useRef<WebView>(null);
+  const mobileAppShellCanGoBackRef = React.useRef(false);
+  const mobileAppShellActiveRef = React.useRef(false);
 
   const [hotUpdateVisible, setHotUpdateVisible] = React.useState(false);
   const [hotUpdateProgress, setHotUpdateProgress] = React.useState(0);
@@ -412,12 +554,182 @@ function RootLayout() {
   const [hotUpdateMessage, setHotUpdateMessage] = React.useState<string | null>(
     null,
   );
+  const [mobileAppShellConfig, setMobileAppShellConfig] =
+    React.useState<MobileAppShellConfig>(DEFAULT_MOBILE_APP_SHELL_CONFIG);
+  const [mobileAppShellReady, setMobileAppShellReady] = React.useState(false);
+  const [mobileAppShellLoading, setMobileAppShellLoading] = React.useState(false);
+  const [mobileAppShellError, setMobileAppShellError] = React.useState<
+    string | null
+  >(null);
+  const [mobileAppShellReloadKey, setMobileAppShellReloadKey] = React.useState(0);
+  const [nativeAuthSnapshot, setNativeAuthSnapshot] = React.useState(() =>
+    serializeWebViewBridgeUserInfo(store.getState()?.auth?.userInfo || null),
+  );
+  const isWebViewShellActive =
+    mobileAppShellConfig.mode === "webview" && !!mobileAppShellConfig.webViewUrl;
+  const nativeAuthUserInfo = React.useMemo(() => {
+    try {
+      return JSON.parse(nativeAuthSnapshot);
+    } catch {
+      return null;
+    }
+  }, [nativeAuthSnapshot]);
+  const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
 
   // Initialize analytics
   useEffect(() => {
     if (isExpoGo) return;
     analytics.init();
   }, []);
+
+  React.useEffect(() => {
+    let lastSnapshot = serializeWebViewBridgeUserInfo(
+      store.getState()?.auth?.userInfo || null,
+    );
+
+    const unsubscribe = store.subscribe(() => {
+      const nextSnapshot = serializeWebViewBridgeUserInfo(
+        store.getState()?.auth?.userInfo || null,
+      );
+      if (nextSnapshot === lastSnapshot) return;
+      lastSnapshot = nextSnapshot;
+      setNativeAuthSnapshot(nextSnapshot);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const loadMobileAppShellConfig = React.useCallback(async () => {
+    try {
+      const response = await fetch(
+        buildApiUrl(HOT_UPDATE_API_BASE_URL, MOBILE_APP_SHELL_PATH),
+        {
+          headers: { "Cache-Control": "no-cache" },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = (await response.json()) as Partial<MobileAppShellConfig>;
+      setMobileAppShellConfig(normalizeMobileAppShellConfig(payload));
+    } catch (error) {
+      console.warn("[AppShell] Failed to fetch mobile app shell config:", error);
+      setMobileAppShellConfig(DEFAULT_MOBILE_APP_SHELL_CONFIG);
+    } finally {
+      setMobileAppShellReady(true);
+    }
+  }, []);
+
+  const reloadMobileAppShellWebView = React.useCallback(() => {
+    setMobileAppShellError(null);
+    setMobileAppShellLoading(true);
+    setMobileAppShellReloadKey((value) => value + 1);
+  }, []);
+
+  const handleMobileAppShellShouldStartLoad = React.useCallback((request: any) => {
+    const requestUrl = String(request?.url || "").trim();
+    if (!requestUrl) return false;
+
+    if (
+      /^https?:\/\//i.test(requestUrl) ||
+      /^about:blank$/i.test(requestUrl) ||
+      /^(blob|data):/i.test(requestUrl)
+    ) {
+      return true;
+    }
+
+    Linking.openURL(requestUrl).catch((error) => {
+      console.warn("[AppShell] Failed to open external URL:", error);
+    });
+    return false;
+  }, []);
+
+  const handleMobileAppShellMessage = React.useCallback((event: any) => {
+    const raw = String(event?.nativeEvent?.data || "").trim();
+    if (!raw) return;
+
+    try {
+      const payload = JSON.parse(raw);
+      if (payload?.source !== "pickletour-web" || payload?.type !== "auth-state") {
+        return;
+      }
+
+      const nextUserInfo = normalizeWebViewBridgeUserInfo(
+        payload?.payload?.userInfo || null,
+      );
+      const currentSnapshot = serializeWebViewBridgeUserInfo(
+        store.getState()?.auth?.userInfo || null,
+      );
+      const nextSnapshot = serializeWebViewBridgeUserInfo(nextUserInfo);
+
+      if (currentSnapshot === nextSnapshot) return;
+
+      if (nextUserInfo) {
+        store.dispatch(setCredentials(nextUserInfo));
+        return;
+      }
+
+      store.dispatch(logout());
+    } catch (error) {
+      console.warn("[AppShell] Failed to process bridge message:", error);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadMobileAppShellConfig();
+  }, [loadMobileAppShellConfig]);
+
+  React.useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void loadMobileAppShellConfig();
+      }
+    });
+
+    return () => sub.remove();
+  }, [loadMobileAppShellConfig]);
+
+  React.useEffect(() => {
+    mobileAppShellActiveRef.current = isWebViewShellActive;
+    if (!isWebViewShellActive) {
+      mobileAppShellCanGoBackRef.current = false;
+      setMobileAppShellLoading(false);
+      setMobileAppShellError(null);
+    } else {
+      setMobileAppShellLoading(true);
+      setMobileAppShellError(null);
+    }
+  }, [isWebViewShellActive, mobileAppShellConfig.webViewUrl]);
+
+  React.useEffect(() => {
+    if (!isWebViewShellActive) {
+      previousNativeAuthSnapshotRef.current = nativeAuthSnapshot;
+      return;
+    }
+
+    const previousSnapshot = previousNativeAuthSnapshotRef.current;
+    const shouldClearSession =
+      previousSnapshot !== "null" && nativeAuthSnapshot === "null";
+
+    previousNativeAuthSnapshotRef.current = nativeAuthSnapshot;
+
+    const webView = mobileAppShellWebViewRef.current;
+    if (!webView) return;
+
+    webView.injectJavaScript(
+      buildWebViewAuthSyncScript({
+        apiBaseUrl: HOT_UPDATE_API_BASE_URL,
+        userInfo: nativeAuthUserInfo,
+        clearSession: shouldClearSession,
+      }),
+    );
+  }, [
+    isWebViewShellActive,
+    nativeAuthSnapshot,
+    nativeAuthUserInfo,
+  ]);
 
   const startHotUpdate = React.useCallback(async (updateInfo: any) => {
     if (!HotUpdater || !updateInfo?.updateBundle) return;
@@ -531,7 +843,7 @@ function RootLayout() {
     try {
       try {
         const killSwitchRes = await fetch(
-          `${HOT_UPDATE_API_BASE_URL}/api/settings/ota-allowed`,
+          buildApiUrl(HOT_UPDATE_API_BASE_URL, "/api/auth/system/ota/allowed"),
           {
             headers: { "Cache-Control": "no-cache" },
           },
@@ -820,10 +1132,15 @@ function RootLayout() {
 
   // Trigger hide splash
   React.useEffect(() => {
-    if (firstFrameDone && fontsReady && lifecycle.phase === "initializing") {
+    if (
+      firstFrameDone &&
+      fontsReady &&
+      mobileAppShellReady &&
+      lifecycle.phase === "initializing"
+    ) {
       hideSplashSafe();
     }
-  }, [firstFrameDone, fontsReady, lifecycle.phase, hideSplashSafe]);
+  }, [firstFrameDone, fontsReady, mobileAppShellReady, lifecycle.phase, hideSplashSafe]);
 
   React.useEffect(() => {
     if (isExpoGo || !HotUpdater) return;
@@ -879,6 +1196,19 @@ function RootLayout() {
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
+        if (mobileAppShellActiveRef.current) {
+          if (mobileAppShellCanGoBackRef.current) {
+            mobileAppShellWebViewRef.current?.goBack();
+            return true;
+          }
+
+          Alert.alert("Thoát ứng dụng", "Bạn có muốn thoát PickleTour?", [
+            { text: "Hủy", style: "cancel" },
+            { text: "Thoát", onPress: () => BackHandler.exitApp() },
+          ]);
+          return true;
+        }
+
         const { router } = require("expo-router");
 
         // Check if can go back
@@ -1168,15 +1498,16 @@ function RootLayout() {
         <BottomSheetModalProvider>
           <SocketProvider>
             <Boot>
-              <AuthSessionSync />
-              <MatchLiveActivityBootstrap />
+              {!isWebViewShellActive && mobileAppShellReady ? <AuthSessionSync /> : null}
+              {!isWebViewShellActive && mobileAppShellReady ? (
+                <MatchLiveActivityBootstrap />
+              ) : null}
               <SafeAreaProvider>
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}
-                  edges={[
-                    Platform.OS === "android" ? "top" : "",
-                    Platform.OS === "android" ? "bottom" : "",
-                  ]}
+                  edges={
+                    isWebViewShellActive ? EMPTY_SAFE_AREA_EDGES : ROOT_SAFE_AREA_EDGES
+                  }
                 >
                   <View
                     style={{ flex: 1 }}
@@ -1184,7 +1515,200 @@ function RootLayout() {
                     collapsable={false}
                   >
                     <ThemeProvider value={navTheme}>
-                      <ChatBotPageContextProvider>
+                      {!mobileAppShellReady ? (
+                        <View
+                          style={{
+                            flex: 1,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: bg,
+                          }}
+                        >
+                          <ActivityIndicator
+                            size="large"
+                            color={navTheme.colors.primary}
+                          />
+                        </View>
+                      ) : isWebViewShellActive ? (
+                        <SafeAreaView
+                          style={{ flex: 1, backgroundColor: bg }}
+                          edges={WEBVIEW_SAFE_AREA_EDGES}
+                        >
+                          <WebView
+                            key={`app-shell-${mobileAppShellReloadKey}-${mobileAppShellConfig.webViewUrl}`}
+                            ref={mobileAppShellWebViewRef}
+                            source={{ uri: mobileAppShellConfig.webViewUrl }}
+                            originWhitelist={["*"]}
+                            injectedJavaScriptBeforeContentLoaded={buildWebViewAuthSyncScript({
+                              apiBaseUrl: HOT_UPDATE_API_BASE_URL,
+                              userInfo: nativeAuthUserInfo,
+                              clearSession: false,
+                            })}
+                            startInLoadingState
+                            javaScriptEnabled
+                            domStorageEnabled
+                            sharedCookiesEnabled
+                            thirdPartyCookiesEnabled
+                            allowsBackForwardNavigationGestures
+                            pullToRefreshEnabled
+                            setSupportMultipleWindows={false}
+                            onShouldStartLoadWithRequest={
+                              handleMobileAppShellShouldStartLoad
+                            }
+                            onMessage={handleMobileAppShellMessage}
+                            onLoadStart={() => {
+                              setMobileAppShellLoading(true);
+                              setMobileAppShellError(null);
+                            }}
+                            onLoadEnd={() => {
+                              setMobileAppShellLoading(false);
+                              mobileAppShellWebViewRef.current?.injectJavaScript(
+                                buildWebViewAuthSyncScript({
+                                  apiBaseUrl: HOT_UPDATE_API_BASE_URL,
+                                  userInfo: nativeAuthUserInfo,
+                                  clearSession: false,
+                                }),
+                              );
+                            }}
+                            onNavigationStateChange={(event) => {
+                              mobileAppShellCanGoBackRef.current = Boolean(
+                                event.canGoBack,
+                              );
+                            }}
+                            onError={(event) => {
+                              setMobileAppShellLoading(false);
+                              setMobileAppShellError(
+                                event.nativeEvent?.description ||
+                                  "Không tải được giao diện web.",
+                              );
+                            }}
+                            onHttpError={(event) => {
+                              setMobileAppShellLoading(false);
+                              setMobileAppShellError(
+                                `Lỗi tải giao diện web (${event.nativeEvent?.statusCode || 0}).`,
+                              );
+                            }}
+                          />
+
+                          {mobileAppShellLoading ? (
+                            <View
+                              pointerEvents="none"
+                              style={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "rgba(255,255,255,0.16)",
+                              }}
+                            >
+                              <ActivityIndicator
+                                size="large"
+                                color={navTheme.colors.primary}
+                              />
+                            </View>
+                          ) : null}
+
+                          {mobileAppShellError ? (
+                            <View
+                              style={{
+                                position: "absolute",
+                                left: 16,
+                                right: 16,
+                                bottom: 24,
+                                borderRadius: 16,
+                                padding: 16,
+                                backgroundColor: isDark
+                                  ? "rgba(17,18,20,0.94)"
+                                  : "rgba(255,255,255,0.96)",
+                                borderWidth: 1,
+                                borderColor: isDark ? "#2f3339" : "#e5e7eb",
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: navTheme.colors.text,
+                                  fontSize: 16,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Không mở được giao diện WebView
+                              </Text>
+                              <Text
+                                style={{
+                                  color: navTheme.colors.text,
+                                  opacity: 0.8,
+                                  lineHeight: 20,
+                                  marginTop: 8,
+                                }}
+                              >
+                                {mobileAppShellError}
+                              </Text>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  marginTop: 12,
+                                }}
+                              >
+                                <TouchableOpacity
+                                  onPress={reloadMobileAppShellWebView}
+                                  style={{
+                                    flex: 1,
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    marginRight: 6,
+                                    alignItems: "center",
+                                    backgroundColor: navTheme.colors.primary,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#ffffff",
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    Tải lại
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    Linking.openURL(
+                                      mobileAppShellConfig.webViewUrl,
+                                    ).catch((error) => {
+                                      console.warn(
+                                        "[AppShell] Failed to open web URL externally:",
+                                        error,
+                                      );
+                                    });
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    marginLeft: 6,
+                                    alignItems: "center",
+                                    borderWidth: 1,
+                                    borderColor: navTheme.colors.border,
+                                    backgroundColor: "transparent",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: navTheme.colors.text,
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    Mở ngoài trình duyệt
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : null}
+                        </SafeAreaView>
+                      ) : (
+                        <ChatBotPageContextProvider>
                         <PikoraProvider>
                           <Stack
                             screenOptions={{
@@ -1437,35 +1961,36 @@ function RootLayout() {
                           </Stack>
 
                           <PikoraHost />
-
-                          <StatusBar
-                            style={isDark ? "light" : "dark"}
-                            backgroundColor={bg}
-                            animated
-                          />
-
-                          {themeApplying && (
-                            <View
-                              pointerEvents="auto"
-                              style={{
-                                position: "absolute",
-                                left: 0,
-                                right: 0,
-                                top: 0,
-                                bottom: 0,
-                                alignItems: "center",
-                                justifyContent: "center",
-                                backgroundColor: "rgba(0,0,0,0.25)",
-                              }}
-                            >
-                              <ActivityIndicator
-                                size="large"
-                                color={navTheme.colors.primary}
-                              />
-                            </View>
-                          )}
                         </PikoraProvider>
                       </ChatBotPageContextProvider>
+                      )}
+
+                      <StatusBar
+                        style={isDark ? "light" : "dark"}
+                        backgroundColor={bg}
+                        animated
+                      />
+
+                      {themeApplying && (
+                        <View
+                          pointerEvents="auto"
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          <ActivityIndicator
+                            size="large"
+                            color={navTheme.colors.primary}
+                          />
+                        </View>
+                      )}
                     </ThemeProvider>
                   </View>
                 </SafeAreaView>
