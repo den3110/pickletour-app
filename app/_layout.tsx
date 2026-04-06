@@ -136,7 +136,7 @@ const buildApiUrl = (baseUrl: string | undefined, path: string) => {
     ? String(path || "").trim()
     : `/${String(path || "").trim()}`;
 
-  if (base.endsWith("/api") && normalizedPath.startsWith("/api/")) {
+  if (base.endsWith("/api/api") && normalizedPath.startsWith("/api/")) {
     return `${base}${normalizedPath.slice(4)}`;
   }
 
