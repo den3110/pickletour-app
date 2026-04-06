@@ -192,6 +192,7 @@ const getCurrentSlotOfUser = ({
 const preStartRightSlotForSide = (side, leftSide) =>
   leftSide === side ? 2 : 1;
 const oppositeSlot = (slot) => (Number(slot) === 1 ? 2 : 1);
+const OPENING_DOUBLES_SERVER = 2;
 
 /* ✅ Luôn ưu tiên theo USER (serverId / lastServerUid)
    ✅ Chỉ fallback theo slot khi chưa có gì */
@@ -210,8 +211,12 @@ const computeServerUid = ({
   // ✅ nếu đã nhớ người giao gần nhất → bám theo người
   if (lastServerUid) return lastServerUid;
 
-  // ✅ fallback cuối cùng: chỉ dùng khi opening serve 0-0-1 và chưa biết serverId
-  if (isStartOfGame && Boolean(serve?.opening) && activeServerNum === 1) {
+  // ✅ fallback cuối cùng: chỉ dùng khi opening serve 0-0-2 và chưa biết serverId
+  if (
+    isStartOfGame &&
+    Boolean(serve?.opening) &&
+    activeServerNum === OPENING_DOUBLES_SERVER
+  ) {
     const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
     return (
       getUidAtSlotNow?.(activeSide, rightSlot) ||
@@ -1853,14 +1858,14 @@ export default function RefereeJudgePanel({ matchId }) {
   // ==== Serve state
   const serve = localServeOverride || match?.serve || {
     side: "A",
-    server: 1,
+    server: eventType !== "single" ? OPENING_DOUBLES_SERVER : 1,
     serverId: "",
     opening: eventType !== "single",
   };
   const activeSide = serve?.side === "B" ? "B" : "A";
   const activeServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
-  const isOpeningServe = Boolean(serve?.opening) && activeServerNum === 1;
+  const isOpeningServe = Boolean(serve?.opening);
 
   // Nhớ người giao gần nhất để icon không “nhảy theo ô”
   const lastServerUidRef = useRef("");
@@ -1885,7 +1890,7 @@ export default function RefereeJudgePanel({ matchId }) {
     serverUidShow: "",
   });
 
-  // Đầu game opening serve (0-0-1) icon phải nằm ở ô phải/even
+  // Đầu game opening serve (0-0-2) icon phải nằm ở ô phải/even
   const pinnedOpeningServer =
     openingServerRef.current.gameIndex === curIdx &&
     openingServerRef.current.side === activeSide
@@ -1941,7 +1946,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ forcedUid phải ưu tiên cao nhất để khỏi nhảy 2 lần
   const serverUidShow = forcedUid || baseServerUidShow;
   // ✅ INIT serve đầu game:
-  // - double local rule: 0-0-1 (opening serve chỉ có 1 lượt giao)
+  // - double pickleball: 0-0-2 (opening serve chỉ có 1 lượt giao)
   // - single: 0-0-1 (server #1)
   // Tự động set người giao bóng chuẩn theo bên đang đứng khi tỉ số 0-0
   const initServeDoneRef = useRef({});
@@ -1967,7 +1972,7 @@ export default function RefereeJudgePanel({ matchId }) {
     }
 
     const isDouble = eventType !== "single";
-    const wantServerNum = 1;
+    const wantServerNum = isDouble ? OPENING_DOUBLES_SERVER : 1;
     const wantOpening = isDouble;
 
     const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
@@ -2276,7 +2281,7 @@ export default function RefereeJudgePanel({ matchId }) {
       textToSpeak = `${serverScore} , ${receiverScore} , ${activeServerNum}`;
     }
 
-    // Nếu vừa bấm bắt đầu trận (0-0-1) cũng cần đọc
+    // Nếu vừa bấm bắt đầu trận (0-0-2) cũng cần đọc
     // Ngắt câu cũ nếu đang đọc dở để đọc câu mới ngay
     Speech.stop();
 
@@ -2865,7 +2870,7 @@ export default function RefereeJudgePanel({ matchId }) {
     }
   };
 
-  // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU/opening serve → 0-0-1; nếu đang live thường → tay 1
+  // --- ĐỔI GIAO: nếu CHƯA BẮT ĐẦU/opening serve → 0-0-2; nếu đang live thường → tay 1
   // --- ĐỔI GIAO (SIDE OUT) ---
   // --- ĐỔI GIAO (SIDE OUT) ---
   const toggleServeSide = () => {
@@ -2875,7 +2880,7 @@ export default function RefereeJudgePanel({ matchId }) {
     const nextSide = activeSide === "A" ? "B" : "A";
     const preStart = waitingStartActive || match?.status !== "live";
     const isDouble = eventType !== "single";
-    const wantOrder = 1;
+    const wantOrder = preStart && isDouble ? OPENING_DOUBLES_SERVER : 1;
     const wantOpening = preStart && isDouble;
     const nextTeamScore = nextSide === "A" ? curA : curB;
     const targetSlot = wantOpening
@@ -2930,7 +2935,11 @@ export default function RefereeJudgePanel({ matchId }) {
       (waitingStartActive ||
         match?.status !== "live" ||
         (Number(curA) === 0 && Number(curB) === 0 && Boolean(serve?.opening)));
-    const nextOrder = preStartOpening ? 1 : activeServerNum === 1 ? 2 : 1;
+    const nextOrder = preStartOpening
+      ? OPENING_DOUBLES_SERVER
+      : activeServerNum === 1
+        ? 2
+        : 1;
     const nextOpening = preStartOpening;
 
     lastServerUidRef.current = partnerId;
@@ -3010,7 +3019,7 @@ export default function RefereeJudgePanel({ matchId }) {
       let nextServe = null;
 
       // ⛳ Theo yêu cầu: nếu chưa bắt đầu trận/game thì KHÔNG đổi giao.
-      // Nhưng nếu hoán đổi ngay tại đội đang giao, cần đảm bảo 0-0-1 opening serve
+      // Nhưng nếu hoán đổi ngay tại đội đang giao, cần đảm bảo 0-0-2 opening serve
       // và người giao là người đang ở ô phải theo bên hiện tại sau hoán đổi.
       if (preOrZero && teamKey === activeSide) {
         const rightSlot = preStartRightSlotForSide(teamKey, leftSide);
@@ -3026,7 +3035,7 @@ export default function RefereeJudgePanel({ matchId }) {
           lastServerUidRef.current = uidRightNew;
           nextServe = {
             side: activeSide,
-            server: 1,
+            server: eventType !== "single" ? OPENING_DOUBLES_SERVER : 1,
             serverId: uidRightNew,
             opening: eventType !== "single",
           };
