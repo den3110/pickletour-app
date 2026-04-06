@@ -574,6 +574,7 @@ function RootLayout() {
       return null;
     }
   }, [nativeAuthSnapshot]);
+  const nativeAuthBearerToken = String(nativeAuthUserInfo?.token || "").trim();
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
 
   // Initialize analytics
@@ -1537,7 +1538,16 @@ function RootLayout() {
                           <WebView
                             key={`app-shell-${mobileAppShellReloadKey}-${mobileAppShellConfig.webViewUrl}`}
                             ref={mobileAppShellWebViewRef}
-                            source={{ uri: mobileAppShellConfig.webViewUrl }}
+                            source={{
+                              uri: mobileAppShellConfig.webViewUrl,
+                              ...(nativeAuthBearerToken
+                                ? {
+                                    headers: {
+                                      Authorization: `Bearer ${nativeAuthBearerToken}`,
+                                    },
+                                  }
+                                : {}),
+                            }}
                             originWhitelist={["*"]}
                             injectedJavaScriptBeforeContentLoaded={buildWebViewAuthSyncScript({
                               apiBaseUrl: HOT_UPDATE_API_BASE_URL,
