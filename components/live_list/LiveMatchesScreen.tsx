@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -253,6 +253,7 @@ function LiveClustersPane({
   onOpenStation,
 }: any) {
   const [keyword, setKeyword] = useState("");
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const stations = useMemo(() => {
     const base = Array.isArray(clusterDetail?.stations)
@@ -273,13 +274,27 @@ function LiveClustersPane({
     return { total, live, active };
   }, [stations]);
   const refreshing = isFetchingClusters || isFetchingCluster;
+  const showRefreshControl = isManualRefreshing && refreshing;
+
+  useEffect(() => {
+    if (!refreshing && isManualRefreshing) {
+      setIsManualRefreshing(false);
+    }
+  }, [isManualRefreshing, refreshing]);
+
+  const handleRefresh = useCallback(() => {
+    setIsManualRefreshing(true);
+    onRefresh();
+  }, [onRefresh]);
 
   return (
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl refreshing={showRefreshControl} onRefresh={handleRefresh} />
+      }
     >
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
@@ -288,7 +303,7 @@ function LiveClustersPane({
             Chạm vào một sân để mở viewer bám theo sân đó. Khi trận đổi trên sân, viewer sẽ đi cùng trận mới.
           </Text>
         </View>
-        {refreshing ? <ActivityIndicator color={T.tint} /> : null}
+        {showRefreshControl ? <ActivityIndicator color={T.tint} /> : null}
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: T.cardBg, borderColor: T.border }]}>
@@ -424,6 +439,7 @@ function LiveArchivePane({ T }: any) {
   const [archiveTournamentId, setArchiveTournamentId] = useState("all");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<any[]>([]);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const debouncedKeyword = useDebouncedValue(keyword, 320);
 
   useEffect(() => {
@@ -459,6 +475,12 @@ function LiveArchivePane({ T }: any) {
     setItems((current) => (page === 1 ? nextItems : mergeUniqueMatches(current, nextItems)));
   }, [data?.items, page]);
 
+  useEffect(() => {
+    if (!isFetching && isManualRefreshing) {
+      setIsManualRefreshing(false);
+    }
+  }, [isFetching, isManualRefreshing]);
+
   const archiveTournaments = useMemo(() => {
     const raw = Array.isArray(data?.tournaments) ? data.tournaments : [];
     return [{ _id: "all", name: "Tất cả giải", count: data?.count || 0 }, ...raw];
@@ -467,6 +489,14 @@ function LiveArchivePane({ T }: any) {
   const archiveGroups = useMemo(() => groupMatchesByTournament(items), [items]);
   const pages = Math.max(1, Number(data?.pages || 1));
   const count = Number(data?.count || 0);
+  const showArchiveRefreshControl = isManualRefreshing && isFetching && page === 1;
+
+  const handleRefresh = useCallback(() => {
+    setPage(1);
+    setItems([]);
+    setIsManualRefreshing(true);
+    refetch();
+  }, [refetch]);
 
   return (
     <ScrollView
@@ -475,12 +505,8 @@ function LiveArchivePane({ T }: any) {
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={isFetching && page === 1}
-          onRefresh={() => {
-            setPage(1);
-            setItems([]);
-            refetch();
-          }}
+          refreshing={showArchiveRefreshControl}
+          onRefresh={handleRefresh}
         />
       }
     >
@@ -491,7 +517,7 @@ function LiveArchivePane({ T }: any) {
             Lọc theo giải đấu hoặc tìm trực tiếp theo mã trận để mở lại đúng video đã phát.
           </Text>
         </View>
-        {isFetching ? <ActivityIndicator color={T.tint} /> : null}
+        {showArchiveRefreshControl ? <ActivityIndicator color={T.tint} /> : null}
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: T.cardBg, borderColor: T.border }]}>

@@ -13,7 +13,6 @@ import {
   FlatList,
   Dimensions,
   DeviceEventEmitter,
-  Easing,
 } from "react-native";
 import { Stack, router, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
@@ -258,40 +257,6 @@ function SocialButton({ onPress, children, bg }) {
 }
 
 const ZALO_SRC = require("@/assets/images/icon-zalo.png");
-
-/* ---------- 🆕 ANIMATION WRAPPER (Fade In Up) ---------- */
-// Thành phần giúp các section xuất hiện mượt mà
-function FadeInSection({ delay = 0, children }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        delay,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.cubic),
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        delay,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.cubic),
-      }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
-    >
-      {children}
-    </Animated.View>
-  );
-}
 
 /* ---------- 🆕 PRO Animated Button Component ---------- */
 function ProButton({ onPress, children, colors, style, icon }) {
@@ -1221,37 +1186,25 @@ export default function HomeScreen() {
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
-          <FadeInSection delay={100}>
-            <AthleteIsland />
-          </FadeInSection>
+          <AthleteIsland />
         </View>
 
         <View style={{ height: 16 }} />
-        <FadeInSection delay={300}>
-          <FeaturesGrid />
-        </FadeInSection>
+        <FeaturesGrid />
 
         <View style={{ height: 24 }} />
-        <FadeInSection delay={500}>
-          <TournamentsSection />
-        </FadeInSection>
+        <TournamentsSection />
 
         <View style={{ height: 24 }} />
-        <FadeInSection delay={700}>
-          <NewsSection />
-        </FadeInSection>
+        <NewsSection />
 
         <View style={{ height: 24 }} />
-        <FadeInSection delay={900}>
-          <LeaderboardSection />
-        </FadeInSection>
+        <LeaderboardSection />
 
         <View style={{ height: 16 }} />
-        <FadeInSection delay={1100}>
-          <View style={{ paddingHorizontal: 16 }}>
-            <ContactCard />
-          </View>
-        </FadeInSection>
+        <View style={{ paddingHorizontal: 16 }}>
+          <ContactCard />
+        </View>
       </ScrollView>
     </>
   );
