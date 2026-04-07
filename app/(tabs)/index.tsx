@@ -17,6 +17,7 @@ import {
 import { Stack, router, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector, useDispatch } from "react-redux";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Hero from "@/components/Hero";
 import {
   AntDesign,
@@ -41,6 +42,7 @@ import LeaderboardSection from "@/components/home/LeaderboardSection";
 
 /* ---------- Lottie asset ---------- */
 const BG_3D = require("@/assets/lottie/bg-3d.json");
+const HERO_3D_BASE_HEIGHT = 240;
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.8;
@@ -1084,6 +1086,7 @@ function ContactCard() {
 
 export default function HomeScreen() {
   const scrollViewRef = React.useRef(null);
+  const insets = useSafeAreaInsets();
   React.useEffect(() => {
     const listener = DeviceEventEmitter.addListener(
       "SCROLL_TO_TOP",
@@ -1114,6 +1117,7 @@ export default function HomeScreen() {
   }, [reauthData, dispatch]);
   const theme = useTheme();
   const bg = theme?.colors?.background ?? "#ffffff";
+  const heroTopInset = Math.max(insets.top, 0);
 
   return (
     <>
@@ -1176,7 +1180,16 @@ export default function HomeScreen() {
         style={{ backgroundColor: bg }}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <View style={styles.hero3dWrap}>
+        <View
+          style={[
+            styles.hero3dWrap,
+            {
+              height: HERO_3D_BASE_HEIGHT + heroTopInset,
+              marginTop: -heroTopInset,
+              paddingTop: heroTopInset,
+            },
+          ]}
+        >
           <LottieView
             source={BG_3D}
             autoPlay
@@ -1213,7 +1226,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   hero3dWrap: {
     width: "100%",
-    height: 240,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     overflow: "hidden",
