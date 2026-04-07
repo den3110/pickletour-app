@@ -25,16 +25,6 @@ const ACTIVE_TAB_TINT = {
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";
 const IOS_26_NATIVE_TABS_ENABLED =
   Platform.OS === "ios" && Number(Platform.Version) >= 26;
-const IOS_NATIVE_TAB_ITEM_LIMIT = 5;
-const IOS_NATIVE_TAB_NAMES = [
-  "index",
-  "tournaments",
-  "live",
-  "rankings",
-  "my_tournament",
-  "chat",
-  "profile",
-] as const;
 
 const HOME_LOTTIE_COLOR_FILTERS = (color: string) => [
   { keypath: "Fill 1", color },
@@ -137,9 +127,6 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
   const isDark = colorScheme === "dark";
-  const canUseIos26NativeTabs =
-    IOS_26_NATIVE_TABS_ENABLED &&
-    IOS_NATIVE_TAB_NAMES.length <= IOS_NATIVE_TAB_ITEM_LIMIT;
   const activeTabTint =
     colorScheme === "dark" ? ACTIVE_TAB_TINT.dark : ACTIVE_TAB_TINT.light;
   const [homeAnimTrigger, setHomeAnimTrigger] = React.useState(0);
@@ -158,7 +145,7 @@ export default function TabLayout() {
     [pathname],
   );
 
-  if (canUseIos26NativeTabs) {
+  if (IOS_26_NATIVE_TABS_ENABLED) {
     const inactiveTabColor = DynamicColorIOS({
       light: "#6B7280",
       dark: "#9CA3AF",
