@@ -22,6 +22,7 @@ import { saveUserInfo } from "@/utils/authStorage";
 import apiSlice from "@/slices/apiSlice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
+import { normalizeAppRoutePath } from "@/utils/nativeTabs";
 
 /* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
@@ -63,7 +64,10 @@ const BG_LOTTIE = require("@/assets/lottie/animated-bg.json");
 const BOTTOM_ACTIONS_H = 132;
 
 export default function LoginScreen() {
-  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    returnTo?: string | string[];
+    redirectTo?: string | string[];
+  }>();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
@@ -78,12 +82,16 @@ export default function LoginScreen() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const [login, { isLoading }] = useLoginMutation();
   const returnTo = useMemo(() => {
-    const raw = Array.isArray(params.returnTo)
+    const rawReturnTo = Array.isArray(params.returnTo)
       ? params.returnTo[0]
       : params.returnTo;
-    const next = String(raw || "/(tabs)").trim();
-    return next.startsWith("/") ? next : "/(tabs)";
-  }, [params.returnTo]);
+    const rawRedirectTo = Array.isArray(params.redirectTo)
+      ? params.redirectTo[0]
+      : params.redirectTo;
+    const raw = String(rawReturnTo || rawRedirectTo || "/").trim();
+
+    return normalizeAppRoutePath(raw || "/");
+  }, [params.redirectTo, params.returnTo]);
 
   // State
   const [loginId, setLoginId] = useState("");
@@ -322,7 +330,7 @@ export default function LoginScreen() {
             ]}
           >
             <Pressable
-              onPress={() => router.push("/(tabs)")}
+              onPress={() => router.replace("/")}
               style={({ pressed }) => [
                 styles.btnOutlinePill,
                 {

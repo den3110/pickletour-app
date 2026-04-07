@@ -58,12 +58,16 @@ import {
   useUpdateUserMutation,
 } from "@/slices/usersApiSlice";
 import * as SecureStore from "expo-secure-store";
-import { useUnregisterPushTokenMutation } from "@/slices/pushApiSlice";
+import {
+  useSyncLiveActivitiesMutation,
+  useUnregisterPushTokenMutation,
+} from "@/slices/pushApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import CccdQrModal from "@/components/CccdQrModal";
-import { DEVICE_ID_KEY } from "@/hooks/useExpoPushToken";
 import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
+import { buildLoginHref, runMobileLogoutFlow } from "@/services/authSession";
+import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
 
 const { SaveFormat } = ImageManipulator;
 
@@ -312,6 +316,7 @@ export default function ProfileScreen({ isBack = false }) {
 
   const [updateProfile, { isLoading }] = useUpdateUserMutation();
   const [unregisterDeviceToken] = useUnregisterPushTokenMutation();
+  const [syncLiveActivities] = useSyncLiveActivitiesMutation();
   const [logoutApiCall] = useLogoutMutation();
   const [deleteMe] = useDeleteMeMutation();
   const [uploadCccd, { isLoading: upLoad }] = useUploadCccdMutation();
@@ -328,7 +333,7 @@ export default function ProfileScreen({ isBack = false }) {
   useEffect(() => {
     if (authReady && !userInfo && !navigatedRef.current) {
       navigatedRef.current = true;
-      router.replace("/login");
+      router.replace(buildLoginHref("/profile"));
     }
   }, [authReady, userInfo]);
 
@@ -338,7 +343,7 @@ export default function ProfileScreen({ isBack = false }) {
       navigatedRef.current = true;
       dispatch(apiSlice.util.resetApiState());
       dispatch(logoutAction());
-      setTimeout(() => router.replace("/login"), 100);
+      setTimeout(() => router.replace(buildLoginHref("/profile")), 100);
     }
   }, [error, dispatch]);
 
@@ -388,6 +393,7 @@ export default function ProfileScreen({ isBack = false }) {
   const [viewerLabels, setViewerLabels] = useState([]);
   const [activeTab, setActiveTab] = useState("home");
   const [refreshing, setRefreshing] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   // ✅ Dynamic header sizing — tự co giãn theo safe-area của từng thiết bị
   const HEADER_MAX_HEIGHT = insets.top + TOP_ROW_H + AVATAR_SIZE + NAME_AREA_H;
@@ -572,8 +578,31 @@ export default function ProfileScreen({ isBack = false }) {
     }
   };
 
+  const performLogout = async () => {
+    if (logoutBusy) return;
+
+    navigatedRef.current = true;
+    setLogoutBusy(true);
+
+    await runMobileLogoutFlow({
+      logoutApiCall: () => logoutApiCall().unwrap(),
+      unregisterDeviceToken: (payload) => unregisterDeviceToken(payload).unwrap(),
+      syncLiveActivities: (payload) => syncLiveActivities(payload).unwrap(),
+      onDebugLog: (label, error) => {
+        if (__DEV__) {
+          console.log(`[logout] ${label}:`, error);
+        }
+      },
+    });
+
+    dispatch(logoutAction());
+    router.replace(buildLoginHref("/"));
+  };
+
   const confirmLogout = () => {
-    const go = () => router.push("/logout");
+    const go = () => {
+      void performLogout();
+    };
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -601,8 +630,9 @@ export default function ProfileScreen({ isBack = false }) {
     setDelBusy(true);
     try {
       await deleteMe(body ?? {}).unwrap();
+      navigatedRef.current = true;
       dispatch(logoutAction());
-      router.replace("/login");
+      router.replace(buildLoginHref("/"));
       dispatch(apiSlice.util.resetApiState());
       Alert.alert("Đã xoá", "Tài khoản đã được xoá.");
     } catch (e) {
@@ -1720,6 +1750,43 @@ export default function ProfileScreen({ isBack = false }) {
             </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal visible={logoutBusy} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: t.surface,
+                borderColor: t.border,
+                borderWidth: 1,
+                alignItems: "center",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.dangerIcon,
+                { backgroundColor: t.accentLight, marginBottom: 14 },
+              ]}
+            >
+              <ActivityIndicator color={t.accent} />
+            </View>
+            <Text style={[styles.modalTitle, { color: t.text, marginBottom: 8 }]}>
+              Đang đăng xuất
+            </Text>
+            <Text
+              style={{
+                color: t.textSecondary,
+                textAlign: "center",
+                lineHeight: 20,
+              }}
+            >
+              Ứng dụng đang thu hồi phiên hiện tại và dọn trạng thái cục bộ.
+            </Text>
+          </View>
+        </View>
       </Modal>
 
       <ImageView
