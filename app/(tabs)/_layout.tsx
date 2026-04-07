@@ -180,7 +180,7 @@ export default function TabLayout() {
           }}
         >
           <NativeTabs.Trigger.Icon
-            sf={{ default: "house", selected: "house.fill" }}
+            sf={{ default: "house.fill", selected: "house.fill" }}
           />
           <NativeTabs.Trigger.Label>Trang chủ</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
@@ -192,7 +192,7 @@ export default function TabLayout() {
           }}
         >
           <NativeTabs.Trigger.Icon
-            sf={{ default: "trophy", selected: "trophy.fill" }}
+            sf={{ default: "trophy.fill", selected: "trophy.fill" }}
           />
           <NativeTabs.Trigger.Label>Giải đấu</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
@@ -216,7 +216,7 @@ export default function TabLayout() {
           }}
         >
           <NativeTabs.Trigger.Icon
-            sf={{ default: "chart.bar", selected: "chart.bar.fill" }}
+            sf={{ default: "chart.bar.fill", selected: "chart.bar.fill" }}
           />
           <NativeTabs.Trigger.Label>Xếp hạng</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
@@ -228,7 +228,7 @@ export default function TabLayout() {
           }}
         >
           <NativeTabs.Trigger.Icon
-            sf={{ default: "sportscourt", selected: "sportscourt.fill" }}
+            sf={{ default: "sportscourt.fill", selected: "sportscourt.fill" }}
           />
           <NativeTabs.Trigger.Label>Giải của tôi</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
@@ -254,7 +254,7 @@ export default function TabLayout() {
         >
           <NativeTabs.Trigger.Icon
             sf={{
-              default: "person.crop.circle",
+              default: "person.crop.circle.fill",
               selected: "person.crop.circle.fill",
             }}
           />
