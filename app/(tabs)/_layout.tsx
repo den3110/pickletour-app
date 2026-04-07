@@ -1,5 +1,4 @@
 import { router, Tabs, usePathname } from "expo-router";
-import { NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
 import {
   DeviceEventEmitter,
@@ -150,6 +149,7 @@ export default function TabLayout() {
   );
 
   if (IOS_26_NATIVE_TABS_ENABLED) {
+    const { NativeTabs } = require("expo-router/unstable-native-tabs");
     const inactiveTabColor = DynamicColorIOS({
       light: "#6B7280",
       dark: "#9CA3AF",
