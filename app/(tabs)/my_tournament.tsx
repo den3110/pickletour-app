@@ -1129,7 +1129,11 @@ export default function MyTournament() {
         style={{ flex: 1, backgroundColor: tokens.colors.background }}
       >
         <Stack.Screen
-          options={{ title: "Giải của tôi", headerTitleAlign: "center" }}
+          options={{
+            title: "Giải của tôi",
+            headerTitleAlign: "center",
+            headerBackTitle: "Quay lại",
+          }}
         />
 
         {!isAuthed ? (

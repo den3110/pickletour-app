@@ -9,6 +9,7 @@ export default function MoreLayout() {
     <Stack
       screenOptions={{
         headerTitleAlign: "center",
+        headerBackTitle: "Quay lại",
         headerStyle: {
           backgroundColor: theme.colors.card,
         },
@@ -18,7 +19,10 @@ export default function MoreLayout() {
         },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="index"
+        options={{ headerShown: false, title: "Quay lại" }}
+      />
       <Stack.Screen name="chat" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />
     </Stack>
