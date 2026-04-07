@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 // NOTE: chỉnh path slice này cho khớp repo của bạn
 import { useGetProfileQuery } from "@/slices/usersApiSlice";
+import { resolveAuxiliaryTabPath } from "@/utils/nativeTabs";
 
 /** Helper: lấy safely các field phổ biến trong repo của bạn */
 function pickAvatar(u) {
@@ -106,8 +107,7 @@ export default function UserInfoGate() {
   const goToProfile = () => {
     // Đóng modal để user thao tác ở trang Profile; nếu chưa đủ khi quay lại, gate sẽ mở lại.
     setOpen(false);
-    // Đường dẫn tới trang profile của bạn: app/(tabs)/profile/index.jsx
-    router.push("/(tabs)/profile");
+    router.push(resolveAuxiliaryTabPath("profile"));
   };
 
   if (isComplete || isFetching) return null;

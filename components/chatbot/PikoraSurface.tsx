@@ -28,6 +28,7 @@ import { usePikora } from "./PikoraProvider";
 type PikoraSurfaceProps = {
   presentation: PikoraUiSurface;
   bottomPaddingOffset?: number;
+  onBack?: (() => void) | null;
 };
 
 type ColorPalette = ReturnType<typeof getColors>;
@@ -839,7 +840,11 @@ function WelcomeHero({
   );
 }
 
-export function PikoraSurface({ presentation = "screen", bottomPaddingOffset = 0 }: PikoraSurfaceProps) {
+export function PikoraSurface({
+  presentation = "screen",
+  bottomPaddingOffset = 0,
+  onBack = null,
+}: PikoraSurfaceProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const [showSettings, setShowSettings] = useState(false);
@@ -962,11 +967,19 @@ export function PikoraSurface({ presentation = "screen", bottomPaddingOffset = 0
             ]}
           >
             <View style={styles.headerSide}>
-              <HeaderButton
-                icon="sparkles-outline"
-                onPress={() => setShowSettings((value) => !value)}
-                colors={colors}
-              />
+              {presentation !== "overlay" && onBack ? (
+                <HeaderButton
+                  icon="chevron-back-outline"
+                  onPress={onBack}
+                  colors={colors}
+                />
+              ) : (
+                <HeaderButton
+                  icon="sparkles-outline"
+                  onPress={() => setShowSettings((value) => !value)}
+                  colors={colors}
+                />
+              )}
             </View>
 
             <View style={styles.headerCenter}>

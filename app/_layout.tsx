@@ -44,6 +44,7 @@ import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
+import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
 if (Constants.appOwnership !== "expo") {
@@ -97,6 +98,7 @@ const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
 const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
 const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
 const EMPTY_SAFE_AREA_EDGES = [] as const;
+const ROOT_SAFE_AREA_TOP_ONLY_EDGES = ["top"] as const;
 const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
 const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
 
@@ -535,6 +537,7 @@ const isExpoGo = Constants.appOwnership === "expo";
 
 function RootLayout() {
   const segments = useSegments();
+  const isTabsRoute = segments[0] === "(tabs)";
 
   const clarityInitRef = React.useRef(false);
   const clarityModRef = React.useRef<any>(null);
@@ -576,6 +579,13 @@ function RootLayout() {
   }, [nativeAuthSnapshot]);
   const nativeAuthBearerToken = String(nativeAuthUserInfo?.token || "").trim();
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
+  const rootSafeAreaEdges = React.useMemo(() => {
+    if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
+    if (IOS_26_NATIVE_TABS_ENABLED && isTabsRoute) {
+      return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
+    }
+    return ROOT_SAFE_AREA_EDGES;
+  }, [isTabsRoute, isWebViewShellActive]);
 
   // Initialize analytics
   useEffect(() => {
@@ -1312,7 +1322,14 @@ function RootLayout() {
 
   const extractUrl = React.useCallback((n?: any | null) => {
     const data: any = n?.request?.content?.data ?? {};
-    return data?.url ?? (data?.matchId ? `/match/${data.matchId}/home` : null);
+    const rawUrl = String(data?.url || "").trim();
+    if (rawUrl) {
+      const resolved = resolvePikoraNavigationTarget(rawUrl);
+      if (resolved.internalPath) {
+        return resolved.internalPath;
+      }
+    }
+    return data?.matchId ? `/match/${data.matchId}/home` : null;
   }, []);
 
   React.useEffect(() => {
@@ -1506,9 +1523,7 @@ function RootLayout() {
               <SafeAreaProvider>
                 <SafeAreaView
                   style={{ flex: 1, backgroundColor: bg }}
-                  edges={
-                    isWebViewShellActive ? EMPTY_SAFE_AREA_EDGES : ROOT_SAFE_AREA_EDGES
-                  }
+                  edges={rootSafeAreaEdges}
                 >
                   <View
                     style={{ flex: 1 }}

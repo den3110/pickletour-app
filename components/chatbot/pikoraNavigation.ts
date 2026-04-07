@@ -10,6 +10,7 @@ import type {
   PikoraUiSurface,
 } from "./pikoraTypes";
 import { normalizeSessionFocus } from "./pikoraUtils";
+import { normalizeAppRoutePath } from "@/utils/nativeTabs";
 
 type NavigationResolution = {
   internalPath: string | null;
@@ -250,7 +251,7 @@ function createResolutionFromPath(path: string): NavigationResolution {
     return { internalPath: null, externalUrl: path };
   }
 
-  return { internalPath: path, externalUrl: null };
+  return { internalPath: normalizeAppRoutePath(path), externalUrl: null };
 }
 
 function normalizeExpoDevLink(rawValue: string) {

@@ -17,6 +17,7 @@ import { useSelector } from "react-redux";
 import ImageViewing from "react-native-image-viewing";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
+import { resolveAuxiliaryTabPath } from "@/utils/nativeTabs";
 
 const FALLBACK = {
   title: "Kết nối cộng đồng & quản lý giải đấu thể thao",
@@ -252,7 +253,7 @@ export default function Hero() {
                 {needKyc && (
                   <CTAButton
                     title="Xác minh ngay"
-                    to="/profile"
+                    to={resolveAuxiliaryTabPath("profile")}
                     variant={needSelfAssess ? "soft" : "primary"}
                     full={isSingleCta}
                     tint={tint}

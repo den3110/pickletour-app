@@ -30,6 +30,7 @@ import {
 // Theme & Icons
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { resolveAuxiliaryTabPath } from "@/utils/nativeTabs";
 
 const OTP_LENGTH = 6;
 
@@ -108,7 +109,7 @@ export default function VerifyOtpScreen() {
       dispatch(setCredentials(normalized));
       await saveUserInfo(normalized);
 
-      router.replace("/(tabs)/profile");
+      router.replace(resolveAuxiliaryTabPath("profile"));
     } catch (err) {
       Alert.alert(
         "Lỗi xác thực",

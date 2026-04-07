@@ -13,6 +13,7 @@ import LottieView from "lottie-react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { CustomTabBar } from "@/components/tabbar/Customtabbar";
+import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 
 const HOME_LOTTIE = require("@/assets/lottie/home-lt-icon.json");
 const CHATBOT_ICON = require("@/assets/images/icon-chatbot.png");
@@ -23,8 +24,6 @@ const ACTIVE_TAB_TINT = {
 };
 
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";
-const IOS_26_NATIVE_TABS_ENABLED =
-  Platform.OS === "ios" && Number(Platform.Version) >= 26;
 
 const HOME_LOTTIE_COLOR_FILTERS = (color: string) => [
   { keypath: "Fill 1", color },
@@ -42,6 +41,7 @@ const TAB_ROOT_PATHS: Record<string, string> = {
   my_tournament: "/my_tournament",
   chat: "/chat",
   profile: "/profile",
+  more: "/more",
 };
 
 const normalizePathname = (value?: string | null) => {
@@ -198,18 +198,6 @@ export default function TabLayout() {
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
-          name="live"
-          listeners={{
-            tabPress: () => emitScrollToTopIfNeeded("live"),
-          }}
-        >
-          <NativeTabs.Trigger.Icon
-            sf="dot.radiowaves.left.and.right"
-          />
-          <NativeTabs.Trigger.Label>Live</NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-
-        <NativeTabs.Trigger
           name="rankings"
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("rankings"),
@@ -222,43 +210,30 @@ export default function TabLayout() {
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
-          name="my_tournament"
+          name="live"
           listeners={{
-            tabPress: () => emitScrollToTopIfNeeded("my_tournament"),
+            tabPress: () => emitScrollToTopIfNeeded("live"),
           }}
         >
           <NativeTabs.Trigger.Icon
-            sf={{ default: "sportscourt.fill", selected: "sportscourt.fill" }}
+            sf="dot.radiowaves.left.and.right"
           />
-          <NativeTabs.Trigger.Label>Giải của tôi</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>Live</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
-          name="chat"
+          name="more"
           listeners={{
-            tabPress: () => emitScrollToTopIfNeeded("chat"),
-          }}
-        >
-          <NativeTabs.Trigger.Icon
-            src={CHATBOT_ICON}
-            renderingMode="original"
-          />
-          <NativeTabs.Trigger.Label>Trợ lý</NativeTabs.Trigger.Label>
-        </NativeTabs.Trigger>
-
-        <NativeTabs.Trigger
-          name="profile"
-          listeners={{
-            tabPress: () => emitScrollToTopIfNeeded("profile"),
+            tabPress: () => emitScrollToTopIfNeeded("more"),
           }}
         >
           <NativeTabs.Trigger.Icon
             sf={{
-              default: "person.crop.circle.fill",
-              selected: "person.crop.circle.fill",
+              default: "ellipsis.circle.fill",
+              selected: "ellipsis.circle.fill",
             }}
           />
-          <NativeTabs.Trigger.Label>Hồ sơ</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
       </NativeTabs>
     );
@@ -404,6 +379,13 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="admin"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="more"
         options={{
           href: null,
         }}

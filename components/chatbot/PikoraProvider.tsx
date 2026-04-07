@@ -61,6 +61,7 @@ import {
   normalizeVerificationMode,
   uniqueSuggestionList,
 } from "./pikoraUtils";
+import { resolveAuxiliaryTabPath } from "@/utils/nativeTabs";
 
 type PendingActionConfirm = {
   action: PikoraAction;
@@ -481,7 +482,7 @@ export function PikoraProvider({ children }: { children: React.ReactNode }) {
 
   const openChatScreen = useCallback(() => {
     setOverlayOpen(false);
-    router.push("/(tabs)/chat" as any);
+    router.push(resolveAuxiliaryTabPath("chat") as any);
   }, []);
 
   const setReasoningMode = useCallback(async (value: PikoraReasoningMode) => {
