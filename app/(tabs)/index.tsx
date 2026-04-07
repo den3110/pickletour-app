@@ -1185,7 +1185,6 @@ export default function HomeScreen() {
             styles.hero3dWrap,
             {
               height: HERO_3D_BASE_HEIGHT + heroTopInset,
-              marginTop: -heroTopInset,
               paddingTop: heroTopInset,
             },
           ]}
