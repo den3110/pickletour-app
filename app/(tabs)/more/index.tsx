@@ -96,7 +96,7 @@ export default function MoreIndexScreen() {
                 },
               ]}
             >
-              Điều hướng mở rộng
+              Tiện ích bổ sung
             </Text>
           </View>
 
@@ -108,7 +108,7 @@ export default function MoreIndexScreen() {
               },
             ]}
           >
-            More
+            Khám phá thêm
           </Text>
 
           <Text
@@ -119,8 +119,8 @@ export default function MoreIndexScreen() {
               },
             ]}
           >
-            Các mục phụ được gom về đây để giữ native tab trên iOS 26 gọn và ổn
-            định hơn.
+            Truy cập nhanh hồ sơ, trợ lý và các tiện ích cá nhân của PickleTour
+            trong một nơi gọn gàng hơn.
           </Text>
         </View>
 
@@ -133,7 +133,7 @@ export default function MoreIndexScreen() {
               },
             ]}
           >
-            Truy cập nhanh
+            Lối tắt nhanh
           </Text>
 
           {MORE_ITEMS.map((item) => (
