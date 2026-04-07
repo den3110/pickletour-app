@@ -4,7 +4,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { router, Stack, usePathname, useSegments } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import {
@@ -98,7 +98,6 @@ const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
 const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
 const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
 const EMPTY_SAFE_AREA_EDGES = [] as const;
-const ROOT_SAFE_AREA_BOTTOM_ONLY_EDGES = ["bottom"] as const;
 const ROOT_SAFE_AREA_TOP_ONLY_EDGES = ["top"] as const;
 const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
 const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
@@ -538,11 +537,7 @@ const isExpoGo = Constants.appOwnership === "expo";
 
 function RootLayout() {
   const segments = useSegments();
-  const pathname = usePathname();
   const isTabsRoute = segments[0] === "(tabs)";
-  const normalizedPathname =
-    pathname && pathname !== "/" ? pathname.replace(/\/+$/, "") || "/" : "/";
-  const isHomeTabRoute = isTabsRoute && normalizedPathname === "/";
 
   const clarityInitRef = React.useRef(false);
   const clarityModRef = React.useRef<any>(null);
@@ -586,16 +581,11 @@ function RootLayout() {
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
   const rootSafeAreaEdges = React.useMemo(() => {
     if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
-    if (isHomeTabRoute) {
-      return IOS_26_NATIVE_TABS_ENABLED
-        ? EMPTY_SAFE_AREA_EDGES
-        : ROOT_SAFE_AREA_BOTTOM_ONLY_EDGES;
-    }
     if (IOS_26_NATIVE_TABS_ENABLED && isTabsRoute) {
       return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
     }
     return ROOT_SAFE_AREA_EDGES;
-  }, [isHomeTabRoute, isTabsRoute, isWebViewShellActive]);
+  }, [isTabsRoute, isWebViewShellActive]);
 
   // Initialize analytics
   useEffect(() => {
