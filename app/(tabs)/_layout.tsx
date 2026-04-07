@@ -146,20 +146,31 @@ export default function TabLayout() {
   );
 
   if (IOS_26_NATIVE_TABS_ENABLED) {
-    const dynamicTabColor = DynamicColorIOS({
-      light: "#111827",
-      dark: "#FFFFFF",
+    const inactiveTabColor = DynamicColorIOS({
+      light: "#6B7280",
+      dark: "#9CA3AF",
     });
 
     return (
       <NativeTabs
         blurEffect="systemChromeMaterial"
         disableTransparentOnScrollEdge
-        tintColor={dynamicTabColor}
+        tintColor={activeTabTint}
+        iconColor={{
+          default: inactiveTabColor,
+          selected: activeTabTint,
+        }}
         labelStyle={{
-          color: dynamicTabColor,
-          fontSize: 11.5,
-          fontWeight: "600",
+          default: {
+            color: inactiveTabColor,
+            fontSize: 11.5,
+            fontWeight: "600",
+          },
+          selected: {
+            color: activeTabTint,
+            fontSize: 11.5,
+            fontWeight: "600",
+          },
         }}
       >
         <NativeTabs.Trigger

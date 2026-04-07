@@ -56,7 +56,10 @@ const COLORS = {
   scoreGrey: "#94a3b8",
 };
 
-const fmt3 = (x) => (Number.isFinite(x) ? Number(x).toFixed(3) : "0.000");
+const fmt3 = (x) => {
+  if (x === null) return "***";
+  return Number.isFinite(x) ? Number(x).toFixed(3) : "0.000";
+};
 
 const CustomImageComponent = (props) => (
   <ExpoImage

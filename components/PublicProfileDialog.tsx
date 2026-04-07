@@ -56,8 +56,10 @@ const safe = (v: any, fb = TEXT_PLACE) => {
   }
   return v;
 };
-const num = (v: any, digits = 3) =>
-  Number.isFinite(v) ? Number(v).toFixed(digits) : TEXT_PLACE;
+const num = (v: any, digits = 3) => {
+  if (v === null) return "***";
+  return Number.isFinite(v) ? Number(v).toFixed(digits) : TEXT_PLACE;
+};
 const fmtDate = (iso?: string) => {
   if (!iso) return TEXT_PLACE;
   const d = new Date(iso);

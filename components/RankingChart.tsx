@@ -247,7 +247,7 @@ const SelectedUserCard = memo(
               TRÌNH ĐÔI
             </Text>
             <Text style={[styles.statValue, { color: COLORS.double }]}>
-              {scoreDouble?.toFixed(3) || "---"}
+              {scoreDouble === null ? "***" : (scoreDouble?.toFixed(3) || "---")}
             </Text>
           </View>
           <View
@@ -258,7 +258,7 @@ const SelectedUserCard = memo(
               TRÌNH ĐƠN
             </Text>
             <Text style={[styles.statValue, { color: COLORS.single }]}>
-              {scoreSingle?.toFixed(3) || "---"}
+              {scoreSingle === null ? "***" : (scoreSingle?.toFixed(3) || "---")}
             </Text>
           </View>
         </View>
@@ -821,7 +821,7 @@ const RankingChart = memo(
           <View style={styles.header}>
             <View>
               <Text style={[styles.headerValue, { color: colors.text }]}>
-                {highestUserScore.toFixed(3)}
+                {highestUserScore === null ? "***" : highestUserScore.toFixed(3)}
               </Text>
               <Text style={[styles.headerLabel, { color: colors.subText }]}>
                 Điểm cao nhất
