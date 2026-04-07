@@ -1178,6 +1178,9 @@ export default function HomeScreen() {
       <ScrollView
         ref={scrollViewRef}
         style={{ backgroundColor: bg }}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
+        automaticallyAdjustsScrollIndicatorInsets={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <View
