@@ -53,8 +53,7 @@ export function CustomTabBar({
     rootOptions.tabBarActiveTintColor ?? (isDark ? "#A78BFA" : "#8B5CF6");
   const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
-  const extraPaddingBottom = Platform.OS === "ios" ? 8 : 0;
-  const bottomOffset = Platform.OS === "ios" ? -Math.max(insets.bottom, 0) : 0;
+  const extraPaddingBottom = Platform.OS === "ios" ? Math.max(insets.bottom, 10) : 0;
 
   const visibleRoutes = state.routes.filter((route) => {
     const { options } = descriptors[route.key];
@@ -179,7 +178,7 @@ export function CustomTabBar({
         styles.wrapper,
         {
           height: TAB_BAR_HEIGHT + CURVE_HEIGHT + extraPaddingBottom,
-          bottom: bottomOffset,
+          bottom: 0,
         },
       ]}
     >

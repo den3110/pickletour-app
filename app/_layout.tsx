@@ -44,7 +44,6 @@ import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
-import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
 if (Constants.appOwnership !== "expo") {
@@ -581,7 +580,7 @@ function RootLayout() {
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
   const rootSafeAreaEdges = React.useMemo(() => {
     if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
-    if (IOS_26_NATIVE_TABS_ENABLED && isTabsRoute) {
+    if (Platform.OS === "ios" && isTabsRoute) {
       return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
     }
     return ROOT_SAFE_AREA_EDGES;
