@@ -16,6 +16,7 @@ import Animated, {
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Bỏ dòng khai báo SCREEN_WIDTH ở ngoài này đi nhé
 // const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -46,12 +47,14 @@ export function CustomTabBar({
 }: CustomTabBarProps) {
   // 2. Lấy chiều rộng màn hình động tại đây
   const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const rootOptions = descriptors[state.routes[0]?.key]?.options ?? {};
   const activeTint =
     rootOptions.tabBarActiveTintColor ?? (isDark ? "#A78BFA" : "#8B5CF6");
   const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
-  const extraPaddingBottom = Platform.OS === "ios" ? 20 : 0;
+  const extraPaddingBottom = Platform.OS === "ios" ? 8 : 0;
+  const bottomOffset = Platform.OS === "ios" ? -Math.max(insets.bottom, 0) : 0;
 
   const visibleRoutes = state.routes.filter((route) => {
     const { options } = descriptors[route.key];
@@ -176,7 +179,7 @@ export function CustomTabBar({
         styles.wrapper,
         {
           height: TAB_BAR_HEIGHT + CURVE_HEIGHT + extraPaddingBottom,
-          bottom: 0,
+          bottom: bottomOffset,
         },
       ]}
     >
