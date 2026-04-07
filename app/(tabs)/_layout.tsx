@@ -1,4 +1,4 @@
-import { Tabs, usePathname } from "expo-router";
+import { router, Tabs, usePathname } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
 import {
@@ -9,9 +9,11 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import LottieView from "lottie-react-native";
+import { useSelector } from "react-redux";
 
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { buildLoginHref } from "@/services/authSession";
 import { CustomTabBar } from "@/components/tabbar/Customtabbar";
 import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 
@@ -126,7 +128,9 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
+  const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
   const isDark = colorScheme === "dark";
+  const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
   const activeTabTint =
     colorScheme === "dark" ? ACTIVE_TAB_TINT.dark : ACTIVE_TAB_TINT.light;
   const [homeAnimTrigger, setHomeAnimTrigger] = React.useState(0);
@@ -362,7 +366,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         listeners={({ navigation }) => ({
-          tabPress: () => {
+          tabPress: (event) => {
+            if (!isAuthed) {
+              event.preventDefault();
+              router.replace(buildLoginHref("/profile") as any);
+              return;
+            }
             if (navigation.isFocused()) {
               DeviceEventEmitter.emit(SCROLL_TO_TOP_EVENT, "profile");
             }

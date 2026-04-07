@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
 import { router, Stack } from "expo-router";
 import React from "react";
+import { useSelector } from "react-redux";
 import {
   Pressable,
   ScrollView,
@@ -10,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { buildLoginHref } from "@/services/authSession";
 
 const MORE_ITEMS = [
   {
@@ -41,7 +44,9 @@ const MORE_ITEMS = [
 export default function MoreIndexScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
   const isDark = theme.dark;
+  const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
 
   return (
     <SafeAreaView
@@ -135,7 +140,13 @@ export default function MoreIndexScreen() {
             <Pressable
               key={item.key}
               accessibilityRole="button"
-              onPress={() => router.push(item.route as any)}
+              onPress={() =>
+                router.push(
+                  (!isAuthed && item.key === "profile"
+                    ? buildLoginHref("/more/profile")
+                    : item.route) as any,
+                )
+              }
               style={({ pressed }) => [
                 styles.itemCard,
                 {
