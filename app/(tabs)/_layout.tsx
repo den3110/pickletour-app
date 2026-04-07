@@ -390,6 +390,7 @@ export default function TabLayout() {
         name="admin"
         options={{
           href: null,
+          tabBarButton: () => null,
         }}
       />
 
@@ -397,6 +398,7 @@ export default function TabLayout() {
         name="more"
         options={{
           href: null,
+          tabBarButton: () => null,
         }}
       />
     </Tabs>

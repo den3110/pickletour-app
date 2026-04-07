@@ -1,7 +1,24 @@
 import { Platform } from "react-native";
 
+function getIosMajorVersion() {
+  if (Platform.OS !== "ios") return 0;
+
+  const rawVersion = Platform.Version;
+  if (typeof rawVersion === "number" && Number.isFinite(rawVersion)) {
+    return Math.trunc(rawVersion);
+  }
+
+  const major = String(rawVersion || "")
+    .trim()
+    .match(/^\d+/)?.[0];
+
+  return major ? Number(major) : 0;
+}
+
+export const IOS_PLATFORM_MAJOR_VERSION = getIosMajorVersion();
+
 export const IOS_26_NATIVE_TABS_ENABLED =
-  Platform.OS === "ios" && Number(Platform.Version) >= 26;
+  Platform.OS === "ios" && IOS_PLATFORM_MAJOR_VERSION >= 26;
 
 type AuxiliaryRouteName = "chat" | "profile" | "my_tournament";
 

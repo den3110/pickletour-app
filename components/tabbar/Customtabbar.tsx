@@ -24,6 +24,15 @@ export const TAB_BAR_HEIGHT = 65;
 const FLOATING_BUTTON_SIZE = 60;
 const CURVE_WIDTH = 100;
 const CURVE_HEIGHT = 20;
+const shouldHideRoute = (routeName?: string) => {
+  const normalized = String(routeName || "").trim().toLowerCase();
+  return (
+    normalized === "admin" ||
+    normalized === "more" ||
+    normalized.startsWith("admin/") ||
+    normalized.startsWith("more/")
+  );
+};
 
 interface CustomTabBarProps extends BottomTabBarProps {
   isDark: boolean;
@@ -46,6 +55,7 @@ export function CustomTabBar({
 
   const visibleRoutes = state.routes.filter((route) => {
     const { options } = descriptors[route.key];
+    if (shouldHideRoute(route.name)) return false;
     return options.href !== null;
   });
 
