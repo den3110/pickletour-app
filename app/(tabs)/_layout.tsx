@@ -167,12 +167,12 @@ export default function TabLayout() {
         labelStyle={{
           default: {
             color: inactiveTabColor,
-            fontSize: 11.5,
+            fontSize: 10.5,
             fontWeight: "600",
           },
           selected: {
             color: activeTabTint,
-            fontSize: 11.5,
+            fontSize: 10.5,
             fontWeight: "600",
           },
         }}

@@ -851,6 +851,8 @@ function RootLayout() {
     otaCheckInFlightRef.current = true;
 
     try {
+      let remoteForceUpdate = false;
+
       try {
         const killSwitchRes = await fetch(
           buildApiUrl(HOT_UPDATE_API_BASE_URL, "/api/auth/system/ota/allowed"),
@@ -860,6 +862,7 @@ function RootLayout() {
         );
         if (killSwitchRes.ok) {
           const killSwitchData = await killSwitchRes.json();
+          remoteForceUpdate = killSwitchData?.forceUpdate === true;
           if (killSwitchData && killSwitchData.allowed === false) {
             if (__DEV__)
               console.log("[HotUpdater] OTA updates disabled remotely.");
@@ -881,12 +884,12 @@ function RootLayout() {
         otaCheckInFlightRef.current = false;
         return;
       }
-      if (otaIgnoredUpdateIdRef.current === updateInfo.id) {
+      const isForceUpdate =
+        updateInfo.shouldForceUpdate === true || remoteForceUpdate;
+      if (otaIgnoredUpdateIdRef.current === updateInfo.id && !isForceUpdate) {
         otaCheckInFlightRef.current = false;
         return;
       }
-
-      const isForceUpdate = updateInfo.shouldForceUpdate === true;
       const title = isForceUpdate
         ? "Cần cập nhật ứng dụng"
         : "Có bản cập nhật mới";
