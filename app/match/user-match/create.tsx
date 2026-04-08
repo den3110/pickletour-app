@@ -647,7 +647,7 @@ export default function CreateUserMatchScreen() {
 
       if (mode === "live" && created?._id) {
         router.replace({
-          pathname: `/match/${created._id}/referee`,
+          pathname: `/match/user-match/${created._id}/live`,
           params: { userMatch: "true" },
         });
       } else {

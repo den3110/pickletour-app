@@ -46,7 +46,7 @@ function buildIosLiveAuthHref(nativeUrl: string) {
     `scope=${encodeURIComponent("live_app_access")}`,
   ].join("&");
 
-  const continueUrl = `https://pickletour.vn/oauth/authorize?response_type=code&${authQuery}`;
+  const continueUrl = `https://pickletour.vn/api/api/oauth/authorize?response_type=code&${authQuery}`;
   return `/live-auth?continueUrl=${encodeURIComponent(
     continueUrl,
   )}&targetUrl=${encodeURIComponent(nativeUrl)}&callbackUri=${encodeURIComponent(

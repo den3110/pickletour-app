@@ -8,7 +8,9 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTheme } from "@react-navigation/native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 import {
@@ -20,6 +22,14 @@ type LiveAuthParams = {
   continueUrl?: string | string[];
   targetUrl?: string | string[];
   callbackUri?: string | string[];
+  client_id?: string | string[];
+  redirect_uri?: string | string[];
+  response_type?: string | string[];
+  scope?: string | string[];
+  state?: string | string[];
+  code_challenge?: string | string[];
+  code_challenge_method?: string | string[];
+  nonce?: string | string[];
 };
 
 type OAuthAuthorizeRequest = {
@@ -53,6 +63,31 @@ type OAuthAuthorizeContext = {
   roleSummary?: string;
 };
 
+type DirectOAuthParams = {
+  client_id: string;
+  redirect_uri: string;
+  response_type: string;
+  scope: string;
+  state: string;
+  code_challenge: string;
+  code_challenge_method: string;
+  nonce: string;
+};
+
+type ParsedAuthorizeRequest =
+  | {
+      continueUrl: string;
+      error: string;
+      request: OAuthAuthorizeRequest | null;
+      pending: true;
+    }
+  | {
+      continueUrl: string;
+      error: string;
+      request: OAuthAuthorizeRequest | null;
+      pending: false;
+    };
+
 function normalizeParam(value: string | string[] | undefined, fallback = "") {
   if (Array.isArray(value)) {
     return String(value[0] || fallback).trim();
@@ -69,16 +104,75 @@ function appendQuery(url: string, key: string, value: string) {
   }
 }
 
-function parseAuthorizeRequest(continueUrl: string) {
-  if (!continueUrl) {
+function parseAuthorizeRequest(
+  continueUrl: string,
+  routeParams: DirectOAuthParams,
+): ParsedAuthorizeRequest {
+  const directParams = {
+    client_id: normalizeParam(routeParams.client_id),
+    redirect_uri: normalizeParam(routeParams.redirect_uri),
+    response_type: normalizeParam(routeParams.response_type),
+    scope: normalizeParam(routeParams.scope, "openid profile"),
+    state: normalizeParam(routeParams.state),
+    code_challenge: normalizeParam(routeParams.code_challenge),
+    code_challenge_method: normalizeParam(
+      routeParams.code_challenge_method,
+      "S256",
+    ),
+    nonce: normalizeParam(routeParams.nonce),
+  };
+
+  const hasDirectOAuthParams = Boolean(
+    directParams.client_id ||
+      directParams.redirect_uri ||
+      directParams.response_type ||
+      directParams.state ||
+      directParams.code_challenge ||
+      directParams.nonce,
+  );
+
+  if (!continueUrl && !hasDirectOAuthParams) {
     return {
+      continueUrl: "",
       error: "Thiếu yêu cầu xác thực từ PickleTour Live.",
       request: null as OAuthAuthorizeRequest | null,
+      pending: false,
     };
   }
 
   try {
-    const url = new URL(continueUrl);
+    const url = new URL(
+      continueUrl || "https://pickletour.vn/api/api/oauth/authorize",
+    );
+
+    if (directParams.nonce) {
+      url.searchParams.set("nonce", directParams.nonce);
+    }
+    if (directParams.response_type) {
+      url.searchParams.set("response_type", directParams.response_type);
+    }
+    if (directParams.client_id) {
+      url.searchParams.set("client_id", directParams.client_id);
+    }
+    if (directParams.redirect_uri) {
+      url.searchParams.set("redirect_uri", directParams.redirect_uri);
+    }
+    if (directParams.scope) {
+      url.searchParams.set("scope", directParams.scope);
+    }
+    if (directParams.state) {
+      url.searchParams.set("state", directParams.state);
+    }
+    if (directParams.code_challenge) {
+      url.searchParams.set("code_challenge", directParams.code_challenge);
+    }
+    if (directParams.code_challenge_method) {
+      url.searchParams.set(
+        "code_challenge_method",
+        directParams.code_challenge_method,
+      );
+    }
+
     const params = url.searchParams;
     const request: OAuthAuthorizeRequest = {
       client_id: String(params.get("client_id") || "").trim(),
@@ -96,9 +190,6 @@ function parseAuthorizeRequest(continueUrl: string) {
       "client_id",
       "redirect_uri",
       "response_type",
-      "state",
-      "code_challenge",
-      "code_challenge_method",
     ].filter((key) => {
       const value = request[key as keyof OAuthAuthorizeRequest];
       return !String(value || "").trim();
@@ -106,23 +197,29 @@ function parseAuthorizeRequest(continueUrl: string) {
 
     if (missing.length > 0) {
       return {
+        continueUrl: url.toString(),
         error: `Yêu cầu cấp quyền không hợp lệ. Thiếu ${missing.join(", ")}.`,
         request: null as OAuthAuthorizeRequest | null,
+        pending: false,
       };
     }
 
     if (request.response_type !== "code") {
       return {
+        continueUrl: url.toString(),
         error: "Yêu cầu cấp quyền không hợp lệ. response_type phải là code.",
         request: null as OAuthAuthorizeRequest | null,
+        pending: false,
       };
     }
 
-    return { error: "", request };
+    return { continueUrl: url.toString(), error: "", request, pending: false };
   } catch {
     return {
+      continueUrl,
       error: "Không đọc được yêu cầu xác thực từ PickleTour Live.",
       request: null as OAuthAuthorizeRequest | null,
+      pending: false,
     };
   }
 }
@@ -145,10 +242,36 @@ function buildAuthorizeSearch(
 
 export default function LiveAuthScreen() {
   const params = useLocalSearchParams<LiveAuthParams>();
+  const hasContinueUrlParam = typeof params.continueUrl !== "undefined";
 
   const continueUrl = useMemo(
     () => normalizeParam(params.continueUrl),
     [params.continueUrl],
+  );
+  const directOAuthParams = useMemo<DirectOAuthParams>(
+    () => ({
+      client_id: normalizeParam(params.client_id),
+      redirect_uri: normalizeParam(params.redirect_uri),
+      response_type: normalizeParam(params.response_type),
+      scope: normalizeParam(params.scope, "openid profile"),
+      state: normalizeParam(params.state),
+      code_challenge: normalizeParam(params.code_challenge),
+      code_challenge_method: normalizeParam(
+        params.code_challenge_method,
+        "S256",
+      ),
+      nonce: normalizeParam(params.nonce),
+    }),
+    [
+      params.client_id,
+      params.redirect_uri,
+      params.response_type,
+      params.scope,
+      params.state,
+      params.code_challenge,
+      params.code_challenge_method,
+      params.nonce,
+    ],
   );
   const targetUrl = useMemo(
     () => normalizeParam(params.targetUrl),
@@ -158,12 +281,40 @@ export default function LiveAuthScreen() {
     () => normalizeParam(params.callbackUri, "pickletour-live://auth-init"),
     [params.callbackUri],
   );
+  const [didWaitForInitialParams, setDidWaitForInitialParams] = useState(false);
+
+  useEffect(() => {
+    if (hasContinueUrlParam) {
+      setDidWaitForInitialParams(true);
+      return;
+    }
+
+    setDidWaitForInitialParams(false);
+    const timer = setTimeout(() => {
+      setDidWaitForInitialParams(true);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [hasContinueUrlParam]);
+
+  const isWaitingForInitialRequest =
+    !hasContinueUrlParam && !didWaitForInitialParams;
 
   const authorizePayload = useMemo(
-    () => parseAuthorizeRequest(continueUrl),
-    [continueUrl],
+    () =>
+      isWaitingForInitialRequest
+        ? {
+            continueUrl: "",
+            error: "",
+            request: null,
+            pending: true,
+          }
+        : parseAuthorizeRequest(continueUrl, directOAuthParams),
+    [continueUrl, directOAuthParams, isWaitingForInitialRequest],
   );
   const authorizeRequest = authorizePayload.request;
+  const resolvedContinueUrl = authorizePayload.continueUrl;
+  const { colors, dark } = useTheme();
 
   const userInfo = useSelector((state: any) => state.auth?.userInfo);
   const [issueOsAuthToken] = useIssueOsAuthTokenMutation();
@@ -178,40 +329,51 @@ export default function LiveAuthScreen() {
   const [contextData, setContextData] = useState<OAuthAuthorizeContext | null>(
     null,
   );
+  const tokens = useMemo(
+    () => ({
+      bg: colors.background,
+      card: colors.card,
+      text: colors.text,
+      subText: dark ? "#9ca3af" : "#64748b",
+      border: colors.border,
+      primary: colors.primary,
+      primaryText: dark ? "#081018" : "#ffffff",
+      tile: dark ? "#171a20" : "#f8fafc",
+      tileBorder: dark ? "#262b33" : "#e2e8f0",
+      badgeBg: dark ? "rgba(124,192,255,0.12)" : "rgba(25,118,210,0.08)",
+      errorBg: dark ? "rgba(239,68,68,0.14)" : "#fee2e2",
+      errorText: dark ? "#fca5a5" : "#b91c1c",
+      secondaryText: dark ? "#d4d4d8" : "#334155",
+      shadow: dark ? "#000000" : "#0f172a",
+    }),
+    [colors, dark],
+  );
 
   const returnTo = useMemo(() => {
-    if (!continueUrl) return "/login";
+    if (!resolvedContinueUrl) return "/login";
 
     const nextParams = new URLSearchParams();
-    nextParams.set("continueUrl", continueUrl);
+    nextParams.set("continueUrl", resolvedContinueUrl);
     nextParams.set("callbackUri", callbackUri);
     if (targetUrl) {
       nextParams.set("targetUrl", targetUrl);
     }
     return `/live-auth?${nextParams.toString()}`;
-  }, [callbackUri, continueUrl, targetUrl]);
+  }, [callbackUri, resolvedContinueUrl, targetUrl]);
 
-  const openWebFallback = async (fallbackMessage?: string) => {
-    if (!continueUrl) {
-      setError("Không thể mở luồng xác thực web.");
+  useEffect(() => {
+    if (authorizePayload.pending) {
+      setError("");
+      setContextData(null);
+      setIsPreparing(false);
+      setMessage("Đang nhận yêu cầu xác thực từ PickleTour Live...");
       return;
     }
 
-    if (fallbackMessage) {
-      setMessage(fallbackMessage);
-    }
-
-    try {
-      await Linking.openURL(continueUrl);
-    } catch {
-      setError("Không thể mở luồng xác thực web.");
-    }
-  };
-
-  useEffect(() => {
     if (authorizePayload.error) {
       setError(authorizePayload.error);
       setContextData(null);
+      setIsPreparing(false);
       return;
     }
 
@@ -277,6 +439,7 @@ export default function LiveAuthScreen() {
     };
   }, [
     authorizePayload.error,
+    authorizePayload.pending,
     authorizeRequest,
     fetchAuthorizeContext,
     issueOsAuthToken,
@@ -313,15 +476,21 @@ export default function LiveAuthScreen() {
       if (targetUrl) {
         callbackUrl = appendQuery(callbackUrl, "targetUrl", targetUrl);
       }
-      if (continueUrl) {
-        callbackUrl = appendQuery(callbackUrl, "continueUrl", continueUrl);
+      if (resolvedContinueUrl) {
+        callbackUrl = appendQuery(
+          callbackUrl,
+          "continueUrl",
+          resolvedContinueUrl,
+        );
       }
 
       try {
         await Linking.openURL(callbackUrl);
+        // Đóng màn hình sau khi chuyển về app live
+        try { router.replace("/(tabs)" as any); } catch {}
       } catch {
-        await openWebFallback(
-          "Không mở lại được PickleTour Live. Chuyển sang xác thực web...",
+        setError(
+          "Không mở lại được PickleTour Live. Vui lòng quay lại app live và thử lại.",
         );
       }
     } catch (e: any) {
@@ -338,63 +507,134 @@ export default function LiveAuthScreen() {
   };
 
   return (
-    <View style={styles.page}>
+    <SafeAreaView
+      edges={["bottom"]}
+      style={[styles.safeArea, { backgroundColor: tokens.bg }]}
+    >
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: tokens.bg }}
       >
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>PICKLETOUR</Text>
-          <Text style={styles.title}>Ủy quyền PickleTour Live</Text>
-          <Text style={styles.body}>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: tokens.card,
+              borderColor: tokens.border,
+              shadowColor: tokens.shadow,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.eyebrow,
+              { color: tokens.primary, backgroundColor: tokens.badgeBg },
+            ]}
+          >
+            PICKLETOUR
+          </Text>
+          <Text style={[styles.title, { color: tokens.text }]}>
+            Ủy quyền PickleTour Live
+          </Text>
+          <Text style={[styles.body, { color: tokens.subText }]}>
             Xác nhận cho phép PickleTour Live dùng phiên đăng nhập hiện tại để
             vào app live và quản lý các giải bạn được cấp quyền.
           </Text>
 
           {error ? (
-            <View style={styles.alert}>
-              <Text style={styles.alertText}>{error}</Text>
+            <View
+              style={[styles.alert, { backgroundColor: tokens.errorBg }]}
+            >
+              <Text style={[styles.alertText, { color: tokens.errorText }]}>
+                {error}
+              </Text>
             </View>
           ) : null}
 
-          {isPreparing ? (
+          {authorizePayload.pending || isPreparing ? (
             <View style={styles.progressBlock}>
-              <ActivityIndicator color="#25c2a0" />
-              <Text style={styles.body}>{message}</Text>
+              <ActivityIndicator color={tokens.primary} />
+              <Text style={[styles.body, { color: tokens.subText }]}>
+                {message}
+              </Text>
             </View>
           ) : null}
 
           {!isPreparing && contextData ? (
             <>
               <View style={styles.metaRow}>
-                <View style={styles.metaTile}>
-                  <Text style={styles.metaLabel}>Tài khoản</Text>
-                  <Text style={styles.metaValue}>{accountName}</Text>
+                <View
+                  style={[
+                    styles.metaTile,
+                    {
+                      backgroundColor: tokens.tile,
+                      borderColor: tokens.tileBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.metaLabel, { color: tokens.primary }]}>
+                    Tài khoản
+                  </Text>
+                  <Text style={[styles.metaValue, { color: tokens.text }]}>
+                    {accountName}
+                  </Text>
                 </View>
-                <View style={styles.metaTile}>
-                  <Text style={styles.metaLabel}>Quyền</Text>
-                  <Text style={styles.metaValue}>
+                <View
+                  style={[
+                    styles.metaTile,
+                    {
+                      backgroundColor: tokens.tile,
+                      borderColor: tokens.tileBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.metaLabel, { color: tokens.primary }]}>
+                    Quyền
+                  </Text>
+                  <Text style={[styles.metaValue, { color: tokens.text }]}>
                     {contextData?.roleSummary || "PickleTour Live"}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Giải được phép live</Text>
+                <Text style={[styles.sectionTitle, { color: tokens.text }]}>
+                  Giải được phép live
+                </Text>
                 {manageableTournaments.length > 0 ? (
                   manageableTournaments.slice(0, 6).map((tournament) => (
-                    <View key={tournament._id || tournament.name} style={styles.tournamentCard}>
-                      <Text style={styles.tournamentName}>
+                    <View
+                      key={tournament._id || tournament.name}
+                      style={[
+                        styles.tournamentCard,
+                        {
+                          backgroundColor: tokens.tile,
+                          borderColor: tokens.tileBorder,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.tournamentName, { color: tokens.text }]}
+                      >
                         {tournament.name || "Giải đấu"}
                       </Text>
-                      <Text style={styles.tournamentStatus}>
+                      <Text
+                        style={[
+                          styles.tournamentStatus,
+                          { color: tokens.subText },
+                        ]}
+                      >
                         {tournament.status || "active"}
                       </Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.body}>
+                  <Text style={[styles.body, { color: tokens.subText }]}>
                     {contextData?.message ||
                       "Tài khoản admin sẽ dùng danh sách giải hiện có của hệ thống."}
                   </Text>
@@ -408,86 +648,111 @@ export default function LiveAuthScreen() {
                     disabled={isAuthorizing}
                     style={[
                       styles.primaryButton,
+                      { backgroundColor: tokens.primary },
                       isAuthorizing && styles.buttonDisabled,
                     ]}
                   >
                     {isAuthorizing ? (
-                      <ActivityIndicator color="#04110b" />
+                      <ActivityIndicator color={tokens.primaryText} />
                     ) : (
-                      <Text style={styles.primaryButtonText}>Cho phép</Text>
+                      <Text
+                        style={[
+                          styles.primaryButtonText,
+                          { color: tokens.primaryText },
+                        ]}
+                      >
+                        Cho phép
+                      </Text>
                     )}
                   </Pressable>
 
                   <Pressable
                     onPress={() => router.replace("/(tabs)")}
-                    style={styles.ghostButton}
+                    style={[
+                      styles.ghostButton,
+                      { borderColor: tokens.border, backgroundColor: tokens.bg },
+                    ]}
                   >
-                    <Text style={styles.ghostButtonText}>Hủy</Text>
+                    <Text
+                      style={[
+                        styles.ghostButtonText,
+                        { color: tokens.secondaryText },
+                      ]}
+                    >
+                      Hủy
+                    </Text>
                   </Pressable>
                 </View>
               ) : (
                 <View style={styles.actionStack}>
-                  <Text style={styles.body}>
+                  <Text style={[styles.body, { color: tokens.subText }]}>
                     {contextData?.message ||
                       "Tài khoản này hiện chưa thể dùng PickleTour Live."}
                   </Text>
                   <Pressable
                     onPress={() => router.replace("/(tabs)")}
-                    style={styles.ghostButton}
+                    style={[
+                      styles.ghostButton,
+                      { borderColor: tokens.border, backgroundColor: tokens.bg },
+                    ]}
                   >
-                    <Text style={styles.ghostButtonText}>Quay lại PickleTour</Text>
+                    <Text
+                      style={[
+                        styles.ghostButtonText,
+                        { color: tokens.secondaryText },
+                      ]}
+                    >
+                      Quay lại PickleTour
+                    </Text>
                   </Pressable>
                 </View>
               )}
             </>
           ) : null}
-
-          <Pressable
-            onPress={() => openWebFallback()}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Mở web thay thế</Text>
-          </Pressable>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#071018",
   },
   scrollContent: {
     flexGrow: 1,
     alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
   card: {
     width: "100%",
     maxWidth: 460,
-    borderRadius: 28,
-    backgroundColor: "#101820",
-    padding: 24,
+    borderRadius: 22,
+    padding: 20,
     gap: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
   eyebrow: {
-    color: "#7cc0ff",
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1.2,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
   title: {
-    color: "#fff",
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
   },
   body: {
-    color: "rgba(255,255,255,0.72)",
     fontSize: 15,
     lineHeight: 22,
   },
@@ -498,37 +763,33 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   alert: {
-    borderRadius: 18,
-    backgroundColor: "rgba(255,107,107,0.14)",
+    borderRadius: 16,
     padding: 14,
   },
   alertText: {
-    color: "#ff8b8b",
     fontSize: 14,
     lineHeight: 20,
   },
   metaRow: {
     flexDirection: "row",
     gap: 12,
+    flexWrap: "wrap",
   },
   metaTile: {
     flex: 1,
-    borderRadius: 18,
-    backgroundColor: "#13202a",
+    minWidth: 140,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
     padding: 14,
     gap: 6,
   },
   metaLabel: {
-    color: "#7cc0ff",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
   },
   metaValue: {
-    color: "#fff",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -536,26 +797,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    color: "#fff",
     fontSize: 17,
     fontWeight: "800",
   },
   tournamentCard: {
     borderRadius: 16,
-    backgroundColor: "#13202a",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
     padding: 14,
     gap: 4,
   },
   tournamentName: {
-    color: "#fff",
     fontSize: 15,
     fontWeight: "700",
   },
   tournamentStatus: {
-    color: "rgba(255,255,255,0.58)",
     fontSize: 13,
+    textTransform: "lowercase",
   },
   actionStack: {
     gap: 12,
@@ -563,7 +820,6 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 52,
     borderRadius: 999,
-    backgroundColor: "#25c2a0",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -571,20 +827,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#04110b",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  secondaryButton: {
-    height: 52,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(37,194,160,0.28)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: {
-    color: "#25c2a0",
     fontWeight: "800",
     fontSize: 15,
   },
@@ -592,12 +834,10 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },
   ghostButtonText: {
-    color: "#fff",
     fontWeight: "700",
     fontSize: 15,
   },
