@@ -43,6 +43,7 @@ import { loadExpoNotifications } from "@/lib/expoNotifications";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
+import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 // HotUpdater: import động để tránh crash trên Expo Go
 let HotUpdater: any = null;
@@ -1106,6 +1107,11 @@ function RootLayout() {
   const navigationQueue = React.useRef<string[]>([]);
   const hiddenRef = React.useRef(false);
   const [firstFrameDone, setFirstFrameDone] = React.useState(false);
+  const isBootSplashReady =
+    lifecycle.phase === "splash-hiding" ||
+    lifecycle.phase === "ready" ||
+    lifecycle.phase === "navigating" ||
+    (firstFrameDone && fontsReady && mobileAppShellReady);
 
   // Transition to ready
   const transitionToReady = React.useCallback(() => {
@@ -1123,19 +1129,14 @@ function RootLayout() {
     setLifecycle({ phase: "splash-hiding" });
 
     try {
-      await SplashScreen.hideAsync();
-    } catch {
-    } finally {
       await new Promise((resolve) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => resolve(null));
         });
       });
-
+    } finally {
       hiddenRef.current = true;
       transitionToReady();
-
-      setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 300);
     }
   }, [lifecycle.phase, transitionToReady]);
 
@@ -1997,6 +1998,8 @@ function RootLayout() {
                         backgroundColor={bg}
                         animated
                       />
+
+                      <AppBootSplash isAppReady={isBootSplashReady} />
 
                       {themeApplying && (
                         <View
