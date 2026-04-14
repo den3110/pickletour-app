@@ -93,7 +93,7 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
           }}
         >
           <Image
-            source={require("../assets/images/splash-icon-circle.png")}
+            source={require("../assets/images/icon-no-background.png")}
             style={styles.logo}
             contentFit="contain"
           />
@@ -129,12 +129,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: {
-    width: 156,
-    height: 156,
+    width: 136,
+    height: 136,
   },
   brandWrap: {
     position: "absolute",
-    top: 176,
+    top: 156,
     alignItems: "center",
   },
   brandText: {
