@@ -1,146 +1,111 @@
-import React from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { StyleSheet, Animated, View, Text } from "react-native";
 import { Image } from "expo-image";
 import * as SplashScreen from "expo-splash-screen";
 
-type AppBootSplashProps = {
+interface AppBootSplashProps {
   isAppReady: boolean;
-};
+}
 
 export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
-  const [isAnimationComplete, setIsAnimationComplete] = React.useState(false);
-  const hasStartedRef = React.useRef(false);
-  const overlayOpacity = React.useRef(new Animated.Value(1)).current;
-  const logoScale = React.useRef(new Animated.Value(0.84)).current;
-  const logoTranslateY = React.useRef(new Animated.Value(0)).current;
-  const textOpacity = React.useRef(new Animated.Value(0)).current;
-  const textTranslateY = React.useRef(new Animated.Value(14)).current;
+  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
+  const containerOpacity = useRef(new Animated.Value(1)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslateY = useRef(new Animated.Value(15)).current;
 
-  React.useEffect(() => {
-    if (!isAppReady || hasStartedRef.current) {
-      return;
+  useEffect(() => {
+    if (isAppReady) {
+      // 1. Hide the native splash screen immediately so our identical view takes over
+      SplashScreen.hideAsync().catch(() => { /* Ignore errors */ });
+
+      // 2. Play the entrance animation
+      Animated.sequence([
+        Animated.parallel([
+          Animated.spring(logoScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7,
+          }),
+          Animated.timing(textOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.spring(textTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 60,
+            friction: 8,
+          }),
+        ]),
+        // 3. Hold for a moment
+        Animated.delay(800),
+        // 4. Fade out everything to reveal the app
+        Animated.timing(containerOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsAnimationComplete(true);
+      });
     }
-
-    hasStartedRef.current = true;
-    SplashScreen.hideAsync().catch(() => {});
-
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 320,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 360,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoScale, {
-          toValue: 1.04,
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.delay(450),
-      Animated.parallel([
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 260,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoTranslateY, {
-          toValue: -10,
-          duration: 260,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      setIsAnimationComplete(true);
-    });
-  }, [
-    isAppReady,
-    logoScale,
-    logoTranslateY,
-    overlayOpacity,
-    textOpacity,
-    textTranslateY,
-  ]);
+  }, [isAppReady, logoScale, textOpacity, textTranslateY, containerOpacity]);
 
   if (isAnimationComplete) {
     return null;
   }
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[styles.overlay, { opacity: overlayOpacity }]}
-    >
-      <View style={styles.content}>
-        <Animated.View
-          style={{
-            transform: [{ translateY: logoTranslateY }, { scale: logoScale }],
-          }}
-        >
+    <Animated.View style={[s.container, { opacity: containerOpacity }]} pointerEvents="none">
+      <View style={s.content}>
+        <Animated.View style={{ transform: [{ scale: logoScale }] }}>
           <Image
             source={require("../assets/images/icon-no-background.png")}
-            style={styles.logo}
+            style={s.logo}
             contentFit="contain"
           />
         </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.brandWrap,
-            {
-              opacity: textOpacity,
-              transform: [{ translateY: textTranslateY }],
-            },
-          ]}
-        >
-          <Text style={styles.brandText}>PickleTour</Text>
+        <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }], alignItems: "center" }}>
+          <Text style={s.brandText}>PickleTour</Text>
+          <Text style={s.sloganText}>Cộng đồng Pickleball của bạn</Text>
         </Animated.View>
       </View>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
+const s = StyleSheet.create({
+  container: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#ffffff",
+    zIndex: 99999, // Make sure it sits on top of everything
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#ffffff",
-    zIndex: 99999,
     elevation: 99999,
   },
   content: {
     alignItems: "center",
-    justifyContent: "center",
   },
   logo: {
     width: 136,
     height: 136,
-  },
-  brandWrap: {
-    position: "absolute",
-    top: 156,
-    alignItems: "center",
+    marginBottom: 16,
   },
   brandText: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: "#071b36",
-    letterSpacing: 0.4,
+    fontSize: 34,
+    fontWeight: "900",
+    color: "#1976d2", // Brand primary blue instead of black
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  sloganText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#64748b",
+    letterSpacing: 0.5,
   },
 });
+
