@@ -10,7 +10,6 @@ interface AppBootSplashProps {
 export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const containerOpacity = useRef(new Animated.Value(1)).current;
-  const logoScale = useRef(new Animated.Value(0.8)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
   const textTranslateY = useRef(new Animated.Value(15)).current;
 
@@ -22,12 +21,6 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
       // 2. Play the entrance animation
       Animated.sequence([
         Animated.parallel([
-          Animated.spring(logoScale, {
-            toValue: 1,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 7,
-          }),
           Animated.timing(textOpacity, {
             toValue: 1,
             duration: 400,
@@ -41,7 +34,7 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
           }),
         ]),
         // 3. Hold for a moment
-        Animated.delay(800),
+        Animated.delay(1000),
         // 4. Fade out everything to reveal the app
         Animated.timing(containerOpacity, {
           toValue: 0,
@@ -52,7 +45,7 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
         setIsAnimationComplete(true);
       });
     }
-  }, [isAppReady, logoScale, textOpacity, textTranslateY, containerOpacity]);
+  }, [isAppReady, textOpacity, textTranslateY, containerOpacity]);
 
   if (isAnimationComplete) {
     return null;
@@ -61,14 +54,13 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
   return (
     <Animated.View style={[s.container, { opacity: containerOpacity }]} pointerEvents="none">
       <View style={s.content}>
-        <Animated.View style={{ transform: [{ scale: logoScale }] }}>
-          <Image
-            source={require("../assets/images/icon-no-background.png")}
-            style={s.logo}
-            contentFit="contain"
-          />
-        </Animated.View>
-        <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }], alignItems: "center" }}>
+        <Image
+          source={require("../assets/images/icon-no-background.png")}
+          style={s.logo}
+          contentFit="contain"
+        />
+        
+        <Animated.View style={[s.textContainer, { opacity: textOpacity, transform: [{ translateY: textTranslateY }] }]}>
           <Text style={s.brandText}>PickleTour</Text>
           <Text style={s.sloganText}>Cộng đồng Pickleball của bạn</Text>
         </Animated.View>
@@ -88,11 +80,19 @@ const s = StyleSheet.create({
   },
   content: {
     alignItems: "center",
+    justifyContent: "center",
   },
   logo: {
-    width: 136,
-    height: 136,
-    marginBottom: 16,
+    width: 180,
+    height: 180,
+    // No margin bottom, so it naturally centers perfectly
+  },
+  textContainer: {
+    position: "absolute",
+    top: "50%",
+    marginTop: 100, // Roughly half of logo (90) + some padding (10)
+    alignItems: "center",
+    width: 300,
   },
   brandText: {
     fontSize: 34,
