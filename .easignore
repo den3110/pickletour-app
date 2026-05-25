@@ -1,6 +1,9 @@
 .vscode
 node_modules
-android
+.build-tmp
+.yarn-cache
+.npm-cache
+.gradle-user-home
 ios
 *.iml
 *.log

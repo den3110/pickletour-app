@@ -4,7 +4,6 @@ import { Stack } from "expo-router";
 import React from "react";
 
 export default function TournamentStack() {
-  // return <FacebookLiveScreen />;
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

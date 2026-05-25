@@ -90,7 +90,7 @@ const pickPreferredStudioMatchId = (matches: any[] = []) => {
   return getMatchId(matches[0]);
 };
 
-const buildNativeLiveStudioUrl = ({
+const buildLiveAppStudioUrl = ({
   courtId,
   matchId,
   pageId,
@@ -103,7 +103,7 @@ const buildNativeLiveStudioUrl = ({
   return qs ? `pickletour-live://stream?${qs}` : "pickletour-live://stream";
 };
 
-const buildIosLiveAuthHref = (nativeUrl: string) => {
+const buildIosLiveAuthHref = (liveAppUrl: string) => {
   const authQuery = [
     `client_id=${encodeURIComponent("pickletour-live-app")}`,
     `redirect_uri=${encodeURIComponent("pickletour-live://auth")}`,
@@ -113,7 +113,7 @@ const buildIosLiveAuthHref = (nativeUrl: string) => {
   const continueUrl = `https://pickletour.vn/api/api/oauth/authorize?response_type=code&${authQuery}`;
   return `/live-auth?continueUrl=${encodeURIComponent(
     continueUrl,
-  )}&targetUrl=${encodeURIComponent(nativeUrl)}&callbackUri=${encodeURIComponent(
+  )}&targetUrl=${encodeURIComponent(liveAppUrl)}&callbackUri=${encodeURIComponent(
     "pickletour-live://auth-init",
   )}`;
 };
@@ -552,6 +552,8 @@ export default function LiveSetupSheet({
         tournamentHref: `/tournament/${tournamentId}/manage`,
         homeHref: "/",
       };
+      if (preferredMatchId) params.matchId = preferredMatchId;
+      if (pageId) params.pageId = pageId;
 
       const guessUrl = String(current.videoUrl || "").trim();
       if (looksLikeRTMP(guessUrl)) {
@@ -559,7 +561,7 @@ export default function LiveSetupSheet({
         params.fullUrl = guessUrl;
       }
 
-      const nativeUrl = buildNativeLiveStudioUrl({
+      const liveAppUrl = buildLiveAppStudioUrl({
         courtId: itemId,
         matchId: preferredMatchId,
         pageId,
@@ -568,7 +570,7 @@ export default function LiveSetupSheet({
       const fallbackHref =
         Platform.OS === "android"
           ? `/live/studio_court_android?${qs}`
-          : buildIosLiveAuthHref(nativeUrl);
+          : buildIosLiveAuthHref(liveAppUrl);
 
       try {
         const finalUrl =
@@ -580,7 +582,7 @@ export default function LiveSetupSheet({
 
         if (Platform.OS === "ios") {
           try {
-            await Linking.openURL(nativeUrl);
+            await Linking.openURL(liveAppUrl);
             sheetRef.current?.dismiss();
             return;
           } catch {}
@@ -590,11 +592,11 @@ export default function LiveSetupSheet({
           try {
             let supported: boolean | null = null;
             try {
-              supported = await Linking.canOpenURL(nativeUrl);
+              supported = await Linking.canOpenURL(liveAppUrl);
             } catch {}
 
             if (supported !== false) {
-              await Linking.openURL(nativeUrl);
+              await Linking.openURL(liveAppUrl);
               sheetRef.current?.dismiss();
               return;
             }

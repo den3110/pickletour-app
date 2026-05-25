@@ -3,6 +3,5 @@ import LiveMatchesScreen from "@/components/live_list/LiveMatchesScreen";
 import React from "react";
 
 export default function LiveRoute() {
-  // return <FacebookLiveScreen />;
   return <LiveMatchesScreen isBack />
 }

@@ -77,6 +77,7 @@ def releaseStoreFile = findProperty('PICKLETOUR_UPLOAD_STORE_FILE')
 def releaseStorePassword = findProperty('PICKLETOUR_UPLOAD_STORE_PASSWORD')
 def releaseKeyAlias = findProperty('PICKLETOUR_UPLOAD_KEY_ALIAS')
 def releaseKeyPassword = findProperty('PICKLETOUR_UPLOAD_KEY_PASSWORD')
+def pickletourHotUpdaterEnabled = (findProperty('pickletour.hotUpdaterEnabled') ?: 'false').toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -114,6 +115,7 @@ packagingOptions {
         versionName "1.0.27"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        buildConfigField "boolean", "PICKLETOUR_HOT_UPDATER_ENABLED", "${pickletourHotUpdaterEnabled}"
     }
     signingConfigs {
         debug {
@@ -179,9 +181,6 @@ packagingOptions {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-
-    // ✅ RTMP Streaming - RootEncoder (equivalent to HaishinKit on iOS)
-    implementation("com.github.pedroSG94.RootEncoder:library:2.4.5")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

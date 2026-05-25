@@ -8,8 +8,11 @@ import { router } from "expo-router";
 import LottieView from "lottie-react-native";
 import { useGetFeaturedLeaderboardQuery } from "@/slices/leaderboardApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
-const BG_3D = require("@/assets/lottie/bg-3d.json"); // Adjust path
+const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
+  ? require("@/assets/lottie/bg-3d.json")
+  : null; // Adjust path
 
 /* ---------- Leaderboard Card Component ---------- */
 function LeaderboardCard({ athlete, theme }) {
@@ -204,15 +207,17 @@ export default function LeaderboardSection() {
     <View style={styles.leaderboardSection}>
       {/* Background Animation */}
       <View style={styles.leaderboardBackground}>
-        <LottieView
-          source={BG_3D}
-          autoPlay
-          speed={0.5}
-          loop
-          resizeMode="cover"
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
+        {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
+          <LottieView
+            source={BG_3D}
+            autoPlay
+            speed={0.5}
+            loop
+            resizeMode="cover"
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        ) : null}
         <View style={styles.leaderboardOverlay} />
       </View>
 

@@ -26,7 +26,7 @@ function buildQuery(obj: Record<string, string | null | undefined>) {
     .join("&");
 }
 
-function buildNativeLiveStudioUrl({
+function buildLiveAppStudioUrl({
   courtId,
   matchId,
   pageId,
@@ -39,7 +39,7 @@ function buildNativeLiveStudioUrl({
   return qs ? `pickletour-live://stream?${qs}` : "pickletour-live://stream";
 }
 
-function buildIosLiveAuthHref(nativeUrl: string) {
+function buildIosLiveAuthHref(liveAppUrl: string) {
   const authQuery = [
     `client_id=${encodeURIComponent("pickletour-live-app")}`,
     `redirect_uri=${encodeURIComponent("pickletour-live://auth")}`,
@@ -49,7 +49,7 @@ function buildIosLiveAuthHref(nativeUrl: string) {
   const continueUrl = `https://pickletour.vn/api/api/oauth/authorize?response_type=code&${authQuery}`;
   return `/live-auth?continueUrl=${encodeURIComponent(
     continueUrl,
-  )}&targetUrl=${encodeURIComponent(nativeUrl)}&callbackUri=${encodeURIComponent(
+  )}&targetUrl=${encodeURIComponent(liveAppUrl)}&callbackUri=${encodeURIComponent(
     "pickletour-live://auth-init",
   )}`;
 }
@@ -64,11 +64,11 @@ export default function StudioCourtIOSRedirectPage() {
   const courtId = useMemo(() => normalizeParam(params.courtId), [params.courtId]);
   const matchId = useMemo(() => normalizeParam(params.matchId), [params.matchId]);
   const pageId = useMemo(() => normalizeParam(params.pageId), [params.pageId]);
-  const nativeUrl = useMemo(
-    () => buildNativeLiveStudioUrl({ courtId, matchId, pageId }),
+  const liveAppUrl = useMemo(
+    () => buildLiveAppStudioUrl({ courtId, matchId, pageId }),
     [courtId, matchId, pageId],
   );
-  const fallbackHref = useMemo(() => buildIosLiveAuthHref(nativeUrl), [nativeUrl]);
+  const fallbackHref = useMemo(() => buildIosLiveAuthHref(liveAppUrl), [liveAppUrl]);
   const [message, setMessage] = useState("Đang chuyển sang PickleTour Live...");
   const [error, setError] = useState("");
 
@@ -77,7 +77,7 @@ export default function StudioCourtIOSRedirectPage() {
 
     (async () => {
       try {
-        await Linking.openURL(nativeUrl);
+        await Linking.openURL(liveAppUrl);
       } catch {
         if (cancelled) return;
         setMessage("Không thấy app PickleTour Live, chuyển sang bước xác thực...");
@@ -88,7 +88,7 @@ export default function StudioCourtIOSRedirectPage() {
     return () => {
       cancelled = true;
     };
-  }, [fallbackHref, nativeUrl]);
+  }, [fallbackHref, liveAppUrl]);
 
   return (
     <View style={styles.page}>
@@ -114,7 +114,7 @@ export default function StudioCourtIOSRedirectPage() {
 
         <Pressable
           onPress={() =>
-            Linking.openURL(nativeUrl).catch(() =>
+            Linking.openURL(liveAppUrl).catch(() =>
               setError("Không mở được PickleTour Live."),
             )
           }

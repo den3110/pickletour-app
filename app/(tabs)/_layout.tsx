@@ -15,8 +15,11 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { buildLoginHref } from "@/services/authSession";
 import { CustomTabBar } from "@/components/tabbar/Customtabbar";
 import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
-const HOME_LOTTIE = require("@/assets/lottie/home-lt-icon.json");
+const HOME_LOTTIE = SHOULD_RENDER_NATIVE_LOTTIE
+  ? require("@/assets/lottie/home-lt-icon.json")
+  : null;
 const CHATBOT_ICON = require("@/assets/images/icon-chatbot.png");
 
 const ACTIVE_TAB_TINT = {
@@ -103,7 +106,7 @@ const HomeTabIcon = React.memo(function HomeTabIcon({
     }
   }, [triggerPlay, focused]);
 
-  if (!focused) {
+  if (!focused || !SHOULD_RENDER_NATIVE_LOTTIE || !HOME_LOTTIE) {
     return Platform.OS === "ios" ? (
       <IconSymbol size={size} name="house.fill" color={color} />
     ) : (
