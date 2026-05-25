@@ -1,8 +1,6 @@
-// app/(tabs)/live.tsx
-import LiveMatchesScreen from "@/components/live_list/LiveMatchesScreen";
+import MobileLiveFeedScreen from "@/components/live_list/MobileLiveFeedScreen";
 import React from "react";
 
 export default function LiveTab() {
-  // return <FacebookLiveScreen />;
-  return <LiveMatchesScreen />
+  return <MobileLiveFeedScreen />;
 }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Constants from "expo-constants";
-import type { StyleProp, ViewStyle } from "react-native";
+import type { StyleProp, ViewProps, ViewStyle } from "react-native";
 
 export const isExpoGo = Constants.appOwnership === "expo";
 
@@ -10,6 +10,10 @@ type PlaybackStatusLike = {
   isLoaded?: boolean;
   didJustFinish?: boolean;
   error?: string;
+  currentTime?: number;
+  duration?: number;
+  bufferedPosition?: number;
+  isPlaying?: boolean;
 };
 type VideoLoadLike = {
   naturalSize?: {
@@ -21,11 +25,14 @@ type CompatVideoProps = {
   source: VideoSourceLike;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
+  shouldLoop?: boolean;
+  muted?: boolean;
+  startPosition?: number;
   useNativeControls?: boolean;
   resizeMode?: "contain" | "cover" | "stretch";
   onLoad?: (meta: VideoLoadLike) => void;
   onPlaybackStatusUpdate?: (status: PlaybackStatusLike) => void;
-};
+} & Pick<ViewProps, "pointerEvents">;
 
 function useLatest<T>(value: T) {
   const ref = useRef(value);
@@ -56,14 +63,19 @@ function ExpoGoVideo({
   source,
   style,
   shouldPlay = false,
+  shouldLoop = false,
+  muted = false,
+  startPosition = 0,
   useNativeControls = true,
   resizeMode = "contain",
   onLoad,
   onPlaybackStatusUpdate,
+  pointerEvents,
 }: CompatVideoProps) {
   const onLoadRef = useLatest(onLoad);
   const onPlaybackStatusUpdateRef = useLatest(onPlaybackStatusUpdate);
   const sourceRef = useLatest(source);
+  const startPositionRef = useLatest(startPosition);
   const { createVideoPlayer, VideoView } = useMemo(
     () => require("expo-video"),
     []
@@ -73,6 +85,10 @@ function ExpoGoVideo({
   const contentFit = resizeMode === "stretch" ? "fill" : resizeMode;
 
   useEffect(() => {
+    player.timeUpdateEventInterval = 0.25;
+  }, [player]);
+
+  useEffect(() => {
     let cancelled = false;
     if (sourceRef.current == null) return undefined;
 
@@ -80,6 +96,9 @@ function ExpoGoVideo({
       try {
         await player.replaceAsync(sourceRef.current);
         if (cancelled) return;
+        if (Number.isFinite(startPositionRef.current) && startPositionRef.current > 0) {
+          player.currentTime = startPositionRef.current;
+        }
         if (shouldPlay) {
           player.play();
         } else {
@@ -97,7 +116,7 @@ function ExpoGoVideo({
     return () => {
       cancelled = true;
     };
-  }, [player, shouldPlay, sourceKey, sourceRef, onPlaybackStatusUpdateRef]);
+  }, [player, shouldPlay, sourceKey, sourceRef, startPositionRef, onPlaybackStatusUpdateRef]);
 
   useEffect(() => {
     if (shouldPlay) {
@@ -106,6 +125,14 @@ function ExpoGoVideo({
       player.pause();
     }
   }, [player, shouldPlay]);
+
+  useEffect(() => {
+    player.loop = shouldLoop;
+  }, [player, shouldLoop]);
+
+  useEffect(() => {
+    player.muted = muted;
+  }, [muted, player]);
 
   useEffect(() => {
     const loadSub = player.addListener(
@@ -127,8 +154,39 @@ function ExpoGoVideo({
       onPlaybackStatusUpdateRef.current?.({
         isLoaded: true,
         didJustFinish: true,
+        currentTime: Number(player.currentTime || 0),
+        duration: Number(player.duration || 0),
+        bufferedPosition: Number(player.bufferedPosition || 0),
+        isPlaying: false,
       });
     });
+
+    const playingSub = player.addListener(
+      "playingChange",
+      ({ isPlaying }: any) => {
+        onPlaybackStatusUpdateRef.current?.({
+          isLoaded: true,
+          didJustFinish: false,
+          currentTime: Number(player.currentTime || 0),
+          duration: Number(player.duration || 0),
+          bufferedPosition: Number(player.bufferedPosition || 0),
+          isPlaying: Boolean(isPlaying),
+        });
+      }
+    );
+
+    const timeSub = player.addListener(
+      "timeUpdate",
+      ({ currentTime, bufferedPosition }: any) => {
+        onPlaybackStatusUpdateRef.current?.({
+          isLoaded: true,
+          didJustFinish: false,
+          currentTime: Number(currentTime || 0),
+          duration: Number(player.duration || 0),
+          bufferedPosition: Number(bufferedPosition || 0),
+        });
+      }
+    );
 
     const statusSub = player.addListener(
       "statusChange",
@@ -145,6 +203,9 @@ function ExpoGoVideo({
           onPlaybackStatusUpdateRef.current?.({
             isLoaded: true,
             didJustFinish: false,
+            currentTime: Number(player.currentTime || 0),
+            duration: Number(player.duration || 0),
+            bufferedPosition: Number(player.bufferedPosition || 0),
           });
         }
       }
@@ -153,6 +214,8 @@ function ExpoGoVideo({
     return () => {
       loadSub.remove();
       endSub.remove();
+      playingSub.remove();
+      timeSub.remove();
       statusSub.remove();
     };
   }, [player, onLoadRef, onPlaybackStatusUpdateRef]);
@@ -167,6 +230,7 @@ function ExpoGoVideo({
     <VideoView
       player={player}
       style={style}
+      pointerEvents={pointerEvents}
       nativeControls={useNativeControls}
       contentFit={contentFit}
     />

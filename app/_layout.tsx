@@ -1999,8 +1999,6 @@ function RootLayout() {
                         animated
                       />
 
-                      <AppBootSplash isAppReady={isBootSplashReady} />
-
                       {themeApplying && (
                         <View
                           pointerEvents="auto"
@@ -2027,6 +2025,7 @@ function RootLayout() {
               </SafeAreaProvider>
             </Boot>
           </SocketProvider>
+          <AppBootSplash isAppReady={isBootSplashReady} isDark={isDark} />
           <ForceUpdateModal />
           <HotUpdateModal
             visible={hotUpdateVisible}

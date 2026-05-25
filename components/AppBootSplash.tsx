@@ -3,39 +3,34 @@ import { StyleSheet, Animated, View, Text } from "react-native";
 import { Image } from "expo-image";
 import * as SplashScreen from "expo-splash-screen";
 
+// Global flag: splash chỉ hiện đúng 1 lần duy nhất trong session
+let __splashAlreadyShown__ = false;
+
 interface AppBootSplashProps {
   isAppReady: boolean;
+  isDark?: boolean;
 }
 
-export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
-  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
+export default function AppBootSplash({ isAppReady, isDark = false }: AppBootSplashProps) {
+  const [isAnimationComplete, setIsAnimationComplete] = useState(
+    __splashAlreadyShown__,
+  );
   const containerOpacity = useRef(new Animated.Value(1)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(15)).current;
 
   useEffect(() => {
     if (isAppReady) {
-      // 1. Hide the native splash screen immediately so our identical view takes over
-      SplashScreen.hideAsync().catch(() => { /* Ignore errors */ });
+      SplashScreen.hideAsync().catch(() => {});
 
-      // 2. Play the entrance animation
+      if (__splashAlreadyShown__) {
+        setIsAnimationComplete(true);
+        return;
+      }
+
+      __splashAlreadyShown__ = true;
+
+      // Giữ splash 1 giây rồi fade out
       Animated.sequence([
-        Animated.parallel([
-          Animated.timing(textOpacity, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.spring(textTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 60,
-            friction: 8,
-          }),
-        ]),
-        // 3. Hold for a moment
         Animated.delay(1000),
-        // 4. Fade out everything to reveal the app
         Animated.timing(containerOpacity, {
           toValue: 0,
           duration: 300,
@@ -45,25 +40,34 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
         setIsAnimationComplete(true);
       });
     }
-  }, [isAppReady, textOpacity, textTranslateY, containerOpacity]);
+  }, [isAppReady, containerOpacity]);
 
   if (isAnimationComplete) {
     return null;
   }
 
   return (
-    <Animated.View style={[s.container, { opacity: containerOpacity }]} pointerEvents="none">
+    <Animated.View
+      style={[
+        s.container,
+        { opacity: containerOpacity, backgroundColor: isDark ? "#0b0c10" : "#ffffff" },
+      ]}
+      pointerEvents="none"
+    >
       <View style={s.content}>
         <Image
           source={require("../assets/images/icon-no-background.png")}
           style={s.logo}
           contentFit="contain"
         />
-        
-        <Animated.View style={[s.textContainer, { opacity: textOpacity, transform: [{ translateY: textTranslateY }] }]}>
-          <Text style={s.brandText}>PickleTour</Text>
-          <Text style={s.sloganText}>Cộng đồng Pickleball của bạn</Text>
-        </Animated.View>
+        <View style={s.textContainer}>
+          <Text style={[s.brandText, { color: isDark ? "#7cc0ff" : "#1976d2" }]}>
+            PickleTour
+          </Text>
+          <Text style={[s.sloganText, { color: isDark ? "#94a3b8" : "#64748b" }]}>
+            Cộng đồng Pickleball của bạn
+          </Text>
+        </View>
       </View>
     </Animated.View>
   );
@@ -72,8 +76,7 @@ export default function AppBootSplash({ isAppReady }: AppBootSplashProps) {
 const s = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#ffffff",
-    zIndex: 99999, // Make sure it sits on top of everything
+    zIndex: 99999,
     alignItems: "center",
     justifyContent: "center",
     elevation: 99999,
@@ -85,27 +88,20 @@ const s = StyleSheet.create({
   logo: {
     width: 180,
     height: 180,
-    // No margin bottom, so it naturally centers perfectly
   },
   textContainer: {
-    position: "absolute",
-    top: "50%",
-    marginTop: 100, // Roughly half of logo (90) + some padding (10)
+    marginTop: 16,
     alignItems: "center",
-    width: 300,
   },
   brandText: {
     fontSize: 34,
     fontWeight: "900",
-    color: "#1976d2", // Brand primary blue instead of black
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   sloganText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#64748b",
     letterSpacing: 0.5,
   },
 });
-
