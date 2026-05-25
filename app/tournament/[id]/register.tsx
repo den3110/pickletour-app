@@ -58,6 +58,8 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import ImageView from "react-native-image-viewing";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
@@ -164,6 +166,31 @@ const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
   } catch {}
   return `https://qr.sepay.vn/img?${params.toString()}`;
 };
+const posterImgUrlFor = (tour: any, r: any) => {
+  const tourId = tour?._id || tour?.id;
+  const regId = r?._id || r?.id;
+  if (!tourId || !regId) return null;
+  const cfg = tour?.registrationPosterConfig || {};
+  const aiJob = cfg?.aiJob || {};
+  const stamp = encodeURIComponent(
+    [
+      r?.updatedAt,
+      cfg?.templateUploadedAt,
+      cfg?.updatedAt,
+      cfg?.templateUrl,
+      aiJob?.id,
+      aiJob?.status,
+      aiJob?.finishedAt,
+    ]
+      .filter(Boolean)
+      .join("|") || String(Date.now())
+  );
+  return normalizeUrl(
+    `/api/tournaments/${tourId}/registrations/${regId}/poster?v=${stamp}`
+  );
+};
+const posterFileNameFor = (reg: any) =>
+  `poster-${regCodeOf(reg)}-${Date.now()}.png`;
 const getScoreCap = (tour: any, isSingles: boolean) =>
   Number(
     isSingles ? tour?.singleCap ?? tour?.scoreCap ?? 0 : tour?.scoreCap ?? 0
@@ -693,6 +720,7 @@ const RegItem = memo(function RegItem({
   onCancel,
   onOpenComplaint,
   onOpenPayment,
+  onOpenPoster,
   busy,
 }: any) {
   const C = useThemeColors();
@@ -921,43 +949,38 @@ const RegItem = memo(function RegItem({
         </View>
 
         {/* Dòng 2: Nút bấm */}
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            justifyContent: "flex-end",
-            flexWrap: "wrap",
-          }}
-        >
+        <View style={styles.actionPanel}>
+          {isPaid ? (
+            <TouchableOpacity
+              style={[styles.actionTile, { backgroundColor: C.infoBg }]}
+              onPress={() => onOpenPoster(r)}
+            >
+              <Ionicons name="image-outline" size={18} color={C.infoText} />
+              <Text style={[styles.actionTileText, { color: C.infoText }]}>
+                Poster
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
-            style={[styles.btnActionSmall, { backgroundColor: C.infoBg }]}
+            style={[styles.actionTile, { backgroundColor: C.infoBg }]}
             onPress={() => onOpenPayment(r)}
           >
-            <Ionicons name="qr-code-outline" size={14} color={C.infoText} />
+            <Ionicons name="qr-code-outline" size={18} color={C.infoText} />
             <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: C.infoText,
-                marginLeft: 4,
-              }}
+              style={[styles.actionTileText, { color: C.infoText }]}
             >
               Thanh toán
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.btnActionSmall, { backgroundColor: C.warningBg }]}
+            style={[styles.actionTile, { backgroundColor: C.warningBg }]}
             onPress={() => onOpenComplaint(r)}
           >
-            <Ionicons name="warning-outline" size={14} color={C.warningText} />
+            <Ionicons name="warning-outline" size={18} color={C.warningText} />
             <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: C.warningText,
-                marginLeft: 4,
-              }}
+              style={[styles.actionTileText, { color: C.warningText }]}
             >
               Khiếu nại
             </Text>
@@ -968,7 +991,7 @@ const RegItem = memo(function RegItem({
               onPress={() => onTogglePayment(r)}
               disabled={busy?.settingPayment}
               style={[
-                styles.iconActionBtn,
+                styles.iconActionTile,
                 {
                   backgroundColor: C.pageBg,
                   borderWidth: 1,
@@ -988,7 +1011,7 @@ const RegItem = memo(function RegItem({
             <TouchableOpacity
               onPress={() => onCancel(r)}
               disabled={busy?.deletingId === r._id}
-              style={[styles.iconActionBtn, { backgroundColor: C.errorBg }]}
+              style={[styles.iconActionTile, { backgroundColor: C.errorBg }]}
             >
               {busy?.deletingId === r._id ? (
                 <ActivityIndicator size="small" color={C.errorText} />
@@ -1095,7 +1118,10 @@ export default function TournamentRegistrationScreen() {
     open: false,
     src: "",
     name: "",
+    isPoster: false,
+    fileName: "",
   });
+  const [sharingPoster, setSharingPoster] = useState(false);
 
   const [replaceDlg, setReplaceDlg] = useState({
     open: false,
@@ -1224,10 +1250,19 @@ export default function TournamentRegistrationScreen() {
       open: true,
       src: normalizeUrl(src) || PLACE,
       name: name || "",
+      isPoster: false,
+      fileName: "",
     });
   }, []);
   const closePreview = useCallback(
-    () => setImgPreview({ open: false, src: "", name: "" }),
+    () =>
+      setImgPreview({
+        open: false,
+        src: "",
+        name: "",
+        isPoster: false,
+        fileName: "",
+      }),
     []
   );
   const openReplace = useCallback(
@@ -1268,6 +1303,65 @@ export default function TournamentRegistrationScreen() {
     (reg: any) => setPaymentDlg({ open: true, reg }),
     []
   );
+  const openPoster = useCallback(
+    (reg: any) => {
+      if (reg?.payment?.status !== "Paid") {
+        Alert.alert(
+          "Thông báo",
+          "Đăng ký cần hoàn tất thanh toán trước khi xem poster."
+        );
+        return;
+      }
+      const src = posterImgUrlFor(tour, reg);
+      if (!src) return Alert.alert("Lỗi", "Không tạo được poster");
+      setImgPreview({
+        open: true,
+        src,
+        name: `Poster #${regCodeOf(reg)}`,
+        isPoster: true,
+        fileName: posterFileNameFor(reg),
+      });
+    },
+    [tour]
+  );
+  const sharePoster = useCallback(async () => {
+    if (!imgPreview.src || !imgPreview.isPoster) return;
+    const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+    if (!dir) {
+      Alert.alert("Lỗi", "Không tìm thấy thư mục tạm để lưu poster.");
+      return;
+    }
+    try {
+      setSharingPoster(true);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Thông báo", "Thiết bị này không hỗ trợ chia sẻ file.");
+        return;
+      }
+      const safeName =
+        String(imgPreview.fileName || `poster-${Date.now()}.png`)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^\w.-]+/g, "-")
+          .replace(/^-+|-+$/g, "") || `poster-${Date.now()}.png`;
+      const fileName = safeName.toLowerCase().endsWith(".png")
+        ? safeName
+        : `${safeName}.png`;
+      const downloaded = await FileSystem.downloadAsync(
+        imgPreview.src,
+        `${dir}${fileName}`
+      );
+      await Sharing.shareAsync(downloaded.uri, {
+        mimeType: "image/png",
+        UTI: "public.png",
+        dialogTitle: imgPreview.name || "Poster",
+      });
+    } catch (error: any) {
+      Alert.alert("Lỗi", error?.message || "Không thể tải poster.");
+    } finally {
+      setSharingPoster(false);
+    }
+  }, [imgPreview]);
   const closePayment = useCallback(
     () => setPaymentDlg({ open: false, reg: null as any }),
     []
@@ -1862,6 +1956,7 @@ export default function TournamentRegistrationScreen() {
               onCancel={onCancelReg}
               onOpenComplaint={openComplaint}
               onOpenPayment={openPayment}
+              onOpenPoster={openPoster}
               busy={{ settingPayment, deletingId: cancelingId }}
             />
           )}
@@ -1930,6 +2025,7 @@ export default function TournamentRegistrationScreen() {
               onCancel={onCancelReg}
               onOpenComplaint={openComplaint}
               onOpenPayment={openPayment}
+              onOpenPoster={openPoster}
               busy={{ settingPayment, deletingId: cancelingId }}
             />
           )}
@@ -1983,7 +2079,7 @@ export default function TournamentRegistrationScreen() {
           )}
           // Caption Name ở Footer
           FooterComponent={({ imageIndex }) =>
-            imgPreview.name ? (
+            imgPreview.name || imgPreview.isPoster ? (
               <SafeAreaView>
                 <View
                   style={{
@@ -2001,6 +2097,43 @@ export default function TournamentRegistrationScreen() {
                   >
                     {imgPreview.name}
                   </Text>
+                  {imgPreview.isPoster && (
+                    <View style={styles.posterActionRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.posterShareBtn,
+                          {
+                            backgroundColor: C.tint,
+                            opacity: sharingPoster ? 0.75 : 1,
+                          },
+                        ]}
+                        disabled={sharingPoster}
+                        onPress={sharePoster}
+                      >
+                        {sharingPoster ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Ionicons
+                            name="download-outline"
+                            size={18}
+                            color="#fff"
+                          />
+                        )}
+                        <Text style={styles.posterShareText}>
+                          {sharingPoster ? "Đang chuẩn bị..." : "Tải xuống"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.posterCloseBtn,
+                          { borderColor: "rgba(255,255,255,0.55)" },
+                        ]}
+                        onPress={closePreview}
+                      >
+                        <Text style={styles.posterCloseText}>Đóng</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </SafeAreaView>
             ) : undefined
@@ -2359,12 +2492,78 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
   },
+  actionPanel: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionTile: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    minWidth: 88,
+    minHeight: 58,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionTileText: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 4,
+    textAlign: "center",
+  },
   iconActionBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+  },
+  iconActionTile: {
+    width: 58,
+    minHeight: 58,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  posterActionRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  posterShareBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  posterShareText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  posterCloseBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  posterCloseText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
   },
 
   input: {

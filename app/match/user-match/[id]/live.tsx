@@ -33,7 +33,7 @@ function buildQuery(obj: Record<string, string | null | undefined>) {
     .join("&");
 }
 
-function buildNativeUserMatchLiveUrl(matchId: string, accessToken: string) {
+function buildLiveAppUserMatchUrl(matchId: string, accessToken: string) {
   const qs = buildQuery({
     matchId,
     launchMode: "user_match",
@@ -72,8 +72,8 @@ export default function UserMatchLiveLauncher() {
     () => resolveLiveAppStoreUrl(contactContent),
     [contactContent],
   );
-  const nativeUrl = useMemo(
-    () => buildNativeUserMatchLiveUrl(matchId, accessToken),
+  const liveAppUrl = useMemo(
+    () => buildLiveAppUserMatchUrl(matchId, accessToken),
     [accessToken, matchId],
   );
 
@@ -97,7 +97,7 @@ export default function UserMatchLiveLauncher() {
       try {
         setError("");
         setMessage("Đang mở PickleTour Live...");
-        await Linking.openURL(nativeUrl);
+        await Linking.openURL(liveAppUrl);
         if (cancelled) return;
         setMessage("Đã gửi yêu cầu mở PickleTour Live.");
       } catch {
@@ -122,7 +122,7 @@ export default function UserMatchLiveLauncher() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, matchId, nativeUrl, storeUrl]);
+  }, [accessToken, liveAppUrl, matchId, storeUrl]);
 
   const textColor = theme.colors?.text ?? "#111827";
   const cardColor = theme.colors?.card ?? "#ffffff";
@@ -158,7 +158,7 @@ export default function UserMatchLiveLauncher() {
         </Text>
         <Text style={[styles.body, { color: mutedColor }]}>
           PickleTour sẽ chuyển trận đấu hiện tại sang app PickleTour Live để phát
-          video bằng camera native.
+          video.
         </Text>
 
         {error ? (
@@ -178,7 +178,7 @@ export default function UserMatchLiveLauncher() {
           <Pressable
             onPress={() => {
               setError("");
-              Linking.openURL(nativeUrl).catch(() => {
+              Linking.openURL(liveAppUrl).catch(() => {
                 setError("Không mở được PickleTour Live.");
               });
             }}

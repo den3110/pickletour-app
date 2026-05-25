@@ -45,25 +45,33 @@ import HotUpdateModal from "@/components/HotUpdateModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
-// HotUpdater: import động để tránh crash trên Expo Go
-let HotUpdater: any = null;
-if (Constants.appOwnership !== "expo") {
-  try {
-    HotUpdater = require("@hot-updater/react-native").HotUpdater;
-  } catch (e) {
-    if (__DEV__) console.warn("HotUpdater not available (Expo Go?):", e);
-  }
-}
+import Constants from "expo-constants";
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import * as SecureStore from "expo-secure-store";
-import Constants from "expo-constants";
 import {
   increaseLaunchCountAndGet,
   initInstallDateIfNeeded,
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
+
+const HOT_UPDATER_ENABLED =
+  process.env.EXPO_PUBLIC_ENABLE_HOT_UPDATER === "1" &&
+  Constants.appOwnership !== "expo";
+const CLARITY_RN_ENABLED =
+  process.env.EXPO_PUBLIC_ENABLE_CLARITY_RN === "1";
+
+// HotUpdater: import động và chỉ bật khi cấu hình rõ ràng để tránh crash native lúc mở app.
+let HotUpdater: any = null;
+if (HOT_UPDATER_ENABLED) {
+  try {
+    HotUpdater = require("@hot-updater/react-native").HotUpdater;
+  } catch (e) {
+    if (__DEV__) console.warn("HotUpdater not available (Expo Go?):", e);
+  }
+}
+
 // app/_layout.tsx
 if (__DEV__) {
   require("../dev/reactotron");
@@ -1336,6 +1344,8 @@ function RootLayout() {
   }, []);
 
   React.useEffect(() => {
+    if (Platform.OS === "android" && Device.isDevice === false) return;
+
     let active = true;
     let sub: { remove: () => void } | null = null;
 
@@ -1478,6 +1488,7 @@ function RootLayout() {
 
   React.useEffect(() => {
     if (isExpoGo) return;
+    if (!CLARITY_RN_ENABLED) return;
     if (clarityInitRef.current) return;
 
     const projectId = process.env.EXPO_PUBLIC_CLARITY_REACT_NATIVE_PROJECT_ID;
@@ -2049,7 +2060,7 @@ function RootLayout() {
   );
 }
 
-// ✅ Expo Go: bỏ qua HotUpdater (native module không khả dụng)
+// HotUpdater chỉ được wrap khi bật EXPO_PUBLIC_ENABLE_HOT_UPDATER=1.
 const ExportedLayout = HotUpdater
   ? HotUpdater.wrap({
       baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",

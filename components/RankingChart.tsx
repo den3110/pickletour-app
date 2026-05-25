@@ -50,6 +50,7 @@ const COLORS = {
   verified: "#0ECB81",
   pending: "#F0B90B",
   unverified: "#9CA3AF",
+  borderPrimary: "#2563EB",
   borderVerified: "#F0B90B",
   borderSelf: "#EF4444",
   borderNone: "#9CA3AF",
@@ -90,7 +91,9 @@ const ChartAvatar = memo(
     );
 
     let borderColor = COLORS.borderNone;
-    if (tierColor === "yellow") borderColor = COLORS.borderVerified;
+    if (tierColor === "blue") {
+      borderColor = colors.primary || COLORS.borderPrimary;
+    } else if (tierColor === "yellow") borderColor = COLORS.borderVerified;
     else if (tierColor === "red") borderColor = COLORS.borderSelf;
 
     let verifiedIcon = "alert-circle";
@@ -482,6 +485,7 @@ const RankingChart = memo(
         singleLine: COLORS.single,
         grid: isDark ? "rgba(132, 142, 156, 0.2)" : "rgba(107, 114, 128, 0.15)",
         gridText: isDark ? "#848E9C" : "#6B7280",
+        primary: theme?.primary || COLORS.borderPrimary,
         bg: isDark ? "#0B0E11" : "#F8FAFC",
         cardBg: isDark ? "#1E2329" : "#FFFFFF",
         card: isDark ? "#181a20" : "#FFFFFF",
@@ -490,7 +494,7 @@ const RankingChart = memo(
         border: isDark ? "#262932" : "#E5E7EB",
         shadow: isDark ? "#000" : "#ccc",
       };
-    }, [theme?.isDark]);
+    }, [theme?.isDark, theme?.primary]);
 
     // --- GLOBAL Range (cố định, không đổi khi scroll) ---
     const globalRange = useMemo(() => {
@@ -959,11 +963,22 @@ const RankingChart = memo(
               <View
                 style={[
                   styles.legendDot,
+                  { backgroundColor: colors.primary },
+                ]}
+              />
+              <Text style={[styles.legendText, { color: colors.subText }]}>
+                Từ 3 giải
+              </Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendDot,
                   { backgroundColor: COLORS.borderVerified },
                 ]}
               />
               <Text style={[styles.legendText, { color: colors.subText }]}>
-                Điểm xác thực
+                Admin chấm
               </Text>
             </View>
             <View style={styles.legendItem}>
@@ -974,7 +989,7 @@ const RankingChart = memo(
                 ]}
               />
               <Text style={[styles.legendText, { color: colors.subText }]}>
-                Tự chấm
+                Cần chấm lại
               </Text>
             </View>
             <View style={styles.legendItem}>

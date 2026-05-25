@@ -52,9 +52,11 @@ const COLORS = {
   bronze: "#CD7F32",
   kycVerified: "#22c55e",
   kycPending: "#f59e0b",
+  scoreBlue: "#2563EB",
   scoreRed: "#ef4444",
   scoreGrey: "#94a3b8",
 };
+const SCORE_STALE_MONTHS = 4;
 
 const fmt3 = (x) => {
   if (x === null) return "***";
@@ -202,6 +204,46 @@ const getVerifyChip = (status, tierColor) => {
     fg: COLORS.scoreGrey,
     icon: "alert-circle",
   };
+};
+
+const hasAnyScore = (r) =>
+  [r?.single, r?.double, r?.mix, r?.points].some((v) => Number(v) > 0);
+
+const getLatestScoreActivityAt = (r) => {
+  const dates = [
+    r?.lastFinishedTourAt,
+    r?.lastAssessmentAt,
+    r?.lastStaffAssessmentAt,
+    r?.lastUpdated,
+    r?.updatedAt,
+  ]
+    .map((v) => (v ? new Date(v) : null))
+    .filter((d) => d && Number.isFinite(d.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+  return dates[0] || null;
+};
+
+const isScoreStale = (r) => {
+  if (!hasAnyScore(r)) return false;
+  const latest = getLatestScoreActivityAt(r);
+  if (!latest) return true;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - SCORE_STALE_MONTHS);
+  return latest.getTime() < cutoff.getTime();
+};
+
+const getScoreColor = (r, theme) => {
+  if (!hasAnyScore(r)) return COLORS.scoreGrey;
+  if (isScoreStale(r)) return COLORS.scoreRed;
+  const totalTours = Number(r?.totalTours || r?.totalFinishedTours || 0);
+  if (totalTours >= 3 || r?.tierColor === "blue") {
+    return theme.primary || COLORS.scoreBlue;
+  }
+  if (totalTours > 0 || r?.hasStaffAssessment || r?.tierColor === "yellow") {
+    return COLORS.gold;
+  }
+  if (r?.tierColor === "red") return COLORS.scoreRed;
+  return COLORS.scoreGrey;
 };
 
 /* ================= ViewModeToggle (Optimized) ================= */
@@ -624,12 +666,7 @@ const RankingCard = memo(
     const avatarSrc = u?.avatar || PLACE;
     const age = calcAge(u);
 
-    const scoreColor =
-      r?.tierColor === "red"
-        ? COLORS.scoreRed
-        : r?.tierColor === "yellow"
-        ? COLORS.gold
-        : COLORS.scoreGrey;
+    const scoreColor = getScoreColor(r, theme);
 
     const sp = scorePatch[u?._id || ""] || {};
     const patched = {
@@ -1114,15 +1151,21 @@ export default function RankingListScreen({ isBack = false }) {
           ]}
         >
           <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.legendText, { color: theme.subText }]}>
+              Từ 3 giải
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
             <View style={[styles.dot, { backgroundColor: COLORS.gold }]} />
             <Text style={[styles.legendText, { color: theme.subText }]}>
-              Điểm xác thực
+              Admin chấm
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.dot, { backgroundColor: COLORS.scoreRed }]} />
             <Text style={[styles.legendText, { color: theme.subText }]}>
-              Tự chấm
+              Cần chấm lại
             </Text>
           </View>
           <View style={styles.legendItem}>
@@ -1388,7 +1431,9 @@ const styles = StyleSheet.create({
   legendContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 12,
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: 12,

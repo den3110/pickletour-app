@@ -38,9 +38,12 @@ import { saveUserInfo } from "@/utils/authStorage";
 import ImageViewing from "react-native-image-viewing";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 /* ---------- Lottie asset ---------- */
-const BG_3D = require("@/assets/lottie/bg-3d.json");
+const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
+  ? require("@/assets/lottie/bg-3d.json")
+  : null;
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.8;
@@ -466,7 +469,7 @@ function AthleteIsland() {
         >
           {/* Left: Avatar */}
           <View style={styles.avatarContainer}>
-            {!userInfo ? (
+            {!userInfo && SHOULD_RENDER_NATIVE_LOTTIE ? (
               <LottieView
                 source={require("@/assets/lottie/humans.json")}
                 autoPlay
@@ -474,6 +477,14 @@ function AthleteIsland() {
                 style={styles.avatar}
                 speed={0.4}
               />
+            ) : !userInfo ? (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Ionicons
+                  name="person-circle"
+                  size={64}
+                  color={themeColors.textSecondary}
+                />
+              </View>
             ) : (
               <Image
                 source={{ uri: normalizeUrl(avatarUrl) }}
@@ -1177,15 +1188,17 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <View style={styles.hero3dWrap}>
-          <LottieView
-            source={BG_3D}
-            autoPlay
-            speed={0.2}
-            loop
-            resizeMode="cover"
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
+          {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
+            <LottieView
+              source={BG_3D}
+              autoPlay
+              speed={0.2}
+              loop
+              resizeMode="cover"
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+          ) : null}
           <AthleteIsland />
         </View>
 
@@ -1280,6 +1293,10 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: "#F0F0F0",
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarBorder: {
     position: "absolute",
