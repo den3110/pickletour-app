@@ -8,6 +8,7 @@ import React, {
   useState,
   memo,
 } from "react";
+import { useSelector } from "react-redux";
 import {
   ActivityIndicator,
   Alert,
@@ -728,6 +729,7 @@ const RegItem = memo(function RegItem({
   const players = [r?.player1, r?.player2].filter(Boolean);
   const code = regCodeOf(r);
   const isPaid = r.payment?.status === "Paid";
+  const canOpenPoster = isPaid || canManage;
   const { state } = decideTotalState(total, cap, delta);
   const totalColor =
     state === "error"
@@ -950,7 +952,7 @@ const RegItem = memo(function RegItem({
 
         {/* Dòng 2: Nút bấm */}
         <View style={styles.actionPanel}>
-          {isPaid ? (
+          {canOpenPoster ? (
             <TouchableOpacity
               style={[styles.actionTile, { backgroundColor: C.infoBg }]}
               onPress={() => onOpenPoster(r)}
@@ -1078,6 +1080,8 @@ export default function TournamentRegistrationScreen() {
   const C = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const authUserInfo = useSelector((state: any) => state.auth?.userInfo);
+  const authToken = String(authUserInfo?.token || "").trim();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<any>>(null);
 
@@ -1120,6 +1124,7 @@ export default function TournamentRegistrationScreen() {
     name: "",
     isPoster: false,
     fileName: "",
+    headers: undefined as Record<string, string> | undefined,
   });
   const [sharingPoster, setSharingPoster] = useState(false);
 
@@ -1252,6 +1257,7 @@ export default function TournamentRegistrationScreen() {
       name: name || "",
       isPoster: false,
       fileName: "",
+      headers: undefined,
     });
   }, []);
   const closePreview = useCallback(
@@ -1262,6 +1268,7 @@ export default function TournamentRegistrationScreen() {
         name: "",
         isPoster: false,
         fileName: "",
+        headers: undefined,
       }),
     []
   );
@@ -1305,7 +1312,7 @@ export default function TournamentRegistrationScreen() {
   );
   const openPoster = useCallback(
     (reg: any) => {
-      if (reg?.payment?.status !== "Paid") {
+      if (reg?.payment?.status !== "Paid" && !canManage) {
         Alert.alert(
           "Thông báo",
           "Đăng ký cần hoàn tất thanh toán trước khi xem poster."
@@ -1320,9 +1327,10 @@ export default function TournamentRegistrationScreen() {
         name: `Poster #${regCodeOf(reg)}`,
         isPoster: true,
         fileName: posterFileNameFor(reg),
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
       });
     },
-    [tour]
+    [authToken, canManage, tour]
   );
   const sharePoster = useCallback(async () => {
     if (!imgPreview.src || !imgPreview.isPoster) return;
@@ -1349,7 +1357,8 @@ export default function TournamentRegistrationScreen() {
         : `${safeName}.png`;
       const downloaded = await FileSystem.downloadAsync(
         imgPreview.src,
-        `${dir}${fileName}`
+        `${dir}${fileName}`,
+        imgPreview.headers ? { headers: imgPreview.headers } : undefined
       );
       await Sharing.shareAsync(downloaded.uri, {
         mimeType: "image/png",
@@ -2042,7 +2051,7 @@ export default function TournamentRegistrationScreen() {
 
         {/* === IMAGE VIEWER LIBRARY === */}
         <ImageView
-          images={[{ uri: imgPreview.src }]}
+          images={[{ uri: imgPreview.src, headers: imgPreview.headers }]}
           imageIndex={0}
           visible={imgPreview.open}
           onRequestClose={closePreview}
