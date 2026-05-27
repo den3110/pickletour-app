@@ -116,14 +116,6 @@ const FEATURES = [
     link: "/live/home",
   },
   {
-    id: 7,
-    icon: "calculator",
-    iconLib: "Ionicons",
-    title: "Chấm trình",
-    color: "#00B894",
-    link: "/levelpoint",
-  },
-  {
     id: 8,
     icon: "people-circle",
     iconLib: "Ionicons",

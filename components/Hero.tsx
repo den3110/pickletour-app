@@ -1,6 +1,5 @@
 // Hero.jsx — cập nhật ImageViewing theo theme (bg & text)
 
-import { useGetLatestAssessmentQuery } from "@/slices/assessmentsApiSlice";
 import { useGetHeroContentQuery } from "@/slices/cmsApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { router } from "expo-router";
@@ -110,11 +109,6 @@ export default function Hero() {
 
   const { userInfo } = useSelector((s) => s.auth);
   const isLoggedIn = !!userInfo;
-  const userId = userInfo?._id || userInfo?.id;
-
-  const { data: latest, isFetching } = useGetLatestAssessmentQuery(userId, {
-    skip: !userId,
-  });
   const {
     data: heroRes,
     isLoading: heroLoading,
@@ -132,13 +126,7 @@ export default function Hero() {
     };
   }, [heroLoading, heroError, heroRes]);
 
-  const needSelfAssess = useMemo(() => {
-    if (!isLoggedIn || isFetching) return false;
-    if (!latest) return true;
-    const s = Number(latest.singleLevel || 0);
-    const d = Number(latest.doubleLevel || 0);
-    return s === 0 || d === 0;
-  }, [isLoggedIn, isFetching, latest]);
+  const needSelfAssess = false;
 
   const needKyc =
     isLoggedIn && (userInfo?.cccdStatus || "unverified") !== "verified";

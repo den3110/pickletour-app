@@ -100,6 +100,7 @@ const HOT_UPDATE_NOTIFY_KEY = "__PICKLETOUR_HOTUPDATE_NOTIFY__";
 const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
 const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
 const HOT_UPDATE_PENDING_KEY = "__PICKLETOUR_HOTUPDATE_PENDING__";
+const HOT_UPDATE_RECOVERED_BUNDLE_KEY = "__PICKLETOUR_HOTUPDATE_RECOVERED_BUNDLE__";
 const HOT_UPDATE_TELEMETRY_PATH = "/api/ota/report-status";
 const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn";
 const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
@@ -310,6 +311,24 @@ const clearPendingHotUpdate = async () => {
   await SecureStore.deleteItemAsync(HOT_UPDATE_PENDING_KEY);
 };
 
+const saveRecoveredHotUpdateBundle = async (bundleId?: string | null) => {
+  const id = String(bundleId || "").trim();
+  if (!id) return;
+  await SecureStore.setItemAsync(HOT_UPDATE_RECOVERED_BUNDLE_KEY, id);
+};
+
+const getRecoveredHotUpdateBundle = async () => {
+  try {
+    return (await SecureStore.getItemAsync(HOT_UPDATE_RECOVERED_BUNDLE_KEY)) || "";
+  } catch {
+    return "";
+  }
+};
+
+const clearRecoveredHotUpdateBundle = async () => {
+  await SecureStore.deleteItemAsync(HOT_UPDATE_RECOVERED_BUNDLE_KEY);
+};
+
 const reportHotUpdateTelemetry = async ({
   status,
   bundleId,
@@ -389,9 +408,11 @@ const handleHotUpdateNotifyTelemetry = async (payload: {
   const pending = await getPendingHotUpdate();
 
   if (payload.status === "RECOVERED") {
+    const recoveredBundleId = payload.crashedBundleId || pending?.bundleId;
+    await saveRecoveredHotUpdateBundle(recoveredBundleId);
     await reportHotUpdateTelemetry({
       status: "recovered",
-      bundleId: payload.crashedBundleId || pending?.bundleId,
+      bundleId: recoveredBundleId,
       currentBundleId: pending?.currentBundleId,
       channel: pending?.channel,
       appVersion: pending?.appVersion,
@@ -399,6 +420,10 @@ const handleHotUpdateNotifyTelemetry = async (payload: {
     });
     await clearPendingHotUpdate();
     return;
+  }
+
+  if (payload.status === "PROMOTED" || payload.status === "STABLE") {
+    await clearRecoveredHotUpdateBundle();
   }
 
   if (!pending?.bundleId) {
@@ -833,6 +858,18 @@ function RootLayout() {
       }, 700);
     } catch (error) {
       console.error("[HotUpdater] Download error:", error);
+      const errorCode =
+        error && typeof error === "object" && "code" in error
+          ? String((error as any).code || "")
+          : "";
+      if (
+        errorCode === "BUNDLE_IN_CRASHED_HISTORY" ||
+        String(error instanceof Error ? error.message : error || "").includes(
+          "crashed history",
+        )
+      ) {
+        await saveRecoveredHotUpdateBundle(pendingPayload.bundleId);
+      }
       await clearPendingHotUpdate();
       await reportHotUpdateTelemetry({
         status: "failed",
@@ -843,6 +880,7 @@ function RootLayout() {
         message: pendingPayload.message,
         errorMessage:
           error instanceof Error ? error.message : "Không thể tải bundle OTA.",
+        errorCode: errorCode || undefined,
         duration: Date.now() - startedAt,
       });
       setHotUpdateStatus("error");
@@ -890,6 +928,36 @@ function RootLayout() {
       });
 
       if (!updateInfo) {
+        otaCheckInFlightRef.current = false;
+        return;
+      }
+      const recoveredBundleId = await getRecoveredHotUpdateBundle();
+      const crashedBundleIds = (() => {
+        try {
+          return Array.isArray(HotUpdater.getCrashHistory?.())
+            ? HotUpdater.getCrashHistory()
+            : [];
+        } catch {
+          return [];
+        }
+      })();
+      if (
+        updateInfo.id &&
+        (updateInfo.id === recoveredBundleId ||
+          crashedBundleIds.includes(updateInfo.id))
+      ) {
+        otaIgnoredUpdateIdRef.current = updateInfo.id;
+        void reportHotUpdateTelemetry({
+          status: "failed",
+          bundleId: updateInfo.id,
+          currentBundleId: updateInfo?.currentBundleId,
+          channel: updateInfo?.channel,
+          appVersion: getHotUpdateAppVersion(),
+          message: updateInfo?.message,
+          errorCode: "BUNDLE_ROLLED_BACK_LOCALLY",
+          errorMessage:
+            "Bundle OTA này đã bị rollback trên thiết bị, bỏ qua để tránh lỗi cập nhật lặp lại.",
+        });
         otaCheckInFlightRef.current = false;
         return;
       }
@@ -1810,7 +1878,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="levelpoint"
                               options={{
-                                title: "Tự chấm trình",
+                                title: "Chấm trình",
                                 headerTitleAlign: "center",
                               }}
                             />

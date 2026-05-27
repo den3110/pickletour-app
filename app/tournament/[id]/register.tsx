@@ -190,6 +190,14 @@ const posterImgUrlFor = (tour: any, r: any) => {
     `/api/tournaments/${tourId}/registrations/${regId}/poster?v=${stamp}`
   );
 };
+const posterPlayersUrlFor = (tour: any, r: any) => {
+  const tourId = tour?._id || tour?.id;
+  const regId = r?._id || r?.id;
+  if (!tourId || !regId) return null;
+  return normalizeUrl(
+    `/api/tournaments/${tourId}/registrations/${regId}/poster/players`
+  );
+};
 const posterFileNameFor = (reg: any) =>
   `poster-${regCodeOf(reg)}-${Date.now()}.png`;
 const getScoreCap = (tour: any, isSingles: boolean) =>
@@ -723,13 +731,16 @@ const RegItem = memo(function RegItem({
   onOpenPayment,
   onOpenPoster,
   busy,
+  posterBusyId,
 }: any) {
   const C = useThemeColors();
   const total = totalScoreOf(r, isSingles);
   const players = [r?.player1, r?.player2].filter(Boolean);
   const code = regCodeOf(r);
+  const posterRegId = String(r?._id || r?.id || code);
   const isPaid = r.payment?.status === "Paid";
   const canOpenPoster = isPaid || canManage;
+  const posterBusy = Boolean(posterRegId && posterBusyId === posterRegId);
   const { state } = decideTotalState(total, cap, delta);
   const totalColor =
     state === "error"
@@ -954,12 +965,23 @@ const RegItem = memo(function RegItem({
         <View style={styles.actionPanel}>
           {canOpenPoster ? (
             <TouchableOpacity
-              style={[styles.actionTile, { backgroundColor: C.infoBg }]}
+              style={[
+                styles.actionTile,
+                {
+                  backgroundColor: C.infoBg,
+                  opacity: posterBusy ? 0.7 : 1,
+                },
+              ]}
+              disabled={posterBusy}
               onPress={() => onOpenPoster(r)}
             >
-              <Ionicons name="image-outline" size={18} color={C.infoText} />
+              {posterBusy ? (
+                <ActivityIndicator size="small" color={C.infoText} />
+              ) : (
+                <Ionicons name="image-outline" size={18} color={C.infoText} />
+              )}
               <Text style={[styles.actionTileText, { color: C.infoText }]}>
-                Poster
+                {posterBusy ? "Đang mở" : "Poster"}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -1127,6 +1149,9 @@ export default function TournamentRegistrationScreen() {
     headers: undefined as Record<string, string> | undefined,
   });
   const [sharingPoster, setSharingPoster] = useState(false);
+  const sharingPosterRef = useRef(false);
+  const posterOpenLockRef = useRef("");
+  const [posterBusyId, setPosterBusyId] = useState("");
 
   const [replaceDlg, setReplaceDlg] = useState({
     open: false,
@@ -1261,7 +1286,9 @@ export default function TournamentRegistrationScreen() {
     });
   }, []);
   const closePreview = useCallback(
-    () =>
+    () => {
+      posterOpenLockRef.current = "";
+      setPosterBusyId("");
       setImgPreview({
         open: false,
         src: "",
@@ -1269,7 +1296,8 @@ export default function TournamentRegistrationScreen() {
         isPoster: false,
         fileName: "",
         headers: undefined,
-      }),
+      });
+    },
     []
   );
   const openReplace = useCallback(
@@ -1321,25 +1349,52 @@ export default function TournamentRegistrationScreen() {
       }
       const src = posterImgUrlFor(tour, reg);
       if (!src) return Alert.alert("Lỗi", "Không tạo được poster");
+      const regId = String(reg?._id || reg?.id || regCodeOf(reg));
+      if (posterOpenLockRef.current) return;
+      posterOpenLockRef.current = regId;
+      setPosterBusyId(regId);
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
       setImgPreview({
         open: true,
         src,
         name: `Poster #${regCodeOf(reg)}`,
         isPoster: true,
         fileName: posterFileNameFor(reg),
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        headers,
       });
+      const playersUrl = posterPlayersUrlFor(tour, reg);
+      if (playersUrl) {
+        fetch(playersUrl, headers ? { headers } : undefined)
+          .then(async (response) => {
+            if (!response.ok) throw new Error("Không thể tải thông tin avatar");
+            return response.json();
+          })
+          .then((payload) => {
+            console.log("[Poster avatar debug]", payload);
+          })
+          .catch((error: any) => {
+            console.warn("[Poster avatar debug] failed", error);
+          });
+      }
+      setTimeout(() => {
+        if (posterOpenLockRef.current === regId) {
+          posterOpenLockRef.current = "";
+          setPosterBusyId("");
+        }
+      }, 800);
     },
     [authToken, canManage, tour]
   );
   const sharePoster = useCallback(async () => {
     if (!imgPreview.src || !imgPreview.isPoster) return;
+    if (sharingPosterRef.current) return;
     const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
     if (!dir) {
       Alert.alert("Lỗi", "Không tìm thấy thư mục tạm để lưu poster.");
       return;
     }
     try {
+      sharingPosterRef.current = true;
       setSharingPoster(true);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
@@ -1368,6 +1423,7 @@ export default function TournamentRegistrationScreen() {
     } catch (error: any) {
       Alert.alert("Lỗi", error?.message || "Không thể tải poster.");
     } finally {
+      sharingPosterRef.current = false;
       setSharingPoster(false);
     }
   }, [imgPreview]);
@@ -1967,6 +2023,7 @@ export default function TournamentRegistrationScreen() {
               onOpenPayment={openPayment}
               onOpenPoster={openPoster}
               busy={{ settingPayment, deletingId: cancelingId }}
+              posterBusyId={posterBusyId}
             />
           )}
         />
@@ -2036,6 +2093,7 @@ export default function TournamentRegistrationScreen() {
               onOpenPayment={openPayment}
               onOpenPoster={openPoster}
               busy={{ settingPayment, deletingId: cancelingId }}
+              posterBusyId={posterBusyId}
             />
           )}
           ListHeaderComponent={HeaderComponent}

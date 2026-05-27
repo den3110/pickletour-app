@@ -119,10 +119,12 @@ export default function SupportThreadScreen() {
   }, []);
 
   const pickImages = useCallback(async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Thiếu quyền", "Bạn cần cấp quyền thư viện ảnh để đính kèm.");
-      return;
+    if (Platform.OS !== "android") {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Thiếu quyền", "Bạn cần cấp quyền thư viện ảnh để đính kèm.");
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({

@@ -19,6 +19,7 @@ import {
 import { useRouter } from "expo-router";
 import { useForgotPasswordMutation } from "@/slices/usersApiSlice";
 import LottieView from "lottie-react-native"; // ⬅️ NEW
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 // ⬅️ NEW: asset Lottie
 const FORGOT_LOTTIE = require("@/assets/lottie/forgot-password.json");
@@ -119,16 +120,18 @@ export default function ForgotPasswordScreen() {
               ]}
             >
               {/* ⬇️ NEW: Lottie ở trên đầu, căn giữa */}
-              <View style={styles.animWrap}>
-                <LottieView
-                  source={FORGOT_LOTTIE}
-                  autoPlay
-                  loop
-                  resizeMode="contain"
-                  style={styles.anim}
-                  pointerEvents="none"
-                />
-              </View>
+              {SHOULD_RENDER_NATIVE_LOTTIE ? (
+                <View style={styles.animWrap}>
+                  <LottieView
+                    source={FORGOT_LOTTIE}
+                    autoPlay
+                    loop
+                    resizeMode="contain"
+                    style={styles.anim}
+                    pointerEvents="none"
+                  />
+                </View>
+              ) : null}
 
               <Text style={[styles.title, { color: themed.text }]}>
                 Quên mật khẩu

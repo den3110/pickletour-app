@@ -1020,7 +1020,7 @@ export default function RankingListScreen({ isBack = false }) {
   }, [kw, dispatch]);
 
   const me = useGetMeQuery().data;
-  const canSelfAssess = !me || me.isScoreVerified === false;
+  const canSelfAssess = false;
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerImages, setViewerImages] = useState([]);

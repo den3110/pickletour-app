@@ -197,8 +197,10 @@ export default function ClubCreateModal({
   }, [allowedMemberVis, form.memberVisibility]);
 
   const pickImage = async (field: "logoUrl" | "coverUrl") => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (Platform.OS !== "android") {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+    }
     const rs = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,

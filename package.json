@@ -37,6 +37,7 @@
     "dayjs": "^1.11.19",
     "expo": "^55.0.9",
     "expo-application": "~55.0.10",
+    "expo-asset": "~55.0.10",
     "expo-audio": "~55.0.8",
     "expo-blur": "~55.0.10",
     "expo-brightness": "~55.0.9",

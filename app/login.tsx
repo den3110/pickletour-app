@@ -22,6 +22,7 @@ import { saveUserInfo } from "@/utils/authStorage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
 import { normalizeAppRoutePath } from "@/utils/nativeTabs";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 /* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
@@ -167,14 +168,16 @@ export default function LoginScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={{ flex: 1 }}>
-        <LottieView
-          source={BG_LOTTIE}
-          autoPlay
-          loop
-          resizeMode="cover"
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
+        {SHOULD_RENDER_NATIVE_LOTTIE ? (
+          <LottieView
+            source={BG_LOTTIE}
+            autoPlay
+            loop
+            resizeMode="cover"
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        ) : null}
         <View
           pointerEvents="none"
           style={[

@@ -30,6 +30,7 @@ import ClubPollsRN from "@/components/clubs/ClubPollsRN";
 import ClubMembersCarouselRN from "@/components/clubs/ClubMembersCarouselRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const { width: W } = Dimensions.get("window");
 const TABS = ["news", "events", "polls"] as const;
@@ -146,15 +147,17 @@ export default function ClubDetailPageRN() {
     return (
       <SafeAreaView style={{ flex: 1 }}>
         {/* Lottie BG while loading */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <LottieView
-            source={require("@/assets/lottie/animated-bg.json")}
-            autoPlay
-            loop
-            speed={0.8}
-            style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
-          />
-        </View>
+        {SHOULD_RENDER_NATIVE_LOTTIE ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <LottieView
+              source={require("@/assets/lottie/animated-bg.json")}
+              autoPlay
+              loop
+              speed={0.8}
+              style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.centered}>
           <ActivityIndicator />
@@ -168,15 +171,17 @@ export default function ClubDetailPageRN() {
     return (
       <SafeAreaView style={{ flex: 1 }}>
         {/* Lottie BG */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <LottieView
-            source={require("@/assets/lottie/animated-bg.json")}
-            autoPlay
-            loop
-            speed={0.8}
-            style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
-          />
-        </View>
+        {SHOULD_RENDER_NATIVE_LOTTIE ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <LottieView
+              source={require("@/assets/lottie/animated-bg.json")}
+              autoPlay
+              loop
+              speed={0.8}
+              style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.centered}>
           <GradientCard>
@@ -233,15 +238,17 @@ export default function ClubDetailPageRN() {
 
       <View style={{ flex: 1 }}>
         {/* ===== LOTTIE BACKGROUND (toàn trang) ===== */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <LottieView
-            source={require("@/assets/lottie/animated-bg.json")}
-            autoPlay
-            loop
-            speed={0.8}
-            style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
-          />
-        </View>
+        {SHOULD_RENDER_NATIVE_LOTTIE ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <LottieView
+              source={require("@/assets/lottie/animated-bg.json")}
+              autoPlay
+              loop
+              speed={0.8}
+              style={[StyleSheet.absoluteFill, { opacity: LOTTIE_OPACITY }]}
+            />
+          </View>
+        ) : null}
 
         {/* ===== Content ===== */}
         <Animated.ScrollView

@@ -1,7 +1,6 @@
 // app/screens/LevelPointScreen.jsx
 import AuthGuard from "@/components/auth/AuthGuard";
 import {
-  useCreateAssessmentMutation,
   useGetLatestAssessmentQuery,
 } from "@/slices/assessmentsApiSlice";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -469,8 +468,8 @@ export default function LevelPointScreen({ userId: userIdProp }) {
   const [doubleInput, setDoubleInput] = useState("");
   const didPrefillRef = useRef(false);
 
-  const [createAssessment, { isLoading: saving }] =
-    useCreateAssessmentMutation();
+  const saving = false;
+  const selfAssessmentDisabled = true;
   const {
     data: latest,
     isLoading: loadingLatest,
@@ -529,34 +528,10 @@ export default function LevelPointScreen({ userId: userIdProp }) {
   };
 
   const handleSubmit = async () => {
-    if (!userId) return Alert.alert("Lỗi", "Thiếu userId.");
-
-    const sV = parseDecimal(singleInput);
-    const dV = parseDecimal(doubleInput);
-
-    if (
-      isNaN(sV) ||
-      sV < DUPR_MIN ||
-      sV > DUPR_MAX ||
-      isNaN(dV) ||
-      dV < DUPR_MIN ||
-      dV > DUPR_MAX
-    ) {
-      Alert.alert("Chưa hợp lệ", `Điểm phải từ ${DUPR_MIN} đến ${DUPR_MAX}`);
-      return;
-    }
-
-    try {
-      await createAssessment({
-        userId,
-        singleLevel: sV,
-        doubleLevel: dV,
-        note: "Tự chấm trình",
-      }).unwrap();
-      Alert.alert("Thành công", "Đã cập nhật trình độ!");
-    } catch (err) {
-      Alert.alert("Lỗi", "Không lưu được đánh giá.");
-    }
+    Alert.alert(
+      "Tính năng đã tắt",
+      "Tính năng tự chấm trình đã tắt. Vui lòng chờ admin hoặc người chấm trình cập nhật điểm.",
+    );
   };
 
   /* ===== RETURN VIEW OR SKELETON ===== */
@@ -606,6 +581,20 @@ export default function LevelPointScreen({ userId: userIdProp }) {
               </View>
             </View>
 
+            <View
+              style={[
+                styles.disabledNotice,
+                { backgroundColor: T.chipBg, borderColor: T.border },
+              ]}
+            >
+              <Text style={[styles.disabledNoticeTitle, { color: T.text }]}>
+                Tính năng tự chấm trình đã tắt
+              </Text>
+              <Text style={[styles.disabledNoticeText, { color: T.subText }]}>
+                Admin hoặc người chấm trình sẽ cập nhật điểm cho vận động viên.
+              </Text>
+            </View>
+
             {/* Inputs */}
             <View style={styles.statsGrid}>
               <StatCard
@@ -643,17 +632,17 @@ export default function LevelPointScreen({ userId: userIdProp }) {
 
               <TouchableOpacity
                 onPress={handleSubmit}
-                disabled={saving}
+                disabled={selfAssessmentDisabled || saving}
                 style={[
                   styles.mainButton,
-                  { backgroundColor: T.text, opacity: saving ? 0.7 : 1 },
+                  { backgroundColor: T.text, opacity: 0.55 },
                 ]}
               >
                 {saving ? (
                   <ActivityIndicator color={T.bg} />
                 ) : (
                   <Text style={[styles.mainBtnText, { color: T.bg }]}>
-                    CẬP NHẬT
+                    ĐÃ TẮT
                   </Text>
                 )}
               </TouchableOpacity>
@@ -692,6 +681,14 @@ export default function LevelPointScreen({ userId: userIdProp }) {
 const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: "800" },
   headerSubtitle: { fontSize: 14, marginTop: 2 },
+  disabledNotice: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  disabledNoticeTitle: { fontSize: 15, fontWeight: "800", marginBottom: 4 },
+  disabledNoticeText: { fontSize: 13, lineHeight: 18 },
 
   // Badge mới
   badgeContainer: {

@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import LottieView from "lottie-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 export default function DevelopmentScreen() {
   const insets = useSafeAreaInsets();
@@ -30,12 +31,14 @@ export default function DevelopmentScreen() {
         />
 
         <View style={styles.centerWrap}>
-          <LottieView
-            source={require("@/assets/lottie/development.json")}
-            autoPlay
-            loop
-            style={styles.lottie}
-          />
+          {SHOULD_RENDER_NATIVE_LOTTIE ? (
+            <LottieView
+              source={require("@/assets/lottie/development.json")}
+              autoPlay
+              loop
+              style={styles.lottie}
+            />
+          ) : null}
 
           <Text style={[styles.title, { color: colors.text }]}>
             Chức năng đang phát triển

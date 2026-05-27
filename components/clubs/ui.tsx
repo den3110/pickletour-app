@@ -11,6 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 // ✅ dùng Lottie thay icon
 import LottieView from "lottie-react-native";
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 export const Section = ({ title, subtitle, children }: any) => (
   <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -94,13 +95,21 @@ export const EmptyState = ({
       paddingVertical: 22,
     }}
   >
-    <LottieView
-      source={require("@/assets/lottie/empty.json")}
-      autoPlay
-      loop
-      speed={speed}
-      style={{ width: size, height: size }}
-    />
+    {SHOULD_RENDER_NATIVE_LOTTIE ? (
+      <LottieView
+        source={require("@/assets/lottie/empty.json")}
+        autoPlay
+        loop
+        speed={speed}
+        style={{ width: size, height: size }}
+      />
+    ) : icon ? (
+      <MaterialCommunityIcons
+        name={icon as any}
+        size={Math.min(size, 96)}
+        color="#7f92b3"
+      />
+    ) : null}
     <Text style={{ color: "#7f92b3", marginTop: 6 }}>{label}</Text>
   </View>
 );

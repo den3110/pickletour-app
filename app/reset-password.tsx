@@ -29,6 +29,7 @@ import {
   useResetPasswordMutation,
 } from "@/slices/usersApiSlice";
 import LottieView from "lottie-react-native"; // ⬅️ NEW
+import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const OTP_LOTTIE = require("@/assets/lottie/otp-verification.json"); // ⬅️ NEW
 
@@ -314,7 +315,7 @@ export default function ResetPasswordOtpScreen() {
               </Text>
 
               {/* ⬇️ NEW: Lottie OTP — chỉ hiện ở phase OTP */}
-              {phase === "otp" && (
+              {phase === "otp" && SHOULD_RENDER_NATIVE_LOTTIE && (
                 <View style={styles.otpAnimWrap}>
                   <LottieView
                     ref={otpAnimRef}
