@@ -205,6 +205,65 @@ const smartDepLabel = (m, prevDep) => {
   });
 };
 
+const normalizeLooseLabel = (value) =>
+  String(value || "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const isPendingTeamLabel = (value) => {
+  const normalized = normalizeLooseLabel(value);
+  return (
+    !normalized ||
+    normalized === "chua co doi" ||
+    normalized === "tbd" ||
+    normalized === "registration"
+  );
+};
+
+const isByeLabel = (value) => /^bye$/i.test(String(value || "").trim());
+const visibleTeamLabel = (value) =>
+  isPendingTeamLabel(value) ? "—" : String(value || "").trim();
+const hasResolvedPair = (pair) =>
+  Boolean(
+    pair &&
+      (pair?.player1 ||
+        pair?.player2 ||
+        pair?.name ||
+        pair?.teamName ||
+        pair?.label ||
+        pair?.displayName)
+  );
+const normalizeSeedRefLabel = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, "-");
+const isUsefulSideLabel = (value) => {
+  const text = String(value || "").trim();
+  return !!text && !isPendingTeamLabel(text) && !isByeLabel(text);
+};
+const isByeSeed = (seed) =>
+  seed?.type === "bye" ||
+  (typeof seed?.label === "string" && /\bBYE\b/i.test(seed.label));
+const isByeMatchObj = (m) => !!m && (isByeSeed(m?.seedA) || isByeSeed(m?.seedB));
+const isThirdPlaceMatch = (m) => {
+  if (!m) return false;
+  const type = String(m?.bracket?.type || m?.format || "").toLowerCase();
+  if (["roundelim", "po", "playoff"].includes(type)) return false;
+  if (m.isThirdPlace === true || m?.meta?.thirdPlace === true) return true;
+  const label = String(m?.meta?.stageLabel || m?.roundName || "").toLowerCase();
+  return label.includes("hạng 3") || label.includes("3/4");
+};
+const extractDisplayCodeText = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(
+    /\b(?:V\d+(?:-B[^-\s]+)?(?:-NT)?-T\d+|WB\d+-T\d+|LB\d+-T\d+|GF(?:\d+)?-T\d+)\b/i
+  );
+  return match ? match[0].toUpperCase() : "";
+};
+
 /* ----- seed label helpers ----- */
 export const seedLabel = (seed) => {
   if (!seed || !seed.type) return "Chưa có đội";
@@ -465,6 +524,45 @@ const readBracketScale = (br) => {
   if (!cands.length) return 0;
   return ceilPow2(Math.max(...cands));
 };
+
+function roundsCountForBracket(bracket, matchesOfThis = []) {
+  const type = String(bracket?.type || "").toLowerCase();
+  if (type === "group") return 1;
+
+  if (type === "roundelim") {
+    let rounds =
+      Number(bracket?.meta?.maxRounds) ||
+      Number(bracket?.config?.roundElim?.maxRounds) ||
+      0;
+    if (!rounds) {
+      const maxRound =
+        Math.max(
+          0,
+          ...(matchesOfThis || []).map((m) => Number(m.round || 1))
+        ) || 1;
+      rounds = Math.max(1, maxRound);
+    }
+    return rounds;
+  }
+
+  const roundsFromMatches = (() => {
+    const rs = (matchesOfThis || []).map((m) => Number(m.round || 1));
+    if (!rs.length) return 0;
+    return Math.max(1, Math.max(...rs) - Math.min(...rs) + 1);
+  })();
+  if (roundsFromMatches) return roundsFromMatches;
+
+  const firstPairs =
+    (Array.isArray(bracket?.prefill?.seeds) && bracket.prefill.seeds.length) ||
+    (Array.isArray(bracket?.prefill?.pairs) && bracket.prefill.pairs.length) ||
+    0;
+  if (firstPairs > 0) return Math.ceil(Math.log2(firstPairs * 2));
+
+  const scale = readBracketScale(bracket);
+  if (scale) return Math.ceil(Math.log2(scale));
+
+  return 1;
+}
 
 /* ===================== Champion gate ===================== */
 function computeChampionGate(allMatches) {
@@ -1004,10 +1102,15 @@ function buildEmptyRoundsByScale(scale /* 2^n */) {
   return rounds;
 }
 function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
+  const prefillSeeds = Array.isArray(bracket?.prefill?.seeds)
+    ? bracket.prefill.seeds
+    : [];
+  const prefillRoundOneTeams = prefillSeeds.map((entry) => ({
+    A: seedLabel(entry?.A),
+    B: seedLabel(entry?.B),
+  }));
   const r1FromPrefill =
-    Array.isArray(bracket?.prefill?.seeds) && bracket.prefill.seeds.length
-      ? bracket.prefill.seeds.length
-      : 0;
+    prefillSeeds.length ? prefillSeeds.length : 0;
   const r1FromMatches = (brMatches || []).filter(
     (m) => (m.round || 1) === 1
   ).length;
@@ -1040,7 +1143,13 @@ function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
       id: `re-${r}-${i}`,
       __match: null,
       __round: r,
-      teams: [{ name: "Chưa có đội" }, { name: "Chưa có đội" }],
+      teams:
+        r === 1 && prefillRoundOneTeams[i]
+          ? [
+              { name: prefillRoundOneTeams[i].A },
+              { name: prefillRoundOneTeams[i].B },
+            ]
+          : [{ name: "Chưa có đội" }, { name: "Chưa có đội" }],
     }));
 
     const ms = (brMatches || [])
@@ -1052,14 +1161,25 @@ function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
         ? m.order
         : seeds.findIndex((s) => s.__match === null);
       if (i < 0 || i >= seeds.length) i = Math.min(idx, seeds.length - 1);
+      const fallbackTeams = r === 1 ? prefillRoundOneTeams[i] || null : null;
+      const nameA = resolveSideLabel(m, "A");
+      const nameB = resolveSideLabel(m, "B");
 
       seeds[i] = {
         id: m._id || `re-${r}-${i}`,
         __match: m,
         __round: r,
         teams: [
-          { name: resolveSideLabel(m, "A") },
-          { name: resolveSideLabel(m, "B") },
+          {
+            name: isPendingTeamLabel(nameA)
+              ? fallbackTeams?.A || nameA
+              : nameA,
+          },
+          {
+            name: isPendingTeamLabel(nameB)
+              ? fallbackTeams?.B || nameB
+              : nameB,
+          },
         ],
       };
     });
@@ -1670,7 +1790,7 @@ const BracketColumns = ({
       : null;
 
   // ===== BYE helpers =====
-  const isByeName = (s) => typeof s === "string" && /^BYE$/i.test(s.trim());
+  const isByeName = isByeLabel;
   const seedHasBye = (seed) => {
     const a = seed?.teams?.[0]?.name || "";
     const b = seed?.teams?.[1]?.name || "";
@@ -1679,8 +1799,8 @@ const BracketColumns = ({
   const nonByeName = (seed) => {
     const a = seed?.teams?.[0]?.name || "";
     const b = seed?.teams?.[1]?.name || "";
-    if (isByeName(a) && !isByeName(b)) return b;
-    if (isByeName(b) && !isByeName(a)) return a;
+    if (isByeName(a) && !isByeName(b) && !isPendingTeamLabel(b)) return b;
+    if (isByeName(b) && !isByeName(a) && !isPendingTeamLabel(a)) return a;
     return null;
   };
   // đo cột/ô để vẽ connector
@@ -1733,7 +1853,7 @@ const BracketColumns = ({
         const side = i % 2; // 0 => A, 1 => B
         if (nxt.seeds[dstIdx]) {
           const curName = nxt.seeds[dstIdx].teams?.[side]?.name;
-          if (!curName || /^(Chưa có đội|BYE)$/i.test(curName)) {
+          if (isPendingTeamLabel(curName) || isByeLabel(curName)) {
             nxt.seeds[dstIdx].teams[side] = { name: adv };
           }
         }
@@ -1742,9 +1862,9 @@ const BracketColumns = ({
     return copy;
   }, [rounds]);
 
-  const ROUND_GAP = 56;
-  const INNER_GAP = 24;
-  const EXTRA_SLOT = 6;
+  const ROUND_GAP = 64;
+  const INNER_GAP = 36;
+  const EXTRA_SLOT = 16;
   const [baseCardH, setBaseCardH] = useState(56);
 
   const slotH0 = Math.max(
@@ -1862,7 +1982,6 @@ const BracketColumns = ({
         const y2 = sBot.y + sBot.h / 2;
 
         const xd = dst.x;
-        const yd = dst.y + dst.h / 2;
 
         const rightMax = Math.max(x1, x2);
         const busX = Math.min(xd - TO_DST, rightMax + OUT);
@@ -1871,14 +1990,7 @@ const BracketColumns = ({
         pushH(x1, y1, busX - x1, `h-a-${c}-${j}`);
         pushH(x2, y2, busX - x2, `h-b-${c}-${j}`);
         pushV(busX, Math.min(y1, y2), Math.abs(y2 - y1), `v-${c}-${j}`);
-        pushH(busX, midY, xd - TO_DST - busX, `h-c-${c}-${j}`);
-        pushV(
-          xd - TO_DST,
-          Math.min(midY, yd),
-          Math.abs(yd - midY),
-          `v2-${c}-${j}`
-        );
-        pushH(xd - TO_DST, yd, TO_DST, `h-d-${c}-${j}`);
+        pushH(busX, midY, xd - busX, `h-c-${c}-${j}`);
       }
     }
     return L;
@@ -1921,7 +2033,10 @@ const BracketColumns = ({
                 key={colIdx}
                 style={[
                   styles.roundCol,
-                  { marginRight: 56, marginTop: colTopOffset[colIdx] || 0 },
+                  {
+                    marginRight: ROUND_GAP,
+                    marginTop: colTopOffset[colIdx] || 0,
+                  },
                 ]}
                 onLayout={(e) => {
                   const { x, y, width: w, height: h } = e.nativeEvent.layout;
@@ -1947,11 +2062,15 @@ const BracketColumns = ({
                 String(m._id) === String(championMatchId) &&
                 (m.winner === "A" || m.winner === "B");
 
-              const nameA = s.teams?.[0]?.name || "Chưa có đội";
-              const nameB = s.teams?.[1]?.name || "Chưa có đội";
+              const rawNameA = s.teams?.[0]?.name || "Chưa có đội";
+              const rawNameB = s.teams?.[1]?.name || "Chưa có đội";
+              const pendingA = isPendingTeamLabel(rawNameA);
+              const pendingB = isPendingTeamLabel(rawNameB);
+              const nameA = visibleTeamLabel(rawNameA);
+              const nameB = visibleTeamLabel(rawNameB);
               const byeCard =
-                /^(BYE)$/i.test(nameA) ||
-                /^(BYE)$/i.test(nameB) ||
+                isByeLabel(rawNameA) ||
+                isByeLabel(rawNameB) ||
                 m?.seedA?.type === "bye" ||
                 m?.seedB?.type === "bye";
               const status = byeCard
@@ -1967,7 +2086,7 @@ const BracketColumns = ({
                   key={`${colIdx}-${i}`}
                   style={[
                     styles.seedWrap,
-                    { height: wrapH, paddingVertical: 24 },
+                    { height: wrapH, paddingVertical: INNER_GAP },
                   ]}
                   onLayout={(e) => {
                     const { x, y, width: w, height: h } = e.nativeEvent.layout;
@@ -2163,17 +2282,23 @@ const BracketColumns = ({
                                     styles.teamText,
                                     { color: t.colors.text },
                                     widA && styles.teamTextWin,
+                                    pendingA && [
+                                      styles.teamTextPending,
+                                      { color: t.subtext },
+                                    ],
                                   ]}
                                 >
                                   {nameA}
-                                  <Text
-                                    style={[
-                                      styles.sideTag,
-                                      { color: t.subtext },
-                                    ]}
-                                  >
-                                    (A)
-                                  </Text>
+                                  {!pendingA && (
+                                    <Text
+                                      style={[
+                                        styles.sideTag,
+                                        { color: t.subtext },
+                                      ]}
+                                    >
+                                      (A)
+                                    </Text>
+                                  )}
                                 </Text>
                               </Pressable>
                               <Pressable
@@ -2194,18 +2319,24 @@ const BracketColumns = ({
                                     styles.teamText,
                                     { color: t.colors.text },
                                     widB && styles.teamTextWin,
+                                    pendingB && [
+                                      styles.teamTextPending,
+                                      { color: t.subtext },
+                                    ],
                                   ]}
                                 >
                                   {nameB}
-                                  <Text
-                                    style={[
-                                      styles.sideTag,
-                                      { color: t.subtext },
-                                    ]}
-                                  >
-                                    {" "}
-                                    (B)
-                                  </Text>
+                                  {!pendingB && (
+                                    <Text
+                                      style={[
+                                        styles.sideTag,
+                                        { color: t.subtext },
+                                      ]}
+                                    >
+                                      {" "}
+                                      (B)
+                                    </Text>
+                                  )}
                                 </Text>
                               </Pressable>
                             </>
@@ -2511,6 +2642,74 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     return m;
   }, [brackets, matchesMerged]);
 
+  const bracketById = useMemo(() => {
+    const mp = new Map();
+    (brackets || []).forEach((b) => {
+      const id = String(b?._id || "");
+      if (id) mp.set(id, b);
+    });
+    return mp;
+  }, [brackets]);
+
+  const matchRefIndex = useMemo(() => {
+    const byId = new Map();
+    const byBracketRoundOrder = new Map();
+    const byStageRoundOrder = new Map();
+
+    for (const m of matchesMerged || []) {
+      const id = String(m?._id || "");
+      const bracketId = String(m?.bracket?._id || m?.bracket || "");
+      const bracketObj =
+        (m?.bracket && typeof m.bracket === "object" ? m.bracket : null) ||
+        bracketById.get(bracketId) ||
+        null;
+      const stageNum = Number(
+        bracketObj?.stage ?? m?.stage ?? m?.stageIndex ?? NaN
+      );
+      const roundNum = Number(m?.round);
+      const orderNum = Number(m?.order);
+
+      if (id) byId.set(id, m);
+      if (bracketId && Number.isFinite(roundNum) && Number.isFinite(orderNum)) {
+        byBracketRoundOrder.set(`${bracketId}:${roundNum}:${orderNum}`, m);
+      }
+      if (Number.isFinite(stageNum) && Number.isFinite(roundNum) && Number.isFinite(orderNum)) {
+        byStageRoundOrder.set(`${stageNum}:${roundNum}:${orderNum}`, m);
+      }
+    }
+
+    return { byId, byBracketRoundOrder, byStageRoundOrder };
+  }, [matchesMerged, bracketById]);
+
+  const baseRoundStartByBracketId = useMemo(() => {
+    const out = new Map();
+    let sum = 0;
+
+    for (const bracket of brackets || []) {
+      const bracketId = String(bracket?._id || "");
+      if (!bracketId) continue;
+      out.set(bracketId, sum + 1);
+      sum += roundsCountForBracket(bracket, byBracket?.[bracket._id] || []);
+    }
+
+    return out;
+  }, [brackets, byBracket]);
+
+  const firstBracketIdByStage = useMemo(() => {
+    const out = new Map();
+
+    for (const bracket of brackets || []) {
+      const bracketId = String(bracket?._id || "");
+      const stageNum = Number(bracket?.stage ?? bracket?.stageIndex ?? NaN);
+      if (!bracketId || !Number.isFinite(stageNum) || out.has(stageNum)) {
+        continue;
+      }
+      out.set(stageNum, bracketId);
+    }
+
+    return out;
+  }, [brackets]);
+
   const completedGroupAliasSet = useMemo(
     () => buildCompletedGroupAliasSet(brackets, byBracket),
     [brackets, byBracket]
@@ -2543,6 +2742,228 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     [byBracket, current]
   );
 
+  const findSourceMatchFromSeed = useCallback(
+    (ownerMatch, seed) => {
+      if (!seed) return null;
+
+      const matchId = String(seed?.ref?.matchId || "");
+      if (matchId && matchRefIndex.byId.has(matchId)) {
+        return matchRefIndex.byId.get(matchId);
+      }
+
+      const roundNum = Number(seed?.ref?.round);
+      const orderNum = Number(seed?.ref?.order);
+      if (!Number.isFinite(roundNum) || !Number.isFinite(orderNum)) {
+        return null;
+      }
+
+      const stageNum = Number(seed?.ref?.stageIndex ?? seed?.ref?.stage);
+      if (Number.isFinite(stageNum)) {
+        const hit = matchRefIndex.byStageRoundOrder.get(
+          `${stageNum}:${roundNum}:${orderNum}`
+        );
+        if (hit) return hit;
+      }
+
+      const bracketId = String(
+        ownerMatch?.bracket?._id || ownerMatch?.bracket || ""
+      );
+      if (bracketId) {
+        return (
+          matchRefIndex.byBracketRoundOrder.get(
+            `${bracketId}:${roundNum}:${orderNum}`
+          ) || null
+        );
+      }
+
+      return null;
+    },
+    [matchRefIndex]
+  );
+
+  const getDisplayCodeForMatch = useCallback(
+    (sourceMatch) => {
+      if (!sourceMatch) return "";
+
+      const candidates = [
+        sourceMatch?.displayCode,
+        sourceMatch?.codeDisplay,
+        sourceMatch?.codeResolved,
+        sourceMatch?.globalCodeV,
+        sourceMatch?.globalCode,
+        sourceMatch?.code,
+        sourceMatch?.matchCode,
+        sourceMatch?.slotCode,
+        sourceMatch?.bracketCode,
+        sourceMatch?.labelKey,
+        sourceMatch?.meta?.code,
+        sourceMatch?.meta?.label,
+      ];
+      for (const candidate of candidates) {
+        const hit = extractDisplayCodeText(candidate);
+        if (hit) return hit;
+      }
+
+      const bracketId = String(
+        sourceMatch?.bracket?._id || sourceMatch?.bracket || ""
+      );
+      const baseRoundStart = baseRoundStartByBracketId.get(bracketId);
+      const roundNum = Number(sourceMatch?.round);
+      const orderNum = Number(sourceMatch?.order);
+      const branch = String(
+        sourceMatch?.branch || sourceMatch?.phase || ""
+      ).toLowerCase();
+      const isLosersBranch = branch === "lb" || branch === "losers";
+
+      if (
+        Number.isFinite(baseRoundStart) &&
+        Number.isFinite(roundNum) &&
+        Number.isFinite(orderNum)
+      ) {
+        const prefix = `V${baseRoundStart + roundNum - 1}`;
+        return isLosersBranch
+          ? `${prefix}-NT-T${orderNum + 1}`
+          : `${prefix}-T${orderNum + 1}`;
+      }
+
+      return "";
+    },
+    [baseRoundStartByBracketId]
+  );
+
+  const resolveSeedReferenceLabel = useCallback(
+    (seed, ownerMatch = null) => {
+      if (!seed || !seed.type) return seedLabel(seed);
+
+      const type = String(seed?.type || "");
+      const isWinnerSeed =
+        type === "stageMatchWinner" || type === "matchWinner";
+      const isLoserSeed =
+        type === "stageMatchLoser" || type === "matchLoser";
+
+      if (!isWinnerSeed && !isLoserSeed) return seedLabel(seed);
+
+      const prefix = isLoserSeed ? "L" : "W";
+      const sourceMatch = findSourceMatchFromSeed(ownerMatch, seed);
+      const sourceCode = getDisplayCodeForMatch(sourceMatch);
+      if (sourceCode) return `${prefix}-${sourceCode}`;
+
+      const stageNum = Number(seed?.ref?.stageIndex ?? seed?.ref?.stage);
+      const roundNum = Number(seed?.ref?.round);
+      const orderNum = Number(seed?.ref?.order);
+      const bracketId = firstBracketIdByStage.get(stageNum);
+      const baseRoundStart = bracketId
+        ? baseRoundStartByBracketId.get(bracketId)
+        : null;
+
+      if (
+        Number.isFinite(baseRoundStart) &&
+        Number.isFinite(roundNum) &&
+        Number.isFinite(orderNum)
+      ) {
+        return `${prefix}-V${baseRoundStart + roundNum - 1}-T${orderNum + 1}`;
+      }
+
+      const rawCode = extractDisplayCodeText(seed?.label);
+      if (rawCode) return `${prefix}-${rawCode}`;
+
+      return seedLabel({ ...seed, label: "" });
+    },
+    [
+      findSourceMatchFromSeed,
+      getDisplayCodeForMatch,
+      firstBracketIdByStage,
+      baseRoundStartByBracketId,
+    ]
+  );
+
+  const getPlannedSeedForMatchSide = useCallback(
+    (match, side) => {
+      if (!match || !current) return null;
+
+      const localRound = Number(match?.round || 1);
+      const codeOrder = Number(
+        extractDisplayCodeText(match?.code || match?.displayCode || "").match(
+          /-T(\d+)/i
+        )?.[1]
+      );
+      const localOrder = Number(
+        match?.order ??
+          match?.meta?.order ??
+          (Number.isFinite(codeOrder) ? codeOrder - 1 : NaN)
+      );
+      if (!Number.isFinite(localOrder)) return null;
+
+      if (localRound > 1) {
+        const matchBracketId = String(match?.bracket?._id || match?.bracket || "");
+        const bracketMatches = matchBracketId
+          ? byBracket?.[matchBracketId] || []
+          : currentMatches;
+        const sameBranch = (candidate) =>
+          String(candidate?.branch || "main") ===
+            String(match?.branch || "main") &&
+          String(candidate?.phase || "") === String(match?.phase || "") &&
+          isThirdPlaceMatch(candidate) === isThirdPlaceMatch(match);
+        const byOrder = (a, b) => Number(a?.order || 0) - Number(b?.order || 0);
+        const currentRoundMatches = bracketMatches
+          .filter((candidate) => Number(candidate?.round || 1) === localRound)
+          .filter(sameBranch)
+          .sort(byOrder);
+        const currentIndex = currentRoundMatches.findIndex(
+          (candidate) => String(candidate?._id || "") === String(match?._id || "")
+        );
+        const sourceSlot =
+          (currentIndex >= 0 ? currentIndex : localOrder) * 2 +
+          (side === "B" ? 1 : 0);
+        const previousRoundMatches = bracketMatches
+          .filter((candidate) => Number(candidate?.round || 1) === localRound - 1)
+          .filter(sameBranch)
+          .sort(byOrder);
+        const sourceMatch = previousRoundMatches[sourceSlot] || null;
+        const sourceRound = Number(sourceMatch?.round ?? localRound - 1);
+        const sourceOrder = Number(
+          sourceMatch?.order ?? localOrder * 2 + (side === "B" ? 1 : 0)
+        );
+        const stageIndex =
+          Number(
+            sourceMatch?.bracket?.stage ??
+              current?.stage ??
+              current?.stageIndex ??
+              0
+          ) || 0;
+        const ref = {
+          stage: stageIndex,
+          stageIndex,
+          round: sourceRound,
+          order: sourceOrder,
+        };
+        if (sourceMatch?._id) ref.matchId = sourceMatch._id;
+
+        return {
+          type: "stageMatchWinner",
+          ref,
+          label: `W-V${localRound - 1}-T${sourceOrder + 1}`,
+        };
+      }
+
+      const seedRows = Array.isArray(current?.prefill?.seeds)
+        ? current.prefill.seeds
+        : Array.isArray(current?.config?.blueprint?.seeds)
+        ? current.config.blueprint.seeds
+        : [];
+      if (!seedRows.length) return null;
+
+      const pairNo = localOrder + 1;
+      const planned =
+        seedRows.find((entry) => Number(entry?.pair) === pairNo) ||
+        seedRows[localOrder] ||
+        null;
+      const plannedSeed = side === "A" ? planned?.A : planned?.B;
+      return plannedSeed?.type ? plannedSeed : null;
+    },
+    [byBracket, current, currentMatches]
+  );
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const enterFullscreen = useCallback(() => setIsFullscreen(true), []);
   const exitFullscreen = useCallback(() => setIsFullscreen(false), []);
@@ -2568,7 +2989,23 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       const eventType = tour?.eventType;
       if (!m) return "Chưa có đội";
 
-      const seed = side === "A" ? m.seedA : m.seedB;
+      const rawSeed = side === "A" ? m.seedA : m.seedB;
+      const pair = side === "A" ? m.pairA : m.pairB;
+      const plannedSeed = getPlannedSeedForMatchSide(m, side);
+      const seedType = String(rawSeed?.type || "");
+      const isEmptyRegistrationSeed =
+        seedType === "registration" &&
+        !rawSeed?.label &&
+        !rawSeed?.ref?.registration &&
+        !rawSeed?.ref?.reg &&
+        !rawSeed?.ref?.id &&
+        !rawSeed?.ref?._id;
+      const seed =
+        rawSeed?.type && !isEmptyRegistrationSeed
+          ? rawSeed
+          : plannedSeed || rawSeed;
+
+      if (hasResolvedPair(pair)) return pairLabelNickOnly(pair, eventType, m);
 
       if (seed?.type === "groupRank") {
         const st = Number(seed.ref?.stage ?? seed.ref?.stageIndex ?? 0) || 0;
@@ -2576,11 +3013,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
         const groupReady = gc && completedGroupAliasSet.has(`${st}|${gc}`);
         if (!groupReady) {
-          return seedLabel(seed);
+          return resolveSeedReferenceLabel(seed, m);
         }
-
-        const pair = side === "A" ? m.pairA : m.pairB;
-        if (pair) return pairLabelNickOnly(pair, eventType, m);
 
         const inferred =
           resolvePairFromGroupRankSeed(seed, brackets, byBracket, eventType) ||
@@ -2590,9 +3024,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         return seedLabel(seed);
       }
 
-      const pair = side === "A" ? m.pairA : m.pairB;
-      if (pair) return pairLabelNickOnly(pair, eventType, m);
-
       const prev = side === "A" ? m.previousA : m.previousB;
       if (prev) {
         const prevId =
@@ -2601,17 +3032,120 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             : String(prev);
         const pm =
           matchIndex.get(prevId) || (typeof prev === "object" ? prev : null);
+
+        if (pm && isByeMatchObj(pm)) {
+          const isLoserSeed =
+            seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
+          if (isLoserSeed) return "—";
+
+          const byeA = isByeSeed(pm?.seedA);
+          const byeB = isByeSeed(pm?.seedB);
+          const winSide = byeA ? "B" : byeB ? "A" : null;
+
+          if (winSide) {
+            const carried = resolveSideLabel(pm, winSide);
+            if (isUsefulSideLabel(carried)) return carried;
+
+            const fromSeed = resolveSeedReferenceLabel(
+              pm[`seed${winSide}`],
+              pm
+            );
+            if (isUsefulSideLabel(fromSeed)) return fromSeed;
+
+            const winPair = pm[`pair${winSide}`];
+            if (hasResolvedPair(winPair)) {
+              return pairLabelNickOnly(winPair, eventType, pm);
+            }
+          }
+
+          const carriedCode = getDisplayCodeForMatch(pm);
+          if (carriedCode) return `W-${carriedCode}`;
+          const refLabel = resolveSeedReferenceLabel(seed, m);
+          if (isUsefulSideLabel(refLabel)) return refLabel;
+        }
+
         if (pm && pm.status === "finished" && pm.winner) {
           const wp = pm.winner === "A" ? pm.pairA : pm.pairB;
-          if (wp) return pairLabelNickOnly(wp, eventType, pm);
+          if (hasResolvedPair(wp)) return pairLabelNickOnly(wp, eventType, pm);
         }
+
+        const carriedCode = getDisplayCodeForMatch(pm);
+        if (carriedCode) return `W-${carriedCode}`;
+
+        const refLabel = resolveSeedReferenceLabel(seed, m);
+        if (isUsefulSideLabel(refLabel)) return refLabel;
+
         return smartDepLabel(m, prev);
       }
 
-      if (seed && seed.type) return seedLabel(seed);
+      if (seed && seed.type) {
+        const sourceRefLabel = normalizeSeedRefLabel(
+          resolveSeedReferenceLabel(seed, m)
+        );
+        const sourceMatch = findSourceMatchFromSeed(m, seed);
+        const isWinnerSeed =
+          seed?.type === "stageMatchWinner" || seed?.type === "matchWinner";
+        const isLoserSeed =
+          seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
+
+        if (sourceMatch && isWinnerSeed && isByeMatchObj(sourceMatch)) {
+          const byeA = isByeSeed(sourceMatch?.seedA);
+          const byeB = isByeSeed(sourceMatch?.seedB);
+          const winSide = byeA ? "B" : byeB ? "A" : null;
+
+          if (winSide) {
+            const carried = resolveSideLabel(sourceMatch, winSide);
+            if (isUsefulSideLabel(carried)) return carried;
+
+            const fromSeed = resolveSeedReferenceLabel(
+              sourceMatch[`seed${winSide}`],
+              sourceMatch
+            );
+            if (isUsefulSideLabel(fromSeed)) return fromSeed;
+
+            const carriedPair = sourceMatch[`pair${winSide}`];
+            if (hasResolvedPair(carriedPair)) {
+              return pairLabelNickOnly(carriedPair, eventType, sourceMatch);
+            }
+          }
+        }
+
+        if (sourceMatch?.status === "finished" && sourceMatch?.winner) {
+          const sourcePair = isLoserSeed
+            ? sourceMatch.winner === "A"
+              ? sourceMatch.pairB
+              : sourceMatch.pairA
+            : sourceMatch.winner === "A"
+            ? sourceMatch.pairA
+            : sourceMatch.pairB;
+
+          if (hasResolvedPair(sourcePair)) {
+            const suffix = isUsefulSideLabel(sourceRefLabel)
+              ? ` (${sourceRefLabel})`
+              : "";
+            return `${pairLabelNickOnly(sourcePair, eventType, sourceMatch)}${suffix}`;
+          }
+        }
+
+        if ((isWinnerSeed || isLoserSeed) && isUsefulSideLabel(sourceRefLabel)) {
+          return sourceRefLabel;
+        }
+
+        return resolveSeedReferenceLabel(seed, m);
+      }
       return "Chưa có đội";
     },
-    [matchIndex, tour?.eventType, completedGroupAliasSet, brackets, byBracket]
+    [
+      matchIndex,
+      tour?.eventType,
+      completedGroupAliasSet,
+      brackets,
+      byBracket,
+      findSourceMatchFromSeed,
+      getDisplayCodeForMatch,
+      getPlannedSeedForMatchSide,
+      resolveSeedReferenceLabel,
+    ]
   );
 
   const prefillRounds = useMemo(() => {
@@ -3694,6 +4228,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   teamText: { fontSize: 13 },
+  teamTextPending: { opacity: 0.58, fontWeight: "500" },
   teamTextWin: { fontWeight: "800" },
   sideTag: { opacity: 0.65, fontWeight: "700" },
   seedMeta: { opacity: 0.7, fontSize: 12, marginTop: 2 },
