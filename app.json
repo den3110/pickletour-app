@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "34",
+      "buildNumber": "35",
       "associatedDomains": [
         "applinks:pickletour.vn",
         "applinks:www.pickletour.vn"

@@ -17,6 +17,7 @@ import {
   Pressable,
   Linking,
   RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import PropTypes from "prop-types";
 import { useRoute, useTheme, useColorScheme } from "@react-navigation/native";
@@ -1439,6 +1440,7 @@ const FilterSheet = React.forwardRef(
     );
   }
 );
+FilterSheet.displayName = "FilterSheet";
 
 /* ===================== Match Modal (themed) ===================== */
 const MatchModal = ({ visible, match, onClose, eventType, t }) => {
@@ -1548,6 +1550,59 @@ const VideoModal = ({ visible, url, onClose, t }) => {
 };
 
 /* ===================== Bracket columns (RN) ===================== */
+const BRACKET_ZOOM_MIN = 0.4;
+const BRACKET_ZOOM_MAX = 1.6;
+const BRACKET_ZOOM_STEP = 0.1;
+
+const clampBracketZoom = (value) =>
+  Math.min(BRACKET_ZOOM_MAX, Math.max(BRACKET_ZOOM_MIN, value));
+
+const getInitialBracketZoom = (width) => {
+  if (!Number.isFinite(width)) return 0.75;
+  if (width < 380) return 0.62;
+  if (width < 480) return 0.68;
+  if (width < 768) return 0.78;
+  return 1;
+};
+
+const ZoomControlsRN = ({ zoom, onZoomOut, onZoomIn, onReset, t }) => (
+  <View
+    style={[
+      styles.bracketZoomBar,
+      { borderColor: t.colors.border, backgroundColor: t.colors.card },
+    ]}
+  >
+    <Pressable
+      accessibilityLabel="Thu nhỏ sơ đồ"
+      disabled={zoom <= BRACKET_ZOOM_MIN}
+      hitSlop={8}
+      onPress={onZoomOut}
+      style={[styles.zoomBtn, zoom <= BRACKET_ZOOM_MIN && styles.zoomBtnOff]}
+    >
+      <Text style={[styles.zoomBtnText, { color: t.colors.text }]}>-</Text>
+    </Pressable>
+    <Pressable
+      accessibilityLabel="Về kích thước mặc định"
+      hitSlop={8}
+      onPress={onReset}
+      style={styles.zoomValueBtn}
+    >
+      <Text style={[styles.zoomValueText, { color: t.colors.text }]}>
+        {Math.round(zoom * 100)}%
+      </Text>
+    </Pressable>
+    <Pressable
+      accessibilityLabel="Phóng to sơ đồ"
+      disabled={zoom >= BRACKET_ZOOM_MAX}
+      hitSlop={8}
+      onPress={onZoomIn}
+      style={[styles.zoomBtn, zoom >= BRACKET_ZOOM_MAX && styles.zoomBtnOff]}
+    >
+      <Text style={[styles.zoomBtnText, { color: t.colors.text }]}>+</Text>
+    </Pressable>
+  </View>
+);
+
 const BracketColumns = ({
   rounds,
   onOpenMatch,
@@ -1557,6 +1612,63 @@ const BracketColumns = ({
   onOpenVideo,
   t,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const initialZoom = useMemo(
+    () => getInitialBracketZoom(windowWidth),
+    [windowWidth]
+  );
+  const [zoom, setZoom] = useState(initialZoom);
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
+  const zoomTouchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!zoomTouchedRef.current) setZoom(initialZoom);
+  }, [initialZoom]);
+
+  const setUserZoom = useCallback((next) => {
+    zoomTouchedRef.current = true;
+    setZoom((prev) =>
+      clampBracketZoom(typeof next === "function" ? next(prev) : next)
+    );
+  }, []);
+
+  const zoomOut = useCallback(
+    () => setUserZoom((z) => Number((z - BRACKET_ZOOM_STEP).toFixed(2))),
+    [setUserZoom]
+  );
+  const zoomIn = useCallback(
+    () => setUserZoom((z) => Number((z + BRACKET_ZOOM_STEP).toFixed(2))),
+    [setUserZoom]
+  );
+  const resetZoom = useCallback(() => {
+    zoomTouchedRef.current = false;
+    setZoom(initialZoom);
+  }, [initialZoom]);
+
+  const onCanvasLayout = useCallback((e) => {
+    const { width, height } = e.nativeEvent.layout;
+    setContentSize((prev) =>
+      Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
+        ? prev
+        : { width, height }
+    );
+  }, []);
+
+  const hasMeasuredCanvas = contentSize.width > 0 && contentSize.height > 0;
+  const scaledFrameStyle = hasMeasuredCanvas
+    ? {
+        width: Math.ceil(contentSize.width * zoom),
+        height: Math.ceil(contentSize.height * zoom),
+      }
+    : null;
+  const scaledCanvasStyle =
+    hasMeasuredCanvas && zoom !== 1
+      ? ({
+          transform: [{ scale: zoom }],
+          transformOrigin: "top left",
+        } as any)
+      : null;
+
   // ===== BYE helpers =====
   const isByeName = (s) => typeof s === "string" && /^BYE$/i.test(s.trim());
   const seedHasBye = (seed) => {
@@ -1773,41 +1885,61 @@ const BracketColumns = ({
   }, [viewRounds, locByMatchId, colRects, wrapRects, absWrap, slotH0, t.dark]);
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      nestedScrollEnabled
-      directionalLockEnabled
-    >
-      <View style={[styles.roundsRow, styles.bracketCanvas]}>
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {connectors}
-        </View>
-
-        {viewRounds.map((r, colIdx) => (
+    <View>
+      <View style={styles.bracketZoomWrap}>
+        <ZoomControlsRN
+          zoom={zoom}
+          onZoomOut={zoomOut}
+          onZoomIn={zoomIn}
+          onReset={resetZoom}
+          t={t}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        nestedScrollEnabled
+        directionalLockEnabled
+        contentContainerStyle={styles.bracketScrollContent}
+      >
+        <View style={[styles.bracketScaleFrame, scaledFrameStyle]}>
           <View
-            key={colIdx}
+            onLayout={onCanvasLayout}
             style={[
-              styles.roundCol,
-              { marginRight: 56, marginTop: colTopOffset[colIdx] || 0 },
+              styles.roundsRow,
+              styles.bracketCanvas,
+              hasMeasuredCanvas && zoom !== 1 && styles.bracketScaledCanvas,
+              scaledCanvasStyle,
             ]}
-            onLayout={(e) => {
-              const { x, y, width: w, height: h } = e.nativeEvent.layout;
-              setColRect(colIdx, { x, y, w, h });
-            }}
           >
-            <View style={styles.roundTitleWrap}>
-              <Text
-                style={[
-                  styles.roundTitle,
-                  { backgroundColor: t.headerBg, color: t.colors.text },
-                ]}
-              >
-                {r.title}
-              </Text>
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              {connectors}
             </View>
 
-            {(r.seeds || []).map((s, i) => {
+            {viewRounds.map((r, colIdx) => (
+              <View
+                key={colIdx}
+                style={[
+                  styles.roundCol,
+                  { marginRight: 56, marginTop: colTopOffset[colIdx] || 0 },
+                ]}
+                onLayout={(e) => {
+                  const { x, y, width: w, height: h } = e.nativeEvent.layout;
+                  setColRect(colIdx, { x, y, w, h });
+                }}
+              >
+                <View style={styles.roundTitleWrap}>
+                  <Text
+                    style={[
+                      styles.roundTitle,
+                      { backgroundColor: t.headerBg, color: t.colors.text },
+                    ]}
+                  >
+                    {r.title}
+                  </Text>
+                </View>
+
+                {(r.seeds || []).map((s, i) => {
               const m = s.__match || null;
               const isChampion =
                 m &&
@@ -2095,11 +2227,13 @@ const BracketColumns = ({
                   </Card>
                 </View>
               );
-            })}
+                })}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -3455,6 +3589,55 @@ const styles = StyleSheet.create({
   rankChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
 
   // bracket
+  bracketZoomWrap: {
+    alignItems: "flex-end",
+    marginBottom: 8,
+  },
+  bracketZoomBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 999,
+    padding: 2,
+  },
+  zoomBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomBtnOff: {
+    opacity: 0.4,
+  },
+  zoomBtnText: {
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  zoomValueBtn: {
+    minWidth: 48,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  zoomValueText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  bracketScrollContent: {
+    paddingBottom: 6,
+  },
+  bracketScaleFrame: {
+    position: "relative",
+    overflow: "visible",
+  },
+  bracketScaledCanvas: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+  },
   roundsRow: { flexDirection: "row", gap: 30 },
   seedBox: {
     borderWidth: 1,

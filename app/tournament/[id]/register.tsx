@@ -158,7 +158,7 @@ const qrImgUrlFor = (tour: any, r: any, mePhone?: string) => {
   if (!bank || !acc) return null;
   const code = regCodeOf(r);
   const des = normalizeNoAccent(
-    `Ma giai ${tour?._id || ""} Ma dang ky ${code}`
+    `Ma giai ${tour?.code || tour?._id || ""} Ma dang ky ${code}`
   );
   const params = new URLSearchParams({ bank, acc, des, template: "compact" });
   try {
@@ -427,6 +427,7 @@ const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
     </View>
   );
 });
+TournamentCountdown.displayName = "TournamentCountdown";
 
 // ... (HtmlPreviewBlock, HtmlCols, StatCard)
 const HTML_PREVIEW_MAX_HEIGHT = 260;
@@ -553,7 +554,6 @@ const HtmlPreviewBlock = memo(
 
         <Modal
           visible={open}
-          visible={open}
           animationType="slide"
           presentationStyle="fullScreen"
           onRequestClose={() => setOpen(false)}
@@ -615,6 +615,7 @@ const HtmlPreviewBlock = memo(
     );
   }
 );
+HtmlPreviewBlock.displayName = "HtmlPreviewBlock";
 
 const HtmlCols = memo(({ tour }: { tour: any }) => {
   const { width } = useWindowDimensions();
@@ -661,6 +662,7 @@ const HtmlCols = memo(({ tour }: { tour: any }) => {
     </View>
   );
 });
+HtmlCols.displayName = "HtmlCols";
 
 const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
   const C = useThemeColors();
@@ -712,6 +714,7 @@ const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
     </View>
   );
 });
+StatCard.displayName = "StatCard";
 
 const RegItem = memo(function RegItem({
   r,

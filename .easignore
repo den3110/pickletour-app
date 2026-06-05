@@ -1,9 +1,21 @@
 .vscode
 node_modules
 .build-tmp
+.expo
+.hot-updater
 .yarn-cache
 .npm-cache
 .gradle-user-home
 ios
-*.iml
+ios 2
+ios copy
+ios copy 2
+ios3
+dist
+dist-android
+dist-ios
+ota-build
+logs
 *.log
+*.profraw
+*.iml
