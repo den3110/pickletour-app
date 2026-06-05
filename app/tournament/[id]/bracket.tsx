@@ -1723,6 +1723,41 @@ const ZoomControlsRN = ({ zoom, onZoomOut, onZoomIn, onReset, t }) => (
   </View>
 );
 
+const getSeedLayoutKey = (seed, fallbackRound, fallbackOrder) => {
+  const match = seed?.__match;
+  const round = Number(match?.round ?? seed?.__round ?? fallbackRound);
+  const order = Number(match?.order ?? fallbackOrder);
+  if (!Number.isFinite(round) || !Number.isFinite(order)) return "";
+  return `${round}:${order}`;
+};
+
+const getSeedSourceRefs = (seed) => {
+  const match = seed?.__match;
+  if (!match) return [];
+  return [match.seedA, match.seedB]
+    .map((source) => {
+      const type = String(source?.type || "");
+      if (
+        type !== "stageMatchLoser" &&
+        type !== "stageMatchWinner" &&
+        type !== "matchLoser" &&
+        type !== "matchWinner"
+      ) {
+        return null;
+      }
+      const round = Number(source?.ref?.round);
+      const order = Number(source?.ref?.order);
+      if (!Number.isFinite(round) || !Number.isFinite(order)) return null;
+      return { round, order };
+    })
+    .filter(Boolean);
+};
+
+const getMatchRefId = (value) =>
+  value && typeof value === "object"
+    ? String(value._id ?? value.id ?? "")
+    : String(value ?? "");
+
 const BracketColumns = ({
   rounds,
   onOpenMatch,
@@ -1873,23 +1908,68 @@ const BracketColumns = ({
   );
   const slotHeight = (col) => slotH0 * Math.pow(2, col);
 
-  const tallest = useMemo(() => {
-    const hs = Object.entries(colRects).map(([c, r]) => {
-      const n = viewRounds[c]?.seeds?.length || 0;
-      return n * slotHeight(Number(c));
-    });
-    return hs.length ? Math.max(...hs) : 0;
-  }, [colRects, viewRounds, slotH0]);
-
-  const colTopOffset = useMemo(() => {
+  const seedLayout = useMemo(() => {
+    const positionsByKey = new Map();
+    const positionsByCell = new Map();
     const out = {};
-    viewRounds.forEach((r, c) => {
-      const n = r.seeds?.length || 0;
-      const h = n * slotHeight(c);
-      out[c] = Math.max(0, (tallest - h) / 2);
+
+    viewRounds.forEach((round, col) => {
+      out[col] = {};
+      const wrapH = slotHeight(col);
+
+      (round?.seeds || []).forEach((seed, index) => {
+        const sourceCenters = [];
+
+        getSeedSourceRefs(seed).forEach((ref) => {
+          const source = positionsByKey.get(`${ref.round}:${ref.order}`);
+          if (Number.isFinite(source?.centerY)) {
+            sourceCenters.push(source.centerY);
+          }
+        });
+
+        const match = seed?.__match;
+        [match?.previousA, match?.previousB].forEach((previous) => {
+          const loc = locByMatchId.get(getMatchRefId(previous));
+          const source = loc
+            ? positionsByCell.get(`${loc.col}:${loc.idx}`)
+            : null;
+          if (Number.isFinite(source?.centerY)) {
+            sourceCenters.push(source.centerY);
+          }
+        });
+
+        const fallbackCenter = index * wrapH + wrapH / 2;
+        let centerY = sourceCenters.length
+          ? sourceCenters.reduce((sum, value) => sum + value, 0) /
+            sourceCenters.length
+          : fallbackCenter;
+        let top = Math.max(0, centerY - wrapH / 2);
+        centerY = top + wrapH / 2;
+
+        const node = { top, centerY, height: wrapH };
+        out[col][index] = node;
+        positionsByCell.set(`${col}:${index}`, node);
+
+        const layoutKey = getSeedLayoutKey(seed, col + 1, index);
+        if (layoutKey) positionsByKey.set(layoutKey, node);
+      });
     });
+
     return out;
-  }, [viewRounds, tallest, slotH0]);
+  }, [viewRounds, locByMatchId, slotH0]);
+
+  const getSeedMarginTop = useCallback(
+    (col, index) => {
+      const current = seedLayout[col]?.[index];
+      if (!current) return 0;
+      if (index === 0) return current.top;
+
+      const previous = seedLayout[col]?.[index - 1];
+      if (!previous) return current.top;
+      return Math.max(0, current.top - (previous.top + previous.height));
+    },
+    [seedLayout]
+  );
 
   const absWrap = useCallback(
     (c, i) => {
@@ -2035,7 +2115,6 @@ const BracketColumns = ({
                   styles.roundCol,
                   {
                     marginRight: ROUND_GAP,
-                    marginTop: colTopOffset[colIdx] || 0,
                   },
                 ]}
                 onLayout={(e) => {
@@ -2086,7 +2165,11 @@ const BracketColumns = ({
                   key={`${colIdx}-${i}`}
                   style={[
                     styles.seedWrap,
-                    { height: wrapH, paddingVertical: INNER_GAP },
+                    {
+                      height: wrapH,
+                      marginTop: getSeedMarginTop(colIdx, i),
+                      paddingVertical: INNER_GAP,
+                    },
                   ]}
                   onLayout={(e) => {
                     const { x, y, width: w, height: h } = e.nativeEvent.layout;
