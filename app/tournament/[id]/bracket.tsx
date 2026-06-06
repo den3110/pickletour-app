@@ -1731,26 +1731,78 @@ const getSeedLayoutKey = (seed, fallbackRound, fallbackOrder) => {
   return `${round}:${order}`;
 };
 
+const normalizeLayoutCode = (value) => extractDisplayCodeText(value);
+
+const getSeedLayoutCodes = (seed, fallbackOrder) => {
+  const match = seed?.__match;
+  if (!match) return [];
+  return [
+    matchApiCode(match, fallbackOrder),
+    match?.displayCode,
+    match?.codeDisplay,
+    match?.codeResolved,
+    match?.globalCodeV,
+    match?.globalCode,
+    match?.code,
+    match?.matchCode,
+    match?.slotCode,
+    match?.bracketCode,
+    match?.labelKey,
+    match?.meta?.code,
+    match?.meta?.label,
+  ]
+    .map(normalizeLayoutCode)
+    .filter(Boolean);
+};
+
+const getSeedSourceCode = (source) =>
+  [source?.label, source?.ref?.label]
+    .map(normalizeLayoutCode)
+    .find(Boolean) || "";
+
 const getSeedSourceRefs = (seed) => {
   const match = seed?.__match;
   if (!match) return [];
-  return [match.seedA, match.seedB]
-    .map((source) => {
-      const type = String(source?.type || "");
-      if (
-        type !== "stageMatchLoser" &&
-        type !== "stageMatchWinner" &&
-        type !== "matchLoser" &&
-        type !== "matchWinner"
-      ) {
-        return null;
-      }
-      const round = Number(source?.ref?.round);
-      const order = Number(source?.ref?.order);
-      if (!Number.isFinite(round) || !Number.isFinite(order)) return null;
-      return { round, order };
-    })
-    .filter(Boolean);
+  const refs = [];
+  const pushRef = (ref) => {
+    if (!ref) return;
+    const key = ref.code || `${ref.round}:${ref.order}`;
+    if (refs.some((item) => (item.code || `${item.round}:${item.order}`) === key)) {
+      return;
+    }
+    refs.push(ref);
+  };
+
+  [match.seedA, match.seedB].forEach((source) => {
+    const type = String(source?.type || "");
+    if (
+      type !== "stageMatchLoser" &&
+      type !== "stageMatchWinner" &&
+      type !== "matchLoser" &&
+      type !== "matchWinner"
+    ) {
+      return;
+    }
+
+    const code = getSeedSourceCode(source);
+    if (code) {
+      pushRef({ code });
+      return;
+    }
+
+    const round = Number(source?.ref?.round);
+    const order = Number(source?.ref?.order);
+    if (Number.isFinite(round) && Number.isFinite(order)) {
+      pushRef({ round, order });
+    }
+  });
+
+  (seed?.teams || []).forEach((team) => {
+    const code = normalizeLayoutCode(team?.name);
+    if (code) pushRef({ code });
+  });
+
+  return refs;
 };
 
 const getMatchRefId = (value) =>
@@ -1908,34 +1960,76 @@ const BracketColumns = ({
   );
   const slotHeight = (col) => slotH0 * Math.pow(2, col);
 
+  const layoutIndex = useMemo(() => {
+    const byKey = new Map();
+    const byCode = new Map();
+
+    viewRounds.forEach((round, col) => {
+      (round?.seeds || []).forEach((seed, index) => {
+        const cell = { col, idx: index };
+        const layoutKey = getSeedLayoutKey(seed, col + 1, index);
+        if (layoutKey) byKey.set(layoutKey, cell);
+
+        getSeedLayoutCodes(seed, index + 1).forEach((code) => {
+          if (!byCode.has(code)) byCode.set(code, []);
+          byCode.get(code).push(cell);
+        });
+      });
+    });
+
+    return { byKey, byCode };
+  }, [viewRounds]);
+
+  const getSourceCellsForSeed = useCallback(
+    (seed, targetCol) => {
+      const cells = [];
+      const seen = new Set();
+      const prevCol = targetCol - 1;
+      const pushCell = (cell) => {
+        if (!cell || cell.col !== prevCol) return;
+        const key = `${cell.col}:${cell.idx}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        cells.push(cell);
+      };
+
+      getSeedSourceRefs(seed).forEach((ref) => {
+        if (ref.code) {
+          (layoutIndex.byCode.get(ref.code) || []).forEach(pushCell);
+        } else if (Number.isFinite(ref.round) && Number.isFinite(ref.order)) {
+          pushCell(layoutIndex.byKey.get(`${ref.round}:${ref.order}`));
+        }
+      });
+
+      const match = seed?.__match;
+      [match?.previousA, match?.previousB].forEach((previous) => {
+        pushCell(locByMatchId.get(getMatchRefId(previous)));
+      });
+
+      return cells;
+    },
+    [layoutIndex, locByMatchId]
+  );
+
   const seedLayout = useMemo(() => {
-    const positionsByKey = new Map();
     const positionsByCell = new Map();
     const out = {};
 
     viewRounds.forEach((round, col) => {
       out[col] = {};
       const wrapH = slotHeight(col);
+      let lastBottom = 0;
 
       (round?.seeds || []).forEach((seed, index) => {
         const sourceCenters = [];
-
-        getSeedSourceRefs(seed).forEach((ref) => {
-          const source = positionsByKey.get(`${ref.round}:${ref.order}`);
+        const pushSourceCenter = (source) => {
           if (Number.isFinite(source?.centerY)) {
             sourceCenters.push(source.centerY);
           }
-        });
+        };
 
-        const match = seed?.__match;
-        [match?.previousA, match?.previousB].forEach((previous) => {
-          const loc = locByMatchId.get(getMatchRefId(previous));
-          const source = loc
-            ? positionsByCell.get(`${loc.col}:${loc.idx}`)
-            : null;
-          if (Number.isFinite(source?.centerY)) {
-            sourceCenters.push(source.centerY);
-          }
+        getSourceCellsForSeed(seed, col).forEach((cell) => {
+          pushSourceCenter(positionsByCell.get(`${cell.col}:${cell.idx}`));
         });
 
         const fallbackCenter = index * wrapH + wrapH / 2;
@@ -1943,20 +2037,18 @@ const BracketColumns = ({
           ? sourceCenters.reduce((sum, value) => sum + value, 0) /
             sourceCenters.length
           : fallbackCenter;
-        let top = Math.max(0, centerY - wrapH / 2);
+        let top = Math.max(0, lastBottom, centerY - wrapH / 2);
         centerY = top + wrapH / 2;
+        lastBottom = top + wrapH;
 
         const node = { top, centerY, height: wrapH };
         out[col][index] = node;
         positionsByCell.set(`${col}:${index}`, node);
-
-        const layoutKey = getSeedLayoutKey(seed, col + 1, index);
-        if (layoutKey) positionsByKey.set(layoutKey, node);
       });
     });
 
     return out;
-  }, [viewRounds, locByMatchId, slotH0]);
+  }, [viewRounds, getSourceCellsForSeed, slotH0]);
 
   const getSeedMarginTop = useCallback(
     (col, index) => {
@@ -2024,10 +2116,6 @@ const BracketColumns = ({
           ]}
         />
       );
-    const idOf = (v) =>
-      v && typeof v === "object"
-        ? String(v._id ?? v.id ?? "")
-        : String(v ?? "");
 
     for (let c = 0; c < viewRounds.length - 1; c++) {
       const nextSeeds = viewRounds[c + 1]?.seeds || [];
@@ -2035,46 +2123,57 @@ const BracketColumns = ({
         const dst = absWrap(c + 1, j);
         if (!dst) continue;
 
-        let srcIdxs = [];
-        const m = nextSeeds[j].__match;
-        if (m) {
-          const la = locByMatchId.get(idOf(m.previousA));
-          const lb = locByMatchId.get(idOf(m.previousB));
-          if (la?.col === c) srcIdxs.push(la.idx);
-          if (lb?.col === c) srcIdxs.push(lb.idx);
+        let srcIdxs = getSourceCellsForSeed(nextSeeds[j], c + 1).map(
+          (cell) => cell.idx
+        );
+        if (!srcIdxs.length) {
+          const a = 2 * j;
+          const b = 2 * j + 1;
+          if (absWrap(c, a)) srcIdxs.push(a);
+          if (absWrap(c, b)) srcIdxs.push(b);
         }
-        const a = 2 * j,
-          b = 2 * j + 1;
-        if (!srcIdxs.includes(a) && absWrap(c, a)) srcIdxs.push(a);
-        if (!srcIdxs.includes(b) && absWrap(c, b)) srcIdxs.push(b);
-        if (srcIdxs.length < 2) continue;
+        srcIdxs = Array.from(new Set(srcIdxs));
 
-        const r1 = absWrap(c, srcIdxs[0]);
-        const r2 = absWrap(c, srcIdxs[1]);
-        if (!r1 || !r2) continue;
-
-        const sTop = r1.y <= r2.y ? r1 : r2;
-        const sBot = r1.y <= r2.y ? r2 : r1;
-
-        const x1 = sTop.x + sTop.w;
-        const y1 = sTop.y + sTop.h / 2;
-        const x2 = sBot.x + sBot.w;
-        const y2 = sBot.y + sBot.h / 2;
+        const sources = srcIdxs
+          .map((idx) => absWrap(c, idx))
+          .filter(Boolean)
+          .sort((a, b) => a.y + a.h / 2 - (b.y + b.h / 2));
+        if (!sources.length) continue;
 
         const xd = dst.x;
-
-        const rightMax = Math.max(x1, x2);
+        const yd = dst.y + dst.h / 2;
+        const rightMax = Math.max(...sources.map((src) => src.x + src.w));
         const busX = Math.min(xd - TO_DST, rightMax + OUT);
-        const midY = (y1 + y2) / 2;
 
-        pushH(x1, y1, busX - x1, `h-a-${c}-${j}`);
-        pushH(x2, y2, busX - x2, `h-b-${c}-${j}`);
-        pushV(busX, Math.min(y1, y2), Math.abs(y2 - y1), `v-${c}-${j}`);
-        pushH(busX, midY, xd - busX, `h-c-${c}-${j}`);
+        if (sources.length === 1) {
+          const src = sources[0];
+          const x = src.x + src.w;
+          const y = src.y + src.h / 2;
+          if (Math.abs(y - yd) < 1) {
+            pushH(x, y, xd - x, `h-single-${c}-${j}`);
+          } else {
+            pushH(x, y, busX - x, `h-single-a-${c}-${j}`);
+            pushV(busX, Math.min(y, yd), Math.abs(yd - y), `v-single-${c}-${j}`);
+            pushH(busX, yd, xd - busX, `h-single-b-${c}-${j}`);
+          }
+          continue;
+        }
+
+        const sourceYs = sources.map((src) => src.y + src.h / 2);
+        const minY = Math.min(...sourceYs, yd);
+        const maxY = Math.max(...sourceYs, yd);
+
+        sources.forEach((src, idx) => {
+          const x = src.x + src.w;
+          const y = src.y + src.h / 2;
+          pushH(x, y, busX - x, `h-src-${c}-${j}-${idx}`);
+        });
+        pushV(busX, minY, maxY - minY, `v-${c}-${j}`);
+        pushH(busX, yd, xd - busX, `h-dst-${c}-${j}`);
       }
     }
     return L;
-  }, [viewRounds, locByMatchId, colRects, wrapRects, absWrap, slotH0, t.dark]);
+  }, [viewRounds, getSourceCellsForSeed, absWrap, t.dark]);
 
   return (
     <View>
