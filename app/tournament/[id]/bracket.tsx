@@ -1970,10 +1970,16 @@ const BracketColumns = ({
         const layoutKey = getSeedLayoutKey(seed, col + 1, index);
         if (layoutKey) byKey.set(layoutKey, cell);
 
-        getSeedLayoutCodes(seed, index + 1).forEach((code) => {
+        const pushCode = (code) => {
+          if (!code) return;
           if (!byCode.has(code)) byCode.set(code, []);
           byCode.get(code).push(cell);
-        });
+        };
+
+        getSeedLayoutCodes(seed, index + 1).forEach(pushCode);
+        if (seedHasBye(seed)) {
+          pushCode(normalizeLayoutCode(nonByeName(seed)));
+        }
       });
     });
 
