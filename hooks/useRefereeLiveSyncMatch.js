@@ -44,18 +44,6 @@ function buildRequestError(payload, fallback = "Request failed") {
   return error;
 }
 
-function buildAuthRequiredError() {
-  const error = buildRequestError(
-    {
-      code: "auth_required",
-      message: "Bạn cần đăng nhập để chấm trận.",
-    },
-    "Bạn cần đăng nhập để chấm trận."
-  );
-  error.code = "auth_required";
-  return error;
-}
-
 function normalizeTimestamp(value) {
   const raw = trim(value);
   if (!raw) return null;
@@ -115,28 +103,6 @@ export function useRefereeLiveSyncMatch(
   const deviceRef = useRef({ deviceId: "", deviceName: "" });
   const { userInfo } = useSelector((state) => state.auth || {});
   const token = tokenFromArg || userInfo?.token || "";
-  const matchKind = trim(options?.matchKind);
-  const matchKindHeaders = useMemo(
-    () =>
-      matchKind
-        ? {
-            "x-pt-match-kind": matchKind,
-            "x-pkt-match-kind": matchKind,
-          }
-        : {},
-    [matchKind]
-  );
-  const appendMatchKindPayload = useCallback(
-    (payload = {}) =>
-      matchKind
-        ? {
-            ...(payload || {}),
-            matchKind,
-            userMatch: matchKind === "user",
-          }
-        : payload,
-    [matchKind]
-  );
 
   const [state, setState] = useState(() => ({
     loading: enabled && Boolean(matchId),
@@ -389,7 +355,7 @@ export function useRefereeLiveSyncMatch(
         try {
           return await socketRequest(
             socketEvent,
-            appendMatchKindPayload(socketBody ?? body ?? {}),
+            socketBody ?? body ?? {},
             { timeoutMs }
           );
         } catch (error) {
@@ -402,23 +368,9 @@ export function useRefereeLiveSyncMatch(
         }
       }
 
-      return httpRequest(path, {
-        method,
-        body: body ? appendMatchKindPayload(body) : body,
-        headers: {
-          ...matchKindHeaders,
-          ...(headers || {}),
-        },
-        timeoutMs,
-      });
+      return httpRequest(path, { method, body, headers, timeoutMs });
     },
-    [
-      socket,
-      socketRequest,
-      httpRequest,
-      appendMatchKindPayload,
-      matchKindHeaders,
-    ]
+    [socket, socketRequest, httpRequest]
   );
 
   const applyRemoteSnapshot = useCallback(
@@ -886,25 +838,6 @@ export function useRefereeLiveSyncMatch(
     return persistRef.current.owner;
   }, [enabled, matchId, token, bootstrap, claim, readCurrentRuntime, syncNow]);
 
-  useEffect(() => {
-    if (!enabled || !matchId) return;
-    if (token) {
-      setDerivedState((prev) =>
-        prev.error?.data?.code === "auth_required"
-          ? { ...prev, loading: true, error: null }
-          : prev
-      );
-      return;
-    }
-
-    const error = buildAuthRequiredError();
-    setDerivedState((prev) => ({
-      ...prev,
-      loading: false,
-      error,
-    }));
-  }, [enabled, matchId, token, setDerivedState]);
-
   const takeover = useCallback(async () => {
     if (!enabled || !matchId || !token) return null;
     setDerivedState((prev) => ({ ...prev, claiming: true }));
@@ -1054,12 +987,10 @@ export function useRefereeLiveSyncMatch(
       dataRef.current = stored.snapshot
         ? rebuildLiveSyncSnapshot(stored.snapshot, stored.queue)
         : null;
-      const hasToken = Boolean(token);
       setState((prev) => ({
         ...prev,
-        loading: hasToken && !dataRef.current,
+        loading: true,
         data: dataRef.current,
-        error: hasToken ? prev.error : buildAuthRequiredError(),
         featureEnabled: storedRuntime.featureEnabled,
         mode: storedRuntime.mode,
         settingsUpdatedAt: storedRuntime.settingsUpdatedAt,
@@ -1071,22 +1002,13 @@ export function useRefereeLiveSyncMatch(
             : []
           : [],
       }));
-      if (hasToken) {
-        await refreshOwnership();
-      }
+      await refreshOwnership();
     })();
 
     return () => {
       mountedRef.current = false;
     };
-  }, [
-    enabled,
-    matchId,
-    ownerForRuntime,
-    refreshOwnership,
-    resolveRuntimeFromPayload,
-    token,
-  ]);
+  }, [enabled, matchId, ownerForRuntime, refreshOwnership, resolveRuntimeFromPayload]);
 
   useEffect(() => {
     if (!enabled || !matchId) return;

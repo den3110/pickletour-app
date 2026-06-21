@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 // 1. Import Theme Hook
 import { useTheme } from '@react-navigation/native';
-import LiquidGlassSurface from '@/components/ui/LiquidGlassSurface';
 
 interface TextInputProps extends RNTextInputProps {
   label?: string;
@@ -49,12 +48,7 @@ export default function TextInput({
         </Text>
       )}
       
-      <LiquidGlassSurface
-        effect="regular"
-        fallback="view"
-        isDark={dark}
-        tintAlpha={0.76}
-        tone={error ? "danger" : "field"}
+      <View
         style={[
           styles.inputContainer,
           { 
@@ -73,7 +67,7 @@ export default function TextInput({
         />
         
         {rightIcon && <View style={styles.icon}>{rightIcon}</View>}
-      </LiquidGlassSurface>
+      </View>
       
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>

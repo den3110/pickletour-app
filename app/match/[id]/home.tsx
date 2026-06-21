@@ -24,7 +24,6 @@ import {
   getPlayerDisplayName,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 /* ---------- theme tokens ---------- */
 function useThemeTokens() {
@@ -181,15 +180,9 @@ export default function MatchHomePage() {
                 }
               }}
               hitSlop={12}
+              style={{ paddingHorizontal: 6, paddingVertical: 4 }}
             >
-              <LiquidGlassSurface
-                active
-                effect="clear"
-                isDark={T.scheme === "dark"}
-                style={styles.headerIconBtn}
-              >
-                <Ionicons name="chevron-back" size={22} color={T.text} />
-              </LiquidGlassSurface>
+              <Ionicons name="chevron-back" size={22} color={T.text} />
             </Pressable>
           ),
           headerRight: () => (
@@ -197,15 +190,9 @@ export default function MatchHomePage() {
               <Pressable
                 onPress={onRefresh}
                 hitSlop={12}
+                style={{ paddingHorizontal: 6, paddingVertical: 4 }}
               >
-                <LiquidGlassSurface
-                  active
-                  effect="clear"
-                  isDark={T.scheme === "dark"}
-                  style={styles.headerIconBtn}
-                >
-                  <MaterialIcons name="refresh" size={22} color={T.text} />
-                </LiquidGlassSurface>
+                <MaterialIcons name="refresh" size={22} color={T.text} />
               </Pressable>
             </View>
           ),
@@ -265,18 +252,13 @@ export default function MatchHomePage() {
           </Text>
           <Pressable
             onPress={onRefresh}
+            style={[
+              styles.retry,
+              { borderColor: T.border, backgroundColor: T.cardBg },
+            ]}
           >
-            <LiquidGlassSurface
-              active
-              isDark={T.scheme === "dark"}
-              style={[
-                styles.retry,
-                { borderColor: T.border, backgroundColor: T.cardBg },
-              ]}
-            >
-              <MaterialIcons name="refresh" size={18} color={T.text} />
-              <Text style={[styles.retryText, { color: T.text }]}>Thử lại</Text>
-            </LiquidGlassSurface>
+            <MaterialIcons name="refresh" size={18} color={T.text} />
+            <Text style={[styles.retryText, { color: T.text }]}>Thử lại</Text>
           </Pressable>
         </ScrollView>
       ) : (
@@ -311,11 +293,4 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   retryText: { fontWeight: "600" },
-  headerIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

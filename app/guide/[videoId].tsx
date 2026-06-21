@@ -12,7 +12,6 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { Ionicons } from "@expo/vector-icons";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 function formatCount(n) {
   const num = Number(n);
@@ -46,7 +45,6 @@ export default function GuideVideoScreen() {
   const publishedStr = Array.isArray(published) ? published[0] : published;
 
   const theme = useTheme();
-  const isDark = !!theme?.dark;
   const primary = theme?.colors?.primary ?? "#FF6B6B";
   const textColor = theme?.colors?.text ?? "#ffffff";
   const bg = theme?.colors?.background ?? "#000";
@@ -153,17 +151,7 @@ export default function GuideVideoScreen() {
 
         {/* Chỉ hiện info khi màn dọc cho đỡ chật */}
         {!isLandscape && (
-          <LiquidGlassSurface
-            isDark={isDark}
-            style={[
-              styles.info,
-              {
-                backgroundColor: isDark
-                  ? "rgba(17,24,39,0.62)"
-                  : "rgba(255,255,255,0.78)",
-              },
-            ]}
-          >
+          <View style={styles.info}>
             <Text
               style={[styles.title, { color: textColor }]}
               numberOfLines={3}
@@ -173,11 +161,7 @@ export default function GuideVideoScreen() {
 
             <View style={styles.metaRow}>
               {viewsLabel ? (
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.metaChip}
-                >
+                <View style={styles.metaChip}>
                   <Ionicons
                     name="eye-outline"
                     size={14}
@@ -185,15 +169,11 @@ export default function GuideVideoScreen() {
                     style={{ marginRight: 4 }}
                   />
                   <Text style={styles.metaText}>{viewsLabel} lượt xem</Text>
-                </LiquidGlassSurface>
+                </View>
               ) : null}
 
               {likesLabel ? (
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.metaChip}
-                >
+                <View style={styles.metaChip}>
                   <Ionicons
                     name="thumbs-up-outline"
                     size={14}
@@ -201,15 +181,11 @@ export default function GuideVideoScreen() {
                     style={{ marginRight: 4 }}
                   />
                   <Text style={styles.metaText}>{likesLabel} lượt thích</Text>
-                </LiquidGlassSurface>
+                </View>
               ) : null}
 
               {dateLabel ? (
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.metaChip}
-                >
+                <View style={styles.metaChip}>
                   <Ionicons
                     name="time-outline"
                     size={14}
@@ -217,10 +193,10 @@ export default function GuideVideoScreen() {
                     style={{ marginRight: 4 }}
                   />
                   <Text style={styles.metaText}>{dateLabel}</Text>
-                </LiquidGlassSurface>
+                </View>
               ) : null}
             </View>
-          </LiquidGlassSurface>
+          </View>
         )}
       </View>
     </>
@@ -249,11 +225,8 @@ const styles = StyleSheet.create({
   },
 
   info: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 12,
   },
 
   title: {
