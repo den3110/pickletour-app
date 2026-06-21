@@ -31,6 +31,7 @@ import { useSelector } from "react-redux";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import {
   useGetTournamentQuery,
+  useListTournamentBracketsQuery,
   useListPublicMatchesByTournamentQuery,
   useVerifyRefereeQuery,
 } from "@/slices/tournamentsApiSlice";
@@ -126,11 +127,125 @@ function pairToName(pair, source) {
 function seedToName(seed) {
   return seed?.label || null;
 }
-function teamNameFrom(m, side) {
+
+const isByeSeed = (seed) =>
+  seed?.type === "bye" ||
+  String(seed?.label || "").trim().toUpperCase() === "BYE";
+
+const isUsefulTeamName = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return ![
+    "bye",
+    "tbd",
+    "registration",
+    "chua co doi",
+    "-",
+    "--",
+    "—",
+  ].includes(normalized);
+};
+
+const matchCodeOf = (m) => {
+  const direct =
+    m?.displayCode || m?.code || m?.matchCode || m?.slotCode || m?.globalCode;
+  if (direct) return String(direct).trim();
+  const round = Number(m?.round ?? m?.roundNo ?? m?.roundIndex);
+  const order = Number(m?.order ?? m?.orderNo ?? m?.slot ?? m?.index);
+  if (Number.isFinite(round) && Number.isFinite(order)) {
+    return `V${round}-T${order + 1}`;
+  }
+  return "";
+};
+
+const refMatchId = (ref) =>
+  String(
+    ref?._id ??
+      ref?.id ??
+      ref?.matchId ??
+      ref?.match ??
+      ref?.ref?.matchId ??
+      ref?.ref?.match ??
+      ""
+  ).trim();
+
+const seedSourceMatch = (seed, matchIndex) => {
+  if (!seed || !matchIndex) return null;
+  const id = refMatchId(seed);
+  if (id && matchIndex.get(id)) return matchIndex.get(id);
+  const labelCode = String(seed?.label || "").match(
+    /\b(?:V\d+(?:-B[^-\s]+)?(?:-NT)?-T\d+|WB\d+-T\d+|LB\d+-T\d+|GF(?:\d+)?-T\d+)\b/i
+  )?.[0];
+  if (!labelCode) return null;
+  const normalized = labelCode.toUpperCase();
+  for (const source of matchIndex.values()) {
+    if (matchCodeOf(source).toUpperCase() === normalized) return source;
+  }
+  return null;
+};
+
+function teamNameFrom(m, side, matchIndex = null, depth = 0) {
   if (!m) return "TBD";
+  if (depth > 10) return "TBD";
   const pair = side === "A" ? m.pairA : m.pairB;
   const seed = side === "A" ? m.seedA : m.seedB;
-  return pairToName(pair, m) || seedToName(seed) || "TBD";
+  const resolved =
+    side === "A"
+      ? m.__sideA || m.resolvedSideNameA || m.teamAName || m.sideAName
+      : m.__sideB || m.resolvedSideNameB || m.teamBName || m.sideBName;
+  const pairName = pairToName(pair, m);
+  if (isUsefulTeamName(pairName)) return pairName;
+  if (isUsefulTeamName(resolved)) return String(resolved).trim();
+  if (isByeSeed(seed)) return "BYE";
+
+  const seedType = String(seed?.type || "");
+  const isLoserSeed =
+    seedType === "stageMatchLoser" || seedType === "matchLoser";
+  const isWinnerSeed =
+    seedType === "stageMatchWinner" || seedType === "matchWinner";
+  const prev = side === "A" ? m.previousA : m.previousB;
+  const sourceId = refMatchId(prev);
+  const sourceMatch =
+    (sourceId && matchIndex?.get(sourceId)) ||
+    (prev && typeof prev === "object" ? prev : null) ||
+    ((isWinnerSeed || isLoserSeed) ? seedSourceMatch(seed, matchIndex) : null);
+
+  if (sourceMatch) {
+    const sourceByeA = isByeSeed(sourceMatch.seedA);
+    const sourceByeB = isByeSeed(sourceMatch.seedB);
+
+    if (sourceByeA || sourceByeB) {
+      if (isLoserSeed || (sourceByeA && sourceByeB)) return "BYE";
+      const carriedSide = sourceByeA ? "B" : "A";
+      const carried = teamNameFrom(
+        sourceMatch,
+        carriedSide,
+        matchIndex,
+        depth + 1
+      );
+      if (isUsefulTeamName(carried)) return carried;
+    }
+
+    if (String(sourceMatch.status || "").toLowerCase() === "finished") {
+      const winnerSide = sourceMatch.winner === "A" ? "A" : "B";
+      const sourceSide = isLoserSeed
+        ? winnerSide === "A"
+          ? "B"
+          : "A"
+        : winnerSide;
+      const carried = teamNameFrom(sourceMatch, sourceSide, matchIndex, depth + 1);
+      if (isUsefulTeamName(carried)) return carried;
+    }
+
+    const code = matchCodeOf(sourceMatch);
+    if (code) return `${isLoserSeed ? "L" : "W"}-${code}`;
+  }
+
+  return seedToName(seed) || "TBD";
 }
 function scoreText(m) {
   if (typeof m?.scoreText === "string" && m.scoreText.trim())
@@ -152,6 +267,94 @@ function courtNameOf(m) {
 }
 const hasAssignedCourt = (m) =>
   String(courtNameOf(m)).toLowerCase().includes("chưa phân sân") === false;
+
+const STATUS_TABS = [
+  { key: "all", label: "Tất cả", icon: null },
+  { key: "live", label: "Đang diễn ra", icon: "fire" },
+  { key: "upcoming", label: "Sắp tới", icon: null },
+  { key: "finished", label: "Đã kết thúc", icon: null },
+];
+const STATUS_KEYS = new Set(STATUS_TABS.map((tab) => tab.key));
+
+const normalizeParam = (value) => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw == null ? "" : String(raw).trim();
+};
+
+const getBracketId = (value) =>
+  String(
+    value?.bracket?._id ??
+      value?.bracket ??
+      value?.bracketId ??
+      value?._id ??
+      value?.id ??
+      ""
+  ).trim();
+
+const getBracketName = (value, fallback = "Bracket") => {
+  const name =
+    value?.bracket?.name ??
+    value?.name ??
+    value?.title ??
+    value?.label ??
+    value?.type;
+  return String(name || fallback).trim();
+};
+
+const isEliminationBracketType = (bracket) => {
+  const type = String(bracket?.type || bracket?.format || "").toLowerCase();
+  return (
+    type.includes("knockout") ||
+    type.includes("playoff") ||
+    type.includes("elim") ||
+    type === "ko"
+  );
+};
+
+const readBracketScale = (bracket) => {
+  const candidates = [
+    bracket?.drawSize,
+    bracket?.size,
+    bracket?.scale,
+    bracket?.noTeams,
+    bracket?.teamCount,
+    bracket?.participantCount,
+    bracket?.prefill?.seeds?.length,
+    bracket?.prefill?.pairs?.length ? bracket.prefill.pairs.length * 2 : null,
+  ];
+  for (const candidate of candidates) {
+    const n = Number(candidate);
+    if (Number.isFinite(n) && n > 1) return n;
+  }
+  return 0;
+};
+
+const roundsCountForBracket = (bracket, matchesOfBracket = []) => {
+  const rounds = matchesOfBracket
+    .map((m) => Number(m?.round ?? m?.roundNo ?? m?.roundIndex ?? 1))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (rounds.length)
+    return Math.max(1, Math.max(...rounds) - Math.min(...rounds) + 1);
+  const scale = readBracketScale(bracket);
+  return scale ? Math.max(1, Math.ceil(Math.log2(scale))) : 1;
+};
+
+const scheduleRoundLabel = (match, matchesOfBracket = []) => {
+  const round = Number(match?.round ?? match?.roundNo ?? match?.roundIndex ?? 1) || 1;
+  const bracket =
+    match?.bracket && typeof match.bracket === "object" ? match.bracket : null;
+  if (!isEliminationBracketType(bracket)) return `Vòng ${round}`;
+
+  const totalRounds = roundsCountForBracket(bracket, matchesOfBracket);
+  const remainingRounds = Math.max(1, totalRounds - round + 1);
+  const drawSize = 2 ** remainingRounds;
+
+  if (drawSize === 2) return "Chung kết";
+  if (drawSize === 4) return "Bán kết";
+  if (drawSize === 8) return "Tứ kết";
+  if (drawSize >= 16) return `Vòng 1/${drawSize}`;
+  return `Vòng ${round}`;
+};
 
 /* ----------------------------------------------------- */
 /* ------------------- THEME VÀ UTILITY REDESIGN ------------------- */
@@ -309,7 +512,7 @@ function StatusChip({ m, theme }) {
 }
 
 /* Match Card (Redesign Triệt để) */
-function MatchCard({ m, onOpenMatch, theme }) {
+function MatchCard({ m, onOpenMatch, theme, resolveTeamName = teamNameFrom }) {
   const isLiveMatch = isLive(m);
   const isFinishMatch = isFinished(m);
   const statusColor = isLiveMatch
@@ -318,8 +521,8 @@ function MatchCard({ m, onOpenMatch, theme }) {
     ? theme.finished
     : theme.upcoming;
   const winnerSide = m?.winner === "A" ? "A" : m?.winner === "B" ? "B" : null;
-  const teamA = teamNameFrom(m, "A");
-  const teamB = teamNameFrom(m, "B");
+  const teamA = resolveTeamName(m, "A");
+  const teamB = resolveTeamName(m, "B");
   const score = scoreText(m);
 
   const [isPressing, setIsPressing] = useState(false);
@@ -477,10 +680,10 @@ function MatchCard({ m, onOpenMatch, theme }) {
 
 /* Row cho Court Status (Compact & Orderly) */
 // 1. Live Banner Row (Nhấn mạnh score và đội)
-function MatchBannerRow({ m, onOpenMatch, theme }) {
+function MatchBannerRow({ m, onOpenMatch, theme, resolveTeamName = teamNameFrom }) {
   const score = scoreText(m);
-  const teamA = teamNameFrom(m, "A");
-  const teamB = teamNameFrom(m, "B");
+  const teamA = resolveTeamName(m, "A");
+  const teamB = resolveTeamName(m, "B");
 
   return (
     <Pressable
@@ -519,9 +722,15 @@ function MatchBannerRow({ m, onOpenMatch, theme }) {
 }
 
 // 2. Queue Row (Tối giản)
-function MatchQueueRow({ m, onOpenMatch, theme, order }) {
-  const teamA = teamNameFrom(m, "A");
-  const teamB = teamNameFrom(m, "B");
+function MatchQueueRow({
+  m,
+  onOpenMatch,
+  theme,
+  order,
+  resolveTeamName = teamNameFrom,
+}) {
+  const teamA = resolveTeamName(m, "A");
+  const teamB = resolveTeamName(m, "B");
 
   return (
     <Pressable
@@ -559,7 +768,13 @@ function MatchQueueRow({ m, onOpenMatch, theme, order }) {
 }
 
 /* Court Card (Redesign - Live Banner & Compact Queue) */
-function CourtStatusCard({ court, queueLimit = 4, onOpenMatch, theme }) {
+function CourtStatusCard({
+  court,
+  queueLimit = 4,
+  onOpenMatch,
+  theme,
+  resolveTeamName = teamNameFrom,
+}) {
   const hasLive = court.live.length > 0;
   const hasQueue = court.queue.length > 0;
   const isUnassigned = court.name.toLowerCase().includes("chưa phân sân");
@@ -626,6 +841,7 @@ function CourtStatusCard({ court, queueLimit = 4, onOpenMatch, theme }) {
                 onOpenMatch={onOpenMatch}
                 theme={theme}
                 isLive={true}
+                resolveTeamName={resolveTeamName}
               />
             </View>
           ))}
@@ -655,6 +871,7 @@ function CourtStatusCard({ court, queueLimit = 4, onOpenMatch, theme }) {
               onOpenMatch={onOpenMatch}
               theme={theme}
               order={index + 1}
+              resolveTeamName={resolveTeamName}
             />
           ))}
           {court.queue.length > queueLimit && (
@@ -931,11 +1148,22 @@ function PageSkeleton({ theme }) {
 /* ----------------------------------------------------- */
 
 export default function TournamentScheduleNative() {
-  const { id } = useLocalSearchParams();
+  const routeParams = useLocalSearchParams();
+  const id = normalizeParam(routeParams.id);
   const router = useRouter();
   const me = useSelector((s) => s.auth?.userInfo || null);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("all"); // all | live | upcoming | finished
+  const routeTab = normalizeParam(routeParams.tab || routeParams.status);
+  const routeBracket = normalizeParam(routeParams.bracket);
+  const routeRound = normalizeParam(routeParams.round);
+  const [status, setStatus] = useState(
+    STATUS_KEYS.has(routeTab) ? routeTab : "all"
+  ); // all | live | upcoming | finished
+  const [selectedBracket, setSelectedBracket] = useState(routeBracket || "all");
+  const [selectedRound, setSelectedRound] = useState(routeRound || "all");
+  const lastRouteTabRef = useRef(routeTab);
+  const lastRouteBracketRef = useRef(routeBracket);
+  const lastRouteRoundRef = useRef(routeRound);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState(null);
 
@@ -959,8 +1187,12 @@ export default function TournamentScheduleNative() {
   } = useListPublicMatchesByTournamentQuery({
     tid: id,
   });
-  const brackets = useMemo(() => [], []);
-  const loading = tLoading || mLoading;
+  const {
+    data: brackets = [],
+    isLoading: bLoading,
+    refetch: refetchBrackets,
+  } = useListTournamentBracketsQuery(id, { skip: !id });
+  const loading = tLoading || mLoading || bLoading;
   const errorMsg =
     (tError && (tError.data?.message || tError.error)) ||
     (mError && (mError.data?.message || mError.error));
@@ -1067,6 +1299,7 @@ export default function TournamentScheduleNative() {
     onResync: () => {
       refetchTournament?.();
       refetchMatches?.();
+      refetchBrackets?.();
     },
   });
 
@@ -1078,6 +1311,7 @@ export default function TournamentScheduleNative() {
       if (tournamentId && tournamentId !== String(id || "").trim()) return;
       refetchTournament?.();
       refetchMatches?.();
+      refetchBrackets?.();
     };
     const onRemove = (payload) => {
       const id = String(payload?.id ?? payload?._id ?? "");
@@ -1100,7 +1334,7 @@ export default function TournamentScheduleNative() {
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, id, refetchMatches, refetchTournament]);
+  }, [socket, queueUpsert, id, refetchBrackets, refetchMatches, refetchTournament]);
 
   const bracketsKey = useMemo(
     () =>
@@ -1132,6 +1366,32 @@ export default function TournamentScheduleNative() {
       ),
     [id, liveBump]
   );
+  const bracketById = useMemo(() => {
+    const map = new Map();
+    (brackets || []).forEach((bracket) => {
+      const bracketId = getBracketId(bracket);
+      if (bracketId) map.set(bracketId, bracket);
+    });
+    return map;
+  }, [brackets]);
+  const enrichedMatches = useMemo(
+    () =>
+      matches.map((m) => {
+        const bracketId = getBracketId(m);
+        const bracketDetail = bracketById.get(bracketId);
+        if (!bracketDetail) return m;
+        const currentBracket =
+          m?.bracket && typeof m.bracket === "object" ? m.bracket : {};
+        return {
+          ...m,
+          bracket: {
+            ...bracketDetail,
+            ...currentBracket,
+          },
+        };
+      }),
+    [bracketById, matches]
+  );
   const admin = useMemo(() => isAdminUser(me), [me]);
   const manager = useMemo(
     () => isManagerOfTournament(tournament, me) || admin,
@@ -1146,18 +1406,175 @@ export default function TournamentScheduleNative() {
   });
   const referee = !!(inferredReferee || refereeCheck?.isReferee);
   const allSorted = useMemo(() => {
-    return [...matches].sort((a, b) => {
+    return [...enrichedMatches].sort((a, b) => {
       const ak = orderKey(a);
       const bk = orderKey(b);
       for (let i = 0; i < ak.length; i++)
         if (ak[i] !== bk[i]) return ak[i] - bk[i];
       return 0;
     });
-  }, [matches]);
+  }, [enrichedMatches]);
+  const matchIndex = useMemo(() => {
+    const map = new Map();
+    allSorted.forEach((match) => {
+      if (match?._id) map.set(String(match._id), match);
+    });
+    return map;
+  }, [allSorted]);
+  const resolveTeamName = useCallback(
+    (match, side) => teamNameFrom(match, side, matchIndex),
+    [matchIndex]
+  );
+
+  const hasRouteStatus = STATUS_KEYS.has(routeTab);
+  useEffect(() => {
+    if (routeTab === lastRouteTabRef.current) return;
+    lastRouteTabRef.current = routeTab;
+    if (STATUS_KEYS.has(routeTab)) setStatus(routeTab);
+  }, [routeTab]);
+  useEffect(() => {
+    if (routeBracket === lastRouteBracketRef.current) return;
+    lastRouteBracketRef.current = routeBracket;
+    setSelectedBracket(routeBracket || "all");
+  }, [routeBracket]);
+  useEffect(() => {
+    if (routeRound === lastRouteRoundRef.current) return;
+    lastRouteRoundRef.current = routeRound;
+    setSelectedRound(routeRound || "all");
+  }, [routeRound]);
+
+  const syncRouteParams = useCallback(
+    (next = {}) => {
+      router.setParams({
+        tab: next.status ?? status,
+        bracket: next.bracket ?? selectedBracket,
+        round: next.round ?? selectedRound,
+      });
+    },
+    [router, selectedBracket, selectedRound, status]
+  );
+
+  const selectStatus = useCallback(
+    (nextStatus) => {
+      setStatus(nextStatus);
+      syncRouteParams({ status: nextStatus });
+    },
+    [syncRouteParams]
+  );
+
+  const matchesByBracket = useMemo(() => {
+    const map = new Map();
+    allSorted.forEach((m) => {
+      const bracketId = getBracketId(m) || "unknown";
+      if (!map.has(bracketId)) map.set(bracketId, []);
+      map.get(bracketId).push(m);
+    });
+    return map;
+  }, [allSorted]);
+
+  const bracketOptions = useMemo(() => {
+    const map = new Map();
+    (brackets || []).forEach((bracket, index) => {
+      const bracketId = getBracketId(bracket);
+      if (!bracketId) return;
+      map.set(bracketId, {
+        key: bracketId,
+        label: getBracketName(bracket, `Bracket ${index + 1}`),
+        order: Number(bracket?.order ?? index),
+      });
+    });
+    allSorted.forEach((m, index) => {
+      const bracketId = getBracketId(m);
+      if (!bracketId || map.has(bracketId)) return;
+      map.set(bracketId, {
+        key: bracketId,
+        label: getBracketName(m, `Bracket ${index + 1}`),
+        order: Number(m?.bracket?.order ?? index),
+      });
+    });
+    const options = Array.from(map.values()).sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.label.localeCompare(b.label);
+    });
+    return [{ key: "all", label: "Tất cả bracket" }, ...options];
+  }, [allSorted, brackets]);
+
+  const matchesAfterBracket = useMemo(() => {
+    if (selectedBracket === "all") return allSorted;
+    return allSorted.filter((m) => getBracketId(m) === selectedBracket);
+  }, [allSorted, selectedBracket]);
+
+  const roundOptions = useMemo(() => {
+    const map = new Map();
+    matchesAfterBracket.forEach((m) => {
+      const round = Number(m?.round ?? m?.roundNo ?? m?.roundIndex ?? 1) || 1;
+      const bracketId = getBracketId(m) || "unknown";
+      const matchesOfBracket = matchesByBracket.get(bracketId) || [];
+      if (!map.has(String(round))) {
+        map.set(String(round), {
+          key: String(round),
+          label: scheduleRoundLabel(m, matchesOfBracket),
+          order: round,
+        });
+      }
+    });
+    const options = Array.from(map.values()).sort((a, b) => a.order - b.order);
+    return [{ key: "all", label: "Tất cả vòng" }, ...options];
+  }, [matchesAfterBracket, matchesByBracket]);
+
+  useEffect(() => {
+    if (loading || selectedBracket === "all") return;
+    if (!bracketOptions.some((option) => option.key === selectedBracket)) {
+      setSelectedBracket("all");
+      setSelectedRound("all");
+      syncRouteParams({ bracket: "all", round: "all" });
+    }
+  }, [bracketOptions, loading, selectedBracket, syncRouteParams]);
+
+  useEffect(() => {
+    if (loading || selectedRound === "all") return;
+    if (!roundOptions.some((option) => option.key === selectedRound)) {
+      setSelectedRound("all");
+      syncRouteParams({ round: "all" });
+    }
+  }, [loading, roundOptions, selectedRound, syncRouteParams]);
+
+  const hasLiveMatches = useMemo(() => allSorted.some(isLive), [allSorted]);
+  useEffect(() => {
+    if (hasRouteStatus || loading || allSorted.length === 0) return;
+    const nextStatus = hasLiveMatches ? "live" : "all";
+    setStatus((prev) => (prev === nextStatus ? prev : nextStatus));
+    if (nextStatus === "live") syncRouteParams({ status: nextStatus });
+  }, [allSorted.length, hasLiveMatches, hasRouteStatus, loading, syncRouteParams]);
+
+  const selectBracket = useCallback(
+    (nextBracket) => {
+      setSelectedBracket(nextBracket);
+      setSelectedRound("all");
+      syncRouteParams({ bracket: nextBracket, round: "all" });
+    },
+    [syncRouteParams]
+  );
+
+  const selectRound = useCallback(
+    (nextRound) => {
+      setSelectedRound(nextRound);
+      syncRouteParams({ round: nextRound });
+    },
+    [syncRouteParams]
+  );
 
   const filteredAll = useMemo(() => {
     const qnorm = q.trim().toLowerCase();
     let res = allSorted.filter((m) => {
+      if (selectedBracket !== "all" && getBracketId(m) !== selectedBracket)
+        return false;
+      if (
+        selectedRound !== "all" &&
+        String(Number(m?.round ?? m?.roundNo ?? m?.roundIndex ?? 1) || 1) !==
+          selectedRound
+      )
+        return false;
       if (status === "live" && !isLive(m)) return false;
       if (
         status === "upcoming" &&
@@ -1168,8 +1585,8 @@ export default function TournamentScheduleNative() {
       if (!qnorm) return true;
       const hay = [
         m.code,
-        teamNameFrom(m, "A"),
-        teamNameFrom(m, "B"),
+        resolveTeamName(m, "A"),
+        resolveTeamName(m, "B"),
         m.bracket?.name,
         courtNameOf(m),
       ]
@@ -1186,7 +1603,7 @@ export default function TournamentScheduleNative() {
       res = [...notFinished, ...finished];
     }
     return res;
-  }, [allSorted, q, status]);
+  }, [allSorted, q, resolveTeamName, selectedBracket, selectedRound, status]);
 
   const courts = useMemo(() => {
     const map = new Map();
@@ -1244,6 +1661,54 @@ export default function TournamentScheduleNative() {
   // --- Render ---
 
   // Component cho phần Filter và Tabs (để tái sử dụng cho layout 2 cột)
+  const renderOptionScroller = (label, options, selected, onSelect) => {
+    if (!options || options.length <= 1) return null;
+    return (
+      <View style={stylesNew.filterBlock}>
+        <Text style={[stylesNew.filterLabel, { color: T.textSecondary }]}>
+          {label}
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={stylesNew.optionScrollContent}
+        >
+          {options.map((option) => {
+            const active = selected === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => onSelect(option.key)}
+                style={[
+                  stylesNew.optionChip,
+                  {
+                    backgroundColor: T.tabBg,
+                    borderColor: T.tabBd,
+                  },
+                  active && {
+                    backgroundColor: T.tabActiveBg,
+                    borderColor: T.tabActiveBd,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    stylesNew.optionChipText,
+                    { color: T.tabText },
+                    active && { color: T.tabTextActive, fontWeight: "800" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  };
+
   const FilterAndTabs = (
     <View
       style={[
@@ -1277,22 +1742,21 @@ export default function TournamentScheduleNative() {
       </View>
 
       <View style={stylesNew.statusTabs}>
-        {[
-          { key: "all", label: "Tất cả" },
-          { key: "live", label: "Đang diễn ra" },
-          { key: "upcoming", label: "Sắp diễn ra" },
-          { key: "finished", label: "Đã diễn ra" },
-        ].map((it) => {
+        {STATUS_TABS.map((it) => {
           const active = status === it.key;
+          const hotLiveTab = it.key === "live" && hasLiveMatches;
           return (
             <Pressable
               key={it.key}
-              onPress={() => setStatus(it.key)}
+              onPress={() => selectStatus(it.key)}
               style={[
                 stylesNew.tab,
                 {
                   backgroundColor: T.tabBg,
                   borderColor: T.tabBd,
+                },
+                hotLiveTab && {
+                  borderColor: T.live,
                 },
                 active && {
                   backgroundColor: T.tabActiveBg,
@@ -1300,19 +1764,31 @@ export default function TournamentScheduleNative() {
                 },
               ]}
             >
-              <Text
-                style={[
-                  stylesNew.tabText,
-                  { color: T.tabText },
-                  active && { color: T.tabTextActive, fontWeight: "700" },
-                ]}
-              >
-                {it.label}
-              </Text>
+              <View style={stylesNew.tabContent}>
+                {it.icon && hotLiveTab ? (
+                  <MaterialCommunityIcons
+                    name="fire"
+                    size={14}
+                    color={active ? T.tabTextActive : T.live}
+                  />
+                ) : null}
+                <Text
+                  style={[
+                    stylesNew.tabText,
+                    { color: T.tabText },
+                    active && { color: T.tabTextActive, fontWeight: "700" },
+                  ]}
+                >
+                  {it.label}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
       </View>
+
+      {renderOptionScroller("Bracket", bracketOptions, selectedBracket, selectBracket)}
+      {renderOptionScroller("Vòng", roundOptions, selectedRound, selectRound)}
     </View>
   );
 
@@ -1355,6 +1831,7 @@ export default function TournamentScheduleNative() {
               queueLimit={queueLimit}
               onOpenMatch={openViewer}
               theme={T}
+              resolveTeamName={resolveTeamName}
             />
           ))}
         </View>
@@ -1396,7 +1873,13 @@ export default function TournamentScheduleNative() {
       ) : (
         <View style={{ gap: 8 }}>
           {filteredAll.map((m) => (
-            <MatchCard key={m._id} m={m} onOpenMatch={openViewer} theme={T} />
+            <MatchCard
+              key={m._id}
+              m={m}
+              onOpenMatch={openViewer}
+              theme={T}
+              resolveTeamName={resolveTeamName}
+            />
           ))}
         </View>
       )}
@@ -1607,7 +2090,36 @@ const stylesNew = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   tabText: { fontSize: 13 },
+  filterBlock: {
+    marginBottom: 10,
+  },
+  filterLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 6,
+    textTransform: "uppercase",
+  },
+  optionScrollContent: {
+    gap: 6,
+    paddingRight: 12,
+  },
+  optionChip: {
+    maxWidth: 180,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  optionChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   // --- Card / Base ---
   card: {
