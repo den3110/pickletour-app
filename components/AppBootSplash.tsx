@@ -56,7 +56,7 @@ export default function AppBootSplash({ isAppReady, isDark = false }: AppBootSpl
     >
       <View style={s.content}>
         <Image
-          source={require("../assets/images/icon-no-background.png")}
+          source={require("../assets/images/icon-transparent.png")}
           style={s.logo}
           contentFit="contain"
         />

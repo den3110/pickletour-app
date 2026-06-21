@@ -287,10 +287,24 @@ function ProButton({ onPress, children, colors, style, icon }) {
           <AppleLiquidGlassView
             fallback="view"
             glassEffectStyle="regular"
-            glassTintColor="rgba(255, 140, 83, 0.42)"
+            glassTintColor="rgba(255, 255, 255, 0.2)"
             isInteractive
             style={[styles.proButtonGradient, styles.proButtonGlass]}
           >
+            <LinearGradient
+              colors={colors || ["#FF6B6B", "#FF8E53"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              pointerEvents="none"
+              style={styles.proButtonGlassGradient}
+            />
+            <LinearGradient
+              colors={["rgba(255,255,255,0.36)", "rgba(255,255,255,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 0.58 }}
+              pointerEvents="none"
+              style={styles.proButtonGloss}
+            />
             <View style={styles.proButtonContent}>
               {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
               {children}
@@ -348,10 +362,17 @@ function AnimatedStatusChip() {
         <AppleLiquidGlassView
           fallback="view"
           glassEffectStyle="regular"
-          glassTintColor="rgba(78, 205, 196, 0.48)"
+          glassTintColor="rgba(255, 255, 255, 0.22)"
           isInteractive
           style={[styles.statusBadgeGradient, styles.statusBadgeGlass]}
         >
+          <LinearGradient
+            colors={["#4ECDC4", "#45B7D1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            pointerEvents="none"
+            style={styles.glassGradientFill}
+          />
           <Ionicons name="time-outline" size={14} color="#FFFFFF" />
           <Text style={styles.statusBadgeText}>Sắp diễn ra</Text>
         </AppleLiquidGlassView>
@@ -896,40 +917,51 @@ function TournamentsSection() {
     <View style={styles.tournamentsSection}>
       {/* 🛑 GIỮ NGUYÊN HEADER CŨ THEO YÊU CẦU */}
       <View style={styles.sectionHeaderWrapper}>
-        {IOS_26_LIQUID_GLASS_ENABLED ? (
-          <AppleLiquidGlassView
-            fallback="view"
-            glassEffectStyle="regular"
-            glassTintColor="rgba(78, 205, 196, 0.46)"
-            isInteractive
-            style={[styles.sectionHeader, styles.sectionHeaderGlass]}
-          >
-            <Ionicons name="trophy" size={24} color="#FFFFFF" />
-            <Text style={styles.sectionHeaderText}>
-              Đăng ký tham gia giải đấu
-            </Text>
-            <Ionicons name="trophy" size={24} color="#FFFFFF" />
-          </AppleLiquidGlassView>
-        ) : (
-          <>
-            <LinearGradient
-              colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sectionHeader}
+        <LinearGradient
+          colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.sectionHeader}
+        >
+          {IOS_26_LIQUID_GLASS_ENABLED ? (
+            <AppleLiquidGlassView
+              fallback="view"
+              glassEffectStyle="regular"
+              glassTintColor="rgba(255, 255, 255, 0.28)"
+              isInteractive
+              style={styles.sectionHeaderGlassFill}
             >
+              <LinearGradient
+                colors={[
+                  "rgba(255,107,107,0.44)",
+                  "rgba(78,205,196,0.36)",
+                  "rgba(69,183,209,0.42)",
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                pointerEvents="none"
+                style={styles.sectionHeaderGlassShine}
+              />
+              <View style={styles.sectionHeaderContent}>
+                <Ionicons name="trophy" size={24} color="#FFFFFF" />
+                <Text style={styles.sectionHeaderText}>
+                  Đăng ký tham gia giải đấu
+                </Text>
+                <Ionicons name="trophy" size={24} color="#FFFFFF" />
+              </View>
+            </AppleLiquidGlassView>
+          ) : (
+            <View style={styles.sectionHeaderContent}>
               <Ionicons name="trophy" size={24} color="#FFFFFF" />
               <Text style={styles.sectionHeaderText}>
                 Đăng ký tham gia giải đấu
               </Text>
               <Ionicons name="trophy" size={24} color="#FFFFFF" />
-            </LinearGradient>
-            <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
-            <View
-              style={[styles.triangleRight, { borderRightColor: bgColor }]}
-            />
-          </>
-        )}
+            </View>
+          )}
+        </LinearGradient>
+        <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
+        <View style={[styles.triangleRight, { borderRightColor: bgColor }]} />
       </View>
 
       <View style={styles.navigationContainer}>
@@ -942,10 +974,17 @@ function TournamentsSection() {
             <AppleLiquidGlassView
               fallback="view"
               glassEffectStyle="regular"
-              glassTintColor="rgba(78, 205, 196, 0.42)"
+              glassTintColor="rgba(255, 255, 255, 0.2)"
               isInteractive
               style={styles.navArrowGradient}
             >
+              <LinearGradient
+                colors={["#4ECDC4", "#45B7D1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                pointerEvents="none"
+                style={styles.glassGradientFill}
+              />
               <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </AppleLiquidGlassView>
           ) : (
@@ -966,10 +1005,17 @@ function TournamentsSection() {
             <AppleLiquidGlassView
               fallback="view"
               glassEffectStyle="regular"
-              glassTintColor="rgba(78, 205, 196, 0.42)"
+              glassTintColor="rgba(255, 255, 255, 0.2)"
               isInteractive
               style={styles.navArrowGradient}
             >
+              <LinearGradient
+                colors={["#4ECDC4", "#45B7D1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                pointerEvents="none"
+                style={styles.glassGradientFill}
+              />
               <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
             </AppleLiquidGlassView>
           ) : (
@@ -1131,10 +1177,19 @@ function NewsSection() {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => router.push("/news")}
-          style={styles.seeMoreButtonNew}
         >
-          <Text style={styles.seeMoreTextNew}>Xem thêm</Text>
-          <Ionicons name="chevron-forward" size={14} color="#6C5CE7" />
+          <AppleLiquidGlassView
+            fallback="view"
+            glassEffectStyle="regular"
+            glassTintColor={
+              isDark ? "rgba(108, 92, 231, 0.34)" : "rgba(255, 255, 255, 0.42)"
+            }
+            isInteractive
+            style={styles.seeMoreButtonNew}
+          >
+            <Text style={styles.seeMoreTextNew}>Xem thêm</Text>
+            <Ionicons name="chevron-forward" size={14} color="#6C5CE7" />
+          </AppleLiquidGlassView>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -1378,10 +1433,17 @@ export default function HomeScreen() {
                 <AppleLiquidGlassView
                   fallback="view"
                   glassEffectStyle="regular"
-                  glassTintColor="rgba(255, 255, 255, 0.42)"
+                  glassTintColor="rgba(255, 255, 255, 0.24)"
                   isInteractive
                   style={styles.headerLogoGlass}
                 >
+                  <LinearGradient
+                    colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    pointerEvents="none"
+                    style={styles.glassGradientFill}
+                  />
                   <Text style={styles.headerLogoText}>PickleTour</Text>
                 </AppleLiquidGlassView>
               ) : (
@@ -1513,6 +1575,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.45)",
+    overflow: "hidden",
     shadowColor: "#4ECDC4",
     shadowOpacity: 0.22,
     shadowRadius: 12,
@@ -1763,12 +1826,15 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  sectionHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
     gap: 12,
-    borderRadius: 12,
   },
   sectionHeaderGlass: {
     borderRadius: 18,
@@ -1778,6 +1844,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
+  },
+  sectionHeaderGlassFill: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.62)",
+    backgroundColor: "rgba(255,255,255,0.24)",
+    shadowColor: "#4ECDC4",
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  sectionHeaderGlassShine: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.95,
   },
   triangleLeft: {
     position: "absolute",
@@ -1831,6 +1912,8 @@ const styles = StyleSheet.create({
   navArrowGradient: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1880,6 +1963,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.34)",
+    overflow: "hidden",
   },
   statusBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   tournamentInfo: { padding: 18, paddingBottom: 14, gap: 10 },
@@ -1919,11 +2003,18 @@ const styles = StyleSheet.create({
   },
   proButtonGlass: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.38)",
+    borderColor: "rgba(255,255,255,0.55)",
     shadowColor: "#EE5A24",
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
+  },
+  proButtonGlassGradient: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.96,
+  },
+  glassGradientFill: {
+    ...StyleSheet.absoluteFillObject,
   },
   proButtonGloss: {
     position: "absolute",
@@ -2007,6 +2098,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     gap: 4,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(162,155,254,0.24)",
+    shadowColor: "#6C5CE7",
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   seeMoreTextNew: { fontSize: 12, fontWeight: "700", color: "#6C5CE7" },
   newsList: { paddingHorizontal: 16, paddingVertical: 8 },

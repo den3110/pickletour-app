@@ -495,7 +495,20 @@ export default function MatchScheduleScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.header}
           >
-            <View style={styles.headerContent}>
+            <LiquidGlassSurface
+              effect="regular"
+              isDark={isDark}
+              tintAlpha={0.56}
+              style={[
+                styles.headerContent,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(8,13,24,0.44)"
+                    : "rgba(255,255,255,0.24)",
+                  borderColor: "rgba(255,255,255,0.22)",
+                },
+              ]}
+            >
               <View style={styles.headerTop}>
                 <View style={styles.headerLeft}>
                   <TouchableOpacity
@@ -509,6 +522,7 @@ export default function MatchScheduleScreen() {
                       active
                       effect="clear"
                       isDark={isDark}
+                      tintAlpha={0.62}
                       style={[
                         styles.backButton,
                         { backgroundColor: "rgba(15,23,42,0.35)" },
@@ -539,6 +553,7 @@ export default function MatchScheduleScreen() {
                       active
                       effect="clear"
                       isDark={isDark}
+                      tintAlpha={0.62}
                       style={[
                         styles.headerIconButton,
                         { backgroundColor: C.headerSoft },
@@ -567,6 +582,7 @@ export default function MatchScheduleScreen() {
                       active
                       effect="clear"
                       isDark={isDark}
+                      tintAlpha={0.62}
                       style={[
                         styles.headerIconButton,
                         { backgroundColor: C.headerSoft },
@@ -588,6 +604,7 @@ export default function MatchScheduleScreen() {
                       active
                       effect="clear"
                       isDark={isDark}
+                      tintAlpha={0.68}
                       style={[
                         styles.headerIconButton,
                         styles.headerIconButtonActive,
@@ -628,7 +645,7 @@ export default function MatchScheduleScreen() {
                   />
                 </View>
               )}
-            </View>
+            </LiquidGlassSurface>
           </LinearGradient>
 
           {/* Permission Banner */}
@@ -640,6 +657,7 @@ export default function MatchScheduleScreen() {
               <LiquidGlassSurface
                 isDark={isDark}
                 tone="danger"
+                tintAlpha={0.78}
                 style={[
                   styles.permissionBanner,
                   {
@@ -678,6 +696,8 @@ export default function MatchScheduleScreen() {
                 {/* Calendar */}
                 <LiquidGlassSurface
                   isDark={isDark}
+                  tone="field"
+                  tintAlpha={0.8}
                   style={[
                     styles.calendarCard,
                     { backgroundColor: C.card, borderColor: C.border },
@@ -699,8 +719,24 @@ export default function MatchScheduleScreen() {
                 </LiquidGlassSurface>
 
                 {/* Selected Date Matches */}
-                <View style={styles.selectedDateSection}>
-                  <View style={styles.sectionHeader}>
+                <LiquidGlassSurface
+                  isDark={isDark}
+                  tone="field"
+                  tintAlpha={0.74}
+                  style={[
+                    styles.selectedDateSection,
+                    { backgroundColor: C.card, borderColor: C.border },
+                  ]}
+                >
+                  <LiquidGlassSurface
+                    effect="clear"
+                    isDark={isDark}
+                    tintAlpha={0.62}
+                    style={[
+                      styles.sectionHeader,
+                      { backgroundColor: C.cardAlt, borderColor: C.border },
+                    ]}
+                  >
                     <View style={styles.sectionTitleRow}>
                       <Icon name="calendar-today" size={22} color={C.sub} />
                       <Text style={[styles.sectionTitle, { color: C.text }]}>
@@ -708,13 +744,19 @@ export default function MatchScheduleScreen() {
                       </Text>
                     </View>
                     {selectedDateMatches.length > 0 && (
-                      <View style={styles.countBadge}>
+                      <LiquidGlassSurface
+                        active
+                        effect="clear"
+                        isDark={isDark}
+                        tintAlpha={0.52}
+                        style={styles.countBadge}
+                      >
                         <Text style={styles.countBadgeText}>
                           {selectedDateMatches.length}
                         </Text>
-                      </View>
+                      </LiquidGlassSurface>
                     )}
-                  </View>
+                  </LiquidGlassSurface>
 
                   {isLoading ? (
                     <SkeletonLoader />
@@ -747,11 +789,19 @@ export default function MatchScheduleScreen() {
                       />
                     ))
                   )}
-                </View>
+                </LiquidGlassSurface>
               </>
             ) : (
               /* ✅ LIST VIEW - FIXED */
-              <View style={styles.listViewContainer}>
+              <LiquidGlassSurface
+                isDark={isDark}
+                tone="field"
+                tintAlpha={0.74}
+                style={[
+                  styles.listViewContainer,
+                  { backgroundColor: C.card, borderColor: C.border },
+                ]}
+              >
                 {isLoading ? (
                   <SkeletonLoader />
                 ) : allMatchesByDate.length === 0 ? (
@@ -781,7 +831,7 @@ export default function MatchScheduleScreen() {
                     />
                   ))
                 )}
-              </View>
+              </LiquidGlassSurface>
             )}
 
             {/* Upcoming Matches Quick View */}
@@ -790,6 +840,8 @@ export default function MatchScheduleScreen() {
               viewMode === "calendar" && (
                 <LiquidGlassSurface
                   isDark={isDark}
+                  tone="field"
+                  tintAlpha={0.78}
                   style={[
                     styles.upcomingSection,
                     { backgroundColor: C.card, borderColor: C.border },
@@ -800,6 +852,7 @@ export default function MatchScheduleScreen() {
                       effect="clear"
                       isDark={isDark}
                       tone="danger"
+                      tintAlpha={0.7}
                       style={[
                         styles.upcomingHeaderGradient,
                         {
@@ -847,6 +900,7 @@ export default function MatchScheduleScreen() {
                         active
                         effect="clear"
                         isDark={isDark}
+                        tintAlpha={0.72}
                         style={[
                           styles.viewAllButton,
                           { backgroundColor: C.cardAlt, borderColor: C.border },
@@ -895,7 +949,14 @@ const StatPillSurface = ({ icon, label, value, color }: any) => {
     <LiquidGlassSurface
       effect="clear"
       isDark={isDark}
-      style={[styles.statPill, { backgroundColor: C.headerSoft }]}
+      tintAlpha={0.56}
+      style={[
+        styles.statPill,
+        {
+          backgroundColor: C.headerSoft,
+          borderColor: "rgba(255,255,255,0.18)",
+        },
+      ]}
     >
       <Icon name={icon} size={16} color={color} />
       <Text style={styles.statValue}>{value}</Text>
@@ -1025,6 +1086,8 @@ const EnhancedMatchCard = ({
     >
       <LiquidGlassSurface
         isDark={isDark}
+        tone="field"
+        tintAlpha={0.78}
         style={[
           styles.enhancedMatchCard,
           { backgroundColor: C.card, borderColor: C.border },
@@ -1043,16 +1106,53 @@ const EnhancedMatchCard = ({
           style={styles.matchCardHeader}
         >
           <View style={styles.matchTimeRow}>
-            <View style={styles.timeBadge}>
-              <Icon name="clock-outline" size={16} color="#1F2937" />
-              <Text style={styles.matchTime}>{match.localScheduledTime}</Text>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: status.color }]}
+            <LiquidGlassSurface
+              effect="clear"
+              isDark={isDark}
+              tone="field"
+              tintAlpha={0.72}
+              style={[
+                styles.timeBadge,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(15,23,42,0.62)"
+                    : "rgba(255,255,255,0.78)",
+                  borderColor: isDark
+                    ? "rgba(255,255,255,0.14)"
+                    : "rgba(255,255,255,0.72)",
+                },
+              ]}
+            >
+              <Icon
+                name="clock-outline"
+                size={16}
+                color={isDark ? "#E5E7EB" : "#1F2937"}
+              />
+              <Text
+                style={[
+                  styles.matchTime,
+                  { color: isDark ? "#F8FAFC" : "#1F2937" },
+                ]}
+              >
+                {match.localScheduledTime}
+              </Text>
+            </LiquidGlassSurface>
+            <LiquidGlassSurface
+              active
+              effect="clear"
+              isDark={isDark}
+              tintAlpha={0.58}
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: status.color,
+                  borderColor: "rgba(255,255,255,0.28)",
+                },
+              ]}
             >
               <Icon name={status.icon} size={12} color="#FFF" />
               <Text style={styles.statusText}>{status.label}</Text>
-            </View>
+            </LiquidGlassSurface>
           </View>
         </LinearGradient>
 
@@ -1113,6 +1213,7 @@ const EnhancedMatchCard = ({
                 <LiquidGlassSurface
                   effect="clear"
                   isDark={isDark}
+                  tintAlpha={0.7}
                   style={[
                     styles.metaBadge,
                     { backgroundColor: C.cardAlt, borderColor: C.border },
@@ -1128,7 +1229,19 @@ const EnhancedMatchCard = ({
                 <LiquidGlassSurface
                   effect="clear"
                   isDark={isDark}
-                  style={[styles.metaBadge, styles.metaBadgeWarning]}
+                  tintAlpha={0.72}
+                  style={[
+                    styles.metaBadge,
+                    styles.metaBadgeWarning,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(146,64,14,0.22)"
+                        : "#FEF3C7",
+                      borderColor: isDark
+                        ? "rgba(251,191,36,0.22)"
+                        : "rgba(217,119,6,0.16)",
+                    },
+                  ]}
                 >
                   <Icon name="timer-sand" size={14} color="#D97706" />
                   <Text style={styles.metaTextWarning}>
@@ -1151,9 +1264,28 @@ const EnhancedMatchCard = ({
                     active
                     effect="clear"
                     isDark={isDark}
+                    tintAlpha={0.74}
                     style={[
                       styles.calendarBtn,
-                      inCalendar && styles.calendarBtnActive,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(37,99,235,0.16)"
+                          : "#EFF6FF",
+                        borderColor: isDark
+                          ? "rgba(96,165,250,0.24)"
+                          : "#BFDBFE",
+                      },
+                      inCalendar && [
+                        styles.calendarBtnActive,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(16,185,129,0.16)"
+                            : "#D1FAE5",
+                          borderColor: isDark
+                            ? "rgba(52,211,153,0.28)"
+                            : "#86EFAC",
+                        },
+                      ],
                     ]}
                   >
                   {isAdding ? (
@@ -1190,6 +1322,7 @@ const EnhancedMatchCard = ({
                       effect="clear"
                       isDark={isDark}
                       tone="danger"
+                      tintAlpha={0.74}
                       style={styles.calendarDeleteBtn}
                     >
                     {isRemoving ? (
@@ -1206,12 +1339,13 @@ const EnhancedMatchCard = ({
 
           {/* Scores */}
           {match.gameScores && match.gameScores.length > 0 && (
-            <View style={styles.scoresRow}>
+            <View style={[styles.scoresRow, { borderTopColor: C.border }]}>
               {match.gameScores.map((game: any, idx: number) => (
                 <LiquidGlassSurface
                   key={idx}
                   effect="clear"
                   isDark={isDark}
+                  tintAlpha={0.68}
                   style={[
                     styles.scoreChip,
                     { backgroundColor: C.cardAlt, borderColor: C.border },
@@ -1248,6 +1382,7 @@ const TeamRow = ({
     <LiquidGlassSurface
       effect="clear"
       isDark={isDark}
+      tintAlpha={isHighlight ? 0.72 : 0.64}
       style={[
         styles.teamRow,
         isHighlight && styles.teamRowHighlight,
@@ -1303,6 +1438,8 @@ const CompactMatchCard = ({ match, index, onPress }: any) => {
       >
         <LiquidGlassSurface
           isDark={isDark}
+          tone="field"
+          tintAlpha={0.76}
           style={[
             styles.compactCard,
             { backgroundColor: C.card, borderColor: C.border },
@@ -1333,10 +1470,25 @@ const CompactMatchCard = ({ match, index, onPress }: any) => {
         </View>
 
         <View style={styles.compactRight}>
-          <View style={styles.compactTimeBadge}>
+          <LiquidGlassSurface
+            effect="clear"
+            isDark={isDark}
+            tintAlpha={0.7}
+            style={[
+              styles.compactTimeBadge,
+              {
+                backgroundColor: isDark
+                  ? "rgba(146,64,14,0.22)"
+                  : "#FEF3C7",
+                borderColor: isDark
+                  ? "rgba(251,191,36,0.2)"
+                  : "rgba(217,119,6,0.18)",
+              },
+            ]}
+          >
             <Icon name="clock-fast" size={12} color="#D97706" />
             <Text style={styles.compactTimeText}>{match.timeUntilMatch}</Text>
-          </View>
+          </LiquidGlassSurface>
           <Icon name="chevron-right" size={18} color="#9CA3AF" />
         </View>
         </LiquidGlassSurface>
@@ -1382,6 +1534,7 @@ const DaySection = ({
       <LiquidGlassSurface
         effect="clear"
         isDark={isDark}
+        tintAlpha={0.68}
         style={[
           styles.daySectionHeader,
           {
@@ -1392,14 +1545,20 @@ const DaySection = ({
         ]}
       >
         <View style={styles.dayHeaderLeft}>
-          <View style={[styles.dayBadge, isToday && styles.dayBadgeToday]}>
+          <LiquidGlassSurface
+            active={isToday}
+            effect="clear"
+            isDark={isDark}
+            tintAlpha={0.64}
+            style={[styles.dayBadge, isToday && styles.dayBadgeToday]}
+          >
             <Text style={[styles.dayNumber, isToday && styles.dayNumberToday]}>
               {dt.toFormat("dd")}
             </Text>
             <Text style={[styles.dayMonth, isToday && styles.dayMonthToday]}>
               {monthLabel}
             </Text>
-          </View>
+          </LiquidGlassSurface>
           <View style={styles.dayInfo}>
             <Text
               style={[
@@ -1418,9 +1577,15 @@ const DaySection = ({
             </Text>
           </View>
         </View>
-        <View style={styles.dayCountBadge}>
+        <LiquidGlassSurface
+          active
+          effect="clear"
+          isDark={isDark}
+          tintAlpha={0.52}
+          style={styles.dayCountBadge}
+        >
           <Text style={styles.dayCountText}>{dayData.matchCount}</Text>
-        </View>
+        </LiquidGlassSurface>
       </LiquidGlassSurface>
 
       {/* Matches */}
@@ -1450,6 +1615,8 @@ const EmptyState = ({ icon, title, subtitle }: any) => {
   return (
     <LiquidGlassSurface
       isDark={isDark}
+      tone="field"
+      tintAlpha={0.76}
       style={[
         styles.emptyState,
         { backgroundColor: C.card, borderColor: C.border },
@@ -1458,6 +1625,7 @@ const EmptyState = ({ icon, title, subtitle }: any) => {
       <LiquidGlassSurface
         effect="clear"
         isDark={isDark}
+        tintAlpha={0.7}
         style={[styles.emptyIconContainer, { backgroundColor: C.cardAlt }]}
       >
         <Icon name={icon} size={64} color={C.muted} />
@@ -1481,6 +1649,8 @@ const SkeletonLoader = () => {
         <LiquidGlassSurface
           key={i}
           isDark={isDark}
+          tone="field"
+          tintAlpha={0.72}
           style={[
             styles.skeletonCard,
             { backgroundColor: C.card, borderColor: C.border },
@@ -1529,6 +1699,8 @@ const CalendarPermissionModal = ({
       />
       <LiquidGlassSurface
         isDark={isDark}
+        tone="field"
+        tintAlpha={0.82}
         style={[
           styles.modalContent,
           { backgroundColor: C.cardSolid, borderColor: C.border },
@@ -1574,6 +1746,7 @@ const CalendarPermissionModal = ({
             <LiquidGlassSurface
               effect="clear"
               isDark={isDark}
+              tintAlpha={0.72}
               style={[
                 styles.modalButtonSecondary,
                 { borderColor: C.border, backgroundColor: C.cardAlt },
@@ -1594,21 +1767,29 @@ const CalendarPermissionModal = ({
             activeOpacity={0.8}
             disabled={isRequesting}
           >
-            <LinearGradient
-              colors={["#3B82F6", "#2563EB"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.modalButtonPrimaryGradient}
+            <LiquidGlassSurface
+              active
+              effect="clear"
+              isDark={isDark}
+              tintAlpha={0.62}
+              style={styles.modalButtonPrimaryGlass}
             >
-              {isRequesting ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <>
-                  <Icon name="check-circle" size={20} color="#FFF" />
-                  <Text style={styles.modalButtonPrimaryText}>Cấp quyền</Text>
-                </>
-              )}
-            </LinearGradient>
+              <LinearGradient
+                colors={["#3B82F6", "#2563EB"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.modalButtonPrimaryGradient}
+              >
+                {isRequesting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Icon name="check-circle" size={20} color="#FFF" />
+                    <Text style={styles.modalButtonPrimaryText}>Cấp quyền</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </LiquidGlassSurface>
           </TouchableOpacity>
         </View>
       </LiquidGlassSurface>
@@ -1623,19 +1804,30 @@ const FeatureItem = ({ icon, title, subtitle }: any) => {
   const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
 
   return (
-  <View style={[styles.featureItem, { borderBottomColor: C.border }]}>
     <LiquidGlassSurface
       effect="clear"
       isDark={isDark}
-      style={[styles.featureIcon, { backgroundColor: C.cardAlt }]}
+      tintAlpha={0.58}
+      style={[
+        styles.featureItem,
+        { backgroundColor: C.cardAlt, borderBottomColor: C.border },
+      ]}
     >
-      <Icon name={icon} size={24} color="#3B82F6" />
+      <LiquidGlassSurface
+        effect="clear"
+        isDark={isDark}
+        tintAlpha={0.7}
+        style={[styles.featureIcon, { backgroundColor: C.cardAlt }]}
+      >
+        <Icon name={icon} size={24} color="#3B82F6" />
+      </LiquidGlassSurface>
+      <View style={styles.featureText}>
+        <Text style={[styles.featureTitle, { color: C.text }]}>{title}</Text>
+        <Text style={[styles.featureSubtitle, { color: C.sub }]}>
+          {subtitle}
+        </Text>
+      </View>
     </LiquidGlassSurface>
-    <View style={styles.featureText}>
-      <Text style={[styles.featureTitle, { color: C.text }]}>{title}</Text>
-      <Text style={[styles.featureSubtitle, { color: C.sub }]}>{subtitle}</Text>
-    </View>
-  </View>
   );
 };
 
@@ -1731,7 +1923,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerContent: {
-    paddingHorizontal: 20,
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   headerTop: {
     flexDirection: "row",
@@ -1781,7 +1977,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backdropFilter: "blur(10px)",
+    borderWidth: 1,
   },
   statValue: {
     fontSize: 18,
@@ -1860,14 +2056,23 @@ const styles = StyleSheet.create({
 
   // Selected Date Section
   selectedDateSection: {
-    paddingHorizontal: 16,
+    marginHorizontal: 16,
     marginTop: 20,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 2,
+    borderRadius: 22,
+    borderWidth: 1,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   sectionTitleRow: {
     flexDirection: "row",
@@ -1932,6 +2137,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: 1,
   },
   matchTime: {
     fontSize: 16,
@@ -1945,6 +2151,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: 1,
   },
   statusText: {
     fontSize: 12,
@@ -1996,6 +2203,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     backgroundColor: "#F9FAFB",
+    borderWidth: 1,
   },
   teamRowHighlight: {
     backgroundColor: "#EFF6FF",
@@ -2054,6 +2262,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 1,
   },
   metaBadgeWarning: {
     backgroundColor: "#FEF3C7",
@@ -2108,6 +2317,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 10,
+    borderWidth: 1,
   },
   scoreText: {
     fontSize: 15,
@@ -2182,6 +2392,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(217,119,6,0.18)",
   },
   compactTimeText: {
     fontSize: 11,
@@ -2191,8 +2403,13 @@ const styles = StyleSheet.create({
 
   // List View Container
   listViewContainer: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 2,
+    borderRadius: 22,
+    borderWidth: 1,
   },
 
   // Day Section
@@ -2207,6 +2424,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 12,
     paddingBottom: 14,
+    borderWidth: 1,
     borderBottomWidth: 3,
     borderBottomColor: "#E5E7EB",
   },
@@ -2441,6 +2659,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
     paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },
@@ -2488,6 +2709,11 @@ const styles = StyleSheet.create({
   },
   modalButtonPrimary: {
     flex: 2,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  modalButtonPrimaryGlass: {
+    flex: 1,
     borderRadius: 12,
     overflow: "hidden",
   },
