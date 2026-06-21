@@ -1427,7 +1427,7 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 16,
   },
   headerTitle: {
@@ -2190,12 +2190,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEF2F2",
     alignItems: "center",
     justifyContent: "center",
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
   },
   headerLeft: {
     flexDirection: "row",
