@@ -28,7 +28,6 @@ import {
   useSendMessageMutation,
 } from "@/slices/supportApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
-import SupportGlassSurface from "@/components/support/SupportGlassSurface";
 
 type Picked = { uri: string; name?: string; mime?: string; size?: number };
 
@@ -58,21 +57,14 @@ const Avatar = ({
   label,
   color,
   bg,
-  isDark,
 }: {
   label: string;
   color: string;
   bg: string;
-  isDark: boolean;
 }) => (
-  <SupportGlassSurface
-    effect="clear"
-    isDark={isDark}
-    tintAlpha={0.5}
-    style={[styles.avatar, { backgroundColor: bg }]}
-  >
+  <View style={[styles.avatar, { backgroundColor: bg }]}>
     <Text style={[styles.avatarText, { color: color }]}>{label}</Text>
-  </SupportGlassSurface>
+  </View>
 );
 
 export default function SupportThreadScreen() {
@@ -229,8 +221,7 @@ export default function SupportThreadScreen() {
         : "";
 
       return (
-        <SupportGlassSurface
-          isDark={isDark}
+        <View
           style={[
             styles.card,
             { backgroundColor: colors.card, borderColor: colors.border },
@@ -242,7 +233,6 @@ export default function SupportThreadScreen() {
               label={isUser ? "ME" : "SP"}
               bg={isUser ? colors.primaryBg : "#F3E5F5"}
               color={isUser ? colors.primary : "#9C27B0"}
-              isDark={isDark}
             />
             <View style={{ flex: 1 }}>
               <View style={styles.headerTopRow}>
@@ -277,24 +267,12 @@ export default function SupportThreadScreen() {
             {item.attachments?.length > 0 && (
               <View style={styles.attachContainer}>
                 {item.attachments.map((a: any, idx: number) => (
-                  <SupportGlassSurface
+                  <ExpoImage
                     key={idx}
-                    effect="clear"
-                    isDark={isDark}
-                    style={[
-                      styles.attachFrame,
-                      {
-                        backgroundColor: isDark ? "#1C1C1E" : "#F2F2F7",
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <ExpoImage
-                      source={{ uri: a.url }}
-                      style={styles.attachThumb}
-                      contentFit="cover"
-                    />
-                  </SupportGlassSurface>
+                    source={{ uri: a.url }}
+                    style={styles.attachThumb}
+                    contentFit="cover"
+                  />
                 ))}
               </View>
             )}
@@ -303,36 +281,21 @@ export default function SupportThreadScreen() {
           {/* Footer Action: Reply Button */}
           <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
             <TouchableOpacity
+              style={styles.cardActionBtn}
               onPress={() => handleReplyToMessage(item)}
-              activeOpacity={0.82}
             >
-              <SupportGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={[
-                  styles.cardActionBtn,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(255,255,255,0.08)"
-                      : "rgba(0,0,0,0.04)",
-                    borderColor: colors.border,
-                  },
-                ]}
+              <Ionicons name="arrow-undo" size={16} color={colors.sub} />
+              <Text
+                style={{ fontSize: 13, fontWeight: "600", color: colors.sub }}
               >
-                <Ionicons name="arrow-undo" size={16} color={colors.sub} />
-                <Text
-                  style={{ fontSize: 13, fontWeight: "600", color: colors.sub }}
-                >
-                  Trả lời tin này
-                </Text>
-              </SupportGlassSurface>
+                Trả lời tin này
+              </Text>
             </TouchableOpacity>
           </View>
-        </SupportGlassSurface>
+        </View>
       );
     },
-    [colors, handleReplyToMessage, isDark]
+    [colors, handleReplyToMessage]
   );
 
   return (
@@ -347,9 +310,7 @@ export default function SupportThreadScreen() {
       />
 
       {/* Custom Sticky Header - Giống Email Subject */}
-      <SupportGlassSurface
-        isDark={isDark}
-        tintAlpha={0.68}
+      <View
         style={[
           styles.subjectHeader,
           { backgroundColor: colors.card, borderBottomColor: colors.border },
@@ -363,15 +324,10 @@ export default function SupportThreadScreen() {
             marginBottom: 4,
           }}
         >
-          <SupportGlassSurface
-            effect="clear"
-            isDark={isDark}
+          <View
             style={[
               styles.statusTag,
-              {
-                backgroundColor: status === "open" ? "#E8F5E9" : "#F5F5F5",
-                borderColor: colors.border,
-              },
+              { backgroundColor: status === "open" ? "#E8F5E9" : "#F5F5F5" },
             ]}
           >
             <Text
@@ -384,7 +340,7 @@ export default function SupportThreadScreen() {
             >
               {status}
             </Text>
-          </SupportGlassSurface>
+          </View>
           <Text style={{ color: colors.sub, fontSize: 12 }}>
             Ticket #{id.slice(-6).toUpperCase()}
           </Text>
@@ -395,7 +351,7 @@ export default function SupportThreadScreen() {
         >
           {ticketTitle}
         </Text>
-      </SupportGlassSurface>
+      </View>
 
       {isLoading ? (
         <View style={styles.center}>
@@ -412,15 +368,9 @@ export default function SupportThreadScreen() {
             onRefresh={refetch}
             refreshing={isFetching}
             ListEmptyComponent={
-              <SupportGlassSurface
-                isDark={isDark}
-                style={[
-                  styles.emptyCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
+              <View style={{ padding: 40, alignItems: "center" }}>
                 <Text style={{ color: colors.sub }}>Chưa có phản hồi nào.</Text>
-              </SupportGlassSurface>
+              </View>
             }
           />
 
@@ -429,9 +379,7 @@ export default function SupportThreadScreen() {
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             keyboardVerticalOffset={headerHeight}
           >
-            <SupportGlassSurface
-              isDark={isDark}
-              tintAlpha={0.72}
+            <View
               style={[
                 styles.composer,
                 {
@@ -450,41 +398,15 @@ export default function SupportThreadScreen() {
                 >
                   {images.map((img) => (
                     <View key={img.uri}>
-                      <SupportGlassSurface
-                        effect="clear"
-                        isDark={isDark}
-                        style={[
-                          styles.previewThumbFrame,
-                          {
-                            backgroundColor: isDark ? "#1C1C1E" : "#F2F2F7",
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <ExpoImage
-                          source={{ uri: img.uri }}
-                          style={styles.previewThumb}
-                        />
-                      </SupportGlassSurface>
+                      <ExpoImage
+                        source={{ uri: img.uri }}
+                        style={{ width: 60, height: 60, borderRadius: 8 }}
+                      />
                       <TouchableOpacity
                         onPress={() => removeImage(img.uri)}
-                        activeOpacity={0.82}
-                        style={styles.removeBtnWrap}
+                        style={styles.removeBtn}
                       >
-                        <SupportGlassSurface
-                          active
-                          effect="clear"
-                          isDark={isDark}
-                          style={[
-                            styles.removeBtn,
-                            {
-                              backgroundColor: "rgba(0,0,0,0.7)",
-                              borderColor: "rgba(255,255,255,0.42)",
-                            },
-                          ]}
-                        >
-                          <Ionicons name="close" size={14} color="#fff" />
-                        </SupportGlassSurface>
+                        <Ionicons name="close" size={14} color="#fff" />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -494,38 +416,16 @@ export default function SupportThreadScreen() {
               <View style={styles.inputRow}>
                 <TouchableOpacity
                   onPress={pickImages}
+                  style={styles.iconBtn}
                   disabled={busy}
-                  activeOpacity={0.82}
                 >
-                  <SupportGlassSurface
-                    active
-                    effect="clear"
-                    isDark={isDark}
-                    style={[
-                      styles.iconBtn,
-                      {
-                        backgroundColor: isDark
-                          ? "rgba(255,255,255,0.08)"
-                          : "rgba(0,0,0,0.04)",
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <Ionicons name="attach" size={24} color={colors.sub} />
-                  </SupportGlassSurface>
+                  <Ionicons name="attach" size={26} color={colors.sub} />
                 </TouchableOpacity>
 
-                <SupportGlassSurface
-                  effect="regular"
-                  isDark={isDark}
-                  tintAlpha={0.78}
-                  tone="field"
+                <View
                   style={[
                     styles.inputContainer,
-                    {
-                      backgroundColor: isDark ? "#1C1C1E" : "#F2F2F7",
-                      borderColor: colors.border,
-                    },
+                    { backgroundColor: isDark ? "#1C1C1E" : "#F2F2F7" },
                   ]}
                 >
                   <TextInput
@@ -537,36 +437,28 @@ export default function SupportThreadScreen() {
                     style={[styles.input, { color: colors.text }]}
                     multiline
                   />
-                </SupportGlassSurface>
+                </View>
 
                 <TouchableOpacity
                   onPress={onSend}
                   disabled={busy || (!text && !images.length)}
-                  activeOpacity={0.82}
+                  style={[
+                    styles.sendBtn,
+                    {
+                      backgroundColor:
+                        text || images.length ? colors.primary : colors.sub,
+                    },
+                    busy && { opacity: 0.7 },
+                  ]}
                 >
-                  <SupportGlassSurface
-                    active
-                    effect="clear"
-                    isDark={isDark}
-                    style={[
-                      styles.sendBtn,
-                      {
-                        backgroundColor:
-                          text || images.length ? colors.primary : colors.sub,
-                        borderColor: "rgba(255,255,255,0.32)",
-                      },
-                      busy && { opacity: 0.7 },
-                    ]}
-                  >
-                    {busy ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="arrow-up" size={20} color="#fff" />
-                    )}
-                  </SupportGlassSurface>
+                  {busy ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="arrow-up" size={20} color="#fff" />
+                  )}
                 </TouchableOpacity>
               </View>
-            </SupportGlassSurface>
+            </View>
           </KeyboardAvoidingView>
         </>
       )}
@@ -587,7 +479,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    borderWidth: 1,
     marginRight: 6,
   },
   subjectTitle: { fontSize: 18, fontWeight: "700", lineHeight: 24 },
@@ -602,14 +493,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  emptyCard: {
-    alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1,
-    margin: 16,
-    padding: 40,
+    borderWidth: 0, // Bỏ border đen
   },
   cardHeader: {
     flexDirection: "row",
@@ -647,16 +531,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   attachThumb: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 10,
-    backgroundColor: "#eee",
-  },
-  attachFrame: {
     width: 100,
     height: 80,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: "#eee",
   },
 
   cardFooter: {
@@ -673,7 +551,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     backgroundColor: "rgba(0,0,0,0.04)",
     borderRadius: 8,
-    borderWidth: 1,
   },
 
   // Composer
@@ -689,43 +566,27 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   previewBar: { marginBottom: 10, paddingHorizontal: 4 },
-  previewThumbFrame: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  previewThumb: { width: "100%", height: "100%", borderRadius: 10 },
-  removeBtnWrap: {
+  removeBtn: {
     position: "absolute",
     top: -6,
     right: -6,
-  },
-  removeBtn: {
     width: 22,
     height: 22,
     borderRadius: 11,
+    backgroundColor: "#8E8E93",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  iconBtn: { padding: 8, marginBottom: 2 },
   inputContainer: {
     flex: 1,
-    borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -737,7 +598,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,

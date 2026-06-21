@@ -19,7 +19,6 @@ import { Image as ExpoImage } from "expo-image";
 
 import { useCreateTicketMutation } from "@/slices/supportApiSlice";
 import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
-import SupportGlassSurface from "@/components/support/SupportGlassSurface";
 
 type Picked = { uri: string; name?: string; mime?: string; size?: number };
 
@@ -159,28 +158,19 @@ export default function SupportNewScreen() {
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
-              activeOpacity={0.82}
-              style={{ paddingHorizontal: 8 }}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+              }}
             >
-              <SupportGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={[
-                  styles.headerIcon,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <Ionicons name="chevron-back" size={24} color={colors.text} />
-              </SupportGlassSurface>
+              <Ionicons name="chevron-back" size={24} />
             </TouchableOpacity>
           ),
         }}
       />
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <SupportGlassSurface
-          isDark={isDark}
+        <View
           style={[
             styles.card,
             { backgroundColor: colors.card, borderColor: colors.border },
@@ -189,54 +179,40 @@ export default function SupportNewScreen() {
           <Text style={[styles.label, { color: colors.sub }]}>
             Tiêu đề (tuỳ chọn)
           </Text>
-          <SupportGlassSurface
-            effect="regular"
-            isDark={isDark}
-            tintAlpha={0.78}
-            tone="field"
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="VD: Lỗi live / góp ý UI..."
+            placeholderTextColor={colors.sub}
             style={[
-              styles.inputShell,
+              styles.input,
               {
                 backgroundColor: isDark ? "#2C2C2C" : "#fff",
                 borderColor: colors.border,
+                color: colors.text,
               },
             ]}
-          >
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="VD: Lỗi live / góp ý UI..."
-              placeholderTextColor={colors.sub}
-              style={[styles.input, { color: colors.text }]}
-            />
-          </SupportGlassSurface>
+          />
 
           <Text style={[styles.label, { color: colors.sub, marginTop: 12 }]}>
             Nội dung
           </Text>
-          <SupportGlassSurface
-            effect="regular"
-            isDark={isDark}
-            tintAlpha={0.78}
-            tone="field"
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Mô tả vấn đề, kèm bước tái hiện nếu có..."
+            placeholderTextColor={colors.sub}
+            multiline
+            textAlignVertical="top"
             style={[
-              styles.textAreaShell,
+              styles.textArea,
               {
                 backgroundColor: isDark ? "#2C2C2C" : "#fff",
                 borderColor: colors.border,
+                color: colors.text,
               },
             ]}
-          >
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder="Mô tả vấn đề, kèm bước tái hiện nếu có..."
-              placeholderTextColor={colors.sub}
-              multiline
-              textAlignVertical="top"
-              style={[styles.textArea, { color: colors.text }]}
-            />
-          </SupportGlassSurface>
+          />
 
           <View
             style={{
@@ -251,31 +227,12 @@ export default function SupportNewScreen() {
             </Text>
             <TouchableOpacity
               onPress={pickImages}
-              activeOpacity={0.82}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
             >
-              <SupportGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={[
-                  styles.attachBtn,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(10,132,255,0.18)"
-                      : "rgba(10,132,255,0.10)",
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="image-outline"
-                  size={18}
-                  color={colors.primary}
-                />
-                <Text style={{ color: colors.primary, fontWeight: "800" }}>
-                  Chọn ảnh
-                </Text>
-              </SupportGlassSurface>
+              <Ionicons name="image-outline" size={18} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontWeight: "800" }}>
+                Chọn ảnh
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -287,80 +244,41 @@ export default function SupportNewScreen() {
             >
               {images.map((img) => (
                 <View key={img.uri} style={{ position: "relative" }}>
-                  <SupportGlassSurface
-                    effect="clear"
-                    isDark={isDark}
-                    style={[
-                      styles.thumbFrame,
-                      { backgroundColor: colors.card, borderColor: colors.border },
-                    ]}
-                  >
-                    <ExpoImage
-                      source={{ uri: img.uri }}
-                      style={styles.thumb}
-                      contentFit="cover"
-                    />
-                  </SupportGlassSurface>
+                  <ExpoImage
+                    source={{ uri: img.uri }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
                   <TouchableOpacity
                     onPress={() => removeImage(img.uri)}
-                    activeOpacity={0.82}
-                    style={styles.thumbRemoveWrap}
+                    style={styles.thumbRemove}
                   >
-                    <SupportGlassSurface
-                      active
-                      effect="clear"
-                      isDark={isDark}
-                      style={[
-                        styles.thumbRemove,
-                        { backgroundColor: "rgba(0,0,0,0.7)" },
-                      ]}
-                    >
-                      <Ionicons name="close" size={16} color="#fff" />
-                    </SupportGlassSurface>
+                    <Ionicons name="close" size={16} color="#fff" />
                   </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
           ) : (
-            <SupportGlassSurface
-              effect="clear"
-              isDark={isDark}
-              style={[
-                styles.emptyAttach,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(255,255,255,0.05)"
-                    : "rgba(0,0,0,0.035)",
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Ionicons name="image-outline" size={17} color={colors.sub} />
-              <Text style={{ color: colors.sub }}>Chưa có ảnh.</Text>
-            </SupportGlassSurface>
+            <Text style={{ color: colors.sub, marginTop: 8 }}>
+              Chưa có ảnh.
+            </Text>
           )}
 
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={busy}
-            activeOpacity={0.86}
+            style={[
+              styles.submit,
+              { backgroundColor: colors.primary, opacity: busy ? 0.7 : 1 },
+            ]}
           >
-            <SupportGlassSurface
-              active
-              isDark={isDark}
-              style={[
-                styles.submit,
-                { backgroundColor: colors.primary, opacity: busy ? 0.7 : 1 },
-              ]}
-            >
-              {busy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={{ color: "#fff", fontWeight: "900" }}>Gửi</Text>
-              )}
-            </SupportGlassSurface>
+            {busy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={{ color: "#fff", fontWeight: "900" }}>Gửi</Text>
+            )}
           </TouchableOpacity>
-        </SupportGlassSurface>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -369,86 +287,40 @@ export default function SupportNewScreen() {
 const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 14, borderWidth: 1 },
   label: { fontSize: 13, fontWeight: "700" },
-  inputShell: {
+  input: {
     height: 48,
     borderWidth: 1,
     borderRadius: 12,
-    marginTop: 8,
-    overflow: "hidden",
-  },
-  input: {
-    flex: 1,
     paddingHorizontal: 12,
     fontSize: 15,
+    marginTop: 8,
   },
-  textAreaShell: {
+  textArea: {
     minHeight: 140,
     borderWidth: 1,
     borderRadius: 12,
-    marginTop: 8,
-    overflow: "hidden",
-  },
-  textArea: {
-    flex: 1,
-    minHeight: 140,
     paddingHorizontal: 12,
     paddingTop: 12,
     fontSize: 15,
+    marginTop: 8,
   },
   submit: {
     height: 48,
     borderRadius: 12,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 14,
   },
-  headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  attachBtn: {
-    minHeight: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  emptyAttach: {
-    minHeight: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  thumbFrame: {
-    width: 88,
-    height: 88,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  thumb: { width: "100%", height: "100%", borderRadius: 14 },
-  thumbRemoveWrap: {
+  thumb: { width: 88, height: 88, borderRadius: 14 },
+  thumbRemove: {
     position: "absolute",
     top: -6,
     right: -6,
-  },
-  thumbRemove: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
 });

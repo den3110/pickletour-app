@@ -31,8 +31,6 @@ import ClubMembersCarouselRN from "@/components/clubs/ClubMembersCarouselRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
-import { useTheme } from "@react-navigation/native";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 const { width: W } = Dimensions.get("window");
 const TABS = ["news", "events", "polls"] as const;
@@ -71,10 +69,8 @@ function GradientCard({
   style?: any;
   pad?: number;
 }) {
-  const { dark } = useTheme();
-
   return (
-    <LiquidGlassSurface isDark={dark} style={[styles.gradCard, style]}>
+    <View style={[styles.gradCard, style]}>
       <LinearGradient
         colors={["#667eea", "#764ba2"]}
         start={{ x: 0, y: 0 }}
@@ -83,7 +79,7 @@ function GradientCard({
         pointerEvents="none"
       />
       <View style={{ padding: pad }}>{children}</View>
-    </LiquidGlassSurface>
+    </View>
   );
 }
 
@@ -207,23 +203,31 @@ export default function ClubDetailPageRN() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setOpenEdit(true);
         }}
+        style={[styles.fabBtn, { right: 94 }]}
       >
-        <GradientCard style={[styles.fabBtn, { right: 94 }]} pad={0}>
-          <View style={styles.fabInner}>
-            <Text style={styles.fabText}>Sửa CLB</Text>
-          </View>
-        </GradientCard>
+        <LinearGradient
+          colors={["#667eea", "#764ba2"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <Text style={styles.fabText}>Sửa CLB</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={openJR}
+        style={[styles.fabBtn, { right: 16 }]}
       >
-        <GradientCard style={[styles.fabBtn, { right: 16 }]} pad={0}>
-          <View style={styles.fabInner}>
-            <Text style={styles.fabText}>Duyệt</Text>
-          </View>
-        </GradientCard>
+        <LinearGradient
+          colors={["#667eea", "#764ba2"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <Text style={styles.fabText}>Duyệt</Text>
       </TouchableOpacity>
     </View>
   ) : null;
@@ -465,11 +469,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#0000",
   },
   fabText: { color: "#fff", fontWeight: "800" },
-  fabInner: {
-    minWidth: 64,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
 });

@@ -18,7 +18,6 @@ import { Image } from "expo-image";
 import RenderHTML from "react-native-render-html";
 import { useGetNewsDetailQuery } from "@/slices/newsApiSlice";
 import { openInApp } from "@/utils/openInApp"; // ⬅️ dùng in-app browser
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 const FALLBACK_IMG =
   "https://dummyimage.com/800x450/A29BFE/ffffff&text=Pickleball+News";
@@ -126,27 +125,17 @@ export default function NewsDetailScreen() {
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
+              style={styles.newsBackBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <LiquidGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={styles.newsBackBtn}
-              >
-                <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
-              </LiquidGlassSurface>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           ),
           headerRight: () =>
             sourceLabel || article?.sourceUrl ? (
               <View style={styles.newsHeaderRight}>
                 {sourceLabel ? (
-                  <LiquidGlassSurface
-                    effect="clear"
-                    isDark={isDark}
-                    style={styles.newsHeaderSourceWrap}
-                  >
+                  <View style={styles.newsHeaderSourceWrap}>
                     <Ionicons
                       name="newspaper-outline"
                       size={14}
@@ -155,21 +144,15 @@ export default function NewsDetailScreen() {
                     <Text style={styles.newsHeaderSourceText} numberOfLines={1}>
                       {sourceLabel}
                     </Text>
-                  </LiquidGlassSurface>
+                  </View>
                 ) : null}
                 {article?.sourceUrl ? (
                   <TouchableOpacity
                     onPress={() => openUrl(article.sourceUrl, article.title)}
+                    style={styles.headerRightIconBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <LiquidGlassSurface
-                      active
-                      effect="clear"
-                      isDark={isDark}
-                      style={styles.headerRightIconBtn}
-                    >
-                      <Ionicons name="open-outline" size={16} color="#FFFFFF" />
-                    </LiquidGlassSurface>
+                    <Ionicons name="open-outline" size={16} color="#FFFFFF" />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -236,18 +219,7 @@ export default function NewsDetailScreen() {
             </View>
 
             {/* Meta */}
-            <LiquidGlassSurface
-              effect="clear"
-              isDark={isDark}
-              style={[
-                styles.metaWrap,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(17,24,39,0.62)"
-                    : "rgba(255,255,255,0.72)",
-                },
-              ]}
-            >
+            <View style={styles.metaWrap}>
               <View style={styles.metaRow}>
                 <Ionicons name="time-outline" size={16} color={sub} />
                 <Text style={[styles.metaText, { color: sub }]}>
@@ -266,39 +238,21 @@ export default function NewsDetailScreen() {
                   </Text>
                 </View>
               ) : null}
-            </LiquidGlassSurface>
+            </View>
 
             {/* Tags */}
             {tags.length > 0 && (
               <View style={styles.tagsWrap}>
                 {tags.map((tag) => (
-                  <LiquidGlassSurface
-                    key={tag}
-                    effect="clear"
-                    isDark={isDark}
-                    style={styles.tagChip}
-                  >
+                  <View key={tag} style={styles.tagChip}>
                     <Text style={styles.tagText}>#{tag}</Text>
-                  </LiquidGlassSurface>
+                  </View>
                 ))}
               </View>
             )}
 
             {/* Content */}
-            <LiquidGlassSurface
-              isDark={isDark}
-              style={[
-                styles.contentWrap,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(17,24,39,0.52)"
-                    : "rgba(255,255,255,0.78)",
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.10)"
-                    : "rgba(15,23,42,0.08)",
-                },
-              ]}
-            >
+            <View style={styles.contentWrap}>
               {htmlSource ? (
                 <RenderHTML
                   source={htmlSource}
@@ -363,7 +317,7 @@ export default function NewsDetailScreen() {
                   Nội dung bài viết không khả dụng. Vui lòng mở liên kết gốc.
                 </Text>
               )}
-            </LiquidGlassSurface>
+            </View>
 
             {/* Link gốc (dưới) */}
             {article.sourceUrl && (
@@ -372,20 +326,15 @@ export default function NewsDetailScreen() {
                 onPress={() => openUrl(article.sourceUrl, article.title)}
                 style={styles.originBtnWrapper}
               >
-                <LiquidGlassSurface
-                  active
-                  isDark={isDark}
+                <LinearGradient
+                  colors={["#4ECDC4", "#45B7D1"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={styles.originBtn}
                 >
-                  <LinearGradient
-                    colors={["#4ECDC4", "#45B7D1"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
                   <Ionicons name="open-outline" size={18} color="#FFFFFF" />
                   <Text style={styles.originBtnText}>Đọc bản gốc</Text>
-                </LiquidGlassSurface>
+                </LinearGradient>
               </TouchableOpacity>
             )}
 
@@ -424,14 +373,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
-  metaWrap: {
-    marginHorizontal: 16,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
-    gap: 2,
-    borderRadius: 14,
-  },
+  metaWrap: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4, gap: 2 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   metaText: { fontSize: 12 },
   tagsWrap: {
@@ -448,15 +390,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(162,155,254,0.18)",
   },
   tagText: { fontSize: 11, color: "#A29BFE", fontWeight: "600" },
-  contentWrap: {
-    marginHorizontal: 16,
-    marginTop: 6,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderRadius: 18,
-    borderWidth: 1,
-  },
+  contentWrap: { paddingHorizontal: 16, paddingTop: 4 },
   contentText: { fontSize: 14, lineHeight: 22 },
   originBtnWrapper: { marginTop: 16, paddingHorizontal: 16 },
   originBtn: {
@@ -466,7 +400,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
     gap: 8,
-    overflow: "hidden",
   },
   originBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
   center: {

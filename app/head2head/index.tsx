@@ -22,7 +22,6 @@ import * as Haptics from "expo-haptics";
 import { useSelector } from "react-redux";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 import { useSearchUserQuery } from "@/slices/usersApiSlice";
 import {
   useGetHead2HeadQuery,
@@ -223,15 +222,11 @@ const PlayerCard = ({ player, side, onPress, theme, isSelected }) => {
       <Animated.View
         style={[styles.playerCard, { transform: [{ scale: scaleAnim }] }]}
       >
-        <LiquidGlassSurface
-          active={isSelected}
-          isDark={isDark}
+        <LinearGradient
+          colors={isDark ? ["#1a1a2e", "#16213e"] : ["#ffffff", "#f8f9fa"]}
           style={[
             styles.playerCardInner,
             {
-              backgroundColor: isDark
-                ? "rgba(26,26,46,0.82)"
-                : "rgba(255,255,255,0.86)",
               borderColor: isSelected
                 ? borderColor
                 : isDark
@@ -323,7 +318,7 @@ const PlayerCard = ({ player, side, onPress, theme, isSelected }) => {
               </Text>
             </>
           )}
-        </LiquidGlassSurface>
+        </LinearGradient>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -375,8 +370,7 @@ const PlayerSearchModal = ({
         intensity={isDark ? 40 : 20}
         style={StyleSheet.absoluteFill}
       />
-      <LiquidGlassSurface
-        isDark={isDark}
+      <View
         style={[
           styles.modalContent,
           {
@@ -397,9 +391,7 @@ const PlayerSearchModal = ({
           </TouchableOpacity>
         </View>
 
-        <LiquidGlassSurface
-          isDark={isDark}
-          tone="field"
+        <View
           style={[
             styles.searchInputWrapper,
             { backgroundColor: isDark ? "#1a1a2e" : "#f0f0f0" },
@@ -423,7 +415,7 @@ const PlayerSearchModal = ({
               />
             </TouchableOpacity>
           )}
-        </LiquidGlassSurface>
+        </View>
 
         {(isLoading || isFetching) && (
           <ActivityIndicator style={{ marginTop: 20 }} color="#4ECDC4" />
@@ -440,20 +432,16 @@ const PlayerSearchModal = ({
           }
           renderItem={({ item }) => (
             <TouchableOpacity
+              style={[
+                styles.searchResultItem,
+                { backgroundColor: isDark ? "#1a1a2e" : "#f8f9fa" },
+              ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onSelect(item);
               }}
               activeOpacity={0.7}
             >
-              <LiquidGlassSurface
-                effect="clear"
-                isDark={isDark}
-                style={[
-                  styles.searchResultItem,
-                  { backgroundColor: isDark ? "#1a1a2e" : "#f8f9fa" },
-                ]}
-              >
               <Image
                 source={{ uri: normalizeUrl(item.avatar) }}
                 style={styles.searchResultAvatar}
@@ -486,7 +474,6 @@ const PlayerSearchModal = ({
                     : "---"}
                 </Text>
               </View>
-              </LiquidGlassSurface>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -509,7 +496,7 @@ const PlayerSearchModal = ({
             ) : null
           }
         />
-      </LiquidGlassSurface>
+      </View>
     </View>
   );
 };
@@ -525,15 +512,11 @@ const MatchHistoryItem = ({ match, player1Id, theme, onPress }) => {
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={onPress}
+      style={[
+        styles.matchHistoryItem,
+        { backgroundColor: isDark ? "#1a1a2e" : "#fff" },
+      ]}
     >
-      <LiquidGlassSurface
-        effect="clear"
-        isDark={isDark}
-        style={[
-          styles.matchHistoryItem,
-          { backgroundColor: isDark ? "#1a1a2e" : "#fff" },
-        ]}
-      >
       <View
         style={[
           styles.matchResultIndicator,
@@ -589,7 +572,6 @@ const MatchHistoryItem = ({ match, player1Id, theme, onPress }) => {
           </View>
         </View>
       </View>
-      </LiquidGlassSurface>
     </TouchableOpacity>
   );
 };
@@ -601,8 +583,7 @@ const PlayerStatsCard = ({ title, theme, data, loading }) => {
   const isDark = theme?.dark;
 
   return (
-    <LiquidGlassSurface
-      isDark={isDark}
+    <View
       style={[
         styles.playerStatsCard,
         { backgroundColor: isDark ? "#12121a" : "#fff" },
@@ -722,7 +703,7 @@ const PlayerStatsCard = ({ title, theme, data, loading }) => {
           Chưa có dữ liệu thống kê
         </Text>
       )}
-    </LiquidGlassSurface>
+    </View>
   );
 };
 
@@ -737,15 +718,11 @@ const OpponentItem = ({ item, theme, onPress }) => {
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={onPress}
+      style={[
+        styles.oppItem,
+        { backgroundColor: isDark ? "#1a1a2e" : "#f8f9fa" },
+      ]}
     >
-      <LiquidGlassSurface
-        effect="clear"
-        isDark={isDark}
-        style={[
-          styles.oppItem,
-          { backgroundColor: isDark ? "#1a1a2e" : "#f8f9fa" },
-        ]}
-      >
       <Image
         source={{ uri: normalizeUrl(u?.avatar) }}
         style={styles.oppAvatar}
@@ -773,7 +750,6 @@ const OpponentItem = ({ item, theme, onPress }) => {
           win
         </Text>
       </View>
-      </LiquidGlassSurface>
     </TouchableOpacity>
   );
 };
@@ -789,8 +765,7 @@ const FrequentOpponentsSection = ({
   const isDark = theme?.dark;
 
   return (
-    <LiquidGlassSurface
-      isDark={isDark}
+    <View
       style={[
         styles.opponentsSection,
         { backgroundColor: isDark ? "#12121a" : "#fff" },
@@ -826,7 +801,7 @@ const FrequentOpponentsSection = ({
           Chưa có dữ liệu đối thủ thường gặp
         </Text>
       )}
-    </LiquidGlassSurface>
+    </View>
   );
 };
 
@@ -899,8 +874,7 @@ const Head2HeadMatchesModal = ({
         style={StyleSheet.absoluteFill}
       />
 
-      <LiquidGlassSurface
-        isDark={isDark}
+      <View
         style={[
           styles.modalContent,
           {
@@ -973,7 +947,7 @@ const Head2HeadMatchesModal = ({
             }
           />
         )}
-      </LiquidGlassSurface>
+      </View>
     </View>
   );
 };
@@ -1244,8 +1218,7 @@ export default function Head2HeadScreen() {
           !h2hLoading &&
           !h2hFetching &&
           (h2hData?.totalMatches ?? 0) === 0 && (
-            <LiquidGlassSurface
-              isDark={isDark}
+            <View
               style={[
                 styles.noMatchesContainer,
                 { backgroundColor: isDark ? "#12121a" : "#fff" },
@@ -1272,13 +1245,12 @@ export default function Head2HeadScreen() {
               >
                 Hai người chơi này chưa từng gặp nhau trong các giải đấu
               </Text>
-            </LiquidGlassSurface>
+            </View>
           )}
 
         {/* ===== STATS COMPARISON ===== */}
         {bothPlayersSelected && hasData && (
-          <LiquidGlassSurface
-            isDark={isDark}
+          <View
             style={[
               styles.statsSection,
               { backgroundColor: isDark ? "#12121a" : "#fff" },
@@ -1328,13 +1300,12 @@ export default function Head2HeadScreen() {
               label="Điểm TB/trận"
               theme={theme}
             />
-          </LiquidGlassSurface>
+          </View>
         )}
 
         {/* ===== MATCH HISTORY ===== */}
         {bothPlayersSelected && (h2hData?.matches?.length || 0) > 0 && (
-          <LiquidGlassSurface
-            isDark={isDark}
+          <View
             style={[
               styles.historySection,
               { backgroundColor: isDark ? "#12121a" : "#fff" },
@@ -1372,7 +1343,7 @@ export default function Head2HeadScreen() {
                 onPress={() => goToMatch(match._id)}
               />
             ))}
-          </LiquidGlassSurface>
+          </View>
         )}
 
         {/* ===== FREQUENT OPPONENTS (NEW) ===== */}
@@ -1404,7 +1375,7 @@ export default function Head2HeadScreen() {
 
         {/* ===== EMPTY STATE ===== */}
         {!player1?._id || !player2?._id ? (
-          <LiquidGlassSurface isDark={isDark} style={styles.emptyState}>
+          <View style={styles.emptyState}>
             <MaterialCommunityIcons
               name="fencing"
               size={80}
@@ -1426,7 +1397,7 @@ export default function Head2HeadScreen() {
             >
               Xem lịch sử đối đầu, thống kê chi tiết, đối thủ thường gặp...
             </Text>
-          </LiquidGlassSurface>
+          </View>
         ) : null}
       </ScrollView>
 

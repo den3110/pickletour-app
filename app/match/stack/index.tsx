@@ -20,7 +20,6 @@ import {
   useDeleteUserMatchMutation,
 } from "@/slices/userMatchesApiSlice";
 import { ScrollView } from "react-native-gesture-handler";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 /* ====== Utils ====== */
 const RANGE_OPTIONS = [
@@ -106,8 +105,6 @@ const statusMeta = {
 };
 
 function StatusChip({ status }) {
-  const theme = useTheme();
-  const isDark = !!theme?.dark;
   const meta = statusMeta[status] || {
     label: status || "Không rõ",
     bg: "#E5E7EB",
@@ -115,9 +112,7 @@ function StatusChip({ status }) {
   };
 
   return (
-    <LiquidGlassSurface
-      effect="clear"
-      isDark={isDark}
+    <View
       style={{
         paddingHorizontal: 8,
         paddingVertical: 4,
@@ -134,7 +129,7 @@ function StatusChip({ status }) {
       >
         {meta.label}
       </Text>
-    </LiquidGlassSurface>
+    </View>
   );
 }
 
@@ -218,18 +213,15 @@ function MatchCard({ item, onPress }) {
       activeOpacity={0.85}
       onPress={onPress}
       disabled={isDeleting}
+      style={[
+        styles.card,
+        {
+          backgroundColor: bg,
+          borderColor: border,
+          opacity: isDeleting ? 0.5 : 1,
+        },
+      ]}
     >
-      <LiquidGlassSurface
-        isDark={isDark}
-        style={[
-          styles.card,
-          {
-            backgroundColor: bg,
-            borderColor: border,
-            opacity: isDeleting ? 0.5 : 1,
-          },
-        ]}
-      >
       <View style={styles.cardHeaderRow}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.matchTitle, { color: text }]} numberOfLines={1}>
@@ -255,20 +247,13 @@ function MatchCard({ item, onPress }) {
           <TouchableOpacity
             onPress={handleDelete}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ paddingLeft: 4 }}
           >
-            <LiquidGlassSurface
-              active
-              effect="clear"
-              isDark={isDark}
-              tone="danger"
-              style={styles.iconActionBtn}
-            >
-              {isDeleting ? (
-                <ActivityIndicator size="small" color="#EF4444" />
-              ) : (
-                <Ionicons name="trash-outline" size={20} color={sub} />
-              )}
-            </LiquidGlassSurface>
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <Ionicons name="trash-outline" size={20} color={sub} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -298,54 +283,36 @@ function MatchCard({ item, onPress }) {
             <TouchableOpacity
               onPress={handleGoLive}
               activeOpacity={0.85}
+              style={[styles.liveBtn, { borderColor: primaryColor }]}
             >
-              <LiquidGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={[styles.liveBtn, { borderColor: primaryColor }]}
-              >
-                <Ionicons name="radio" size={14} color={primaryColor} />
-                <Text style={[styles.liveBtnText, { color: primaryColor }]}>
-                  Live
-                </Text>
-              </LiquidGlassSurface>
+              <Ionicons name="radio" size={14} color={primaryColor} />
+              <Text style={[styles.liveBtnText, { color: primaryColor }]}>
+                Live
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleStartMatch}
               activeOpacity={0.85}
+              style={[styles.startBtn, { backgroundColor: primaryColor }]}
             >
-              <LiquidGlassSurface
-                active
-                isDark={isDark}
-                style={[styles.startBtn, { backgroundColor: primaryColor }]}
-              >
-                <Ionicons name="play" size={14} color="#FFFFFF" />
-                <Text style={styles.startBtnText}>Bắt trận</Text>
-              </LiquidGlassSurface>
+              <Ionicons name="play" size={14} color="#FFFFFF" />
+              <Text style={styles.startBtnText}>Bắt trận</Text>
             </TouchableOpacity>
           </View>
         ) : isFinished ? (
           <TouchableOpacity
             onPress={handleStartMatch}
             activeOpacity={0.85}
+            style={[styles.viewScoreBtn, { borderColor: primaryColor }]}
           >
-            <LiquidGlassSurface
-              active
-              effect="clear"
-              isDark={isDark}
-              style={[styles.viewScoreBtn, { borderColor: primaryColor }]}
-            >
-              <Ionicons name="eye-outline" size={14} color={primaryColor} />
-              <Text style={[styles.viewScoreText, { color: primaryColor }]}>
-                Xem tỉ số
-              </Text>
-            </LiquidGlassSurface>
+            <Ionicons name="eye-outline" size={14} color={primaryColor} />
+            <Text style={[styles.viewScoreText, { color: primaryColor }]}>
+              Xem tỉ số
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>
-      </LiquidGlassSurface>
     </TouchableOpacity>
   );
 }
@@ -453,53 +420,43 @@ export default function MatchesStackScreen() {
             >
               <TouchableOpacity
                 onPress={() => router.push("/match/live-setup")}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: primaryColor,
+                  marginRight: 8,
+                }}
               >
-                <LiquidGlassSurface
-                  active
-                  isDark={isDark}
+                <Ionicons name="radio" size={16} color="#FFFFFF" />
+                <Text
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                    backgroundColor: primaryColor,
-                    marginRight: 8,
+                    marginLeft: 6,
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: "#FFFFFF",
                   }}
                 >
-                  <Ionicons name="radio" size={16} color="#FFFFFF" />
-                  <Text
-                    style={{
-                      marginLeft: 6,
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: "#FFFFFF",
-                    }}
-                  >
-                    Live
-                  </Text>
-                </LiquidGlassSurface>
+                  Live
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => router.push("/match/user-match/create")}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: primaryColor,
+                  marginRight: 8,
+                }}
                 activeOpacity={0.85}
               >
-                <LiquidGlassSurface
-                  active
-                  isDark={isDark}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                    backgroundColor: primaryColor,
-                    marginRight: 8,
-                  }}
-                >
-                  <Ionicons name="add" size={16} color="#FFFFFF" />
-                </LiquidGlassSurface>
+                <Ionicons name="add" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           ),
@@ -509,9 +466,7 @@ export default function MatchesStackScreen() {
       <View style={[styles.container, { backgroundColor: bg }]}>
         {/* Search */}
         <View style={styles.searchContainer}>
-          <LiquidGlassSurface
-            isDark={isDark}
-            tone="field"
+          <View
             style={[
               styles.searchInputWrapper,
               {
@@ -535,7 +490,7 @@ export default function MatchesStackScreen() {
               returnKeyType="search"
               onSubmitEditing={handleRefresh}
             />
-          </LiquidGlassSurface>
+          </View>
         </View>
 
         {/* Time range */}
@@ -561,10 +516,7 @@ export default function MatchesStackScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <LiquidGlassSurface
-                    active={selected}
-                    effect="clear"
-                    isDark={isDark}
+                  <View
                     style={[
                       styles.rangeChip,
                       selected && {
@@ -581,7 +533,7 @@ export default function MatchesStackScreen() {
                     >
                       {opt.label}
                     </Text>
-                  </LiquidGlassSurface>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -598,10 +550,7 @@ export default function MatchesStackScreen() {
               }}
               activeOpacity={0.8}
             >
-              <LiquidGlassSurface
-                active={rangeKey === "custom" || hasCustomRange}
-                effect="clear"
-                isDark={isDark}
+              <View
                 style={[
                   styles.rangeChip,
                   (rangeKey === "custom" || hasCustomRange) && {
@@ -628,7 +577,7 @@ export default function MatchesStackScreen() {
                       )}`
                     : "Khoảng ngày"}
                 </Text>
-              </LiquidGlassSurface>
+              </View>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -666,7 +615,7 @@ export default function MatchesStackScreen() {
             )}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
-              <LiquidGlassSurface isDark={isDark} style={styles.emptyContainer}>
+              <View style={styles.emptyContainer}>
                 <Ionicons
                   name="tennisball-outline"
                   size={32}
@@ -680,7 +629,7 @@ export default function MatchesStackScreen() {
                 >
                   Bạn chưa tạo trận nào trong khoảng thời gian này
                 </Text>
-              </LiquidGlassSurface>
+              </View>
             }
             refreshing={isFetching && !isLoading}
             onRefresh={handleRefresh}
@@ -696,10 +645,7 @@ export default function MatchesStackScreen() {
         onRequestClose={() => setDateModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <LiquidGlassSurface
-            isDark={isDark}
-            style={[styles.modalCard, { backgroundColor: cardBg }]}
-          >
+          <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
             <Text
               style={{
                 fontSize: 13,
@@ -816,16 +762,9 @@ export default function MatchesStackScreen() {
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
                 onPress={() => setDateModalVisible(false)}
+                style={styles.modalTextBtn}
               >
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.modalTextBtn}
-                >
-                  <Text style={{ color: textSec, fontWeight: "600" }}>
-                    Đóng
-                  </Text>
-                </LiquidGlassSurface>
+                <Text style={{ color: textSec, fontWeight: "600" }}>Đóng</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -839,27 +778,22 @@ export default function MatchesStackScreen() {
                   setDateModalVisible(false);
                   handleRefresh();
                 }}
+                style={[
+                  styles.modalApplyBtn,
+                  {
+                    backgroundColor: canApply ? primaryColor : textSec,
+                    opacity: canApply ? 1 : 0.6,
+                  },
+                ]}
               >
-                <LiquidGlassSurface
-                  active={canApply}
-                  isDark={isDark}
-                  style={[
-                    styles.modalApplyBtn,
-                    {
-                      backgroundColor: canApply ? primaryColor : textSec,
-                      opacity: canApply ? 1 : 0.6,
-                    },
-                  ]}
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}
                 >
-                  <Text
-                    style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}
-                  >
-                    Áp dụng
-                  </Text>
-                </LiquidGlassSurface>
+                  Áp dụng
+                </Text>
               </TouchableOpacity>
             </View>
-          </LiquidGlassSurface>
+          </View>
         </View>
       </Modal>
     </>
@@ -943,13 +877,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
-  },
-  iconActionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -1059,9 +986,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 40,
     paddingHorizontal: 32,
-    marginHorizontal: 16,
-    borderRadius: 18,
-    paddingBottom: 40,
   },
   emptyText: {
     marginTop: 8,

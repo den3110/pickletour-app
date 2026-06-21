@@ -18,7 +18,6 @@ import { Image } from "expo-image";
 import YoutubePlayer from "react-native-youtube-iframe";
 import * as Haptics from "expo-haptics";
 import { useGetGuideFeedUrlQuery } from "@/slices/guidesApiSlice";
-import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 // Lấy nội dung giữa <tag>...</tag>
 function extractTag(tag, text) {
@@ -139,10 +138,7 @@ function SkeletonBlock({
 
 function SkeletonItem({ isDark, cardBg }) {
   return (
-    <LiquidGlassSurface
-      isDark={isDark}
-      style={[styles.item, { backgroundColor: cardBg }]}
-    >
+    <View style={[styles.item, { backgroundColor: cardBg }]}>
       <View
         style={[
           styles.thumbnail,
@@ -162,7 +158,7 @@ function SkeletonItem({ isDark, cardBg }) {
         </View>
       </View>
       <SkeletonBlock isDark={isDark} width={18} height={18} radius={9} />
-    </LiquidGlassSurface>
+    </View>
   );
 }
 
@@ -314,72 +310,60 @@ export default function GuidesScreen() {
         delayLongPress={300}
         onLongPress={() => openPreview(item)}
         onPress={() => handleItemPress(item)}
+        style={[styles.item, { backgroundColor: cardBg }]}
       >
-        <LiquidGlassSurface
-          isDark={isDark}
-          style={[styles.item, { backgroundColor: cardBg }]}
-        >
-          <Image
-            source={{ uri: item.thumbnail }}
-            style={styles.thumbnail}
-            contentFit="cover"
-            transition={200}
-          />
+        <Image
+          source={{ uri: item.thumbnail }}
+          style={styles.thumbnail}
+          contentFit="cover"
+          transition={200}
+        />
 
-          <View style={styles.itemContent}>
-            <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>
-              {item.title}
+        <View style={styles.itemContent}>
+          <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <View style={styles.metaRow}>
+            <Ionicons
+              name="time-outline"
+              size={14}
+              color={subColor}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.date, { color: subColor }]}>
+              {formatDate(item.published)}
             </Text>
-
-            <View style={styles.metaRow}>
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color={subColor}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.date, { color: subColor }]}>
-                {formatDate(item.published)}
-              </Text>
-            </View>
-
-            <View style={styles.chipsRow}>
-              {viewsLabel ? (
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.chip}
-                >
-                  <Ionicons
-                    name="eye-outline"
-                    size={12}
-                    color="#9AA0A6"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.chipText}>{viewsLabel} lượt xem</Text>
-                </LiquidGlassSurface>
-              ) : null}
-
-              {likesLabel ? (
-                <LiquidGlassSurface
-                  effect="clear"
-                  isDark={isDark}
-                  style={styles.chip}
-                >
-                  <Ionicons
-                    name="thumbs-up-outline"
-                    size={12}
-                    color="#9AA0A6"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.chipText}>{likesLabel} đánh giá</Text>
-                </LiquidGlassSurface>
-              ) : null}
-            </View>
           </View>
 
-          <Ionicons name="chevron-forward" size={20} color={subColor} />
-        </LiquidGlassSurface>
+          <View style={styles.chipsRow}>
+            {viewsLabel ? (
+              <View style={styles.chip}>
+                <Ionicons
+                  name="eye-outline"
+                  size={12}
+                  color="#9AA0A6"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.chipText}>{viewsLabel} lượt xem</Text>
+              </View>
+            ) : null}
+
+            {likesLabel ? (
+              <View style={styles.chip}>
+                <Ionicons
+                  name="thumbs-up-outline"
+                  size={12}
+                  color="#9AA0A6"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.chipText}>{likesLabel} đánh giá</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <Ionicons name="chevron-forward" size={20} color={subColor} />
       </TouchableOpacity>
     );
   };
@@ -416,28 +400,22 @@ export default function GuidesScreen() {
             }
           />
         ) : error ? (
-          <LiquidGlassSurface isDark={isDark} style={styles.centerCard}>
+          <View style={styles.center}>
             <Text style={{ color: textColor, marginBottom: 12 }}>{error}</Text>
             <TouchableOpacity
+              style={[styles.retryBtn, { borderColor: primary }]}
               onPress={() => {
                 const url = (guideConfig?.guideUrl || "").trim();
                 if (!url) return;
                 fetchFeed({ url, showSkeleton: true });
               }}
             >
-              <LiquidGlassSurface
-                active
-                effect="clear"
-                isDark={isDark}
-                style={[styles.retryBtn, { borderColor: primary }]}
-              >
-                <Ionicons name="refresh" size={18} color={primary} />
-                <Text style={[styles.retryText, { color: primary }]}>
-                  Thử lại
-                </Text>
-              </LiquidGlassSurface>
+              <Ionicons name="refresh" size={18} color={primary} />
+              <Text style={[styles.retryText, { color: primary }]}>
+                Thử lại
+              </Text>
             </TouchableOpacity>
-          </LiquidGlassSurface>
+          </View>
         ) : (
           <FlatList
             data={videos}
@@ -449,9 +427,9 @@ export default function GuidesScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             ListEmptyComponent={
-              <LiquidGlassSurface isDark={isDark} style={styles.centerCard}>
+              <View style={styles.center}>
                 <Text style={{ color: subColor }}>Chưa có video nào.</Text>
-              </LiquidGlassSurface>
+              </View>
             }
           />
         )}
@@ -469,10 +447,7 @@ export default function GuidesScreen() {
           <View style={styles.previewBackdrop}>
             {/* Bấm vào card thì không tắt overlay */}
             <TouchableWithoutFeedback onPress={() => {}}>
-              <LiquidGlassSurface
-                isDark={isDark}
-                style={[styles.previewCard, { backgroundColor: cardBg }]}
-              >
+              <View style={[styles.previewCard, { backgroundColor: cardBg }]}>
                 {/* Player 16:9 */}
                 <View
                   style={[
@@ -524,11 +499,7 @@ export default function GuidesScreen() {
 
                 <View style={styles.previewMetaRow}>
                   {preview.video?.published ? (
-                    <LiquidGlassSurface
-                      effect="clear"
-                      isDark={isDark}
-                      style={styles.previewMetaChip}
-                    >
+                    <View style={styles.previewMetaChip}>
                       <Ionicons
                         name="time-outline"
                         size={12}
@@ -538,15 +509,11 @@ export default function GuidesScreen() {
                       <Text style={styles.previewMetaText}>
                         {formatDate(preview.video.published)}
                       </Text>
-                    </LiquidGlassSurface>
+                    </View>
                   ) : null}
 
                   {typeof preview.video?.viewCount === "number" ? (
-                    <LiquidGlassSurface
-                      effect="clear"
-                      isDark={isDark}
-                      style={styles.previewMetaChip}
-                    >
+                    <View style={styles.previewMetaChip}>
                       <Ionicons
                         name="eye-outline"
                         size={12}
@@ -556,10 +523,10 @@ export default function GuidesScreen() {
                       <Text style={styles.previewMetaText}>
                         {formatCount(preview.video.viewCount)} lượt xem
                       </Text>
-                    </LiquidGlassSurface>
+                    </View>
                   ) : null}
                 </View>
-              </LiquidGlassSurface>
+              </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
@@ -585,7 +552,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
-    overflow: "hidden",
   },
   thumbnail: {
     width: 100,
@@ -632,14 +598,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
-  },
-  centerCard: {
-    marginHorizontal: 16,
-    borderRadius: 18,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 140,
   },
   retryBtn: {
     flexDirection: "row",

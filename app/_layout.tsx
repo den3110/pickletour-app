@@ -55,6 +55,7 @@ import {
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
+import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 import { enableFreeze } from "react-native-screens";
 
 enableFreeze(true);
@@ -110,6 +111,7 @@ const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
 const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
 const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
 const EMPTY_SAFE_AREA_EDGES = [] as const;
+const ROOT_SAFE_AREA_TOP_ONLY_EDGES = ["top"] as const;
 const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
 const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
 
@@ -612,6 +614,8 @@ const isExpoGo = Constants.appOwnership === "expo";
 
 function RootLayout() {
   const segments = useSegments();
+  const isTabsRoute = segments[0] === "(tabs)";
+  const isLiveHomeRoute = segments[0] === "live" && segments[1] === "home";
 
   const clarityInitRef = React.useRef(false);
   const clarityModRef = React.useRef<any>(null);
@@ -653,10 +657,17 @@ function RootLayout() {
   }, [nativeAuthSnapshot]);
   const nativeAuthBearerToken = String(nativeAuthUserInfo?.token || "").trim();
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
-  const rootSafeAreaEdges =
-    isWebViewShellActive || Platform.OS === "ios"
-      ? EMPTY_SAFE_AREA_EDGES
-      : ROOT_SAFE_AREA_EDGES;
+  const rootSafeAreaEdges = React.useMemo(() => {
+    if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
+    if (isLiveHomeRoute) return EMPTY_SAFE_AREA_EDGES;
+    if (Platform.OS === "ios" && isTabsRoute) {
+      return EMPTY_SAFE_AREA_EDGES;
+    }
+    if (IOS_26_NATIVE_TABS_ENABLED) {
+      return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
+    }
+    return ROOT_SAFE_AREA_EDGES;
+  }, [isLiveHomeRoute, isTabsRoute, isWebViewShellActive]);
 
   // Initialize analytics
   useEffect(() => {
@@ -1894,56 +1905,6 @@ function RootLayout() {
                           >
                             <Stack.Screen
                               name="(tabs)"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="stats/user"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="profile/stack"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="profile/[id]/index"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="rankings/stack"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="tournament/stack"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="schedule/index"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="live-auth"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="live/studio_court_ios"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="live/studio_court_android"
-                              options={{ headerShown: false }}
-                            />
-
-                            <Stack.Screen
-                              name="match/user-match/[id]/live"
                               options={{ headerShown: false }}
                             />
 

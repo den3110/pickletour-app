@@ -761,9 +761,6 @@ export default function UserStatsScreen() {
     });
   };
 
-  const headerTopPadding = top + (Platform.OS === "ios" ? 6 : 8);
-  const headerHeight = top + (Platform.OS === "ios" ? 104 : 122);
-
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar barStyle={T.isDark ? "light-content" : "dark-content"} />
@@ -781,8 +778,7 @@ export default function UserStatsScreen() {
           style={[
             styles.headerGlass,
             {
-              height: headerHeight,
-              paddingTop: headerTopPadding,
+              paddingTop: top + 10,
               backgroundColor: T.cardBg,
               borderColor: T.cardBorder,
             },
@@ -1272,7 +1268,7 @@ const styles = StyleSheet.create({
     height: 86,
   },
   headerGlass: {
-    paddingBottom: 8,
+    paddingBottom: 12,
     paddingHorizontal: PADX,
     borderBottomWidth: 1,
   },
@@ -1324,7 +1320,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 4,
     borderRadius: 16,
-    marginTop: 8,
+    marginTop: 16,
     borderWidth: 1,
   },
   segmentBtn: {
@@ -1334,7 +1330,7 @@ const styles = StyleSheet.create({
   },
   segmentPill: {
     width: "100%",
-    minHeight: 34,
+    minHeight: 36,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,
