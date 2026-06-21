@@ -1667,7 +1667,11 @@ export default function RefereeJudgePanel({ matchId }) {
     refetch,
     api: liveApi,
     sync: liveSync,
-  } = useLiveMatch(matchId, null, { offlineSync: true });
+  } = useLiveMatch(matchId, null, {
+    offlineSync: true,
+    optimisticUpdates: false,
+    persistCache: false,
+  });
   const socket = useSocket();
 
   // ===== NEW: court modal state =====

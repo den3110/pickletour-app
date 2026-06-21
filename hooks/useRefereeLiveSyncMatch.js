@@ -28,6 +28,12 @@ function trim(value) {
   return (value && String(value).trim()) || "";
 }
 
+function payloadBelongsToMatch(payload, matchId, { allowMissing = true } = {}) {
+  const id = trim(getMatchPayloadId(payload));
+  if (!id) return allowMissing;
+  return id === String(matchId || "");
+}
+
 async function parseJsonSafe(response) {
   try {
     return await response.json();
@@ -90,8 +96,11 @@ export function useRefereeLiveSyncMatch(
   options = {}
 ) {
   const enabled = options?.enabled !== false;
+  const persistCache = options?.persistCache === true;
+  const optimisticUpdates = options?.optimisticUpdates === true;
   const socket = useSocket();
   const mountedRef = useRef(false);
+  const activeMatchIdRef = useRef(String(matchId || ""));
   const persistRef = useRef(createEmptyLiveSyncState(matchId));
   const dataRef = useRef(null);
   const syncInFlightRef = useRef(null);
@@ -126,16 +135,18 @@ export function useRefereeLiveSyncMatch(
   }, []);
 
   const persistState = useCallback(async (nextPartial) => {
+    const currentMatchId = String(matchId || "");
+    if (activeMatchIdRef.current !== currentMatchId) return;
     const next = {
       ...persistRef.current,
       ...(nextPartial || {}),
-      matchId: String(matchId || ""),
+      matchId: currentMatchId,
     };
     persistRef.current = next;
-    if (matchId) {
+    if (persistCache && matchId) {
       await saveRefereeLiveSyncState(matchId, next);
     }
-  }, [matchId]);
+  }, [matchId, persistCache]);
 
   const setDerivedState = useCallback((updater) => {
     setState((prev) => {
@@ -376,6 +387,11 @@ export function useRefereeLiveSyncMatch(
   const applyRemoteSnapshot = useCallback(
     async (snapshot, { force = false, owner = undefined } = {}) => {
       if (!snapshot) return null;
+      const currentMatchId = String(matchId || "");
+      if (activeMatchIdRef.current !== currentMatchId) return null;
+      if (!payloadBelongsToMatch(snapshot, currentMatchId, { allowMissing: false })) {
+        return null;
+      }
       const queue = Array.isArray(persistRef.current.queue)
         ? persistRef.current.queue
         : [];
@@ -420,7 +436,7 @@ export function useRefereeLiveSyncMatch(
       });
       return rebuilt;
     },
-    [decorateOwner, mergeAuthoritativeSnapshot, persistState, setDerivedState]
+    [decorateOwner, matchId, mergeAuthoritativeSnapshot, persistState, setDerivedState]
   );
 
   const bootstrap = useCallback(async () => {
@@ -435,6 +451,7 @@ export function useRefereeLiveSyncMatch(
             socketEvent: "match:live:bootstrap",
           }
         );
+        if (activeMatchIdRef.current !== String(matchId || "")) return null;
         const runtimeState = buildRuntimeState(result, {
           owner: result?.owner || null,
         });
@@ -461,11 +478,15 @@ export function useRefereeLiveSyncMatch(
         });
         return result;
       } catch (error) {
-        if (!mountedRef.current) return null;
+        if (!mountedRef.current || activeMatchIdRef.current !== String(matchId || "")) {
+          return null;
+        }
         setDerivedState((prev) => ({ ...prev, loading: false, error }));
         return null;
       } finally {
-        bootstrapInFlightRef.current = null;
+        if (activeMatchIdRef.current === String(matchId || "")) {
+          bootstrapInFlightRef.current = null;
+        }
       }
     })();
 
@@ -496,6 +517,7 @@ export function useRefereeLiveSyncMatch(
             socketEvent: "match:live:claim",
           }
         );
+        if (activeMatchIdRef.current !== String(matchId || "")) return null;
         const runtimeState = buildRuntimeState(result, {
           owner: result?.owner || null,
         });
@@ -526,6 +548,7 @@ export function useRefereeLiveSyncMatch(
         await applyRemoteSnapshot(result?.snapshot, { owner: runtimeState.owner });
         return result;
       } catch (error) {
+        if (activeMatchIdRef.current !== String(matchId || "")) return null;
         const runtimeState = buildRuntimeState(error?.data || {}, {
           owner: error?.data?.owner || null,
         });
@@ -572,8 +595,10 @@ export function useRefereeLiveSyncMatch(
         }
         return null;
       } finally {
-        claimInFlightRef.current = null;
-        if (mountedRef.current) {
+        if (activeMatchIdRef.current === String(matchId || "")) {
+          claimInFlightRef.current = null;
+        }
+        if (mountedRef.current && activeMatchIdRef.current === String(matchId || "")) {
           setDerivedState((prev) => ({ ...prev, claiming: false }));
         }
       }
@@ -599,6 +624,7 @@ export function useRefereeLiveSyncMatch(
         method: "POST",
         socketEvent: "match:live:release",
       });
+      if (activeMatchIdRef.current !== String(matchId || "")) return null;
       const runtimeState = buildRuntimeState(result, {
         owner: result?.owner ?? null,
       });
@@ -676,6 +702,7 @@ export function useRefereeLiveSyncMatch(
               },
             },
           );
+          if (activeMatchIdRef.current !== String(matchId || "")) return null;
 
           const rejected = Array.isArray(result?.rejectedEvents)
             ? result.rejectedEvents
@@ -766,11 +793,15 @@ export function useRefereeLiveSyncMatch(
           }
         }
       } catch (error) {
-        setDerivedState((prev) => ({ ...prev, error }));
+        if (activeMatchIdRef.current === String(matchId || "")) {
+          setDerivedState((prev) => ({ ...prev, error }));
+        }
         return null;
       } finally {
-        syncInFlightRef.current = null;
-        if (mountedRef.current) {
+        if (activeMatchIdRef.current === String(matchId || "")) {
+          syncInFlightRef.current = null;
+        }
+        if (mountedRef.current && activeMatchIdRef.current === String(matchId || "")) {
           setDerivedState((prev) => ({ ...prev, syncing: false }));
         }
       }
@@ -849,6 +880,7 @@ export function useRefereeLiveSyncMatch(
           socketEvent: "match:live:takeover",
         }
       );
+      if (activeMatchIdRef.current !== String(matchId || "")) return null;
       const runtimeState = buildRuntimeState(result, {
         owner: result?.owner || null,
       });
@@ -879,7 +911,7 @@ export function useRefereeLiveSyncMatch(
       await syncNow();
       return result;
     } finally {
-      if (mountedRef.current) {
+      if (mountedRef.current && activeMatchIdRef.current === String(matchId || "")) {
         setDerivedState((prev) => ({ ...prev, claiming: false }));
       }
     }
@@ -906,9 +938,18 @@ export function useRefereeLiveSyncMatch(
             Number(persistRef.current.lastAckedServerVersion || 0);
           const event = createClientLiveSyncEvent(type, payload, baseVersion);
           const nextQueue = [...(persistRef.current.queue || []), event];
-          const sourceSnapshot = dataRef.current || persistRef.current.snapshot;
-          const optimistic = applyLiveSyncEventLocally(sourceSnapshot, event);
-          dataRef.current = optimistic;
+          const sourceSnapshotRaw = dataRef.current || persistRef.current.snapshot;
+          const sourceSnapshot = payloadBelongsToMatch(sourceSnapshotRaw, matchId, {
+            allowMissing: false,
+          })
+            ? sourceSnapshotRaw
+            : null;
+          const optimistic = optimisticUpdates && sourceSnapshot
+            ? applyLiveSyncEventLocally(sourceSnapshot, event)
+            : null;
+          if (optimistic) {
+            dataRef.current = optimistic;
+          }
           await persistState({
             queue: nextQueue,
             snapshot: normalizeMatchDisplay(persistRef.current.snapshot),
@@ -922,7 +963,18 @@ export function useRefereeLiveSyncMatch(
           const onlineNow = state.online;
           const owner = persistRef.current.owner;
           if (onlineNow && (!owner || owner.isSelf)) {
-            syncNow();
+            void Promise.resolve(syncNow()).finally(() => {
+              const hasPending = Array.isArray(persistRef.current.queue)
+                ? persistRef.current.queue.length > 0
+                : false;
+              if (
+                hasPending &&
+                mountedRef.current &&
+                activeMatchIdRef.current === String(matchId || "")
+              ) {
+                syncNow();
+              }
+            });
           }
           return event;
         });
@@ -932,6 +984,7 @@ export function useRefereeLiveSyncMatch(
     [
       enabled,
       matchId,
+      optimisticUpdates,
       state.online,
       persistState,
       setDerivedState,
@@ -941,8 +994,15 @@ export function useRefereeLiveSyncMatch(
 
   useEffect(() => {
     mountedRef.current = true;
+    const normalizedMatchId = String(matchId || "");
+    activeMatchIdRef.current = normalizedMatchId;
     if (!enabled || !matchId) {
+      persistRef.current = createEmptyLiveSyncState(matchId);
       dataRef.current = null;
+      syncInFlightRef.current = null;
+      bootstrapInFlightRef.current = null;
+      claimInFlightRef.current = null;
+      enqueueChainRef.current = Promise.resolve();
       setState({
         loading: false,
         data: null,
@@ -962,18 +1022,53 @@ export function useRefereeLiveSyncMatch(
       };
     }
 
+    persistRef.current = createEmptyLiveSyncState(matchId);
+    dataRef.current = null;
+    syncInFlightRef.current = null;
+    bootstrapInFlightRef.current = null;
+    claimInFlightRef.current = null;
+    enqueueChainRef.current = Promise.resolve();
+    setState((prev) => ({
+      ...prev,
+      loading: true,
+      data: null,
+      error: null,
+      owner: null,
+      pendingCount: 0,
+      syncing: false,
+      claiming: false,
+      lastRejectedBatch: [],
+    }));
+
     (async () => {
       const [deviceId, deviceName] = await Promise.all([
         getDeviceId(),
         getDeviceName(),
       ]);
+      if (!mountedRef.current || activeMatchIdRef.current !== normalizedMatchId) {
+        return;
+      }
       deviceRef.current = { deviceId, deviceName };
-      const stored = await loadRefereeLiveSyncState(matchId);
-      if (!mountedRef.current) return;
+      const stored = persistCache
+        ? await loadRefereeLiveSyncState(matchId)
+        : createEmptyLiveSyncState(matchId);
+      if (!mountedRef.current || activeMatchIdRef.current !== normalizedMatchId) {
+        return;
+      }
+      const storedSnapshot = payloadBelongsToMatch(stored.snapshot, matchId, {
+        allowMissing: false,
+      })
+        ? stored.snapshot
+        : null;
+      const storedQueue = storedSnapshot && Array.isArray(stored.queue)
+        ? stored.queue
+        : [];
       const storedRuntime = resolveRuntimeFromPayload(stored);
       const storedOwner = ownerForRuntime(stored.owner || null, storedRuntime);
       persistRef.current = {
         ...stored,
+        snapshot: storedSnapshot,
+        queue: storedQueue,
         featureEnabled: storedRuntime.featureEnabled,
         mode: storedRuntime.mode,
         settingsUpdatedAt: storedRuntime.settingsUpdatedAt,
@@ -984,8 +1079,8 @@ export function useRefereeLiveSyncMatch(
             : []
           : [],
       };
-      dataRef.current = stored.snapshot
-        ? rebuildLiveSyncSnapshot(stored.snapshot, stored.queue)
+      dataRef.current = storedSnapshot
+        ? rebuildLiveSyncSnapshot(storedSnapshot, storedQueue)
         : null;
       setState((prev) => ({
         ...prev,
@@ -995,7 +1090,7 @@ export function useRefereeLiveSyncMatch(
         mode: storedRuntime.mode,
         settingsUpdatedAt: storedRuntime.settingsUpdatedAt,
         owner: storedOwner,
-        pendingCount: Array.isArray(stored.queue) ? stored.queue.length : 0,
+        pendingCount: storedQueue.length,
         lastRejectedBatch: storedRuntime.featureEnabled
           ? Array.isArray(stored.lastRejectedBatch)
             ? stored.lastRejectedBatch
@@ -1008,7 +1103,14 @@ export function useRefereeLiveSyncMatch(
     return () => {
       mountedRef.current = false;
     };
-  }, [enabled, matchId, ownerForRuntime, refreshOwnership, resolveRuntimeFromPayload]);
+  }, [
+    enabled,
+    matchId,
+    ownerForRuntime,
+    persistCache,
+    refreshOwnership,
+    resolveRuntimeFromPayload,
+  ]);
 
   useEffect(() => {
     if (!enabled || !matchId) return;
@@ -1073,7 +1175,8 @@ export function useRefereeLiveSyncMatch(
       const queue = Array.isArray(persistRef.current.queue)
         ? persistRef.current.queue
         : [];
-      const shouldOverlayQueue = queue.length > 0 && !syncInFlightRef.current;
+      const shouldOverlayQueue =
+        optimisticUpdates && queue.length > 0 && !syncInFlightRef.current;
       const baseSnapshot =
         shouldOverlayQueue
           ? rebuildLiveSyncSnapshot(incoming, queue)
@@ -1111,7 +1214,8 @@ export function useRefereeLiveSyncMatch(
       const queue = Array.isArray(persistRef.current.queue)
         ? persistRef.current.queue
         : [];
-      const shouldOverlayQueue = queue.length > 0 && !syncInFlightRef.current;
+      const shouldOverlayQueue =
+        optimisticUpdates && queue.length > 0 && !syncInFlightRef.current;
       const nextData =
         shouldOverlayQueue
           ? rebuildLiveSyncSnapshot(mergedSnapshot, queue)
@@ -1197,6 +1301,7 @@ export function useRefereeLiveSyncMatch(
     matchId,
     ownerForRuntime,
     persistState,
+    optimisticUpdates,
     readCurrentRuntime,
     refreshOwnership,
     setDerivedState,
