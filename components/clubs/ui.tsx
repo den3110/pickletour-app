@@ -8,10 +8,12 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTheme } from "@react-navigation/native";
 // ✅ dùng Lottie thay icon
 import LottieView from "lottie-react-native";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 export const Section = ({ title, subtitle, children }: any) => (
   <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -36,46 +38,66 @@ export const GlassCard = ({ children, style }: any) => (
   </View>
 );
 
-export const PrimaryBtn = ({ title, onPress, small, style, disabled }: any) => (
-  <TouchableOpacity
-    activeOpacity={0.9}
-    disabled={disabled}
-    onPress={onPress}
-    style={[styles.pBtn, small && styles.pBtnSmall, style]}
-  >
-    <LinearGradient
-      colors={["#4ECDC4", "#45B7D1"]}
-      style={StyleSheet.absoluteFill}
-    />
-    <Text style={styles.pBtnText}>{title}</Text>
-  </TouchableOpacity>
-);
+export const PrimaryBtn = ({ title, onPress, small, style, disabled }: any) => {
+  const { dark } = useTheme();
+  return (
+    <TouchableOpacity activeOpacity={0.9} disabled={disabled} onPress={onPress}>
+      <LiquidGlassSurface
+        active={!disabled}
+        isDark={dark}
+        style={[styles.pBtn, small && styles.pBtnSmall, style]}
+      >
+        <LinearGradient
+          colors={["#4ECDC4", "#45B7D1"]}
+          style={StyleSheet.absoluteFill}
+        />
+        <Text style={styles.pBtnText}>{title}</Text>
+      </LiquidGlassSurface>
+    </TouchableOpacity>
+  );
+};
 
-export const SecondaryBtn = ({ title, onPress, small, style }: any) => (
-  <TouchableOpacity
-    activeOpacity={0.9}
-    onPress={onPress}
-    style={[styles.sBtn, small && styles.sBtnSmall, style]}
-  >
-    <Text style={styles.sBtnText}>{title}</Text>
-  </TouchableOpacity>
-);
+export const SecondaryBtn = ({ title, onPress, small, style }: any) => {
+  const { dark } = useTheme();
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+      <LiquidGlassSurface
+        active
+        effect="clear"
+        isDark={dark}
+        style={[styles.sBtn, small && styles.sBtnSmall, style]}
+      >
+        <Text style={styles.sBtnText}>{title}</Text>
+      </LiquidGlassSurface>
+    </TouchableOpacity>
+  );
+};
 
-export const DangerGhostBtn = ({ title, onPress, small, style }: any) => (
-  <TouchableOpacity
-    activeOpacity={0.9}
-    onPress={onPress}
-    style={[styles.dBtn, small && styles.dBtnSmall, style]}
-  >
-    <Text style={styles.dBtnText}>{title}</Text>
-  </TouchableOpacity>
-);
+export const DangerGhostBtn = ({ title, onPress, small, style }: any) => {
+  const { dark } = useTheme();
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+      <LiquidGlassSurface
+        active
+        effect="clear"
+        isDark={dark}
+        tone="danger"
+        style={[styles.dBtn, small && styles.dBtnSmall, style]}
+      >
+        <Text style={styles.dBtnText}>{title}</Text>
+      </LiquidGlassSurface>
+    </TouchableOpacity>
+  );
+};
 
-export const Badge = ({ text }: { text: string }) => (
-  <View style={styles.badge}>
-    <Text style={styles.badgeText}>{text}</Text>
-  </View>
-);
+export const Badge = ({ text }: { text: string }) => {
+  const { dark } = useTheme();
+  return (
+    <LiquidGlassSurface effect="clear" isDark={dark} style={styles.badge}>
+      <Text style={styles.badgeText}>{text}</Text>
+    </LiquidGlassSurface>
+  );
+};
 
 export const EmptyState = ({
   label,

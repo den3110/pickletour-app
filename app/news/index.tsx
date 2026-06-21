@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useGetNewsQuery } from "@/slices/newsApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 const FALLBACK_IMG =
   "https://dummyimage.com/600x400/A29BFE/ffffff&text=Pickleball+News";
@@ -90,7 +91,8 @@ function NewsCardSkeleton({ theme }) {
   const chip = isDark ? "#242a36" : "#e9ecf2";
 
   return (
-    <View
+    <LiquidGlassSurface
+      isDark={isDark}
       style={[
         styles.card,
         { backgroundColor: card, borderColor: "transparent" },
@@ -137,7 +139,7 @@ function NewsCardSkeleton({ theme }) {
           radius={10}
         />
       </View>
-    </View>
+    </LiquidGlassSurface>
   );
 }
 
@@ -166,74 +168,94 @@ function NewsListItem({ item, theme }) {
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() => router.push(`/news/${item.slug}`)}
-      style={[styles.card, { backgroundColor: bg, borderColor: border }]}
     >
-      <View style={styles.imageWrap}>
-        <Image
-          source={{
-            uri: normalizeUrl(item.thumbImageUrl || item.heroImageUrl || FALLBACK_IMG),
-          }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.7)"]}
-          style={styles.imageOverlay}
-        />
-        {item.sourceName ? (
-          <View style={styles.sourceBadge}>
-            <Text style={styles.sourceText} numberOfLines={1}>
-              {item.sourceName}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.info}>
-        <Text style={[styles.title, { color: text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        {item.summary ? (
-          <Text style={[styles.summary, { color: sub }]} numberOfLines={2}>
-            {item.summary}
-          </Text>
-        ) : null}
-
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={14} color={sub} />
-          <Text style={[styles.metaText, { color: sub }]}>
-            {formatDate(item.originalPublishedAt || item.createdAt)}
-          </Text>
+      <LiquidGlassSurface
+        isDark={isDark}
+        style={[styles.card, { backgroundColor: bg, borderColor: border }]}
+      >
+        <View style={styles.imageWrap}>
+          <Image
+            source={{
+              uri: normalizeUrl(
+                item.thumbImageUrl || item.heroImageUrl || FALLBACK_IMG
+              ),
+            }}
+            style={styles.image}
+            contentFit="cover"
+            transition={200}
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.7)"]}
+            style={styles.imageOverlay}
+          />
+          {item.sourceName ? (
+            <LiquidGlassSurface
+              effect="clear"
+              isDark
+              style={styles.sourceBadge}
+            >
+              <Text style={styles.sourceText} numberOfLines={1}>
+                {item.sourceName}
+              </Text>
+            </LiquidGlassSurface>
+          ) : null}
         </View>
 
-        {Array.isArray(item.tags) && item.tags.length > 0 && (
-          <View style={styles.tagsRow}>
-            {item.tags.slice(0, 3).map((tag) => (
-              <View key={tag} style={styles.tagChip}>
-                <Text style={styles.tagText}>#{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <View style={styles.info}>
+          <Text style={[styles.title, { color: text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => router.push(`/news/${item.slug}`)}
-          style={styles.detailBtnWrapper}
-        >
-          <LinearGradient
-            colors={["#A29BFE", "#FD79A8"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.detailBtn}
+          {item.summary ? (
+            <Text style={[styles.summary, { color: sub }]} numberOfLines={2}>
+              {item.summary}
+            </Text>
+          ) : null}
+
+          <View style={styles.metaRow}>
+            <Ionicons name="time-outline" size={14} color={sub} />
+            <Text style={[styles.metaText, { color: sub }]}>
+              {formatDate(item.originalPublishedAt || item.createdAt)}
+            </Text>
+          </View>
+
+          {Array.isArray(item.tags) && item.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {item.tags.slice(0, 3).map((tag) => (
+                <LiquidGlassSurface
+                  key={tag}
+                  effect="clear"
+                  isDark={isDark}
+                  style={styles.tagChip}
+                >
+                  <Text style={styles.tagText}>#{tag}</Text>
+                </LiquidGlassSurface>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => router.push(`/news/${item.slug}`)}
           >
-            <Text style={styles.detailBtnText}>Chi tiết</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+            <LiquidGlassSurface
+              active
+              isDark={isDark}
+              style={styles.detailBtnWrapper}
+            >
+              <LinearGradient
+                colors={["#A29BFE", "#FD79A8"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.detailBtn}
+              >
+                <Text style={styles.detailBtnText}>Chi tiết</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </LinearGradient>
+            </LiquidGlassSurface>
+          </TouchableOpacity>
+        </View>
+      </LiquidGlassSurface>
     </TouchableOpacity>
   );
 }
@@ -308,13 +330,36 @@ export default function NewsListScreen() {
             />
           ),
           headerLeft: () => (
-            <View style={styles.newsHeaderPill}>
-              <View style={styles.newsHeaderDot} />
-              <Text style={styles.newsHeaderTitle}>PickleTour News</Text>
+            <View style={styles.newsHeaderLeftGroup}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <LiquidGlassSurface
+                  active
+                  effect="clear"
+                  isDark={isDark}
+                  style={styles.newsHeaderBackBtn}
+                >
+                  <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+                </LiquidGlassSurface>
+              </TouchableOpacity>
+              <LiquidGlassSurface
+                effect="clear"
+                isDark={isDark}
+                style={styles.newsHeaderPill}
+              >
+                <View style={styles.newsHeaderDot} />
+                <Text style={styles.newsHeaderTitle}>PickleTour News</Text>
+              </LiquidGlassSurface>
             </View>
           ),
           headerRight: () => (
-            <View style={styles.newsHeaderRight}>
+            <LiquidGlassSurface
+              effect="clear"
+              isDark={isDark}
+              style={styles.newsHeaderRight}
+            >
               <TouchableOpacity
                 onPress={() => setSearchVisible((v) => !v)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -331,7 +376,7 @@ export default function NewsListScreen() {
               >
                 <Ionicons name="options" size={20} color="#FFFFFF" />
               </TouchableOpacity>
-            </View>
+            </LiquidGlassSurface>
           ),
         }}
       />
@@ -346,7 +391,11 @@ export default function NewsListScreen() {
         ]}
       >
         {searchVisible && (
-          <View style={styles.searchBarWrap}>
+          <LiquidGlassSurface
+            isDark={isDark}
+            tone="field"
+            style={styles.searchBarWrap}
+          >
             <Ionicons
               name="search"
               size={18}
@@ -371,11 +420,15 @@ export default function NewsListScreen() {
                 <Ionicons name="close-circle" size={18} color="#9aa0b1" />
               </TouchableOpacity>
             )}
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {items.length > 0 && !isLoading && (
-          <View style={styles.sortBar}>
+          <LiquidGlassSurface
+            effect="clear"
+            isDark={isDark}
+            style={styles.sortBar}
+          >
             <Ionicons
               name={
                 sortMode === "latest"
@@ -388,22 +441,22 @@ export default function NewsListScreen() {
             <Text style={styles.sortText}>
               {sortMode === "latest" ? "Sắp xếp: Mới nhất" : "Sắp xếp: Cũ nhất"}
             </Text>
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {isLoading ? (
           <NewsListSkeleton theme={theme} />
         ) : isError ? (
-          <View style={styles.centerWrap}>
+          <LiquidGlassSurface isDark={isDark} style={styles.centerWrap}>
             <Text style={styles.errorText}>Không tải được tin tức.</Text>
             <TouchableOpacity onPress={refetch} style={styles.retryBtn}>
               <Text style={styles.retryText}>Thử lại</Text>
             </TouchableOpacity>
-          </View>
+          </LiquidGlassSurface>
         ) : filteredItems.length === 0 ? (
-          <View style={styles.centerWrap}>
+          <LiquidGlassSurface isDark={isDark} style={styles.centerWrap}>
             <Text style={styles.emptyText}>Không có bài viết phù hợp.</Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           <FlatList
             data={filteredItems}
@@ -558,6 +611,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
     gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
   },
   searchInput: { flex: 1, fontSize: 13, color: "#e4e7ed" },
   sortBar: {
@@ -566,16 +621,35 @@ const styles = StyleSheet.create({
     gap: 6,
     marginHorizontal: 18,
     marginBottom: 4,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(6,10,18,0.62)",
   },
   sortText: { fontSize: 11, color: "#9aa0b1" },
   headerRightSpacer: { marginLeft: 10 },
-  newsHeaderPill: {
+  newsHeaderLeftGroup: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 4,
     gap: 8,
+  },
+  newsHeaderBackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.24)",
+  },
+  newsHeaderPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
 });

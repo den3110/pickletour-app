@@ -23,6 +23,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { router, Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@react-navigation/native";
 import {
   useGetMyScheduleQuery,
   useGetMarkedDatesQuery,
@@ -31,6 +32,7 @@ import {
 import { useMatchCalendar } from "@/hooks/useMatchCalendar";
 import AuthGuard from "@/components/auth/AuthGuard";
 import { Ionicons } from "@expo/vector-icons";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 // ===== CALENDAR LOCALE (VIETNAMESE) =====
 LocaleConfig.locales["vi"] = {
   monthNames: [
@@ -87,6 +89,24 @@ if (
 const { width, height } = Dimensions.get("window");
 const CARD_MARGIN = 16;
 const CARD_WIDTH = width - CARD_MARGIN * 2;
+
+const getSchedulePalette = (isDark: boolean) => ({
+  bg: isDark ? "#070A0F" : "#F9FAFB",
+  card: isDark ? "rgba(20,24,33,0.88)" : "#FFFFFF",
+  cardSolid: isDark ? "#141821" : "#FFFFFF",
+  cardAlt: isDark ? "rgba(31,41,55,0.78)" : "#F9FAFB",
+  border: isDark ? "rgba(255,255,255,0.12)" : "#E5E7EB",
+  text: isDark ? "#F8FAFC" : "#1F2937",
+  sub: isDark ? "#A8B3C7" : "#6B7280",
+  muted: isDark ? "#5F6B7A" : "#9CA3AF",
+  primary: "#3B82F6",
+  header: isDark
+    ? ["#07111F", "#10243C", "#1E3A5F"]
+    : ["#1E40AF", "#3B82F6", "#60A5FA"],
+  headerSoft: isDark
+    ? "rgba(255,255,255,0.10)"
+    : "rgba(255,255,255,0.25)",
+});
 
 // ============= TYPES =============
 interface Match {
@@ -175,6 +195,9 @@ function formatSelectedDateVi(isoDate: string) {
 
 // ============= MAIN COMPONENT =============
 export default function MatchScheduleScreen() {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
   const [selectedDate, setSelectedDate] = useState(
     DateTime.now().toISODate() || ""
   );
@@ -186,6 +209,25 @@ export default function MatchScheduleScreen() {
     useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
   const slideAnim = useState(new Animated.Value(50))[0];
+  const themedCalendar = useMemo(
+    () => ({
+      ...calendarTheme,
+      backgroundColor: "transparent",
+      calendarBackground: "transparent",
+      textSectionTitleColor: C.sub,
+      selectedDayBackgroundColor: C.primary,
+      selectedDayTextColor: "#FFFFFF",
+      todayTextColor: "#EF4444",
+      dayTextColor: C.text,
+      textDisabledColor: C.muted,
+      dotColor: C.primary,
+      selectedDotColor: "#FFFFFF",
+      arrowColor: C.primary,
+      monthTextColor: C.text,
+      indicatorColor: C.primary,
+    }),
+    [C]
+  );
 
   // Calendar hook
   const {
@@ -432,8 +474,11 @@ export default function MatchScheduleScreen() {
   return (
     <AuthGuard>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
+      <View style={[styles.container, { backgroundColor: C.bg }]}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={isDark ? "#07111F" : "#1E40AF"}
+        />
 
         {/* Animated Container */}
         <Animated.View
@@ -445,7 +490,7 @@ export default function MatchScheduleScreen() {
         >
           {/* Header with Gradient */}
           <LinearGradient
-            colors={["#1E40AF", "#3B82F6", "#60A5FA"]}
+            colors={C.header}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.header}
@@ -454,14 +499,23 @@ export default function MatchScheduleScreen() {
               <View style={styles.headerTop}>
                 <View style={styles.headerLeft}>
                   <TouchableOpacity
-                    style={styles.backButton}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       router.back();
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="chevron-back" size={24} color="#FFF" />
+                    <LiquidGlassSurface
+                      active
+                      effect="clear"
+                      isDark={isDark}
+                      style={[
+                        styles.backButton,
+                        { backgroundColor: "rgba(15,23,42,0.35)" },
+                      ]}
+                    >
+                      <Ionicons name="chevron-back" size={24} color="#FFF" />
+                    </LiquidGlassSurface>
                   </TouchableOpacity>
 
                   <View>
@@ -478,47 +532,75 @@ export default function MatchScheduleScreen() {
                 <View style={styles.headerActions}>
                   {/* Sync all */}
                   <TouchableOpacity
-                    style={styles.headerIconButton}
                     onPress={handleSyncAll}
                     disabled={calendarLoading || !hasCalendarPermission}
                   >
-                    <Icon
-                      name="calendar-sync"
-                      size={22}
-                      color={
-                        hasCalendarPermission ? "#FFF" : "rgba(255,255,255,0.4)"
-                      }
-                    />
+                    <LiquidGlassSurface
+                      active
+                      effect="clear"
+                      isDark={isDark}
+                      style={[
+                        styles.headerIconButton,
+                        { backgroundColor: C.headerSoft },
+                      ]}
+                    >
+                      <Icon
+                        name="calendar-sync"
+                        size={22}
+                        color={
+                          hasCalendarPermission
+                            ? "#FFF"
+                            : "rgba(255,255,255,0.4)"
+                        }
+                      />
+                    </LiquidGlassSurface>
                   </TouchableOpacity>
 
                   {/* Open calendar */}
                   <TouchableOpacity
-                    style={styles.headerIconButton}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       openCalendarApp();
                     }}
                   >
-                    <Icon
-                      name="calendar-month-outline"
-                      size={22}
-                      color="#FFF"
-                    />
+                    <LiquidGlassSurface
+                      active
+                      effect="clear"
+                      isDark={isDark}
+                      style={[
+                        styles.headerIconButton,
+                        { backgroundColor: C.headerSoft },
+                      ]}
+                    >
+                      <Icon
+                        name="calendar-month-outline"
+                        size={22}
+                        color="#FFF"
+                      />
+                    </LiquidGlassSurface>
                   </TouchableOpacity>
 
                   {/* Toggle view */}
                   <TouchableOpacity
-                    style={[
-                      styles.headerIconButton,
-                      styles.headerIconButtonActive,
-                    ]}
                     onPress={handleToggleView}
                   >
-                    <Icon
-                      name={viewMode === "calendar" ? "view-list" : "calendar"}
-                      size={22}
-                      color="#FFF"
-                    />
+                    <LiquidGlassSurface
+                      active
+                      effect="clear"
+                      isDark={isDark}
+                      style={[
+                        styles.headerIconButton,
+                        styles.headerIconButtonActive,
+                      ]}
+                    >
+                      <Icon
+                        name={
+                          viewMode === "calendar" ? "view-list" : "calendar"
+                        }
+                        size={22}
+                        color="#FFF"
+                      />
+                    </LiquidGlassSurface>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -552,22 +634,30 @@ export default function MatchScheduleScreen() {
           {/* Permission Banner */}
           {!hasCalendarPermission && (
             <TouchableOpacity
-              style={styles.permissionBanner}
               onPress={handleRequestCalendarPermission}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={["#FEF3C7", "#FDE68A"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.permissionBannerGradient}
+              <LiquidGlassSurface
+                isDark={isDark}
+                tone="danger"
+                style={[
+                  styles.permissionBanner,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(69,26,3,0.72)"
+                      : "#FEF3C7",
+                    borderColor: isDark
+                      ? "rgba(251,191,36,0.28)"
+                      : "rgba(146,64,14,0.16)",
+                  },
+                ]}
               >
                 <Icon name="calendar-alert" size={20} color="#92400E" />
                 <Text style={styles.permissionText}>
                   Cấp quyền lịch để thêm trận vào lịch hệ thống
                 </Text>
                 <Icon name="chevron-right" size={20} color="#92400E" />
-              </LinearGradient>
+              </LiquidGlassSurface>
             </TouchableOpacity>
           )}
 
@@ -586,28 +676,34 @@ export default function MatchScheduleScreen() {
             {viewMode === "calendar" ? (
               <>
                 {/* Calendar */}
-                <View style={styles.calendarCard}>
+                <LiquidGlassSurface
+                  isDark={isDark}
+                  style={[
+                    styles.calendarCard,
+                    { backgroundColor: C.card, borderColor: C.border },
+                  ]}
+                >
                   <Calendar
                     current={selectedDate}
                     onDayPress={handleDayPress}
                     onMonthChange={handleMonthChange}
                     markedDates={markedDates}
                     markingType="multi-dot"
-                    theme={calendarTheme}
+                    theme={themedCalendar}
                     enableSwipeMonths
                     hideExtraDays={false}
                     monthFormat={"MMMM yyyy"} // dùng monthNames tiếng Việt
                     firstDay={1} // tuỳ, cho tuần bắt đầu từ Thứ 2
                     style={styles.calendar}
                   />
-                </View>
+                </LiquidGlassSurface>
 
                 {/* Selected Date Matches */}
                 <View style={styles.selectedDateSection}>
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
-                      <Icon name="calendar-today" size={22} color="#1F2937" />
-                      <Text style={styles.sectionTitle}>
+                      <Icon name="calendar-today" size={22} color={C.sub} />
+                      <Text style={[styles.sectionTitle, { color: C.text }]}>
                         {formatSelectedDateVi(selectedDate)}
                       </Text>
                     </View>
@@ -692,19 +788,32 @@ export default function MatchScheduleScreen() {
             {upcomingData?.matches &&
               upcomingData.matches.length > 0 &&
               viewMode === "calendar" && (
-                <View style={styles.upcomingSection}>
+                <LiquidGlassSurface
+                  isDark={isDark}
+                  style={[
+                    styles.upcomingSection,
+                    { backgroundColor: C.card, borderColor: C.border },
+                  ]}
+                >
                   <View style={styles.upcomingSectionHeader}>
-                    <LinearGradient
-                      colors={["#FEE2E2", "#FEF2F2"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.upcomingHeaderGradient}
+                    <LiquidGlassSurface
+                      effect="clear"
+                      isDark={isDark}
+                      tone="danger"
+                      style={[
+                        styles.upcomingHeaderGradient,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(127,29,29,0.34)"
+                            : "#FEF2F2",
+                        },
+                      ]}
                     >
                       <Icon name="fire" size={20} color="#DC2626" />
                       <Text style={styles.upcomingSectionTitle}>
                         Sắp diễn ra (7 ngày tới)
                       </Text>
-                    </LinearGradient>
+                    </LiquidGlassSurface>
                   </View>
 
                   {upcomingData.matches
@@ -728,20 +837,29 @@ export default function MatchScheduleScreen() {
 
                   {upcomingData.matches.length > 3 && (
                     <TouchableOpacity
-                      style={styles.viewAllButton}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         handleToggleView();
                       }}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.viewAllText}>
-                        Xem tất cả {upcomingData.matches.length} trận
-                      </Text>
-                      <Icon name="arrow-right" size={18} color="#3B82F6" />
+                      <LiquidGlassSurface
+                        active
+                        effect="clear"
+                        isDark={isDark}
+                        style={[
+                          styles.viewAllButton,
+                          { backgroundColor: C.cardAlt, borderColor: C.border },
+                        ]}
+                      >
+                        <Text style={styles.viewAllText}>
+                          Xem tất cả {upcomingData.matches.length} trận
+                        </Text>
+                        <Icon name="arrow-right" size={18} color="#3B82F6" />
+                      </LiquidGlassSurface>
                     </TouchableOpacity>
                   )}
-                </View>
+                </LiquidGlassSurface>
               )}
 
             <View style={{ height: 40 }} />
@@ -765,12 +883,26 @@ export default function MatchScheduleScreen() {
 
 // Stat Pill
 const StatPill = ({ icon, label, value, color }: any) => (
-  <View style={styles.statPill}>
-    <Icon name={icon} size={16} color={color} />
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
+  <StatPillSurface icon={icon} label={label} value={value} color={color} />
 );
+
+const StatPillSurface = ({ icon, label, value, color }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
+
+  return (
+    <LiquidGlassSurface
+      effect="clear"
+      isDark={isDark}
+      style={[styles.statPill, { backgroundColor: C.headerSoft }]}
+    >
+      <Icon name={icon} size={16} color={color} />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </LiquidGlassSurface>
+  );
+};
 
 // Enhanced Match Card
 const EnhancedMatchCard = ({
@@ -783,6 +915,9 @@ const EnhancedMatchCard = ({
   openCalendarApp, // 👈 thêm prop này
   onRemoveFromCalendar,
 }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
   const [inCalendar, setInCalendar] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -867,12 +1002,14 @@ const EnhancedMatchCard = ({
   };
 
   const status = getStatusConfig(match.status);
+  const statusGradient = isDark
+    ? ["rgba(30,41,59,0.92)", "rgba(15,23,42,0.82)"]
+    : status.gradient;
   const bracketColor = match.bracket.color || "#6B7280";
 
   return (
     <Animated.View
       style={[
-        styles.enhancedMatchCard,
         {
           transform: [
             {
@@ -886,6 +1023,13 @@ const EnhancedMatchCard = ({
         },
       ]}
     >
+      <LiquidGlassSurface
+        isDark={isDark}
+        style={[
+          styles.enhancedMatchCard,
+          { backgroundColor: C.card, borderColor: C.border },
+        ]}
+      >
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onPress}
@@ -893,7 +1037,7 @@ const EnhancedMatchCard = ({
       >
         {/* Header with gradient background */}
         <LinearGradient
-          colors={status.gradient}
+          colors={statusGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.matchCardHeader}
@@ -917,14 +1061,20 @@ const EnhancedMatchCard = ({
           {/* Tournament info */}
           <View style={styles.tournamentRow}>
             <View style={styles.tournamentInfo}>
-              <Text style={styles.tournamentName} numberOfLines={1}>
+              <Text
+                style={[styles.tournamentName, { color: C.text }]}
+                numberOfLines={1}
+              >
                 {match.tournament.name}
               </Text>
               <View style={styles.bracketRow}>
                 <View
                   style={[styles.bracketDot, { backgroundColor: bracketColor }]}
                 />
-                <Text style={styles.bracketText} numberOfLines={1}>
+                <Text
+                  style={[styles.bracketText, { color: C.sub }]}
+                  numberOfLines={1}
+                >
                   {match.bracket.name}
                 </Text>
               </View>
@@ -960,18 +1110,31 @@ const EnhancedMatchCard = ({
           <View style={styles.matchCardFooter}>
             <View style={styles.matchMetaRow}>
               {matchCourtLabel(match) && (
-                <View style={styles.metaBadge}>
-                  <Icon name="map-marker" size={14} color="#6B7280" />
-                  <Text style={styles.metaText}>{matchCourtLabel(match)}</Text>
-                </View>
+                <LiquidGlassSurface
+                  effect="clear"
+                  isDark={isDark}
+                  style={[
+                    styles.metaBadge,
+                    { backgroundColor: C.cardAlt, borderColor: C.border },
+                  ]}
+                >
+                  <Icon name="map-marker" size={14} color={C.sub} />
+                  <Text style={[styles.metaText, { color: C.sub }]}>
+                    {matchCourtLabel(match)}
+                  </Text>
+                </LiquidGlassSurface>
               )}
               {match.isUpcoming && (
-                <View style={[styles.metaBadge, styles.metaBadgeWarning]}>
+                <LiquidGlassSurface
+                  effect="clear"
+                  isDark={isDark}
+                  style={[styles.metaBadge, styles.metaBadgeWarning]}
+                >
                   <Icon name="timer-sand" size={14} color="#D97706" />
                   <Text style={styles.metaTextWarning}>
                     {match.timeUntilMatch}
                   </Text>
-                </View>
+                </LiquidGlassSurface>
               )}
             </View>
 
@@ -980,14 +1143,19 @@ const EnhancedMatchCard = ({
               <View style={styles.calendarActions}>
                 {/* Nút thêm / mở lịch */}
                 <TouchableOpacity
-                  style={[
-                    styles.calendarBtn,
-                    inCalendar && styles.calendarBtnActive,
-                  ]}
                   onPress={handleCalendarPress}
                   disabled={isAdding || isRemoving}
                   activeOpacity={0.7}
                 >
+                  <LiquidGlassSurface
+                    active
+                    effect="clear"
+                    isDark={isDark}
+                    style={[
+                      styles.calendarBtn,
+                      inCalendar && styles.calendarBtnActive,
+                    ]}
+                  >
                   {isAdding ? (
                     <ActivityIndicator size="small" color="#3B82F6" />
                   ) : (
@@ -1007,21 +1175,29 @@ const EnhancedMatchCard = ({
                       </Text>
                     </>
                   )}
+                  </LiquidGlassSurface>
                 </TouchableOpacity>
 
                 {/* Nút xoá đặt lịch (icon-only) */}
                 {inCalendar && onRemoveFromCalendar && (
                   <TouchableOpacity
-                    style={styles.calendarDeleteBtn}
                     onPress={handleRemoveFromCalendar}
                     disabled={isRemoving}
                     activeOpacity={0.7}
                   >
+                    <LiquidGlassSurface
+                      active
+                      effect="clear"
+                      isDark={isDark}
+                      tone="danger"
+                      style={styles.calendarDeleteBtn}
+                    >
                     {isRemoving ? (
                       <ActivityIndicator size="small" color="#EF4444" />
                     ) : (
                       <Icon name="calendar-remove" size={18} color="#EF4444" />
                     )}
+                    </LiquidGlassSurface>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1032,16 +1208,25 @@ const EnhancedMatchCard = ({
           {match.gameScores && match.gameScores.length > 0 && (
             <View style={styles.scoresRow}>
               {match.gameScores.map((game: any, idx: number) => (
-                <View key={idx} style={styles.scoreChip}>
-                  <Text style={styles.scoreText}>
+                <LiquidGlassSurface
+                  key={idx}
+                  effect="clear"
+                  isDark={isDark}
+                  style={[
+                    styles.scoreChip,
+                    { backgroundColor: C.cardAlt, borderColor: C.border },
+                  ]}
+                >
+                  <Text style={[styles.scoreText, { color: C.text }]}>
                     {game.a} - {game.b}
                   </Text>
-                </View>
+                </LiquidGlassSurface>
               ))}
             </View>
           )}
         </View>
       </TouchableOpacity>
+      </LiquidGlassSurface>
     </Animated.View>
   );
 };
@@ -1054,21 +1239,45 @@ const TeamRow = ({
   iconColor,
   isHighlight,
   isWinner,
-}: any) => (
-  <View style={[styles.teamRow, isHighlight && styles.teamRowHighlight]}>
-    <View style={styles.teamLeft}>
-      <Icon name={icon} size={16} color={iconColor} />
-      <Text style={styles.teamLabel}>{label}</Text>
-    </View>
-    <Text style={styles.teamNameText} numberOfLines={1}>
-      {getTeamName(team)}
-    </Text>
-    {isWinner && <Icon name="trophy" size={16} color="#F59E0B" />}
-  </View>
-);
+}: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
+
+  return (
+    <LiquidGlassSurface
+      effect="clear"
+      isDark={isDark}
+      style={[
+        styles.teamRow,
+        isHighlight && styles.teamRowHighlight,
+        {
+          backgroundColor: isHighlight
+            ? isDark
+              ? "rgba(59,130,246,0.18)"
+              : "#EFF6FF"
+            : C.cardAlt,
+          borderColor: isHighlight ? "#60A5FA" : C.border,
+        },
+      ]}
+    >
+      <View style={styles.teamLeft}>
+        <Icon name={icon} size={16} color={iconColor} />
+        <Text style={[styles.teamLabel, { color: C.sub }]}>{label}</Text>
+      </View>
+      <Text style={[styles.teamNameText, { color: C.text }]} numberOfLines={1}>
+        {getTeamName(team)}
+      </Text>
+      {isWinner && <Icon name="trophy" size={16} color="#F59E0B" />}
+    </LiquidGlassSurface>
+  );
+};
 
 // Compact Match Card
 const CompactMatchCard = ({ match, index, onPress }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
   const scaleAnim = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
@@ -1089,12 +1298,18 @@ const CompactMatchCard = ({ match, index, onPress }: any) => {
       }}
     >
       <TouchableOpacity
-        style={styles.compactCard}
         onPress={onPress}
         activeOpacity={0.8}
       >
-        <View style={styles.compactLeft}>
-          <Text style={styles.compactDate}>
+        <LiquidGlassSurface
+          isDark={isDark}
+          style={[
+            styles.compactCard,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+        <View style={[styles.compactLeft, { borderRightColor: C.border }]}>
+          <Text style={[styles.compactDate, { color: C.text }]}>
             {DateTime.fromJSDate(new Date(match.scheduledAt)).toFormat("dd/MM")}
           </Text>
           <Text style={styles.compactTime}>
@@ -1103,10 +1318,16 @@ const CompactMatchCard = ({ match, index, onPress }: any) => {
         </View>
 
         <View style={styles.compactCenter}>
-          <Text style={styles.compactTournament} numberOfLines={1}>
+          <Text
+            style={[styles.compactTournament, { color: C.text }]}
+            numberOfLines={1}
+          >
             {match.tournament?.name}
           </Text>
-          <Text style={styles.compactBracket} numberOfLines={1}>
+          <Text
+            style={[styles.compactBracket, { color: C.sub }]}
+            numberOfLines={1}
+          >
             {match.bracket?.name}
           </Text>
         </View>
@@ -1118,6 +1339,7 @@ const CompactMatchCard = ({ match, index, onPress }: any) => {
           </View>
           <Icon name="chevron-right" size={18} color="#9CA3AF" />
         </View>
+        </LiquidGlassSurface>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1134,6 +1356,9 @@ const DaySection = ({
   openCalendarApp,
   onRemoveFromCalendar,
 }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
   const isToday = dayData.date === DateTime.now().toISODate();
   const fadeAnim = useState(new Animated.Value(0))[0];
   const dt = DateTime.fromISO(dayData.date);
@@ -1154,7 +1379,18 @@ const DaySection = ({
   return (
     <Animated.View style={[styles.daySection, { opacity: fadeAnim }]}>
       {/* Day Header */}
-      <View style={styles.daySectionHeader}>
+      <LiquidGlassSurface
+        effect="clear"
+        isDark={isDark}
+        style={[
+          styles.daySectionHeader,
+          {
+            backgroundColor: C.card,
+            borderBottomColor: C.border,
+            borderColor: C.border,
+          },
+        ]}
+      >
         <View style={styles.dayHeaderLeft}>
           <View style={[styles.dayBadge, isToday && styles.dayBadgeToday]}>
             <Text style={[styles.dayNumber, isToday && styles.dayNumberToday]}>
@@ -1165,11 +1401,19 @@ const DaySection = ({
             </Text>
           </View>
           <View style={styles.dayInfo}>
-            <Text style={[styles.dayTitle, isToday && styles.dayTitleToday]}>
+            <Text
+              style={[
+                styles.dayTitle,
+                { color: isToday ? "#EF4444" : C.text },
+              ]}
+            >
               {weekdayLabel}
               {isToday && " • Hôm nay"}
             </Text>
-            <Text style={styles.daySubtitle} numberOfLines={1}>
+            <Text
+              style={[styles.daySubtitle, { color: C.sub }]}
+              numberOfLines={1}
+            >
               {dayData.tournaments.join(", ")}
             </Text>
           </View>
@@ -1177,7 +1421,7 @@ const DaySection = ({
         <View style={styles.dayCountBadge}>
           <Text style={styles.dayCountText}>{dayData.matchCount}</Text>
         </View>
-      </View>
+      </LiquidGlassSurface>
 
       {/* Matches */}
       {dayData.matches.map((match: Match, matchIndex: number) => (
@@ -1198,29 +1442,64 @@ const DaySection = ({
 };
 
 // Empty State
-const EmptyState = ({ icon, title, subtitle }: any) => (
-  <View style={styles.emptyState}>
-    <View style={styles.emptyIconContainer}>
-      <Icon name={icon} size={64} color="#D1D5DB" />
-    </View>
-    <Text style={styles.emptyTitle}>{title}</Text>
-    <Text style={styles.emptySubtitle}>{subtitle}</Text>
-  </View>
-);
+const EmptyState = ({ icon, title, subtitle }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
+
+  return (
+    <LiquidGlassSurface
+      isDark={isDark}
+      style={[
+        styles.emptyState,
+        { backgroundColor: C.card, borderColor: C.border },
+      ]}
+    >
+      <LiquidGlassSurface
+        effect="clear"
+        isDark={isDark}
+        style={[styles.emptyIconContainer, { backgroundColor: C.cardAlt }]}
+      >
+        <Icon name={icon} size={64} color={C.muted} />
+      </LiquidGlassSurface>
+      <Text style={[styles.emptyTitle, { color: C.text }]}>{title}</Text>
+      <Text style={[styles.emptySubtitle, { color: C.sub }]}>{subtitle}</Text>
+    </LiquidGlassSurface>
+  );
+};
 
 // Skeleton Loader
-const SkeletonLoader = () => (
-  <View style={styles.skeletonContainer}>
-    {[1, 2].map((i) => (
-      <View key={i} style={styles.skeletonCard}>
-        <View style={styles.skeletonHeader} />
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: "70%" }]} />
-        <View style={styles.skeletonFooter} />
-      </View>
-    ))}
-  </View>
-);
+const SkeletonLoader = () => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
+  const shape = isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB";
+
+  return (
+    <View style={styles.skeletonContainer}>
+      {[1, 2].map((i) => (
+        <LiquidGlassSurface
+          key={i}
+          isDark={isDark}
+          style={[
+            styles.skeletonCard,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <View style={[styles.skeletonHeader, { backgroundColor: shape }]} />
+          <View style={[styles.skeletonLine, { backgroundColor: shape }]} />
+          <View
+            style={[
+              styles.skeletonLine,
+              { width: "70%", backgroundColor: shape },
+            ]}
+          />
+          <View style={[styles.skeletonFooter, { backgroundColor: shape }]} />
+        </LiquidGlassSurface>
+      ))}
+    </View>
+  );
+};
 
 // Calendar Permission Modal
 const CalendarPermissionModal = ({
@@ -1228,6 +1507,9 @@ const CalendarPermissionModal = ({
   onClose,
   onRequestPermission,
 }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
   const [isRequesting, setIsRequesting] = useState(false);
 
   if (!visible) return null;
@@ -1245,14 +1527,22 @@ const CalendarPermissionModal = ({
         activeOpacity={1}
         onPress={onClose}
       />
-      <View style={styles.modalContent}>
+      <LiquidGlassSurface
+        isDark={isDark}
+        style={[
+          styles.modalContent,
+          { backgroundColor: C.cardSolid, borderColor: C.border },
+        ]}
+      >
         <LinearGradient
-          colors={["#DBEAFE", "#EFF6FF"]}
+          colors={isDark ? ["#10243C", "#172B46"] : ["#DBEAFE", "#EFF6FF"]}
           style={styles.modalHeader}
         >
           <Icon name="calendar-star" size={48} color="#3B82F6" />
-          <Text style={styles.modalTitle}>Cấp quyền truy cập lịch</Text>
-          <Text style={styles.modalSubtitle}>
+          <Text style={[styles.modalTitle, { color: C.text }]}>
+            Cấp quyền truy cập lịch
+          </Text>
+          <Text style={[styles.modalSubtitle, { color: C.sub }]}>
             Để thêm trận đấu vào lịch hệ thống và nhận nhắc nhở tự động
           </Text>
         </LinearGradient>
@@ -1275,14 +1565,24 @@ const CalendarPermissionModal = ({
           />
         </View>
 
-        <View style={styles.modalFooter}>
+        <View style={[styles.modalFooter, { borderTopColor: C.border }]}>
           <TouchableOpacity
-            style={styles.modalButtonSecondary}
             onPress={onClose}
             activeOpacity={0.8}
             disabled={isRequesting}
           >
-            <Text style={styles.modalButtonSecondaryText}>Để sau</Text>
+            <LiquidGlassSurface
+              effect="clear"
+              isDark={isDark}
+              style={[
+                styles.modalButtonSecondary,
+                { borderColor: C.border, backgroundColor: C.cardAlt },
+              ]}
+            >
+              <Text style={[styles.modalButtonSecondaryText, { color: C.sub }]}>
+                Để sau
+              </Text>
+            </LiquidGlassSurface>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1311,23 +1611,33 @@ const CalendarPermissionModal = ({
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </LiquidGlassSurface>
     </View>
   );
 };
 
 // Feature Item for Modal
-const FeatureItem = ({ icon, title, subtitle }: any) => (
-  <View style={styles.featureItem}>
-    <View style={styles.featureIcon}>
+const FeatureItem = ({ icon, title, subtitle }: any) => {
+  const theme = useTheme();
+  const isDark = !!theme.dark;
+  const C = useMemo(() => getSchedulePalette(isDark), [isDark]);
+
+  return (
+  <View style={[styles.featureItem, { borderBottomColor: C.border }]}>
+    <LiquidGlassSurface
+      effect="clear"
+      isDark={isDark}
+      style={[styles.featureIcon, { backgroundColor: C.cardAlt }]}
+    >
       <Icon name={icon} size={24} color="#3B82F6" />
-    </View>
+    </LiquidGlassSurface>
     <View style={styles.featureText}>
-      <Text style={styles.featureTitle}>{title}</Text>
-      <Text style={styles.featureSubtitle}>{subtitle}</Text>
+      <Text style={[styles.featureTitle, { color: C.text }]}>{title}</Text>
+      <Text style={[styles.featureSubtitle, { color: C.sub }]}>{subtitle}</Text>
     </View>
   </View>
-);
+  );
+};
 
 // ============= HELPER FUNCTIONS =============
 
@@ -1491,6 +1801,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     overflow: "hidden",
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -1524,6 +1840,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 16,
     overflow: "hidden",
+    borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -1583,6 +1900,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
     overflow: "hidden",
+    borderWidth: 1,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -1886,6 +2204,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    borderRadius: 18,
+    padding: 12,
     paddingBottom: 14,
     borderBottomWidth: 3,
     borderBottomColor: "#E5E7EB",
@@ -1962,6 +2282,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
   },
   upcomingSectionHeader: {
     marginBottom: 14,
@@ -2003,6 +2326,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 60,
     paddingHorizontal: 40,
+    marginHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   emptyIconContainer: {
     width: 120,
@@ -2034,6 +2360,7 @@ const styles = StyleSheet.create({
   skeletonCard: {
     backgroundColor: "#FFF",
     borderRadius: 16,
+    borderWidth: 1,
     padding: 16,
     marginBottom: 16,
   },
@@ -2069,6 +2396,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: 1,
     maxHeight: height * 0.85,
     ...Platform.select({
       ios: {

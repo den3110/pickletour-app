@@ -12,6 +12,7 @@ import { useTheme } from "@react-navigation/native";
 import dayjs from "dayjs";
 import { Ionicons } from "@expo/vector-icons";
 import { useGetMyTicketsQuery } from "@/slices/supportApiSlice";
+import SupportGlassSurface from "@/components/support/SupportGlassSurface";
 
 export default function SupportInboxScreen() {
   const router = useRouter();
@@ -43,13 +44,19 @@ export default function SupportInboxScreen() {
           headerRight: () => (
             <TouchableOpacity
               onPress={() => router.push("/support/new")}
-              style={{ paddingHorizontal: 12 }}
+              style={{ paddingHorizontal: 8 }}
             >
-              <Ionicons
-                name="add-circle-outline"
-                size={24}
-                color={colors.primary}
-              />
+              <SupportGlassSurface
+                active
+                effect="clear"
+                isDark={isDark}
+                style={[
+                  styles.headerIcon,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <Ionicons name="add" size={22} color={colors.primary} />
+              </SupportGlassSurface>
             </TouchableOpacity>
           ),
           // headerLeft: () => (
@@ -78,7 +85,8 @@ export default function SupportInboxScreen() {
           refreshing={isFetching}
           contentContainerStyle={{ padding: 16, gap: 12 }}
           ListEmptyComponent={
-            <View
+            <SupportGlassSurface
+              isDark={isDark}
               style={[
                 styles.empty,
                 { backgroundColor: colors.card, borderColor: colors.border },
@@ -99,59 +107,101 @@ export default function SupportInboxScreen() {
               </Text>
               <TouchableOpacity
                 onPress={() => router.push("/support/new")}
-                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+                activeOpacity={0.86}
               >
-                <Text style={{ color: "#fff", fontWeight: "800" }}>
-                  Tạo yêu cầu
-                </Text>
+                <SupportGlassSurface
+                  active
+                  isDark={isDark}
+                  style={[
+                    styles.primaryBtn,
+                    { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>
+                    Tạo yêu cầu
+                  </Text>
+                </SupportGlassSurface>
               </TouchableOpacity>
-            </View>
+            </SupportGlassSurface>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => router.push(`/support/${item._id}`)}
-              style={[
-                styles.card,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
               activeOpacity={0.8}
             >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              <SupportGlassSurface
+                isDark={isDark}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
               >
-                <Ionicons
-                  name="mail-unread-outline"
-                  size={18}
-                  color={colors.primary}
-                />
-                <Text
-                  style={{ color: colors.text, fontWeight: "800", flex: 1 }}
-                  numberOfLines={1}
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
                 >
-                  {item.title || "Hỗ trợ"}
-                </Text>
-                <Text style={{ color: colors.sub, fontSize: 12 }}>
-                  {item.lastMessageAt
-                    ? dayjs(item.lastMessageAt).format("DD/MM HH:mm")
-                    : ""}
-                </Text>
-              </View>
-
-              <Text
-                style={{ color: colors.sub, marginTop: 8 }}
-                numberOfLines={2}
-              >
-                {item.lastMessagePreview || "—"}
-              </Text>
-
-              <View style={{ marginTop: 10 }}>
-                <Text style={{ color: colors.sub, fontSize: 12 }}>
-                  Trạng thái:{" "}
-                  <Text style={{ color: colors.text, fontWeight: "700" }}>
-                    {item.status}
+                  <SupportGlassSurface
+                    active
+                    effect="clear"
+                    isDark={isDark}
+                    style={[
+                      styles.ticketIcon,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(10,132,255,0.16)"
+                          : "rgba(10,132,255,0.10)",
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="mail-unread-outline"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </SupportGlassSurface>
+                  <Text
+                    style={{ color: colors.text, fontWeight: "800", flex: 1 }}
+                    numberOfLines={1}
+                  >
+                    {item.title || "Hỗ trợ"}
                   </Text>
+                  <Text style={{ color: colors.sub, fontSize: 12 }}>
+                    {item.lastMessageAt
+                      ? dayjs(item.lastMessageAt).format("DD/MM HH:mm")
+                      : ""}
+                  </Text>
+                </View>
+
+                <Text
+                  style={{ color: colors.sub, marginTop: 8 }}
+                  numberOfLines={2}
+                >
+                  {item.lastMessagePreview || "—"}
                 </Text>
-              </View>
+
+                <View style={{ marginTop: 10, alignItems: "flex-start" }}>
+                  <SupportGlassSurface
+                    effect="clear"
+                    isDark={isDark}
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.08)"
+                          : "rgba(0,0,0,0.04)",
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.sub, fontSize: 12 }}>
+                      Trạng thái:{" "}
+                      <Text style={{ color: colors.text, fontWeight: "700" }}>
+                        {item.status}
+                      </Text>
+                    </Text>
+                  </SupportGlassSurface>
+                </View>
+              </SupportGlassSurface>
             </TouchableOpacity>
           )}
         />
@@ -176,7 +226,30 @@ const styles = StyleSheet.create({
   primaryBtn: {
     height: 44,
     borderRadius: 12,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ticketIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
 });

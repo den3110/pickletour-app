@@ -42,6 +42,7 @@ import {
 } from "@/slices/radarApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 // --- CONFIG ---
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -168,7 +169,8 @@ const RadarLoading = ({ isDark }) => (
 );
 
 const PermissionHintBanner = ({ isDark, onEnable }) => (
-  <View
+  <LiquidGlassSurface
+    isDark={isDark}
     style={[
       styles.permissionBanner,
       {
@@ -194,7 +196,7 @@ const PermissionHintBanner = ({ isDark, onEnable }) => (
         Bật
       </Text>
     </TouchableOpacity>
-  </View>
+  </LiquidGlassSurface>
 );
 
 const RadarPulse = () => {
@@ -767,13 +769,19 @@ export default function PickleRadarScreen() {
             {item.type === "user" ? (
               <>
                 <TouchableOpacity
-                  style={[
-                    styles.btnAction,
-                    { backgroundColor: isPinged ? "#374151" : THEME_COLOR },
-                  ]}
                   onPress={() => handlePing(item)}
                   disabled={isPinged}
+                  style={{ flex: 1 }}
                 >
+                  <LiquidGlassSurface
+                    active={!isPinged}
+                    effect="clear"
+                    isDark={isDark}
+                    style={[
+                      styles.btnAction,
+                      { backgroundColor: isPinged ? "#374151" : THEME_COLOR },
+                    ]}
+                  >
                   {isPinged ? (
                     <View
                       style={{ flexDirection: "row", alignItems: "center" }}
@@ -793,44 +801,55 @@ export default function PickleRadarScreen() {
                       Ping ⚡️
                     </Text>
                   )}
+                  </LiquidGlassSurface>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.btnAction,
-                    { backgroundColor: dynamicStyles.chipBg, flex: 2 },
-                  ]}
                   onPress={() => handleOpenDetail(item)}
+                  style={{ flex: 2 }}
                 >
-                  <Text
+                  <LiquidGlassSurface
+                    active
+                    effect="clear"
+                    isDark={isDark}
                     style={[
-                      styles.btnTextSecondary,
-                      { color: dynamicStyles.textMain },
+                      styles.btnAction,
+                      { backgroundColor: dynamicStyles.chipBg, flex: 2 },
                     ]}
                   >
-                    Xem Profile
-                  </Text>
+                    <Text
+                      style={[
+                        styles.btnTextSecondary,
+                        { color: dynamicStyles.textMain },
+                      ]}
+                    >
+                      Xem Profile
+                    </Text>
+                  </LiquidGlassSurface>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <TouchableOpacity
-                  style={[
-                    styles.btnAction,
-                    { backgroundColor: THEME_COLOR, flex: 2 },
-                  ]}
                   onPress={() => handleOpenDetail(item)}
+                  style={{ flex: 2 }}
                 >
-                  <Text style={[styles.btnTextPrimary, { color: "#FFF" }]}>
-                    Xem chi tiết
-                  </Text>
+                  <LiquidGlassSurface
+                    active
+                    isDark={isDark}
+                    style={[
+                      styles.btnAction,
+                      { backgroundColor: THEME_COLOR, flex: 2 },
+                    ]}
+                  >
+                    <Text style={[styles.btnTextPrimary, { color: "#FFF" }]}>
+                      Xem chi tiết
+                    </Text>
+                  </LiquidGlassSurface>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.btnAction,
-                    { backgroundColor: dynamicStyles.chipBg },
-                  ]}
+                  style={{ flex: 1 }}
                   onPress={() => {
                     const c = item?.location?.coordinates;
                     if (!Array.isArray(c) || c.length !== 2) return;
@@ -842,14 +861,24 @@ export default function PickleRadarScreen() {
                     Linking.openURL(url).catch(() => {});
                   }}
                 >
-                  <Text
+                  <LiquidGlassSurface
+                    active
+                    effect="clear"
+                    isDark={isDark}
                     style={[
-                      styles.btnTextSecondary,
-                      { color: dynamicStyles.textMain },
+                      styles.btnAction,
+                      { backgroundColor: dynamicStyles.chipBg },
                     ]}
                   >
-                    Maps
-                  </Text>
+                    <Text
+                      style={[
+                        styles.btnTextSecondary,
+                        { color: dynamicStyles.textMain },
+                      ]}
+                    >
+                      Maps
+                    </Text>
+                  </LiquidGlassSurface>
                 </TouchableOpacity>
               </>
             )}
@@ -933,43 +962,58 @@ export default function PickleRadarScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             onPress={() => router.back()}
-            style={[styles.roundBtn, { backgroundColor: dynamicStyles.pillBg }]}
           >
-            <Ionicons
-              name="chevron-back"
-              size={22}
-              color={dynamicStyles.textMain}
-            />
+            <LiquidGlassSurface
+              active
+              effect="clear"
+              isDark={isDark}
+              style={[
+                styles.roundBtn,
+                { backgroundColor: dynamicStyles.pillBg },
+              ]}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color={dynamicStyles.textMain}
+              />
+            </LiquidGlassSurface>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setShowFilterModal(true)}
-            style={[
-              styles.smartFilterPill,
-              { backgroundColor: dynamicStyles.pillBg },
-            ]}
           >
-            <MaterialCommunityIcons
-              name="tune-variant"
-              size={18}
-              color={dynamicStyles.textMain}
-            />
-            <Text
+            <LiquidGlassSurface
+              active
+              effect="clear"
+              isDark={isDark}
               style={[
-                styles.smartFilterText,
-                { color: dynamicStyles.textMain },
+                styles.smartFilterPill,
+                { backgroundColor: dynamicStyles.pillBg },
               ]}
-              numberOfLines={1}
             >
-              {getLabel(ENTITY_TYPES, entityType)} •{" "}
-              {getLabel(PLAY_TYPES, playTypeFilter)} • {radiusKm}km
-            </Text>
-            <MaterialCommunityIcons
-              name="chevron-down"
-              size={18}
-              color={dynamicStyles.textSub}
-            />
+              <MaterialCommunityIcons
+                name="tune-variant"
+                size={18}
+                color={dynamicStyles.textMain}
+              />
+              <Text
+                style={[
+                  styles.smartFilterText,
+                  { color: dynamicStyles.textMain },
+                ]}
+                numberOfLines={1}
+              >
+                {getLabel(ENTITY_TYPES, entityType)} •{" "}
+                {getLabel(PLAY_TYPES, playTypeFilter)} • {radiusKm}km
+              </Text>
+              <MaterialCommunityIcons
+                name="chevron-down"
+                size={18}
+                color={dynamicStyles.textSub}
+              />
+            </LiquidGlassSurface>
           </TouchableOpacity>
         </View>
 
@@ -1019,33 +1063,39 @@ export default function PickleRadarScreen() {
                     return (
                       <TouchableOpacity
                         key={opt.key}
-                        style={[
-                          styles.modalChip,
-                          {
-                            borderColor: active
-                              ? THEME_COLOR
-                              : dynamicStyles.cardBorder,
-                            backgroundColor: active
-                              ? THEME_COLOR
-                              : "transparent",
-                          },
-                        ]}
                         onPress={() => setEntityType(opt.key)}
                       >
-                        <Text
+                        <LiquidGlassSurface
+                          active={active}
+                          effect="clear"
+                          isDark={isDark}
                           style={[
-                            styles.modalChipText,
-                            active
-                              ? { color: "#FFF", fontWeight: "900" }
-                              : {
-                                  color: dynamicStyles.textMain,
-                                  fontWeight: "800",
-                                },
+                            styles.modalChip,
+                            {
+                              borderColor: active
+                                ? THEME_COLOR
+                                : dynamicStyles.cardBorder,
+                              backgroundColor: active
+                                ? THEME_COLOR
+                                : "transparent",
+                            },
                           ]}
-                          numberOfLines={1}
                         >
-                          {opt.label}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.modalChipText,
+                              active
+                                ? { color: "#FFF", fontWeight: "900" }
+                                : {
+                                    color: dynamicStyles.textMain,
+                                    fontWeight: "800",
+                                  },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {opt.label}
+                          </Text>
+                        </LiquidGlassSurface>
                       </TouchableOpacity>
                     );
                   })}
@@ -1065,32 +1115,38 @@ export default function PickleRadarScreen() {
                     return (
                       <TouchableOpacity
                         key={opt.key}
-                        style={[
-                          styles.modalChip,
-                          {
-                            borderColor: active
-                              ? THEME_COLOR
-                              : dynamicStyles.cardBorder,
-                            backgroundColor: active
-                              ? THEME_COLOR
-                              : "transparent",
-                          },
-                        ]}
                         onPress={() => setPlayTypeFilter(opt.key)}
                       >
-                        <Text
+                        <LiquidGlassSurface
+                          active={active}
+                          effect="clear"
+                          isDark={isDark}
                           style={[
-                            styles.modalChipText,
-                            active
-                              ? { color: "#FFF", fontWeight: "900" }
-                              : {
-                                  color: dynamicStyles.textMain,
-                                  fontWeight: "800",
-                                },
+                            styles.modalChip,
+                            {
+                              borderColor: active
+                                ? THEME_COLOR
+                                : dynamicStyles.cardBorder,
+                              backgroundColor: active
+                                ? THEME_COLOR
+                                : "transparent",
+                            },
                           ]}
                         >
-                          {opt.label}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.modalChipText,
+                              active
+                                ? { color: "#FFF", fontWeight: "900" }
+                                : {
+                                    color: dynamicStyles.textMain,
+                                    fontWeight: "800",
+                                  },
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </LiquidGlassSurface>
                       </TouchableOpacity>
                     );
                   })}
@@ -1110,35 +1166,41 @@ export default function PickleRadarScreen() {
                     return (
                       <TouchableOpacity
                         key={opt}
-                        style={[
-                          styles.modalOption,
-                          {
-                            borderColor: active
-                              ? THEME_COLOR
-                              : dynamicStyles.cardBorder,
-                            backgroundColor: active
-                              ? THEME_COLOR
-                              : "transparent",
-                          },
-                        ]}
                         onPress={() => {
                           setRadiusKm(opt);
                           if (myLocation) zoomToRadius(myLocation, opt);
                         }}
                       >
-                        <Text
+                        <LiquidGlassSurface
+                          active={active}
+                          effect="clear"
+                          isDark={isDark}
                           style={[
-                            styles.modalOptionText,
-                            active
-                              ? { color: "#FFF", fontWeight: "900" }
-                              : {
-                                  color: dynamicStyles.textSub,
-                                  fontWeight: "800",
-                                },
+                            styles.modalOption,
+                            {
+                              borderColor: active
+                                ? THEME_COLOR
+                                : dynamicStyles.cardBorder,
+                              backgroundColor: active
+                                ? THEME_COLOR
+                                : "transparent",
+                            },
                           ]}
                         >
-                          {opt} km
-                        </Text>
+                          <Text
+                            style={[
+                              styles.modalOptionText,
+                              active
+                                ? { color: "#FFF", fontWeight: "900" }
+                                : {
+                                    color: dynamicStyles.textSub,
+                                    fontWeight: "800",
+                                  },
+                            ]}
+                          >
+                            {opt} km
+                          </Text>
+                        </LiquidGlassSurface>
                       </TouchableOpacity>
                     );
                   })}
@@ -1181,15 +1243,24 @@ export default function PickleRadarScreen() {
       </Modal>
 
       <TouchableOpacity
-        style={[styles.recenterBtn, { backgroundColor: dynamicStyles.pillBg }]}
         onPress={handleRecenter}
         activeOpacity={0.8}
       >
-        <MaterialCommunityIcons
-          name="crosshairs-gps"
-          size={24}
-          color={NEON_BLUE}
-        />
+        <LiquidGlassSurface
+          active
+          effect="clear"
+          isDark={isDark}
+          style={[
+            styles.recenterBtn,
+            { backgroundColor: dynamicStyles.pillBg },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="crosshairs-gps"
+            size={24}
+            color={NEON_BLUE}
+          />
+        </LiquidGlassSurface>
       </TouchableOpacity>
 
       {/* Bottom list */}

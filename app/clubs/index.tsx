@@ -34,6 +34,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 // 🆕 Import Theme Hook
 import { useTheme } from "@react-navigation/native";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 const { width } = Dimensions.get("window");
 
@@ -146,10 +147,16 @@ export default function ClubsListScreen() {
           <View style={styles.headerTopRow}>
             <TouchableOpacity
               onPress={() => router.back()}
-              style={styles.backBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="chevron-back" size={24} color="#fff" />
+              <LiquidGlassSurface
+                active
+                effect="clear"
+                isDark={dark}
+                style={styles.backBtn}
+              >
+                <Ionicons name="chevron-back" size={24} color="#fff" />
+              </LiquidGlassSurface>
             </TouchableOpacity>
 
             <Text style={styles.headerTitle}>Câu lạc bộ</Text>
@@ -180,30 +187,44 @@ export default function ClubsListScreen() {
 
         <View style={styles.tabsContainer}>
           <TouchableOpacity
-            style={[styles.tab, tab === "all" && styles.tabActive]}
             onPress={() => setTab("all")}
+            activeOpacity={0.85}
           >
-            <Text
-              style={[
-                styles.tabText,
-                tab === "all" && { color: "#667eea" }, // Active text color
-              ]}
+            <LiquidGlassSurface
+              active={tab === "all"}
+              effect="clear"
+              isDark={dark}
+              style={[styles.tab, tab === "all" && styles.tabActive]}
             >
-              Tất cả
-            </Text>
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === "all" && { color: "#667eea" },
+                ]}
+              >
+                Tất cả
+              </Text>
+            </LiquidGlassSurface>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, tab === "mine" && styles.tabActive]}
             onPress={() => setTab("mine")}
+            activeOpacity={0.85}
           >
-            <Text
-              style={[
-                styles.tabText,
-                tab === "mine" && { color: "#667eea" }, // Active text color
-              ]}
+            <LiquidGlassSurface
+              active={tab === "mine"}
+              effect="clear"
+              isDark={dark}
+              style={[styles.tab, tab === "mine" && styles.tabActive]}
             >
-              CLB của tôi
-            </Text>
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === "mine" && { color: "#667eea" },
+                ]}
+              >
+                CLB của tôi
+              </Text>
+            </LiquidGlassSurface>
           </TouchableOpacity>
         </View>
 
@@ -323,16 +344,21 @@ export default function ClubsListScreen() {
         />
 
         <TouchableOpacity
-          style={styles.fab}
           onPress={() => setOpenCreate(true)}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={["#667eea", "#764ba2"]}
-            style={styles.fabGradient}
+          <LiquidGlassSurface
+            active
+            isDark={dark}
+            style={styles.fab}
           >
-            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
-          </LinearGradient>
+            <LinearGradient
+              colors={["#667eea", "#764ba2"]}
+              style={styles.fabGradient}
+            >
+              <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            </LinearGradient>
+          </LiquidGlassSurface>
         </TouchableOpacity>
 
         <ClubCreateModal
@@ -396,6 +422,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
   },
   tabActive: {
     backgroundColor: "#fff",
@@ -442,9 +470,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backBtn: {
-    paddingRight: 8,
-    paddingVertical: 4,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     marginRight: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
 
   /* SKELETON STYLES */

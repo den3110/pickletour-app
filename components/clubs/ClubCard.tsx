@@ -15,6 +15,7 @@ import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 // 1. Import Theme Hook
 import { useTheme } from "@react-navigation/native";
+import LiquidGlassSurface from "@/components/ui/LiquidGlassSurface";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 32;
@@ -48,150 +49,166 @@ export default function ClubCard({ club, onPress }: ClubCardProps) {
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
       <Animated.View
         entering={FadeIn.duration(300)}
-        style={[styles.card, { backgroundColor: colors.cardBg }]} // Áp dụng màu nền dynamic
       >
-        {/* Cover Image with Gradient Overlay */}
-        <View style={styles.coverContainer}>
-          <ExpoImage
-            source={{ uri: normalizeUrl(cover) }}
-            style={styles.cover}
-            contentFit="cover"
-            transition={200}
-            cachePolicy="memory-disk"
-            recyclingKey={`cover-${cover}`}
-          />
-          <LinearGradient
-            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.4)"]}
-            style={styles.coverGradient}
-          />
-
-          {/* Verified Badge */}
-          {club.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <MaterialCommunityIcons
-                name="check-decagram"
-                size={20}
-                color="#fff"
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Logo Avatar */}
-          <View style={styles.avatarContainer}>
+        <LiquidGlassSurface
+          isDark={isDark}
+          style={[styles.card, { backgroundColor: colors.cardBg }]}
+        >
+          {/* Cover Image with Gradient Overlay */}
+          <View style={styles.coverContainer}>
             <ExpoImage
-              source={{ uri: normalizeUrl(logo) }}
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: colors.cardBg, // Nền avatar trùng nền card
-                  borderColor: colors.avatarBorder, // Viền avatar trùng nền card
-                },
-              ]}
+              source={{ uri: normalizeUrl(cover) }}
+              style={styles.cover}
               contentFit="cover"
-              transition={150}
+              transition={200}
               cachePolicy="memory-disk"
-              recyclingKey={`logo-${logo}`}
+              recyclingKey={`cover-${cover}`}
             />
+            <LinearGradient
+              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.4)"]}
+              style={styles.coverGradient}
+            />
+
+            {/* Verified Badge */}
             {club.isVerified && (
-              <View
-                style={[
-                  styles.avatarBadge,
-                  { backgroundColor: colors.avatarBorder }, // Nền badge trùng nền card
-                ]}
+              <LiquidGlassSurface
+                active
+                effect="clear"
+                isDark={isDark}
+                style={styles.verifiedBadge}
               >
                 <MaterialCommunityIcons
-                  name="check-circle"
-                  size={18}
-                  color="#4CAF50"
+                  name="check-decagram"
+                  size={20}
+                  color="#fff"
                 />
-              </View>
+              </LiquidGlassSurface>
             )}
           </View>
 
-          {/* Club Info */}
-          <View style={styles.info}>
-            <Text
-              style={[styles.clubName, { color: colors.textPrimary }]}
-              numberOfLines={1}
-            >
-              {club.name}
-            </Text>
-
-            {/* Location */}
-            {(club.province || club.city) && (
-              <View style={styles.locationRow}>
-                <MaterialCommunityIcons
-                  name="map-marker"
-                  size={14}
-                  color={colors.textSecondary}
-                />
-                <Text
-                  style={[styles.location, { color: colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {club.city ? `${club.city}, ` : ""}
-                  {club.province || ""}
-                </Text>
-              </View>
-            )}
-
-            {/* Sport Types */}
-            {club.sportTypes && club.sportTypes.length > 0 && (
-              <View style={styles.sportsContainer}>
-                {club.sportTypes.slice(0, 2).map((sport) => (
-                  <Chip
-                    key={sport}
-                    label={sport}
-                    style={styles.sportChip}
-                    // Nếu Chip component hỗ trợ prop theme/color thì truyền vào đây
-                    // Ví dụ: textColor={colors.textSecondary}
-                  />
-                ))}
-                {club.sportTypes.length > 2 && (
-                  <Text
-                    style={[styles.moreSports, { color: colors.textSecondary }]}
-                  >
-                    +{club.sportTypes.length - 2}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={16}
-                  color="#667eea" // Giữ màu brand hoặc đổi nếu cần
-                />
-                <Text style={[styles.statText, { color: colors.textTertiary }]}>
-                  {memberCount} thành viên
-                </Text>
-              </View>
-
-              {club.shortCode && (
-                <View
+          {/* Content */}
+          <View style={styles.content}>
+            {/* Logo Avatar */}
+            <View style={styles.avatarContainer}>
+              <ExpoImage
+                source={{ uri: normalizeUrl(logo) }}
+                style={[
+                  styles.avatar,
+                  {
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.avatarBorder,
+                  },
+                ]}
+                contentFit="cover"
+                transition={150}
+                cachePolicy="memory-disk"
+                recyclingKey={`logo-${logo}`}
+              />
+              {club.isVerified && (
+                <LiquidGlassSurface
+                  effect="clear"
+                  isDark={isDark}
                   style={[
-                    styles.shortCodeBadge,
-                    { backgroundColor: colors.badgeBg },
+                    styles.avatarBadge,
+                    { backgroundColor: colors.avatarBorder },
                   ]}
                 >
-                  <Text style={styles.shortCodeText}>{club.shortCode}</Text>
-                </View>
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={18}
+                    color="#4CAF50"
+                  />
+                </LiquidGlassSurface>
               )}
             </View>
-          </View>
-        </View>
 
-        {/* Bottom Gradient Accent */}
-        <LinearGradient
-          colors={["rgba(102, 126, 234, 0)", "rgba(102, 126, 234, 0.1)"]}
-          style={styles.bottomAccent}
-        />
+            {/* Club Info */}
+            <View style={styles.info}>
+              <Text
+                style={[styles.clubName, { color: colors.textPrimary }]}
+                numberOfLines={1}
+              >
+                {club.name}
+              </Text>
+
+              {/* Location */}
+              {(club.province || club.city) && (
+                <View style={styles.locationRow}>
+                  <MaterialCommunityIcons
+                    name="map-marker"
+                    size={14}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[styles.location, { color: colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {club.city ? `${club.city}, ` : ""}
+                    {club.province || ""}
+                  </Text>
+                </View>
+              )}
+
+              {/* Sport Types */}
+              {club.sportTypes && club.sportTypes.length > 0 && (
+                <View style={styles.sportsContainer}>
+                  {club.sportTypes.slice(0, 2).map((sport) => (
+                    <Chip
+                      key={sport}
+                      label={sport}
+                      style={styles.sportChip}
+                    />
+                  ))}
+                  {club.sportTypes.length > 2 && (
+                    <Text
+                      style={[
+                        styles.moreSports,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      +{club.sportTypes.length - 2}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Stats */}
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <MaterialCommunityIcons
+                    name="account-group"
+                    size={16}
+                    color="#667eea"
+                  />
+                  <Text
+                    style={[styles.statText, { color: colors.textTertiary }]}
+                  >
+                    {memberCount} thành viên
+                  </Text>
+                </View>
+
+                {club.shortCode && (
+                  <LiquidGlassSurface
+                    effect="clear"
+                    isDark={isDark}
+                    style={[
+                      styles.shortCodeBadge,
+                      { backgroundColor: colors.badgeBg },
+                    ]}
+                  >
+                    <Text style={styles.shortCodeText}>{club.shortCode}</Text>
+                  </LiquidGlassSurface>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom Gradient Accent */}
+          <LinearGradient
+            colors={["rgba(102, 126, 234, 0)", "rgba(102, 126, 234, 0.1)"]}
+            style={styles.bottomAccent}
+          />
+        </LiquidGlassSurface>
       </Animated.View>
     </TouchableOpacity>
   );

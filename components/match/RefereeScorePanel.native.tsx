@@ -42,7 +42,6 @@ import {
 import CCCDModal from "../CCCDModal.native";
 import { useTheme } from "@react-navigation/native";
 import { useUserMatchHeader } from "@/hooks/useUserMatchHeader";
-import { LinearGradient } from "expo-linear-gradient"; // ✅ NEW
 import MatchSettingsModal from "./MatchSettingsModal";
 import { useVoiceCommands } from "@/hooks/useVoiceCommands";
 import * as Speech from "expo-speech";
@@ -1667,7 +1666,10 @@ export default function RefereeJudgePanel({ matchId }) {
     refetch,
     api: liveApi,
     sync: liveSync,
-  } = useLiveMatch(matchId, null, { offlineSync: true });
+  } = useLiveMatch(matchId, null, {
+    offlineSync: true,
+    matchKind: isUserMatch ? "user" : "",
+  });
   const socket = useSocket();
 
   // ===== NEW: court modal state =====
@@ -3353,17 +3355,6 @@ export default function RefereeJudgePanel({ matchId }) {
   }, [serve?.serverId]);
 
   /* ========== render ========== */
-  const showInitialSkeleton = !isLandscape || (isLoading && !match);
-  if (showInitialSkeleton)
-    return (
-      <RefereeJudgeSkeleton
-        tokens={t}
-        insets={insets}
-        pageSafeEdges={pageSafeEdges}
-        pageBottomInset={pageBottomInset}
-        compact={isCompactLandscape || !isLandscape}
-      />
-    );
   if (error)
     return (
       <View
@@ -3378,6 +3369,17 @@ export default function RefereeJudgePanel({ matchId }) {
             "Lỗi tải trận"}
         </Text>
       </View>
+    );
+  const showInitialSkeleton = isLoading && !match;
+  if (showInitialSkeleton)
+    return (
+      <RefereeJudgeSkeleton
+        tokens={t}
+        insets={insets}
+        pageSafeEdges={pageSafeEdges}
+        pageBottomInset={pageBottomInset}
+        compact={isCompactLandscape || !isLandscape}
+      />
     );
   if (!match) return null;
 
