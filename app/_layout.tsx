@@ -2072,6 +2072,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="guide/index"
                               options={{
+                                title: "Hướng dẫn",
                                 headerTitleAlign: "center",
                                 headerTintColor: navTheme.colors.primary,
                                 headerTitleStyle: {

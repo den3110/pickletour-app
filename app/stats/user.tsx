@@ -1,6 +1,7 @@
 // app/(tabs)/user-stats.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
@@ -42,6 +43,7 @@ import {
 } from "@/slices/userStatsApiSlice";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 if (
   Platform.OS === "android" &&
@@ -67,24 +69,98 @@ function useThemeColors() {
   const isDark = scheme === "dark";
   return {
     isDark,
+    bg: isDark ? "#0f1115" : "#F5F7FA",
     bgGradient: isDark
-      ? ["#0f172a", "#1e1b4b", "#0f172a"]
-      : ["#f8fafc", "#f1f5f9", "#e2e8f0"],
+      ? ["#0f1115", "#181a20", "#0f1115"]
+      : ["#F5F7FA", "#FFFFFF", "#F5F7FA"],
     text: isDark ? "#f8fafc" : "#0f172a",
-    subText: isDark ? "#94a3b8" : "#64748b",
-    cardBg: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(255, 255, 255, 0.65)",
-    cardBorder: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.6)",
+    subText: isDark ? "#848E9C" : "#6B7280",
+    cardBg: isDark ? "rgba(24,26,32,0.72)" : "rgba(255,255,255,0.74)",
+    cardBorder: isDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.72)",
     cardGradient: isDark
-      ? ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.0)"]
-      : ["rgba(255,255,255,0.8)", "rgba(255,255,255,0.2)"],
+      ? ["rgba(255,255,255,0.08)", "rgba(255,255,255,0.01)"]
+      : ["rgba(255,255,255,0.82)", "rgba(255,255,255,0.18)"],
     blurTint: (isDark ? "dark" : "light") as "dark" | "light" | "default",
     chartGrid: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
     chartText: isDark ? "#94a3b8" : "#64748b",
-    iconBg: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-    kpiBg: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.5)",
-    segmentBg: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-    tooltipBg: isDark ? "#1e293b" : "#ffffff",
+    iconBg: isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.68)",
+    kpiBg: isDark ? "rgba(32,35,43,0.62)" : "rgba(255,255,255,0.7)",
+    segmentBg: isDark ? "rgba(24,26,32,0.72)" : "rgba(255,255,255,0.74)",
+    tooltipBg: isDark ? "#181a20" : "#ffffff",
   };
+}
+
+const statsGlassScheme = (theme: any) => (theme.isDark ? "dark" : "light");
+const statsGlassSurfaceTint = (theme: any, light = 0.58, dark = 0.54) =>
+  theme.isDark
+    ? `rgba(24,26,32,${dark})`
+    : `rgba(255,255,255,${light})`;
+const statsGlassAccentTint = (alpha = 0.26) =>
+  `rgba(99,102,241,${alpha})`;
+
+function StatsLiquidBackdrop({ theme }: any) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 16],
+  });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.28, 0.48],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.ambientBackdrop}>
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          {
+            backgroundColor: theme.isDark
+              ? "rgba(59,130,246,0.18)"
+              : "rgba(37,99,235,0.14)",
+            opacity,
+            transform: [{ translateY }, { rotate: "-8deg" }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          styles.ambientBandAlt,
+          {
+            backgroundColor: theme.isDark
+              ? "rgba(245,158,11,0.12)"
+              : "rgba(245,158,11,0.1)",
+            opacity,
+            transform: [{ translateY }, { rotate: "7deg" }],
+          },
+        ]}
+      />
+    </View>
+  );
 }
 
 /* =================== COMPONENTS =================== */
@@ -112,12 +188,22 @@ const IconButton = ({ icon, onPress, theme }: any) => (
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: theme.iconBg,
-      alignItems: "center",
-      justifyContent: "center",
     }}
   >
-    <Ionicons name={icon} size={20} color={theme.text} />
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={statsGlassScheme(theme)}
+      glassEffectStyle="clear"
+      glassTintColor={statsGlassSurfaceTint(theme, 0.58, 0.48)}
+      isInteractive
+      style={[
+        styles.iconButtonGlass,
+        { backgroundColor: theme.iconBg, borderColor: theme.cardBorder },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+      ]}
+    >
+      <Ionicons name={icon} size={20} color={theme.text} />
+    </AppleLiquidGlassView>
   </ScaleBtn>
 );
 
@@ -147,18 +233,21 @@ function GlassCard({
   style,
 }: any) {
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="blur"
+      intensity={theme.isDark ? 24 : 42}
+      tint={theme.blurTint}
+      glassColorScheme={statsGlassScheme(theme)}
+      glassEffectStyle="regular"
+      glassTintColor={statsGlassSurfaceTint(theme, 0.62, 0.52)}
+      isInteractive
       style={[
         styles.cardContainer,
         { borderColor: theme.cardBorder, backgroundColor: theme.cardBg },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.liquidCard,
         style,
       ]}
     >
-      <AppleLiquidGlassView
-        intensity={theme.isDark ? 20 : 40}
-        tint={theme.blurTint}
-        style={StyleSheet.absoluteFill}
-      />
       <LinearGradient
         colors={theme.cardGradient}
         style={StyleSheet.absoluteFill}
@@ -184,16 +273,24 @@ function GlassCard({
         </View>
       </View>
       <View style={styles.cardBody}>{children}</View>
-    </View>
+    </AppleLiquidGlassView>
   );
 }
 
 function KPI({ label, value, color, theme }: any) {
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="blur"
+      intensity={theme.isDark ? 18 : 34}
+      tint={theme.blurTint}
+      glassColorScheme={statsGlassScheme(theme)}
+      glassEffectStyle="clear"
+      glassTintColor={statsGlassSurfaceTint(theme, 0.48, 0.38)}
+      isInteractive
       style={[
         styles.kpiBox,
         { backgroundColor: theme.kpiBg, borderColor: theme.cardBorder },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.innerGlass,
       ]}
     >
       <Text
@@ -203,7 +300,7 @@ function KPI({ label, value, color, theme }: any) {
         {value}
       </Text>
       <Text style={[styles.kpiLabel, { color: theme.subText }]}>{label}</Text>
-    </View>
+    </AppleLiquidGlassView>
   );
 }
 
@@ -665,24 +762,28 @@ export default function UserStatsScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.bgGradient[0] }}>
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar barStyle={T.isDark ? "light-content" : "dark-content"} />
       <AuthGuard>
         <Stack.Screen options={{ headerShown: false }} />
-        <LinearGradient
-          colors={T.bgGradient}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
+        <StatsLiquidBackdrop theme={T} />
 
         {/* Header */}
-        <View
-          style={{
-            paddingTop: top + 10,
-            paddingBottom: 10,
-            paddingHorizontal: PADX,
-          }}
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={statsGlassScheme(T)}
+          glassEffectStyle="regular"
+          glassTintColor={statsGlassSurfaceTint(T, 0.62, 0.52)}
+          isInteractive
+          style={[
+            styles.headerGlass,
+            {
+              paddingTop: top + 10,
+              backgroundColor: T.cardBg,
+              borderColor: T.cardBorder,
+            },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+          ]}
         >
           <View
             style={{
@@ -697,18 +798,27 @@ export default function UserStatsScreen() {
               theme={T}
             />
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ color: T.text, fontWeight: "900", fontSize: 20 }}>
-                THỐNG KÊ
+              <Text style={{ color: T.text, fontWeight: "900", fontSize: 22 }}>
+                Thống kê
               </Text>
               <Text style={{ color: ACCENT, fontSize: 13, fontWeight: "600" }}>
-                {name?.toUpperCase()}
+                {name ? `@${String(name).toUpperCase()}` : "PickleTour"}
               </Text>
             </View>
           </View>
 
           {/* Range selector */}
-          <View
-            style={[styles.segmentContainer, { backgroundColor: T.segmentBg }]}
+          <AppleLiquidGlassView
+            fallback="view"
+            glassColorScheme={statsGlassScheme(T)}
+            glassEffectStyle="clear"
+            glassTintColor={statsGlassSurfaceTint(T, 0.48, 0.38)}
+            isInteractive
+            style={[
+              styles.segmentContainer,
+              { backgroundColor: T.segmentBg, borderColor: T.cardBorder },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.innerGlass,
+            ]}
           >
             {[7, 14, 30, 90].map((d) => {
               const isActive = rangeVal === d;
@@ -716,30 +826,44 @@ export default function UserStatsScreen() {
                 <TouchableOpacity
                   key={d}
                   onPress={() => changeRange(d)}
-                  style={[
-                    styles.segmentBtn,
-                    isActive && {
-                      backgroundColor: T.isDark
-                        ? "rgba(99, 102, 241, 0.2)"
-                        : "#fff",
-                    },
-                    isActive && !T.isDark && styles.shadowSm,
-                  ]}
+                  style={styles.segmentBtn}
                 >
-                  <Text
+                  <AppleLiquidGlassView
+                    fallback="view"
+                    glassColorScheme={statsGlassScheme(T)}
+                    glassEffectStyle="clear"
+                    glassTintColor={
+                      isActive
+                        ? statsGlassAccentTint(0.34)
+                        : "rgba(255,255,255,0)"
+                    }
+                    isInteractive={isActive}
                     style={[
-                      styles.segmentText,
-                      { color: isActive ? ACCENT : T.subText },
-                      isActive && { fontWeight: "700" },
+                      styles.segmentPill,
+                      isActive && {
+                        backgroundColor: T.isDark
+                          ? "rgba(99, 102, 241, 0.22)"
+                          : "rgba(255,255,255,0.74)",
+                      },
+                      isActive && IOS_26_LIQUID_GLASS_ENABLED && styles.innerGlass,
+                      isActive && !T.isDark && styles.shadowSm,
                     ]}
                   >
-                    {d} ngày
-                  </Text>
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        { color: isActive ? ACCENT : T.subText },
+                        isActive && { fontWeight: "700" },
+                      ]}
+                    >
+                      {d} ngày
+                    </Text>
+                  </AppleLiquidGlassView>
                 </TouchableOpacity>
               );
             })}
-          </View>
-        </View>
+          </AppleLiquidGlassView>
+        </AppleLiquidGlassView>
 
         <ScrollView
           contentContainerStyle={{
@@ -1127,6 +1251,52 @@ export default function UserStatsScreen() {
 /* =================== STYLES =================== */
 
 const styles = StyleSheet.create({
+  ambientBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  ambientBand: {
+    position: "absolute",
+    top: 72,
+    left: -40,
+    right: -40,
+    height: 120,
+    borderRadius: 28,
+  },
+  ambientBandAlt: {
+    top: 210,
+    height: 86,
+  },
+  headerGlass: {
+    paddingBottom: 12,
+    paddingHorizontal: PADX,
+    borderBottomWidth: 1,
+  },
+  iconButtonGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glassControl: {
+    borderColor: "rgba(255,255,255,0.28)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  liquidCard: {
+    borderColor: "rgba(255,255,255,0.26)",
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  innerGlass: {
+    borderColor: "rgba(255,255,255,0.22)",
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: "700",
@@ -1151,11 +1321,18 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 16,
     marginTop: 16,
+    borderWidth: 1,
   },
   segmentBtn: {
     flex: 1,
-    paddingVertical: 8,
     alignItems: "center",
+    borderRadius: 12,
+  },
+  segmentPill: {
+    width: "100%",
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 12,
   },
   segmentText: { fontWeight: "600", fontSize: 13 },
