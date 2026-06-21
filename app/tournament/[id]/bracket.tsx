@@ -1733,6 +1733,13 @@ const getSeedLayoutKey = (seed, fallbackRound, fallbackOrder) => {
 
 const normalizeLayoutCode = (value) => extractDisplayCodeText(value);
 
+const normalizeLayoutName = (value) => {
+  const text = String(value || "").trim();
+  if (!text || isPendingTeamLabel(text) || isByeLabel(text)) return "";
+  if (normalizeLayoutCode(text)) return "";
+  return text.replace(/\s*\([AB]\)\s*$/i, "").replace(/\s+/g, " ").toLowerCase();
+};
+
 const getSeedLayoutCodes = (seed, fallbackOrder) => {
   const match = seed?.__match;
   if (!match) return [];
@@ -1766,8 +1773,21 @@ const getSeedSourceRefs = (seed) => {
   const refs = [];
   const pushRef = (ref) => {
     if (!ref) return;
-    const key = ref.code || `${ref.round}:${ref.order}`;
-    if (refs.some((item) => (item.code || `${item.round}:${item.order}`) === key)) {
+    const key = ref.code
+      ? `code:${ref.code}`
+      : ref.name
+      ? `name:${ref.name}`
+      : `match:${ref.round}:${ref.order}`;
+    if (
+      refs.some((item) => {
+        const itemKey = item.code
+          ? `code:${item.code}`
+          : item.name
+          ? `name:${item.name}`
+          : `match:${item.round}:${item.order}`;
+        return itemKey === key;
+      })
+    ) {
       return;
     }
     refs.push(ref);
@@ -1799,7 +1819,13 @@ const getSeedSourceRefs = (seed) => {
 
   (seed?.teams || []).forEach((team) => {
     const code = normalizeLayoutCode(team?.name);
-    if (code) pushRef({ code });
+    if (code) {
+      pushRef({ code });
+      return;
+    }
+
+    const name = normalizeLayoutName(team?.name);
+    if (name) pushRef({ name });
   });
 
   return refs;
@@ -1878,18 +1904,18 @@ const BracketColumns = ({
 
   // ===== BYE helpers =====
   const isByeName = isByeLabel;
-  const seedHasBye = (seed) => {
+  const seedHasBye = useCallback((seed) => {
     const a = seed?.teams?.[0]?.name || "";
     const b = seed?.teams?.[1]?.name || "";
     return isByeName(a) || isByeName(b);
-  };
-  const nonByeName = (seed) => {
+  }, [isByeName]);
+  const nonByeName = useCallback((seed) => {
     const a = seed?.teams?.[0]?.name || "";
     const b = seed?.teams?.[1]?.name || "";
     if (isByeName(a) && !isByeName(b) && !isPendingTeamLabel(b)) return b;
     if (isByeName(b) && !isByeName(a) && !isPendingTeamLabel(a)) return a;
     return null;
-  };
+  }, [isByeName]);
   // đo cột/ô để vẽ connector
   const [colRects, setColRects] = useState({});
   const [wrapRects, setWrapRects] = useState({});
@@ -1947,7 +1973,7 @@ const BracketColumns = ({
       });
     }
     return copy;
-  }, [rounds]);
+  }, [rounds, seedHasBye, nonByeName]);
 
   const ROUND_GAP = 64;
   const INNER_GAP = 36;
@@ -1958,11 +1984,15 @@ const BracketColumns = ({
     baseCardH + INNER_GAP * 2 + EXTRA_SLOT,
     72 + INNER_GAP * 2
   );
-  const slotHeight = (col) => slotH0 * Math.pow(2, col);
+  const slotHeight = useCallback(
+    (col) => slotH0 * Math.pow(2, col),
+    [slotH0]
+  );
 
   const layoutIndex = useMemo(() => {
     const byKey = new Map();
     const byCode = new Map();
+    const byName = new Map();
 
     viewRounds.forEach((round, col) => {
       (round?.seeds || []).forEach((seed, index) => {
@@ -1975,16 +2005,22 @@ const BracketColumns = ({
           if (!byCode.has(code)) byCode.set(code, []);
           byCode.get(code).push(cell);
         };
+        const pushName = (name) => {
+          if (!name) return;
+          if (!byName.has(name)) byName.set(name, []);
+          byName.get(name).push(cell);
+        };
 
         getSeedLayoutCodes(seed, index + 1).forEach(pushCode);
         if (seedHasBye(seed)) {
           pushCode(normalizeLayoutCode(nonByeName(seed)));
+          pushName(normalizeLayoutName(nonByeName(seed)));
         }
       });
     });
 
-    return { byKey, byCode };
-  }, [viewRounds]);
+    return { byKey, byCode, byName };
+  }, [viewRounds, seedHasBye, nonByeName]);
 
   const getSourceCellsForSeed = useCallback(
     (seed, targetCol) => {
@@ -2002,6 +2038,8 @@ const BracketColumns = ({
       getSeedSourceRefs(seed).forEach((ref) => {
         if (ref.code) {
           (layoutIndex.byCode.get(ref.code) || []).forEach(pushCell);
+        } else if (ref.name) {
+          (layoutIndex.byName.get(ref.name) || []).forEach(pushCell);
         } else if (Number.isFinite(ref.round) && Number.isFinite(ref.order)) {
           pushCell(layoutIndex.byKey.get(`${ref.round}:${ref.order}`));
         }
@@ -2015,6 +2053,53 @@ const BracketColumns = ({
       return cells;
     },
     [layoutIndex, locByMatchId]
+  );
+
+  const getStructuralSourceCells = useCallback(
+    (targetCol, targetIdx) => {
+      const prevCol = targetCol - 1;
+      if (prevCol < 0) return [];
+      const prevSeeds = viewRounds?.[prevCol]?.seeds || [];
+      return [targetIdx * 2, targetIdx * 2 + 1]
+        .filter((idx) => prevSeeds[idx])
+        .map((idx) => ({ col: prevCol, idx }));
+    },
+    [viewRounds]
+  );
+
+  const getVisualSourceCellsForSeed = useCallback(
+    (seed, targetCol, targetIdx) => {
+      const cells = [];
+      const seen = new Set();
+      const pushCell = (cell) => {
+        if (!cell) return;
+        const key = `${cell.col}:${cell.idx}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        cells.push(cell);
+      };
+
+      const explicitCells = getSourceCellsForSeed(seed, targetCol);
+      const structuralCells = getStructuralSourceCells(targetCol, targetIdx);
+      explicitCells.forEach(pushCell);
+
+      const structuralKeys = new Set(
+        structuralCells.map((cell) => `${cell.col}:${cell.idx}`)
+      );
+      const explicitTouchesPair = explicitCells.some((cell) =>
+        structuralKeys.has(`${cell.col}:${cell.idx}`)
+      );
+      const pairHasBye = structuralCells.some((cell) =>
+        seedHasBye(viewRounds?.[cell.col]?.seeds?.[cell.idx])
+      );
+
+      if (!explicitCells.length || explicitTouchesPair || pairHasBye) {
+        structuralCells.forEach(pushCell);
+      }
+
+      return cells;
+    },
+    [getSourceCellsForSeed, getStructuralSourceCells, seedHasBye, viewRounds]
   );
 
   const seedLayout = useMemo(() => {
@@ -2034,7 +2119,7 @@ const BracketColumns = ({
           }
         };
 
-        getSourceCellsForSeed(seed, col).forEach((cell) => {
+        getVisualSourceCellsForSeed(seed, col, index).forEach((cell) => {
           pushSourceCenter(positionsByCell.get(`${cell.col}:${cell.idx}`));
         });
 
@@ -2054,7 +2139,7 @@ const BracketColumns = ({
     });
 
     return out;
-  }, [viewRounds, getSourceCellsForSeed, slotH0]);
+  }, [viewRounds, getVisualSourceCellsForSeed, slotHeight]);
 
   const getSeedMarginTop = useCallback(
     (col, index) => {
@@ -2129,7 +2214,7 @@ const BracketColumns = ({
         const dst = absWrap(c + 1, j);
         if (!dst) continue;
 
-        let srcIdxs = getSourceCellsForSeed(nextSeeds[j], c + 1).map(
+        let srcIdxs = getVisualSourceCellsForSeed(nextSeeds[j], c + 1, j).map(
           (cell) => cell.idx
         );
         if (!srcIdxs.length) {
@@ -2179,7 +2264,7 @@ const BracketColumns = ({
       }
     }
     return L;
-  }, [viewRounds, getSourceCellsForSeed, absWrap, t.dark]);
+  }, [viewRounds, getVisualSourceCellsForSeed, absWrap, t.dark]);
 
   return (
     <View>
@@ -2624,18 +2709,20 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const flushPending = useCallback(() => {
     if (!pendingRef.current.size) return;
     const mp = liveMapRef.current;
+    let changed = false;
     for (const [id, inc] of pendingRef.current) {
       const cur = mp.get(id);
+      if (cur && !isNewerOrEqualMatchPayload(cur, inc)) continue;
       const merged =
-        !cur || isNewerOrEqualMatchPayload(cur, inc)
-          ? mergeMatchPayload(cur, inc, cur || tour) ||
-            normalizeMatchDisplay(inc, cur || tour)
-          : cur;
+        mergeMatchPayload(cur, inc, cur || tour) ||
+        normalizeMatchDisplay(inc, cur || tour);
+      if (!merged) continue;
       mp.set(id, merged);
+      changed = true;
     }
     pendingRef.current.clear();
-    setLiveBump((x) => x + 1);
-  }, []);
+    if (changed) setLiveBump((x) => x + 1);
+  }, [tour]);
 
   const queueUpsert = useCallback(
     (incRaw) => {
@@ -2646,9 +2733,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         return;
       }
       const payload = incRaw?.data ?? incRaw?.match ?? incRaw;
+      const key = String(id);
+      const inc = normalizeMatchDisplay(payload, tour);
+      const base = pendingRef.current.get(key) || liveMapRef.current.get(key);
+      if (base && !isNewerOrEqualMatchPayload(base, inc)) return;
       pendingRef.current.set(
-        String(id),
-        normalizeMatchDisplay(payload, tour)
+        key,
+        mergeMatchPayload(base, inc, base || tour) ||
+          normalizeMatchDisplay(inc, base || tour)
       );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
@@ -2709,15 +2801,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   });
   const initialSeededRef = useRef(false);
 
-  const versionOf = (m) => {
-    const v = Number(m?.liveVersion ?? m?.version ?? NaN);
-    if (!Number.isFinite(v)) {
-      const t = new Date(m?.updatedAt ?? m?.createdAt ?? 0).getTime();
-      return Number.isFinite(t) ? t : 0;
-    }
-    return v;
-  };
-
   useEffect(() => {
     if (!Array.isArray(allMatchesFetched)) return;
 
@@ -2751,19 +2834,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         changed = true;
         continue;
       }
-      const vNew = versionOf(m);
-      const vOld = versionOf(cur);
-
-      if (vNew > vOld) {
-        mp.set(id, m);
-        changed = true;
-      } else if (vNew === vOld) {
-        const merged = { ...cur, ...m };
-        if (merged !== cur) {
-          mp.set(id, merged);
-          changed = true;
-        }
-      }
+      if (!isNewerOrEqualMatchPayload(cur, m)) continue;
+      const merged =
+        mergeMatchPayload(cur, m, cur || tour) ||
+        normalizeMatchDisplay(m, cur || tour);
+      if (!merged) continue;
+      if (JSON.stringify(merged) === JSON.stringify(cur)) continue;
+      mp.set(id, merged);
+      changed = true;
     }
 
     if (changed) {
@@ -3308,10 +3386,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             : sourceMatch.pairB;
 
           if (hasResolvedPair(sourcePair)) {
-            const suffix = isUsefulSideLabel(sourceRefLabel)
-              ? ` (${sourceRefLabel})`
-              : "";
-            return `${pairLabelNickOnly(sourcePair, eventType, sourceMatch)}${suffix}`;
+            return pairLabelNickOnly(sourcePair, eventType, sourceMatch);
           }
         }
 

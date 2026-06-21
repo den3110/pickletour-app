@@ -107,6 +107,34 @@ const textOf = (v) => {
     return v.name || v.label || v.title || v.message || v.error || "";
   return "";
 };
+const firstRejectedLiveSyncEvent = (result) =>
+  Array.isArray(result?.rejectedEvents) && result.rejectedEvents.length
+    ? result.rejectedEvents[0]
+    : null;
+const liveSyncRejectedMessage = (
+  rejection,
+  fallback = "Không thể đồng bộ thao tác"
+) => {
+  const code = String(rejection?.code || "").toLowerCase();
+  const message = textOf(rejection?.message);
+  const lower = message.toLowerCase();
+  if (code === "ownership_conflict" || lower.includes("another referee")) {
+    return "Trận này đang do trọng tài khác điều khiển.";
+  }
+  if (code === "break_active") {
+    return "Trận đang trong thời gian nghỉ, hãy tiếp tục trận trước khi thao tác.";
+  }
+  if (lower.includes("score is not finished")) {
+    return "Tỉ số hiện tại chưa đủ điều kiện kết thúc trận.";
+  }
+  if (lower.includes("winner does not match")) {
+    return "Đội thắng không khớp với tỉ số hiện tại.";
+  }
+  if (lower.includes("already finished")) {
+    return "Trận này đã được kết thúc trước đó.";
+  }
+  return message || fallback;
+};
 const userIdOf = (u) => {
   // 1. Ưu tiên lấy ID user hệ thống (nếu có)
   const id = u?.user?._id || u?.user || u?._id || u?.id || u?.uid;
@@ -135,6 +163,7 @@ const playersOf = (reg, eventType = "double") => {
 };
 
 const needWins = (bestOf = 3) => Math.floor(bestOf / 2) + 1;
+const SCORE_TAP_GUARD_MS = 120;
 const isGameWin = (a = 0, b = 0, ptw = 11, wbt = true) => {
   const max = Math.max(a, b),
     min = Math.min(a, b);
@@ -2138,12 +2167,9 @@ export default function RefereeJudgePanel({ matchId }) {
   const [midPointCustom, setMidPointCustom] = useState(null);
 
   // Busy flags
-  const [incBusy, setIncBusy] = useState(false);
+  const incBusy = false;
   const [undoBusy, setUndoBusy] = useState(false);
-
-  // Track pending op
-  const pendingOpRef = useRef(null);
-  const opTimeoutRef = useRef(null);
+  const scoreTapGuardRef = useRef({ side: "", until: 0 });
 
   // Mid-game side switch prompt
   const [midPromptOpen, setMidPromptOpen] = useState(false);
@@ -2344,32 +2370,6 @@ export default function RefereeJudgePanel({ matchId }) {
     setMidPointCustom(null);
   }, [match?._id]);
 
-  // Release busy when score actually changed for the pending op
-  useEffect(() => {
-    const op = pendingOpRef.current;
-    if (!op) return;
-    const changed =
-      op.type === "inc"
-        ? op.side === "A"
-          ? curA === op.prevA + 1
-          : curB === op.prevB + 1
-        : op.type === "undo"
-          ? op.side === "A"
-            ? curA === op.prevA - 1
-            : curB === op.prevB - 1
-          : false;
-
-    if (changed) {
-      if (op.type === "inc") setIncBusy(false);
-      if (op.type === "undo") setUndoBusy(false);
-      pendingOpRef.current = null;
-      if (opTimeoutRef.current) {
-        clearTimeout(opTimeoutRef.current);
-        opTimeoutRef.current = null;
-      }
-    }
-  }, [curA, curB]);
-
   // ====== actions ======
   const onStart = useCallback(async () => {
     if (!match || !ensureLiveOwner()) return;
@@ -2404,9 +2404,41 @@ export default function RefereeJudgePanel({ matchId }) {
       return;
     }
     try {
-      await liveSync?.syncNow?.();
-      await liveApi.finish(winner);
-      await liveSync?.syncNow?.();
+      const preSyncResult = await liveSync?.syncNow?.();
+      const preSyncRejected = firstRejectedLiveSyncEvent(preSyncResult);
+      if (preSyncRejected) {
+        Toast.show({
+          type: "error",
+          text1: "Chưa thể kết thúc",
+          text2: liveSyncRejectedMessage(
+            preSyncRejected,
+            "Chưa đồng bộ được điểm trước đó"
+          ),
+        });
+        return;
+      }
+
+      const finishEvent = await liveApi.finish(winner);
+      const finishSyncResult = liveSync?.syncEventNow
+        ? await liveSync.syncEventNow(finishEvent)
+        : { result: await liveSync?.syncNow?.() };
+
+      if (finishSyncResult?.rejected) {
+        Toast.show({
+          type: "error",
+          text1: "Chưa thể kết thúc",
+          text2: liveSyncRejectedMessage(finishSyncResult.rejected),
+        });
+        return;
+      }
+
+      if (finishSyncResult?.pending) {
+        Toast.show({
+          type: "info",
+          text1: "Đã lưu tạm",
+          text2: "Kết quả sẽ tự đồng bộ khi có mạng.",
+        });
+      }
     } catch (e) {
       Toast.show({
         type: "error",
@@ -2746,18 +2778,15 @@ export default function RefereeJudgePanel({ matchId }) {
     return false;
   }, [match?.liveLog]);
 
-  const beginOpTimeout = useCallback((kind) => {
-    if (opTimeoutRef.current) clearTimeout(opTimeoutRef.current);
-    opTimeoutRef.current = setTimeout(() => {
-      if (kind === "inc") setIncBusy(false);
-      if (kind === "undo") setUndoBusy(false);
-      pendingOpRef.current = null;
-    }, 2500);
-  }, []);
-
   const inc = async (side) => {
     if (!match || !ensureLiveOwner()) return;
-    if (incBusy || pendingOpRef.current?.type === "inc") return;
+    const now = Date.now();
+    const tapGuard = scoreTapGuardRef.current;
+    if (tapGuard?.side === side && now < Number(tapGuard.until || 0)) return;
+    scoreTapGuardRef.current = {
+      side,
+      until: now + SCORE_TAP_GUARD_MS,
+    };
 
     if (!canScoreNow) {
       Toast.show({
@@ -2784,21 +2813,22 @@ export default function RefereeJudgePanel({ matchId }) {
       };
       lastServerUidRef.current = prevServerUid;
     }
-    setIncBusy(true);
-    pendingOpRef.current = {
-      type: "inc",
-      side,
-      prevA: curA,
-      prevB: curB,
-      t: Date.now(),
-    };
     // ✅ chặn score "lùi" trong 1.5s để slot không flip -> bóng không nhảy 2 lần
+    const guardedA =
+      Date.now() < Number(scoreGuardRef.current?.until || 0) &&
+      typeof scoreGuardRef.current?.a === "number"
+        ? Math.max(curA, scoreGuardRef.current.a)
+        : curA;
+    const guardedB =
+      Date.now() < Number(scoreGuardRef.current?.until || 0) &&
+      typeof scoreGuardRef.current?.b === "number"
+        ? Math.max(curB, scoreGuardRef.current.b)
+        : curB;
     scoreGuardRef.current = {
-      a: side === "A" ? curA + 1 : curA,
-      b: side === "B" ? curB + 1 : curB,
+      a: side === "A" ? guardedA + 1 : guardedA,
+      b: side === "B" ? guardedB + 1 : guardedB,
       until: Date.now() + 1500,
     };
-    beginOpTimeout("inc");
 
     try {
       if (side === "A") await liveApi.pointA(1);
@@ -2810,12 +2840,6 @@ export default function RefereeJudgePanel({ matchId }) {
       }
 
     } catch (e) {
-      setIncBusy(false);
-      pendingOpRef.current = null;
-      if (opTimeoutRef.current) {
-        clearTimeout(opTimeoutRef.current);
-        opTimeoutRef.current = null;
-      }
       Toast.show({
         type: "error",
         text1: "Lỗi",
@@ -3112,8 +3136,8 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const leftServing = activeSide === leftSide;
   const rightServing = activeSide === rightSide;
-  const leftEnabled = canScoreByMatchState && leftServing && !incBusy && !undoBusy;
-  const rightEnabled = canScoreByMatchState && rightServing && !incBusy && !undoBusy;
+  const leftEnabled = canScoreByMatchState && leftServing && !undoBusy;
+  const rightEnabled = canScoreByMatchState && rightServing && !undoBusy;
   const preStartServeSideLabel =
     activeSide === leftSide ? "Đội bên trái" : "Đội bên phải";
   const preStartServeHint = waitingStartActive

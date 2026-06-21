@@ -1033,7 +1033,7 @@ export default function CreateUserMatchScreen() {
                 <DateTimePicker
                   value={matchDate}
                   mode="datetime"
-                  display="spinner"
+                  display="compact"
                   onChange={onDateChange}
                   locale="vi-VN"
                   textColor={colors.text}

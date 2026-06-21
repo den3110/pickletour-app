@@ -6,7 +6,6 @@
 // - Avatar ẩn hiện mượt mà
 
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -1998,19 +1997,34 @@ const FormSelect = ({
                 <Text style={{ color: t.accent, fontWeight: "600" }}>Xong</Text>
               </Pressable>
             </View>
-            <Picker
-              selectedValue={temp}
-              onValueChange={(v) => setTemp(String(v))}
-              itemStyle={{ color: t.text }}
-            >
-              {options.map((o) => (
-                <Picker.Item
-                  key={o.value ?? o.label}
-                  label={o.label}
-                  value={o.value}
-                />
-              ))}
-            </Picker>
+            <View style={styles.pickerOptionList}>
+              {options.map((o) => {
+                const selected = o.value === temp;
+                return (
+                  <Pressable
+                    key={o.value ?? o.label}
+                    onPress={() => setTemp(o.value)}
+                    style={[
+                      styles.pickerOption,
+                      { borderBottomColor: t.border },
+                      selected && { backgroundColor: t.surfaceAlt },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        { color: selected ? t.text : t.textSecondary },
+                      ]}
+                    >
+                      {o.label}
+                    </Text>
+                    {selected ? (
+                      <Feather name="check" size={18} color={t.accent} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
       </Modal>
@@ -2072,7 +2086,7 @@ const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
             <DateTimePicker
               value={temp}
               mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
+              display={Platform.OS === "ios" ? "compact" : "default"}
               onChange={(_, d) => d && setTemp(d)}
               maximumDate={new Date()}
             />
@@ -2654,6 +2668,24 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.1)",
+  },
+  pickerOptionList: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  pickerOption: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickerOptionText: {
+    flex: 1,
+    fontSize: 16,
   },
   coverCenterNamePill: {
     backgroundColor: "rgba(0,0,0,0.28)",

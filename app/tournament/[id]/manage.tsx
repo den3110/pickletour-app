@@ -50,6 +50,7 @@ import {
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
+import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 
 import ManageRefereesSheet from "@/components/sheets/ManageRefereesSheet";
 import TournamentManagersSheet from "@/components/sheets/TournamentManagersSheet";
@@ -61,7 +62,13 @@ import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
-import { getMatchCourtStationName, getMatchDisplayCode } from "@/utils/matchDisplay";
+import {
+  getMatchCourtStationName,
+  getMatchDisplayCode,
+  isNewerOrEqualMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 
 const normalizeGroupCode = (code) => {
   const s = String(code || "")
@@ -170,6 +177,37 @@ const pairLabel = (pair) => {
   if (pair.name) return pair.name;
   const ps = [pair.player1, pair.player2].filter(Boolean).map(playerName);
   return ps.join(" / ") || "—";
+};
+// Nhãn nguồn (seed) khi cặp đấu CHƯA xác định — đồng bộ sơ đồ giải, tránh hiện "—".
+const seedSourceLabel = (seed) => {
+  if (!seed || !seed.type) return "";
+  if (seed.label) return String(seed.label);
+  const r = seed.ref?.round ?? "?";
+  const ord = (seed.ref?.order ?? -1) + 1;
+  switch (seed.type) {
+    case "groupRank": {
+      const st = seed.ref?.stage ?? seed.ref?.stageIndex ?? "?";
+      const g = seed.ref?.groupCode;
+      const rk = seed.ref?.rank ?? "?";
+      return g ? `V${st}-B${g}-T${rk}` : `V${st}-T${rk}`;
+    }
+    case "stageMatchWinner":
+    case "matchWinner":
+      return `W-V${r}-T${ord}`;
+    case "stageMatchLoser":
+    case "matchLoser":
+      return `L-V${r}-T${ord}`;
+    case "bye":
+      return "BYE";
+    default:
+      return "";
+  }
+};
+// Ưu tiên cặp đã xác định; chưa có thì hiện nguồn seed thay vì "—".
+const teamLabel = (pair, seed) => {
+  const name = pairLabel(pair);
+  if (name && name !== "—") return name;
+  return seedSourceLabel(seed) || name || "—";
 };
 const matchCode = (m) =>
   getMatchDisplayCode(m) || m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
@@ -1069,7 +1107,7 @@ const MatchRowCard = memo(function MatchRowCard({
             style={[styles.teamLabel, { color: colors.text }]}
             numberOfLines={1}
           >
-            {pairLabel(match?.pairA)}
+            {teamLabel(match?.pairA, match?.seedA)}
           </Text>
           {busyCourtA ? <BusyChip court={busyCourtA} /> : null}
         </View>
@@ -1078,7 +1116,7 @@ const MatchRowCard = memo(function MatchRowCard({
             style={[styles.teamLabel, { color: colors.text }]}
             numberOfLines={1}
           >
-            {pairLabel(match?.pairB)}
+            {teamLabel(match?.pairB, match?.seedB)}
           </Text>
           {busyCourtB ? <BusyChip court={busyCourtB} /> : null}
         </View>
@@ -1250,19 +1288,6 @@ export default function ManageScreen() {
   const pendingRef = useRef(new Map());
   const rafRef = useRef(null);
   const [liveBump, setLiveBump] = useState(0);
-  const joinedMatchesRef = useRef(new Set());
-  const lastSnapshotAtRef = useRef(new Map());
-  const requestSnapshot = useCallback(
-    (mid) => {
-      if (!socket || !mid) return;
-      const now = Date.now();
-      const last = lastSnapshotAtRef.current.get(mid) || 0;
-      if (now - last < 600) return;
-      lastSnapshotAtRef.current.set(mid, now);
-      socket.emit("match:snapshot:request", { matchId: mid });
-    },
-    [socket]
-  );
 
   const {
     data: tour,
@@ -1395,11 +1420,37 @@ export default function ManageScreen() {
       .join("|");
     if (fp === seededFingerprintRef.current) return;
     seededFingerprintRef.current = fp;
-    const mp = new Map();
-    for (const m of allMatches) if (m?._id) mp.set(String(m._id), m);
+    const mp = new Map(liveMapRef.current);
+    let changed = false;
+    for (const m of allMatches) {
+      if (!m?._id) continue;
+      const id = String(m._id);
+      const cur = mp.get(id);
+      if (cur && !isNewerOrEqualMatchPayload(cur, m)) continue;
+      const merged =
+        mergeMatchPayload(cur, m, cur || tour) ||
+        normalizeMatchDisplay(m, cur || tour);
+      if (!merged) continue;
+      mp.set(id, merged);
+      changed = true;
+    }
+    if (!changed && mp.size === liveMapRef.current.size) return;
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
-  }, [allMatches]);
+  }, [allMatches, tour]);
+
+  const tournamentRoomIds = useMemo(() => (tid ? [String(tid)] : []), [tid]);
+
+  useSocketRoomSet(socket, tournamentRoomIds, {
+    subscribeEvent: "tournament:subscribe",
+    unsubscribeEvent: "tournament:unsubscribe",
+    payloadKey: "tournamentId",
+    onResync: () => {
+      refetchTour?.();
+      refetchMatchesRef.current?.();
+      refetchBracketsRef.current?.();
+    },
+  });
 
   useEffect(() => {
     if (!socket) return;
@@ -1420,28 +1471,32 @@ export default function ManageScreen() {
           name: inc.court.name || inc.court.label || inc.court.title || "",
         };
       }
-      pendingRef.current.set(String(inc._id), inc);
+      const key = String(inc._id);
+      const base = pendingRef.current.get(key) || liveMapRef.current.get(key);
+      if (base && !isNewerOrEqualMatchPayload(base, inc)) return;
+      pendingRef.current.set(
+        key,
+        mergeMatchPayload(base, inc, base || tour) ||
+          normalizeMatchDisplay(inc, base || tour)
+      );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         if (!pendingRef.current.size) return;
         const mp = liveMapRef.current;
+        let changed = false;
         for (const [mid, inc2] of pendingRef.current) {
           const cur = mp.get(mid);
-          const vNew = Number(inc2?.liveVersion ?? inc2?.version ?? 0);
-          const vOld = Number(cur?.liveVersion ?? cur?.version ?? 0);
+          if (cur && !isNewerOrEqualMatchPayload(cur, inc2)) continue;
           const merged =
-            !cur || vNew >= vOld ? { ...(cur || {}), ...inc2 } : cur;
+            mergeMatchPayload(cur, inc2, cur || tour) ||
+            normalizeMatchDisplay(inc2, cur || tour);
+          if (!merged) continue;
           mp.set(mid, merged);
+          changed = true;
         }
         pendingRef.current.clear();
-        setLiveBump((x) => x + 1);
-      });
-    };
-    const onConnected = () => {
-      joinedMatchesRef.current.forEach((mid) => {
-        socket.emit("match:join", { matchId: mid });
-        requestSnapshot(mid);
+        if (changed) setLiveBump((x) => x + 1);
       });
     };
     const onRemove = (payload) => {
@@ -1460,18 +1515,19 @@ export default function ManageScreen() {
       refetchMatchesRef.current?.();
       refetchBracketsRef.current?.();
     };
-    socket.on("connect", onConnected);
-    socket.on("match:update", queueUpsert);
-    socket.on("match:snapshot", queueUpsert);
-    socket.on("score:updated", queueUpsert);
+    const onInvalidate = (payload) => {
+      const tournamentId = String(payload?.tournamentId || "").trim();
+      if (tournamentId && tournamentId !== String(tid || "").trim()) return;
+      onRefilled();
+    };
+    socket.on("tournament:match:update", queueUpsert);
+    socket.on("tournament:invalidate", onInvalidate);
     socket.on("match:deleted", onRemove);
     socket.on("draw:refilled", onRefilled);
     socket.on("bracket:updated", onRefilled);
     return () => {
-      socket.off("connect", onConnected);
-      socket.off("match:update", queueUpsert);
-      socket.off("match:snapshot", queueUpsert);
-      socket.off("score:updated", queueUpsert);
+      socket.off("tournament:match:update", queueUpsert);
+      socket.off("tournament:invalidate", onInvalidate);
       socket.off("match:deleted", onRemove);
       socket.off("draw:refilled", onRefilled);
       socket.off("bracket:updated", onRefilled);
@@ -1480,34 +1536,7 @@ export default function ManageScreen() {
         rafRef.current = null;
       }
     };
-  }, [socket, requestSnapshot]);
-
-  const allMatchIds = useMemo(() => {
-    if (!allMatches.length) return [];
-    return allMatches.map((m) => String(m?._id)).filter(Boolean);
-  }, [allMatches]);
-
-  useEffect(() => {
-    if (!socket) return;
-    const cur = joinedMatchesRef.current;
-    allMatchIds.forEach((mid) => {
-      if (!cur.has(mid)) {
-        socket.emit("match:join", { matchId: mid });
-        requestSnapshot(mid);
-        cur.add(mid);
-      }
-    });
-    cur.forEach((mid) => {
-      if (!allMatchIds.includes(mid)) {
-        socket.emit("match:leave", { matchId: mid });
-        cur.delete(mid);
-      }
-    });
-    return () => {
-      cur.forEach((mid) => socket.emit("match:leave", { matchId: mid }));
-      cur.clear();
-    };
-  }, [socket, allMatchIds, requestSnapshot]);
+  }, [socket, tid, tour]);
 
   const mergedAllMatches = useMemo(() => {
     const vals = Array.from(liveMapRef.current.values());
@@ -1972,6 +2001,7 @@ export default function ManageScreen() {
               scrollEnabled={false}
               extraData={`${liveBump}|${selBump}`}
               removeClippedSubviews={Platform.OS === "android"}
+              initialNumToRender={8}
               maxToRenderPerBatch={5}
               windowSize={5}
             />
@@ -2681,7 +2711,9 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             }
             extraData={`${liveBump}|${selBump}|${courtFilter}|${showBye}`}
             removeClippedSubviews={Platform.OS === "android"}
+            initialNumToRender={2}
             maxToRenderPerBatch={3}
+            updateCellsBatchingPeriod={80}
             windowSize={5}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],

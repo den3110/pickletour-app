@@ -43,7 +43,12 @@ import {
   BottomSheetBackdrop,
 } from "@gorhom/bottom-sheet";
 import { useCreateFacebookLiveForMatchMutation } from "@/slices/adminMatchLiveApiSlice";
-import { getPlayerDisplayName } from "@/utils/matchDisplay";
+import {
+  getPlayerDisplayName,
+  isNewerOrEqualMatchPayload,
+  mergeMatchPayload,
+  normalizeMatchDisplay,
+} from "@/utils/matchDisplay";
 import { router, useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
 
@@ -2611,8 +2616,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           const winnerPair =
             sourceMatch.winner === "A" ? sourceMatch.pairA : sourceMatch.pairB;
           if (hasResolvedPair(winnerPair)) {
-            const winnerLabel = pairDisplayName(winnerPair, currentIsSingle);
-            return sourceCode ? `${winnerLabel} (W-${sourceCode})` : winnerLabel;
+            return pairDisplayName(winnerPair, currentIsSingle);
           }
         }
 
@@ -2638,10 +2642,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               : sourceMatch.pairB;
 
           if (hasResolvedPair(sourcePair)) {
-            const suffix = isUsefulPendingLabel(sourceRefLabel)
-              ? ` (${sourceRefLabel})`
-              : "";
-            return `${pairDisplayName(sourcePair, currentIsSingle)}${suffix}`;
+            return pairDisplayName(sourcePair, currentIsSingle);
           }
         }
 
@@ -2740,9 +2741,35 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
       payload.snapshot?.gameScores;
 
     if (Array.isArray(gameScores)) {
-      setLocalPatch((p) => ({ ...(p || {}), gameScores }));
+      const raw = payload.snapshot || payload.data || payload.match || payload;
+      setLocalPatch((p) => {
+        const current = p ? { ...(mm || {}), ...p } : mm || {};
+        const incoming = normalizeMatchDisplay(
+          {
+            ...(raw || {}),
+            _id: raw?._id || raw?.matchId || lockedId,
+            gameScores,
+          },
+          current
+        );
+        if (current && !isNewerOrEqualMatchPayload(current, incoming)) {
+          return p;
+        }
+        const merged =
+          mergeMatchPayload(current, incoming, current) || incoming || {};
+        return {
+          ...(p || {}),
+          gameScores: merged.gameScores ?? gameScores,
+          currentGame: merged.currentGame ?? p?.currentGame,
+          liveVersion: merged.liveVersion ?? p?.liveVersion,
+          version: merged.version ?? p?.version,
+          status: merged.status ?? p?.status,
+          winner: merged.winner ?? p?.winner,
+          updatedAt: merged.updatedAt ?? p?.updatedAt,
+        };
+      });
     }
-  }, []);
+  }, [lockedId, mm]);
 
   const applyLocalStreamIfAny = useCallback((payload = {}) => {
     const snap = payload.snapshot || payload.data || payload || {};

@@ -8,11 +8,14 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   Linking,
+  Platform,
   useColorScheme,
 } from "react-native";
 import * as StoreReview from "expo-store-review";
 
 const PRIMARY = "#2563EB";
+const ANDROID_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.pkt.pickletour";
 
 const DARK_PALETTE = {
   backdrop: "rgba(0,0,0,0.55)",
@@ -50,6 +53,12 @@ export default function AskForReviewGateModal({
 
   const handleGood = async () => {
     try {
+      if (Platform.OS === "android") {
+        const url = StoreReview.storeUrl() || ANDROID_STORE_URL;
+        if (url) await Linking.openURL(url);
+        return;
+      }
+
       const isAvailable = await StoreReview.isAvailableAsync();
       if (isAvailable) {
         await StoreReview.requestReview();

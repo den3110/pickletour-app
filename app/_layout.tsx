@@ -289,6 +289,46 @@ const getHotUpdateAppVersion = () =>
       "0.0.0",
   );
 
+const sanitizeAppShellHeaderValue = (value: unknown, max = 160) =>
+  String(value ?? "")
+    .replace(/[\r\n]/g, " ")
+    .slice(0, max);
+
+const getAppShellBuildNumber = () => {
+  const expoCfg = Constants.expoConfig ?? {};
+  if (Platform.OS === "ios") {
+    return String(expoCfg?.ios?.buildNumber || "");
+  }
+  const versionCode = expoCfg?.android?.versionCode;
+  return Number.isFinite(versionCode) ? String(versionCode) : "";
+};
+
+const buildMobileAppShellHeaders = async (userInfo: any) => {
+  const token = String(userInfo?.token || "").trim();
+  const userId = String(userInfo?._id || userInfo?.id || "").trim();
+  const userRole = String(userInfo?.role || "").trim();
+  const deviceId = await getHotUpdateDeviceId();
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-cache",
+    "X-Platform": Platform.OS,
+    "X-App-Version": getHotUpdateAppVersion(),
+    "X-Device-Id": sanitizeAppShellHeaderValue(deviceId),
+    "X-Device-Brand": sanitizeAppShellHeaderValue(Device.brand || ""),
+    "X-Device-Model": sanitizeAppShellHeaderValue(
+      Device.modelName || Device.deviceName || "",
+    ),
+    "X-Device-OS-Version": sanitizeAppShellHeaderValue(Device.osVersion || ""),
+  };
+  const buildNumber = getAppShellBuildNumber();
+
+  if (buildNumber) headers["X-Build"] = sanitizeAppShellHeaderValue(buildNumber);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (userId) headers["X-User-Id"] = sanitizeAppShellHeaderValue(userId);
+  if (userRole) headers["X-User-Role"] = sanitizeAppShellHeaderValue(userRole);
+
+  return headers;
+};
+
 const savePendingHotUpdate = async (payload: PendingHotUpdatePayload) => {
   await SecureStore.setItemAsync(
     HOT_UPDATE_PENDING_KEY,
@@ -645,11 +685,10 @@ function RootLayout() {
 
   const loadMobileAppShellConfig = React.useCallback(async () => {
     try {
+      const headers = await buildMobileAppShellHeaders(nativeAuthUserInfo);
       const response = await fetch(
         buildApiUrl(HOT_UPDATE_API_BASE_URL, MOBILE_APP_SHELL_PATH),
-        {
-          headers: { "Cache-Control": "no-cache" },
-        },
+        { headers },
       );
 
       if (!response.ok) {
@@ -664,7 +703,7 @@ function RootLayout() {
     } finally {
       setMobileAppShellReady(true);
     }
-  }, []);
+  }, [nativeAuthUserInfo]);
 
   const reloadMobileAppShellWebView = React.useCallback(() => {
     setMobileAppShellError(null);

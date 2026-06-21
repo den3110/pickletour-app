@@ -92,6 +92,10 @@ def pickletourHotUpdaterEnabled = (findProperty('pickletour.hotUpdaterEnabled') 
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+configurations.configureEach {
+    exclude group: "com.google.android.gms", module: "play-services-code-scanner"
+}
+
 android {
 // @generated begin @rnmapbox/maps-libcpp - expo prebuild (DO NOT MODIFY) sync-e24830a5a3e854b398227dfe9630aabfaa1cadd1
 packagingOptions {
@@ -111,8 +115,8 @@ packagingOptions {
         applicationId 'com.pkt.pickletour'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 33
-        versionName "1.0.27"
+        versionCode 35
+        versionName "1.1.5"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
         buildConfigField "boolean", "PICKLETOUR_HOT_UPDATER_ENABLED", "${pickletourHotUpdaterEnabled}"

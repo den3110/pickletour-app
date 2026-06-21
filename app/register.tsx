@@ -973,7 +973,7 @@ export default function RegisterScreen() {
                   dobDraft || parseDobString(form.dob) || new Date(2000, 0, 1)
                 }
                 mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
+                display={Platform.OS === "ios" ? "compact" : "default"}
                 maximumDate={new Date()}
                 minimumDate={new Date(1900, 0, 1)}
                 locale="vi-VN"

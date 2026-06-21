@@ -46,6 +46,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   getMatchPayloadId,
   getPlayerDisplayName,
+  isNewerOrEqualMatchPayload,
   isLightweightMatchPayload,
   mergeMatchPayload,
   normalizeMatchDisplay,
@@ -916,12 +917,18 @@ export default function MyTournament() {
   const flushPending = useCallback(() => {
     if (!pendingRef.current.size) return;
     const mp = liveMapRef.current;
+    let changed = false;
     for (const [mid, inc] of pendingRef.current) {
       const cur = mp.get(mid);
-      mp.set(mid, mergeMatchPayload(cur, inc, cur) || normalizeMatchDisplay(inc));
+      if (cur && !isNewerOrEqualMatchPayload(cur, inc)) continue;
+      const merged =
+        mergeMatchPayload(cur, inc, cur) || normalizeMatchDisplay(inc, cur);
+      if (!merged) continue;
+      mp.set(mid, merged);
+      changed = true;
     }
     pendingRef.current.clear();
-    setLiveBump((x) => x + 1);
+    if (changed) setLiveBump((x) => x + 1);
   }, []);
 
   const queueUpsert = useCallback(
@@ -933,7 +940,14 @@ export default function MyTournament() {
         return;
       }
       const incRaw = payload?.data ?? payload?.match ?? payload;
-      pendingRef.current.set(String(id), normalizeMatchDisplay(incRaw));
+      const key = String(id);
+      const inc = normalizeMatchDisplay(incRaw);
+      const base = pendingRef.current.get(key) || liveMapRef.current.get(key);
+      if (base && !isNewerOrEqualMatchPayload(base, inc)) return;
+      pendingRef.current.set(
+        key,
+        mergeMatchPayload(base, inc, base) || normalizeMatchDisplay(inc, base)
+      );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
@@ -945,13 +959,25 @@ export default function MyTournament() {
 
   // Seed từ API
   useEffect(() => {
-    const mp = new Map();
+    const mp = new Map(liveMapRef.current);
+    let changed = false;
     for (const t of tournamentsRaw) {
       const list = Array.isArray(t.matches)
         ? t.matches.map((m) => normalizeMatchDisplay(m))
         : [];
-      for (const m of list) if (m?._id) mp.set(String(m._id), m);
+      for (const m of list) {
+        if (!m?._id) continue;
+        const id = String(m._id);
+        const cur = mp.get(id);
+        if (cur && !isNewerOrEqualMatchPayload(cur, m)) continue;
+        const merged =
+          mergeMatchPayload(cur, m, cur) || normalizeMatchDisplay(m, cur);
+        if (!merged) continue;
+        mp.set(id, merged);
+        changed = true;
+      }
     }
+    if (!changed && mp.size === liveMapRef.current.size) return;
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
   }, [tournamentsRaw]);

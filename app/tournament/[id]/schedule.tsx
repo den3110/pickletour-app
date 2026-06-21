@@ -975,11 +975,24 @@ export default function TournamentScheduleNative() {
   const joinedMatchesRef = useRef(new Set());
 
   useEffect(() => {
-    const mp = new Map();
+    const mp = new Map(liveMapRef.current);
+    let changed = false;
     const list = (matchesResp?.list || []).map((m) =>
       normalizeMatchDisplay(m, tournament)
     );
-    for (const m of list) if (m?._id) mp.set(String(m._id), m);
+    for (const m of list) {
+      if (!m?._id) continue;
+      const id = String(m._id);
+      const cur = mp.get(id);
+      if (cur && !isNewerOrEqualMatchPayload(cur, m)) continue;
+      const merged =
+        mergeMatchPayload(cur, m, cur || tournament) ||
+        normalizeMatchDisplay(m, cur || tournament);
+      if (!merged) continue;
+      mp.set(id, merged);
+      changed = true;
+    }
+    if (!changed && mp.size === liveMapRef.current.size) return;
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
   }, [matchesResp, tournament]);
@@ -987,17 +1000,19 @@ export default function TournamentScheduleNative() {
   const flushPending = useCallback(() => {
     if (!pendingRef.current.size) return;
     const mp = liveMapRef.current;
+    let changed = false;
     for (const [mid, inc] of pendingRef.current) {
       const cur = mp.get(mid);
+      if (cur && !isNewerOrEqualMatchPayload(cur, inc)) continue;
       const merged =
-        !cur || isNewerOrEqualMatchPayload(cur, inc)
-          ? mergeMatchPayload(cur, inc, cur || tournament) ||
-            normalizeMatchDisplay(inc, cur || tournament)
-          : cur;
+        mergeMatchPayload(cur, inc, cur || tournament) ||
+        normalizeMatchDisplay(inc, cur || tournament);
+      if (!merged) continue;
       mp.set(mid, merged);
+      changed = true;
     }
     pendingRef.current.clear();
-    setLiveBump((x) => x + 1);
+    if (changed) setLiveBump((x) => x + 1);
   }, [tournament]);
 
   const queueUpsert = useCallback(
@@ -1009,9 +1024,14 @@ export default function TournamentScheduleNative() {
         return;
       }
       const payload = incRaw?.data ?? incRaw?.match ?? incRaw;
+      const key = String(id);
+      const inc = normalizeMatchDisplay(payload, tournament);
+      const base = pendingRef.current.get(key) || liveMapRef.current.get(key);
+      if (base && !isNewerOrEqualMatchPayload(base, inc)) return;
       pendingRef.current.set(
-        String(id),
-        normalizeMatchDisplay(payload, tournament)
+        key,
+        mergeMatchPayload(base, inc, base || tournament) ||
+          normalizeMatchDisplay(inc, base || tournament)
       );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {

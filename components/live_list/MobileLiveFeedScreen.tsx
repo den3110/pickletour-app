@@ -368,6 +368,7 @@ function SharedNativeVideoSurface({
       pointerEvents={pointerEvents}
       nativeControls={false}
       contentFit={resizeMode}
+      fullscreenOptions={{ enable: false }}
     />
   );
 }
@@ -746,6 +747,7 @@ function FullscreenNativeVideoPlayer({
         pointerEvents="none"
         nativeControls={false}
         contentFit="contain"
+        fullscreenOptions={{ enable: false }}
       />
 
       {!isLoaded && !playerError ? (

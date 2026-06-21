@@ -203,3 +203,232 @@ patchFile("node_modules/expo-image-manipulator/ios/ImageManipulatorUtils.swift",
     );
   },
 ]);
+
+patchFile("node_modules/expo-camera/ios/Current/CameraSessionManager.swift", [
+  (contents, relativePath) => {
+    let next = contents;
+
+    next = next.replace(
+      "    if delegate.mode == .video {\n" +
+        "      if self.videoFileOutput == nil {\n",
+      "    if delegate.mode == .video {\n" +
+        "      self.removePhotoOutput(withSessionConfiguration: false)\n" +
+        "      if self.videoFileOutput == nil {\n"
+    );
+
+    next = next.replace(
+      "    } else {\n" +
+        "      self.cleanupMovieFileCapture(withSessionConfiguration: false)\n" +
+        "      self.updateSessionPreset(preset: delegate.pictureSize.toCapturePreset(), withSessionConfiguration: false)\n" +
+        "    }\n",
+      "    } else {\n" +
+        "      self.cleanupMovieFileCapture(withSessionConfiguration: false)\n" +
+        "      self.setupPhotoOutput(withSessionConfiguration: false)\n" +
+        "      self.updateSessionPreset(preset: delegate.pictureSize.toCapturePreset(), withSessionConfiguration: false)\n" +
+        "    }\n"
+    );
+
+    if (!next.includes("func setupPhotoOutput(withSessionConfiguration: Bool = true) -> AVCapturePhotoOutput?")) {
+      next = next.replace(
+        "  func stopSession() {\n",
+        `  @discardableResult
+  func setupPhotoOutput(withSessionConfiguration: Bool = true) -> AVCapturePhotoOutput? {
+    if let photoOutput {
+      return photoOutput
+    }
+
+    let output = AVCapturePhotoOutput()
+    output.isLivePhotoCaptureEnabled = false
+
+    if withSessionConfiguration {
+      session.beginConfiguration()
+    }
+    defer {
+      if withSessionConfiguration {
+        session.commitConfiguration()
+      }
+    }
+
+    if session.canAddOutput(output) {
+      session.addOutput(output)
+      photoOutput = output
+      return output
+    }
+
+    return nil
+  }
+
+  func removePhotoOutput(withSessionConfiguration: Bool = true) {
+    guard let photoOutput else {
+      return
+    }
+    if withSessionConfiguration {
+      session.beginConfiguration()
+    }
+    defer {
+      if withSessionConfiguration {
+        session.commitConfiguration()
+      }
+    }
+    if session.outputs.contains(photoOutput) {
+      session.removeOutput(photoOutput)
+    }
+    self.photoOutput = nil
+  }
+
+  func stopSession() {
+`
+      );
+    }
+
+    next = next.replace(
+      "    for output in session.outputs {\n" +
+        "      session.removeOutput(output)\n" +
+        "    }\n" +
+        "    session.commitConfiguration()\n",
+      "    for output in session.outputs {\n" +
+        "      session.removeOutput(output)\n" +
+        "    }\n" +
+        "    photoOutput = nil\n" +
+        "    videoFileOutput = nil\n" +
+        "    session.commitConfiguration()\n"
+    );
+
+    if (!next.includes("func ensurePhotoOutput() async -> AVCapturePhotoOutput?")) {
+      next = next.replace(
+        "  var currentPhotoOutput: AVCapturePhotoOutput? {\n" +
+          "    return photoOutput\n" +
+          "  }\n\n" +
+          "  var currentVideoFileOutput: AVCaptureMovieFileOutput? {\n",
+        `  var currentPhotoOutput: AVCapturePhotoOutput? {
+    return photoOutput
+  }
+
+  func ensurePhotoOutput() async -> AVCapturePhotoOutput? {
+    if let photoOutput {
+      return photoOutput
+    }
+
+    guard let delegate else {
+      return nil
+    }
+
+    return await withCheckedContinuation { continuation in
+      delegate.sessionQueue.async {
+        continuation.resume(returning: self.setupPhotoOutput())
+      }
+    }
+  }
+
+  var currentVideoFileOutput: AVCaptureMovieFileOutput? {
+`
+      );
+    }
+
+    next = next.replace(
+      "    let photoOutput = AVCapturePhotoOutput()\n" +
+        "    photoOutput.isLivePhotoCaptureEnabled = false\n" +
+        "    session.beginConfiguration()\n" +
+        "    if session.canAddOutput(photoOutput) {\n" +
+        "      session.addOutput(photoOutput)\n" +
+        "      self.photoOutput = photoOutput\n" +
+        "    }\n\n" +
+        "    let preset = delegate.mode == .video\n",
+      "    session.beginConfiguration()\n\n" +
+        "    let preset = delegate.mode == .video\n"
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoCamera iOS lazy photo output",
+      [
+        "    let photoOutput = AVCapturePhotoOutput()",
+        "      self.photoOutput = photoOutput",
+      ]
+    );
+  },
+]);
+
+patchFile("node_modules/expo-camera/ios/Current/CameraView.swift", [
+  (contents, relativePath) => {
+    const next = contents.replaceAll(
+      "guard let photoOutput = sessionManager.currentPhotoOutput else",
+      "guard let photoOutput = await sessionManager.ensurePhotoOutput() else"
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoCamera iOS lazy takePicture output",
+      ["sessionManager.currentPhotoOutput"]
+    );
+  },
+]);
+
+patchFile("node_modules/expo-camera/android/build.gradle", [
+  (contents, relativePath) => {
+    const next = contents.replace(
+      '  add(barcodeDependencyConfiguration, "com.google.android.gms:play-services-code-scanner:16.1.0")\n',
+      '  add("compileOnly", "com.google.android.gms:play-services-code-scanner:16.1.0")\n'
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoCamera Google code scanner dependency",
+      ['add(barcodeDependencyConfiguration, "com.google.android.gms:play-services-code-scanner:16.1.0")']
+    );
+  },
+]);
+
+patchFile("node_modules/expo-camera/android/src/main/java/expo/modules/camera/CameraViewModule.kt", [
+  (contents, relativePath) => {
+    let next = contents;
+
+    next = next.replace(
+      "import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions\n",
+      ""
+    );
+    next = next.replace(
+      "import com.google.mlkit.vision.codescanner.GmsBarcodeScanning\n",
+      ""
+    );
+
+    next = next.replace(
+      /    \/\/ Aligned with iOS which has the same property\. True when ML Kit is available\.\n    \/\/ False on Horizon OS \(Quest devices\) and devices without Google Play Services\.\n    Property\("isModernBarcodeScannerAvailable"\) \{\n      !VRUtilities\.isQuest\(\) && CameraUtils\.isMLKitAvailable\(appContext\.reactContext\)\n    \}\n/s,
+      `    // Disabled here because Google Code Scanner launches Google Play Services
+    // activities that crash on some Android devices. CameraView inline barcode
+    // scanning still uses ML Kit below.
+    Property("isModernBarcodeScannerAvailable") {
+      false
+    }
+`
+    );
+
+    next = next.replace(
+      /    AsyncFunction\("launchScanner"\) \{ settings: BarcodeSettings, promise: Promise ->[\s\S]*?\n    \}\n\n    AsyncFunction\("dismissScanner"\)/,
+      `    AsyncFunction("launchScanner") { _: BarcodeSettings, promise: Promise ->
+      promise.reject(CameraExceptions.GooglePlayServicesUnavailableException())
+    }
+
+    AsyncFunction("dismissScanner")`
+    );
+
+    return ensurePatchedOrThrow(
+      contents,
+      next,
+      relativePath,
+      "ExpoCamera Google code scanner launch",
+      [
+        "GmsBarcodeScannerOptions",
+        "GmsBarcodeScanning",
+        "scanner.startScan()",
+        "!VRUtilities.isQuest() && CameraUtils.isMLKitAvailable(appContext.reactContext)",
+      ]
+    );
+  },
+]);

@@ -82,6 +82,8 @@ function shouldApplyLiveSyncRuntime(nextRuntime = {}, currentRuntime = {}) {
   );
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
+
 export function useRefereeLiveSyncMatch(
   matchId,
   tokenFromArg,
@@ -95,6 +97,7 @@ export function useRefereeLiveSyncMatch(
   const syncInFlightRef = useRef(null);
   const bootstrapInFlightRef = useRef(null);
   const claimInFlightRef = useRef(null);
+  const enqueueChainRef = useRef(Promise.resolve());
   const appStateRef = useRef(AppState.currentState);
   const netOnlineRef = useRef(null);
   const deviceRef = useRef({ deviceId: "", deviceName: "" });
@@ -152,9 +155,9 @@ export function useRefereeLiveSyncMatch(
       const ownerUserId = trim(owner.userId);
       const ownerDeviceId = trim(owner.deviceId);
       const isSelf =
-        ownerUserId && currentUserId
-          ? ownerUserId === currentUserId
-          : Boolean(currentDeviceId) && ownerDeviceId === currentDeviceId;
+        ownerDeviceId || currentDeviceId
+          ? Boolean(ownerDeviceId && currentDeviceId && ownerDeviceId === currentDeviceId)
+          : Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
       return {
         ...owner,
         isSelf,
@@ -217,30 +220,61 @@ export function useRefereeLiveSyncMatch(
   );
 
   const httpRequest = useCallback(
-    async (path, { method = "GET", body, headers = {} } = {}) => {
+    async (
+      path,
+      {
+        method = "GET",
+        body,
+        headers = {},
+        timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+      } = {}
+    ) => {
       const [deviceId, deviceName] = await Promise.all([
         getDeviceId(),
         getDeviceName(),
       ]);
       deviceRef.current = { deviceId, deviceName };
-      const response = await fetch(`${BASE_URL}${path}`, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "X-Device-Id": deviceId,
-          "X-Device-Name": deviceName,
-          ...(headers || {}),
-        },
-        body: body ? JSON.stringify({ ...body, deviceId, deviceName }) : undefined,
-      });
-      const json = await parseJsonSafe(response);
-      if (!response.ok) {
-        const error = buildRequestError(json, "Request failed");
-        error.status = response.status;
+
+      const canAbort = typeof AbortController !== "undefined";
+      const timeoutValue = Math.max(0, Number(timeoutMs || 0));
+      const controller = canAbort && timeoutValue > 0 ? new AbortController() : null;
+      const timer = controller
+        ? setTimeout(() => controller.abort(), timeoutValue)
+        : null;
+
+      try {
+        const response = await fetch(`${BASE_URL}${path}`, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "X-Device-Id": deviceId,
+            "X-Device-Name": deviceName,
+            ...(headers || {}),
+          },
+          body: body ? JSON.stringify({ ...body, deviceId, deviceName }) : undefined,
+          ...(controller ? { signal: controller.signal } : {}),
+        });
+        const json = await parseJsonSafe(response);
+        if (!response.ok) {
+          const error = buildRequestError(json, "Request failed");
+          error.status = response.status;
+          throw error;
+        }
+        return json || {};
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          const timeoutError = buildRequestError(
+            { code: "request_timeout", message: "Request timed out" },
+            "Request timed out"
+          );
+          timeoutError.code = "request_timeout";
+          throw timeoutError;
+        }
         throw error;
+      } finally {
+        if (timer) clearTimeout(timer);
       }
-      return json || {};
     },
     [token]
   );
@@ -312,7 +346,7 @@ export function useRefereeLiveSyncMatch(
         headers,
         socketEvent = "",
         socketFirst = true,
-        timeoutMs = 5000,
+        timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
       } = {}
     ) => {
       const shouldTrySocket =
@@ -334,7 +368,7 @@ export function useRefereeLiveSyncMatch(
         }
       }
 
-      return httpRequest(path, { method, body, headers });
+      return httpRequest(path, { method, body, headers, timeoutMs });
     },
     [socket, socketRequest, httpRequest]
   );
@@ -643,16 +677,28 @@ export function useRefereeLiveSyncMatch(
             },
           );
 
-          const acked = new Set(result?.ackedClientEventIds || []);
-          const currentQueue = Array.isArray(persistRef.current.queue)
-            ? persistRef.current.queue
-            : [];
-          const remainingQueue = currentQueue.filter(
-            (event) => !acked.has(String(event?.clientEventId || ""))
-          );
           const rejected = Array.isArray(result?.rejectedEvents)
             ? result.rejectedEvents
             : [];
+          const durableRejected = rejected.filter(
+            (item) => item?.code !== "server_busy"
+          );
+          const acked = new Set(result?.ackedClientEventIds || []);
+          const rejectedIds = new Set(
+            durableRejected
+              .map((item) => String(item?.clientEventId || "").trim())
+              .filter(Boolean)
+          );
+          const currentQueue = Array.isArray(persistRef.current.queue)
+            ? persistRef.current.queue
+            : [];
+          const remainingQueue = currentQueue.filter((event) => {
+            const clientEventId = String(event?.clientEventId || "").trim();
+            return (
+              !acked.has(clientEventId) &&
+              !rejectedIds.has(clientEventId)
+            );
+          });
           const runtimeState = buildRuntimeState(result, {
             owner: result?.owner || null,
             lastRejectedBatch: rejected,
@@ -660,6 +706,7 @@ export function useRefereeLiveSyncMatch(
           const hasOwnershipConflict =
             runtimeState.runtime.featureEnabled &&
             rejected.some((item) => item?.code === "ownership_conflict");
+          const hasAuthoritativeRejection = durableRejected.length > 0;
 
           const nextPersist = {
             queue: remainingQueue,
@@ -683,7 +730,7 @@ export function useRefereeLiveSyncMatch(
           if (result?.snapshot) {
             await applyRemoteSnapshot(result.snapshot, {
               owner: runtimeState.owner,
-              force: hasOwnershipConflict,
+              force: hasOwnershipConflict || hasAuthoritativeRejection,
             });
           } else {
             setDerivedState((prev) => ({
@@ -741,6 +788,39 @@ export function useRefereeLiveSyncMatch(
     applyRemoteSnapshot,
     setDerivedState,
   ]);
+
+  const syncEventNow = useCallback(
+    async (event) => {
+      const clientEventId = String(event?.clientEventId || "");
+      const result = await syncNow();
+      const rejected = Array.isArray(result?.rejectedEvents)
+        ? result.rejectedEvents.find(
+            (item) => String(item?.clientEventId || "") === clientEventId
+          )
+        : null;
+      const acked = Array.isArray(result?.ackedClientEventIds)
+        ? result.ackedClientEventIds.some((id) => String(id) === clientEventId)
+        : false;
+      const lastRejected = Array.isArray(persistRef.current.lastRejectedBatch)
+        ? persistRef.current.lastRejectedBatch.find(
+            (item) => String(item?.clientEventId || "") === clientEventId
+          )
+        : null;
+      const stillPending = Array.isArray(persistRef.current.queue)
+        ? persistRef.current.queue.some(
+            (item) => String(item?.clientEventId || "") === clientEventId
+          )
+        : false;
+
+      return {
+        ok: Boolean(acked || (!rejected && !lastRejected && !stillPending)),
+        pending: Boolean(stillPending && !rejected && !lastRejected),
+        rejected: rejected || lastRejected || null,
+        result,
+      };
+    },
+    [syncNow]
+  );
 
   const refreshOwnership = useCallback(async () => {
     if (!enabled || !matchId || !token) return null;
@@ -816,32 +896,38 @@ export function useRefereeLiveSyncMatch(
   ]);
 
   const enqueueEvent = useCallback(
-    async (type, payload = {}) => {
-      if (!enabled || !matchId) return null;
-      const baseVersion =
-        Number(dataRef.current?.liveVersion || 0) ||
-        Number(persistRef.current.lastAckedServerVersion || 0);
-      const event = createClientLiveSyncEvent(type, payload, baseVersion);
-      const nextQueue = [...(persistRef.current.queue || []), event];
-      const sourceSnapshot = dataRef.current || persistRef.current.snapshot;
-      const optimistic = applyLiveSyncEventLocally(sourceSnapshot, event);
-      dataRef.current = optimistic;
-      await persistState({
-        queue: nextQueue,
-        snapshot: normalizeMatchDisplay(persistRef.current.snapshot),
-      });
-      setDerivedState((prev) => ({
-        ...prev,
-        data: optimistic || prev.data,
-        pendingCount: nextQueue.length,
-        error: null,
-      }));
-      const onlineNow = state.online;
-      const owner = persistRef.current.owner;
-      if (onlineNow && (!owner || owner.isSelf)) {
-        syncNow();
-      }
-      return event;
+    (type, payload = {}) => {
+      const run = enqueueChainRef.current
+        .catch(() => null)
+        .then(async () => {
+          if (!enabled || !matchId) return null;
+          const baseVersion =
+            Number(dataRef.current?.liveVersion || 0) ||
+            Number(persistRef.current.lastAckedServerVersion || 0);
+          const event = createClientLiveSyncEvent(type, payload, baseVersion);
+          const nextQueue = [...(persistRef.current.queue || []), event];
+          const sourceSnapshot = dataRef.current || persistRef.current.snapshot;
+          const optimistic = applyLiveSyncEventLocally(sourceSnapshot, event);
+          dataRef.current = optimistic;
+          await persistState({
+            queue: nextQueue,
+            snapshot: normalizeMatchDisplay(persistRef.current.snapshot),
+          });
+          setDerivedState((prev) => ({
+            ...prev,
+            data: optimistic || prev.data,
+            pendingCount: nextQueue.length,
+            error: null,
+          }));
+          const onlineNow = state.online;
+          const owner = persistRef.current.owner;
+          if (onlineNow && (!owner || owner.isSelf)) {
+            syncNow();
+          }
+          return event;
+        });
+      enqueueChainRef.current = run.catch(() => null);
+      return run;
     },
     [
       enabled,
@@ -1127,6 +1213,27 @@ export function useRefereeLiveSyncMatch(
     return () => clearInterval(interval);
   }, [enabled, matchId, state.featureEnabled, state.online, token, claim, state.owner]);
 
+  useEffect(() => {
+    if (!enabled || !matchId || !state.online || !token || !state.pendingCount) {
+      return;
+    }
+    const interval = setInterval(() => {
+      const owner = persistRef.current.owner;
+      if (!state.featureEnabled || !owner || owner.isSelf) {
+        syncNow();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [
+    enabled,
+    matchId,
+    state.featureEnabled,
+    state.online,
+    state.pendingCount,
+    token,
+    syncNow,
+  ]);
+
   const api = useMemo(
     () => ({
       start: () => enqueueEvent("start"),
@@ -1139,12 +1246,12 @@ export function useRefereeLiveSyncMatch(
       undo: () => enqueueEvent("undo"),
       finish: (winner, reason = "") =>
         enqueueEvent("finish", { winner, reason }),
-      forfeit: (winner, reason = "forfeit") =>
-        enqueueEvent("forfeit", { winner, reason }),
+      forfeit: (winner, reason = "forfeit", extra = {}) =>
+        enqueueEvent("forfeit", { winner, reason, ...extra }),
       nextGame: ({ autoNext, userMatch = false } = {}) =>
         request(`/api/referee/matches/${matchId}/score`, {
           method: "PATCH",
-          body: { autoNext, userMatch },
+          body: { op: "nextGame", autoNext, userMatch },
           headers: userMatch ? { "X-Pkt-Match-Kind": "user" } : undefined,
           socketEvent: "match:nextGame",
         }),
@@ -1224,6 +1331,7 @@ export function useRefereeLiveSyncMatch(
       claim,
       takeover,
       syncNow,
+      syncEventNow,
       discardRejected,
       release,
     }),
@@ -1240,6 +1348,7 @@ export function useRefereeLiveSyncMatch(
       claim,
       takeover,
       syncNow,
+      syncEventNow,
       discardRejected,
       release,
     ]

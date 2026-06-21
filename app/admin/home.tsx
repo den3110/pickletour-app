@@ -1294,7 +1294,7 @@ function DOBPickerRN({
           <DateTimePicker
             value={temp}
             mode="date"
-            display="spinner"
+            display="compact"
             maximumDate={maxDate}
             minimumDate={minDate}
             onChange={(_, d) => d && setTemp(d)}

@@ -397,23 +397,32 @@ export default function RefereeCenterScreen() {
       if (typeof inc.score_text === "string" && !inc.scoreText)
         inc.scoreText = inc.score_text;
 
-      pendingRef.current.set(String(inc._id), inc);
+      const key = String(inc._id);
+      const base = pendingRef.current.get(key) || liveMapRef.current.get(key);
+      if (base && !isNewerOrEqualMatchPayload(base, inc)) return;
+      pendingRef.current.set(
+        key,
+        mergeMatchPayload(base, inc, base || displaySourceRef.current) ||
+          normalizeMatchDisplay(inc, base || displaySourceRef.current)
+      );
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         if (!pendingRef.current.size) return;
         const mp = liveMapRef.current;
+        let changed = false;
         for (const [mid, inc2] of pendingRef.current) {
           const cur = mp.get(mid);
+          if (cur && !isNewerOrEqualMatchPayload(cur, inc2)) continue;
           const merged =
-            !cur || isNewerOrEqualMatchPayload(cur, inc2)
-              ? mergeMatchPayload(cur, inc2, cur || displaySourceRef.current) ||
-                normalizeMatchDisplay(inc2, cur || displaySourceRef.current)
-              : cur;
+            mergeMatchPayload(cur, inc2, cur || displaySourceRef.current) ||
+            normalizeMatchDisplay(inc2, cur || displaySourceRef.current);
+          if (!merged) continue;
           mp.set(mid, merged);
+          changed = true;
         }
         pendingRef.current.clear();
-        setLiveBump((x) => x + 1);
+        if (changed) setLiveBump((x) => x + 1);
       });
     };
     requestSnapshotRef.current = requestSnapshot;
@@ -491,10 +500,21 @@ export default function RefereeCenterScreen() {
     if (fp === seededFingerprintRef.current) return;
     seededFingerprintRef.current = fp;
 
-    const mp = new Map();
+    const mp = new Map(liveMapRef.current);
+    let changed = false;
     for (const m of allMatches.map((item) => normalizeMatchDisplay(item, tour))) {
-      if (m?._id) mp.set(String(m._id), m);
+      if (!m?._id) continue;
+      const id = String(m._id);
+      const cur = mp.get(id);
+      if (cur && !isNewerOrEqualMatchPayload(cur, m)) continue;
+      const merged =
+        mergeMatchPayload(cur, m, cur || tour) ||
+        normalizeMatchDisplay(m, cur || tour);
+      if (!merged) continue;
+      mp.set(id, merged);
+      changed = true;
     }
+    if (!changed && mp.size === liveMapRef.current.size) return;
     liveMapRef.current = mp;
     setLiveBump((x) => x + 1);
   }, [allMatches, tour]);

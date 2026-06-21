@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Constants from "expo-constants";
-import type { StyleProp, ViewProps, ViewStyle } from "react-native";
+import { Platform, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 
 export const isExpoGo = Constants.appOwnership === "expo";
 
@@ -29,6 +29,7 @@ type CompatVideoProps = {
   muted?: boolean;
   startPosition?: number;
   useNativeControls?: boolean;
+  allowsFullscreenVideo?: boolean;
   resizeMode?: "contain" | "cover" | "stretch";
   onLoad?: (meta: VideoLoadLike) => void;
   onPlaybackStatusUpdate?: (status: PlaybackStatusLike) => void;
@@ -67,6 +68,7 @@ function ExpoGoVideo({
   muted = false,
   startPosition = 0,
   useNativeControls = true,
+  allowsFullscreenVideo = true,
   resizeMode = "contain",
   onLoad,
   onPlaybackStatusUpdate,
@@ -83,6 +85,10 @@ function ExpoGoVideo({
   const [player] = useState(() => createVideoPlayer(null));
   const sourceKey = useMemo(() => getVideoSourceKey(source), [source]);
   const contentFit = resizeMode === "stretch" ? "fill" : resizeMode;
+  const fullscreenOptions = useMemo(
+    () => ({ enable: Platform.OS !== "android" && allowsFullscreenVideo !== false }),
+    [allowsFullscreenVideo]
+  );
 
   useEffect(() => {
     player.timeUpdateEventInterval = 0.25;
@@ -233,6 +239,7 @@ function ExpoGoVideo({
       pointerEvents={pointerEvents}
       nativeControls={useNativeControls}
       contentFit={contentFit}
+      fullscreenOptions={fullscreenOptions}
     />
   );
 }
