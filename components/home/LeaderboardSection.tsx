@@ -9,6 +9,8 @@ import LottieView from "lottie-react-native";
 import { useGetFeaturedLeaderboardQuery } from "@/slices/leaderboardApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
   ? require("@/assets/lottie/bg-3d.json")
@@ -82,7 +84,16 @@ function LeaderboardCard({ athlete, theme }) {
           router.push(`/profile/${athlete.id}`);
         }}
       >
-        <View style={[styles.leaderboardCard, { backgroundColor: bg }]}>
+        <AppleLiquidGlassView
+          fallback="view"
+          intensity={isDark ? 74 : 62}
+          tint={isDark ? "dark" : "light"}
+          glassTintColor={
+            isDark ? "rgba(26, 29, 35, 0.5)" : "rgba(255, 255, 255, 0.42)"
+          }
+          isInteractive
+          style={[styles.leaderboardCard, { backgroundColor: bg }]}
+        >
           {/* Header: Rank + Avatar + Name */}
           <View style={styles.cardHeader}>
             <View style={styles.rankBadge}>
@@ -177,7 +188,7 @@ function LeaderboardCard({ athlete, theme }) {
               </View>
             </View>
           )}
-        </View>
+        </AppleLiquidGlassView>
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -223,18 +234,34 @@ export default function LeaderboardSection() {
 
       {/* Header */}
       <View style={styles.leaderboardHeaderContainer}>
-        <LinearGradient
-          colors={["#FFD700", "#FFA500"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.leaderboardHeader}
-        >
-          <Ionicons name="podium" size={28} color="#FFFFFF" />
-          <Text style={styles.leaderboardHeaderText}>
-            Bảng xếp hạng nổi bật
-          </Text>
-          <Ionicons name="podium" size={28} color="#FFFFFF" />
-        </LinearGradient>
+        {IOS_26_LIQUID_GLASS_ENABLED ? (
+          <AppleLiquidGlassView
+            fallback="view"
+            glassEffectStyle="regular"
+            glassTintColor="rgba(255, 180, 0, 0.46)"
+            isInteractive
+            style={[styles.leaderboardHeader, styles.leaderboardHeaderGlass]}
+          >
+            <Ionicons name="podium" size={28} color="#FFFFFF" />
+            <Text style={styles.leaderboardHeaderText}>
+              Bảng xếp hạng nổi bật
+            </Text>
+            <Ionicons name="podium" size={28} color="#FFFFFF" />
+          </AppleLiquidGlassView>
+        ) : (
+          <LinearGradient
+            colors={["#FFD700", "#FFA500"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.leaderboardHeader}
+          >
+            <Ionicons name="podium" size={28} color="#FFFFFF" />
+            <Text style={styles.leaderboardHeaderText}>
+              Bảng xếp hạng nổi bật
+            </Text>
+            <Ionicons name="podium" size={28} color="#FFFFFF" />
+          </LinearGradient>
+        )}
       </View>
 
       {/* Cards Container */}
@@ -247,7 +274,11 @@ export default function LeaderboardSection() {
                 key={i}
                 style={[styles.leaderboardCardGradient, { opacity: 0.6 }]}
               >
-                <View
+                <AppleLiquidGlassView
+                  fallback="view"
+                  intensity={70}
+                  tint="dark"
+                  glassTintColor="rgba(0, 0, 0, 0.2)"
                   style={[
                     styles.leaderboardCard,
                     { backgroundColor: "#00000020", height: 200 },
@@ -306,15 +337,36 @@ export default function LeaderboardSection() {
           onPress={() => router.push("/rankings/stack")}
           style={styles.viewAllButton}
         >
-          <LinearGradient
-            colors={["#FFD700", "#FFA500"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.viewAllGradient}
-          >
-            <Text style={styles.viewAllText}>Xem toàn bộ xếp hạng</Text>
-            <Ionicons name="arrow-forward-circle" size={24} color="#FFFFFF" />
-          </LinearGradient>
+          {IOS_26_LIQUID_GLASS_ENABLED ? (
+            <AppleLiquidGlassView
+              fallback="view"
+              glassEffectStyle="regular"
+              glassTintColor="rgba(255, 180, 0, 0.46)"
+              isInteractive
+              style={styles.viewAllGradient}
+            >
+              <Text style={styles.viewAllText}>Xem toàn bộ xếp hạng</Text>
+              <Ionicons
+                name="arrow-forward-circle"
+                size={24}
+                color="#FFFFFF"
+              />
+            </AppleLiquidGlassView>
+          ) : (
+            <LinearGradient
+              colors={["#FFD700", "#FFA500"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.viewAllGradient}
+            >
+              <Text style={styles.viewAllText}>Xem toàn bộ xếp hạng</Text>
+              <Ionicons
+                name="arrow-forward-circle"
+                size={24}
+                color="#FFFFFF"
+              />
+            </LinearGradient>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -349,6 +401,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 16,
     gap: 12,
+  },
+  leaderboardHeaderGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.38)",
+    shadowColor: "#FFA500",
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
   leaderboardHeaderText: {
     fontSize: 20,

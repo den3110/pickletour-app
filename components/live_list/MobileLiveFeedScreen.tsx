@@ -27,6 +27,7 @@ import {
   View,
   ViewToken,
 } from "react-native";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useIsFocused } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,6 +36,8 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { CompatVideo as Video } from "@/lib/expoMediaCompat";
 import { useGetLiveFeedProbeQuery, useGetLiveFeedQuery } from "@/slices/liveApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 import { getLiveMatchCourtText } from "./courtDisplay";
 import InfoModal from "./InfoModal";
@@ -55,8 +58,84 @@ const MODE_CHIPS = [
   { value: "replay", label: "Replay" },
 ];
 
+function LiveGlassSurface({
+  children,
+  effect = "regular",
+  interactive = false,
+  style,
+  tintColor = "rgba(6,10,16,0.58)",
+}: {
+  children?: React.ReactNode;
+  effect?: "regular" | "clear";
+  interactive?: boolean;
+  style?: any;
+  tintColor?: string;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme="dark"
+      glassEffectStyle={effect}
+      glassTintColor={tintColor}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
 function asTrimmed(value: any) {
   return String(value || "").trim();
+}
+
+function isNativeSharedObjectError(error: any) {
+  const message = String(error?.message || error || "");
+  return (
+    message.includes("NativeSharedObjectNotFoundException") ||
+    message.includes("native shared object")
+  );
+}
+
+function safeNativePlayerNumber(player: any, key: string, fallback = 0) {
+  try {
+    const value = Number(player?.[key] || fallback);
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeNativePlayerSet(
+  player: any,
+  key: string,
+  value: any,
+  onInvalid?: (error: any) => void
+) {
+  try {
+    if (!player) return false;
+    player[key] = value;
+    return true;
+  } catch (error) {
+    if (isNativeSharedObjectError(error)) onInvalid?.(error);
+    return false;
+  }
+}
+
+function safeNativePlayerCall<T = any>(
+  player: any,
+  method: string,
+  args: any[] = [],
+  onInvalid?: (error: any) => void
+) {
+  try {
+    const action = player?.[method];
+    if (typeof action !== "function") return undefined;
+    return action.apply(player, args) as T;
+  } catch (error) {
+    if (isNativeSharedObjectError(error)) onInvalid?.(error);
+    return undefined;
+  }
 }
 
 function relativeTime(value?: string | number | Date | null) {
@@ -454,12 +533,23 @@ function FullscreenNativeVideoPlayer({
 
   const syncStateFromPlayer = useCallback(
     (fallbackPlaying = shouldPlayOnOpen) => {
-      const nextCurrentTime = Number(player.currentTime || startPosition || 0);
-      const nextDuration = Number(player.duration || playbackSnapshotRef.current.duration || 0);
-      const nextBufferedPosition = Number(player.bufferedPosition || 0);
-      const nextIsPlaying = typeof player.playing === "boolean" ? player.playing : fallbackPlaying;
+      const nextCurrentTime = safeNativePlayerNumber(player, "currentTime", startPosition || 0);
+      const nextDuration = safeNativePlayerNumber(
+        player,
+        "duration",
+        playbackSnapshotRef.current.duration || 0
+      );
+      const nextBufferedPosition = safeNativePlayerNumber(player, "bufferedPosition");
+      let nextIsPlaying = fallbackPlaying;
+      let nextStatus = "";
+      try {
+        nextIsPlaying = typeof player.playing === "boolean" ? player.playing : fallbackPlaying;
+        nextStatus = String(player.status || "");
+      } catch {
+        // no-op
+      }
       const nextIsLoaded =
-        player.status === "readyToPlay" || nextDuration > 0 || nextCurrentTime > 0;
+        nextStatus === "readyToPlay" || nextDuration > 0 || nextCurrentTime > 0;
 
       setIsLoaded(nextIsLoaded);
       setIsPlaying(Boolean(nextIsPlaying));
@@ -508,40 +598,63 @@ function FullscreenNativeVideoPlayer({
   );
 
   useEffect(() => {
-    player.timeUpdateEventInterval = 0.25;
+    safeNativePlayerSet(player, "timeUpdateEventInterval", 0.25);
     if (ownsPlayer) {
-      player.loop = false;
+      safeNativePlayerSet(player, "loop", false);
     }
   }, [ownsPlayer, player]);
 
   useEffect(() => {
-    player.muted = muted;
+    safeNativePlayerSet(player, "muted", muted);
   }, [muted, player]);
 
   useEffect(() => {
-    const sourceLoadSub = player.addListener("sourceLoad", ({ duration: nextDuration }: any) => {
-      const resolvedDuration = Number(nextDuration || player.duration || 0);
-      setIsLoaded(true);
-      setDuration(resolvedDuration);
-      setPlayerError("");
-      publishPlaybackState({
-        isLoaded: true,
-        duration: resolvedDuration,
-        error: "",
+    const subscriptions: { remove: () => void }[] = [];
+    const addPlayerListener = (eventName: string, listener: (event: any) => void) => {
+      const subscription = safeNativePlayerCall<{ remove: () => void }>(player, "addListener", [
+        eventName,
+        listener,
+      ]);
+      if (!subscription) return false;
+      subscriptions.push(subscription);
+      return true;
+    };
+    const removeSubscriptions = () => {
+      subscriptions.forEach((subscription) => {
+        try {
+          subscription.remove();
+        } catch {
+          // no-op
+        }
       });
-    });
+    };
 
-    const playingSub = player.addListener("playingChange", ({ isPlaying: nextIsPlaying }: any) => {
-      setIsPlaying(Boolean(nextIsPlaying));
-      publishPlaybackState({
-        isPlaying: Boolean(nextIsPlaying),
-      });
-    });
-
-    const timeSub = player.addListener(
-      "timeUpdate",
-      ({ currentTime: nextTime, bufferedPosition: nextBuffered }: any) => {
-        const resolvedDuration = Number(player.duration || playbackSnapshotRef.current.duration || 0);
+    const didAttachListeners = [
+      addPlayerListener("sourceLoad", ({ duration: nextDuration }: any) => {
+        const resolvedDuration = Number(
+          nextDuration || safeNativePlayerNumber(player, "duration")
+        );
+        setIsLoaded(true);
+        setDuration(resolvedDuration);
+        setPlayerError("");
+        publishPlaybackState({
+          isLoaded: true,
+          duration: resolvedDuration,
+          error: "",
+        });
+      }),
+      addPlayerListener("playingChange", ({ isPlaying: nextIsPlaying }: any) => {
+        setIsPlaying(Boolean(nextIsPlaying));
+        publishPlaybackState({
+          isPlaying: Boolean(nextIsPlaying),
+        });
+      }),
+      addPlayerListener("timeUpdate", ({ currentTime: nextTime, bufferedPosition: nextBuffered }: any) => {
+        const resolvedDuration = safeNativePlayerNumber(
+          player,
+          "duration",
+          playbackSnapshotRef.current.duration || 0
+        );
         setCurrentTime(Number(nextTime || 0));
         setBufferedPosition(Number(nextBuffered || 0));
         if (resolvedDuration > 0) {
@@ -552,48 +665,45 @@ function FullscreenNativeVideoPlayer({
           bufferedPosition: Number(nextBuffered || 0),
           duration: resolvedDuration > 0 ? resolvedDuration : undefined,
         });
-      }
-    );
-
-    const endSub = player.addListener("playToEnd", () => {
-      setIsEnded(true);
-      setIsPlaying(false);
-      setControlsVisible(true);
-      publishPlaybackState({
-        currentTime: Number(player.currentTime || 0),
-        duration: Number(player.duration || 0),
-        isPlaying: false,
-        didJustFinish: true,
-      });
-    });
-
-    const statusSub = player.addListener("statusChange", ({ status, error }: any) => {
-      if (status === "error") {
-        const nextError = error?.message ?? "Không phát được video.";
-        setPlayerError(nextError);
+      }),
+      addPlayerListener("playToEnd", () => {
+        setIsEnded(true);
+        setIsPlaying(false);
         setControlsVisible(true);
         publishPlaybackState({
-          error: nextError,
+          currentTime: safeNativePlayerNumber(player, "currentTime"),
+          duration: safeNativePlayerNumber(player, "duration"),
           isPlaying: false,
+          didJustFinish: true,
         });
-        return;
-      }
-      if (status === "readyToPlay") {
-        publishPlaybackState({
-          isLoaded: true,
-          duration: Number(player.duration || 0),
-          error: "",
-        });
-      }
-    });
+      }),
+      addPlayerListener("statusChange", ({ status, error }: any) => {
+        if (status === "error") {
+          const nextError = error?.message ?? "Không phát được video.";
+          setPlayerError(nextError);
+          setControlsVisible(true);
+          publishPlaybackState({
+            error: nextError,
+            isPlaying: false,
+          });
+          return;
+        }
+        if (status === "readyToPlay") {
+          publishPlaybackState({
+            isLoaded: true,
+            duration: safeNativePlayerNumber(player, "duration"),
+            error: "",
+          });
+        }
+      }),
+    ].every(Boolean);
 
-    return () => {
-      sourceLoadSub.remove();
-      playingSub.remove();
-      timeSub.remove();
-      endSub.remove();
-      statusSub.remove();
-    };
+    if (!didAttachListeners) {
+      removeSubscriptions();
+      return undefined;
+    }
+
+    return removeSubscriptions;
   }, [player, publishPlaybackState]);
 
   useEffect(() => {
@@ -601,7 +711,7 @@ function FullscreenNativeVideoPlayer({
 
     if (!visible || (!source && ownsPlayer)) {
       if (ownsPlayer) {
-        player.pause();
+        safeNativePlayerCall(player, "pause");
       }
       return undefined;
     }
@@ -612,9 +722,9 @@ function FullscreenNativeVideoPlayer({
     if (!ownsPlayer) {
       syncStateFromPlayer(shouldPlayOnOpen);
       if (shouldPlayOnOpen === false) {
-        player.pause();
+        safeNativePlayerCall(player, "pause");
       } else {
-        player.play();
+        safeNativePlayerCall(player, "play");
       }
       return undefined;
     }
@@ -638,12 +748,12 @@ function FullscreenNativeVideoPlayer({
         await player.replaceAsync(source);
         if (cancelled) return;
         if (Number.isFinite(startPosition) && startPosition > 0) {
-          player.currentTime = startPosition;
+          safeNativePlayerSet(player, "currentTime", startPosition);
         }
         if (shouldPlayOnOpen === false) {
-          player.pause();
+          safeNativePlayerCall(player, "pause");
         } else {
-          player.play();
+          safeNativePlayerCall(player, "play");
         }
       } catch (error: any) {
         if (cancelled) return;
@@ -659,7 +769,7 @@ function FullscreenNativeVideoPlayer({
     return () => {
       cancelled = true;
       if (ownsPlayer) {
-        player.pause();
+        safeNativePlayerCall(player, "pause");
       }
     };
   }, [ownsPlayer, player, publishPlaybackState, shouldPlayOnOpen, source, startPosition, syncStateFromPlayer, visible]);
@@ -680,8 +790,8 @@ function FullscreenNativeVideoPlayer({
   useEffect(() => {
     return () => {
       clearControlsTimer();
-      if (ownsPlayer) {
-        internalPlayer.release();
+      if (ownsPlayer && !__DEV__) {
+        safeNativePlayerCall(internalPlayer, "release");
       }
     };
   }, [clearControlsTimer, internalPlayer, ownsPlayer]);
@@ -698,27 +808,27 @@ function FullscreenNativeVideoPlayer({
 
   const handleTogglePlayback = useCallback(() => {
     if (isEnded) {
-      player.replay();
+      safeNativePlayerCall(player, "replay");
       setIsEnded(false);
       bumpControls();
       return;
     }
 
     if (isPlaying) {
-      player.pause();
+      safeNativePlayerCall(player, "pause");
       showControls();
       clearControlsTimer();
       return;
     }
 
-    player.play();
+    safeNativePlayerCall(player, "play");
     bumpControls();
   }, [bumpControls, clearControlsTimer, isEnded, isPlaying, player, showControls]);
 
   const handleSeekBy = useCallback(
     (seconds: number) => {
       if (!isLoaded) return;
-      player.seekBy(seconds);
+      safeNativePlayerCall(player, "seekBy", [seconds]);
       setIsEnded(false);
       bumpControls();
     },
@@ -731,7 +841,7 @@ function FullscreenNativeVideoPlayer({
       const locationX = Number(event?.nativeEvent?.locationX || 0);
       const ratio = Math.max(0, Math.min(1, locationX / progressWidthRef.current));
       const nextTime = ratio * duration;
-      player.currentTime = nextTime;
+      safeNativePlayerSet(player, "currentTime", nextTime);
       setCurrentTime(nextTime);
       setIsEnded(false);
       bumpControls();
@@ -882,9 +992,13 @@ function IconCircleButton({
       disabled={disabled}
       style={[styles.railItem, disabled && styles.railItemDisabled]}
     >
-      <View style={[styles.railButton, disabled && styles.railButtonDisabled]}>
+      <LiveGlassSurface
+        interactive={!disabled}
+        tintColor="rgba(255,255,255,0.14)"
+        style={[styles.railButton, disabled && styles.railButtonDisabled]}
+      >
         <Ionicons name={icon} size={20} color="#ffffff" />
-      </View>
+      </LiveGlassSurface>
       <Text style={styles.railLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -903,9 +1017,14 @@ function ModeChip({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.9}
-      style={[styles.modeChip, active ? styles.modeChipActive : null]}
     >
-      <Text style={[styles.modeChipText, active ? styles.modeChipTextActive : null]}>{label}</Text>
+      <LiveGlassSurface
+        interactive
+        tintColor={active ? "rgba(37,244,238,0.46)" : "rgba(6,10,16,0.58)"}
+        style={[styles.modeChip, active ? styles.modeChipActive : null]}
+      >
+        <Text style={[styles.modeChipText, active ? styles.modeChipTextActive : null]}>{label}</Text>
+      </LiveGlassSurface>
     </TouchableOpacity>
   );
 }
@@ -1018,18 +1137,9 @@ const FeedSlide = memo(function FeedSlide({
         </View>
       ) : null}
 
-      {canOpenFullscreen ? (
-        <TouchableOpacity
-          onPress={() => onOpenFullscreen(item, session, isActive)}
-          activeOpacity={0.92}
-          style={[styles.fullscreenLaunchButton, { bottom: bottomInset + 172 }]}
-        >
-          <Ionicons name="phone-landscape-outline" size={19} color="#ffffff" />
-        </TouchableOpacity>
-      ) : null}
-
       <View style={[styles.cardTopChips, { top: topInset + 82 }]}>
-        <View
+        <LiveGlassSurface
+          tintColor={statusMeta.background}
           style={[
             styles.statusChip,
             {
@@ -1041,29 +1151,41 @@ const FeedSlide = memo(function FeedSlide({
           <Text style={[styles.statusChipText, { color: statusMeta.text }]}>
             {getLiveStatusLabel(item?.status)}
           </Text>
-        </View>
+        </LiveGlassSurface>
 
         {codeChipLabel ? (
-          <View style={styles.metaChip}>
+          <LiveGlassSurface effect="clear" tintColor="rgba(7,12,18,0.52)" style={styles.metaChip}>
             <Text style={styles.metaChipText}>{codeChipLabel}</Text>
-          </View>
+          </LiveGlassSurface>
         ) : null}
 
         {stageChipLabel ? (
-          <View style={[styles.metaChip, styles.metaChipAccent]}>
+          <LiveGlassSurface
+            effect="clear"
+            tintColor="rgba(37,244,238,0.16)"
+            style={[styles.metaChip, styles.metaChipAccent]}
+          >
             <Text style={[styles.metaChipText, styles.metaChipAccentText]}>{stageChipLabel}</Text>
-          </View>
+          </LiveGlassSurface>
         ) : null}
 
         {showTemporaryReplayHint ? (
-          <View style={[styles.metaChip, styles.metaChipAccent]}>
+          <LiveGlassSurface
+            effect="clear"
+            tintColor="rgba(37,244,238,0.16)"
+            style={[styles.metaChip, styles.metaChipAccent]}
+          >
             <Text style={[styles.metaChipText, styles.metaChipAccentText]}>Đang phát bản tạm</Text>
-          </View>
+          </LiveGlassSurface>
         ) : null}
       </View>
 
       <View style={[styles.bottomOverlay, { bottom: bottomInset + 18 }]}>
-        <View style={styles.infoColumn}>
+        <LiveGlassSurface
+          effect="clear"
+          tintColor="rgba(6,10,16,0.34)"
+          style={[styles.infoColumn, IOS_26_LIQUID_GLASS_ENABLED && styles.infoGlassPanel]}
+        >
           <View style={styles.creatorRow}>
             <View style={[styles.avatarFallback, !tournamentImage ? { backgroundColor: "rgba(37,244,238,0.24)" } : null]}>
               {tournamentImage ? (
@@ -1088,10 +1210,10 @@ const FeedSlide = memo(function FeedSlide({
               </Text>
             </View>
 
-            <View style={styles.timePill}>
+            <LiveGlassSurface effect="clear" tintColor="rgba(7,12,18,0.44)" style={styles.timePill}>
               <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.74)" />
               <Text style={styles.timePillText}>{metaText}</Text>
-            </View>
+            </LiveGlassSurface>
           </View>
 
           <Text style={styles.matchTitle} numberOfLines={2}>
@@ -1108,49 +1230,68 @@ const FeedSlide = memo(function FeedSlide({
 
           <View style={styles.infoActionsRow}>
             {scoreTuple ? (
-              <View style={styles.scorePill}>
+              <LiveGlassSurface effect="clear" tintColor="rgba(7,12,18,0.5)" style={styles.scorePill}>
                 <Ionicons name="trophy-outline" size={13} color="#ffffff" />
                 <Text style={styles.scorePillText}>
                   {scoreTuple[0]} - {scoreTuple[1]}
                 </Text>
-              </View>
+              </LiveGlassSurface>
             ) : null}
 
             {sessions.length > 0 ? (
-              <View style={styles.scorePill}>
+              <LiveGlassSurface effect="clear" tintColor="rgba(7,12,18,0.5)" style={styles.scorePill}>
                 <Ionicons name="layers-outline" size={13} color="#ffffff" />
                 <Text style={styles.scorePillText}>{sessions.length} nguồn</Text>
-              </View>
+              </LiveGlassSurface>
             ) : null}
 
             <TouchableOpacity
               onPress={() => onOpenViewer(item)}
               disabled={!canOpenViewer}
               activeOpacity={0.9}
-              style={[styles.detailPill, !canOpenViewer ? styles.detailPillDisabled : null]}
+              style={!canOpenViewer ? styles.detailPillDisabled : null}
             >
-              <Ionicons name="open-outline" size={14} color="#07111a" />
-              <Text style={styles.detailPillText}>Xem trận</Text>
+              <LiveGlassSurface
+                interactive={canOpenViewer}
+                tintColor="rgba(37,244,238,0.46)"
+                style={styles.detailPill}
+              >
+                <Ionicons name="open-outline" size={14} color="#07111a" />
+                <Text style={styles.detailPillText}>Xem trận</Text>
+              </LiveGlassSurface>
             </TouchableOpacity>
           </View>
-        </View>
+        </LiveGlassSurface>
 
-        <View style={styles.railColumn}>
-          <IconCircleButton icon="information-circle-outline" label="Info" onPress={() => onOpenInfo(item)} />
-          <IconCircleButton
-            icon="open-outline"
-            label="Mở link"
-            onPress={openLink}
-            disabled={!primaryOpenUrl}
-          />
-          {canMute ? (
+        <LiveGlassSurface
+          effect="clear"
+          tintColor="rgba(6,10,16,0.28)"
+          style={styles.railColumnGlass}
+        >
+          <View style={styles.railColumn}>
+            {canOpenFullscreen ? (
+              <IconCircleButton
+                icon="phone-landscape-outline"
+                label="Ngang"
+                onPress={() => onOpenFullscreen(item, session, isActive)}
+              />
+            ) : null}
+            <IconCircleButton icon="information-circle-outline" label="Info" onPress={() => onOpenInfo(item)} />
             <IconCircleButton
-              icon={globalMuted ? "volume-mute-outline" : "volume-high-outline"}
-              label={globalMuted ? "Bật tiếng" : "Tắt tiếng"}
-              onPress={onToggleMuted}
+              icon="open-outline"
+              label="Mở link"
+              onPress={openLink}
+              disabled={!primaryOpenUrl}
             />
-          ) : null}
-        </View>
+            {canMute ? (
+              <IconCircleButton
+                icon={globalMuted ? "volume-mute-outline" : "volume-high-outline"}
+                label={globalMuted ? "Bật tiếng" : "Tắt tiếng"}
+                onPress={onToggleMuted}
+              />
+            ) : null}
+          </View>
+        </LiveGlassSurface>
       </View>
 
       <View style={styles.progressTrack}>
@@ -1262,7 +1403,8 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const isFocused = useIsFocused();
-  const [sharedNativePlayer] = useState(() => createVideoPlayer(null));
+  const [sharedNativePlayer, setSharedNativePlayer] = useState(() => createVideoPlayer(null));
+  const sharedNativePlayerRef = useRef(sharedNativePlayer);
   const listRef = useRef<FlatList>(null);
   const previousActiveIndexRef = useRef(0);
   const lockedActiveIndexRef = useRef<number | null>(null);
@@ -1296,6 +1438,12 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
   const fullscreenAttached = fullscreenVisible;
   const effectiveActiveIndex = lockedActiveIndex ?? activeIndex;
   const isPortraitViewport = windowHeight >= windowWidth;
+  const topChromePadding = insets.top + (isBack ? 8 : 10);
+  const topGradientHeight = insets.top + (isBack ? 132 : 150);
+
+  useEffect(() => {
+    sharedNativePlayerRef.current = sharedNativePlayer;
+  }, [sharedNativePlayer]);
 
   useEffect(() => {
     lockedActiveIndexRef.current = lockedActiveIndex;
@@ -1555,18 +1703,42 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
     playbackSnapshotsRef.current[snapshotKey] = nextSnapshot;
   }, []);
 
+  const recreateSharedNativePlayer = useCallback(() => {
+    safeNativePlayerCall(sharedNativePlayerRef.current, "release");
+    sharedPlayerTargetRef.current = {
+      item: null,
+      session: null,
+      key: "",
+    };
+    setSharedNativePlayerKey("");
+    setSharedNativePlayer(createVideoPlayer(null));
+  }, []);
+
   useEffect(() => {
-    sharedNativePlayer.timeUpdateEventInterval = 0.25;
-    sharedNativePlayer.loop = true;
+    if (
+      !safeNativePlayerSet(
+        sharedNativePlayer,
+        "timeUpdateEventInterval",
+        0.25,
+        recreateSharedNativePlayer
+      )
+    ) {
+      return undefined;
+    }
+    if (!safeNativePlayerSet(sharedNativePlayer, "loop", true, recreateSharedNativePlayer)) {
+      return undefined;
+    }
 
     return () => {
-      sharedNativePlayer.release();
+      if (!__DEV__) {
+        safeNativePlayerCall(sharedNativePlayer, "release");
+      }
     };
-  }, [sharedNativePlayer]);
+  }, [recreateSharedNativePlayer, sharedNativePlayer]);
 
   useEffect(() => {
-    sharedNativePlayer.muted = globalMuted;
-  }, [globalMuted, sharedNativePlayer]);
+    safeNativePlayerSet(sharedNativePlayer, "muted", globalMuted, recreateSharedNativePlayer);
+  }, [globalMuted, recreateSharedNativePlayer, sharedNativePlayer]);
 
   useEffect(() => {
     const publishForTarget = (status: any) => {
@@ -1575,78 +1747,94 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
       handlePlaybackSnapshotChange(target.item, target.session, status);
     };
 
-    const sourceLoadSub = sharedNativePlayer.addListener("sourceLoad", ({ duration }: any) => {
-      publishForTarget({
-        isLoaded: true,
-        currentTime: Number(sharedNativePlayer.currentTime || 0),
-        duration: Number(duration || sharedNativePlayer.duration || 0),
-        bufferedPosition: Number(sharedNativePlayer.bufferedPosition || 0),
-        error: "",
+    const subscriptions: { remove: () => void }[] = [];
+    const addSharedListener = (eventName: string, listener: (event: any) => void) => {
+      const subscription = safeNativePlayerCall<{ remove: () => void }>(
+        sharedNativePlayer,
+        "addListener",
+        [eventName, listener],
+        recreateSharedNativePlayer
+      );
+      if (!subscription) return false;
+      subscriptions.push(subscription);
+      return true;
+    };
+    const removeSubscriptions = () => {
+      subscriptions.forEach((subscription) => {
+        try {
+          subscription.remove();
+        } catch {
+          // no-op
+        }
       });
-    });
+    };
 
-    const playingSub = sharedNativePlayer.addListener("playingChange", ({ isPlaying }: any) => {
-      publishForTarget({
-        isPlaying: Boolean(isPlaying),
-        currentTime: Number(sharedNativePlayer.currentTime || 0),
-        duration: Number(sharedNativePlayer.duration || 0),
-        bufferedPosition: Number(sharedNativePlayer.bufferedPosition || 0),
-      });
-    });
-
-    const timeSub = sharedNativePlayer.addListener(
-      "timeUpdate",
-      ({ currentTime, bufferedPosition }: any) => {
-        publishForTarget({
-          currentTime: Number(currentTime || 0),
-          duration: Number(sharedNativePlayer.duration || 0),
-          bufferedPosition: Number(bufferedPosition || 0),
-        });
-      }
-    );
-
-    const endSub = sharedNativePlayer.addListener("playToEnd", () => {
-      publishForTarget({
-        currentTime: Number(sharedNativePlayer.currentTime || 0),
-        duration: Number(sharedNativePlayer.duration || 0),
-        bufferedPosition: Number(sharedNativePlayer.bufferedPosition || 0),
-        isPlaying: false,
-        didJustFinish: true,
-      });
-    });
-
-    const statusSub = sharedNativePlayer.addListener("statusChange", ({ status, error }: any) => {
-      if (status === "error") {
-        publishForTarget({
-          error: error?.message ?? "Không phát được video.",
-          isPlaying: false,
-        });
-        return;
-      }
-      if (status === "readyToPlay") {
+    const didAttachListeners = [
+      addSharedListener("sourceLoad", ({ duration }: any) => {
         publishForTarget({
           isLoaded: true,
-          currentTime: Number(sharedNativePlayer.currentTime || 0),
-          duration: Number(sharedNativePlayer.duration || 0),
-          bufferedPosition: Number(sharedNativePlayer.bufferedPosition || 0),
+          currentTime: safeNativePlayerNumber(sharedNativePlayer, "currentTime"),
+          duration: Number(duration || safeNativePlayerNumber(sharedNativePlayer, "duration")),
+          bufferedPosition: safeNativePlayerNumber(sharedNativePlayer, "bufferedPosition"),
           error: "",
         });
-      }
-    });
+      }),
+      addSharedListener("playingChange", ({ isPlaying }: any) => {
+        publishForTarget({
+          isPlaying: Boolean(isPlaying),
+          currentTime: safeNativePlayerNumber(sharedNativePlayer, "currentTime"),
+          duration: safeNativePlayerNumber(sharedNativePlayer, "duration"),
+          bufferedPosition: safeNativePlayerNumber(sharedNativePlayer, "bufferedPosition"),
+        });
+      }),
+      addSharedListener("timeUpdate", ({ currentTime, bufferedPosition }: any) => {
+        publishForTarget({
+          currentTime: Number(currentTime || 0),
+          duration: safeNativePlayerNumber(sharedNativePlayer, "duration"),
+          bufferedPosition: Number(bufferedPosition || 0),
+        });
+      }),
+      addSharedListener("playToEnd", () => {
+        publishForTarget({
+          currentTime: safeNativePlayerNumber(sharedNativePlayer, "currentTime"),
+          duration: safeNativePlayerNumber(sharedNativePlayer, "duration"),
+          bufferedPosition: safeNativePlayerNumber(sharedNativePlayer, "bufferedPosition"),
+          isPlaying: false,
+          didJustFinish: true,
+        });
+      }),
+      addSharedListener("statusChange", ({ status, error }: any) => {
+        if (status === "error") {
+          publishForTarget({
+            error: error?.message ?? "Không phát được video.",
+            isPlaying: false,
+          });
+          return;
+        }
+        if (status === "readyToPlay") {
+          publishForTarget({
+            isLoaded: true,
+            currentTime: safeNativePlayerNumber(sharedNativePlayer, "currentTime"),
+            duration: safeNativePlayerNumber(sharedNativePlayer, "duration"),
+            bufferedPosition: safeNativePlayerNumber(sharedNativePlayer, "bufferedPosition"),
+            error: "",
+          });
+        }
+      }),
+    ].every(Boolean);
 
-    return () => {
-      sourceLoadSub.remove();
-      playingSub.remove();
-      timeSub.remove();
-      endSub.remove();
-      statusSub.remove();
-    };
-  }, [handlePlaybackSnapshotChange, sharedNativePlayer]);
+    if (!didAttachListeners) {
+      removeSubscriptions();
+      return undefined;
+    }
+
+    return removeSubscriptions;
+  }, [handlePlaybackSnapshotChange, recreateSharedNativePlayer, sharedNativePlayer]);
 
   useEffect(() => {
     if (!isFocused || !activeItem || !activeSession || !activeNativePlayerKey) {
       if (!fullscreenAttached) {
-        sharedNativePlayer.pause();
+        safeNativePlayerCall(sharedNativePlayer, "pause", [], recreateSharedNativePlayer);
         sharedPlayerTargetRef.current = {
           item: null,
           session: null,
@@ -1673,7 +1861,7 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
     if (previousTargetKey === activeNativePlayerKey) {
       if (!fullscreenAttached) {
         setSharedNativePlayerKey(activeNativePlayerKey);
-        sharedNativePlayer.play();
+        safeNativePlayerCall(sharedNativePlayer, "play", [], recreateSharedNativePlayer);
       }
       return undefined;
     }
@@ -1688,13 +1876,21 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
         if (cancelled) return;
         const resumeTime = Number.isFinite(Number(snapshot?.currentTime)) ? Number(snapshot.currentTime) : 0;
         if (resumeTime > 0) {
-          sharedNativePlayer.currentTime = resumeTime;
+          safeNativePlayerSet(
+            sharedNativePlayer,
+            "currentTime",
+            resumeTime,
+            recreateSharedNativePlayer
+          );
         }
         if (!fullscreenAttached) {
           setSharedNativePlayerKey(activeNativePlayerKey);
-          sharedNativePlayer.play();
+          safeNativePlayerCall(sharedNativePlayer, "play", [], recreateSharedNativePlayer);
         }
       } catch (error: any) {
+        if (isNativeSharedObjectError(error)) {
+          recreateSharedNativePlayer();
+        }
         handlePlaybackSnapshotChange(activeItem, activeSession, {
           error: error?.message ?? "Không phát được video.",
           isPlaying: false,
@@ -1713,6 +1909,7 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
     getPlaybackSnapshot,
     handlePlaybackSnapshotChange,
     isFocused,
+    recreateSharedNativePlayer,
     sharedNativePlayer,
   ]);
 
@@ -1847,15 +2044,16 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
   const refreshing = manualRefreshing && isFetching;
 
   return (
-    <View
-      style={styles.screen}
-      onLayout={(event) => {
-        const nextHeight = Math.max(1, Math.round(event.nativeEvent.layout.height));
-        if (Math.abs(nextHeight - slideHeight) > 1) {
-          setListHeight(nextHeight);
-        }
-      }}
-    >
+    <BottomSheetModalProvider>
+      <View
+        style={styles.screen}
+        onLayout={(event) => {
+          const nextHeight = Math.max(1, Math.round(event.nativeEvent.layout.height));
+          if (Math.abs(nextHeight - slideHeight) > 1) {
+            setListHeight(nextHeight);
+          }
+        }}
+      >
       <StatusBar style="light" translucent backgroundColor="transparent" />
 
       <FlatList
@@ -1893,17 +2091,29 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
         ListEmptyComponent={
           isLoading ? (
             <View style={[styles.emptyState, { height: slideHeight }]}>
-              <ActivityIndicator size="large" color="#ffffff" />
-              <Text style={styles.emptyTitle}>Đang tải live feed</Text>
-              <Text style={styles.emptyText}>App đang lấy danh sách stream giống smart feed trên web.</Text>
+              <LiveGlassSurface
+                effect="clear"
+                tintColor="rgba(6,10,16,0.52)"
+                style={styles.emptyGlassCard}
+              >
+                <ActivityIndicator size="large" color="#ffffff" />
+                <Text style={styles.emptyTitle}>Đang tải live feed</Text>
+                <Text style={styles.emptyText}>App đang lấy danh sách stream giống smart feed trên web.</Text>
+              </LiveGlassSurface>
             </View>
           ) : (
             <View style={[styles.emptyState, { height: slideHeight }]}>
-              <Ionicons name="videocam-off-outline" size={44} color="rgba(255,255,255,0.72)" />
-              <Text style={styles.emptyTitle}>Chưa có video phù hợp</Text>
-              <Text style={styles.emptyText}>
-                Khi có trận đang live hoặc replay công khai, feed sẽ tự xuất hiện ở đây.
-              </Text>
+              <LiveGlassSurface
+                effect="clear"
+                tintColor="rgba(6,10,16,0.52)"
+                style={styles.emptyGlassCard}
+              >
+                <Ionicons name="videocam-off-outline" size={44} color="rgba(255,255,255,0.72)" />
+                <Text style={styles.emptyTitle}>Chưa có video phù hợp</Text>
+                <Text style={styles.emptyText}>
+                  Khi có trận đang live hoặc replay công khai, feed sẽ tự xuất hiện ở đây.
+                </Text>
+              </LiveGlassSurface>
             </View>
           )
         }
@@ -1913,17 +2123,35 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
 
       <LinearGradient
         colors={["rgba(0,0,0,0.62)", "transparent"]}
-        style={[styles.topGradient, { height: insets.top + 150 }]}
+        style={[styles.topGradient, { height: topGradientHeight }]}
         pointerEvents="none"
       />
 
       <View pointerEvents="box-none" style={styles.topChrome}>
-        <View style={[styles.topChromeInner, { paddingTop: insets.top + 10 }]}>
+        <View style={[styles.topChromeInner, { paddingTop: topChromePadding }]}>
           <View style={styles.chromeLeft}>
-            <View style={styles.feedBadge}>
-              <Text style={styles.feedBadgeText}>
-                {`PickleTour Feed${liveCount ? ` · ${liveCount} LIVE` : ""}`}
-              </Text>
+            <View style={styles.feedHeaderRow}>
+              {isBack ? (
+                <TouchableOpacity onPress={handleBack} activeOpacity={0.9}>
+                  <LiveGlassSurface
+                    interactive
+                    tintColor="rgba(6,10,16,0.62)"
+                    style={styles.backButton}
+                  >
+                    <Ionicons name="chevron-back" size={23} color="#ffffff" />
+                  </LiveGlassSurface>
+                </TouchableOpacity>
+              ) : null}
+
+              <LiveGlassSurface
+                effect="clear"
+                tintColor="rgba(6,10,16,0.62)"
+                style={styles.feedBadge}
+              >
+                <Text style={styles.feedBadgeText} numberOfLines={1}>
+                  {`PickleTour Feed${liveCount ? ` · ${liveCount} LIVE` : ""}`}
+                </Text>
+              </LiveGlassSurface>
             </View>
 
             <View style={styles.modeRow}>
@@ -1946,42 +2174,52 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
             </View>
 
             {hasPendingNewItems ? (
-              <TouchableOpacity onPress={handleRefresh} style={styles.pendingChip} activeOpacity={0.9}>
-                <Ionicons name="sparkles-outline" size={13} color="#08110f" />
-                <Text style={styles.pendingChipText}>Có trận mới</Text>
+              <TouchableOpacity onPress={handleRefresh} activeOpacity={0.9}>
+                <LiveGlassSurface
+                  interactive
+                  tintColor="rgba(255,107,87,0.46)"
+                  style={styles.pendingChip}
+                >
+                  <Ionicons name="sparkles-outline" size={13} color="#08110f" />
+                  <Text style={styles.pendingChipText}>Có trận mới</Text>
+                </LiveGlassSurface>
               </TouchableOpacity>
             ) : null}
           </View>
 
           <View style={styles.chromeRight}>
-            <TouchableOpacity onPress={handleRefresh} style={styles.chromeButton} activeOpacity={0.9}>
+            <TouchableOpacity onPress={handleRefresh} activeOpacity={0.9}>
+              <LiveGlassSurface
+                interactive
+                tintColor="rgba(6,10,16,0.62)"
+                style={styles.chromeButton}
+              >
               {isFetching ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <Ionicons name="refresh" size={20} color="#ffffff" />
               )}
+              </LiveGlassSurface>
             </TouchableOpacity>
-
-            {isBack ? (
-              <TouchableOpacity onPress={handleBack} style={styles.chromeButton} activeOpacity={0.9}>
-                <Ionicons name="close" size={20} color="#ffffff" />
-              </TouchableOpacity>
-            ) : null}
           </View>
         </View>
       </View>
 
       {items.length ? (
         <View pointerEvents="none" style={[styles.counterWrap, { bottom: insets.bottom + 8 }]}>
-          <Text style={styles.counterText}>
-            {Math.min(effectiveActiveIndex + 1, items.length)} / {items.length}
-          </Text>
+          <LiveGlassSurface effect="clear" tintColor="rgba(6,10,16,0.58)" style={styles.counterGlass}>
+            <Text style={styles.counterText}>
+              {Math.min(effectiveActiveIndex + 1, items.length)} / {items.length}
+            </Text>
+          </LiveGlassSurface>
         </View>
       ) : null}
 
       {isFetching && page > 1 ? (
         <View pointerEvents="none" style={[styles.loadMoreWrap, { bottom: insets.bottom + 48 }]}>
-          <ActivityIndicator size="small" color="#ffffff" />
+          <LiveGlassSurface effect="clear" tintColor="rgba(6,10,16,0.58)" style={styles.loadMoreGlass}>
+            <ActivityIndicator size="small" color="#ffffff" />
+          </LiveGlassSurface>
         </View>
       ) : null}
 
@@ -2016,7 +2254,8 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
         initialMatch={viewerMatch || null}
         onClose={() => setViewerMatch(null)}
       />
-    </View>
+      </View>
+    </BottomSheetModalProvider>
   );
 }
 
@@ -2034,19 +2273,6 @@ const styles = StyleSheet.create({
     width: "100%",
     overflow: "hidden",
     backgroundColor: "#05070b",
-  },
-  fullscreenLaunchButton: {
-    position: "absolute",
-    left: "50%",
-    marginLeft: -22,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(6,10,16,0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
   },
   fullscreenModal: {
     flex: 1,
@@ -2207,13 +2433,31 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
+  feedHeaderRow: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   chromeRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(6,10,16,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
   feedBadge: {
     alignSelf: "flex-start",
+    flexShrink: 1,
+    maxWidth: "100%",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -2328,6 +2572,13 @@ const styles = StyleSheet.create({
     maxWidth: "75%",
     gap: 10,
   },
+  infoGlassPanel: {
+    maxWidth: "78%",
+    padding: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
   creatorRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2440,6 +2691,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
+  railColumnGlass: {
+    borderRadius: 28,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(6,10,16,0.22)",
+  },
   railColumn: {
     alignItems: "center",
     gap: 14,
@@ -2511,14 +2770,15 @@ const styles = StyleSheet.create({
   counterText: {
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 999,
-    overflow: "hidden",
     fontSize: 11,
     fontWeight: "800",
     color: "#ffffff",
-    backgroundColor: "rgba(6,10,16,0.62)",
+  },
+  counterGlass: {
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(6,10,16,0.62)",
   },
   loadMoreWrap: {
     position: "absolute",
@@ -2526,12 +2786,34 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
   },
+  loadMoreGlass: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(6,10,16,0.62)",
+  },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
     gap: 12,
     backgroundColor: "#03060a",
+  },
+  emptyGlassCard: {
+    width: "100%",
+    maxWidth: 330,
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(6,10,16,0.54)",
   },
   emptyTitle: {
     color: "#ffffff",

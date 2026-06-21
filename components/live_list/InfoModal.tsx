@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   useColorScheme,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +16,9 @@ import {
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 import {
   getLiveStatusLabel,
@@ -56,6 +61,33 @@ function providerLabel(session: any) {
   return session?.providerLabel || session?.label || "Stream";
 }
 
+function InfoGlassSurface({
+  children,
+  effect = "regular",
+  interactive = false,
+  style,
+  tintColor = "rgba(12,22,24,0.58)",
+}: {
+  children?: React.ReactNode;
+  effect?: "regular" | "clear";
+  interactive?: boolean;
+  style?: StyleProp<ViewStyle>;
+  tintColor?: string;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme="dark"
+      glassEffectStyle={effect}
+      glassTintColor={tintColor}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
 export default function InfoModal({
   visible,
   onClose,
@@ -92,13 +124,18 @@ export default function InfoModal({
       snapPoints={snapPoints}
       enablePanDownToClose
       topInset={insets.top}
+      bottomInset={0}
+      detached={false}
       onDismiss={onClose}
       backdropComponent={renderBackdrop}
+      containerStyle={styles.modalContainer}
       handleIndicatorStyle={[styles.handle, { backgroundColor: T.handle }]}
       backgroundStyle={[
         styles.sheet,
         {
-          backgroundColor: T.sheetBg,
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "rgba(7,10,14,0.72)"
+            : T.sheetBg,
           borderTopColor: T.border,
         },
       ]}
@@ -114,6 +151,7 @@ export default function InfoModal({
         <TouchableOpacity
           onPress={() => modalRef.current?.dismiss()}
           style={[styles.closeBtn, { backgroundColor: T.softBg, borderColor: T.border }]}
+          activeOpacity={0.9}
         >
           <Ionicons name="close" size={18} color={T.textPrimary} />
         </TouchableOpacity>
@@ -128,7 +166,11 @@ export default function InfoModal({
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.panel, { backgroundColor: T.softBg, borderColor: T.border }]}>
+        <InfoGlassSurface
+          effect="clear"
+          tintColor="rgba(26,55,49,0.44)"
+          style={[styles.panel, { backgroundColor: T.softBg, borderColor: T.border }]}
+        >
           <InfoRow
             label="Mã trận"
             value={match?.displayCode || match?.code || "-"}
@@ -145,7 +187,7 @@ export default function InfoModal({
           <InfoRow label="Cập nhật" value={timeAgo(match?.updatedAt) || "-"} T={T} />
           <InfoRow label="Lịch" value={formatDate(match?.scheduledAt)} T={T} />
           <InfoRow label="Bắt đầu" value={formatDate(match?.startedAt)} T={T} />
-        </View>
+        </InfoGlassSurface>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>Nguồn xem</Text>
@@ -156,8 +198,10 @@ export default function InfoModal({
               const targetUrl = session?.watchUrl || session?.openUrl || "";
 
               return (
-                <View
+                <InfoGlassSurface
                   key={key || label}
+                  effect="clear"
+                  tintColor="rgba(26,55,49,0.42)"
                   style={[styles.sessionCard, { backgroundColor: T.softBg, borderColor: T.border }]}
                 >
                   <View style={{ flex: 1 }}>
@@ -176,30 +220,46 @@ export default function InfoModal({
                   <View style={styles.sessionActions}>
                     {!!targetUrl && (
                       <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
                         onPress={() => onOpenUrl?.(targetUrl)}
+                        activeOpacity={0.9}
                       >
-                        <Ionicons name="open-outline" size={16} color={T.textPrimary} />
+                        <InfoGlassSurface
+                          interactive
+                          tintColor="rgba(7,10,14,0.42)"
+                          style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
+                        >
+                          <Ionicons name="open-outline" size={16} color={T.textPrimary} />
+                        </InfoGlassSurface>
                       </TouchableOpacity>
                     )}
                     {!!targetUrl && (
                       <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
                         onPress={() => onCopy?.(targetUrl, "Đã sao chép liên kết")}
+                        activeOpacity={0.9}
                       >
-                        <Ionicons name="copy-outline" size={16} color={T.textPrimary} />
+                        <InfoGlassSurface
+                          interactive
+                          tintColor="rgba(7,10,14,0.42)"
+                          style={[styles.actionBtn, { borderColor: T.border, backgroundColor: T.sheetBg }]}
+                        >
+                          <Ionicons name="copy-outline" size={16} color={T.textPrimary} />
+                        </InfoGlassSurface>
                       </TouchableOpacity>
                     )}
                   </View>
-                </View>
+                </InfoGlassSurface>
               );
             })
           ) : (
-            <View style={[styles.emptyBox, { backgroundColor: T.softBg, borderColor: T.border }]}>
+            <InfoGlassSurface
+              effect="clear"
+              tintColor="rgba(26,55,49,0.42)"
+              style={[styles.emptyBox, { backgroundColor: T.softBg, borderColor: T.border }]}
+            >
               <Text style={[styles.emptyText, { color: T.textSecondary }]}>
                 Trận này chưa có liên kết phát công khai.
               </Text>
-            </View>
+            </InfoGlassSurface>
           )}
         </View>
       </BottomSheetScrollView>
@@ -226,6 +286,9 @@ function InfoRow({ label, value, onCopy, T }: any) {
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

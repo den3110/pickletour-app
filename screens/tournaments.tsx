@@ -12,9 +12,8 @@ import {
   TextInput,
   useColorScheme,
   View,
-  Keyboard,
   Modal,
-  SafeAreaView
+  SafeAreaView,
 } from "react-native";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
@@ -22,10 +21,9 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const ViewerImage = (props) => {
   return (
@@ -87,15 +85,15 @@ function useModernTheme() {
   return {
     isDark,
     colors: {
-      bg: isDark ? "#0f172a" : "#f8fafc",
-      card: isDark ? "#1e293b" : "#ffffff",
-      text: isDark ? "#f1f5f9" : "#0f172a",
-      textSec: isDark ? "#94a3b8" : "#64748b",
-      border: isDark ? "#334155" : "#e2e8f0",
+      bg: isDark ? "#0f1115" : "#f8fafc",
+      card: isDark ? "#181a20" : "#ffffff",
+      text: isDark ? "#ffffff" : "#0f172a",
+      textSec: isDark ? "#848E9C" : "#64748b",
+      border: isDark ? "#262932" : "#e2e8f0",
       primary: primaryColor,
       success: "#10b981",
       warning: "#f97316",
-      inputBg: isDark ? "#334155" : "#f1f5f9",
+      inputBg: isDark ? "#20232b" : "#f1f5f9",
     },
     cardShadow: {
       shadowColor: isDark ? "#000" : "#1e293b",
@@ -166,10 +164,17 @@ function SkeletonBlock({ style }) {
 function SkeletonCard() {
   const theme = useModernTheme();
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={theme.isDark ? "dark" : "light"}
+      glassEffectStyle="regular"
+      glassTintColor={
+        theme.isDark ? "rgba(15, 23, 42, 0.58)" : "rgba(255, 255, 255, 0.58)"
+      }
       style={[
         styles.cardContainer,
         { backgroundColor: theme.colors.card },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
         theme.cardShadow,
       ]}
     >
@@ -190,7 +195,7 @@ function SkeletonCard() {
           <SkeletonBlock style={{ height: 40, width: 90, borderRadius: 20 }} />
         </View>
       </View>
-    </View>
+    </AppleLiquidGlassView>
   );
 }
 
@@ -212,28 +217,59 @@ function TabPill({ label, active, onPress, theme }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.tabPill,
-        active
-          ? {
-              backgroundColor: theme.colors.text,
-              borderColor: theme.colors.text,
-            }
-          : {
-              backgroundColor: "transparent",
-              borderColor: theme.colors.border,
-            },
+      style={({ pressed }) => [
+        pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
       ]}
     >
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={theme.isDark ? "dark" : "light"}
+        glassEffectStyle={active ? "regular" : "clear"}
+        glassTintColor={
+          active
+            ? theme.isDark
+              ? "rgba(167, 139, 250, 0.32)"
+              : "rgba(255, 255, 255, 0.64)"
+            : theme.isDark
+            ? "rgba(15, 23, 42, 0.44)"
+            : "rgba(255, 255, 255, 0.38)"
+        }
+        isInteractive
+        style={[
+          styles.tabPill,
+          active
+            ? {
+                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? theme.colors.primary + "20"
+                  : theme.colors.text,
+                borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? theme.colors.primary + "66"
+                  : theme.colors.text,
+              }
+            : {
+                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? theme.colors.card + "99"
+                  : "transparent",
+                borderColor: theme.colors.border,
+              },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+        ]}
+      >
       <Text
         style={{
           fontSize: 13,
           fontWeight: "600",
-          color: active ? theme.colors.card : theme.colors.textSec,
+          color:
+            active && !IOS_26_LIQUID_GLASS_ENABLED
+              ? theme.colors.card
+              : active
+              ? theme.colors.primary
+              : theme.colors.textSec,
         }}
       >
         {label}
       </Text>
+      </AppleLiquidGlassView>
     </Pressable>
   );
 }
@@ -250,6 +286,47 @@ const btnBaseStyle = {
 
 /* ---------- Buttons ---------- */
 function PrimaryBtn({ onPress, children, theme, icon }) {
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={theme.isDark ? "dark" : "light"}
+          glassEffectStyle="regular"
+          glassTintColor={
+            theme.isDark ? "rgba(37, 99, 235, 0.24)" : "rgba(255, 255, 255, 0.5)"
+          }
+          isInteractive
+          style={[
+            btnBaseStyle,
+            styles.actionGlassBtn,
+            {
+              backgroundColor: theme.colors.primary + "20",
+              borderColor: theme.colors.primary + "66",
+            },
+          ]}
+        >
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={16}
+              color={theme.colors.primary}
+              style={{ marginRight: 6 }}
+            />
+          )}
+          <Text style={[styles.btnTextWhite, { color: theme.colors.primary }]}>
+            {children}
+          </Text>
+        </AppleLiquidGlassView>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -273,31 +350,48 @@ function PrimaryBtn({ onPress, children, theme, icon }) {
   );
 }
 
-function SuccessBtn({ onPress, children, theme, icon }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        btnBaseStyle,
-        { backgroundColor: theme.colors.success, marginBottom: 10 },
-        theme.successShadow,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-      ]}
-    >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color="#fff"
-          style={{ marginRight: 6 }}
-        />
-      )}
-      <Text style={styles.btnTextWhite}>{children}</Text>
-    </Pressable>
-  );
-}
-
 function WarningBtn({ onPress, children, theme, icon }) {
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={theme.isDark ? "dark" : "light"}
+          glassEffectStyle="regular"
+          glassTintColor={
+            theme.isDark ? "rgba(249, 115, 22, 0.24)" : "rgba(255, 255, 255, 0.5)"
+          }
+          isInteractive
+          style={[
+            btnBaseStyle,
+            styles.actionGlassBtn,
+            {
+              backgroundColor: theme.colors.warning + "20",
+              borderColor: theme.colors.warning + "66",
+            },
+          ]}
+        >
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={16}
+              color={theme.colors.warning}
+              style={{ marginRight: 6 }}
+            />
+          )}
+          <Text style={[styles.btnTextWhite, { color: theme.colors.warning }]}>
+            {children}
+          </Text>
+        </AppleLiquidGlassView>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -326,17 +420,44 @@ function OutlineBtn({ onPress, children, theme, icon }) {
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        btnBaseStyle,
-        {
-          backgroundColor: "transparent",
-          borderWidth: 1.5,
-          borderColor: theme.colors.border,
-          paddingVertical: 8.5,
-          marginBottom: 10,
-        },
-        pressed && { backgroundColor: theme.colors.text + "08" },
+        !IOS_26_LIQUID_GLASS_ENABLED && [
+          btnBaseStyle,
+          {
+            backgroundColor: "transparent",
+            borderWidth: 1.5,
+            borderColor: theme.colors.border,
+            paddingVertical: 8.5,
+            marginBottom: 10,
+          },
+        ],
+        pressed &&
+          (IOS_26_LIQUID_GLASS_ENABLED
+            ? { opacity: 0.88, transform: [{ scale: 0.98 }] }
+            : { backgroundColor: theme.colors.text + "08" }),
       ]}
     >
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={theme.isDark ? "dark" : "light"}
+        glassEffectStyle="clear"
+        glassTintColor={
+          theme.isDark ? "rgba(15, 23, 42, 0.42)" : "rgba(255, 255, 255, 0.42)"
+        }
+        isInteractive
+        style={
+          IOS_26_LIQUID_GLASS_ENABLED
+            ? [
+                btnBaseStyle,
+                {
+                  backgroundColor: theme.colors.card + "80",
+                  borderColor: theme.colors.border,
+                },
+                styles.actionGlassBtn,
+                styles.glassControl,
+              ]
+            : styles.transparentFill
+        }
+      >
       {icon && (
         <Ionicons
           name={icon}
@@ -350,14 +471,200 @@ function OutlineBtn({ onPress, children, theme, icon }) {
       >
         {children}
       </Text>
+      </AppleLiquidGlassView>
     </Pressable>
+  );
+}
+
+function TournamentListHeader({
+  isBack,
+  theme,
+  keyword,
+  setKeyword,
+  tab,
+  setTab,
+  openDateModal,
+  hasDateFilter,
+  fromDate,
+  toDate,
+  clearDateFilter,
+  error,
+}) {
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <View style={styles.header}>
+        {isBack && (
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={10}
+            style={IOS_26_LIQUID_GLASS_ENABLED ? styles.backButtonGlassWrap : { marginRight: 10 }}
+          >
+            {IOS_26_LIQUID_GLASS_ENABLED ? (
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={theme.isDark ? "dark" : "light"}
+                glassEffectStyle="regular"
+                glassTintColor={
+                  theme.isDark
+                    ? "rgba(15, 23, 42, 0.48)"
+                    : "rgba(255, 255, 255, 0.52)"
+                }
+                isInteractive
+                style={styles.backButtonGlass}
+              >
+                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+              </AppleLiquidGlassView>
+            ) : (
+              <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+            )}
+          </Pressable>
+        )}
+
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Giải đấu
+        </Text>
+      </View>
+
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={theme.isDark ? "dark" : "light"}
+        glassEffectStyle="regular"
+        glassTintColor={
+          theme.isDark ? "rgba(15, 23, 42, 0.56)" : "rgba(255, 255, 255, 0.6)"
+        }
+        isInteractive
+        style={[
+          styles.searchBox,
+          {
+            backgroundColor: theme.colors.card,
+            borderColor: theme.colors.border,
+          },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+        ]}
+      >
+        <Ionicons name="search" size={20} color={theme.colors.textSec} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.colors.text }]}
+          placeholder="Tìm kiếm giải đấu..."
+          placeholderTextColor={theme.colors.textSec}
+          value={keyword}
+          onChangeText={setKeyword}
+          returnKeyType="search"
+        />
+        {keyword.length > 0 && (
+          <Pressable onPress={() => setKeyword("")}>
+            <Ionicons name="close-circle" size={18} color={theme.colors.textSec} />
+          </Pressable>
+        )}
+      </AppleLiquidGlassView>
+
+      <View style={styles.filtersRow}>
+        <View style={styles.tabsRow}>
+          {TABS.map((t) => (
+            <TabPill
+              key={t.key}
+              label={t.label}
+              active={tab === t.key}
+              onPress={() => setTab(t.key)}
+              theme={theme}
+            />
+          ))}
+        </View>
+
+        <Pressable
+          onPress={openDateModal}
+          style={({ pressed }) => [
+            pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+          ]}
+        >
+          <AppleLiquidGlassView
+            fallback="view"
+            glassColorScheme={theme.isDark ? "dark" : "light"}
+            glassEffectStyle={hasDateFilter ? "regular" : "clear"}
+            glassTintColor={
+              hasDateFilter
+                ? theme.isDark
+                  ? "rgba(14, 165, 233, 0.24)"
+                  : "rgba(255, 255, 255, 0.62)"
+                : theme.isDark
+                ? "rgba(15, 23, 42, 0.46)"
+                : "rgba(255, 255, 255, 0.44)"
+            }
+            isInteractive
+            style={[
+              styles.dateFilterPill,
+              {
+                backgroundColor: hasDateFilter
+                  ? theme.colors.primary + "12"
+                  : theme.colors.card,
+                borderColor: hasDateFilter ? theme.colors.primary : theme.colors.border,
+              },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+            ]}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={hasDateFilter ? theme.colors.primary : theme.colors.textSec}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.dateFilterLabel,
+                {
+                  color: hasDateFilter ? theme.colors.primary : theme.colors.textSec,
+                },
+              ]}
+            >
+              {hasDateFilter
+                ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
+                : "Lọc theo ngày"}
+            </Text>
+
+            {hasDateFilter && <View style={[styles.filterActiveDot, { backgroundColor: theme.colors.primary }]} />}
+
+            {hasDateFilter && (
+              <Pressable
+                hitSlop={8}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  clearDateFilter();
+                }}
+                style={{ marginLeft: 2 }}
+              >
+                <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
+              </Pressable>
+            )}
+          </AppleLiquidGlassView>
+        </Pressable>
+      </View>
+
+      {!!error && (
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={theme.isDark ? "dark" : "light"}
+          glassEffectStyle="regular"
+          glassTintColor="rgba(254, 226, 226, 0.72)"
+          style={[
+            styles.errorBox,
+            { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+          ]}
+        >
+          <Ionicons name="alert-circle" size={20} color="#ef4444" />
+          <Text style={{ color: "#b91c1c", flex: 1 }}>
+            {error?.data?.message || error?.error || "Có lỗi xảy ra"}
+          </Text>
+        </AppleLiquidGlassView>
+      )}
+    </View>
   );
 }
 
 /* ---------- Main Screen ---------- */
 export default function TournamentDashboardScreen({ isBack = false }) {
   const theme = useModernTheme();
-  const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
 
@@ -490,7 +797,15 @@ export default function TournamentDashboardScreen({ isBack = false }) {
     const showRegister = canManage(tt) || tt.status === "upcoming";
 
     return (
-      <View
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={theme.isDark ? "dark" : "light"}
+        glassEffectStyle="regular"
+        glassTintColor={
+          theme.isDark
+            ? "rgba(15, 23, 42, 0.58)"
+            : "rgba(255, 255, 255, 0.58)"
+        }
         style={[
           styles.cardContainer,
           {
@@ -498,6 +813,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             borderWidth: theme.isDark ? 0 : 0.5,
             borderColor: theme.isDark ? "transparent" : "#e2e8f0",
           },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
           theme.cardShadow,
         ]}
       >
@@ -516,12 +832,18 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             />
           </Pressable>
 
-          <View style={styles.statusBadgeOverlay}>
+          <AppleLiquidGlassView
+            fallback="view"
+            glassColorScheme={theme.isDark ? "dark" : "light"}
+            glassEffectStyle="regular"
+            glassTintColor="rgba(0, 0, 0, 0.36)"
+            style={styles.statusBadgeOverlay}
+          >
             <View
               style={[styles.statusDot, { backgroundColor: statusMeta.color }]}
             />
             <Text style={styles.statusTextOverlay}>{statusMeta.label}</Text>
-          </View>
+          </AppleLiquidGlassView>
         </View>
 
         <View style={{ padding: 14 }}>
@@ -604,7 +926,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             </OutlineBtn>
           </View>
         </View>
-      </View>
+      </AppleLiquidGlassView>
     );
   };
 
@@ -615,173 +937,20 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         {isLoading || isFetching ? (
           <FlatList
             ListHeaderComponent={
-              <View style={{ marginBottom: 10 }}>
-                {/* Header Title */}
-                <View style={styles.header}>
-                  {isBack && (
-                    <Pressable
-                      onPress={() => router.back()}
-                      hitSlop={10}
-                      style={{ marginRight: 10 }}
-                    >
-                      <Ionicons
-                        name="chevron-back"
-                        size={28}
-                        color={theme.colors.text}
-                      />
-                    </Pressable>
-                  )}
-                  <Text
-                    style={[styles.headerTitle, { color: theme.colors.text }]}
-                  >
-                    Giải đấu
-                  </Text>
-                </View>
-
-                {/* Search */}
-                <View
-                  style={[
-                    styles.searchBox,
-                    {
-                      backgroundColor: theme.colors.card,
-                      borderColor: theme.colors.border,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="search"
-                    size={20}
-                    color={theme.colors.textSec}
-                  />
-                  <TextInput
-                    style={[styles.searchInput, { color: theme.colors.text }]}
-                    placeholder="Tìm kiếm giải đấu..."
-                    placeholderTextColor={theme.colors.textSec}
-                    value={keyword}
-                    onChangeText={setKeyword}
-                    returnKeyType="search"
-                  />
-                  {keyword.length > 0 && (
-                    <Pressable onPress={() => setKeyword("")}>
-                      <Ionicons
-                        name="close-circle"
-                        size={18}
-                        color={theme.colors.textSec}
-                      />
-                    </Pressable>
-                  )}
-                </View>
-
-                {/* Tabs + Date filter */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 6,
-                    gap: 8,
-                    flexWrap: "wrap",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
-                    {TABS.map((t) => (
-                      <TabPill
-                        key={t.key}
-                        label={t.label}
-                        active={tab === t.key}
-                        onPress={() => setTab(t.key)}
-                        theme={theme}
-                      />
-                    ))}
-                  </View>
-
-                  <Pressable
-                    onPress={openDateModal}
-                    style={({ pressed }) => [
-                      styles.dateFilterPill,
-                      {
-                        backgroundColor: hasDateFilter
-                          ? theme.colors.primary + "12"
-                          : theme.colors.card,
-                        borderColor: hasDateFilter
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                      },
-                      pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-                    ]}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={14}
-                      color={
-                        hasDateFilter
-                          ? theme.colors.primary
-                          : theme.colors.textSec
-                      }
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.dateFilterLabel,
-                        {
-                          color: hasDateFilter
-                            ? theme.colors.primary
-                            : theme.colors.textSec,
-                        },
-                      ]}
-                    >
-                      {hasDateFilter
-                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
-                        : "Lọc theo ngày"}
-                    </Text>
-
-                    {hasDateFilter && (
-                      <View
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: theme.colors.primary,
-                          marginHorizontal: 4,
-                        }}
-                      />
-                    )}
-
-                    {hasDateFilter && (
-                      <Pressable
-                        hitSlop={8}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          clearDateFilter();
-                        }}
-                        style={{ marginLeft: 2 }}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={14}
-                          color={theme.colors.primary}
-                        />
-                      </Pressable>
-                    )}
-                  </Pressable>
-                </View>
-
-                {/* Error Message if any */}
-                {!!error && (
-                  <View
-                    style={[
-                      styles.errorBox,
-                      { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
-                    ]}
-                  >
-                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
-                    <Text style={{ color: "#b91c1c", flex: 1 }}>
-                      {error?.data?.message || error?.error || "Có lỗi xảy ra"}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <TournamentListHeader
+                isBack={isBack}
+                theme={theme}
+                keyword={keyword}
+                setKeyword={setKeyword}
+                tab={tab}
+                setTab={setTab}
+                openDateModal={openDateModal}
+                hasDateFilter={hasDateFilter}
+                fromDate={fromDate}
+                toDate={toDate}
+                clearDateFilter={clearDateFilter}
+                error={error}
+              />
             }
             data={Array.from({ length: SKELETON_COUNT })}
             keyExtractor={(_, i) => `sk-${i}`}
@@ -795,173 +964,20 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         ) : (
           <FlatList
             ListHeaderComponent={
-              <View style={{ marginBottom: 10 }}>
-                {/* Header Title */}
-                <View style={styles.header}>
-                  {isBack && (
-                    <Pressable
-                      onPress={() => router.back()}
-                      hitSlop={10}
-                      style={{ marginRight: 10 }}
-                    >
-                      <Ionicons
-                        name="chevron-back"
-                        size={28}
-                        color={theme.colors.text}
-                      />
-                    </Pressable>
-                  )}
-                  <Text
-                    style={[styles.headerTitle, { color: theme.colors.text }]}
-                  >
-                    Giải đấu
-                  </Text>
-                </View>
-
-                {/* Search */}
-                <View
-                  style={[
-                    styles.searchBox,
-                    {
-                      backgroundColor: theme.colors.card,
-                      borderColor: theme.colors.border,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="search"
-                    size={20}
-                    color={theme.colors.textSec}
-                  />
-                  <TextInput
-                    style={[styles.searchInput, { color: theme.colors.text }]}
-                    placeholder="Tìm kiếm giải đấu..."
-                    placeholderTextColor={theme.colors.textSec}
-                    value={keyword}
-                    onChangeText={setKeyword}
-                    returnKeyType="search"
-                  />
-                  {keyword.length > 0 && (
-                    <Pressable onPress={() => setKeyword("")}>
-                      <Ionicons
-                        name="close-circle"
-                        size={18}
-                        color={theme.colors.textSec}
-                      />
-                    </Pressable>
-                  )}
-                </View>
-
-                {/* Tabs + Date filter */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 6,
-                    gap: 8,
-                    flexWrap: "wrap",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 8, flexShrink: 1 }}>
-                    {TABS.map((t) => (
-                      <TabPill
-                        key={t.key}
-                        label={t.label}
-                        active={tab === t.key}
-                        onPress={() => setTab(t.key)}
-                        theme={theme}
-                      />
-                    ))}
-                  </View>
-
-                  <Pressable
-                    onPress={openDateModal}
-                    style={({ pressed }) => [
-                      styles.dateFilterPill,
-                      {
-                        backgroundColor: hasDateFilter
-                          ? theme.colors.primary + "12"
-                          : theme.colors.card,
-                        borderColor: hasDateFilter
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                      },
-                      pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-                    ]}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={14}
-                      color={
-                        hasDateFilter
-                          ? theme.colors.primary
-                          : theme.colors.textSec
-                      }
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.dateFilterLabel,
-                        {
-                          color: hasDateFilter
-                            ? theme.colors.primary
-                            : theme.colors.textSec,
-                        },
-                      ]}
-                    >
-                      {hasDateFilter
-                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
-                        : "Lọc theo ngày"}
-                    </Text>
-
-                    {hasDateFilter && (
-                      <View
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: theme.colors.primary,
-                          marginHorizontal: 4,
-                        }}
-                      />
-                    )}
-
-                    {hasDateFilter && (
-                      <Pressable
-                        hitSlop={8}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          clearDateFilter();
-                        }}
-                        style={{ marginLeft: 2 }}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={14}
-                          color={theme.colors.primary}
-                        />
-                      </Pressable>
-                    )}
-                  </Pressable>
-                </View>
-
-                {/* Error Message if any */}
-                {!!error && (
-                  <View
-                    style={[
-                      styles.errorBox,
-                      { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
-                    ]}
-                  >
-                    <Ionicons name="alert-circle" size={20} color="#ef4444" />
-                    <Text style={{ color: "#b91c1c", flex: 1 }}>
-                      {error?.data?.message || error?.error || "Có lỗi xảy ra"}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <TournamentListHeader
+                isBack={isBack}
+                theme={theme}
+                keyword={keyword}
+                setKeyword={setKeyword}
+                tab={tab}
+                setTab={setTab}
+                openDateModal={openDateModal}
+                hasDateFilter={hasDateFilter}
+                fromDate={fromDate}
+                toDate={toDate}
+                clearDateFilter={clearDateFilter}
+                error={error}
+              />
             }
             data={filtered}
             keyExtractor={(item) => String(item._id)}
@@ -1003,8 +1019,20 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         onRequestClose={() => setDateModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[styles.modalCard, { backgroundColor: theme.colors.card }]}
+          <AppleLiquidGlassView
+            fallback="view"
+            glassColorScheme={theme.isDark ? "dark" : "light"}
+            glassEffectStyle="regular"
+            glassTintColor={
+              theme.isDark
+                ? "rgba(15, 23, 42, 0.7)"
+                : "rgba(255, 255, 255, 0.7)"
+            }
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
+            ]}
           >
             <Text
               style={{
@@ -1102,8 +1130,12 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 return marked;
               })()}
               theme={{
-                backgroundColor: theme.colors.card,
-                calendarBackground: theme.colors.card,
+                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? "transparent"
+                  : theme.colors.card,
+                calendarBackground: IOS_26_LIQUID_GLASS_ENABLED
+                  ? "transparent"
+                  : theme.colors.card,
                 textSectionTitleColor: theme.colors.textSec,
                 dayTextColor: theme.colors.text,
                 monthTextColor: theme.colors.text,
@@ -1150,7 +1182,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </AppleLiquidGlassView>
         </View>
       </Modal>
 
@@ -1177,6 +1209,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     overflow: Platform.OS === "android" ? "hidden" : "visible",
   },
+  glassCard: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1186,7 +1222,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "800",
-    letterSpacing: -0.5,
+    letterSpacing: 0,
+  },
+  backButtonGlassWrap: {
+    marginRight: 10,
+  },
+  backButtonGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
   },
   searchBox: {
     flexDirection: "row",
@@ -1198,15 +1246,40 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
+  glassControl: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  actionGlassBtn: {
+    borderWidth: 1,
+    paddingVertical: 8.5,
+    marginBottom: 10,
+  },
   searchInput: {
     flex: 1,
     height: "100%",
     fontSize: 16,
   },
+  filtersRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  tabsRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexShrink: 1,
+  },
   tabPill: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
+    borderWidth: 1,
+  },
+  glassPill: {
     borderWidth: 1,
   },
   cardImage: {
@@ -1271,10 +1344,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     maxWidth: 240,
   },
+  filterActiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 4,
+  },
   dateFilterLabel: {
     fontSize: 12,
     fontWeight: "600",
     flexShrink: 1,
+  },
+  transparentFill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBackdrop: {
     flex: 1,
@@ -1288,6 +1372,10 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     borderRadius: 16,
     padding: 12,
+  },
+  glassModal: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
   },
   modalBtnRow: {
     flexDirection: "row",

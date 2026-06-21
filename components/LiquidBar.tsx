@@ -1,7 +1,6 @@
 // components/NativeLikeTabBar.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, Pressable, Platform, StyleSheet } from "react-native";
-import { BlurView } from "expo-blur";
+import React, { useEffect, useState } from "react";
+import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -12,6 +11,7 @@ import Animated, {
   Extrapolate,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 type Props = {
   state: any;
@@ -74,9 +74,11 @@ export default function NativeLikeTabBar({
     width: pillW.value,
   }));
 
-  const Container = Platform.OS === "ios" ? BlurView : View;
-  const containerProps =
-    Platform.OS === "ios" ? { intensity: 22, tint: "default" as const } : {};
+  const containerProps = {
+    fallback: Platform.OS === "ios" ? ("blur" as const) : ("view" as const),
+    intensity: 22,
+    tint: "default" as const,
+  };
 
   return (
     <View
@@ -84,7 +86,7 @@ export default function NativeLikeTabBar({
       style={{ paddingBottom: Math.max(insets.bottom, 8) }}
     >
       <View style={styles.outerPad}>
-        <Container {...containerProps} style={styles.shell}>
+        <AppleLiquidGlassView {...containerProps} style={styles.shell}>
           {/* liquid pill */}
           <Animated.View
             pointerEvents="none"
@@ -132,7 +134,6 @@ export default function NativeLikeTabBar({
                   key={route.key}
                   focused={focused}
                   active={active}
-                  inactive={inactive}
                   label={label}
                   renderIcon={renderIcon}
                   onPress={onPress}
@@ -142,7 +143,7 @@ export default function NativeLikeTabBar({
               );
             })}
           </View>
-        </Container>
+        </AppleLiquidGlassView>
       </View>
     </View>
   );
@@ -151,7 +152,6 @@ export default function NativeLikeTabBar({
 function TabItem({
   focused,
   active,
-  inactive,
   label,
   renderIcon,
   onPress,
@@ -160,7 +160,6 @@ function TabItem({
 }: {
   focused: boolean;
   active: string;
-  inactive: string;
   label: string;
   renderIcon: () => React.ReactNode;
   onPress: () => void;
@@ -187,6 +186,8 @@ function TabItem({
 
   return (
     <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
       onLayout={onLayout}
       onPress={() => {
         ripple.value = 0;
@@ -201,12 +202,6 @@ function TabItem({
         style={[styles.ripple, rStyle, { backgroundColor: active + "44" }]}
       />
       <Animated.View style={iconStyle}>{renderIcon()}</Animated.View>
-      <Text
-        numberOfLines={1}
-        style={[styles.label, { color: focused ? active : inactive }]}
-      >
-        {label}
-      </Text>
     </Pressable>
   );
 }
@@ -238,12 +233,11 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 11,
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  label: { marginTop: 3, fontSize: 11.5, fontWeight: "600" },
   pill: { position: "absolute", top: 6, bottom: 6, borderRadius: 20 },
   ripple: {
     position: "absolute",

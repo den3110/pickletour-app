@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Svg, {
   Circle,
@@ -42,6 +41,7 @@ import {
   useGetUserProfileExQuery,
 } from "@/slices/userStatsApiSlice";
 import AuthGuard from "@/components/auth/AuthGuard";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 if (
   Platform.OS === "android" &&
@@ -154,7 +154,7 @@ function GlassCard({
         style,
       ]}
     >
-      <BlurView
+      <AppleLiquidGlassView
         intensity={theme.isDark ? 20 : 40}
         tint={theme.blurTint}
         style={StyleSheet.absoluteFill}
@@ -427,7 +427,7 @@ function InteractiveRadar({ single = 0, double = 0, mix = 0, theme }: any) {
 
       {selected && (
         <View style={styles.radarTooltip} pointerEvents="none">
-          <BlurView
+          <AppleLiquidGlassView
             intensity={90}
             tint={theme.isDark ? "dark" : "light"}
             style={StyleSheet.absoluteFill}

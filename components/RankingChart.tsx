@@ -30,6 +30,8 @@ import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import * as Haptics from "expo-haptics";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";
@@ -55,6 +57,12 @@ const COLORS = {
   borderSelf: "#EF4444",
   borderNone: "#9CA3AF",
 };
+
+const glassScheme = (colors) => (colors.isDark ? "dark" : "light");
+const glassSurfaceTint = (colors, light = 0.58, dark = 0.58) =>
+  colors.isDark
+    ? `rgba(15, 17, 21, ${dark})`
+    : `rgba(255, 255, 255, ${light})`;
 
 // --- Helpers ---
 const createSmoothPath = (points) => {
@@ -129,7 +137,11 @@ const ChartAvatar = memo(
             },
           ]}
         />
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(colors)}
+          glassEffectStyle="regular"
+          glassTintColor={glassSurfaceTint(colors, 0.4, 0.38)}
           style={[
             styles.avatarRing,
             {
@@ -140,6 +152,7 @@ const ChartAvatar = memo(
               borderWidth: 1.5,
               backgroundColor: colors.cardBg,
             },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassAvatarRing,
           ]}
         >
           <ExpoImage
@@ -152,8 +165,12 @@ const ChartAvatar = memo(
             contentFit="cover"
             cachePolicy="memory-disk"
           />
-        </View>
-        <View
+        </AppleLiquidGlassView>
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(colors)}
+          glassEffectStyle="clear"
+          glassTintColor={glassSurfaceTint(colors, 0.46, 0.42)}
           style={[
             styles.miniBadge,
             {
@@ -164,10 +181,11 @@ const ChartAvatar = memo(
               top: -2,
               right: -2,
             },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassMiniBadge,
           ]}
         >
           <Ionicons name={verifiedIcon} size={iconSize} color={verifiedColor} />
-        </View>
+        </AppleLiquidGlassView>
       </TouchableOpacity>
     );
   },
@@ -179,6 +197,7 @@ const ChartAvatar = memo(
     prev.cccdStatus === next.cccdStatus &&
     prev.tierColor === next.tierColor
 );
+ChartAvatar.displayName = "ChartAvatar";
 
 const SelectedUserCard = memo(
   ({ user, scoreDouble, scoreSingle, colors, onPress, onClose }) => {
@@ -186,7 +205,12 @@ const SelectedUserCard = memo(
     const isVerified = user?.cccdStatus === "verified";
 
     return (
-      <View
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={glassScheme(colors)}
+        glassEffectStyle="regular"
+        glassTintColor={glassSurfaceTint(colors, 0.62, 0.58)}
+        isInteractive
         style={[
           styles.userCard,
           {
@@ -194,6 +218,7 @@ const SelectedUserCard = memo(
             borderColor: colors.border,
             shadowColor: colors.shadow,
           },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
         ]}
       >
         <View style={styles.cardHeader}>
@@ -244,7 +269,17 @@ const SelectedUserCard = memo(
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.cardBody, { backgroundColor: colors.bg }]}>
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(colors)}
+          glassEffectStyle="clear"
+          glassTintColor={glassSurfaceTint(colors, 0.42, 0.4)}
+          style={[
+            styles.cardBody,
+            { backgroundColor: colors.bg, borderColor: colors.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
+          ]}
+        >
           <View style={styles.statColumn}>
             <Text style={[styles.statLabel, { color: colors.subText }]}>
               TRÌNH ĐÔI
@@ -264,7 +299,7 @@ const SelectedUserCard = memo(
               {scoreSingle === null ? "***" : (scoreSingle?.toFixed(3) || "---")}
             </Text>
           </View>
-        </View>
+        </AppleLiquidGlassView>
 
         <TouchableOpacity
           style={[styles.cardFooterBtn, { borderTopColor: colors.border }]}
@@ -276,10 +311,11 @@ const SelectedUserCard = memo(
           </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.text} />
         </TouchableOpacity>
-      </View>
+      </AppleLiquidGlassView>
     );
   }
 );
+SelectedUserCard.displayName = "SelectedUserCard";
 
 const YAxis = memo(
   ({ minScore, maxScore, height, paddingTop, paddingBottom, colors }) => {
@@ -315,6 +351,7 @@ const YAxis = memo(
     );
   }
 );
+YAxis.displayName = "YAxis";
 
 // Memoized SVG Chart - tách riêng để không re-render khi scroll
 const ChartSVG = memo(
@@ -444,6 +481,7 @@ const ChartSVG = memo(
     );
   }
 );
+ChartSVG.displayName = "ChartSVG";
 
 // --- MAIN CHART ---
 const RankingChart = memo(
@@ -480,6 +518,7 @@ const RankingChart = memo(
     const colors = useMemo(() => {
       const isDark = theme?.isDark ?? true;
       return {
+        isDark,
         line: COLORS.double,
         lineGlow: "rgba(246, 70, 93, 0.3)",
         singleLine: COLORS.single,
@@ -809,18 +848,38 @@ const RankingChart = memo(
     // --- Empty State ---
     if (!rankings.length) {
       return (
-        <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(colors)}
+          glassEffectStyle="regular"
+          glassTintColor={glassSurfaceTint(colors, 0.58, 0.52)}
+          style={[
+            styles.emptyContainer,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
+          ]}
+        >
           <Ionicons name="analytics-outline" size={48} color={colors.subText} />
           <Text style={[styles.emptyText, { color: colors.subText }]}>
             Không có dữ liệu
           </Text>
-        </View>
+        </AppleLiquidGlassView>
       );
     }
 
     return (
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(colors)}
+          glassEffectStyle="regular"
+          glassTintColor={glassSurfaceTint(colors, 0.44, 0.42)}
+          style={[
+            styles.container,
+            { backgroundColor: colors.bg, borderColor: colors.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassChartShell,
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
             <View>
@@ -834,18 +893,28 @@ const RankingChart = memo(
 
             <View style={styles.headerRight}>
               <TouchableOpacity
-                style={[
-                  styles.toggleBadge,
-                  {
-                    backgroundColor: showDouble ? COLORS.double : colors.cardBg,
-                    borderColor: COLORS.double,
-                  },
-                ]}
                 onPress={() => {
                   Haptics.selectionAsync();
                   setShowDouble(!showDouble);
                 }}
               >
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassColorScheme={glassScheme(colors)}
+                  glassEffectStyle={showDouble ? "regular" : "clear"}
+                  glassTintColor={
+                    showDouble ? "rgba(246,70,93,0.28)" : glassSurfaceTint(colors, 0.4, 0.4)
+                  }
+                  isInteractive
+                  style={[
+                    styles.toggleBadge,
+                    {
+                      backgroundColor: showDouble ? COLORS.double : colors.cardBg,
+                      borderColor: COLORS.double,
+                    },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassChip,
+                  ]}
+                >
                 <Text
                   style={[
                     styles.toggleText,
@@ -854,21 +923,32 @@ const RankingChart = memo(
                 >
                   Đôi
                 </Text>
+                </AppleLiquidGlassView>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.toggleBadge,
-                  {
-                    backgroundColor: showSingle ? COLORS.single : colors.cardBg,
-                    borderColor: COLORS.single,
-                  },
-                ]}
                 onPress={() => {
                   Haptics.selectionAsync();
                   setShowSingle(!showSingle);
                 }}
               >
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassColorScheme={glassScheme(colors)}
+                  glassEffectStyle={showSingle ? "regular" : "clear"}
+                  glassTintColor={
+                    showSingle ? "rgba(240,185,11,0.28)" : glassSurfaceTint(colors, 0.4, 0.4)
+                  }
+                  isInteractive
+                  style={[
+                    styles.toggleBadge,
+                    {
+                      backgroundColor: showSingle ? COLORS.single : colors.cardBg,
+                      borderColor: COLORS.single,
+                    },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassChip,
+                  ]}
+                >
                 <Text
                   style={[
                     styles.toggleText,
@@ -877,12 +957,18 @@ const RankingChart = memo(
                 >
                   Đơn
                 </Text>
+                </AppleLiquidGlassView>
               </TouchableOpacity>
 
-              <View
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={glassScheme(colors)}
+                glassEffectStyle="clear"
+                glassTintColor={glassSurfaceTint(colors, 0.4, 0.4)}
                 style={[
                   styles.zoomIndicator,
-                  { backgroundColor: colors.cardBg },
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassChip,
                 ]}
               >
                 <Ionicons
@@ -893,7 +979,7 @@ const RankingChart = memo(
                 <Text style={[styles.zoomText, { color: colors.subText }]}>
                   {Math.round((pointWidth / DEFAULT_POINT_WIDTH) * 100)}%
                 </Text>
-              </View>
+              </AppleLiquidGlassView>
             </View>
           </View>
 
@@ -1026,26 +1112,37 @@ const RankingChart = memo(
             {rankings.length} người •{" "}
             {hasMore ? "Kéo để tải thêm" : "Hết danh sách"}
           </Text>
-        </View>
+        </AppleLiquidGlassView>
       </ScrollView>
     );
   }
 );
+RankingChart.displayName = "RankingChart";
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     borderRadius: 16,
+    borderWidth: 0,
     paddingTop: 16,
     paddingBottom: 60,
     marginBottom: 16,
+  },
+  glassChartShell: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   emptyContainer: {
     height: 200,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 16,
+    borderWidth: 1,
     gap: 12,
+  },
+  glassCard: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
   },
   emptyText: {
     fontSize: 14,
@@ -1077,6 +1174,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 1,
     gap: 4,
   },
   zoomText: {
@@ -1092,6 +1190,9 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 11,
     fontWeight: "700",
+  },
+  glassChip: {
+    borderWidth: 1,
   },
   chartRow: {
     flexDirection: "row",
@@ -1125,10 +1226,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+  glassAvatarRing: {
+    borderWidth: 1,
+  },
   miniBadge: {
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
+  },
+  glassMiniBadge: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
   },
   legend: {
     flexDirection: "row",
@@ -1245,8 +1353,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "space-evenly",
+  },
+  glassPanel: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
   },
   statColumn: {
     alignItems: "center",

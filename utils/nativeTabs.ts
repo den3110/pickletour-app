@@ -1,4 +1,8 @@
 import { Platform } from "react-native";
+import {
+  isGlassEffectAPIAvailable,
+  isLiquidGlassAvailable,
+} from "expo-glass-effect";
 
 function getIosMajorVersion() {
   if (Platform.OS !== "ios") return 0;
@@ -17,8 +21,21 @@ function getIosMajorVersion() {
 
 export const IOS_PLATFORM_MAJOR_VERSION = getIosMajorVersion();
 
-export const IOS_26_NATIVE_TABS_ENABLED =
-  Platform.OS === "ios" && IOS_PLATFORM_MAJOR_VERSION >= 26;
+function getIos26LiquidGlassEnabled() {
+  if (Platform.OS !== "ios" || IOS_PLATFORM_MAJOR_VERSION < 26) {
+    return false;
+  }
+
+  try {
+    return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+  } catch {
+    return false;
+  }
+}
+
+export const IOS_26_LIQUID_GLASS_ENABLED = getIos26LiquidGlassEnabled();
+
+export const IOS_26_NATIVE_TABS_ENABLED = IOS_26_LIQUID_GLASS_ENABLED;
 
 type AuxiliaryRouteName = "chat" | "profile" | "my_tournament";
 

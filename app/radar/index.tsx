@@ -27,7 +27,6 @@ import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
@@ -42,6 +41,7 @@ import {
   useUpsertMyPresenceMutation,
 } from "@/slices/radarApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 // --- CONFIG ---
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -632,7 +632,7 @@ export default function PickleRadarScreen() {
         onPress={() => handleSelectItem(item, index)}
         style={styles.cardWrapper}
       >
-        <BlurView
+        <AppleLiquidGlassView
           intensity={80}
           tint={isDark ? "dark" : "light"}
           style={[
@@ -870,7 +870,7 @@ export default function PickleRadarScreen() {
               </Text>
             </View>
           ) : null}
-        </BlurView>
+        </AppleLiquidGlassView>
       </TouchableOpacity>
     );
   };
@@ -991,7 +991,7 @@ export default function PickleRadarScreen() {
         <TouchableWithoutFeedback onPress={() => setShowFilterModal(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <BlurView
+              <AppleLiquidGlassView
                 intensity={40}
                 tint={isDark ? "dark" : "light"}
                 style={[
@@ -1174,7 +1174,7 @@ export default function PickleRadarScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </BlurView>
+              </AppleLiquidGlassView>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>

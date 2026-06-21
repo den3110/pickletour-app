@@ -39,6 +39,9 @@ import ImageViewing from "react-native-image-viewing";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /* ---------- Lottie asset ---------- */
 const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
@@ -280,23 +283,38 @@ function ProButton({ onPress, children, colors, style, icon }) {
       <Animated.View
         style={{ transform: [{ scale: scaleVal }], width: "100%" }}
       >
-        <LinearGradient
-          colors={colors || ["#FF6B6B", "#FF8E53"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.proButtonGradient}
-        >
+        {IOS_26_LIQUID_GLASS_ENABLED ? (
+          <AppleLiquidGlassView
+            fallback="view"
+            glassEffectStyle="regular"
+            glassTintColor="rgba(255, 140, 83, 0.42)"
+            isInteractive
+            style={[styles.proButtonGradient, styles.proButtonGlass]}
+          >
+            <View style={styles.proButtonContent}>
+              {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
+              {children}
+            </View>
+          </AppleLiquidGlassView>
+        ) : (
           <LinearGradient
-            colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0)"]}
+            colors={colors || ["#FF6B6B", "#FF8E53"]}
             start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 0.5 }}
-            style={styles.proButtonGloss}
-          />
-          <View style={styles.proButtonContent}>
-            {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
-            {children}
-          </View>
-        </LinearGradient>
+            end={{ x: 1, y: 1 }}
+            style={styles.proButtonGradient}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 0.5 }}
+              style={styles.proButtonGloss}
+            />
+            <View style={styles.proButtonContent}>
+              {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
+              {children}
+            </View>
+          </LinearGradient>
+        )}
       </Animated.View>
     </TouchableOpacity>
   );
@@ -326,15 +344,28 @@ function AnimatedStatusChip() {
     <Animated.View
       style={[styles.statusBadgeOnImage, { transform: [{ scale: scaleAnim }] }]}
     >
-      <LinearGradient
-        colors={["#4ECDC4", "#45B7D1"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.statusBadgeGradient}
-      >
-        <Ionicons name="time-outline" size={14} color="#FFFFFF" />
-        <Text style={styles.statusBadgeText}>Sắp diễn ra</Text>
-      </LinearGradient>
+      {IOS_26_LIQUID_GLASS_ENABLED ? (
+        <AppleLiquidGlassView
+          fallback="view"
+          glassEffectStyle="regular"
+          glassTintColor="rgba(78, 205, 196, 0.48)"
+          isInteractive
+          style={[styles.statusBadgeGradient, styles.statusBadgeGlass]}
+        >
+          <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+          <Text style={styles.statusBadgeText}>Sắp diễn ra</Text>
+        </AppleLiquidGlassView>
+      ) : (
+        <LinearGradient
+          colors={["#4ECDC4", "#45B7D1"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.statusBadgeGradient}
+        >
+          <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+          <Text style={styles.statusBadgeText}>Sắp diễn ra</Text>
+        </LinearGradient>
+      )}
     </Animated.View>
   );
 }
@@ -361,12 +392,12 @@ function AnimatedLogo() {
   }, []);
 
   return (
-    <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ scale: scaleAnim }],
-        marginBottom: 16,
-      }}
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }],
+          marginBottom: 16,
+        }}
     >
       <LinearGradient
         colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
@@ -437,96 +468,109 @@ function AthleteIsland() {
 
   // Render
   return (
-    <View style={styles.islandContainer}>
-      <AnimatedLogo />
+      <View style={styles.islandContainer}>
+        <AnimatedLogo />
 
       {/* Premium Island Card with Drop Shadow */}
       <View
         style={[
           styles.athleteIslandWrapper,
           { shadowOpacity: themeColors.shadowOpacity }, // Dynamic shadow
+          IOS_26_LIQUID_GLASS_ENABLED && styles.athleteIslandWrapperCalm,
         ]}
       >
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={userInfo ? goProfile : () => router.push("/login")}
-          style={[
-            styles.athleteIslandContent,
-            {
-              backgroundColor: themeColors.cardBg,
-              borderColor: themeColors.border,
-              borderWidth: dark ? 1 : 0,
-            },
-          ]}
+          style={styles.athleteIslandTouch}
         >
-          {/* Left: Avatar */}
-          <View style={styles.avatarContainer}>
-            {!userInfo && SHOULD_RENDER_NATIVE_LOTTIE ? (
-              <LottieView
-                source={require("@/assets/lottie/humans.json")}
-                autoPlay
-                loop
-                style={styles.avatar}
-                speed={0.4}
-              />
-            ) : !userInfo ? (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Ionicons
-                  name="person-circle"
-                  size={64}
-                  color={themeColors.textSecondary}
+          <AppleLiquidGlassView
+            fallback="view"
+            intensity={dark ? 72 : 58}
+            tint={dark ? "dark" : "light"}
+            glassTintColor={
+              dark ? "rgba(28, 28, 30, 0.38)" : "rgba(255, 255, 255, 0.34)"
+            }
+            isInteractive
+            style={[
+              styles.athleteIslandContent,
+              {
+                backgroundColor: themeColors.cardBg,
+                borderColor: themeColors.border,
+                borderWidth: dark ? 1 : 0,
+              },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.athleteIslandContentCalm,
+            ]}
+          >
+            {/* Left: Avatar */}
+            <View style={styles.avatarContainer}>
+              {!userInfo && SHOULD_RENDER_NATIVE_LOTTIE ? (
+                <LottieView
+                  source={require("@/assets/lottie/humans.json")}
+                  autoPlay
+                  loop
+                  style={styles.avatar}
+                  speed={0.4}
                 />
-              </View>
+              ) : !userInfo ? (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Ionicons
+                    name="person-circle"
+                    size={64}
+                    color={themeColors.textSecondary}
+                  />
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: normalizeUrl(avatarUrl) }}
+                  style={styles.avatar}
+                  contentFit="cover"
+                  transition={500}
+                />
+              )}
+              {userInfo && (
+                <View style={[styles.avatarBorder, { borderColor: rankColor }]} />
+              )}
+            </View>
+
+            {/* Center: Info */}
+            <View style={styles.nameContainer}>
+              <Text
+                style={[styles.athleteName, { color: themeColors.textPrimary }]}
+                numberOfLines={1}
+              >
+                {userInfo ? name : "Bắt đầu hành trình"}
+              </Text>
+              <Text
+                style={[
+                  styles.athleteTitle,
+                  { color: themeColors.textSecondary },
+                ]}
+              >
+                {userInfo ? roleUser() : "Cùng PickleTour"}
+              </Text>
+            </View>
+
+            {/* Right: Action or Rank */}
+            {userInfo ? (
+              <LinearGradient
+                colors={[rankColor, "#FF8E53"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.rankBadge}
+              >
+                <MaterialIcons name={rankIcon} size={14} color="#FFFFFF" />
+                <Text style={styles.rankText}>{rankDisplay}</Text>
+              </LinearGradient>
             ) : (
-              <Image
-                source={{ uri: normalizeUrl(avatarUrl) }}
-                style={styles.avatar}
-                contentFit="cover"
-                transition={500}
-              />
+              <LinearGradient
+                colors={["#4ECDC4", "#45B7D1"]}
+                style={styles.loginBadge}
+              >
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              </LinearGradient>
             )}
-            {userInfo && (
-              <View style={[styles.avatarBorder, { borderColor: rankColor }]} />
-            )}
-          </View>
-
-          {/* Center: Info */}
-          <View style={styles.nameContainer}>
-            <Text
-              style={[styles.athleteName, { color: themeColors.textPrimary }]}
-              numberOfLines={1}
-            >
-              {userInfo ? name : "Bắt đầu hành trình"}
-            </Text>
-            <Text
-              style={[
-                styles.athleteTitle,
-                { color: themeColors.textSecondary },
-              ]}
-            >
-              {userInfo ? roleUser() : "Cùng PickleTour"}
-            </Text>
-          </View>
-
-          {/* Right: Action or Rank */}
-          {userInfo ? (
-            <LinearGradient
-              colors={[rankColor, "#FF8E53"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.rankBadge}
-            >
-              <MaterialIcons name={rankIcon} size={14} color="#FFFFFF" />
-              <Text style={styles.rankText}>{rankDisplay}</Text>
-            </LinearGradient>
-          ) : (
-            <LinearGradient
-              colors={["#4ECDC4", "#45B7D1"]}
-              style={styles.loginBadge}
-            >
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            </LinearGradient>
-          )}
+          </AppleLiquidGlassView>
         </TouchableOpacity>
       </View>
     </View>
@@ -536,16 +580,17 @@ function AthleteIsland() {
 /* ---------- Feature Item (Interactive) ---------- */
 function FeatureItem({ item, theme }) {
   const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#14171c" : "#ffffff");
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const scaleVal = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
     if (!item.link) return;
     if (typeof item.link === "string") {
-      item.link.startsWith("http")
-        ? openURL(item.link)
-        : router.push(item.link);
+      if (item.link.startsWith("http")) {
+        openURL(item.link);
+      } else {
+        router.push(item.link);
+      }
     }
   };
 
@@ -567,6 +612,54 @@ function FeatureItem({ item, theme }) {
     return <Lib {...iconProps} />;
   };
 
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={{ width: "22%", marginBottom: 16 }}
+      >
+        <Animated.View
+          style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
+        >
+          <AppleLiquidGlassView
+            fallback="view"
+            glassEffectStyle="regular"
+            glassTintColor={
+              isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.22)"
+            }
+            isInteractive
+            style={[
+              styles.featureIconContainer,
+              {
+                backgroundColor: isDark ? "#1F2229" : "#FFF",
+                shadowColor: item.color,
+              },
+              styles.featureIconContainerCalm,
+            ]}
+          >
+            <View
+              style={[
+                styles.featureIconBg,
+                { backgroundColor: item.color + "15" },
+              ]}
+            >
+              {renderIcon()}
+            </View>
+          </AppleLiquidGlassView>
+          <Text
+            style={[styles.featureTitle, { color: text }]}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       activeOpacity={1}
@@ -578,7 +671,14 @@ function FeatureItem({ item, theme }) {
       <Animated.View
         style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
       >
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          intensity={isDark ? 68 : 55}
+          tint={isDark ? "dark" : "light"}
+          glassTintColor={
+            isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.2)"
+          }
+          isInteractive
           style={[
             styles.featureIconContainer,
             {
@@ -595,7 +695,7 @@ function FeatureItem({ item, theme }) {
           >
             {renderIcon()}
           </View>
-        </View>
+        </AppleLiquidGlassView>
         <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
           {item.title}
         </Text>
@@ -650,7 +750,14 @@ function TournamentCard({ tournament, theme }) {
     "https://dummyimage.com/600x400/4ECDC4/ffffff&text=Tournament";
 
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="view"
+      intensity={isDark ? 74 : 62}
+      tint={isDark ? "dark" : "light"}
+      glassTintColor={
+        isDark ? "rgba(26, 29, 35, 0.5)" : "rgba(255, 255, 255, 0.42)"
+      }
+      isInteractive
       style={[
         styles.tournamentCard,
         { backgroundColor: bg, borderColor: border },
@@ -744,7 +851,7 @@ function TournamentCard({ tournament, theme }) {
         swipeToCloseEnabled
         backgroundColor={isDark ? "rgba(0,0,0,0.95)" : "rgba(255,255,255,0.95)"}
       />
-    </View>
+    </AppleLiquidGlassView>
   );
 }
 
@@ -789,20 +896,40 @@ function TournamentsSection() {
     <View style={styles.tournamentsSection}>
       {/* 🛑 GIỮ NGUYÊN HEADER CŨ THEO YÊU CẦU */}
       <View style={styles.sectionHeaderWrapper}>
-        <LinearGradient
-          colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sectionHeader}
-        >
-          <Ionicons name="trophy" size={24} color="#FFFFFF" />
-          <Text style={styles.sectionHeaderText}>
-            Đăng ký tham gia giải đấu
-          </Text>
-          <Ionicons name="trophy" size={24} color="#FFFFFF" />
-        </LinearGradient>
-        <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
-        <View style={[styles.triangleRight, { borderRightColor: bgColor }]} />
+        {IOS_26_LIQUID_GLASS_ENABLED ? (
+          <AppleLiquidGlassView
+            fallback="view"
+            glassEffectStyle="regular"
+            glassTintColor="rgba(78, 205, 196, 0.46)"
+            isInteractive
+            style={[styles.sectionHeader, styles.sectionHeaderGlass]}
+          >
+            <Ionicons name="trophy" size={24} color="#FFFFFF" />
+            <Text style={styles.sectionHeaderText}>
+              Đăng ký tham gia giải đấu
+            </Text>
+            <Ionicons name="trophy" size={24} color="#FFFFFF" />
+          </AppleLiquidGlassView>
+        ) : (
+          <>
+            <LinearGradient
+              colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sectionHeader}
+            >
+              <Ionicons name="trophy" size={24} color="#FFFFFF" />
+              <Text style={styles.sectionHeaderText}>
+                Đăng ký tham gia giải đấu
+              </Text>
+              <Ionicons name="trophy" size={24} color="#FFFFFF" />
+            </LinearGradient>
+            <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
+            <View
+              style={[styles.triangleRight, { borderRightColor: bgColor }]}
+            />
+          </>
+        )}
       </View>
 
       <View style={styles.navigationContainer}>
@@ -811,24 +938,48 @@ function TournamentsSection() {
           style={styles.navArrow}
           activeOpacity={0.7}
         >
-          <LinearGradient
-            colors={["#4ECDC4", "#45B7D1"]}
-            style={styles.navArrowGradient}
-          >
-            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-          </LinearGradient>
+          {IOS_26_LIQUID_GLASS_ENABLED ? (
+            <AppleLiquidGlassView
+              fallback="view"
+              glassEffectStyle="regular"
+              glassTintColor="rgba(78, 205, 196, 0.42)"
+              isInteractive
+              style={styles.navArrowGradient}
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </AppleLiquidGlassView>
+          ) : (
+            <LinearGradient
+              colors={["#4ECDC4", "#45B7D1"]}
+              style={styles.navArrowGradient}
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </LinearGradient>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleNext}
           style={styles.navArrow}
           activeOpacity={0.7}
         >
-          <LinearGradient
-            colors={["#4ECDC4", "#45B7D1"]}
-            style={styles.navArrowGradient}
-          >
-            <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
-          </LinearGradient>
+          {IOS_26_LIQUID_GLASS_ENABLED ? (
+            <AppleLiquidGlassView
+              fallback="view"
+              glassEffectStyle="regular"
+              glassTintColor="rgba(78, 205, 196, 0.42)"
+              isInteractive
+              style={styles.navArrowGradient}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+            </AppleLiquidGlassView>
+          ) : (
+            <LinearGradient
+              colors={["#4ECDC4", "#45B7D1"]}
+              style={styles.navArrowGradient}
+            >
+              <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+            </LinearGradient>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -858,7 +1009,14 @@ function TournamentsSection() {
         onPress={() => router.push("/tournament/stack")}
         style={styles.viewAllContainerNew}
       >
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          intensity={isDark ? 70 : 58}
+          tint={isDark ? "dark" : "light"}
+          glassTintColor={
+            isDark ? "rgba(31, 34, 41, 0.46)" : "rgba(255, 255, 255, 0.38)"
+          }
+          isInteractive
           style={[
             styles.viewAllButtonNew,
             { backgroundColor: isDark ? "#1F2229" : "#FFF" },
@@ -872,7 +1030,7 @@ function TournamentsSection() {
           <View style={styles.viewAllIconCircle}>
             <Ionicons name="chevron-forward" size={16} color="#FFF" />
           </View>
-        </View>
+        </AppleLiquidGlassView>
       </TouchableOpacity>
     </View>
   );
@@ -888,7 +1046,14 @@ function NewsCard({ news, theme }) {
   const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
 
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="view"
+      intensity={isDark ? 72 : 60}
+      tint={isDark ? "dark" : "light"}
+      glassTintColor={
+        isDark ? "rgba(26, 29, 35, 0.48)" : "rgba(255, 255, 255, 0.4)"
+      }
+      isInteractive
       style={[styles.newsCard, { backgroundColor: bg, borderColor: border }]}
     >
       <TouchableOpacity
@@ -935,7 +1100,7 @@ function NewsCard({ news, theme }) {
           <Ionicons name="chevron-forward" size={16} color="#A29BFE" />
         </TouchableOpacity>
       </View>
-    </View>
+    </AppleLiquidGlassView>
   );
 }
 
@@ -1002,7 +1167,15 @@ function ContactCard() {
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: bg, borderColor: border }]}>
+    <AppleLiquidGlassView
+      fallback="view"
+      intensity={isDark ? 72 : 58}
+      tint={isDark ? "dark" : "light"}
+      glassTintColor={
+        isDark ? "rgba(20, 23, 28, 0.48)" : "rgba(255, 255, 255, 0.38)"
+      }
+      style={[styles.card, { backgroundColor: bg, borderColor: border }]}
+    >
       <View style={styles.contactHeader}>
         <MaterialIcons name="support-agent" size={28} color={tint} />
         <Text style={[styles.contactTitle, { color: text }]}>
@@ -1081,12 +1254,79 @@ function ContactCard() {
       ) : (
         <Text style={{ color: sub }}>Đang tải…</Text>
       )}
+    </AppleLiquidGlassView>
+  );
+}
+
+function HomeLiquidGlassBackdrop({ isDark }: { isDark: boolean }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 16],
+  });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.28, 0.48],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.ambientBackdrop}>
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          {
+            backgroundColor: isDark
+              ? "rgba(59,130,246,0.18)"
+              : "rgba(37,99,235,0.14)",
+            opacity,
+            transform: [{ translateY }, { rotate: "-8deg" }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          styles.ambientBandAlt,
+          {
+            backgroundColor: isDark
+              ? "rgba(245,158,11,0.12)"
+              : "rgba(245,158,11,0.1)",
+            opacity,
+            transform: [{ translateY }, { rotate: "7deg" }],
+          },
+        ]}
+      />
     </View>
   );
 }
 
 export default function HomeScreen() {
   const scrollViewRef = React.useRef(null);
+  const insets = useSafeAreaInsets();
   React.useEffect(() => {
     const listener = DeviceEventEmitter.addListener(
       "SCROLL_TO_TOP",
@@ -1116,7 +1356,9 @@ export default function HomeScreen() {
     }
   }, [reauthData, dispatch]);
   const theme = useTheme();
-  const bg = theme?.colors?.background ?? "#ffffff";
+  const isDark = !!theme?.dark;
+  const bg = isDark ? "#0f1115" : "#F5F7FA";
+  const heroTopBleed = Platform.OS === "ios" ? insets.top : 0;
 
   return (
     <>
@@ -1132,90 +1374,173 @@ export default function HomeScreen() {
                 marginLeft: -8,
               }}
             >
-              <LinearGradient
-                colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 12,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "900",
-                    color: "#FFFFFF",
-                    letterSpacing: 1,
-                  }}
+              {IOS_26_LIQUID_GLASS_ENABLED ? (
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassEffectStyle="regular"
+                  glassTintColor="rgba(255, 255, 255, 0.42)"
+                  isInteractive
+                  style={styles.headerLogoGlass}
                 >
-                  PickleTour
-                </Text>
-              </LinearGradient>
+                  <Text style={styles.headerLogoText}>PickleTour</Text>
+                </AppleLiquidGlassView>
+              ) : (
+                <LinearGradient
+                  colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.headerLogoGradient}
+                >
+                  <Text style={styles.headerLogoText}>PickleTour</Text>
+                </LinearGradient>
+              )}
             </View>
           ),
           headerRight: () => (
             <TouchableOpacity
               onPress={() => router.push("/notifications")}
-              style={{
-                marginRight: 8,
-                padding: 8,
-                borderRadius: 20,
-                backgroundColor: theme?.colors?.card ?? "#fff",
-              }}
+              style={styles.headerIconTouch}
             >
-              <Ionicons
-                name="notifications"
-                size={24}
-                color={theme?.colors?.primary ?? "#0a84ff"}
-              />
+              {IOS_26_LIQUID_GLASS_ENABLED ? (
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassEffectStyle="regular"
+                  glassTintColor="rgba(255, 255, 255, 0.42)"
+                  isInteractive
+                  style={styles.headerIconGlass}
+                >
+                  <Ionicons
+                    name="notifications"
+                    size={24}
+                    color={theme?.colors?.primary ?? "#0a84ff"}
+                  />
+                </AppleLiquidGlassView>
+              ) : (
+                <View
+                  style={[
+                    styles.headerIconGlass,
+                    { backgroundColor: theme?.colors?.card ?? "#fff" },
+                  ]}
+                >
+                  <Ionicons
+                    name="notifications"
+                    size={24}
+                    color={theme?.colors?.primary ?? "#0a84ff"}
+                  />
+                </View>
+              )}
             </TouchableOpacity>
           ),
         }}
       />
-      <ScrollView
-        ref={scrollViewRef}
-        style={{ backgroundColor: bg }}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-        <View style={styles.hero3dWrap}>
-          {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
-            <LottieView
-              source={BG_3D}
-              autoPlay
-              speed={0.2}
-              loop
-              resizeMode="cover"
-              style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
-            />
-          ) : null}
-          <AthleteIsland />
-        </View>
+      <View style={[styles.homeRoot, { backgroundColor: bg }]}>
+        <HomeLiquidGlassBackdrop isDark={isDark} />
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.homeScroll}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={{ paddingBottom: 100 }}
+        >
+          <View style={[styles.hero3dWrap, { height: 240 + heroTopBleed }]}>
+            {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
+              <LottieView
+                source={BG_3D}
+                autoPlay
+                speed={0.2}
+                loop
+                resizeMode="cover"
+                style={StyleSheet.absoluteFillObject}
+                pointerEvents="none"
+              />
+            ) : null}
+            <AthleteIsland />
+          </View>
 
-        <View style={{ height: 16 }} />
-        <FeaturesGrid />
+          <View style={{ height: 16 }} />
+          <FeaturesGrid />
 
-        <View style={{ height: 24 }} />
-        <TournamentsSection />
+          <View style={{ height: 24 }} />
+          <TournamentsSection />
 
-        <View style={{ height: 24 }} />
-        <NewsSection />
+          <View style={{ height: 24 }} />
+          <NewsSection />
 
-        <View style={{ height: 24 }} />
-        <LeaderboardSection />
+          <View style={{ height: 24 }} />
+          <LeaderboardSection />
 
-        <View style={{ height: 16 }} />
-        <View style={{ paddingHorizontal: 16 }}>
-          <ContactCard />
-        </View>
-      </ScrollView>
+          <View style={{ height: 16 }} />
+          <View style={{ paddingHorizontal: 16 }}>
+            <ContactCard />
+          </View>
+        </ScrollView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  homeRoot: {
+    flex: 1,
+  },
+  homeScroll: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  ambientBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  ambientBand: {
+    position: "absolute",
+    top: 70,
+    left: -40,
+    right: -40,
+    height: 120,
+    borderRadius: 28,
+  },
+  ambientBandAlt: {
+    top: 190,
+    height: 86,
+  },
+  headerLogoGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  headerLogoGlass: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    shadowColor: "#4ECDC4",
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+  },
+  headerLogoText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 1,
+  },
+  headerIconTouch: {
+    marginRight: 8,
+    borderRadius: 22,
+  },
+  headerIconGlass: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    shadowColor: "#0A84FF",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+  },
   hero3dWrap: {
     width: "100%",
     height: 240,
@@ -1225,6 +1550,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  heroLiquidGlassBackdrop: {
+    position: "absolute",
+    top: 16,
+    left: 14,
+    right: 14,
+    bottom: 16,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#FFFFFF",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
   },
   islandContainer: {
     alignItems: "center",
@@ -1241,6 +1580,10 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
+  },
+  logoGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.48)",
   },
   logoText: {
     fontSize: 32,
@@ -1267,6 +1610,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
+  athleteIslandWrapperCalm: {
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  athleteIslandTouch: {
+    width: "100%",
+  },
   athleteIslandContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -1278,6 +1630,13 @@ const styles = StyleSheet.create({
     gap: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.6)",
+  },
+  athleteIslandContentCalm: {
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
   },
   avatarContainer: { position: "relative" },
   avatar: {
@@ -1336,7 +1695,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 16,
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   featuresGrid: {
     flexDirection: "row",
@@ -1356,6 +1715,27 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
+  },
+  featureIconContainerCalm: {
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  featureGlassTile: {
+    width: "100%",
+    minHeight: 104,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    gap: 7,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
   featureIconBg: {
     width: 60,
@@ -1389,6 +1769,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
     borderRadius: 12,
+  },
+  sectionHeaderGlass: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.42)",
+    shadowColor: "#4ECDC4",
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   triangleLeft: {
     position: "absolute",
@@ -1487,6 +1876,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 4,
   },
+  statusBadgeGlass: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+  },
   statusBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   tournamentInfo: { padding: 18, paddingBottom: 14, gap: 10 },
   tournamentName: {
@@ -1522,6 +1916,14 @@ const styles = StyleSheet.create({
     padding: 1,
     position: "relative",
     overflow: "hidden",
+  },
+  proButtonGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.38)",
+    shadowColor: "#EE5A24",
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
   },
   proButtonGloss: {
     position: "absolute",

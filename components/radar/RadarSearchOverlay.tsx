@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 export default function RadarSearchOverlay({
   visible,
@@ -22,7 +22,7 @@ export default function RadarSearchOverlay({
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
-      <BlurView
+      <AppleLiquidGlassView
         intensity={40}
         tint={isDark ? "dark" : "light"}
         style={[styles.bar, { backgroundColor: pillBg }]}
@@ -40,7 +40,7 @@ export default function RadarSearchOverlay({
         <TouchableOpacity onPress={onClose} hitSlop={10}>
           <Ionicons name="close" size={20} color={textColor} />
         </TouchableOpacity>
-      </BlurView>
+      </AppleLiquidGlassView>
     </View>
   );
 }

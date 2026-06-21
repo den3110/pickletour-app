@@ -9,10 +9,14 @@ import {
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const MORE_ITEMS = [
   {
@@ -41,6 +45,33 @@ const MORE_ITEMS = [
   },
 ];
 
+function MoreGlassSurface({
+  children,
+  effect = "regular",
+  interactive = false,
+  style,
+  tintColor = "rgba(18,20,26,0.62)",
+}: {
+  children?: React.ReactNode;
+  effect?: "regular" | "clear";
+  interactive?: boolean;
+  style?: StyleProp<ViewStyle>;
+  tintColor?: string;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme="dark"
+      glassEffectStyle={effect}
+      glassTintColor={tintColor}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
 export default function MoreIndexScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -64,16 +95,25 @@ export default function MoreIndexScreen() {
           },
         ]}
       >
-        <View
+        <MoreGlassSurface
+          effect="clear"
+          tintColor={
+            isDark ? "rgba(17,19,24,0.58)" : "rgba(255,255,255,0.68)"
+          }
           style={[
             styles.heroCard,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.heroCardGlass,
             {
               backgroundColor: theme.colors.card,
               borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
             },
           ]}
         >
-          <View
+          <MoreGlassSurface
+            effect="clear"
+            tintColor={
+              isDark ? "rgba(139,92,246,0.26)" : "rgba(139,92,246,0.18)"
+            }
             style={[
               styles.heroBadge,
               {
@@ -81,6 +121,7 @@ export default function MoreIndexScreen() {
                   ? "rgba(139,92,246,0.18)"
                   : "rgba(139,92,246,0.10)",
               },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.heroBadgeGlass,
             ]}
           >
             <Ionicons
@@ -98,7 +139,7 @@ export default function MoreIndexScreen() {
             >
               Tiện ích bổ sung
             </Text>
-          </View>
+          </MoreGlassSurface>
 
           <Text
             style={[
@@ -122,7 +163,7 @@ export default function MoreIndexScreen() {
             Truy cập nhanh hồ sơ, trợ lý và các tiện ích cá nhân của PickleTour
             trong một nơi gọn gàng hơn.
           </Text>
-        </View>
+        </MoreGlassSurface>
 
         <View style={styles.section}>
           <Text
@@ -148,53 +189,72 @@ export default function MoreIndexScreen() {
                 )
               }
               style={({ pressed }) => [
-                styles.itemCard,
+                styles.itemPressable,
                 {
-                  backgroundColor: theme.colors.card,
-                  borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
                   opacity: pressed ? 0.92 : 1,
                 },
               ]}
             >
-              <View
+              <MoreGlassSurface
+                interactive
+                effect="clear"
+                tintColor={
+                  isDark ? "rgba(17,19,24,0.58)" : "rgba(255,255,255,0.66)"
+                }
                 style={[
-                  styles.itemIconWrap,
+                  styles.itemCard,
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.itemCardGlass,
                   {
-                    backgroundColor: `${item.accent}18`,
+                    backgroundColor: theme.colors.card,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : "#E5E7EB",
                   },
                 ]}
               >
-                <Ionicons name={item.icon} size={22} color={item.accent} />
-              </View>
-
-              <View style={styles.itemBody}>
-                <Text
+                <MoreGlassSurface
+                  effect="clear"
+                  tintColor={`${item.accent}24`}
                   style={[
-                    styles.itemTitle,
+                    styles.itemIconWrap,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.itemIconGlass,
                     {
-                      color: theme.colors.text,
+                      backgroundColor: `${item.accent}18`,
                     },
                   ]}
                 >
-                  {item.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.itemDescription,
-                    {
-                      color: isDark ? "#A1A1AA" : "#52525B",
-                    },
-                  ]}
-                >
-                  {item.description}
-                </Text>
-              </View>
+                  <Ionicons name={item.icon} size={22} color={item.accent} />
+                </MoreGlassSurface>
 
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={isDark ? "#71717A" : "#A1A1AA"}
-              />
+                <View style={styles.itemBody}>
+                  <Text
+                    style={[
+                      styles.itemTitle,
+                      {
+                        color: theme.colors.text,
+                      },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.itemDescription,
+                      {
+                        color: isDark ? "#A1A1AA" : "#52525B",
+                      },
+                    ]}
+                  >
+                    {item.description}
+                  </Text>
+                </View>
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={isDark ? "#71717A" : "#A1A1AA"}
+                />
+              </MoreGlassSurface>
             </Pressable>
           ))}
         </View>
@@ -214,6 +274,14 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
+  heroCardGlass: {
+    borderColor: "rgba(255,255,255,0.18)",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    overflow: "hidden",
+  },
   heroBadge: {
     alignSelf: "flex-start",
     flexDirection: "row",
@@ -223,6 +291,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  heroBadgeGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    overflow: "hidden",
+  },
   heroBadgeText: {
     fontSize: 12,
     fontWeight: "700",
@@ -230,7 +303,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 30,
     fontWeight: "800",
-    letterSpacing: -0.6,
+    letterSpacing: 0,
   },
   heroDescription: {
     fontSize: 14,
@@ -245,12 +318,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: "uppercase",
   },
+  itemPressable: {
+    borderRadius: 20,
+  },
   itemCard: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 20,
     padding: 16,
+  },
+  itemCardGlass: {
+    borderColor: "rgba(255,255,255,0.16)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    overflow: "hidden",
   },
   itemIconWrap: {
     width: 46,
@@ -259,6 +343,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+  },
+  itemIconGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    overflow: "hidden",
   },
   itemBody: {
     flex: 1,

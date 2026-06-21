@@ -9,14 +9,13 @@ import {
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import Animated, {
   useAnimatedStyle,
-  withSpring,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 // Bỏ dòng khai báo SCREEN_WIDTH ở ngoài này đi nhé
 // const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -39,6 +38,108 @@ interface CustomTabBarProps extends BottomTabBarProps {
   isDark: boolean;
 }
 
+function CustomTabBarButton({
+  route,
+  visibleIndex,
+  floatingButtonIndex,
+  state,
+  descriptors,
+  navigation,
+  activeTint,
+  inactiveTint,
+}: {
+  route: any;
+  visibleIndex: number;
+  floatingButtonIndex: number;
+  state: BottomTabBarProps["state"];
+  descriptors: BottomTabBarProps["descriptors"];
+  navigation: BottomTabBarProps["navigation"];
+  activeTint: string;
+  inactiveTint: string;
+}) {
+  const { options } = descriptors[route.key];
+  const originalIndex = state.routes.findIndex((r) => r.key === route.key);
+  const isFocused = state.index === originalIndex;
+
+  const scale = useSharedValue(isFocused ? 1 : 0.9);
+  const opacity = useSharedValue(isFocused ? 1 : 0.6);
+
+  React.useEffect(() => {
+    scale.value = withTiming(isFocused ? 1 : 0.96, { duration: 120 });
+    opacity.value = withTiming(isFocused ? 1 : 0.72, { duration: 120 });
+  }, [isFocused, opacity, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  if (visibleIndex === floatingButtonIndex) {
+    return (
+      <View
+        key={route.key}
+        style={[styles.floatingContainer, { height: TAB_BAR_HEIGHT }]}
+      />
+    );
+  }
+
+  const onPress = () => {
+    if (Platform.OS === "ios") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
+
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name);
+    }
+  };
+
+  const onLongPress = () => {
+    navigation.emit({
+      type: "tabLongPress",
+      target: route.key,
+    });
+  };
+
+  return (
+    <TouchableOpacity
+      key={route.key}
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityLabel={options.tabBarAccessibilityLabel}
+      testID={options.tabBarTestID}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={styles.tabButton}
+      activeOpacity={0.7}
+    >
+      <Animated.View style={[styles.tabButtonInner, animatedStyle]}>
+        {options.tabBarIcon?.({
+          focused: isFocused,
+          color: isFocused ? activeTint : inactiveTint,
+          size: 24,
+        })}
+
+        {isFocused && (
+          <View
+            style={[
+              styles.activeIndicator,
+              {
+                backgroundColor: activeTint,
+              },
+            ]}
+          />
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 export function CustomTabBar({
   state,
   descriptors,
@@ -55,122 +156,42 @@ export function CustomTabBar({
 
   const extraPaddingBottom = Platform.OS === "ios" ? Math.max(insets.bottom, 10) : 0;
 
-  const visibleRoutes = state.routes.filter((route) => {
-    const { options } = descriptors[route.key];
-    if (shouldHideRoute(route.name)) return false;
-    return options.href !== null;
-  });
-
-  const floatingButtonIndex = visibleRoutes.findIndex(
-    (route) => route.name === "rankings"
+  const visibleRoutes = React.useMemo(
+    () =>
+      state.routes.filter((route) => {
+        const { options } = descriptors[route.key];
+        if (shouldHideRoute(route.name)) return false;
+        return options.href !== null;
+      }),
+    [descriptors, state.routes],
   );
 
-  // ... (Phần renderTabButton giữ nguyên không đổi) ...
-  const renderTabButton = (route: any, visibleIndex: number) => {
-    const { options } = descriptors[route.key];
-    const originalIndex = state.routes.findIndex((r) => r.key === route.key);
-    const isFocused = state.index === originalIndex;
-
-    const scale = useSharedValue(isFocused ? 1 : 0.9);
-    const opacity = useSharedValue(isFocused ? 1 : 0.6);
-
-    React.useEffect(() => {
-      scale.value = withSpring(isFocused ? 1 : 0.9, {
-        damping: 15,
-        stiffness: 150,
-      });
-      opacity.value = withTiming(isFocused ? 1 : 0.6, { duration: 200 });
-    }, [isFocused]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-      opacity: opacity.value,
-    }));
-
-    const onPress = () => {
-      if (Platform.OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-
-      const event = navigation.emit({
-        type: "tabPress",
-        target: route.key,
-        canPreventDefault: true,
-      });
-
-      if (!isFocused && !event.defaultPrevented) {
-        navigation.navigate(route.name);
-      }
-    };
-
-    const onLongPress = () => {
-      navigation.emit({
-        type: "tabLongPress",
-        target: route.key,
-      });
-    };
-
-    if (visibleIndex === floatingButtonIndex) {
-      return (
-        <View
-          key={route.key}
-          style={[styles.floatingContainer, { height: TAB_BAR_HEIGHT }]}
-        />
-      );
-    }
-
-    return (
-      <TouchableOpacity
-        key={route.key}
-        accessibilityRole="button"
-        accessibilityState={isFocused ? { selected: true } : {}}
-        accessibilityLabel={options.tabBarAccessibilityLabel}
-        testID={options.tabBarTestID}
-        onPress={onPress}
-        onLongPress={onLongPress}
-        style={styles.tabButton}
-        activeOpacity={0.7}
-      >
-        <Animated.View style={[styles.tabButtonInner, animatedStyle]}>
-          {options.tabBarIcon?.({
-            focused: isFocused,
-            color: isFocused ? activeTint : inactiveTint,
-            size: 24,
-          })}
-
-          {isFocused && (
-            <View
-              style={[
-                styles.activeIndicator,
-                {
-                  backgroundColor: activeTint,
-                },
-              ]}
-            />
-          )}
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
+  const floatingButtonIndex = React.useMemo(
+    () => visibleRoutes.findIndex((route) => route.name === "rankings"),
+    [visibleRoutes],
+  );
 
   const bgColor = "transparent";
 
   // 3. Tính toán lại đường dẫn SVG dựa trên screenWidth mới
-  const svgPath = `
-    M 0,${CURVE_HEIGHT + 10}
-    L 0,${CURVE_HEIGHT}
-    L ${(screenWidth - CURVE_WIDTH) / 2},${CURVE_HEIGHT}
-    Q ${(screenWidth - CURVE_WIDTH) / 2},0 ${
-    screenWidth / 2 - FLOATING_BUTTON_SIZE / 2 - 10
-  },0
-    L ${screenWidth / 2 + FLOATING_BUTTON_SIZE / 2 + 10},0
-    Q ${(screenWidth + CURVE_WIDTH) / 2},0 ${
-    (screenWidth + CURVE_WIDTH) / 2
-  },${CURVE_HEIGHT}
-    L ${screenWidth},${CURVE_HEIGHT}
-    L ${screenWidth},${CURVE_HEIGHT + 10}
-    Z
-  `;
+  const svgPath = React.useMemo(
+    () => `
+      M 0,${CURVE_HEIGHT + 10}
+      L 0,${CURVE_HEIGHT}
+      L ${(screenWidth - CURVE_WIDTH) / 2},${CURVE_HEIGHT}
+      Q ${(screenWidth - CURVE_WIDTH) / 2},0 ${
+      screenWidth / 2 - FLOATING_BUTTON_SIZE / 2 - 10
+    },0
+      L ${screenWidth / 2 + FLOATING_BUTTON_SIZE / 2 + 10},0
+      Q ${(screenWidth + CURVE_WIDTH) / 2},0 ${
+      (screenWidth + CURVE_WIDTH) / 2
+    },${CURVE_HEIGHT}
+      L ${screenWidth},${CURVE_HEIGHT}
+      L ${screenWidth},${CURVE_HEIGHT + 10}
+      Z
+    `,
+    [screenWidth],
+  );
 
   return (
     <View
@@ -261,8 +282,8 @@ export function CustomTabBar({
           </Svg>
         </View>
 
-        {/* BlurView chứa nội dung Tab */}
-        <BlurView
+        {/* Glass/Blur surface chứa nội dung Tab */}
+        <AppleLiquidGlassView
           intensity={isDark ? 90 : 100}
           tint={isDark ? "dark" : "light"}
           style={styles.blurView}
@@ -280,10 +301,22 @@ export function CustomTabBar({
             ]}
           >
             {visibleRoutes.map((route, visibleIndex) => {
-              return renderTabButton(route, visibleIndex);
+              return (
+                <CustomTabBarButton
+                  key={route.key}
+                  route={route}
+                  visibleIndex={visibleIndex}
+                  floatingButtonIndex={floatingButtonIndex}
+                  state={state}
+                  descriptors={descriptors}
+                  navigation={navigation}
+                  activeTint={activeTint}
+                  inactiveTint={inactiveTint}
+                />
+              );
             })}
           </View>
-        </BlurView>
+        </AppleLiquidGlassView>
       </View>
     </View>
   );

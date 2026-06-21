@@ -55,6 +55,10 @@ import {
 } from "@/services/ratingService";
 import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
+import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
+import { enableFreeze } from "react-native-screens";
+
+enableFreeze(true);
 
 const HOT_UPDATER_ENABLED =
   process.env.EXPO_PUBLIC_ENABLE_HOT_UPDATER === "1" &&
@@ -611,6 +615,7 @@ const isExpoGo = Constants.appOwnership === "expo";
 function RootLayout() {
   const segments = useSegments();
   const isTabsRoute = segments[0] === "(tabs)";
+  const isLiveHomeRoute = segments[0] === "live" && segments[1] === "home";
 
   const clarityInitRef = React.useRef(false);
   const clarityModRef = React.useRef<any>(null);
@@ -654,11 +659,15 @@ function RootLayout() {
   const previousNativeAuthSnapshotRef = React.useRef(nativeAuthSnapshot);
   const rootSafeAreaEdges = React.useMemo(() => {
     if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
+    if (isLiveHomeRoute) return EMPTY_SAFE_AREA_EDGES;
     if (Platform.OS === "ios" && isTabsRoute) {
+      return EMPTY_SAFE_AREA_EDGES;
+    }
+    if (IOS_26_NATIVE_TABS_ENABLED) {
       return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
     }
     return ROOT_SAFE_AREA_EDGES;
-  }, [isTabsRoute, isWebViewShellActive]);
+  }, [isLiveHomeRoute, isTabsRoute, isWebViewShellActive]);
 
   // Initialize analytics
   useEffect(() => {
@@ -1865,6 +1874,7 @@ function RootLayout() {
                               contentStyle: {
                                 backgroundColor: bg,
                               },
+                              freezeOnBlur: true,
 
                               // ✅ GLOBAL: tất cả chevron-back tự ăn theme (theo tintColor)
                               headerLeft: ({ canGoBack, tintColor }) => {

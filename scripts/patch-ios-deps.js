@@ -1,3 +1,4 @@
+/* global __dirname */
 const fs = require("fs");
 const path = require("path");
 
@@ -64,10 +65,7 @@ patchFile("node_modules/expo-image/ios/ExpoImage.podspec", [
 patchFile("node_modules/expo-image/ios/Coders/WebPCoder.swift", [
   (contents, relativePath) => {
     let next = contents;
-
-    next = next.replace(
-      "internal import SDWebImage\ninternal import SDWebImageWebPCoder\n",
-      `internal import SDWebImage
+    const webpHeader = `internal import SDWebImage
 
 internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "useAppleWebpCodec")
 
@@ -76,7 +74,11 @@ internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "u
  The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
  when this app links both expo-image and react-native-skia statically.
  */
-`
+`;
+
+    next = next.replace(
+      "internal import SDWebImage\ninternal import SDWebImageWebPCoder\n",
+      webpHeader
     );
 
     if (!next.includes('internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "useAppleWebpCodec")')) {
@@ -118,7 +120,12 @@ internal let imageCoderOptionUseAppleWebpCodec = SDImageCoderOption(rawValue: "u
  The libwebp-backed SDWebImageWebPCoder conflicts with Skia's vendored libwebp
  when this app links both expo-image and react-native-skia statically.
  */
-`
+      `
+    );
+
+    next = next.replace(
+      /internal import SDWebImage[\s\S]*?(?=internal final class WebPCoder)/,
+      `${webpHeader}\n`
     );
 
     next = next.replace("  private var useAppleWebpCodec: Bool = true\n", "");

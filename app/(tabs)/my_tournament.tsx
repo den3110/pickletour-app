@@ -18,7 +18,7 @@ import React, {
   useRef,
 } from "react";
 import {
-    SafeAreaView,
+  SafeAreaView,
   ActivityIndicator,
   FlatList,
   Platform,
@@ -29,6 +29,8 @@ import {
   TextInput,
   View,
   useColorScheme,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,6 +45,8 @@ import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useTheme } from "@react-navigation/native";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import {
   getMatchPayloadId,
   getPlayerDisplayName,
@@ -114,6 +118,39 @@ function toneColor(tone, tokens) {
   }
 }
 
+function MyTournamentGlassSurface({
+  children,
+  effect = "clear",
+  interactive = false,
+  style,
+  tintColor = "rgba(17,19,24,0.58)",
+}: {
+  children?: React.ReactNode;
+  effect?: "regular" | "clear";
+  interactive?: boolean;
+  style?: StyleProp<ViewStyle>;
+  tintColor?: string;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme="dark"
+      glassEffectStyle={effect}
+      glassTintColor={tintColor}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
+function myTournamentGlassTint(tokens, darkAlpha = 0.5, lightAlpha = 0.68) {
+  return tokens?.isDark
+    ? `rgba(17,19,24,${darkAlpha})`
+    : `rgba(255,255,255,${lightAlpha})`;
+}
+
 /* ================= Utils ================= */
 const dateFmt = (s) => {
   if (!s) return "—";
@@ -181,24 +218,35 @@ function ChipToggle({ active, label, onPress, tokens, style, tone }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? c + "1a" : tokens.chipBg,
-          borderColor: active ? c : tokens.colors.border,
-        },
-        style,
+      style={({ pressed }) => [
+        styles.chipPressable,
+        { opacity: pressed ? 0.88 : 1 },
       ]}
     >
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: "700",
-          color: active ? c : tokens.sub,
-        }}
+      <MyTournamentGlassSurface
+        effect="clear"
+        interactive
+        tintColor={active ? c + "24" : tokens.chipBg}
+        style={[
+          styles.chip,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+          {
+            backgroundColor: active ? c + "1a" : tokens.chipBg,
+            borderColor: active ? c : tokens.colors.border,
+          },
+          style,
+        ]}
       >
-        {label}
-      </Text>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "700",
+            color: active ? c : tokens.sub,
+          }}
+        >
+          {label}
+        </Text>
+      </MyTournamentGlassSurface>
     </Pressable>
   );
 }
@@ -212,8 +260,14 @@ function StatusChip({ status, tokens }) {
   const bg = c + "22";
   const fg = c;
   return (
-    <View
-      style={[styles.chip, { backgroundColor: bg, borderColor: "transparent" }]}
+    <MyTournamentGlassSurface
+      effect="clear"
+      tintColor={bg}
+      style={[
+        styles.chip,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+        { backgroundColor: bg, borderColor: "transparent" },
+      ]}
     >
       <Text style={{ fontSize: 12, fontWeight: "700", color: fg }}>
         {status === "live"
@@ -222,7 +276,7 @@ function StatusChip({ status, tokens }) {
           ? "Đã kết thúc"
           : "Sắp diễn ra"}
       </Text>
-    </View>
+    </MyTournamentGlassSurface>
   );
 }
 function SmallMeta({ icon, text, tokens }) {
@@ -256,16 +310,19 @@ function formatScoreFromMatch(m) {
 function ScoreBadgeFromMatch({ m, tokens }) {
   const text = formatScoreFromMatch(m);
   return (
-    <View
+    <MyTournamentGlassSurface
+      effect="clear"
+      tintColor={tokens.muted}
       style={[
         styles.scoreBadge,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
         { backgroundColor: tokens.muted, borderColor: tokens.colors.border },
       ]}
     >
       <Text style={{ fontWeight: "700", color: tokens.colors.text }}>
         {text}
       </Text>
-    </View>
+    </MyTournamentGlassSurface>
   );
 }
 
@@ -296,9 +353,12 @@ function SkeletonBlock({
 
 function SkeletonMatchRow({ tokens }) {
   return (
-    <View
+    <MyTournamentGlassSurface
+      effect="clear"
+      tintColor={tokens.colors.card}
       style={[
         styles.matchRow,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.matchRowGlass,
         {
           borderColor: tokens.colors.border,
           backgroundColor: tokens.colors.card,
@@ -331,15 +391,18 @@ function SkeletonMatchRow({ tokens }) {
       <View style={styles.chev}>
         <SkeletonBlock tokens={tokens} width={16} height={16} radius={8} />
       </View>
-    </View>
+    </MyTournamentGlassSurface>
   );
 }
 
 function SkeletonTournamentCard({ tokens }) {
   return (
-    <View
+    <MyTournamentGlassSurface
+      effect="clear"
+      tintColor={tokens.colors.card}
       style={[
         styles.card,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.cardGlass,
         {
           backgroundColor: tokens.colors.card,
           borderColor: tokens.colors.border,
@@ -379,7 +442,7 @@ function SkeletonTournamentCard({ tokens }) {
           <SkeletonMatchRow tokens={tokens} />
         </View>
       </View>
-    </View>
+    </MyTournamentGlassSurface>
   );
 }
 
@@ -395,13 +458,6 @@ function SkeletonHeader({ tokens }) {
       ]}
     >
       <View style={styles.pageHeader}>
-        <SkeletonBlock
-          tokens={tokens}
-          width={140}
-          height={22}
-          radius={6}
-          style={{ marginBottom: 10, marginTop: 4 }}
-        />
         <SkeletonBlock
           tokens={tokens}
           width="100%"
@@ -434,58 +490,68 @@ function MatchRow({ m, onPress, tokens, eventType }) {
     <Pressable
       onPress={() => onPress?.(m)}
       style={({ pressed }) => [
-        styles.matchRow,
-        {
-          borderColor: tokens.colors.border,
-          backgroundColor: tokens.colors.card,
-          opacity: pressed ? 0.9 : 1,
-          shadowColor: tokens.shadow,
-        },
+        styles.matchPressable,
+        { opacity: pressed ? 0.9 : 1 },
       ]}
     >
-      <View style={[styles.matchAccent, { backgroundColor: accent }]} />
-      <View style={{ flex: 1, gap: 6 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
+      <MyTournamentGlassSurface
+        effect="clear"
+        interactive
+        tintColor={tokens.colors.card}
+        style={[
+          styles.matchRow,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.matchRowGlass,
+          {
+            borderColor: tokens.colors.border,
+            backgroundColor: tokens.colors.card,
+            shadowColor: tokens.shadow,
+          },
+        ]}
+      >
+        <View style={[styles.matchAccent, { backgroundColor: accent }]} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={[styles.team, { color: tokens.colors.text }]}
+            >
+              {teamLabel(a, eventType)}
+            </Text>
+            <StatusChip status={status} tokens={tokens} />
+          </View>
           <Text
             numberOfLines={1}
             style={[styles.team, { color: tokens.colors.text }]}
           >
-            {teamLabel(a, eventType)}
+            {teamLabel(b, eventType)}
           </Text>
-          <StatusChip status={status} tokens={tokens} />
+
+          {/* realtime score */}
+          <ScoreBadgeFromMatch m={m} tokens={tokens} />
+
+          <View style={styles.metaRow}>
+            <SmallMeta icon="event" text={dateFmt(when)} tokens={tokens} />
+            {!!court && (
+              <SmallMeta
+                icon="sports-tennis"
+                text={`Sân ${court}`}
+                tokens={tokens}
+              />
+            )}
+            <SmallMeta icon="schedule" text={roundText(m)} tokens={tokens} />
+          </View>
         </View>
-        <Text
-          numberOfLines={1}
-          style={[styles.team, { color: tokens.colors.text }]}
-        >
-          {teamLabel(b, eventType)}
-        </Text>
 
-        {/* realtime score */}
-        <ScoreBadgeFromMatch m={m} tokens={tokens} />
-
-        <View style={styles.metaRow}>
-          <SmallMeta icon="event" text={dateFmt(when)} tokens={tokens} />
-          {!!court && (
-            <SmallMeta
-              icon="sports-tennis"
-              text={`Sân ${court}`}
-              tokens={tokens}
-            />
-          )}
-          <SmallMeta icon="schedule" text={roundText(m)} tokens={tokens} />
+        <View style={styles.chev}>
+          <MaterialIcons name="chevron-right" size={22} color={tokens.sub} />
         </View>
-      </View>
-
-      <View style={styles.chev}>
-        <MaterialIcons name="chevron-right" size={22} color={tokens.sub} />
-      </View>
+      </MyTournamentGlassSurface>
     </Pressable>
   );
 }
@@ -568,30 +634,45 @@ function Banner({ t, tokens, collapsed, onToggle }) {
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={[styles.statusTag, { backgroundColor: statusColor }]}>
+            <MyTournamentGlassSurface
+              effect="clear"
+              tintColor={statusColor + "33"}
+              style={[
+                styles.statusTag,
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                { backgroundColor: statusColor },
+              ]}
+            >
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
                 {statusText}
               </Text>
-            </View>
+            </MyTournamentGlassSurface>
 
             {/* Nút toggle collapse */}
             <Pressable
               onPress={onToggle}
               style={({ pressed }) => [
-                styles.bannerToggleBtn,
-                {
-                  backgroundColor: "rgba(255,255,255,0.14)",
-                  opacity: pressed ? 0.8 : 1,
-                },
+                styles.bannerTogglePressable,
+                { opacity: pressed ? 0.8 : 1 },
               ]}
               accessibilityRole="button"
               accessibilityLabel={collapsed ? "Mở chi tiết" : "Thu gọn"}
             >
-              <MaterialIcons
-                name={collapsed ? "expand-more" : "expand-less"}
-                size={18}
-                color="#fff"
-              />
+              <MyTournamentGlassSurface
+                effect="clear"
+                interactive
+                tintColor="rgba(255,255,255,0.18)"
+                style={[
+                  styles.bannerToggleBtn,
+                  { backgroundColor: "rgba(255,255,255,0.14)" },
+                ]}
+              >
+                <MaterialIcons
+                  name={collapsed ? "expand-more" : "expand-less"}
+                  size={18}
+                  color="#fff"
+                />
+              </MyTournamentGlassSurface>
             </Pressable>
           </View>
         </View>
@@ -660,9 +741,12 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
     });
 
   return (
-    <View
+    <MyTournamentGlassSurface
+      effect="clear"
+      tintColor={tokens.colors.card}
       style={[
         styles.card,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.cardGlass,
         {
           backgroundColor: tokens.colors.card,
           borderColor: tokens.colors.border,
@@ -693,15 +777,24 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
           </View>
 
           {/* SEARCH MATCHES + FILTERS */}
-          <View
+          <MyTournamentGlassSurface
+            effect="regular"
+            interactive
+            tintColor={myTournamentGlassTint(tokens, 0.36, 0.54)}
             style={[
               styles.searchRow,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.searchRowGlass,
               {
                 backgroundColor: tokens.inputBg,
-                borderColor: tokens.colors.border,
+                borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? "rgba(255,255,255,0.24)"
+                  : tokens.colors.border,
               },
             ]}
           >
+            {IOS_26_LIQUID_GLASS_ENABLED && (
+              <View pointerEvents="none" style={styles.searchGlassEdge} />
+            )}
             <MaterialIcons name="search" size={18} color={tokens.sub} />
             <TextInput
               placeholder="Tìm trận (VĐV, vòng, sân...)"
@@ -715,7 +808,7 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
                 <MaterialIcons name="close" size={18} color={tokens.sub} />
               </Pressable>
             ) : null}
-          </View>
+          </MyTournamentGlassSurface>
 
           <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
             <ChipToggle
@@ -757,9 +850,12 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
 
           {/* LIST MATCHES */}
           {filteredSortedMatches.length === 0 ? (
-            <View
+            <MyTournamentGlassSurface
+              effect="clear"
+              tintColor={tokens.colors.card}
               style={[
                 styles.emptyMatches,
+                IOS_26_LIQUID_GLASS_ENABLED && styles.emptyMatchesGlass,
                 { borderColor: tokens.colors.border },
               ]}
             >
@@ -767,7 +863,7 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
               <Text style={{ color: tokens.sub }}>
                 Không có trận phù hợp bộ lọc.
               </Text>
-            </View>
+            </MyTournamentGlassSurface>
           ) : (
             <View style={{ gap: 10 }}>
               {shown.map((m) => (
@@ -783,28 +879,39 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
               {hasMore && (
                 <Pressable
                   onPress={() => setExpanded((v) => !v)}
-                  style={[
-                    styles.showMoreBtn,
-                    {
-                      borderColor: tokens.colors.border,
-                      backgroundColor: tokens.muted,
-                    },
+                  style={({ pressed }) => [
+                    styles.showMorePressable,
+                    { opacity: pressed ? 0.88 : 1 },
                   ]}
                 >
-                  <Text
-                    style={{ color: tokens.colors.text, fontWeight: "700" }}
+                  <MyTournamentGlassSurface
+                    effect="clear"
+                    interactive
+                    tintColor={tokens.muted}
+                    style={[
+                      styles.showMoreBtn,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                      {
+                        borderColor: tokens.colors.border,
+                        backgroundColor: tokens.muted,
+                      },
+                    ]}
                   >
-                    {expanded
-                      ? "Thu gọn"
-                      : `Xem tất cả ${filteredSortedMatches.length} trận`}
-                  </Text>
+                    <Text
+                      style={{ color: tokens.colors.text, fontWeight: "700" }}
+                    >
+                      {expanded
+                        ? "Thu gọn"
+                        : `Xem tất cả ${filteredSortedMatches.length} trận`}
+                    </Text>
+                  </MyTournamentGlassSurface>
                 </Pressable>
               )}
             </View>
           )}
         </View>
       )}
-    </View>
+    </MyTournamentGlassSurface>
   );
 }
 
@@ -817,9 +924,12 @@ function LoginPrompt({ tokens }) {
     <View
       style={[styles.loginWrap, { backgroundColor: tokens.colors.background }]}
     >
-      <View
+      <MyTournamentGlassSurface
+        effect="clear"
+        tintColor={tokens.colors.card}
         style={[
           styles.loginCard,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.cardGlass,
           {
             backgroundColor: tokens.colors.card,
             borderColor: tokens.colors.border,
@@ -856,7 +966,7 @@ function LoginPrompt({ tokens }) {
             Đăng nhập
           </Text>
         </Pressable>
-      </View>
+      </MyTournamentGlassSurface>
     </View>
   );
 }
@@ -1097,20 +1207,24 @@ export default function MyTournament() {
       ]}
     >
       <View style={styles.pageHeader}>
-        <Text style={[styles.pageTitle, { color: tokens.colors.text }]}>
-          Giải của tôi
-        </Text>
-
-        <View
+        <MyTournamentGlassSurface
+          effect="regular"
+          interactive
+          tintColor={myTournamentGlassTint(tokens, 0.36, 0.54)}
           style={[
             styles.searchRow,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.searchRowGlass,
             {
               backgroundColor: tokens.inputBg,
-              borderColor: tokens.colors.border,
-              marginTop: 10,
+              borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? "rgba(255,255,255,0.24)"
+                : tokens.colors.border,
             },
           ]}
         >
+          {IOS_26_LIQUID_GLASS_ENABLED && (
+            <View pointerEvents="none" style={styles.searchGlassEdge} />
+          )}
           <MaterialIcons name="search" size={18} color={tokens.sub} />
           <TextInput
             placeholder="Tìm giải (tên, địa điểm)"
@@ -1124,7 +1238,7 @@ export default function MyTournament() {
               <MaterialIcons name="close" size={18} color={tokens.sub} />
             </Pressable>
           ) : null}
-        </View>
+        </MyTournamentGlassSurface>
 
         {!!tournaments?.length && (
           <Text style={[styles.pageSub, { color: tokens.sub }]}>
@@ -1136,7 +1250,21 @@ export default function MyTournament() {
   );
 
   const EmptyState = (
-    <View style={styles.emptyWrap}>
+    <MyTournamentGlassSurface
+      effect="regular"
+      tintColor={myTournamentGlassTint(tokens, 0.42, 0.58)}
+      style={[
+        styles.emptyWrap,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.emptyGlass,
+        IOS_26_LIQUID_GLASS_ENABLED && {
+          backgroundColor: tokens.colors.card,
+          borderColor: "rgba(255,255,255,0.24)",
+        },
+      ]}
+    >
+      {IOS_26_LIQUID_GLASS_ENABLED && (
+        <View pointerEvents="none" style={styles.emptyGlassEdge} />
+      )}
       <Text style={{ fontSize: 42, marginBottom: 6 }}>🏆</Text>
       <Text
         style={{ color: tokens.colors.text, fontWeight: "800", fontSize: 16 }}
@@ -1146,7 +1274,7 @@ export default function MyTournament() {
       <Text style={{ color: tokens.sub, marginTop: 4, textAlign: "center" }}>
         Tham gia giải để theo dõi lịch đấu và kết quả của bạn tại đây.
       </Text>
-    </View>
+    </MyTournamentGlassSurface>
   );
 
   return (
@@ -1245,10 +1373,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   pageHeader: { paddingBottom: 10 },
-  pageTitle: {
-    fontSize: 20,
-    fontWeight: Platform.select({ ios: "700", android: "700", default: "700" }),
-  },
   pageSub: { marginTop: 6 },
 
   searchRow: {
@@ -1259,6 +1383,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  searchRowGlass: {
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+  },
+  searchGlassEdge: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
   input: {
     flex: 1,
@@ -1274,6 +1412,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
+  },
+  cardGlass: {
+    borderColor: "rgba(255,255,255,0.16)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
   },
 
   /* Banner */
@@ -1315,13 +1460,24 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  bannerTogglePressable: {
+    borderRadius: 999,
   },
 
+  chipPressable: {
+    borderRadius: 999,
+  },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: Platform.select({ ios: 6, android: 4 }),
     borderRadius: 999,
     borderWidth: 1,
+  },
+  glassPill: {
+    borderColor: "rgba(255,255,255,0.18)",
+    overflow: "hidden",
   },
   metaRow: {
     flexDirection: "row",
@@ -1347,6 +1503,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
+  matchPressable: {
+    borderRadius: 12,
+  },
+  matchRowGlass: {
+    borderColor: "rgba(255,255,255,0.14)",
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+  },
   matchAccent: { width: 4, borderRadius: 999 },
   scoreBadge: {
     alignSelf: "flex-start",
@@ -1365,6 +1532,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
+  showMorePressable: {
+    alignSelf: "center",
+    borderRadius: 12,
+  },
 
   emptyWrap: {
     paddingTop: 40,
@@ -1373,6 +1544,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 2,
   },
+  emptyGlass: {
+    marginTop: 40,
+    paddingHorizontal: 18,
+    paddingTop: 24,
+    paddingBottom: 24,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.26,
+    shadowRadius: 26,
+  },
+  emptyGlassEdge: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
   emptyMatches: {
     backgroundColor: "transparent",
     borderStyle: "dashed",
@@ -1380,6 +1571,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
+  },
+  emptyMatchesGlass: {
+    borderStyle: "solid",
+    borderColor: "rgba(255,255,255,0.14)",
+    overflow: "hidden",
   },
 
   /* Login prompt */

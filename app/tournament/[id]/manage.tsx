@@ -34,7 +34,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as LegacyFS from "expo-file-system/legacy";
-import { BlurView } from "expo-blur";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import {
   useGetTournamentQuery,
   useAdminGetBracketsQuery,
@@ -712,7 +712,7 @@ const MiniChipBtn = memo(({ icon, label, onPress, color }) => {
             },
           ]}
         >
-          <BlurView
+          <AppleLiquidGlassView
             intensity={dark ? 18 : 35}
             tint={blurTint}
             style={StyleSheet.absoluteFill}

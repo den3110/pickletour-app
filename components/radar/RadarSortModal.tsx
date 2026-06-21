@@ -7,7 +7,7 @@ import {
   TouchableWithoutFeedback,
   StyleSheet,
 } from "react-native";
-import { BlurView } from "expo-blur";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 export default function RadarSortModal({
   visible,
@@ -32,7 +32,7 @@ export default function RadarSortModal({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <BlurView
+            <AppleLiquidGlassView
               intensity={40}
               tint={isDark ? "dark" : "light"}
               style={[styles.content, { backgroundColor: modalBg }]}
@@ -75,7 +75,7 @@ export default function RadarSortModal({
               <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                 <Text style={{ color: textSub, fontWeight: "700" }}>Đóng</Text>
               </TouchableOpacity>
-            </BlurView>
+            </AppleLiquidGlassView>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>

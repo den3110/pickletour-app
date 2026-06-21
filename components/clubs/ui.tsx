@@ -6,12 +6,12 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 // ✅ dùng Lottie thay icon
 import LottieView from "lottie-react-native";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 export const Section = ({ title, subtitle, children }: any) => (
   <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -23,7 +23,7 @@ export const Section = ({ title, subtitle, children }: any) => (
 
 export const GlassCard = ({ children, style }: any) => (
   <View style={[styles.glass, style]}>
-    <BlurView
+    <AppleLiquidGlassView
       intensity={Platform.OS === "ios" ? 30 : 20}
       tint="dark"
       style={StyleSheet.absoluteFill}

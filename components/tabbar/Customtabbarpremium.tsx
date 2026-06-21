@@ -15,9 +15,9 @@ import Animated, {
   withSequence,
   Easing,
 } from "react-native-reanimated";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TAB_BAR_HEIGHT = 70;
@@ -210,7 +210,7 @@ export function CustomTabBarPremium({
   return (
     <View style={styles.container}>
       <View style={styles.notchContainer}>
-        <BlurView
+        <AppleLiquidGlassView
           intensity={isDark ? 90 : 100}
           tint={isDark ? "dark" : "light"}
           style={[
@@ -224,7 +224,7 @@ export function CustomTabBarPremium({
         />
       </View>
 
-      <BlurView
+      <AppleLiquidGlassView
         intensity={isDark ? 95 : 100}
         tint={isDark ? "dark" : "light"}
         style={styles.blurView}
@@ -250,7 +250,7 @@ export function CustomTabBarPremium({
           end={{ x: 1, y: 0 }}
           style={styles.topBorderGradient}
         />
-      </BlurView>
+      </AppleLiquidGlassView>
     </View>
   );
 }

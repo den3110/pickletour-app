@@ -25,7 +25,7 @@ import {
   useColorScheme,
   DeviceEventEmitter,
   InteractionManager,
-  SafeAreaView
+  SafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
@@ -43,6 +43,8 @@ import { useGetMeQuery } from "@/slices/usersApiSlice";
 import { setKeyword } from "@/slices/rankingUiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import RankingChart from "@/components/RankingChart";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 /* ================= Config ================= */
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";
@@ -246,6 +248,16 @@ const getScoreColor = (r, theme) => {
   return COLORS.scoreGrey;
 };
 
+const glassScheme = (theme) => (theme.isDark ? "dark" : "light");
+const glassSurfaceTint = (theme, light = 0.58, dark = 0.58) =>
+  theme.isDark
+    ? `rgba(15, 17, 21, ${dark})`
+    : `rgba(255, 255, 255, ${light})`;
+const glassAccentTint = (color, alpha = 0.22) =>
+  `${String(color || "#2563EB")}${Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, "0")}`;
+
 /* ================= ViewModeToggle (Optimized) ================= */
 const ViewModeToggle = memo(({ mode, onToggle, theme }) => {
   // Local state để animation chạy tức thì
@@ -288,12 +300,29 @@ const ViewModeToggle = memo(({ mode, onToggle, theme }) => {
   });
 
   return (
-    <View style={[styles.toggleContainer, { backgroundColor: theme.inputBg }]}>
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={glassScheme(theme)}
+      glassEffectStyle="regular"
+      glassTintColor={glassSurfaceTint(theme, 0.52, 0.5)}
+      isInteractive
+      style={[
+        styles.toggleContainer,
+        { backgroundColor: theme.inputBg, borderColor: theme.border },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+      ]}
+    >
       <Animated.View
         style={[
           styles.toggleIndicator,
           {
-            backgroundColor: theme.primary,
+            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? glassAccentTint(theme.primary, 0.28)
+              : theme.primary,
+            borderColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? theme.primary
+              : "transparent",
+            borderWidth: IOS_26_LIQUID_GLASS_ENABLED ? 1 : 0,
             transform: [{ translateX }],
           },
         ]}
@@ -306,7 +335,13 @@ const ViewModeToggle = memo(({ mode, onToggle, theme }) => {
         <Ionicons
           name="list"
           size={18}
-          color={localMode === "list" ? "#fff" : theme.subText}
+          color={
+            localMode === "list" && IOS_26_LIQUID_GLASS_ENABLED
+              ? theme.primary
+              : localMode === "list"
+              ? "#fff"
+              : theme.subText
+          }
         />
       </Pressable>
       <Pressable
@@ -317,19 +352,31 @@ const ViewModeToggle = memo(({ mode, onToggle, theme }) => {
         <Ionicons
           name="analytics"
           size={18}
-          color={localMode === "chart" ? "#fff" : theme.subText}
+          color={
+            localMode === "chart" && IOS_26_LIQUID_GLASS_ENABLED
+              ? theme.primary
+              : localMode === "chart"
+              ? "#fff"
+              : theme.subText
+          }
         />
       </Pressable>
-    </View>
+    </AppleLiquidGlassView>
   );
 });
+ViewModeToggle.displayName = "ViewModeToggle";
 
 /* ================= Sub-Components ================= */
 const InfoTag = memo(({ icon, text, theme }) => (
-  <View
+  <AppleLiquidGlassView
+    fallback="view"
+    glassColorScheme={glassScheme(theme)}
+    glassEffectStyle="clear"
+    glassTintColor={glassSurfaceTint(theme, 0.4, 0.42)}
     style={[
       styles.infoTag,
       { backgroundColor: theme.inputBg, borderColor: theme.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.glassChip,
     ]}
   >
     {icon && (
@@ -341,17 +388,95 @@ const InfoTag = memo(({ icon, text, theme }) => (
       />
     )}
     <Text style={[styles.infoTagText, { color: theme.text }]}>{text}</Text>
-  </View>
+  </AppleLiquidGlassView>
 ));
+InfoTag.displayName = "InfoTag";
 
 const ScoreBlock = memo(({ label, score, color, theme }) => (
-  <View style={[styles.scoreBlock, { backgroundColor: theme.inputBg }]}>
+  <AppleLiquidGlassView
+    fallback="view"
+    glassColorScheme={glassScheme(theme)}
+    glassEffectStyle="regular"
+    glassTintColor={glassSurfaceTint(theme, 0.44, 0.44)}
+    style={[
+      styles.scoreBlock,
+      { backgroundColor: theme.inputBg, borderColor: theme.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.glassScoreBlock,
+    ]}
+  >
     <Text style={[styles.scoreLabel, { color: theme.subText }]}>{label}</Text>
     <Text style={[styles.scoreValue, { color: color || theme.text }]}>
       {score}
     </Text>
-  </View>
+  </AppleLiquidGlassView>
 ));
+ScoreBlock.displayName = "ScoreBlock";
+
+const LiquidGlassBackdrop = memo(({ theme }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 16],
+  });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.28, 0.48],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.ambientBackdrop}>
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          {
+            backgroundColor: theme.isDark
+              ? "rgba(59,130,246,0.18)"
+              : "rgba(37,99,235,0.14)",
+            opacity,
+            transform: [{ translateY }, { rotate: "-8deg" }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.ambientBand,
+          styles.ambientBandAlt,
+          {
+            backgroundColor: theme.isDark
+              ? "rgba(245,158,11,0.12)"
+              : "rgba(245,158,11,0.1)",
+            opacity,
+            transform: [{ translateY }, { rotate: "7deg" }],
+          },
+        ]}
+      />
+    </View>
+  );
+});
+LiquidGlassBackdrop.displayName = "LiquidGlassBackdrop";
 
 /* ================= Skeletons & Cards ================= */
 const SkeletonCard = memo(() => {
@@ -377,14 +502,20 @@ const SkeletonCard = memo(() => {
 
   const bg = theme.isDark ? "#2a2d36" : "#e1e4e8";
   return (
-    <View
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={glassScheme(theme)}
+      glassEffectStyle="regular"
+      glassTintColor={glassSurfaceTint(theme, 0.58, 0.56)}
       style={[
         styles.card,
         {
           backgroundColor: theme.card,
-          borderWidth: 0,
+          borderColor: theme.border,
+          borderWidth: IOS_26_LIQUID_GLASS_ENABLED ? 1 : 0,
           elevation: 0,
         },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -439,14 +570,20 @@ const SkeletonCard = memo(() => {
           }}
         />
       </View>
-    </View>
+    </AppleLiquidGlassView>
   );
 });
+SkeletonCard.displayName = "SkeletonCard";
 
 const FlameCard = memo(({ medal, theme, children }) => {
   if (!medal) {
     return (
-      <View
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={glassScheme(theme)}
+        glassEffectStyle="regular"
+        glassTintColor={glassSurfaceTint(theme, 0.58, 0.56)}
+        isInteractive
         style={[
           styles.card,
           {
@@ -455,10 +592,11 @@ const FlameCard = memo(({ medal, theme, children }) => {
             borderWidth: 1,
             shadowColor: theme.shadow,
           },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
         ]}
       >
         {children}
-      </View>
+      </AppleLiquidGlassView>
     );
   }
   return (
@@ -467,6 +605,7 @@ const FlameCard = memo(({ medal, theme, children }) => {
     </FlameCardAnimated>
   );
 });
+FlameCard.displayName = "FlameCard";
 
 const FlameCardAnimated = memo(({ medal, theme, children }) => {
   const anim = useRef(new Animated.Value(0)).current;
@@ -516,7 +655,12 @@ const FlameCardAnimated = memo(({ medal, theme, children }) => {
         pointerEvents="none"
         style={[styles.cardFlameGlow, { backgroundColor: glow2, opacity: op2 }]}
       />
-      <View
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme={glassScheme(theme)}
+        glassEffectStyle="regular"
+        glassTintColor={glassSurfaceTint(theme, 0.6, 0.58)}
+        isInteractive
         style={[
           styles.card,
           {
@@ -525,22 +669,29 @@ const FlameCardAnimated = memo(({ medal, theme, children }) => {
             borderWidth: 1.5,
             shadowColor: theme.shadow,
           },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassMedalCard,
         ]}
       >
         {children}
-      </View>
+      </AppleLiquidGlassView>
     </View>
   );
 });
+FlameCardAnimated.displayName = "FlameCardAnimated";
 
 const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
   if (!medal) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(theme)}
+          glassEffectStyle="clear"
+          glassTintColor={glassSurfaceTint(theme, 0.36, 0.4)}
           style={[
             styles.avatarRingPlain,
             { borderColor: theme.border, backgroundColor: theme.card },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassAvatarRing,
           ]}
         >
           <ExpoImage
@@ -550,7 +701,7 @@ const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
             cachePolicy="memory-disk"
             transition={200}
           />
-        </View>
+        </AppleLiquidGlassView>
       </TouchableOpacity>
     );
   }
@@ -563,6 +714,7 @@ const FlameAvatar = memo(({ uri, medal, theme, onPress }) => {
     />
   );
 });
+FlameAvatar.displayName = "FlameAvatar";
 
 const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
   const anim = useRef(new Animated.Value(0)).current;
@@ -628,10 +780,15 @@ const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
             },
           ]}
         />
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(theme)}
+          glassEffectStyle="regular"
+          glassTintColor={glassSurfaceTint(theme, 0.42, 0.42)}
           style={[
             styles.avatarRing,
             { borderColor: border, backgroundColor: theme.card },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassAvatarRing,
           ]}
         >
           <ExpoImage
@@ -641,11 +798,12 @@ const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
             cachePolicy="memory-disk"
             transition={200}
           />
-        </View>
+        </AppleLiquidGlassView>
       </View>
     </TouchableOpacity>
   );
 });
+FlameAvatarAnimated.displayName = "FlameAvatarAnimated";
 
 /* ================= Ranking Card ================= */
 const RankingCard = memo(
@@ -718,8 +876,16 @@ const RankingCard = memo(
                 marginTop: 6,
               }}
             >
-              <View
-                style={[styles.verifyBadge, { backgroundColor: verifyChip.bg }]}
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={glassScheme(theme)}
+                glassEffectStyle="clear"
+                glassTintColor={verifyChip.bg}
+                style={[
+                  styles.verifyBadge,
+                  { backgroundColor: verifyChip.bg, borderColor: verifyChip.fg },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassVerifyBadge,
+                ]}
               >
                 <Ionicons
                   name={verifyChip.icon}
@@ -730,21 +896,29 @@ const RankingCard = memo(
                 <Text style={[styles.verifyText, { color: verifyChip.fg }]}>
                   {verifyChip.label}
                 </Text>
-              </View>
+              </AppleLiquidGlassView>
             </View>
 
             {podium ? (
               <TouchableOpacity
                 onPress={() => onGoToTournament(podium.picked)}
                 activeOpacity={0.85}
-                style={[
-                  styles.medalPill,
-                  {
-                    borderColor: COLORS[podium.medal],
-                    backgroundColor: theme.card,
-                  },
-                ]}
               >
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassColorScheme={glassScheme(theme)}
+                  glassEffectStyle="regular"
+                  glassTintColor={getMedalColors(podium.medal).glow2}
+                  isInteractive
+                  style={[
+                    styles.medalPill,
+                    {
+                      borderColor: COLORS[podium.medal],
+                      backgroundColor: theme.card,
+                    },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassMedalPill,
+                  ]}
+                >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <MaterialCommunityIcons
                     name="medal"
@@ -762,6 +936,7 @@ const RankingCard = memo(
                     {podium.label}
                   </Text>
                 </View>
+                </AppleLiquidGlassView>
               </TouchableOpacity>
             ) : u?.province ? (
               <Text style={[styles.provinceText, { color: theme.subText }]}>
@@ -796,12 +971,25 @@ const RankingCard = memo(
 
         <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
           <TouchableOpacity
-            style={styles.actionBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push(`/profile/${u?._id}`);
             }}
           >
+            <AppleLiquidGlassView
+              fallback="view"
+              glassColorScheme={glassScheme(theme)}
+              glassEffectStyle="clear"
+              glassTintColor={glassAccentTint(theme.primary, 0.12)}
+              isInteractive
+              style={[
+                styles.actionBtn,
+                IOS_26_LIQUID_GLASS_ENABLED && [
+                  styles.glassActionBtn,
+                  { borderColor: theme.primary + "55" },
+                ],
+              ]}
+            >
             <Ionicons
               name="person-circle-outline"
               size={20}
@@ -810,31 +998,59 @@ const RankingCard = memo(
             <Text style={[styles.actionText, { color: theme.primary }]}>
               Hồ sơ
             </Text>
+            </AppleLiquidGlassView>
           </TouchableOpacity>
 
           {allowGrade && (
             <TouchableOpacity
-              style={styles.actionBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 onOpenGrade(u, r);
               }}
             >
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={glassScheme(theme)}
+                glassEffectStyle="clear"
+                glassTintColor={glassSurfaceTint(theme, 0.34, 0.36)}
+                isInteractive
+                style={[
+                  styles.actionBtn,
+                  IOS_26_LIQUID_GLASS_ENABLED && [
+                    styles.glassActionBtn,
+                    { borderColor: theme.border },
+                  ],
+                ]}
+              >
               <Ionicons name="create-outline" size={20} color={theme.text} />
               <Text style={[styles.actionText, { color: theme.text }]}>
                 Chấm trình
               </Text>
+              </AppleLiquidGlassView>
             </TouchableOpacity>
           )}
 
           {allowKyc && (
             <TouchableOpacity
-              style={styles.actionBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 onOpenKyc(u);
               }}
             >
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={glassScheme(theme)}
+                glassEffectStyle="clear"
+                glassTintColor={glassSurfaceTint(theme, 0.34, 0.36)}
+                isInteractive
+                style={[
+                  styles.actionBtn,
+                  IOS_26_LIQUID_GLASS_ENABLED && [
+                    styles.glassActionBtn,
+                    { borderColor: theme.border },
+                  ],
+                ]}
+              >
               <Ionicons
                 name="shield-checkmark-outline"
                 size={20}
@@ -843,6 +1059,7 @@ const RankingCard = memo(
               <Text style={[styles.actionText, { color: theme.subText }]}>
                 KYC
               </Text>
+              </AppleLiquidGlassView>
             </TouchableOpacity>
           )}
         </View>
@@ -859,6 +1076,7 @@ const RankingCard = memo(
     );
   }
 );
+RankingCard.displayName = "RankingCard";
 
 /* ================= MEMOIZED VIEWS ================= */
 
@@ -912,6 +1130,7 @@ const MemoizedListView = memo(
     );
   }
 );
+MemoizedListView.displayName = "MemoizedListView";
 
 // View Chart: Tách biệt
 const MemoizedChartView = memo(
@@ -928,6 +1147,7 @@ const MemoizedChartView = memo(
     );
   }
 );
+MemoizedChartView.displayName = "MemoizedChartView";
 
 /* ================= MAIN SCREEN ================= */
 export default function RankingListScreen({ isBack = false }) {
@@ -1144,10 +1364,15 @@ export default function RankingListScreen({ isBack = false }) {
   const HeaderComponent = useMemo(
     () => (
       <View style={{ marginBottom: 16 }}>
-        <View
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={glassScheme(theme)}
+          glassEffectStyle="regular"
+          glassTintColor={glassSurfaceTint(theme, 0.54, 0.5)}
           style={[
             styles.legendContainer,
             { backgroundColor: theme.card, borderColor: theme.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
           ]}
         >
           <View style={styles.legendItem}>
@@ -1174,7 +1399,7 @@ export default function RankingListScreen({ isBack = false }) {
               Chưa có điểm
             </Text>
           </View>
-        </View>
+        </AppleLiquidGlassView>
       </View>
     ),
     [theme]
@@ -1182,6 +1407,7 @@ export default function RankingListScreen({ isBack = false }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+      <LiquidGlassBackdrop theme={theme} />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.headerArea}>
           <View style={styles.topBar}>
@@ -1192,7 +1418,24 @@ export default function RankingListScreen({ isBack = false }) {
                   style={styles.backBtn}
                   hitSlop={12}
                 >
-                  <Ionicons name="chevron-back" size={24} color={theme.text} />
+                  {IOS_26_LIQUID_GLASS_ENABLED ? (
+                    <AppleLiquidGlassView
+                      fallback="view"
+                      glassColorScheme={glassScheme(theme)}
+                      glassEffectStyle="regular"
+                      glassTintColor={glassSurfaceTint(theme, 0.52, 0.48)}
+                      isInteractive
+                      style={styles.backBtnGlass}
+                    >
+                      <Ionicons
+                        name="chevron-back"
+                        size={22}
+                        color={theme.text}
+                      />
+                    </AppleLiquidGlassView>
+                  ) : (
+                    <Ionicons name="chevron-back" size={24} color={theme.text} />
+                  )}
                 </Pressable>
               )}
               <Text style={[styles.screenTitle, { color: theme.text }]}>
@@ -1214,19 +1457,33 @@ export default function RankingListScreen({ isBack = false }) {
               />
               {canSelfAssess && !isLoadingList && (
                 <TouchableOpacity
-                  style={[styles.selfBtn, { backgroundColor: theme.primary }]}
                   onPress={() => router.push("/levelpoint")}
                 >
-                  <Text style={styles.selfBtnText}>Tự chấm</Text>
+                  <AppleLiquidGlassView
+                    fallback="view"
+                    glassColorScheme={glassScheme(theme)}
+                    glassEffectStyle="regular"
+                    glassTintColor={glassAccentTint(theme.primary, 0.28)}
+                    isInteractive
+                    style={[styles.selfBtn, { backgroundColor: theme.primary }]}
+                  >
+                    <Text style={styles.selfBtnText}>Tự chấm</Text>
+                  </AppleLiquidGlassView>
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          <View
+          <AppleLiquidGlassView
+            fallback="view"
+            glassColorScheme={glassScheme(theme)}
+            glassEffectStyle="regular"
+            glassTintColor={glassSurfaceTint(theme, 0.58, 0.52)}
+            isInteractive
             style={[
               styles.searchContainer,
               { backgroundColor: theme.card, borderColor: theme.border },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
             ]}
           >
             <Ionicons name="search" size={20} color={theme.subText} />
@@ -1243,13 +1500,24 @@ export default function RankingListScreen({ isBack = false }) {
                 <Ionicons name="close-circle" size={18} color={theme.subText} />
               </TouchableOpacity>
             )}
-          </View>
+          </AppleLiquidGlassView>
         </View>
       </TouchableWithoutFeedback>
 
       <View style={{ flex: 1, paddingHorizontal: 16 }}>
         {error ? (
           <View style={styles.center}>
+            <AppleLiquidGlassView
+              fallback="view"
+              glassColorScheme={glassScheme(theme)}
+              glassEffectStyle="regular"
+              glassTintColor={glassSurfaceTint(theme, 0.58, 0.52)}
+              style={[
+                styles.errorGlass,
+                { backgroundColor: theme.card, borderColor: theme.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+              ]}
+            >
             <Text style={{ color: theme.subText }}>Có lỗi xảy ra.</Text>
             <TouchableOpacity
               onPress={() => {
@@ -1262,6 +1530,7 @@ export default function RankingListScreen({ isBack = false }) {
                 Thử lại
               </Text>
             </TouchableOpacity>
+            </AppleLiquidGlassView>
           </View>
         ) : initialLoading ? (
           <FlatList
@@ -1329,6 +1598,17 @@ export default function RankingListScreen({ isBack = false }) {
                 {!chartReady ? (
                   // ✅ LOAD NHẸ TRƯỚC
                   <View style={styles.center}>
+                    <AppleLiquidGlassView
+                      fallback="view"
+                      glassColorScheme={glassScheme(theme)}
+                      glassEffectStyle="regular"
+                      glassTintColor={glassSurfaceTint(theme, 0.58, 0.52)}
+                      style={[
+                        styles.chartLoadingGlass,
+                        { backgroundColor: theme.card, borderColor: theme.border },
+                        IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
+                      ]}
+                    >
                     <ActivityIndicator size="small" color={theme.primary} />
                     <Text
                       style={{
@@ -1339,6 +1619,7 @@ export default function RankingListScreen({ isBack = false }) {
                     >
                       Đang tải biểu đồ...
                     </Text>
+                    </AppleLiquidGlassView>
                   </View>
                 ) : (
                   // ✅ LOAD NẶNG SAU 150ms
@@ -1373,6 +1654,22 @@ export default function RankingListScreen({ isBack = false }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  ambientBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  ambientBand: {
+    position: "absolute",
+    top: 70,
+    left: -40,
+    right: -40,
+    height: 120,
+    borderRadius: 28,
+  },
+  ambientBandAlt: {
+    top: 190,
+    height: 86,
+  },
   headerArea: {
     paddingHorizontal: 16,
     paddingBottom: 12,
@@ -1386,10 +1683,19 @@ const styles = StyleSheet.create({
   },
   titleRow: { flexDirection: "row", alignItems: "center" },
   backBtn: { marginRight: 12 },
+  backBtnGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
   screenTitle: {
     fontSize: 26,
     fontWeight: "800",
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   selfBtn: {
     paddingHorizontal: 14,
@@ -1419,6 +1725,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  glassControl: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1426,6 +1736,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
+  },
+  errorGlass: {
+    minWidth: 220,
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  chartLoadingGlass: {
+    minWidth: 190,
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15, height: "100%" },
   legendContainer: {
@@ -1452,6 +1778,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  glassCard: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+  },
+  glassMedalCard: {
+    borderWidth: 1.5,
+  },
   cardHeader: { flexDirection: "row", marginBottom: 16 },
   avatarContainer: { position: "relative", width: 68, height: 68 },
   avatarBorder: {
@@ -1473,6 +1806,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignSelf: "flex-start",
   },
+  glassVerifyBadge: {
+    borderWidth: 1,
+  },
   verifyText: { fontSize: 11, fontWeight: "700" },
   provinceText: { fontSize: 13, marginTop: 4 },
   medalPill: {
@@ -1482,6 +1818,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginTop: 8,
+  },
+  glassMedalPill: {
+    borderWidth: 1.5,
   },
   medalPillText: {
     fontSize: 12,
@@ -1502,6 +1841,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
+  glassChip: {
+    borderWidth: 1,
+  },
   infoTagText: { fontSize: 11, fontWeight: "600" },
   scoreGrid: { flexDirection: "row", gap: 12, marginBottom: 16 },
   scoreBlock: {
@@ -1510,10 +1852,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
   },
+  glassScoreBlock: {
+    borderWidth: 1,
+  },
   scoreLabel: {
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
     marginBottom: 4,
     textTransform: "uppercase",
   },
@@ -1529,6 +1874,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingVertical: 4,
+  },
+  glassActionBtn: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   actionText: { fontSize: 13, fontWeight: "600" },
   flameCardWrap: { position: "relative" },
@@ -1561,6 +1912,9 @@ const styles = StyleSheet.create({
     padding: 2,
     borderWidth: 1,
     borderRadius: 34,
+  },
+  glassAvatarRing: {
+    borderWidth: 1,
   },
   avatarImg: {
     width: 64,

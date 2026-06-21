@@ -1,4 +1,5 @@
 import { router, Tabs, usePathname } from "expo-router";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
 import {
   DeviceEventEmitter,
@@ -152,7 +153,10 @@ export default function TabLayout() {
   );
 
   if (IOS_26_NATIVE_TABS_ENABLED) {
-    const { NativeTabs } = require("expo-router/unstable-native-tabs");
+    const activeTabColor = DynamicColorIOS({
+      light: ACTIVE_TAB_TINT.light,
+      dark: ACTIVE_TAB_TINT.dark,
+    });
     const inactiveTabColor = DynamicColorIOS({
       light: "#6B7280",
       dark: "#9CA3AF",
@@ -162,26 +166,15 @@ export default function TabLayout() {
       <NativeTabs
         blurEffect="systemChromeMaterial"
         disableTransparentOnScrollEdge
-        tintColor={activeTabTint}
+        tintColor={activeTabColor}
         iconColor={{
           default: inactiveTabColor,
-          selected: activeTabTint,
-        }}
-        labelStyle={{
-          default: {
-            color: inactiveTabColor,
-            fontSize: 10.5,
-            fontWeight: "600",
-          },
-          selected: {
-            color: activeTabTint,
-            fontSize: 10.5,
-            fontWeight: "600",
-          },
+          selected: activeTabColor,
         }}
       >
         <NativeTabs.Trigger
           name="index"
+          disableAutomaticContentInsets
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("index"),
           }}
@@ -189,11 +182,12 @@ export default function TabLayout() {
           <NativeTabs.Trigger.Icon
             sf={{ default: "house.fill", selected: "house.fill" }}
           />
-          <NativeTabs.Trigger.Label>Trang chủ</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label hidden />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
           name="tournaments"
+          disableAutomaticContentInsets
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("tournaments"),
           }}
@@ -201,11 +195,12 @@ export default function TabLayout() {
           <NativeTabs.Trigger.Icon
             sf={{ default: "trophy.fill", selected: "trophy.fill" }}
           />
-          <NativeTabs.Trigger.Label>Giải đấu</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label hidden />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
           name="rankings"
+          disableAutomaticContentInsets
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("rankings"),
           }}
@@ -213,11 +208,12 @@ export default function TabLayout() {
           <NativeTabs.Trigger.Icon
             sf={{ default: "chart.bar.fill", selected: "chart.bar.fill" }}
           />
-          <NativeTabs.Trigger.Label>Xếp hạng</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label hidden />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
           name="live"
+          disableAutomaticContentInsets
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("live"),
           }}
@@ -225,11 +221,12 @@ export default function TabLayout() {
           <NativeTabs.Trigger.Icon
             sf="dot.radiowaves.left.and.right"
           />
-          <NativeTabs.Trigger.Label>Live</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label hidden />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger
           name="more"
+          disableAutomaticContentInsets
           listeners={{
             tabPress: () => emitScrollToTopIfNeeded("more"),
           }}
@@ -240,7 +237,7 @@ export default function TabLayout() {
               selected: "ellipsis.circle.fill",
             }}
           />
-          <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Label hidden />
         </NativeTabs.Trigger>
       </NativeTabs>
     );
@@ -253,6 +250,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: activeTabTint,
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        lazy: true,
+        freezeOnBlur: true,
+        detachInactiveScreens: true,
+        animation: "none",
       }}
     >
       <Tabs.Screen

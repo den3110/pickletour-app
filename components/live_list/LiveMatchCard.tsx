@@ -18,6 +18,7 @@ import { Image as ExpoImage } from "expo-image";
 import { WebView } from "react-native-webview";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 import { CompatVideo as Video } from "@/lib/expoMediaCompat";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -479,14 +480,16 @@ const LiveMatchCard = memo(
           </SafeAreaView>
         </Modal>
 
-        <InfoModal
-          visible={infoVisible}
-          onClose={() => setInfoVisible(false)}
-          match={buildLiveInfoMatch(match)}
-          sessions={sessions}
-          onCopy={handleCopy}
-          onOpenUrl={handleOpenExternal}
-        />
+        <BottomSheetModalProvider>
+          <InfoModal
+            visible={infoVisible}
+            onClose={() => setInfoVisible(false)}
+            match={buildLiveInfoMatch(match)}
+            sessions={sessions}
+            onCopy={handleCopy}
+            onOpenUrl={handleOpenExternal}
+          />
+        </BottomSheetModalProvider>
       </>
     );
   },

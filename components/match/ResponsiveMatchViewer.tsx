@@ -20,13 +20,8 @@ import {
   BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetScrollView,
-  useBottomSheetModal,
-  BottomSheetModalProvider,
 } from "@gorhom/bottom-sheet";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { useLiveMatch } from "@/hooks/useLiveMatch";
@@ -462,7 +457,6 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
   const topInset = isLandscape
     ? Math.max(insets.top, Platform.OS === "android" ? 12 : 0)
     : 0;
-  const bottomInset = Math.max(insets.bottom, 8);
 
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => ["80%", "100%"], []);
@@ -471,7 +465,6 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
   // Flags chống race-condition present/dismiss
   const isAnimatingRef = useRef(false);
   const isDismissedRef = useRef(true); // coi như đang đóng lúc đầu
-  const { dismissAll } = useBottomSheetModal(); // dọn modal khác nếu có (optional)
 
   const safePresent = useCallback(async () => {
     if (!sheetRef.current) return;
@@ -616,13 +609,18 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
         }}
         backdropComponent={renderBackdrop}
         topInset={topInset}
-        containerStyle={{
-          marginLeft: sideInset,
-          marginRight: sideInset,
-          zIndex: 1000  
-        }}
+        bottomInset={0}
+        detached={false}
+        containerStyle={[
+          styles.modalContainer,
+          {
+            marginLeft: sideInset,
+            marginRight: sideInset,
+            zIndex: 1000,
+          },
+        ]}
         handleIndicatorStyle={{ backgroundColor: T.handle }}
-        backgroundStyle={{ backgroundColor: T.sheetBg }}
+        backgroundStyle={[styles.sheetBackground, { backgroundColor: T.sheetBg }]}
         enableDynamicSizing={false}
       >
         {/* Header */}
@@ -679,6 +677,14 @@ export default function ResponsiveMatchViewer(props) {
 
 /* ================= Styles ================= */
 const styles = StyleSheet.create({
+  modalContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheetBackground: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+  },
   header: {
     paddingHorizontal: 12,
     paddingTop: 4,

@@ -173,8 +173,11 @@ const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
       ref={modalRef}
       snapPoints={snapPoints}
       topInset={insets.top}
+      bottomInset={0}
+      detached={false}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
+      containerStyle={styles.modalContainer}
       handleIndicatorStyle={[styles.handle, { backgroundColor: T.handle }]}
       backgroundStyle={[
         styles.sheet,
@@ -361,6 +364,9 @@ const FiltersBottomSheet = forwardRef(function FiltersBottomSheet(
 });
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

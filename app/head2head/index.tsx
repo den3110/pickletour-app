@@ -18,10 +18,10 @@ import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { useSelector } from "react-redux";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useSearchUserQuery } from "@/slices/usersApiSlice";
 import {
   useGetHead2HeadQuery,
@@ -366,7 +366,10 @@ const PlayerSearchModal = ({
 
   return (
     <View style={styles.modalOverlay}>
-      <BlurView intensity={isDark ? 40 : 20} style={StyleSheet.absoluteFill} />
+      <AppleLiquidGlassView
+        intensity={isDark ? 40 : 20}
+        style={StyleSheet.absoluteFill}
+      />
       <View
         style={[
           styles.modalContent,
@@ -866,7 +869,10 @@ const Head2HeadMatchesModal = ({
 
   return (
     <View style={styles.modalOverlay}>
-      <BlurView intensity={isDark ? 40 : 20} style={StyleSheet.absoluteFill} />
+      <AppleLiquidGlassView
+        intensity={isDark ? 40 : 20}
+        style={StyleSheet.absoluteFill}
+      />
 
       <View
         style={[
