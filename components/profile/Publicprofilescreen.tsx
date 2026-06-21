@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types, react/display-name */
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import {
   View,
@@ -47,6 +47,8 @@ import {
 } from "@/slices/usersApiSlice";
 import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -174,16 +176,242 @@ function getSPC(base) {
   };
 }
 
+const profileGlassScheme = (colors) => (colors?.isDark ? "dark" : "light");
+const profileGlassSurfaceTint = (colors, light = 0.58, dark = 0.54) =>
+  colors?.isDark
+    ? `rgba(24,26,32,${dark})`
+    : `rgba(255,255,255,${light})`;
+const profileGlassAccentTint = (colors, alpha = 0.3) =>
+  colors?.isDark
+    ? `rgba(99,102,241,${alpha})`
+    : `rgba(99,102,241,${alpha})`;
+
+const ProfileGlassSurface = React.memo(
+  ({
+    children,
+    colors,
+    style,
+    effect = "regular",
+    tintColor,
+    interactive = false,
+  }) => (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={profileGlassScheme(colors)}
+      glassEffectStyle={effect}
+      glassTintColor={tintColor || profileGlassSurfaceTint(colors)}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  )
+);
+ProfileGlassSurface.displayName = "ProfileGlassSurface";
+
+const ProfileLiquidBackdrop = React.memo(({ colors }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 2800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-12, 16],
+  });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.24, 0.46],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.profileAmbientBackdrop}>
+      <Animated.View
+        style={[
+          styles.profileAmbientBand,
+          {
+            backgroundColor: colors.isDark
+              ? "rgba(99,102,241,0.2)"
+              : "rgba(99,102,241,0.14)",
+            opacity,
+            transform: [{ translateY }, { rotate: "-8deg" }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.profileAmbientBand,
+          styles.profileAmbientBandAlt,
+          {
+            backgroundColor: colors.isDark
+              ? "rgba(236,72,153,0.13)"
+              : "rgba(236,72,153,0.1)",
+            opacity,
+            transform: [{ translateY }, { rotate: "7deg" }],
+          },
+        ]}
+      />
+    </View>
+  );
+});
+ProfileLiquidBackdrop.displayName = "ProfileLiquidBackdrop";
+
+const ProfileSection = React.memo(({ children, colors, style }) => (
+  <ProfileGlassSurface
+    colors={colors}
+    interactive
+    tintColor={profileGlassSurfaceTint(colors, 0.64, 0.5)}
+    style={[
+      styles.section,
+      { backgroundColor: colors.card, borderColor: colors.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+      style,
+    ]}
+  >
+    {children}
+  </ProfileGlassSurface>
+));
+ProfileSection.displayName = "ProfileSection";
+
+const StatsGlassBox = React.memo(({ children, colors, style }) => (
+  <ProfileGlassSurface
+    colors={colors}
+    effect="clear"
+    tintColor={profileGlassSurfaceTint(colors, 0.46, 0.36)}
+    style={[
+      styles.statBox,
+      { backgroundColor: colors.bgMuted, borderColor: colors.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
+      style,
+    ]}
+  >
+    {children}
+  </ProfileGlassSurface>
+));
+StatsGlassBox.displayName = "StatsGlassBox";
+
+const EmptyGlassState = React.memo(({ children, colors }) => (
+  <ProfileGlassSurface
+    colors={colors}
+    tintColor={profileGlassSurfaceTint(colors, 0.62, 0.48)}
+    style={[
+      styles.emptyGlassState,
+      { backgroundColor: colors.card, borderColor: colors.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+    ]}
+  >
+    {children}
+  </ProfileGlassSurface>
+));
+EmptyGlassState.displayName = "EmptyGlassState";
+
+const ProfilePageButton = React.memo(
+  ({ children, colors, disabled, onPress }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.8}
+    >
+      <ProfileGlassSurface
+        colors={colors}
+        interactive={!disabled}
+        tintColor={profileGlassSurfaceTint(colors, 0.52, 0.42)}
+        style={[
+          styles.pageButton,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+          disabled && styles.pageButtonDisabled,
+        ]}
+      >
+        {children}
+      </ProfileGlassSurface>
+    </TouchableOpacity>
+  )
+);
+ProfilePageButton.displayName = "ProfilePageButton";
+
+const ProfileTabPill = React.memo(
+  ({ tab, index, activeTab, onPress, colors, sticky = false }) => {
+    const active = activeTab === index;
+    const textStyle = sticky ? styles.stickyTabText : styles.tabText;
+    return (
+      <TouchableOpacity
+        style={sticky ? styles.stickyTab : styles.tab}
+        onPress={() => onPress(index)}
+        activeOpacity={0.82}
+      >
+        {active ? (
+          <ProfileGlassSurface
+            colors={colors}
+            interactive
+            tintColor={profileGlassAccentTint(colors, 0.48)}
+            style={[
+              styles.profileActiveTabGlass,
+              { backgroundColor: colors.tabActive },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
+            ]}
+          >
+            <Text style={[textStyle, styles.tabTextActive]} numberOfLines={1}>
+              {tab}
+            </Text>
+          </ProfileGlassSurface>
+        ) : (
+          <Text
+            style={[textStyle, { color: colors.tabInactive }]}
+            numberOfLines={1}
+          >
+            {tab}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
+  }
+);
+ProfileTabPill.displayName = "ProfileTabPill";
+
 /* ---------- SUB-COMPONENTS ---------- */
 
-const StatCard = React.memo(({ icon, value, label, gradient, onPress }) => (
+const StatCard = React.memo(({ icon, value, label, gradient, onPress, colors }) => (
   <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={{ flex: 1 }}>
-    <LinearGradient
-      colors={gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.statCard, isSmallDevice && styles.statCardSmall]}
+    <ProfileGlassSurface
+      colors={colors}
+      interactive
+      tintColor={profileGlassAccentTint(colors, 0.38)}
+      style={[
+        styles.statCard,
+        { backgroundColor: gradient?.[0] || colors.primary },
+        isSmallDevice && styles.statCardSmall,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.statCardGlass,
+      ]}
     >
+      <LinearGradient
+        colors={gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          StyleSheet.absoluteFill,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.statGradientWash,
+        ]}
+      />
       <View style={styles.statIconContainer}>{icon}</View>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -194,19 +422,24 @@ const StatCard = React.memo(({ icon, value, label, gradient, onPress }) => (
           color="rgba(255,255,255,0.6)"
         />
       </View>
-    </LinearGradient>
+    </ProfileGlassSurface>
   </TouchableOpacity>
 ));
 
 const InfoBadge = React.memo(
   ({ icon, text, color = "#666", bgColor, textColor }) => (
-    <View
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme="dark"
+      glassEffectStyle="clear"
+      glassTintColor={bgColor || "rgba(255,255,255,0.18)"}
       style={[
         styles.badge,
         {
           borderColor: bgColor ? "transparent" : color,
           backgroundColor: bgColor || "transparent",
         },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.profileHeaderChipGlass,
       ]}
     >
       {icon}
@@ -218,21 +451,30 @@ const InfoBadge = React.memo(
       >
         {text}
       </Text>
-    </View>
+    </AppleLiquidGlassView>
   )
 );
 
 const KycBadge = React.memo(({ status }) => {
   const meta = getKycStatusMeta(status);
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      style={[styles.kycBadge, { backgroundColor: meta.bgColor }]}
-    >
-      <Ionicons name={meta.icon} size={14} color={meta.color} />
-      <Text style={[styles.kycBadgeText, { color: meta.color }]}>
-        {meta.label}
-      </Text>
+    <TouchableOpacity activeOpacity={0.7}>
+      <AppleLiquidGlassView
+        fallback="view"
+        glassColorScheme="dark"
+        glassEffectStyle="clear"
+        glassTintColor={meta.bgColor}
+        style={[
+          styles.kycBadge,
+          { backgroundColor: meta.bgColor },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.profileHeaderChipGlass,
+        ]}
+      >
+        <Ionicons name={meta.icon} size={14} color={meta.color} />
+        <Text style={[styles.kycBadgeText, { color: meta.color }]}>
+          {meta.label}
+        </Text>
+      </AppleLiquidGlassView>
     </TouchableOpacity>
   );
 });
@@ -339,8 +581,15 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View
-        style={[styles.matchCardContainer, { backgroundColor: colors.card }]}
+      <ProfileGlassSurface
+        colors={colors}
+        interactive
+        tintColor={profileGlassSurfaceTint(colors, 0.62, 0.5)}
+        style={[
+          styles.matchCardContainer,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+        ]}
       >
         <View style={styles.matchHeader}>
           <View
@@ -362,8 +611,15 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
         </View>
 
         <View style={styles.teamsVerticalContainer}>
-          <View
-            style={[styles.teamSection, { backgroundColor: colors.bgMuted }]}
+          <ProfileGlassSurface
+            colors={colors}
+            effect="clear"
+            tintColor={profileGlassSurfaceTint(colors, 0.44, 0.36)}
+            style={[
+              styles.teamSection,
+              { backgroundColor: colors.bgMuted, borderColor: colors.border },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
+            ]}
           >
             <View style={styles.teamPlayers}>
               {match.team1?.map((p, i) => (
@@ -375,7 +631,7 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
                 />
               ))}
             </View>
-          </View>
+          </ProfileGlassSurface>
 
           <View style={styles.scoreDisplayContainer}>
             <Text style={[styles.scoreDisplayText, { color: colors.text }]}>
@@ -383,8 +639,15 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
             </Text>
           </View>
 
-          <View
-            style={[styles.teamSection, { backgroundColor: colors.bgMuted }]}
+          <ProfileGlassSurface
+            colors={colors}
+            effect="clear"
+            tintColor={profileGlassSurfaceTint(colors, 0.44, 0.36)}
+            style={[
+              styles.teamSection,
+              { backgroundColor: colors.bgMuted, borderColor: colors.border },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
+            ]}
           >
             <View style={styles.teamPlayers}>
               {match.team2?.map((p, i) => (
@@ -396,7 +659,7 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
                 />
               ))}
             </View>
-          </View>
+          </ProfileGlassSurface>
         </View>
 
         {match.video && (
@@ -411,7 +674,7 @@ const MatchCard = React.memo(({ match, userId, onPress, colors }) => {
             <Text style={styles.videoText}>Video</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ProfileGlassSurface>
     </TouchableOpacity>
   );
 });
@@ -442,7 +705,16 @@ const RatingHistoryRow = React.memo(
       "";
 
     return (
-      <View style={[styles.ratingRow, { backgroundColor: colors.card }]}>
+      <ProfileGlassSurface
+        colors={colors}
+        interactive
+        tintColor={profileGlassSurfaceTint(colors, 0.62, 0.5)}
+        style={[
+          styles.ratingRow,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+        ]}
+      >
         {isAdmin && (
           <TouchableOpacity
             style={styles.deleteItemButton}
@@ -479,10 +751,14 @@ const RatingHistoryRow = React.memo(
 
         <View style={styles.ratingScores}>
           {Number.isFinite(item.single) && (
-            <View
+            <ProfileGlassSurface
+              colors={colors}
+              effect="clear"
+              tintColor={profileGlassSurfaceTint(colors, 0.46, 0.34)}
               style={[
                 styles.ratingScoreBadge,
-                { backgroundColor: colors.bgMuted },
+                { backgroundColor: colors.bgMuted, borderColor: colors.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
               ]}
             >
               <Text style={styles.ratingScoreLabel}>Đơn</Text>
@@ -498,14 +774,21 @@ const RatingHistoryRow = React.memo(
                   {numFloat(singleDelta)}
                 </Text>
               )}
-            </View>
+            </ProfileGlassSurface>
           )}
 
           {Number.isFinite(item.double) && (
-            <View
+            <ProfileGlassSurface
+              colors={colors}
+              effect="clear"
+              tintColor={profileGlassSurfaceTint(colors, 0.46, 0.34)}
               style={[
                 styles.ratingScoreBadge,
-                { backgroundColor: colors.isDark ? "#1A2733" : "#E3F2FD" },
+                {
+                  backgroundColor: colors.isDark ? "#1A2733" : "#E3F2FD",
+                  borderColor: colors.border,
+                },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
               ]}
             >
               <Text style={[styles.ratingScoreLabel, { color: "#1976D2" }]}>
@@ -525,10 +808,10 @@ const RatingHistoryRow = React.memo(
                   {numFloat(doubleDelta)}
                 </Text>
               )}
-            </View>
+            </ProfileGlassSurface>
           )}
         </View>
-      </View>
+      </ProfileGlassSurface>
     );
   }
 );
@@ -537,7 +820,16 @@ const InfoItem = React.memo(({ label, value, copyable, onCopy, colors }) => {
   const display =
     value === null || value === undefined || value === "" ? "—" : value;
   return (
-    <View style={styles.infoItem}>
+    <ProfileGlassSurface
+      colors={colors}
+      effect="clear"
+      tintColor={profileGlassSurfaceTint(colors, 0.44, 0.34)}
+      style={[
+        styles.infoItem,
+        { backgroundColor: colors.bgMuted, borderColor: colors.border },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
+      ]}
+    >
       <Text style={[styles.infoLabel, { color: colors.subText }]}>{label}</Text>
       <View style={styles.infoValueContainer}>
         <Text
@@ -555,7 +847,7 @@ const InfoItem = React.memo(({ label, value, copyable, onCopy, colors }) => {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </ProfileGlassSurface>
   );
 });
 
@@ -657,10 +949,14 @@ const getTopStyle = (k) => {
 const fmtRate = (v) => (Number.isFinite(v) ? `${v.toFixed(1)}%` : "—");
 
 const KpiCard = React.memo(({ title, value, sub, colors }) => (
-  <View
+  <ProfileGlassSurface
+    colors={colors}
+    interactive
+    tintColor={profileGlassSurfaceTint(colors, 0.62, 0.5)}
     style={[
       styles.kpiCard,
       { backgroundColor: colors.card, borderColor: colors.border },
+      IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
     ]}
   >
     <Text style={[styles.kpiTitle, { color: colors.text }]} numberOfLines={1}>
@@ -675,16 +971,20 @@ const KpiCard = React.memo(({ title, value, sub, colors }) => (
         {sub}
       </Text>
     ) : null}
-  </View>
+  </ProfileGlassSurface>
 ));
 
 const AchievementRow = React.memo(({ data, colors }) => {
   const { bg, fg } = getTopStyle(data?.topK);
   return (
-    <View
+    <ProfileGlassSurface
+      colors={colors}
+      interactive
+      tintColor={profileGlassSurfaceTint(colors, 0.62, 0.5)}
       style={[
         styles.achRowCard,
         { backgroundColor: colors.card, borderColor: colors.border },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
       ]}
     >
       <Text style={[styles.achRowTitle, { color: colors.text }]}>
@@ -729,7 +1029,7 @@ const AchievementRow = React.memo(({ data, colors }) => {
           {data.lastMatchAt ? fmtDate(data.lastMatchAt) : "—"}
         </Text>
       </View>
-    </View>
+    </ProfileGlassSurface>
   );
 });
 
@@ -994,12 +1294,12 @@ export default function PublicProfileScreen() {
     () => ({
       isDark,
       primary: theme.colors.primary || "#6366F1",
-      bg: isDark ? "#121212" : "#F5F7FA",
-      card: isDark ? "#1E1E1E" : "#FFFFFF",
+      bg: isDark ? "#0f1115" : "#F5F7FA",
+      card: isDark ? "#181a20" : "#FFFFFF",
       text: isDark ? "#FFFFFF" : "#333333",
-      subText: isDark ? "#A0A0A0" : "#666666",
-      border: isDark ? "#333333" : "#E0E0E0",
-      bgMuted: isDark ? "#2C2C2E" : "#F8F9FA",
+      subText: isDark ? "#848E9C" : "#666666",
+      border: isDark ? "#262932" : "#E0E0E0",
+      bgMuted: isDark ? "#20232b" : "#F8F9FA",
       tabActive: "#6366F1",
       tabInactive: isDark ? "#A0A0A0" : "#666666",
     }),
@@ -1466,36 +1766,30 @@ export default function PublicProfileScreen() {
         {statsSheetType === "matches" && (
           <View style={styles.statsContent}>
             <View style={styles.statsRow}>
-              <View
-                style={[styles.statBox, { backgroundColor: colors.bgMuted }]}
-              >
+              <StatsGlassBox colors={colors}>
                 <Text style={[styles.statBoxValue, { color: colors.primary }]}>
                   {matchStatsData?.totalMatches || 0}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: colors.subText }]}>
                   Tổng trận
                 </Text>
-              </View>
-              <View
-                style={[styles.statBox, { backgroundColor: colors.bgMuted }]}
-              >
+              </StatsGlassBox>
+              <StatsGlassBox colors={colors}>
                 <Text style={[styles.statBoxValue, { color: "#10B981" }]}>
                   {matchStatsData?.thisMonth || 0}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: colors.subText }]}>
                   Tháng này
                 </Text>
-              </View>
-              <View
-                style={[styles.statBox, { backgroundColor: colors.bgMuted }]}
-              >
+              </StatsGlassBox>
+              <StatsGlassBox colors={colors}>
                 <Text style={[styles.statBoxValue, { color: "#F59E0B" }]}>
                   {matchStatsData?.avgPerMonth?.toFixed(1) || "0"}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: colors.subText }]}>
                   TB/Tháng
                 </Text>
-              </View>
+              </StatsGlassBox>
             </View>
 
             <Text style={[styles.chartTitle, { color: colors.text }]}>
@@ -1533,25 +1827,29 @@ export default function PublicProfileScreen() {
             </View>
 
             <View style={styles.statsRow}>
-              <View style={[styles.statBox, { backgroundColor: "#E8F5E9" }]}>
+              <StatsGlassBox
+                colors={colors}
+                style={{ backgroundColor: "#E8F5E9", borderColor: "#BBF7D0" }}
+              >
                 <Text style={[styles.statBoxValue, { color: "#4CAF50" }]}>
                   {winStatsData?.wins || 0}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: "#2E7D32" }]}>
                   Thắng
                 </Text>
-              </View>
-              <View style={[styles.statBox, { backgroundColor: "#FFEBEE" }]}>
+              </StatsGlassBox>
+              <StatsGlassBox
+                colors={colors}
+                style={{ backgroundColor: "#FFEBEE", borderColor: "#FECACA" }}
+              >
                 <Text style={[styles.statBoxValue, { color: "#F44336" }]}>
                   {winStatsData?.losses || 0}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: "#C62828" }]}>
                   Thua
                 </Text>
-              </View>
-              <View
-                style={[styles.statBox, { backgroundColor: colors.bgMuted }]}
-              >
+              </StatsGlassBox>
+              <StatsGlassBox colors={colors}>
                 <Text style={[styles.statBoxValue, { color: colors.text }]}>
                   {Math.abs(winStatsData?.streak || 0)}
                 </Text>
@@ -1560,7 +1858,7 @@ export default function PublicProfileScreen() {
                     ? "Chuỗi thắng"
                     : "Chuỗi thua"}
                 </Text>
-              </View>
+              </StatsGlassBox>
             </View>
 
             <View style={styles.winLossBarContainer}>
@@ -1614,34 +1912,38 @@ export default function PublicProfileScreen() {
         {statsSheetType === "rating" && ratingStatsData && (
           <View style={styles.statsContent}>
             <View style={styles.statsRow}>
-              <View style={[styles.statBox, { backgroundColor: "#E8F5E9" }]}>
+              <StatsGlassBox
+                colors={colors}
+                style={{ backgroundColor: "#E8F5E9", borderColor: "#BBF7D0" }}
+              >
                 <Text style={[styles.statBoxValue, { color: "#4CAF50" }]}>
                   {num(ratingStatsData.latestSingle)}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: "#2E7D32" }]}>
                   Điểm Đơn
                 </Text>
-              </View>
+              </StatsGlassBox>
 
-              <View style={[styles.statBox, { backgroundColor: "#E3F2FD" }]}>
+              <StatsGlassBox
+                colors={colors}
+                style={{ backgroundColor: "#E3F2FD", borderColor: "#BFDBFE" }}
+              >
                 <Text style={[styles.statBoxValue, { color: "#1976D2" }]}>
                   {num(ratingStatsData.latestDouble)}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: "#1565C0" }]}>
                   Điểm Đôi
                 </Text>
-              </View>
+              </StatsGlassBox>
 
-              <View
-                style={[styles.statBox, { backgroundColor: colors.bgMuted }]}
-              >
+              <StatsGlassBox colors={colors}>
                 <Text style={[styles.statBoxValue, { color: colors.text }]}>
                   {ratingStatsData.totalRatings || 0}
                 </Text>
                 <Text style={[styles.statBoxLabel, { color: colors.subText }]}>
                   Lượt chấm
                 </Text>
-              </View>
+              </StatsGlassBox>
             </View>
 
             {ratingStatsData.hasDoubleData && (
@@ -1770,47 +2072,38 @@ export default function PublicProfileScreen() {
     >
       <BottomSheetModalProvider>
         <StatusBar barStyle="light-content" />
+        <ProfileLiquidBackdrop colors={colors} />
 
         {/* Sticky Tab Bar */}
         {isTabBarSticky && (
-          <View
+          <ProfileGlassSurface
+            colors={colors}
+            tintColor={profileGlassSurfaceTint(colors, 0.7, 0.58)}
             style={[
               styles.stickyTabBar,
               {
                 backgroundColor: colors.card,
                 borderBottomColor: colors.border,
               },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
             ]}
           >
             <View style={styles.stickyTabWrapper}>
               {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình", "Thành tích"].map(
                 (tab, index) => (
-                  <TouchableOpacity
+                  <ProfileTabPill
                     key={index}
-                    style={[
-                      styles.stickyTab,
-                      activeTab === index && [
-                        styles.stickyTabActive,
-                        { backgroundColor: colors.tabActive },
-                      ],
-                    ]}
-                    onPress={() => handleTabPress(index)}
-                  >
-                    <Text
-                      style={[
-                        styles.stickyTabText,
-                        { color: colors.tabInactive },
-                        activeTab === index && styles.stickyTabTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {tab}
-                    </Text>
-                  </TouchableOpacity>
+                    tab={tab}
+                    index={index}
+                    activeTab={activeTab}
+                    onPress={handleTabPress}
+                    colors={colors}
+                    sticky
+                  />
                 )
               )}
             </View>
-          </View>
+          </ProfileGlassSurface>
         )}
 
         {/* Animated Header */}
@@ -1833,32 +2126,36 @@ export default function PublicProfileScreen() {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => setIsImageViewVisible(true)}
-                style={[styles.avatarWrapper, { borderColor: colors.card }]}
+                style={styles.avatarPressable}
               >
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={styles.avatar}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  transition={200}
-                  onLoadStart={() => setIsAvatarLoading(true)}
-                  onLoad={() => setIsAvatarLoading(false)}
-                />
-                {isAvatarLoading && (
-                  <View style={styles.avatarLoadingOverlay}>
-                    <ActivityIndicator size="small" color="#FFF" />
-                  </View>
-                )}
-
                 <View
-                  style={[
-                    styles.onlineStatusBadge,
-                    {
-                      backgroundColor: isOnline ? "#4CAF50" : "#9E9E9E",
-                      borderColor: colors.card,
-                    },
-                  ]}
-                />
+                  style={[styles.avatarWrapper, { borderColor: colors.card }]}
+                >
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
+                    onLoadStart={() => setIsAvatarLoading(true)}
+                    onLoad={() => setIsAvatarLoading(false)}
+                  />
+                  {isAvatarLoading && (
+                    <View style={styles.avatarLoadingOverlay}>
+                      <ActivityIndicator size="small" color="#FFF" />
+                    </View>
+                  )}
+
+                  <View
+                    style={[
+                      styles.onlineStatusBadge,
+                      {
+                        backgroundColor: isOnline ? "#4CAF50" : "#9E9E9E",
+                        borderColor: colors.card,
+                      },
+                    ]}
+                  />
+                </View>
               </TouchableOpacity>
 
               {base?.isAdmin && (
@@ -1874,11 +2171,19 @@ export default function PublicProfileScreen() {
               {base?.name || base?.fullName || "Người dùng"}
             </Text>
 
-            <View style={styles.nicknameContainer}>
+            <ProfileGlassSurface
+              colors={colors}
+              effect="clear"
+              tintColor="rgba(255,255,255,0.18)"
+              style={[
+                styles.nicknameContainer,
+                IOS_26_LIQUID_GLASS_ENABLED && styles.profileHeaderChipGlass,
+              ]}
+            >
               <Text style={styles.userNickname}>
                 @{base?.nickname || "no_nick"}
               </Text>
-            </View>
+            </ProfileGlassSurface>
 
             <View style={styles.quickInfoContainer}>
               {hasData(base?.province) && (
@@ -1927,14 +2232,30 @@ export default function PublicProfileScreen() {
               onPress={() => router.back()}
               activeOpacity={0.8}
             >
-              <Ionicons name="chevron-back" size={24} color="#FFF" />
+              <ProfileGlassSurface
+                colors={colors}
+                effect="clear"
+                interactive
+                tintColor="rgba(255,255,255,0.22)"
+                style={styles.headerButtonGlass}
+              >
+                <Ionicons name="chevron-back" size={24} color="#FFF" />
+              </ProfileGlassSurface>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.shareButton}
               onPress={handleOpenShareSheet}
             >
-              <Ionicons name="share-social" size={20} color="#FFF" />
+              <ProfileGlassSurface
+                colors={colors}
+                effect="clear"
+                interactive
+                tintColor="rgba(255,255,255,0.22)"
+                style={styles.headerButtonGlass}
+              >
+                <Ionicons name="share-social" size={20} color="#FFF" />
+              </ProfileGlassSurface>
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
@@ -1969,6 +2290,7 @@ export default function PublicProfileScreen() {
               value={totalMatches}
               label="Tổng trận"
               gradient={["#6366F1", "#8B5CF6"]}
+              colors={colors}
               onPress={() => handleOpenStatsSheet("matches")}
             />
             <StatCard
@@ -1976,6 +2298,7 @@ export default function PublicProfileScreen() {
               value={`${wins} (${winRate}%)`}
               label="Chiến thắng"
               gradient={["#F59E0B", "#EF4444"]}
+              colors={colors}
               onPress={() => handleOpenStatsSheet("wins")}
             />
             <StatCard
@@ -1983,37 +2306,36 @@ export default function PublicProfileScreen() {
               value={`${num(latestSingle)} / ${num(latestDouble)}`}
               label="Điểm Đơn/Đôi"
               gradient={["#10B981", "#059669"]}
+              colors={colors}
               onPress={() => handleOpenStatsSheet("rating")}
             />
           </View>
 
           {/* Tab Navigation */}
           <View style={styles.tabContainer} onLayout={onTabBarLayout}>
-            <View style={[styles.tabWrapper, { backgroundColor: colors.card }]}>
+            <ProfileGlassSurface
+              colors={colors}
+              interactive
+              tintColor={profileGlassSurfaceTint(colors, 0.66, 0.54)}
+              style={[
+                styles.tabWrapper,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+              ]}
+            >
               {["Hồ sơ", "Lịch sử thi đấu", "Điểm trình", "Thành tích"].map(
                 (tab, index) => (
-                  <TouchableOpacity
+                  <ProfileTabPill
                     key={index}
-                    style={[
-                      styles.tab,
-                      activeTab === index && styles.tabActive,
-                    ]}
-                    onPress={() => handleTabPress(index)}
-                  >
-                    <Text
-                      style={[
-                        styles.tabText,
-                        { color: colors.tabInactive },
-                        activeTab === index && styles.tabTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {tab}
-                    </Text>
-                  </TouchableOpacity>
+                    tab={tab}
+                    index={index}
+                    activeTab={activeTab}
+                    onPress={handleTabPress}
+                    colors={colors}
+                  />
                 )
               )}
-            </View>
+            </ProfileGlassSurface>
           </View>
 
           {/* Tab Content */}
@@ -2021,20 +2343,16 @@ export default function PublicProfileScreen() {
             {/* TAB 0 */}
             {activeTab === 0 && (
               <View style={styles.profileTab}>
-                <View
-                  style={[styles.section, { backgroundColor: colors.card }]}
-                >
+                <ProfileSection colors={colors}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>
                     Giới thiệu
                   </Text>
                   <Text style={[styles.bioText, { color: colors.subText }]}>
                     {base?.bio || "Chưa có thông tin."}
                   </Text>
-                </View>
+                </ProfileSection>
 
-                <View
-                  style={[styles.section, { backgroundColor: colors.card }]}
-                >
+                <ProfileSection colors={colors}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>
                     Thông tin cơ bản
                   </Text>
@@ -2091,11 +2409,9 @@ export default function PublicProfileScreen() {
                       />
                     )}
                   </View>
-                </View>
+                </ProfileSection>
 
-                <View
-                  style={[styles.section, { backgroundColor: colors.card }]}
-                >
+                <ProfileSection colors={colors}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>
                     Thông tin thi đấu
                   </Text>
@@ -2128,12 +2444,10 @@ export default function PublicProfileScreen() {
                       colors={colors}
                     />
                   </View>
-                </View>
+                </ProfileSection>
 
                 {canSeeSensitive && hasContactBlock && (
-                  <View
-                    style={[styles.section, { backgroundColor: colors.card }]}
-                  >
+                  <ProfileSection colors={colors}>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>
                       Thông tin liên hệ
                     </Text>
@@ -2164,7 +2478,7 @@ export default function PublicProfileScreen() {
                         />
                       )}
                     </View>
-                  </View>
+                  </ProfileSection>
                 )}
               </View>
             )}
@@ -2173,14 +2487,14 @@ export default function PublicProfileScreen() {
             {activeTab === 1 && (
               <View style={styles.matchTab}>
                 {matchQ.isLoading || (matchQ.isFetching && !matchRaw.length) ? (
-                  <View style={styles.emptyContainer}>
+                  <EmptyGlassState colors={colors}>
                     <ActivityIndicator size="large" color={colors.primary} />
                     <Text style={[styles.emptyText, { color: colors.subText }]}>
                       Đang tải dữ liệu trận đấu...
                     </Text>
-                  </View>
+                  </EmptyGlassState>
                 ) : matchPaged.length === 0 ? (
-                  <View style={styles.emptyContainer}>
+                  <EmptyGlassState colors={colors}>
                     <MaterialCommunityIcons
                       name="tennis-ball"
                       size={64}
@@ -2189,7 +2503,7 @@ export default function PublicProfileScreen() {
                     <Text style={[styles.emptyText, { color: colors.subText }]}>
                       Chưa có dữ liệu trận đấu
                     </Text>
-                  </View>
+                  </EmptyGlassState>
                 ) : (
                   <>
                     {matchPaged.map((match) => (
@@ -2206,12 +2520,9 @@ export default function PublicProfileScreen() {
 
                     {matchRaw.length > matchPerPage && (
                       <View style={styles.pagination}>
-                        <TouchableOpacity
-                          style={[
-                            styles.pageButton,
-                            { backgroundColor: colors.card },
-                            pageMatch === 1 && styles.pageButtonDisabled,
-                          ]}
+                        <ProfilePageButton
+                          colors={colors}
+                          disabled={pageMatch === 1}
                           onPress={() => {
                             setPageMatch((p) => Math.max(1, p - 1));
                             Haptics.impactAsync(
@@ -2229,28 +2540,25 @@ export default function PublicProfileScreen() {
                               });
                             });
                           }}
-                          disabled={pageMatch === 1}
                         >
                           <Ionicons
                             name="chevron-back"
                             size={20}
                             color={colors.subText}
                           />
-                        </TouchableOpacity>
+                        </ProfilePageButton>
 
                         <Text style={[styles.pageText, { color: colors.text }]}>
                           {pageMatch} /{" "}
                           {Math.ceil(matchRaw.length / matchPerPage)}
                         </Text>
 
-                        <TouchableOpacity
-                          style={[
-                            styles.pageButton,
-                            { backgroundColor: colors.card },
+                        <ProfilePageButton
+                          colors={colors}
+                          disabled={
                             pageMatch >=
-                              Math.ceil(matchRaw.length / matchPerPage) &&
-                              styles.pageButtonDisabled,
-                          ]}
+                            Math.ceil(matchRaw.length / matchPerPage)
+                          }
                           onPress={() => {
                             setPageMatch((p) =>
                               Math.min(
@@ -2273,17 +2581,13 @@ export default function PublicProfileScreen() {
                               });
                             });
                           }}
-                          disabled={
-                            pageMatch >=
-                            Math.ceil(matchRaw.length / matchPerPage)
-                          }
                         >
                           <Ionicons
                             name="chevron-forward"
                             size={20}
                             color={colors.subText}
                           />
-                        </TouchableOpacity>
+                        </ProfilePageButton>
                       </View>
                     )}
                   </>
@@ -2295,14 +2599,14 @@ export default function PublicProfileScreen() {
             {activeTab === 2 && (
               <View style={styles.ratingTab}>
                 {rateQ.isLoading || (rateQ.isFetching && !ratingRaw.length) ? (
-                  <View style={styles.emptyContainer}>
+                  <EmptyGlassState colors={colors}>
                     <ActivityIndicator size="large" color={colors.primary} />
                     <Text style={[styles.emptyText, { color: colors.subText }]}>
                       Đang tải lịch sử điểm trình...
                     </Text>
-                  </View>
+                  </EmptyGlassState>
                 ) : ratePaged.length === 0 ? (
-                  <View style={styles.emptyContainer}>
+                  <EmptyGlassState colors={colors}>
                     <Ionicons
                       name="stats-chart"
                       size={64}
@@ -2311,7 +2615,7 @@ export default function PublicProfileScreen() {
                     <Text style={[styles.emptyText, { color: colors.subText }]}>
                       Chưa có lịch sử điểm
                     </Text>
-                  </View>
+                  </EmptyGlassState>
                 ) : (
                   <>
                     {ratePaged.map((item, index) => {
@@ -2336,12 +2640,9 @@ export default function PublicProfileScreen() {
 
                     {ratingRaw.length > ratePerPage && (
                       <View style={styles.pagination}>
-                        <TouchableOpacity
-                          style={[
-                            styles.pageButton,
-                            { backgroundColor: colors.card },
-                            pageRate === 1 && styles.pageButtonDisabled,
-                          ]}
+                        <ProfilePageButton
+                          colors={colors}
+                          disabled={pageRate === 1}
                           onPress={() => {
                             setPageRate((p) => Math.max(1, p - 1));
                             Haptics.impactAsync(
@@ -2359,28 +2660,25 @@ export default function PublicProfileScreen() {
                               });
                             });
                           }}
-                          disabled={pageRate === 1}
                         >
                           <Ionicons
                             name="chevron-back"
                             size={20}
                             color={colors.subText}
                           />
-                        </TouchableOpacity>
+                        </ProfilePageButton>
 
                         <Text style={[styles.pageText, { color: colors.text }]}>
                           {pageRate} /{" "}
                           {Math.ceil(ratingRaw.length / ratePerPage)}
                         </Text>
 
-                        <TouchableOpacity
-                          style={[
-                            styles.pageButton,
-                            { backgroundColor: colors.card },
+                        <ProfilePageButton
+                          colors={colors}
+                          disabled={
                             pageRate >=
-                              Math.ceil(ratingRaw.length / ratePerPage) &&
-                              styles.pageButtonDisabled,
-                          ]}
+                            Math.ceil(ratingRaw.length / ratePerPage)
+                          }
                           onPress={() => {
                             setPageRate((p) =>
                               Math.min(
@@ -2403,17 +2701,13 @@ export default function PublicProfileScreen() {
                               });
                             });
                           }}
-                          disabled={
-                            pageRate >=
-                            Math.ceil(ratingRaw.length / ratePerPage)
-                          }
                         >
                           <Ionicons
                             name="chevron-forward"
                             size={20}
                             color={colors.subText}
                           />
-                        </TouchableOpacity>
+                        </ProfilePageButton>
                       </View>
                     )}
                   </>
@@ -2477,7 +2771,15 @@ export default function PublicProfileScreen() {
           snapPoints={shareSnapPoints}
           enablePanDownToClose
           backdropComponent={renderBackdrop}
-          backgroundStyle={{ backgroundColor: colors.card }}
+          backgroundStyle={[
+            styles.sheetBackground,
+            {
+              backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? profileGlassSurfaceTint(colors, 0.7, 0.58)
+                : colors.card,
+              borderColor: colors.border,
+            },
+          ]}
           handleIndicatorStyle={{ backgroundColor: colors.border }}
           containerStyle={{ zIndex: 1000 }}
         >
@@ -2486,7 +2788,15 @@ export default function PublicProfileScreen() {
               Chia sẻ hồ sơ
             </Text>
 
-            <View style={styles.shareList}>
+            <ProfileGlassSurface
+              colors={colors}
+              tintColor={profileGlassSurfaceTint(colors, 0.66, 0.54)}
+              style={[
+                styles.shareList,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.profileGlassPanel,
+              ]}
+            >
               {shareOptions.map((opt) => (
                 <TouchableOpacity
                   key={opt.id}
@@ -2497,14 +2807,18 @@ export default function PublicProfileScreen() {
                   activeOpacity={0.8}
                   onPress={opt.onPress}
                 >
-                  <View
+                  <ProfileGlassSurface
+                    colors={colors}
+                    effect="clear"
+                    tintColor={`${opt.color}26`}
                     style={[
                       styles.shareIconWrap,
                       { backgroundColor: `${opt.color}1A` },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.profileInnerGlass,
                     ]}
                   >
                     <Ionicons name={opt.icon} size={18} color={opt.color} />
-                  </View>
+                  </ProfileGlassSurface>
                   <Text style={[styles.shareLabel, { color: colors.text }]}>
                     {opt.label}
                   </Text>
@@ -2515,7 +2829,7 @@ export default function PublicProfileScreen() {
                   />
                 </TouchableOpacity>
               ))}
-            </View>
+            </ProfileGlassSurface>
           </BottomSheetView>
         </BottomSheet>
 
@@ -2526,7 +2840,15 @@ export default function PublicProfileScreen() {
           snapPoints={statsSnapPoints}
           enablePanDownToClose
           backdropComponent={renderBackdrop}
-          backgroundStyle={{ backgroundColor: colors.card }}
+          backgroundStyle={[
+            styles.sheetBackground,
+            {
+              backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? profileGlassSurfaceTint(colors, 0.7, 0.58)
+                : colors.card,
+              borderColor: colors.border,
+            },
+          ]}
           handleIndicatorStyle={{ backgroundColor: colors.border }}
           containerStyle={{ zIndex: 1000 }}
         >
@@ -2540,6 +2862,38 @@ export default function PublicProfileScreen() {
 /* ---------- STYLES ---------- */
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  profileAmbientBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  profileAmbientBand: {
+    position: "absolute",
+    top: 380,
+    left: -42,
+    right: -42,
+    height: 126,
+    borderRadius: 30,
+  },
+  profileAmbientBandAlt: {
+    top: 560,
+    height: 94,
+  },
+  profileGlassPanel: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  profileInnerGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  profileHeaderChipGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
 
   centerBox: { padding: 20, justifyContent: "center", alignItems: "center" },
   errorContainer: {
@@ -2578,6 +2932,11 @@ const styles = StyleSheet.create({
   },
 
   avatarContainer: { position: "relative", marginBottom: 12 },
+  avatarPressable: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+  },
   avatarWrapper: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -2666,6 +3025,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  headerButtonGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+  },
   backButton: {
     position: "absolute",
     top: 60,
@@ -2695,11 +3064,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 110,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  statCardGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+  statGradientWash: {
+    opacity: 0.74,
   },
   statCardSmall: { width: "100%", alignSelf: "stretch" },
   statIconContainer: { marginBottom: 8 },
@@ -2748,6 +3125,15 @@ const styles = StyleSheet.create({
   stickyTabActive: { backgroundColor: "#6366F1" },
   stickyTabText: { fontSize: 12, fontWeight: "600" },
   stickyTabTextActive: { color: "#FFF" },
+  profileActiveTabGlass: {
+    width: "100%",
+    minHeight: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
 
   tabContainer: { marginBottom: 16, paddingHorizontal: 16 },
   tabWrapper: {
@@ -2787,7 +3173,13 @@ const styles = StyleSheet.create({
   bioText: { fontSize: 14, lineHeight: 22 },
 
   infoGrid: { gap: 16 },
-  infoItem: { gap: 4 },
+  infoItem: {
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   infoLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
   infoValueContainer: {
     flexDirection: "row",
@@ -2923,6 +3315,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 60,
   },
+  emptyGlassState: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 180,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 34,
+  },
   emptyText: { fontSize: 16, marginTop: 16 },
 
   pagination: {
@@ -2970,6 +3371,11 @@ const styles = StyleSheet.create({
 
   /* BottomSheet - share */
   sheetContainer: { paddingHorizontal: 16, paddingTop: 6 },
+  sheetBackground: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   sheetTitle: { fontSize: 16, fontWeight: "800", marginBottom: 12 },
   shareList: { borderRadius: 12, overflow: "hidden" },
   shareRow: {

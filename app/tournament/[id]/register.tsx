@@ -51,6 +51,8 @@ import { Image as ExpoImage } from "expo-image"; // <--- Dùng Expo Image
 import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
 import { getPlayerDisplayName } from "@/utils/matchDisplay";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Ionicons,
@@ -72,13 +74,13 @@ function useThemeColors() {
     return {
       scheme,
       tint: isDark ? "#60a5fa" : "#2563eb",
-      pageBg: isDark ? "#0f172a" : "#f8fafc",
-      cardBg: isDark ? "#1e293b" : "#ffffff",
-      border: isDark ? "#334155" : "#e2e8f0",
+      pageBg: isDark ? "#0f1115" : "#F5F7FA",
+      cardBg: isDark ? "#181a20" : "#FFFFFF",
+      border: isDark ? "#262932" : "#E5E7EB",
       textPrimary: isDark ? "#f8fafc" : "#0f172a",
-      textSecondary: isDark ? "#94a3b8" : "#64748b",
-      chipBg: isDark ? "#334155" : "#f1f5f9",
-      inputBg: isDark ? "#1e293b" : "#ffffff",
+      textSecondary: isDark ? "#848E9C" : "#6B7280",
+      chipBg: isDark ? "#20232b" : "#F3F4F6",
+      inputBg: isDark ? "#20232b" : "#F3F4F6",
       ghostBg: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
       successBg: isDark ? "rgba(34,197,94,0.15)" : "#dcfce7",
       successText: isDark ? "#4ade80" : "#166534",
@@ -88,9 +90,9 @@ function useThemeColors() {
       errorText: isDark ? "#f87171" : "#991b1b",
       infoBg: isDark ? "rgba(59,130,246,0.2)" : "#eff6ff",
       infoText: isDark ? "#93c5fd" : "#1e3a8a",
-      softBtn: isDark ? "#334155" : "#e2e8f0",
-      gradStart: isDark ? "#1e3a8a" : "#1d4ed8",
-      gradEnd: isDark ? "#172554" : "#1e40af",
+      softBtn: isDark ? "#20232b" : "#E5E7EB",
+      gradStart: isDark ? "#181a20" : "#1A1D1E",
+      gradEnd: isDark ? "#0f1115" : "#111827",
       skeleton: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
       // Theme cho Image Viewer
       imageViewBg: isDark ? "#000000" : "#ffffff",
@@ -105,6 +107,139 @@ function useThemeColors() {
       },
     };
   }, [scheme]);
+}
+
+const glassScheme = (C: ReturnType<typeof useThemeColors>) =>
+  C.scheme === "dark" ? "dark" : "light";
+
+const glassSurfaceTint = (
+  C: ReturnType<typeof useThemeColors>,
+  light = 0.54,
+  dark = 0.5
+) =>
+  C.scheme === "dark"
+    ? `rgba(30,41,59,${dark})`
+    : `rgba(255,255,255,${light})`;
+
+const glassAccentTint = (C: ReturnType<typeof useThemeColors>, alpha = 0.28) =>
+  C.scheme === "dark"
+    ? `rgba(96,165,250,${alpha})`
+    : `rgba(37,99,235,${alpha})`;
+
+const getImageValue = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return getImageValue(value[0]);
+  return value?.url || value?.secure_url || value?.path || value?.src || "";
+};
+
+const getTournamentHeroImage = (tour: any) =>
+  normalizeUrl(
+    getImageValue(
+      tour?.image ||
+        tour?.cover ||
+        tour?.banner ||
+        tour?.thumbnail ||
+        tour?.poster ||
+        tour?.backgroundImage ||
+        tour?.background
+    )
+  ) || "";
+
+function RegisterGlassSurface({
+  children,
+  C,
+  style,
+  effect = "regular",
+  interactive = false,
+  tintColor,
+}: {
+  children?: React.ReactNode;
+  C: ReturnType<typeof useThemeColors>;
+  style?: any;
+  effect?: "regular" | "clear";
+  interactive?: boolean;
+  tintColor?: string;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={glassScheme(C)}
+      glassEffectStyle={effect}
+      glassTintColor={tintColor ?? glassSurfaceTint(C)}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
+function RegisterLiquidBackdrop({ C }: { C: ReturnType<typeof useThemeColors> }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 16],
+  });
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.28, 0.48],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.registerBackdrop}>
+      <Animated.View
+        style={[
+          styles.registerAmbientBand,
+          {
+            backgroundColor:
+              C.scheme === "dark"
+                ? "rgba(59,130,246,0.18)"
+                : "rgba(37,99,235,0.14)",
+            opacity,
+            transform: [{ translateY }, { rotate: "-8deg" }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.registerAmbientBand,
+          styles.registerAmbientBandAlt,
+          {
+            backgroundColor:
+              C.scheme === "dark"
+                ? "rgba(245,158,11,0.12)"
+                : "rgba(245,158,11,0.1)",
+            opacity,
+            transform: [{ translateY }, { rotate: "7deg" }],
+          },
+        ]}
+      />
+    </View>
+  );
 }
 
 // ... (Các hàm utils giữ nguyên)
@@ -506,10 +641,14 @@ const HtmlPreviewBlock = memo(
         >
           {title}
         </Text>
-        <View
+        <RegisterGlassSurface
+          C={C}
+          effect="clear"
+          tintColor={glassSurfaceTint(C, 0.58, 0.54)}
           style={[
             styles.htmlCard,
             { backgroundColor: C.cardBg, borderColor: C.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.strongGlassSurface,
           ]}
         >
           <View
@@ -550,7 +689,7 @@ const HtmlPreviewBlock = memo(
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </RegisterGlassSurface>
 
         <Modal
           visible={open}
@@ -681,10 +820,15 @@ const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
   }
 
   return (
-    <View
+    <RegisterGlassSurface
+      C={C}
+      effect="regular"
+      interactive
+      tintColor={glassSurfaceTint(C, 0.58, 0.54)}
       style={[
         styles.statCard,
         { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.strongGlassSurface,
       ]}
     >
       <View style={[styles.statIconBox, { backgroundColor: bgIcon }]}>
@@ -711,7 +855,7 @@ const StatCard = memo(({ icon, label, value, hint, color = "blue" }: any) => {
           </Text>
         ) : null}
       </View>
-    </View>
+    </RegisterGlassSurface>
   );
 });
 StatCard.displayName = "StatCard";
@@ -753,10 +897,15 @@ const RegItem = memo(function RegItem({
       : C.textPrimary;
 
   return (
-    <View
+    <RegisterGlassSurface
+      C={C}
+      effect="regular"
+      interactive
+      tintColor={glassSurfaceTint(C, 0.62, 0.56)}
       style={[
         styles.regCard,
         { backgroundColor: C.cardBg, borderColor: C.border, ...C.shadow },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.strongGlassSurface,
       ]}
     >
       {/* Header Card */}
@@ -968,69 +1117,101 @@ const RegItem = memo(function RegItem({
         <View style={styles.actionPanel}>
           {canOpenPoster ? (
             <TouchableOpacity
-              style={[
-                styles.actionTile,
-                {
-                  backgroundColor: C.infoBg,
-                  opacity: posterBusy ? 0.7 : 1,
-                },
-              ]}
               disabled={posterBusy}
               onPress={() => onOpenPoster(r)}
+              style={styles.actionTileTouch}
             >
-              {posterBusy ? (
-                <ActivityIndicator size="small" color={C.infoText} />
-              ) : (
-                <Ionicons name="image-outline" size={18} color={C.infoText} />
-              )}
-              <Text style={[styles.actionTileText, { color: C.infoText }]}>
-                {posterBusy ? "Đang mở" : "Poster"}
-              </Text>
+              <RegisterGlassSurface
+                C={C}
+                interactive={!posterBusy}
+                tintColor={glassAccentTint(C, 0.22)}
+                style={[
+                  styles.actionTile,
+                  {
+                    backgroundColor: C.infoBg,
+                    opacity: posterBusy ? 0.7 : 1,
+                  },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+                ]}
+              >
+                {posterBusy ? (
+                  <ActivityIndicator size="small" color={C.infoText} />
+                ) : (
+                  <Ionicons name="image-outline" size={18} color={C.infoText} />
+                )}
+                <Text style={[styles.actionTileText, { color: C.infoText }]}>
+                  {posterBusy ? "Đang mở" : "Poster"}
+                </Text>
+              </RegisterGlassSurface>
             </TouchableOpacity>
           ) : null}
 
-          <TouchableOpacity
-            style={[styles.actionTile, { backgroundColor: C.infoBg }]}
-            onPress={() => onOpenPayment(r)}
-          >
-            <Ionicons name="qr-code-outline" size={18} color={C.infoText} />
-            <Text
-              style={[styles.actionTileText, { color: C.infoText }]}
+          <TouchableOpacity onPress={() => onOpenPayment(r)} style={styles.actionTileTouch}>
+            <RegisterGlassSurface
+              C={C}
+              interactive
+              tintColor={glassAccentTint(C, 0.22)}
+              style={[
+                styles.actionTile,
+                { backgroundColor: C.infoBg },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+              ]}
             >
-              Thanh toán
-            </Text>
+              <Ionicons name="qr-code-outline" size={18} color={C.infoText} />
+              <Text style={[styles.actionTileText, { color: C.infoText }]}>
+                Thanh toán
+              </Text>
+            </RegisterGlassSurface>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionTile, { backgroundColor: C.warningBg }]}
-            onPress={() => onOpenComplaint(r)}
-          >
-            <Ionicons name="warning-outline" size={18} color={C.warningText} />
-            <Text
-              style={[styles.actionTileText, { color: C.warningText }]}
+          <TouchableOpacity onPress={() => onOpenComplaint(r)} style={styles.actionTileTouch}>
+            <RegisterGlassSurface
+              C={C}
+              interactive
+              tintColor={
+                C.scheme === "dark"
+                  ? "rgba(245,158,11,0.18)"
+                  : "rgba(245,158,11,0.16)"
+              }
+              style={[
+                styles.actionTile,
+                { backgroundColor: C.warningBg },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+              ]}
             >
-              Khiếu nại
-            </Text>
+              <Ionicons name="warning-outline" size={18} color={C.warningText} />
+              <Text style={[styles.actionTileText, { color: C.warningText }]}>
+                Khiếu nại
+              </Text>
+            </RegisterGlassSurface>
           </TouchableOpacity>
 
           {canManage && (
             <TouchableOpacity
               onPress={() => onTogglePayment(r)}
               disabled={busy?.settingPayment}
-              style={[
-                styles.iconActionTile,
-                {
-                  backgroundColor: C.pageBg,
-                  borderWidth: 1,
-                  borderColor: C.border,
-                },
-              ]}
+              style={styles.iconActionTouch}
             >
-              <FontAwesome5
-                name="coins"
-                size={14}
-                color={isPaid ? C.textSecondary : C.successText}
-              />
+              <RegisterGlassSurface
+                C={C}
+                interactive={!busy?.settingPayment}
+                tintColor={glassSurfaceTint(C, 0.42, 0.38)}
+                style={[
+                  styles.iconActionTile,
+                  {
+                    backgroundColor: C.pageBg,
+                    borderWidth: 1,
+                    borderColor: C.border,
+                  },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+                ]}
+              >
+                <FontAwesome5
+                  name="coins"
+                  size={14}
+                  color={isPaid ? C.textSecondary : C.successText}
+                />
+              </RegisterGlassSurface>
             </TouchableOpacity>
           )}
 
@@ -1038,18 +1219,33 @@ const RegItem = memo(function RegItem({
             <TouchableOpacity
               onPress={() => onCancel(r)}
               disabled={busy?.deletingId === r._id}
-              style={[styles.iconActionTile, { backgroundColor: C.errorBg }]}
+              style={styles.iconActionTouch}
             >
-              {busy?.deletingId === r._id ? (
-                <ActivityIndicator size="small" color={C.errorText} />
-              ) : (
-                <Ionicons name="trash-outline" size={16} color={C.errorText} />
-              )}
+              <RegisterGlassSurface
+                C={C}
+                interactive={busy?.deletingId !== r._id}
+                tintColor={
+                  C.scheme === "dark"
+                    ? "rgba(239,68,68,0.18)"
+                    : "rgba(239,68,68,0.16)"
+                }
+                style={[
+                  styles.iconActionTile,
+                  { backgroundColor: C.errorBg },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+                ]}
+              >
+                {busy?.deletingId === r._id ? (
+                  <ActivityIndicator size="small" color={C.errorText} />
+                ) : (
+                  <Ionicons name="trash-outline" size={16} color={C.errorText} />
+                )}
+              </RegisterGlassSurface>
             </TouchableOpacity>
           )}
         </View>
       </View>
-    </View>
+    </RegisterGlassSurface>
   );
 });
 
@@ -1487,125 +1683,165 @@ export default function TournamentRegistrationScreen() {
 
   // -- HEADER COMPONENT (Memoized) --
   const HeaderComponent = useMemo(
-    () => (
-      <View>
-        <LinearGradient
-          colors={[C.gradStart, C.gradEnd]}
-          style={[styles.headerHero, { paddingTop: insets.top + 10 }]}
-        >
-          {/* Header Top: Badge & Countdown */}
-          <View style={styles.headerTopRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={styles.badgeGlass}>
-                <Text
-                  style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
-                >
-                  {isSingles ? "GIẢI ĐƠN" : "GIẢI ĐÔI"}
-                </Text>
-              </View>
-              <TournamentCountdown deadline={tour?.registrationDeadline} />
-            </View>
-          </View>
+    () => {
+      const heroImageUri = getTournamentHeroImage(tour);
+      const heroTopPadding = 32;
 
-          {/* Tournament Name */}
-          <Text style={styles.tourNameHero}>{tour?.name}</Text>
-
-          {/* Location & Date Row */}
+      return (
+        <View>
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              marginTop: 8,
-              opacity: 0.9,
-              gap: 12,
-            }}
+            style={[
+              styles.headerHero,
+              {
+                paddingTop: heroTopPadding,
+                backgroundColor: C.gradEnd,
+              },
+            ]}
           >
-            {tour?.location && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 4,
-                  flex: 1,
-                }}
-              >
-                <Ionicons
-                  name="location"
-                  size={14}
-                  color="#fff"
-                  style={{ marginTop: 2 }}
-                />
-                <Text
+            {heroImageUri ? (
+              <ExpoImage
+                source={{ uri: heroImageUri }}
+                style={styles.headerHeroImage}
+                contentFit="cover"
+                contentPosition="center"
+                blurRadius={18}
+                transition={200}
+                cachePolicy="memory-disk"
+              />
+            ) : (
+              <LinearGradient
+                colors={[C.gradStart, C.gradEnd]}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+            <View style={styles.headerHeroDim} />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                "rgba(0,0,0,0.56)",
+                "rgba(0,0,0,0.3)",
+                "rgba(0,0,0,0.58)",
+              ]}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Header Top: Badge & Countdown */}
+            <View style={styles.headerTopRow}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.badgeGlass}>
+                  <Text
+                    style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
+                  >
+                    {isSingles ? "GIẢI ĐƠN" : "GIẢI ĐÔI"}
+                  </Text>
+                </View>
+                <TournamentCountdown deadline={tour?.registrationDeadline} />
+              </View>
+            </View>
+
+            {/* Tournament Name */}
+            <Text style={styles.tourNameHero}>{tour?.name}</Text>
+
+            {/* Location & Date Row */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                marginTop: 8,
+                opacity: 0.9,
+                gap: 12,
+              }}
+            >
+              {tour?.location && (
+                <View
                   style={{
-                    color: "#fff",
-                    fontSize: 12,
-                    fontWeight: "600",
-                    lineHeight: 18,
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 4,
+                    flex: 1,
                   }}
                 >
-                  {tour.location}
+                  <Ionicons
+                    name="location"
+                    size={14}
+                    color="#fff"
+                    style={{ marginTop: 2 }}
+                  />
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: 12,
+                      fontWeight: "600",
+                      lineHeight: 18,
+                    }}
+                  >
+                    {tour.location}
+                  </Text>
+                </View>
+              )}
+
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="calendar" size={14} color="#fff" />
+                <Text
+                  style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+                >
+                  {fmtRange(tour?.startDate, tour?.endDate)}
                 </Text>
               </View>
-            )}
-
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-            >
-              <Ionicons name="calendar" size={14} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-                {fmtRange(tour?.startDate, tour?.endDate)}
-              </Text>
             </View>
           </View>
-        </LinearGradient>
 
-        {/* Stats Overlap */}
-        <View style={styles.statsContainer}>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <StatCard
-                icon={<Ionicons name="trophy" />}
-                label="Điểm tối đa"
-                value={cap > 0 ? cap : "Không giới hạn"}
-                color="orange"
-              />
+          {/* Stats Overlap */}
+          <View style={styles.statsContainer}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon={<Ionicons name="trophy" />}
+                  label="Điểm tối đa"
+                  value={cap > 0 ? cap : "Không giới hạn"}
+                  color="orange"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon={<Ionicons name="people" />}
+                  label="Đã đăng ký"
+                  value={regTotal}
+                  color="blue"
+                />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <StatCard
-                icon={<Ionicons name="people" />}
-                label="Đã đăng ký"
-                value={regTotal}
-                color="blue"
-              />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon={<FontAwesome5 name="money-bill-wave" />}
+                  label="Đã thanh toán"
+                  value={`${paidCount}/${regTotal}`}
+                  color="green"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon={<MaterialCommunityIcons name="list-status" />}
+                  label="Chờ thanh toán"
+                  value={regTotal - paidCount}
+                  color="default"
+                />
+              </View>
             </View>
           </View>
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-            <View style={{ flex: 1 }}>
-              <StatCard
-                icon={<FontAwesome5 name="money-bill-wave" />}
-                label="Đã thanh toán"
-                value={`${paidCount}/${regTotal}`}
-                color="green"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <StatCard
-                icon={<MaterialCommunityIcons name="list-status" />}
-                label="Chờ thanh toán"
-                value={regTotal - paidCount}
-                color="default"
-              />
-            </View>
-          </View>
-        </View>
 
-        {/* Action Section & List Header */}
-        <View
-          style={{ paddingHorizontal: 16, marginTop: 16, paddingBottom: 16 }}
-        >
+          {/* Action Section & List Header */}
+          <View
+            style={{ paddingHorizontal: 16, marginTop: 16, paddingBottom: 16 }}
+          >
           {/* Pending Invites */}
           {isLoggedIn && pendingInvitesHere.length > 0 && (
-            <View
+            <RegisterGlassSurface
+              C={C}
+              effect="regular"
+              tintColor={glassSurfaceTint(C, 0.6, 0.54)}
               style={[
                 styles.sectionCard,
                 {
@@ -1613,6 +1849,7 @@ export default function TournamentRegistrationScreen() {
                   borderColor: C.border,
                   marginBottom: 16,
                 },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.strongGlassSurface,
               ]}
             >
               <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>
@@ -1678,14 +1915,18 @@ export default function TournamentRegistrationScreen() {
                   </View>
                 </View>
               ))}
-            </View>
+            </RegisterGlassSurface>
           )}
 
           {/* HTML Columns (Content/Contact) */}
           <HtmlCols tour={tour} />
 
           {/* Registration Form */}
-          <View
+          <RegisterGlassSurface
+            C={C}
+            effect="regular"
+            interactive
+            tintColor={glassSurfaceTint(C, 0.62, 0.56)}
             style={[
               styles.formCard,
               {
@@ -1694,6 +1935,7 @@ export default function TournamentRegistrationScreen() {
                 ...C.shadow,
                 marginTop: 16,
               },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.formGlassSurface,
             ]}
           >
             <View
@@ -1730,20 +1972,33 @@ export default function TournamentRegistrationScreen() {
             {isLoggedIn ? (
               <>
                 {isAdmin ? (
-                  <PlayerSelector
-                    label="VĐV 1"
-                    eventType={tour?.eventType}
-                    onChange={setP1Admin}
-                    value={p1Admin}
-                  />
+                  <RegisterGlassSurface
+                    C={C}
+                    effect="clear"
+                    tintColor={glassSurfaceTint(C, 0.44, 0.38)}
+                    style={[
+                      styles.playerSelectorGlassWrap,
+                      { backgroundColor: C.inputBg, borderColor: C.border },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
+                    ]}
+                  >
+                    <PlayerSelector
+                      label="VĐV 1"
+                      eventType={tour?.eventType}
+                      onChange={setP1Admin}
+                      value={p1Admin}
+                    />
+                  </RegisterGlassSurface>
                 ) : (
-                  <View
-                    style={{
-                      padding: 10,
-                      backgroundColor: C.pageBg,
-                      borderRadius: 8,
-                      marginBottom: 12,
-                    }}
+                  <RegisterGlassSurface
+                    C={C}
+                    effect="clear"
+                    tintColor={glassSurfaceTint(C, 0.42, 0.36)}
+                    style={[
+                      styles.selfPlayerGlass,
+                      { backgroundColor: C.pageBg, borderColor: C.border },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
+                    ]}
                   >
                     <Text style={{ fontWeight: "700", color: C.textPrimary }}>
                       Bạn (VĐV 1): {displayName(me, tour)}
@@ -1760,44 +2015,66 @@ export default function TournamentRegistrationScreen() {
                         isSingles ? me?.score?.single : me?.score?.double
                       )}
                     </Text>
-                  </View>
+                  </RegisterGlassSurface>
                 )}
                 {isDoubles && (
                   <View style={{ marginTop: 12 }}>
-                    <PlayerSelector
-                      label="VĐV 2 (Partner)"
-                      eventType={tour?.eventType}
-                      onChange={setP2}
-                      value={p2}
-                    />
+                    <RegisterGlassSurface
+                      C={C}
+                      effect="clear"
+                      tintColor={glassSurfaceTint(C, 0.44, 0.38)}
+                      style={[
+                        styles.playerSelectorGlassWrap,
+                        { backgroundColor: C.inputBg, borderColor: C.border },
+                        IOS_26_LIQUID_GLASS_ENABLED &&
+                          styles.inputGlassSurface,
+                      ]}
+                    >
+                      <PlayerSelector
+                        label="VĐV 2 (Partner)"
+                        eventType={tour?.eventType}
+                        onChange={setP2}
+                        value={p2}
+                      />
+                    </RegisterGlassSurface>
                   </View>
                 )}
-                <TextInput
-                  placeholder="Lời nhắn cho BTC..."
+                <RegisterGlassSurface
+                  C={C}
+                  effect="clear"
+                  tintColor={glassSurfaceTint(C, 0.44, 0.38)}
                   style={[
-                    styles.input,
-                    {
-                      backgroundColor: C.inputBg,
-                      borderColor: C.border,
-                      color: C.textPrimary,
-                      marginTop: 12,
-                    },
+                    styles.inputGlassWrap,
+                    { backgroundColor: C.inputBg, borderColor: C.border },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
                   ]}
-                  placeholderTextColor={C.textSecondary}
-                  value={msg}
-                  onChangeText={setMsg}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.btnPrimary,
-                    {
-                      backgroundColor: saving ? C.textSecondary : C.tint,
-                      marginTop: 16,
-                    },
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={saving}
                 >
+                  <TextInput
+                    placeholder="Lời nhắn cho BTC..."
+                    style={[
+                      styles.input,
+                      styles.inputInsideGlass,
+                      { color: C.textPrimary },
+                    ]}
+                    placeholderTextColor={C.textSecondary}
+                    value={msg}
+                    onChangeText={setMsg}
+                  />
+                </RegisterGlassSurface>
+                <TouchableOpacity onPress={handleSubmit} disabled={saving}>
+                  <RegisterGlassSurface
+                    C={C}
+                    interactive={!saving}
+                    tintColor={saving ? glassSurfaceTint(C, 0.36, 0.36) : glassAccentTint(C, 0.34)}
+                    style={[
+                      styles.btnPrimary,
+                      {
+                        backgroundColor: saving ? C.textSecondary : C.tint,
+                        marginTop: 16,
+                      },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.primaryGlassButton,
+                    ]}
+                  >
                   {saving ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
@@ -1814,6 +2091,7 @@ export default function TournamentRegistrationScreen() {
                       </Text>
                     </View>
                   )}
+                  </RegisterGlassSurface>
                 </TouchableOpacity>
               </>
             ) : (
@@ -1827,20 +2105,58 @@ export default function TournamentRegistrationScreen() {
                 Đăng nhập để đăng ký
               </Text>
             )}
-          </View>
+          </RegisterGlassSurface>
 
           {/* Manager Buttons */}
           <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
             {canManage && (
               <TouchableOpacity
-                style={[
-                  styles.btnSoft,
-                  { backgroundColor: C.softBtn, flex: 1 },
-                ]}
+                style={{ flex: 1 }}
                 onPress={() => router.push(`/tournament/${id}/manage`)}
               >
-                <Ionicons
-                  name="settings-sharp"
+                <RegisterGlassSurface
+                  C={C}
+                  interactive
+                  tintColor={glassSurfaceTint(C, 0.44, 0.4)}
+                  style={[
+                    styles.btnSoft,
+                    { backgroundColor: C.softBtn },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.softGlassButton,
+                  ]}
+                >
+                  <Ionicons
+                    name="settings-sharp"
+                    size={16}
+                    color={C.textPrimary}
+                  />
+                  <Text
+                    style={{
+                      fontWeight: "700",
+                      color: C.textPrimary,
+                      fontSize: 13,
+                    }}
+                  >
+                    Quản lý
+                  </Text>
+                </RegisterGlassSurface>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              onPress={() => router.push(`/tournament/${id}/bracket`)}
+            >
+              <RegisterGlassSurface
+                C={C}
+                interactive
+                tintColor={glassSurfaceTint(C, 0.44, 0.4)}
+                style={[
+                  styles.btnSoft,
+                  { backgroundColor: C.softBtn },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.softGlassButton,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="tournament"
                   size={16}
                   color={C.textPrimary}
                 />
@@ -1851,28 +2167,9 @@ export default function TournamentRegistrationScreen() {
                     fontSize: 13,
                   }}
                 >
-                  Quản lý
+                  Sơ đồ
                 </Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.btnSoft, { backgroundColor: C.softBtn, flex: 1 }]}
-              onPress={() => router.push(`/tournament/${id}/bracket`)}
-            >
-              <MaterialCommunityIcons
-                name="tournament"
-                size={16}
-                color={C.textPrimary}
-              />
-              <Text
-                style={{
-                  fontWeight: "700",
-                  color: C.textPrimary,
-                  fontSize: 13,
-                }}
-              >
-                Sơ đồ
-              </Text>
+              </RegisterGlassSurface>
             </TouchableOpacity>
           </View>
 
@@ -1898,7 +2195,10 @@ export default function TournamentRegistrationScreen() {
               >
                 Danh sách
               </Text>
-              <View
+              <RegisterGlassSurface
+                C={C}
+                effect="clear"
+                tintColor={glassSurfaceTint(C, 0.34, 0.34)}
                 style={{
                   backgroundColor: C.chipBg,
                   paddingHorizontal: 8,
@@ -1915,30 +2215,29 @@ export default function TournamentRegistrationScreen() {
                 >
                   {filteredRegs.length}
                 </Text>
-              </View>
+              </RegisterGlassSurface>
             </View>
 
             <TouchableOpacity
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: C.softBtn,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
               onPress={() => setSearchOpen(true)}
             >
-              <Ionicons name="search" size={20} color={C.textPrimary} />
+              <RegisterGlassSurface
+                C={C}
+                interactive
+                tintColor={glassSurfaceTint(C, 0.42, 0.38)}
+                style={styles.searchGlassButton}
+              >
+                <Ionicons name="search" size={20} color={C.textPrimary} />
+              </RegisterGlassSurface>
             </TouchableOpacity>
           </View>
         </View>
       </View>
-    ),
+    );
+    },
     [
       tour,
       C,
-      insets.top,
       cap,
       regTotal,
       paidCount,
@@ -1967,15 +2266,20 @@ export default function TournamentRegistrationScreen() {
         { backgroundColor: C.pageBg, zIndex: 10 },
       ]}
     >
+      <RegisterLiquidBackdrop C={C} />
       <SafeAreaView style={{ flex: 1 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: C.border,
-          }}
+        <RegisterGlassSurface
+          C={C}
+          effect="regular"
+          tintColor={glassSurfaceTint(C, 0.58, 0.54)}
+          style={[
+            styles.searchOverlayHeader,
+            {
+              backgroundColor: C.cardBg,
+              borderColor: C.border,
+            },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.strongGlassSurface,
+          ]}
         >
           <TouchableOpacity
             onPress={() => setSearchOpen(false)}
@@ -1983,25 +2287,31 @@ export default function TournamentRegistrationScreen() {
           >
             <Ionicons name="chevron-back" size={24} color={C.textPrimary} />
           </TouchableOpacity>
-          <TextInput
-            autoFocus
-            placeholder="Tìm kiếm..."
-            style={{
-              flex: 1,
-              fontSize: 16,
-              color: C.textPrimary,
-              paddingHorizontal: 10,
-            }}
-            placeholderTextColor={C.textSecondary}
-            value={searchQ}
-            onChangeText={setSearchQ}
-          />
+          <RegisterGlassSurface
+            C={C}
+            effect="clear"
+            tintColor={glassSurfaceTint(C, 0.42, 0.36)}
+            style={[
+              styles.searchInputGlass,
+              { backgroundColor: C.inputBg, borderColor: C.border },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
+            ]}
+          >
+            <TextInput
+              autoFocus
+              placeholder="Tìm kiếm..."
+              style={[styles.searchOverlayInput, { color: C.textPrimary }]}
+              placeholderTextColor={C.textSecondary}
+              value={searchQ}
+              onChangeText={setSearchQ}
+            />
+          </RegisterGlassSurface>
           {searchQ.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQ("")}>
               <Ionicons name="close-circle" size={20} color={C.textSecondary} />
             </TouchableOpacity>
           )}
-        </View>
+        </RegisterGlassSurface>
         <FlashList
           data={filteredRegs}
           estimatedItemSize={150}
@@ -2070,6 +2380,7 @@ export default function TournamentRegistrationScreen() {
         }}
       />
       <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+        <RegisterLiquidBackdrop C={C} />
         {/* Main List */}
         <FlashList
           ref={listRef}
@@ -2244,27 +2555,46 @@ export default function TournamentRegistrationScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ padding: 16 }}>
-              <PlayerSelector
-                label="Chọn VĐV mới"
-                eventType={tour?.eventType}
-                onChange={setNewPlayer}
-                value={newPlayer}
-              />
-              <TouchableOpacity
+              <RegisterGlassSurface
+                C={C}
+                effect="clear"
+                tintColor={glassSurfaceTint(C, 0.44, 0.38)}
                 style={[
-                  styles.btnPrimary,
-                  {
-                    backgroundColor:
-                      replacing || !newPlayer ? C.textSecondary : C.tint,
-                    marginTop: 24,
-                  },
+                  styles.playerSelectorGlassWrap,
+                  { backgroundColor: C.inputBg, borderColor: C.border },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
                 ]}
-                disabled={replacing || !newPlayer}
-                onPress={submitReplace}
               >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>
-                  {replacing ? "Đang lưu..." : "Lưu thay đổi"}
-                </Text>
+                <PlayerSelector
+                  label="Chọn VĐV mới"
+                  eventType={tour?.eventType}
+                  onChange={setNewPlayer}
+                  value={newPlayer}
+                />
+              </RegisterGlassSurface>
+              <TouchableOpacity disabled={replacing || !newPlayer} onPress={submitReplace}>
+                <RegisterGlassSurface
+                  C={C}
+                  interactive={!(replacing || !newPlayer)}
+                  tintColor={
+                    replacing || !newPlayer
+                      ? glassSurfaceTint(C, 0.34, 0.34)
+                      : glassAccentTint(C, 0.34)
+                  }
+                  style={[
+                    styles.btnPrimary,
+                    {
+                      backgroundColor:
+                        replacing || !newPlayer ? C.textSecondary : C.tint,
+                      marginTop: 24,
+                    },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.primaryGlassButton,
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>
+                    {replacing ? "Đang lưu..." : "Lưu thay đổi"}
+                  </Text>
+                </RegisterGlassSurface>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -2277,7 +2607,16 @@ export default function TournamentRegistrationScreen() {
           onRequestClose={closePayment}
         >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { backgroundColor: C.cardBg }]}>
+            <RegisterGlassSurface
+              C={C}
+              effect="regular"
+              tintColor={glassSurfaceTint(C, 0.62, 0.58)}
+              style={[
+                styles.modalCard,
+                { backgroundColor: C.cardBg, borderColor: C.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.modalGlassCard,
+              ]}
+            >
               <Text
                 style={{
                   fontSize: 18,
@@ -2320,16 +2659,21 @@ export default function TournamentRegistrationScreen() {
                   </Text>
                 </View>
               )}
-              <TouchableOpacity
-                style={[
-                  styles.btnPrimary,
-                  { marginTop: 20, backgroundColor: C.tint },
-                ]}
-                onPress={closePayment}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Đóng</Text>
+              <TouchableOpacity onPress={closePayment}>
+                <RegisterGlassSurface
+                  C={C}
+                  interactive
+                  tintColor={glassAccentTint(C, 0.34)}
+                  style={[
+                    styles.btnPrimary,
+                    { marginTop: 20, backgroundColor: C.tint },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.primaryGlassButton,
+                  ]}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Đóng</Text>
+                </RegisterGlassSurface>
               </TouchableOpacity>
-            </View>
+            </RegisterGlassSurface>
           </View>
         </Modal>
 
@@ -2343,16 +2687,21 @@ export default function TournamentRegistrationScreen() {
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={{ flex: 1, justifyContent: "flex-end" }}
           >
-            <View
+            <RegisterGlassSurface
+              C={C}
+              effect="regular"
+              tintColor={glassSurfaceTint(C, 0.62, 0.58)}
               style={[
                 styles.modalCard,
                 {
                   backgroundColor: C.cardBg,
+                  borderColor: C.border,
                   padding: 20,
                   margin: 0,
                   borderBottomLeftRadius: 0,
                   borderBottomRightRadius: 0,
                 },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.modalGlassCard,
               ]}
             >
               <Text
@@ -2365,23 +2714,36 @@ export default function TournamentRegistrationScreen() {
               >
                 Gửi khiếu nại
               </Text>
-              <TextInput
+              <RegisterGlassSurface
+                C={C}
+                effect="clear"
+                tintColor={glassSurfaceTint(C, 0.44, 0.38)}
                 style={[
-                  styles.input,
-                  {
-                    backgroundColor: C.inputBg,
-                    color: C.textPrimary,
-                    minHeight: 80,
-                  },
+                  styles.inputGlassWrap,
+                  styles.complaintInputGlass,
+                  { backgroundColor: C.inputBg, borderColor: C.border },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.inputGlassSurface,
                 ]}
-                multiline
-                placeholder="Nhập nội dung..."
-                placeholderTextColor={C.textSecondary}
-                value={complaintDlg.text}
-                onChangeText={(t) =>
-                  setComplaintDlg({ ...complaintDlg, text: t })
-                }
-              />
+              >
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.inputInsideGlass,
+                    {
+                      color: C.textPrimary,
+                      minHeight: 80,
+                      textAlignVertical: "top",
+                    },
+                  ]}
+                  multiline
+                  placeholder="Nhập nội dung..."
+                  placeholderTextColor={C.textSecondary}
+                  value={complaintDlg.text}
+                  onChangeText={(t) =>
+                    setComplaintDlg({ ...complaintDlg, text: t })
+                  }
+                />
+              </RegisterGlassSurface>
               <View
                 style={{
                   flexDirection: "row",
@@ -2401,19 +2763,22 @@ export default function TournamentRegistrationScreen() {
                     Huỷ
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={submitComplaint}
-                  style={{
-                    backgroundColor: C.tint,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>Gửi</Text>
+                <TouchableOpacity onPress={submitComplaint}>
+                  <RegisterGlassSurface
+                    C={C}
+                    interactive
+                    tintColor={glassAccentTint(C, 0.34)}
+                    style={[
+                      styles.complaintSendButton,
+                      { backgroundColor: C.tint },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.primaryGlassButton,
+                    ]}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>Gửi</Text>
+                  </RegisterGlassSurface>
                 </TouchableOpacity>
               </View>
-            </View>
+            </RegisterGlassSurface>
           </KeyboardAvoidingView>
         </Modal>
       </View>
@@ -2423,8 +2788,157 @@ export default function TournamentRegistrationScreen() {
 
 const styles = StyleSheet.create({
   // ... (Giữ nguyên styles cũ)
+  registerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  registerAmbientBand: {
+    position: "absolute",
+    top: 70,
+    left: -40,
+    right: -40,
+    height: 120,
+    borderRadius: 28,
+  },
+  registerAmbientBandAlt: {
+    top: 190,
+    height: 86,
+  },
+  strongGlassSurface: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  formGlassSurface: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  inputGlassSurface: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  inputGlassWrap: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+  },
+  inputInsideGlass: {
+    width: "100%",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+  },
+  playerSelectorGlassWrap: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 8,
+  },
+  selfPlayerGlass: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  searchInputGlass: {
+    flex: 1,
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 18,
+    justifyContent: "center",
+  },
+  searchOverlayInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  complaintInputGlass: {
+    minHeight: 100,
+  },
+  actionTileTouch: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    minWidth: 88,
+  },
+  iconActionTouch: {
+    width: 58,
+    minHeight: 58,
+  },
+  actionGlassTile: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  primaryGlassButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  complaintSendButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  softGlassButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+  searchGlassButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchOverlayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 10,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 24,
+  },
+  modalGlassCard: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+  },
   // Hero
-  headerHero: { paddingHorizontal: 16, paddingBottom: 40 },
+  headerHero: {
+    minHeight: 200,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    overflow: "hidden",
+    position: "relative",
+  },
+  headerHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  headerHeroDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
   headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -2458,7 +2972,7 @@ const styles = StyleSheet.create({
   },
 
   // Stats
-  statsContainer: { marginTop: -30, paddingHorizontal: 16 },
+  statsContainer: { marginTop: -28, paddingHorizontal: 16 },
   statCard: {
     flexDirection: "row",
     padding: 12,

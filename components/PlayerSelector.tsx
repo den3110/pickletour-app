@@ -15,6 +15,8 @@ import {
 import { Image as ExpoImage } from "expo-image";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { normalizeUri } from "@/utils/normalizeUri";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 type Props = {
   label: string;
@@ -43,6 +45,7 @@ function useThemeColors() {
   const scoreChipFg = scheme === "dark" ? "#93c5fd" : "#3730a3";
 
   return {
+    scheme,
     tint,
     cardBg,
     inputBg,
@@ -57,6 +60,43 @@ function useThemeColors() {
     scoreChipBg,
     scoreChipFg,
   };
+}
+
+const glassScheme = (C: ReturnType<typeof useThemeColors>) =>
+  C.scheme === "dark" ? "dark" : "light";
+
+const glassTint = (
+  C: ReturnType<typeof useThemeColors>,
+  light = 0.42,
+  dark = 0.36
+) =>
+  C.scheme === "dark"
+    ? `rgba(26,28,33,${dark})`
+    : `rgba(255,255,255,${light})`;
+
+function PlayerSelectorGlassSurface({
+  children,
+  C,
+  style,
+  interactive = false,
+}: {
+  children?: React.ReactNode;
+  C: ReturnType<typeof useThemeColors>;
+  style?: any;
+  interactive?: boolean;
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={glassScheme(C)}
+      glassEffectStyle="clear"
+      glassTintColor={glassTint(C)}
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
 }
 
 function maskPhone(p?: string | number) {
@@ -150,10 +190,13 @@ export default function PlayerSelector({
         {label} <Text style={{ color: C.muted }}>(Tên / Nick / SĐT)</Text>
       </Text>
 
-      <View
+      <PlayerSelectorGlassSurface
+        C={C}
+        interactive
         style={[
           styles.inputRow,
           { backgroundColor: C.inputBg, borderColor: C.border },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassInputRow,
         ]}
       >
         <TextInput
@@ -180,14 +223,16 @@ export default function PlayerSelector({
             <Text style={[styles.clearText, { color: C.clearText }]}>×</Text>
           </Pressable>
         ) : null}
-      </View>
+      </PlayerSelectorGlassSurface>
 
       {/* Dropdown suggestions — dùng ScrollView để tránh nested VirtualizedList */}
       {open && (
-        <View
+        <PlayerSelectorGlassSurface
+          C={C}
           style={[
             styles.dropdown,
             { backgroundColor: C.dropBg, borderColor: C.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassDropdown,
           ]}
         >
           {isFetching && options.length === 0 ? (
@@ -247,12 +292,19 @@ export default function PlayerSelector({
               })}
             </ScrollView>
           )}
-        </View>
+        </PlayerSelectorGlassSurface>
       )}
 
       {/* Selected preview */}
       {value && (
-        <View style={styles.selectedRow}>
+        <PlayerSelectorGlassSurface
+          C={C}
+          style={[
+            styles.selectedRow,
+            { backgroundColor: C.inputBg, borderColor: C.border },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassSelectedRow,
+          ]}
+        >
           <ExpoImage
             source={normalizeUri(value?.avatar) || AVA_PLACE}
             style={[
@@ -279,7 +331,7 @@ export default function PlayerSelector({
               Điểm {eventType === "double" ? "đôi" : "đơn"}: {scoreOf(value)}
             </Text>
           </View>
-        </View>
+        </PlayerSelectorGlassSurface>
       )}
     </View>
   );
@@ -298,6 +350,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 44,
   },
+  glassInputRow: {
+    borderColor: "rgba(255,255,255,0.28)",
+    shadowColor: "#0a84ff",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
   input: { flex: 1, fontSize: 16 },
   clearBtn: {
     width: 24,
@@ -313,6 +372,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     overflow: "hidden",
+  },
+  glassDropdown: {
+    borderColor: "rgba(255,255,255,0.26)",
+    shadowColor: "#0a84ff",
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
   ddLoading: { padding: 12, alignItems: "center" },
   ddEmpty: { padding: 12, alignItems: "center" },
@@ -340,6 +406,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 8,
+  },
+  glassSelectedRow: {
+    borderColor: "rgba(255,255,255,0.24)",
   },
   selName: { flex: 1, fontWeight: "600" },
 
