@@ -55,6 +55,11 @@ export const uploadApiSlice = apiSlice.injectEndpoints({
         const fd = new FormData();
         const front = payload?.front;
         const back = payload?.back;
+        const cccd = String(payload?.cccd || "").trim();
+
+        if (cccd) {
+          fd.append("cccd", cccd);
+        }
 
         if (front) {
           if (front.uri) {

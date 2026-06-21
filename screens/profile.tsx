@@ -620,11 +620,12 @@ export default function ProfileScreen({ isBack = false }) {
   };
 
   const sendCccd = async () => {
-    if (!/^\d{12}$/.test(String(form.cccd || "").trim()))
+    const cccd = String(form.cccd || "").trim();
+    if (!/^\d{12}$/.test(cccd))
       return Alert.alert("Thiếu CCCD", "Nhập số CCCD trước.");
     if (!frontImg || !backImg || upLoad) return;
     try {
-      await uploadCccd({ front: frontImg, back: backImg }).unwrap();
+      await uploadCccd({ front: frontImg, back: backImg, cccd }).unwrap();
       setFrontImg(null);
       setBackImg(null);
       await refetch();
