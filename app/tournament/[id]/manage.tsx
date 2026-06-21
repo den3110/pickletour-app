@@ -1172,6 +1172,22 @@ const SkeletonItem = memo(({ width, height, borderRadius = 4, style }) => {
   );
 });
 
+IconBtn.displayName = "IconBtn";
+BtnOutline.displayName = "BtnOutline";
+PickerChip.displayName = "PickerChip";
+CheckChip.displayName = "CheckChip";
+MenuItem.displayName = "MenuItem";
+Pill.displayName = "Pill";
+StatusPill.displayName = "StatusPill";
+BusyChip.displayName = "BusyChip";
+MiniChipBtn.displayName = "MiniChipBtn";
+VideoPill.displayName = "VideoPill";
+CourtPill.displayName = "CourtPill";
+ScorePill.displayName = "ScorePill";
+EdgeFadedHScroll.displayName = "EdgeFadedHScroll";
+ActionButtons.displayName = "ActionButtons";
+SkeletonItem.displayName = "SkeletonItem";
+
 const ManageSkeleton = () => {
   const { colors } = useTheme();
   const RenderMatchSkeleton = () => (
@@ -3411,7 +3427,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                       paddingHorizontal: 24,
                     }}
                   >
-                    💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" để lưu file
+                    {'💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" để lưu file'}
                   </Text>
                 )}
               </>
@@ -3695,7 +3711,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                       paddingHorizontal: 24,
                     }}
                   >
-                    💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" hoặc "Print" để in
+                    {'💡 Nhấn "Lưu" → chọn "Lưu vào Tệp" hoặc "Print" để in'}
                   </Text>
                 )}
               </>
