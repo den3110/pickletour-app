@@ -48,7 +48,10 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import {
+  getMatchDisplayCode,
   getMatchPayloadId,
+  getMatchSideDisplayName,
+  getPairDisplayName,
   getPlayerDisplayName,
   isNewerOrEqualMatchPayload,
   isLightweightMatchPayload,
@@ -168,20 +171,305 @@ const stripVN = (s = "") =>
     .toLowerCase()
     .trim();
 const nameWithNick = (p) => {
-  return getPlayerDisplayName(p) || "—";
+  return getPlayerDisplayName(p) || "\u2014";
 };
-const teamLabel = (team, eventType) => {
-  if (!team) return "—";
-  if (team.name) return team.name;
+
+const normalizeComparableText = (value = "") =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isReferenceTeamLabel = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return (
+    /^[WL]\s*-/i.test(text) ||
+    /^V\d+(?:-[A-Z0-9]+)?(?:-NT)?-T\d+$/i.test(text) ||
+    /^(?:WB|LB)\d+-T\d+$/i.test(text) ||
+    /^GF(?:\d+)?-T\d+$/i.test(text)
+  );
+};
+
+const isUsefulTeamName = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  const normalized = normalizeComparableText(text).replace(/\s+/g, " ");
+  return ![
+    "bye",
+    "tbd",
+    "registration",
+    "chua co doi",
+    "doi a",
+    "doi b",
+    "-",
+    "--",
+    "\u2014",
+  ].includes(normalized);
+};
+
+const isConcreteTeamLabel = (value) =>
+  isUsefulTeamName(value) && !isReferenceTeamLabel(value);
+
+const teamObjectLabel = (team, eventType, source) => {
+  if (!team || typeof team !== "object") return "";
+  const pairName = getPairDisplayName(team, source);
+  if (isUsefulTeamName(pairName)) return pairName;
+  const direct =
+    team.displayName || team.teamName || team.label || team.title || team.name;
+  if (isUsefulTeamName(direct)) return String(direct).trim();
   const players =
-    team.players ||
-    team.members ||
+    (Array.isArray(team.players) && team.players) ||
+    (Array.isArray(team.members) && team.members) ||
     [team.player1, team.player2].filter(Boolean) ||
     [];
-  if (!players.length) return "—";
+  if (!players.length) return "";
   if (eventType === "single") return nameWithNick(players[0]);
   if (players.length === 1) return nameWithNick(players[0]);
   return `${nameWithNick(players[0])} & ${nameWithNick(players[1])}`;
+};
+
+const sideTeamObject = (match, side) => {
+  const sideKey = side === "B" ? "B" : "A";
+  const index = sideKey === "B" ? 1 : 0;
+  const teams = match?.teams;
+  return (
+    match?.[`pair${sideKey}`] ||
+    match?.[`team${sideKey}`] ||
+    match?.[`side${sideKey}`] ||
+    (sideKey === "A" ? match?.home : match?.away) ||
+    (Array.isArray(teams) ? teams[index] : teams?.[sideKey]) ||
+    null
+  );
+};
+
+const isByeSeed = (seed) =>
+  seed?.type === "bye" ||
+  String(seed?.label || "").trim().toUpperCase() === "BYE";
+
+const seedToName = (seed) => {
+  if (!seed) return "";
+  if (isByeSeed(seed)) return "BYE";
+  return (
+    seed.label ||
+    seed.displayName ||
+    seed.teamName ||
+    seed.name ||
+    seed.title ||
+    ""
+  );
+};
+
+const matchCodeOf = (m) => {
+  const direct =
+    getMatchDisplayCode(m) ||
+    m?.displayCode ||
+    m?.code ||
+    m?.matchCode ||
+    m?.slotCode ||
+    m?.globalCode;
+  if (direct) return String(direct).trim();
+  const round = Number(m?.round ?? m?.roundNo ?? m?.roundIndex);
+  const order = Number(m?.order ?? m?.orderNo ?? m?.slot ?? m?.index);
+  if (Number.isFinite(round) && Number.isFinite(order)) {
+    return `V${round}-T${order + 1}`;
+  }
+  return "";
+};
+
+const refMatchId = (ref) =>
+  String(
+    ref?._id ??
+      ref?.id ??
+      ref?.matchId ??
+      ref?.match ??
+      ref?.ref?.matchId ??
+      ref?.ref?.match ??
+      ""
+  ).trim();
+
+const seedSourceMatch = (seed, matchIndex) => {
+  if (!seed || !matchIndex) return null;
+  const id = refMatchId(seed);
+  if (id && matchIndex.get(id)) return matchIndex.get(id);
+  const labelCode = String(seed?.label || "").match(
+    /\b(?:V\d+(?:-B[^-\s]+)?(?:-NT)?-T\d+|WB\d+-T\d+|LB\d+-T\d+|GF(?:\d+)?-T\d+)\b/i
+  )?.[0];
+  if (!labelCode) return null;
+  const normalized = labelCode.toUpperCase();
+  for (const source of matchIndex.values()) {
+    if (matchCodeOf(source).toUpperCase() === normalized) return source;
+  }
+  return null;
+};
+
+const bracketIdOfMatch = (m) =>
+  String(m?.bracket?._id ?? m?.bracket ?? m?.bracketId ?? "").trim();
+
+const roundNumberOfMatch = (m) => {
+  const value = Number(m?.round ?? m?.roundNo ?? m?.roundIndex);
+  if (Number.isFinite(value)) return value;
+  const parsed = matchCodeOf(m).match(/^V(\d+)(?:-[^-]+)?-T\d+$/i);
+  return parsed ? Number(parsed[1]) : NaN;
+};
+
+const orderNumberOfMatch = (m) => {
+  const value = Number(m?.order ?? m?.orderNo ?? m?.slot ?? m?.index);
+  if (Number.isFinite(value)) return value;
+  const parsed = matchCodeOf(m).match(/^V\d+(?:-[^-]+)?-T(\d+)$/i);
+  return parsed ? Number(parsed[1]) - 1 : NaN;
+};
+
+const sameScheduleBranch = (a, b) => {
+  if (String(a?.branch || "main") !== String(b?.branch || "main")) return false;
+  if (String(a?.phase || "") !== String(b?.phase || "")) return false;
+  return true;
+};
+
+const inferPreviousRoundSourceMatch = (m, side, matchIndex) => {
+  if (!m || !matchIndex) return null;
+  const round = roundNumberOfMatch(m);
+  if (!Number.isFinite(round) || round <= 1) return null;
+
+  const bracketId = bracketIdOfMatch(m);
+  const candidates = Array.from(matchIndex.values()).filter((candidate) => {
+    if (!candidate) return false;
+    const candidateBracketId = bracketIdOfMatch(candidate);
+    if (bracketId && candidateBracketId && candidateBracketId !== bracketId) {
+      return false;
+    }
+    return sameScheduleBranch(candidate, m);
+  });
+
+  const byOrder = (a, b) => orderNumberOfMatch(a) - orderNumberOfMatch(b);
+  const currentRound = candidates
+    .filter((candidate) => roundNumberOfMatch(candidate) === round)
+    .sort(byOrder);
+  const previousRound = candidates
+    .filter((candidate) => roundNumberOfMatch(candidate) === round - 1)
+    .sort(byOrder);
+  if (!previousRound.length) return null;
+
+  const currentIndex = currentRound.findIndex(
+    (candidate) => String(candidate?._id || "") === String(m?._id || "")
+  );
+  const order = currentIndex >= 0 ? currentIndex : orderNumberOfMatch(m);
+  if (!Number.isFinite(order)) return null;
+
+  const sourceSlot = order * 2 + (side === "B" ? 1 : 0);
+  return previousRound[sourceSlot] || null;
+};
+
+function teamNameFrom(match, side, matchIndex = null, eventType = "", depth = 0) {
+  if (!match) return "TBD";
+  if (depth > 10) return "TBD";
+
+  const sideKey = side === "B" ? "B" : "A";
+  const directTeamName = teamObjectLabel(
+    sideTeamObject(match, sideKey),
+    eventType,
+    match
+  );
+  if (isUsefulTeamName(directTeamName)) return directTeamName;
+
+  const resolved =
+    sideKey === "A"
+      ? match.__sideA || match.resolvedSideNameA || match.teamAName || match.sideAName
+      : match.__sideB || match.resolvedSideNameB || match.teamBName || match.sideBName;
+  if (isUsefulTeamName(resolved)) return String(resolved).trim();
+
+  const seed = sideKey === "A" ? match.seedA : match.seedB;
+  if (isByeSeed(seed)) return "BYE";
+
+  const seedType = String(seed?.type || "");
+  const isLoserSeed =
+    seedType === "stageMatchLoser" || seedType === "matchLoser";
+  const isWinnerSeed =
+    seedType === "stageMatchWinner" || seedType === "matchWinner";
+  const prev = sideKey === "A" ? match.previousA : match.previousB;
+  const sourceId = refMatchId(prev);
+  const sourceMatch =
+    (sourceId && matchIndex?.get(sourceId)) ||
+    (prev && typeof prev === "object" ? prev : null) ||
+    ((isWinnerSeed || isLoserSeed) ? seedSourceMatch(seed, matchIndex) : null) ||
+    inferPreviousRoundSourceMatch(match, sideKey, matchIndex);
+
+  if (sourceMatch) {
+    const sourceByeA = isByeSeed(sourceMatch.seedA);
+    const sourceByeB = isByeSeed(sourceMatch.seedB);
+
+    if (sourceByeA || sourceByeB) {
+      if (isLoserSeed || (sourceByeA && sourceByeB)) return "BYE";
+      const carriedSide = sourceByeA ? "B" : "A";
+      const carried = teamNameFrom(
+        sourceMatch,
+        carriedSide,
+        matchIndex,
+        eventType,
+        depth + 1
+      );
+      if (isUsefulTeamName(carried)) return carried;
+    }
+
+    if (String(sourceMatch.status || "").toLowerCase() === "finished") {
+      const winnerSide = sourceMatch.winner === "A" ? "A" : "B";
+      const sourceSide = isLoserSeed
+        ? winnerSide === "A"
+          ? "B"
+          : "A"
+        : winnerSide;
+      const carried = teamNameFrom(
+        sourceMatch,
+        sourceSide,
+        matchIndex,
+        eventType,
+        depth + 1
+      );
+      if (isUsefulTeamName(carried)) return carried;
+    }
+
+    const code = matchCodeOf(sourceMatch);
+    if (code) return `${isLoserSeed ? "L" : "W"}-${code}`;
+  }
+
+  const fallbackName = getMatchSideDisplayName(match, sideKey, "");
+  if (isUsefulTeamName(fallbackName)) return fallbackName;
+
+  return seedToName(seed) || "TBD";
+}
+
+function resolveMyTournamentSides(rawList, eventType) {
+  const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
+  const matchIndex = new Map();
+  list.forEach((match) => {
+    const id = String(match?._id || match?.id || match?.matchId || "").trim();
+    if (id) matchIndex.set(id, match);
+  });
+
+  return list.map((match) => {
+    const sideA = teamNameFrom(match, "A", matchIndex, eventType);
+    const sideB = teamNameFrom(match, "B", matchIndex, eventType);
+    return {
+      ...match,
+      __sideA: sideA,
+      __sideB: sideB,
+      resolvedSideNameA: isConcreteTeamLabel(sideA)
+        ? sideA
+        : match?.resolvedSideNameA,
+      resolvedSideNameB: isConcreteTeamLabel(sideB)
+        ? sideB
+        : match?.resolvedSideNameB,
+    };
+  });
+}
+
+const teamLabel = (matchOrTeam, sideOrEventType, eventType) => {
+  const isSide = sideOrEventType === "A" || sideOrEventType === "B";
+  if (isSide) {
+    return teamNameFrom(matchOrTeam, sideOrEventType, null, eventType) || "\u2014";
+  }
+  return teamObjectLabel(matchOrTeam, sideOrEventType) || "\u2014";
 };
 function roundText(m) {
   if (m.roundName) return m.roundName;
@@ -480,8 +768,6 @@ function SkeletonHeader({ tokens }) {
 
 /* ================= Rows / Cards ================= */
 function MatchRow({ m, onPress, tokens, eventType }) {
-  const a = m.teamA || m.home || m.teams?.[0] || m.pairA;
-  const b = m.teamB || m.away || m.teams?.[1] || m.pairB;
   const status = m.status || (m.winner ? "finished" : "scheduled");
   const court = m.courtName || m.court || "";
   const when = m.scheduledAt || m.startTime || m.time;
@@ -528,7 +814,7 @@ function MatchRow({ m, onPress, tokens, eventType }) {
               numberOfLines={1}
               style={[styles.team, { color: tokens.colors.text }]}
             >
-              {teamLabel(a, eventType)}
+              {teamLabel(m, "A", eventType)}
             </Text>
             <StatusChip status={status} tokens={tokens} />
           </View>
@@ -536,7 +822,7 @@ function MatchRow({ m, onPress, tokens, eventType }) {
             numberOfLines={1}
             style={[styles.team, { color: tokens.colors.text }]}
           >
-            {teamLabel(b, eventType)}
+            {teamLabel(m, "B", eventType)}
           </Text>
 
           {/* realtime score */}
@@ -700,7 +986,10 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
     new Set(["scheduled", "live", "finished"])
   );
 
-  const matches = Array.isArray(t.matches) ? t.matches : [];
+  const matches = useMemo(
+    () => resolveMyTournamentSides(t.matches, t.eventType),
+    [t.matches, t.eventType]
+  );
 
   // lọc + SẮP XẾP: LIVE → UPCOMING → FINISHED (phụ theo thời gian)
   const filteredSortedMatches = useMemo(() => {
@@ -709,11 +998,9 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
       const status = m.status || (m.winner ? "finished" : "scheduled");
       if (!statusFilter.has(status)) return false;
       if (!q) return true;
-      const a = m.teamA || m.home || m.teams?.[0] || m.pairA;
-      const b = m.teamB || m.away || m.teams?.[1] || m.pairB;
       const hay = [
-        teamLabel(a, t.eventType),
-        teamLabel(b, t.eventType),
+        teamLabel(m, "A", t.eventType),
+        teamLabel(m, "B", t.eventType),
         roundText(m),
         m.courtName || m.court || "",
       ]

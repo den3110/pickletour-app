@@ -1978,7 +1978,7 @@ const BracketColumns = ({
   const ROUND_GAP = 64;
   const INNER_GAP = 36;
   const EXTRA_SLOT = 16;
-  const [baseCardH, setBaseCardH] = useState(56);
+  const [baseCardH, setBaseCardH] = useState(78);
 
   const slotH0 = Math.max(
     baseCardH + INNER_GAP * 2 + EXTRA_SLOT,
@@ -4495,7 +4495,7 @@ const styles = StyleSheet.create({
   seedBox: {
     borderWidth: 1,
     borderRadius: 10,
-    padding: 10,
+    padding: 12,
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
@@ -4505,8 +4505,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
-    paddingBottom: 4,
+    marginBottom: 8,
+    paddingBottom: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   seedContent: {
@@ -4532,9 +4532,9 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "transparent",
     borderRadius: 4,
-    paddingLeft: 6,
-    paddingVertical: 2,
-    marginBottom: 2,
+    paddingLeft: 8,
+    paddingVertical: 5,
+    marginBottom: 4,
   },
   teamWin: { borderLeftColor: "#f44336" },
   teamHighlight: {
@@ -4546,7 +4546,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  teamText: { fontSize: 13 },
+  teamText: { fontSize: 14, lineHeight: 18 },
   teamTextPending: { opacity: 0.58, fontWeight: "500" },
   teamTextWin: { fontWeight: "800" },
   sideTag: { opacity: 0.65, fontWeight: "700" },
