@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,14 +10,10 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetScrollView,
-} from "@gorhom/bottom-sheet";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
@@ -100,8 +97,8 @@ const Row = ({ children, style }) => (
 );
 
 function QueueDetailSheet({ open, onClose, station, onSelectMatch }) {
-  const sheetRef = useRef(null);
   const t = useTokens();
+  const insets = useSafeAreaInsets();
   const queueMatches = useMemo(
     () =>
       Array.isArray(station?.queueItems)
@@ -110,75 +107,91 @@ function QueueDetailSheet({ open, onClose, station, onSelectMatch }) {
     [station]
   );
 
-  useEffect(() => {
-    if (open) sheetRef.current?.present();
-    else sheetRef.current?.dismiss();
-  }, [open]);
-
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      snapPoints={["65%"]}
-      onDismiss={onClose}
-      backdropComponent={(p) => (
-        <BottomSheetBackdrop {...p} appearsOnIndex={0} disappearsOnIndex={-1} style={{ zIndex: 1000 }} />
-      )}
-      handleIndicatorStyle={{ backgroundColor: t.colors.border }}
-      backgroundStyle={{ backgroundColor: t.colors.card }}
-      containerStyle={{ zIndex: 1000 }}
+    <Modal
+      visible={open}
+      transparent
+      animationType="slide"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
     >
-      <BottomSheetScrollView contentContainerStyle={styles.container}>
-        <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={[styles.title, { color: t.colors.text }]}>Hàng chờ của sân</Text>
-            <Text style={{ color: t.muted }}>
-              {station?.name || "Sân"} · {station?.code || "—"}
-            </Text>
-          </View>
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [
-              styles.iconBtn,
-              pressed && { opacity: 0.8 },
+      <View style={styles.nativeSheetOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View
+          style={[
+            styles.nativeSheetPanel,
+            styles.queueSheetPanel,
+            {
+              backgroundColor: t.colors.card,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <View style={[styles.nativeSheetHandle, { backgroundColor: t.colors.border }]} />
+          <ScrollView
+            style={styles.nativeSheetScroll}
+            contentContainerStyle={[
+              styles.container,
+              { paddingBottom: Math.max(insets.bottom, 16) + 72 },
             ]}
-            hitSlop={8}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+            bounces
           >
-            <MaterialIcons name="close" size={18} color={t.colors.text} />
-          </Pressable>
-        </Row>
-
-        {!queueMatches.length ? (
-          <View
-            style={[
-              styles.infoBox,
-              { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
-            ]}
-          >
-            <Text style={{ color: t.chipInfoFg }}>Sân này chưa có trận nào trong hàng chờ.</Text>
-          </View>
-        ) : (
-          <View style={styles.queuePreviewWrap}>
-            {queueMatches.map((queuedMatch, index) => (
+            <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={[styles.title, { color: t.colors.text }]}>Hàng chờ của sân</Text>
+                <Text style={{ color: t.muted }}>
+                  {station?.name || "Sân"} · {station?.code || "—"}
+                </Text>
+              </View>
               <Pressable
-                key={`${sid(station?._id)}-${sid(queuedMatch?._id || queuedMatch?.id) || index}`}
-                onPress={() => onSelectMatch?.(sid(queuedMatch?._id || queuedMatch?.id))}
+                onPress={onClose}
                 style={({ pressed }) => [
-                  styles.queuePreviewItem,
-                  { borderColor: t.colors.border, backgroundColor: t.colors.card },
-                  pressed && { opacity: 0.88 },
+                  styles.iconBtn,
+                  pressed && { opacity: 0.8 },
+                ]}
+                hitSlop={8}
+              >
+                <MaterialIcons name="close" size={18} color={t.colors.text} />
+              </Pressable>
+            </Row>
+
+            {!queueMatches.length ? (
+              <View
+                style={[
+                  styles.infoBox,
+                  { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd },
                 ]}
               >
-                <Text style={{ color: t.muted, fontSize: 12 }}>{tournamentTitle(queuedMatch)}</Text>
-                <Text style={{ color: t.colors.text, fontWeight: "700" }}>
-                  Hàng chờ #{index + 1} · {matchCode(queuedMatch)}
-                </Text>
-                <Text style={{ color: t.muted }}>{teamLine(queuedMatch)}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+                <Text style={{ color: t.chipInfoFg }}>Sân này chưa có trận nào trong hàng chờ.</Text>
+              </View>
+            ) : (
+              <View style={styles.queuePreviewWrap}>
+                {queueMatches.map((queuedMatch, index) => (
+                  <Pressable
+                    key={`${sid(station?._id)}-${sid(queuedMatch?._id || queuedMatch?.id) || index}`}
+                    onPress={() => onSelectMatch?.(sid(queuedMatch?._id || queuedMatch?.id))}
+                    style={({ pressed }) => [
+                      styles.queuePreviewItem,
+                      { borderColor: t.colors.border, backgroundColor: t.colors.card },
+                      pressed && { opacity: 0.88 },
+                    ]}
+                  >
+                    <Text style={{ color: t.muted, fontSize: 12 }}>{tournamentTitle(queuedMatch)}</Text>
+                    <Text style={{ color: t.colors.text, fontWeight: "700" }}>
+                      Hàng chờ #{index + 1} · {matchCode(queuedMatch)}
+                    </Text>
+                    <Text style={{ color: t.muted }}>{teamLine(queuedMatch)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -223,7 +236,7 @@ export default function AssignCourtSheet({
   match,
   onAssigned,
 }) {
-  const sheetRef = useRef(null);
+  const insets = useSafeAreaInsets();
   const socket = useSocket();
   const t = useTokens();
   const normalizedTournamentId = sid(tournamentId);
@@ -401,11 +414,6 @@ export default function AssignCourtSheet({
     useRemoveTournamentCourtStationQueueItemMutation();
   const [freeCourtStation, { isLoading: freeingStation }] =
     useFreeTournamentCourtStationMutation();
-
-  useEffect(() => {
-    if (open) sheetRef.current?.present();
-    else sheetRef.current?.dismiss();
-  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -893,60 +901,75 @@ export default function AssignCourtSheet({
 
   return (
     <>
-      <BottomSheetModal
-        ref={sheetRef}
-        snapPoints={["84%"]}
-        onDismiss={onClose}
-        backdropComponent={(p) => (
-          <BottomSheetBackdrop
-            {...p}
-            appearsOnIndex={0}
-            disappearsOnIndex={-1}
-            style={{ zIndex: 1000 }}
-          />
-        )}
-        handleIndicatorStyle={{ backgroundColor: t.colors.border }}
-        backgroundStyle={{ backgroundColor: t.colors.card }}
-        containerStyle={{ zIndex: 1000 }}
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onRequestClose={onClose}
       >
-        <BottomSheetScrollView contentContainerStyle={styles.container}>
-          <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <Row style={{ alignItems: "center", gap: 6 }}>
-              <MaterialIcons name="stadium" size={18} color={t.colors.text} />
-              <Text style={[styles.title, { color: t.colors.text }]}>Gán sân — {match ? matchCode(match) : "—"}</Text>
-            </Row>
-            <Row style={{ alignItems: "center", gap: 6 }}>
-              <IconBtn
-                name="refresh"
-                onPress={() => {
-                  refetchClusterOptions?.();
-                  refetchRuntime?.();
-                  refetchLegacyCourts?.();
-                }}
-              />
-              <IconBtn name="close" onPress={() => sheetRef.current?.dismiss()} />
-            </Row>
-          </Row>
+        <View style={styles.nativeSheetOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View
+            style={[
+              styles.nativeSheetPanel,
+              {
+                backgroundColor: t.colors.card,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+            ]}
+          >
+            <View style={[styles.nativeSheetHandle, { backgroundColor: t.colors.border }]} />
+            <ScrollView
+              style={styles.nativeSheetScroll}
+              contentContainerStyle={[
+                styles.container,
+                { paddingBottom: Math.max(insets.bottom, 16) + 112 },
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+              bounces
+            >
+              <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <Row style={{ alignItems: "center", gap: 6 }}>
+                  <MaterialIcons name="stadium" size={18} color={t.colors.text} />
+                  <Text style={[styles.title, { color: t.colors.text }]}>Gán sân — {match ? matchCode(match) : "—"}</Text>
+                </Row>
+                <Row style={{ alignItems: "center", gap: 6 }}>
+                  <IconBtn
+                    name="refresh"
+                    onPress={() => {
+                      refetchClusterOptions?.();
+                      refetchRuntime?.();
+                      refetchLegacyCourts?.();
+                    }}
+                  />
+                  <IconBtn name="close" onPress={onClose} />
+                </Row>
+              </Row>
 
-          <Card>
-            <Text style={{ color: t.colors.text, fontWeight: "700" }}>{teamLine(match)}</Text>
-            <Text style={{ color: t.muted }}>{tournamentTitle(match)} · {matchCode(match)}</Text>
-            <Text style={{ color: t.muted, marginTop: 6 }}>
-              {isClusterRuntimeMode
-                ? "Chọn cụm sân rồi chọn sân phù hợp để gán trận."
-                : "Giải này chưa dùng cụm sân, đang quay về danh sách sân cũ."}
-            </Text>
-          </Card>
+              <Card>
+                <Text style={{ color: t.colors.text, fontWeight: "700" }}>{teamLine(match)}</Text>
+                <Text style={{ color: t.muted }}>{tournamentTitle(match)} · {matchCode(match)}</Text>
+                <Text style={{ color: t.muted, marginTop: 6 }}>
+                  {isClusterRuntimeMode
+                    ? "Chọn cụm sân rồi chọn sân phù hợp để gán trận."
+                    : "Giải này chưa dùng cụm sân, đang quay về danh sách sân cũ."}
+                </Text>
+              </Card>
 
-          {isClusterRuntimeMode ? renderRuntimeSection() : renderLegacySection()}
+              {isClusterRuntimeMode ? renderRuntimeSection() : renderLegacySection()}
 
-          <Row style={{ justifyContent: "flex-end", marginTop: 12 }}>
-            <Btn variant="outline" onPress={() => sheetRef.current?.dismiss()}>
-              Đóng
-            </Btn>
-          </Row>
-        </BottomSheetScrollView>
-      </BottomSheetModal>
+              <Row style={{ justifyContent: "flex-end", marginTop: 12 }}>
+                <Btn variant="outline" onPress={onClose}>
+                  Đóng
+                </Btn>
+              </Row>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <ResponsiveMatchViewer
         open={Boolean(viewerMatchId)}
@@ -966,6 +989,29 @@ export default function AssignCourtSheet({
 
 const styles = StyleSheet.create({
   container: { padding: 12, gap: 12 },
+  nativeSheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.36)",
+  },
+  nativeSheetPanel: {
+    height: "90%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+    paddingTop: 10,
+  },
+  queueSheetPanel: {
+    height: "74%",
+  },
+  nativeSheetHandle: {
+    alignSelf: "center",
+    width: 52,
+    height: 5,
+    borderRadius: 999,
+    marginBottom: 6,
+  },
+  nativeSheetScroll: { flex: 1 },
   row: { flexDirection: "row", gap: 8 },
   title: { fontSize: 16, fontWeight: "700" },
   subtitle: { fontSize: 14, fontWeight: "700" },
