@@ -35,6 +35,7 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useIsFocused } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getMatchDisplayCode,
   getMatchPayloadId,
@@ -316,6 +317,7 @@ export default function RefereeCenterScreen() {
   const isFocused = useIsFocused();
   const { id } = useLocalSearchParams();
   const T = useThemeTokens();
+  const insets = useSafeAreaInsets();
 
   const me = useSelector((s) => s.auth?.userInfo || null);
 
@@ -1419,11 +1421,20 @@ export default function RefereeCenterScreen() {
           animationType="slide"
           onRequestClose={() => setSearchModalOpen(false)}
         >
-          <View style={[styles.filterModalWrap, { backgroundColor: T.bg }]}>
+          <View
+            style={[
+              styles.filterModalWrap,
+              { backgroundColor: T.bg, paddingBottom: insets.bottom },
+            ]}
+          >
             <View
               style={[
                 styles.filterModalHeader,
-                { borderBottomColor: T.border, backgroundColor: T.cardBg },
+                {
+                  borderBottomColor: T.border,
+                  backgroundColor: T.cardBg,
+                  paddingTop: Math.max(insets.top, 12) + 8,
+                },
               ]}
             >
               <Pressable
@@ -1452,7 +1463,12 @@ export default function RefereeCenterScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.filterModalBody}>
+            <View
+              style={[
+                styles.filterModalBody,
+                { paddingBottom: Math.max(insets.bottom, 12) + 16 },
+              ]}
+            >
               <View
                 style={[
                   styles.inputWrap,
