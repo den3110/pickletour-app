@@ -41,6 +41,8 @@ import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  formatRatingScore,
+  getBestRatingScore,
   getRankNoFromPayload,
   isValidRankNo,
 } from "@/utils/rankUtils";
@@ -465,7 +467,9 @@ function AthleteIsland() {
   const rawRankNo = hasStoredRankNo ? storedRawRankNo : fetchedRawRankNo;
   const rankNoNumber = Number(rawRankNo);
   const hasRankNo = isValidRankNo(rawRankNo);
-  const shouldHideRankBadge = !!userInfo && !hasRankNo;
+  const ratingScore = getBestRatingScore(myRankData, userInfo);
+  const shouldHideRankBadge =
+    !!userInfo && !hasRankNo && ratingScore === null && isFetchingMyRank;
 
   let rankDisplay = "Chưa xếp hạng",
     rankIcon = "star-border",
@@ -481,6 +485,10 @@ function AthleteIsland() {
       rankIcon = "military-tech";
       rankColor = "#FFA502";
     }
+  } else if (ratingScore !== null) {
+    rankDisplay = `${formatRatingScore(ratingScore)} điểm`;
+    rankIcon = "trending-up";
+    rankColor = "#4ECDC4";
   }
 
   const roleUser = () => {
