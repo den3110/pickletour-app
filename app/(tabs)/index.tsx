@@ -461,7 +461,7 @@ function AthleteIsland() {
     skip: !shouldFetchMyRank,
   });
   const shouldHideRankBadge =
-    !!userInfo && (userInfo?.rankDeferred === true || isFetchingMyRank);
+    !!userInfo && (shouldFetchMyRank || isFetchingMyRank);
 
   let rankDisplay = "Chưa xếp hạng",
     rankIcon = "star-border",

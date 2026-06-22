@@ -16,7 +16,10 @@ import {
 import { Image } from "expo-image";
 import { router, Stack, Redirect, useLocalSearchParams } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
-import { useLoginMutation } from "@/slices/usersApiSlice";
+import {
+  useLazyGetMyRankQuery,
+  useLoginMutation,
+} from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
@@ -119,6 +122,7 @@ export default function LoginScreen() {
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const [login, { isLoading }] = useLoginMutation();
+  const [refreshMyRank] = useLazyGetMyRankQuery();
   const returnTo = useMemo(() => {
     const rawReturnTo = Array.isArray(params.returnTo)
       ? params.returnTo[0]
@@ -189,6 +193,9 @@ export default function LoginScreen() {
       const normalized = res?.user ? { ...res.user, token: res.token } : res;
 
       dispatch(setCredentials(normalized));
+      void refreshMyRank()
+        .unwrap()
+        .catch(() => {});
 
       router.replace(returnTo as any);
     } catch (err) {

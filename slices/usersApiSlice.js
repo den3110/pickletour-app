@@ -55,7 +55,12 @@ export const userApiSlice = apiSlice.injectEndpoints({
           }
 
           dispatch(setCredentials(next));
-        } catch {}
+        } catch {
+          const prev = getState().auth?.userInfo || {};
+          if (prev?._id) {
+            dispatch(setCredentials({ ...prev, rankDeferred: false }));
+          }
+        }
       },
     }),
     logout: builder.mutation({
@@ -265,6 +270,7 @@ export const {
   useLazyGetOAuthAuthorizeContextQuery,
   useReauthQuery,
   useGetMyRankQuery,
+  useLazyGetMyRankQuery,
   useGetKycCheckDataQuery,
   useUpdateKycStatusMutation,
   useVerifyRegisterOtpMutation,
