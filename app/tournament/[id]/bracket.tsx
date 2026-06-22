@@ -1685,6 +1685,54 @@ const getInitialBracketZoom = (width) => {
   return 1;
 };
 
+function buildSymmetricSlotCounts(rounds = []) {
+  const counts = (rounds || []).map((round) =>
+    Math.max(1, Array.isArray(round?.seeds) ? round.seeds.length : 0)
+  );
+  if (!counts.length) return counts;
+
+  counts[counts.length - 1] = 1;
+  for (let index = counts.length - 2; index >= 0; index -= 1) {
+    counts[index] = Math.max(counts[index], counts[index + 1] * 2);
+  }
+  return counts;
+}
+
+function makeSymmetricSpacer(round, slotIndex) {
+  return {
+    id: `symmetric-spacer-${round?.title || "round"}-${slotIndex}`,
+    __match: null,
+    __round: round?.seeds?.[0]?.__round || 1,
+    __symmetricSpacer: true,
+    teams: [],
+  };
+}
+
+function fillSymmetricSlots(round, slotCount) {
+  const seeds = Array.isArray(round?.seeds) ? round.seeds : [];
+  const safeCount = Math.max(slotCount, seeds.length, 1);
+  const slots = Array.from({ length: safeCount }, (_, index) =>
+    makeSymmetricSpacer(round, index)
+  );
+  seeds.forEach((seed, index) => {
+    if (index < slots.length) slots[index] = seed;
+  });
+  return slots;
+}
+
+function splitKnockoutRound(round, side, slotCount) {
+  const seeds = fillSymmetricSlots(round, slotCount);
+  const mid = Math.ceil(seeds.length / 2);
+  const sourceSeeds = side === "left" ? seeds.slice(0, mid) : seeds.slice(mid);
+  return {
+    ...round,
+    seeds: sourceSeeds.map((seed, index) => ({
+      ...seed,
+      __symmetricOriginalIndex: side === "left" ? index : mid + index,
+    })),
+  };
+}
+
 const ZoomControlsRN = ({ zoom, onZoomOut, onZoomIn, onReset, t }) => (
   <View
     style={[
@@ -1844,6 +1892,9 @@ const BracketColumns = ({
   setFocusRegId,
   onOpenVideo,
   t,
+  mirror = false,
+  canvasOnly = false,
+  externalZoom,
 }) => {
   const { width: windowWidth } = useWindowDimensions();
   const initialZoom = useMemo(
@@ -1887,17 +1938,21 @@ const BracketColumns = ({
     );
   }, []);
 
+  const activeZoom =
+    Number.isFinite(Number(externalZoom)) && Number(externalZoom) > 0
+      ? Number(externalZoom)
+      : zoom;
   const hasMeasuredCanvas = contentSize.width > 0 && contentSize.height > 0;
   const scaledFrameStyle = hasMeasuredCanvas
     ? {
-        width: Math.ceil(contentSize.width * zoom),
-        height: Math.ceil(contentSize.height * zoom),
+        width: Math.ceil(contentSize.width * activeZoom),
+        height: Math.ceil(contentSize.height * activeZoom),
       }
     : null;
   const scaledCanvasStyle =
-    hasMeasuredCanvas && zoom !== 1
+    hasMeasuredCanvas && activeZoom !== 1
       ? ({
-          transform: [{ scale: zoom }],
+          transform: [{ scale: activeZoom }],
           transformOrigin: "top left",
         } as any)
       : null;
@@ -2266,31 +2321,15 @@ const BracketColumns = ({
     return L;
   }, [viewRounds, getVisualSourceCellsForSeed, absWrap, t.dark]);
 
-  return (
-    <View>
-      <View style={styles.bracketZoomWrap}>
-        <ZoomControlsRN
-          zoom={zoom}
-          onZoomOut={zoomOut}
-          onZoomIn={zoomIn}
-          onReset={resetZoom}
-          t={t}
-        />
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        nestedScrollEnabled
-        directionalLockEnabled
-        contentContainerStyle={styles.bracketScrollContent}
-      >
-        <View style={[styles.bracketScaleFrame, scaledFrameStyle]}>
+  const canvasNode = (
+    <View style={[styles.bracketScaleFrame, scaledFrameStyle]}>
           <View
             onLayout={onCanvasLayout}
             style={[
               styles.roundsRow,
               styles.bracketCanvas,
-              hasMeasuredCanvas && zoom !== 1 && styles.bracketScaledCanvas,
+              mirror && styles.bracketMirrorCanvas,
+              hasMeasuredCanvas && activeZoom !== 1 && styles.bracketScaledCanvas,
               scaledCanvasStyle,
             ]}
           >
@@ -2324,6 +2363,23 @@ const BracketColumns = ({
                 </View>
 
                 {(r.seeds || []).map((s, i) => {
+              const wrapH = slotHeight(colIdx);
+              if (s?.__symmetricSpacer) {
+                return (
+                  <View
+                    key={`${colIdx}-${i}`}
+                    style={[
+                      styles.seedWrap,
+                      {
+                        height: wrapH,
+                        marginTop: getSeedMarginTop(colIdx, i),
+                        paddingVertical: INNER_GAP,
+                        opacity: 0,
+                      },
+                    ]}
+                  />
+                );
+              }
               const m = s.__match || null;
               const isChampion =
                 m &&
@@ -2347,8 +2403,6 @@ const BracketColumns = ({
                 : m
                 ? resultLabel(m)
                 : "Chưa diễn ra";
-
-              const wrapH = slotHeight(colIdx);
 
               return (
                 <View
@@ -2377,6 +2431,7 @@ const BracketColumns = ({
                         backgroundColor: t.colors.card,
                         shadowColor: t.dark ? "#000" : "#000",
                       },
+                      mirror && styles.bracketMirrorCard,
                       isChampion && styles.seedChampion,
                     ]}
                     onLayout={(e) => {
@@ -2636,12 +2691,221 @@ const BracketColumns = ({
             ))}
           </View>
         </View>
+  );
+
+  if (canvasOnly) return canvasNode;
+
+  return (
+    <View>
+      <View style={styles.bracketZoomWrap}>
+        <ZoomControlsRN
+          zoom={zoom}
+          onZoomOut={zoomOut}
+          onZoomIn={zoomIn}
+          onReset={resetZoom}
+          t={t}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        nestedScrollEnabled
+        directionalLockEnabled
+        contentContainerStyle={styles.bracketScrollContent}
+      >
+        {canvasNode}
       </ScrollView>
     </View>
   );
 };
 
 /* ===================== Component chính (RN) ===================== */
+const SymmetricKnockoutColumns = ({
+  rounds,
+  onOpenMatch,
+  championMatchId,
+  focusRegId,
+  setFocusRegId,
+  onOpenVideo,
+  t,
+}) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const initialZoom = useMemo(
+    () => getInitialBracketZoom(windowWidth),
+    [windowWidth]
+  );
+  const [zoom, setZoom] = useState(initialZoom);
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
+  const zoomTouchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!zoomTouchedRef.current) setZoom(initialZoom);
+  }, [initialZoom]);
+
+  const setUserZoom = useCallback((next) => {
+    zoomTouchedRef.current = true;
+    setZoom((prev) =>
+      clampBracketZoom(typeof next === "function" ? next(prev) : next)
+    );
+  }, []);
+
+  const zoomOut = useCallback(
+    () => setUserZoom((z) => Number((z - BRACKET_ZOOM_STEP).toFixed(2))),
+    [setUserZoom]
+  );
+  const zoomIn = useCallback(
+    () => setUserZoom((z) => Number((z + BRACKET_ZOOM_STEP).toFixed(2))),
+    [setUserZoom]
+  );
+  const resetZoom = useCallback(() => {
+    zoomTouchedRef.current = false;
+    setZoom(initialZoom);
+  }, [initialZoom]);
+
+  const onContentLayout = useCallback((e) => {
+    const { width, height } = e.nativeEvent.layout;
+    setContentSize((prev) =>
+      Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
+        ? prev
+        : { width, height }
+    );
+  }, []);
+
+  const slotCounts = useMemo(() => buildSymmetricSlotCounts(rounds), [rounds]);
+  const { leftRounds, rightRounds, finalRound } = useMemo(() => {
+    const safeRounds = rounds || [];
+    const branchRounds = safeRounds.slice(0, -1);
+    const final = safeRounds[safeRounds.length - 1] || null;
+    return {
+      leftRounds: branchRounds
+        .map((round, index) =>
+          splitKnockoutRound(round, "left", slotCounts[index])
+        )
+        .filter((round) => (round?.seeds || []).length > 0),
+      rightRounds: branchRounds
+        .map((round, index) =>
+          splitKnockoutRound(round, "right", slotCounts[index])
+        )
+        .filter((round) => (round?.seeds || []).length > 0),
+      finalRound: final,
+    };
+  }, [rounds, slotCounts]);
+
+  const finalOnlyRounds = finalRound
+    ? [{ ...finalRound, seeds: finalRound.seeds?.slice(0, 1) || [] }]
+    : [];
+  const hasBranches = leftRounds.length > 0 || rightRounds.length > 0;
+  const hasMeasuredContent = contentSize.width > 0 && contentSize.height > 0;
+  const scaledFrameStyle = hasMeasuredContent
+    ? {
+        width: Math.ceil(contentSize.width * zoom),
+        height: Math.ceil(contentSize.height * zoom),
+      }
+    : null;
+  const scaledContentStyle =
+    hasMeasuredContent && zoom !== 1
+      ? ({
+          transform: [{ scale: zoom }],
+          transformOrigin: "top left",
+        } as any)
+      : null;
+
+  if (!hasBranches) {
+    return (
+      <BracketColumns
+        rounds={finalOnlyRounds}
+        onOpenMatch={onOpenMatch}
+        championMatchId={championMatchId}
+        focusRegId={focusRegId}
+        setFocusRegId={setFocusRegId}
+        onOpenVideo={onOpenVideo}
+        t={t}
+      />
+    );
+  }
+
+  return (
+    <View>
+      <View style={styles.bracketZoomWrap}>
+        <ZoomControlsRN
+          zoom={zoom}
+          onZoomOut={zoomOut}
+          onZoomIn={zoomIn}
+          onReset={resetZoom}
+          t={t}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        nestedScrollEnabled
+        directionalLockEnabled
+        contentContainerStyle={styles.bracketScrollContent}
+      >
+        <View style={[styles.bracketScaleFrame, scaledFrameStyle]}>
+          <View
+            onLayout={onContentLayout}
+            style={[
+              styles.symmetricKoRow,
+              hasMeasuredContent && zoom !== 1 && styles.bracketScaledCanvas,
+              scaledContentStyle,
+            ]}
+          >
+            <BracketColumns
+              rounds={leftRounds}
+              onOpenMatch={onOpenMatch}
+              championMatchId={championMatchId}
+              focusRegId={focusRegId}
+              setFocusRegId={setFocusRegId}
+              onOpenVideo={onOpenVideo}
+              t={t}
+              canvasOnly
+              externalZoom={1}
+            />
+
+            <View style={styles.symmetricFinalColumn}>
+              <View
+                pointerEvents="none"
+                style={[styles.symmetricFinalBridge, styles.symmetricFinalBridgeLeft]}
+              />
+              <View
+                pointerEvents="none"
+                style={[styles.symmetricFinalBridge, styles.symmetricFinalBridgeRight]}
+              />
+              <View style={styles.symmetricFinalCardWrap}>
+                <BracketColumns
+                  rounds={finalOnlyRounds}
+                  onOpenMatch={onOpenMatch}
+                  championMatchId={championMatchId}
+                  focusRegId={focusRegId}
+                  setFocusRegId={setFocusRegId}
+                  onOpenVideo={onOpenVideo}
+                  t={t}
+                  canvasOnly
+                  externalZoom={1}
+                />
+              </View>
+            </View>
+
+            <BracketColumns
+              rounds={rightRounds}
+              onOpenMatch={onOpenMatch}
+              championMatchId={championMatchId}
+              focusRegId={focusRegId}
+              setFocusRegId={setFocusRegId}
+              onOpenVideo={onOpenVideo}
+              t={t}
+              canvasOnly
+              externalZoom={1}
+              mirror
+            />
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const t = useTokens();
   const route = useRoute();
@@ -4084,7 +4348,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           </Card>
         )}
 
-        <BracketColumns
+        <SymmetricKnockoutColumns
           rounds={roundsToRender}
           onOpenMatch={openMatch}
           championMatchId={finalMatchId}
@@ -4166,7 +4430,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             : buildEmptyRoundsByScale(scaleForCurrent || 4));
 
     return (
-      <BracketColumns
+      <SymmetricKnockoutColumns
         rounds={roundsToRender}
         onOpenMatch={openMatch}
         championMatchId={finalMatchId}
@@ -4490,6 +4754,40 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 0,
+  },
+  bracketMirrorCanvas: {
+    transform: [{ scaleX: -1 }],
+  },
+  bracketMirrorCard: {
+    transform: [{ scaleX: -1 }],
+  },
+  symmetricKoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 42,
+    position: "relative",
+  },
+  symmetricFinalColumn: {
+    alignSelf: "stretch",
+    justifyContent: "center",
+    position: "relative",
+  },
+  symmetricFinalCardWrap: {
+    zIndex: 1,
+  },
+  symmetricFinalBridge: {
+    position: "absolute",
+    top: "50%",
+    width: 42,
+    height: 2,
+    backgroundColor: "rgba(25,118,210,0.42)",
+    zIndex: 0,
+  },
+  symmetricFinalBridgeLeft: {
+    left: -42,
+  },
+  symmetricFinalBridgeRight: {
+    right: -42,
   },
   roundsRow: { flexDirection: "row", gap: 30 },
   seedBox: {
