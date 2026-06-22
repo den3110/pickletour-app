@@ -3368,7 +3368,7 @@ export default function RefereeJudgePanel({ matchId }) {
         compact={isCompactLandscape || !isLandscape}
       />
     );
-  if (error)
+  if (error && !match)
     return (
       <View
         style={[

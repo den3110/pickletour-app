@@ -1190,7 +1190,7 @@ export function useRefereeLiveSyncMatch(
           return prev;
         }
         dataRef.current = nextData;
-        return { ...prev, loading: false, data: nextData };
+        return { ...prev, loading: false, data: nextData, error: null };
       });
       await persistState({ snapshot: incoming });
     };
@@ -1229,6 +1229,7 @@ export function useRefereeLiveSyncMatch(
         data: prev.data
           ? mergeMatchPayload(prev.data, nextData, prev.data)
           : nextData,
+        error: null,
       }));
     };
     const onOwnershipChanged = (payload = {}) => {
