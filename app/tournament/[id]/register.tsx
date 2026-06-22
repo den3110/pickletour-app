@@ -425,11 +425,16 @@ const SkeletonItem = ({
 const TournamentSkeleton = () => {
   const C = useThemeColors();
   const insets = useSafeAreaInsets();
+  const isDark = C.scheme === "dark";
+  const headerBg = isDark ? C.gradStart : "#F8FAFC";
+  const headerSkeleton = isDark
+    ? "rgba(255,255,255,0.2)"
+    : "rgba(15,23,42,0.08)";
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
       {/* Header Skeleton */}
-      <View style={{ height: 200 + insets.top, backgroundColor: C.gradStart }}>
+      <View style={{ height: 200 + insets.top, backgroundColor: headerBg }}>
         <View style={{ marginTop: insets.top + 20, paddingHorizontal: 16 }}>
           <View
             style={{ flexDirection: "row", justifyContent: "space-between" }}
@@ -438,18 +443,18 @@ const TournamentSkeleton = () => {
               width={100}
               height={24}
               borderRadius={20}
-              style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+              style={{ backgroundColor: headerSkeleton }}
             />
           </View>
           <SkeletonItem
             width="80%"
             height={30}
-            style={{ marginTop: 16, backgroundColor: "rgba(255,255,255,0.2)" }}
+            style={{ marginTop: 16, backgroundColor: headerSkeleton }}
           />
           <SkeletonItem
             width="50%"
             height={20}
-            style={{ marginTop: 10, backgroundColor: "rgba(255,255,255,0.2)" }}
+            style={{ marginTop: 10, backgroundColor: headerSkeleton }}
           />
         </View>
       </View>

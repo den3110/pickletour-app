@@ -317,9 +317,30 @@ function glassTintFor(t, darkAlpha = 0.58, lightAlpha = 0.68) {
     : `rgba(255,255,255,${lightAlpha})`;
 }
 
+function profileGlassNeutralTintFor(t, darkAlpha = 0.5, lightAlpha = 0.78) {
+  return IOS_26_LIQUID_GLASS_ENABLED
+    ? glassTintFor(t, darkAlpha, lightAlpha)
+    : glassTintFor(t, 0.38, 0.54);
+}
+
+function profileGlassAccentTintFor(t, darkAlpha = 0.64, lightAlpha = 0.66) {
+  return rgbaFromHex(t.accent, t.dark ? darkAlpha : lightAlpha);
+}
+
+function profileGlassBorderFor(t, darkAlpha = 0.3, lightAlpha = 0.22) {
+  return t.dark
+    ? `rgba(255,255,255,${darkAlpha})`
+    : `rgba(9,9,11,${lightAlpha})`;
+}
+
 function profileFieldTintFor(t, active = false, error = false) {
   if (error) return rgbaFromHex(t.error, 0.16);
-  if (active) return rgbaFromHex(t.accent, 0.2);
+  if (active) {
+    return IOS_26_LIQUID_GLASS_ENABLED
+      ? rgbaFromHex(t.accent, t.dark ? 0.46 : 0.34)
+      : rgbaFromHex(t.accent, 0.2);
+  }
+  if (IOS_26_LIQUID_GLASS_ENABLED) return glassTintFor(t, 0.48, 0.76);
   return glassTintFor(t, 0.34, 0.48);
 }
 
@@ -330,8 +351,8 @@ function profileFieldBorderFor(t, active = false, error = false) {
     return t.border;
   }
   if (error) return rgbaFromHex(t.error, 0.46);
-  if (active) return rgbaFromHex(t.accent, 0.54);
-  return "rgba(255,255,255,0.18)";
+  if (active) return rgbaFromHex(t.accent, t.dark ? 0.7 : 0.56);
+  return t.dark ? "rgba(255,255,255,0.28)" : "rgba(9,9,11,0.16)";
 }
 
 function ProfileGlassSurface({
@@ -341,10 +362,15 @@ function ProfileGlassSurface({
   style,
   tintColor = "rgba(24,24,27,0.58)",
 }) {
+  const navTheme = useTheme?.() || {};
+  const scheme = useColorScheme?.() || "light";
+  const dark =
+    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+
   return (
     <AppleLiquidGlassView
       fallback="view"
-      glassColorScheme="auto"
+      glassColorScheme={dark ? "dark" : "light"}
       glassEffectStyle={effect}
       glassTintColor={tintColor}
       isInteractive={interactive}
@@ -1021,8 +1047,11 @@ export default function ProfileScreen({ isBack = false }) {
               <ProfileGlassSurface
                 effect="clear"
                 interactive
-                tintColor="rgba(255,255,255,0.18)"
-                style={styles.headerBtn}
+                tintColor="rgba(0,0,0,0.38)"
+                style={[
+                  styles.headerBtn,
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.headerBtnGlassStrong,
+                ]}
               >
                 <Feather name="chevron-left" size={20} color="#fff" />
               </ProfileGlassSurface>
@@ -1052,8 +1081,11 @@ export default function ProfileScreen({ isBack = false }) {
             <ProfileGlassSurface
               effect="clear"
               interactive
-              tintColor="rgba(255,255,255,0.18)"
-              style={styles.headerBtn}
+              tintColor="rgba(0,0,0,0.38)"
+              style={[
+                styles.headerBtn,
+                IOS_26_LIQUID_GLASS_ENABLED && styles.headerBtnGlassStrong,
+              ]}
             >
               <Feather name="image" size={18} color="#fff" />
             </ProfileGlassSurface>
@@ -1112,7 +1144,10 @@ export default function ProfileScreen({ isBack = false }) {
               <ProfileGlassSurface
                 effect="clear"
                 interactive
-                tintColor={rgbaFromHex(t.accent, 0.42)}
+                tintColor={rgbaFromHex(
+                  t.accent,
+                  IOS_26_LIQUID_GLASS_ENABLED ? 0.76 : 0.42,
+                )}
                 style={[styles.avatarEditBtn, { backgroundColor: t.accent }]}
               >
                 <Feather name="camera" size={14} color="#fff" />
@@ -1167,11 +1202,20 @@ export default function ProfileScreen({ isBack = false }) {
         <View style={[styles.tabBarContainer, { backgroundColor: t.bg }]}>
           <ProfileGlassSurface
             effect="clear"
-            tintColor={glassTintFor(t, 0.56, 0.68)}
+            tintColor={
+              IOS_26_LIQUID_GLASS_ENABLED
+                ? profileGlassNeutralTintFor(t, 0.64, 0.88)
+                : glassTintFor(t, 0.56, 0.68)
+            }
             style={[
               styles.tabBar,
               IOS_26_LIQUID_GLASS_ENABLED && styles.tabBarGlass,
-              { backgroundColor: t.surface, borderColor: t.border },
+              {
+                backgroundColor: t.surface,
+                borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? profileGlassBorderFor(t, 0.34, 0.24)
+                  : t.border,
+              },
             ]}
           >
             {TABS.map((tab, index) => {
@@ -1196,8 +1240,12 @@ export default function ProfileScreen({ isBack = false }) {
                     interactive={activeTab === tab.key}
                     tintColor={
                       activeTab === tab.key
-                        ? rgbaFromHex(t.accent, 0.42)
-                        : glassTintFor(t, 0.18, 0.28)
+                        ? IOS_26_LIQUID_GLASS_ENABLED
+                          ? profileGlassAccentTintFor(t, 0.74, 0.78)
+                          : rgbaFromHex(t.accent, 0.42)
+                        : IOS_26_LIQUID_GLASS_ENABLED
+                          ? profileGlassNeutralTintFor(t, 0.44, 0.78)
+                          : glassTintFor(t, 0.18, 0.28)
                     }
                     style={[
                       styles.tabItem,
@@ -1209,8 +1257,11 @@ export default function ProfileScreen({ isBack = false }) {
                         IOS_26_LIQUID_GLASS_ENABLED && styles.tabItemGlassActive,
                         {
                           backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                            ? rgbaFromHex(t.accent, 0.32)
+                            ? rgbaFromHex(t.accent, t.dark ? 0.62 : 0.72)
                             : t.accent,
+                          borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                            ? rgbaFromHex(t.accent, t.dark ? 0.86 : 0.82)
+                            : undefined,
                         },
                       ],
                     ]}
@@ -1452,11 +1503,22 @@ export default function ProfileScreen({ isBack = false }) {
                   <ProfileGlassSurface
                     effect="clear"
                     interactive
-                    tintColor={rgbaFromHex(t.accent, 0.2)}
+                    tintColor={
+                      IOS_26_LIQUID_GLASS_ENABLED
+                        ? profileGlassAccentTintFor(t, 0.62, 0.72)
+                        : rgbaFromHex(t.accent, 0.2)
+                    }
                     style={[
                       styles.qrBtn,
                       IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-                      { backgroundColor: t.accentLight },
+                      {
+                        backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                          ? rgbaFromHex(t.accent, t.dark ? 0.36 : 0.34)
+                          : t.accentLight,
+                        borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                          ? rgbaFromHex(t.accent, t.dark ? 0.68 : 0.58)
+                          : undefined,
+                      },
                     ]}
                   >
                     <Feather name="maximize" size={18} color={t.accent} />
@@ -1618,11 +1680,19 @@ export default function ProfileScreen({ isBack = false }) {
                     <View style={styles.switchLeft}>
                       <ProfileGlassSurface
                         effect="clear"
-                        tintColor={rgbaFromHex(t.accent, 0.18)}
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
                         style={[
                           styles.switchIcon,
                           IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-                          { backgroundColor: t.accentLight },
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
                         ]}
                       >
                         <Feather name="bell" size={16} color={t.accent} />
@@ -1828,11 +1898,19 @@ export default function ProfileScreen({ isBack = false }) {
           >
             <ProfileGlassSurface
               effect="clear"
-              tintColor="rgba(239,68,68,0.16)"
+              tintColor={
+                IOS_26_LIQUID_GLASS_ENABLED
+                  ? "rgba(239,68,68,0.32)"
+                  : "rgba(239,68,68,0.16)"
+              }
               style={[
                 styles.dangerIcon,
                 IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-                { backgroundColor: "rgba(239,68,68,0.12)" },
+                {
+                  backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                    ? "rgba(239,68,68,0.18)"
+                    : "rgba(239,68,68,0.12)",
+                },
               ]}
             >
               <Feather name="alert-triangle" size={28} color={t.error} />
@@ -1920,11 +1998,19 @@ export default function ProfileScreen({ isBack = false }) {
               >
                 <ProfileGlassSurface
                   effect="clear"
-                  tintColor={rgbaFromHex(t.accent, 0.18)}
+                  tintColor={
+                    IOS_26_LIQUID_GLASS_ENABLED
+                      ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                      : rgbaFromHex(t.accent, 0.18)
+                  }
                   style={[
                     styles.tipIcon,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-                    { backgroundColor: t.accentLight },
+                    {
+                      backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                        ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                        : t.accentLight,
+                    },
                   ]}
                 >
                   <Feather name="shield" size={18} color={t.accent} />
@@ -1953,11 +2039,20 @@ export default function ProfileScreen({ isBack = false }) {
                 <ProfileGlassSurface
                   effect="clear"
                   interactive
-                  tintColor={rgbaFromHex(t.accent, 0.3)}
+                  tintColor={
+                    IOS_26_LIQUID_GLASS_ENABLED
+                      ? profileGlassAccentTintFor(t, 0.66, 0.54)
+                      : rgbaFromHex(t.accent, 0.3)
+                  }
                   style={[
                     styles.tipBtn,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-                    { backgroundColor: t.accent },
+                    {
+                      backgroundColor: t.accent,
+                      borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                        ? rgbaFromHex(t.accent, t.dark ? 0.76 : 0.62)
+                        : undefined,
+                    },
                   ]}
                 >
                   <Text style={{ color: "#fff", fontWeight: "800" }}>
@@ -2047,15 +2142,23 @@ const ProfileModalButton = ({
       interactive
       tintColor={
         variant === "primary"
-          ? rgbaFromHex(color, 0.3)
-          : glassTintFor(t, 0.38, 0.54)
+          ? IOS_26_LIQUID_GLASS_ENABLED
+            ? rgbaFromHex(color, t.dark ? 0.62 : 0.54)
+            : rgbaFromHex(color, 0.3)
+          : IOS_26_LIQUID_GLASS_ENABLED
+            ? profileGlassNeutralTintFor(t, 0.52, 0.78)
+            : glassTintFor(t, 0.38, 0.54)
       }
       style={[
         variant === "primary" ? styles.modalBtnPrimary : styles.modalBtn,
         IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
         variant === "primary"
           ? { backgroundColor: color }
-          : { borderColor: t.border },
+          : {
+              borderColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? profileGlassBorderFor(t, 0.28, 0.16)
+                : t.border,
+            },
       ]}
     >
       {children}
@@ -2066,17 +2169,31 @@ const ProfileModalButton = ({
 const ProfileRadio = ({ selected, t }) => (
   <ProfileGlassSurface
     effect="clear"
-    tintColor={selected ? rgbaFromHex(t.accent, 0.22) : glassTintFor(t, 0.28, 0.46)}
+    tintColor={
+      selected
+        ? IOS_26_LIQUID_GLASS_ENABLED
+          ? profileGlassAccentTintFor(t, 0.54, 0.42)
+          : rgbaFromHex(t.accent, 0.22)
+        : IOS_26_LIQUID_GLASS_ENABLED
+          ? profileGlassNeutralTintFor(t, 0.46, 0.72)
+          : glassTintFor(t, 0.28, 0.46)
+    }
     style={[
       styles.radio,
       IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-      { borderColor: selected ? t.accent : t.border },
+      {
+        borderColor: selected
+          ? t.accent
+          : IOS_26_LIQUID_GLASS_ENABLED
+            ? profileGlassBorderFor(t, 0.28, 0.16)
+            : t.border,
+      },
     ]}
   >
     {selected && (
       <ProfileGlassSurface
         effect="clear"
-        tintColor={rgbaFromHex(t.accent, 0.44)}
+        tintColor={rgbaFromHex(t.accent, IOS_26_LIQUID_GLASS_ENABLED ? 0.64 : 0.44)}
         style={[styles.radioInner, { backgroundColor: t.accent }]}
       />
     )}
@@ -2196,8 +2313,8 @@ const Card = ({ title, children, t }) => (
     interactive
     tintColor={
       title === "Chỉnh sửa hồ sơ"
-        ? glassTintFor(t, 0.32, 0.42)
-        : glassTintFor(t, 0.38, 0.48)
+        ? profileGlassNeutralTintFor(t, 0.5, 0.86)
+        : profileGlassNeutralTintFor(t, 0.46, 0.78)
     }
     style={[
       styles.card,
@@ -2208,13 +2325,19 @@ const Card = ({ title, children, t }) => (
       {
         backgroundColor: t.surface,
         borderColor: IOS_26_LIQUID_GLASS_ENABLED
-          ? "rgba(255,255,255,0.2)"
+          ? profileGlassBorderFor(t, 0.34, 0.24)
           : t.border,
       },
     ]}
   >
     {IOS_26_LIQUID_GLASS_ENABLED && (
-      <View pointerEvents="none" style={styles.cardGlassEdge} />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.cardGlassEdge,
+          { borderColor: profileGlassBorderFor(t, 0.24, 0.18) },
+        ]}
+      />
     )}
     {title && (
       <Text style={[styles.cardTitle, { color: t.text }]}>{title}</Text>
@@ -2381,10 +2504,17 @@ const FormSelect = ({
                 <ProfileGlassSurface
                   effect="clear"
                   interactive
-                  tintColor={glassTintFor(t, 0.38, 0.5)}
+                  tintColor={
+                    IOS_26_LIQUID_GLASS_ENABLED
+                      ? profileGlassNeutralTintFor(t, 0.5, 0.78)
+                      : glassTintFor(t, 0.38, 0.5)
+                  }
                   style={[
                     styles.pickerAction,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                    IOS_26_LIQUID_GLASS_ENABLED && {
+                      borderColor: profileGlassBorderFor(t, 0.26, 0.14),
+                    },
                   ]}
                 >
                   <Text style={{ color: t.textSecondary }}>Huỷ</Text>
@@ -2506,10 +2636,17 @@ const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
                 <ProfileGlassSurface
                   effect="clear"
                   interactive
-                  tintColor={glassTintFor(t, 0.38, 0.5)}
+                  tintColor={
+                    IOS_26_LIQUID_GLASS_ENABLED
+                      ? profileGlassNeutralTintFor(t, 0.5, 0.78)
+                      : glassTintFor(t, 0.38, 0.5)
+                  }
                   style={[
                     styles.pickerAction,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                    IOS_26_LIQUID_GLASS_ENABLED && {
+                      borderColor: profileGlassBorderFor(t, 0.26, 0.14),
+                    },
                   ]}
                 >
                   <Text style={{ color: t.textSecondary }}>Huỷ</Text>
@@ -2529,10 +2666,17 @@ const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
                 <ProfileGlassSurface
                   effect="clear"
                   interactive
-                  tintColor={rgbaFromHex(t.accent, 0.18)}
+                  tintColor={
+                    IOS_26_LIQUID_GLASS_ENABLED
+                      ? profileGlassAccentTintFor(t, 0.5, 0.4)
+                      : rgbaFromHex(t.accent, 0.18)
+                  }
                   style={[
                     styles.pickerAction,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                    IOS_26_LIQUID_GLASS_ENABLED && {
+                      borderColor: rgbaFromHex(t.accent, t.dark ? 0.52 : 0.36),
+                    },
                   ]}
                 >
                   <Text style={{ color: t.accent, fontWeight: "600" }}>
@@ -2559,41 +2703,52 @@ const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
   );
 };
 
-const GradientBtn = ({ title, onPress, disabled, loading }) => (
-  <Pressable
-    onPress={onPress}
-    disabled={disabled || loading}
-    style={({ pressed }) => [{ opacity: disabled ? 0.5 : pressed ? 0.9 : 1 }]}
-  >
-    <ProfileGlassSurface
-      effect="clear"
-      interactive
-      tintColor={disabled ? "rgba(113,113,122,0.34)" : "rgba(139,92,246,0.34)"}
-      style={[
-        styles.gradientBtn,
-        IOS_26_LIQUID_GLASS_ENABLED && styles.gradientBtnGlass,
-      ]}
+const GradientBtn = ({ title, onPress, disabled, loading }) => {
+  const t = useTokens();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      style={({ pressed }) => [{ opacity: disabled ? 0.5 : pressed ? 0.9 : 1 }]}
     >
-      <LinearGradient
-        colors={
+      <ProfileGlassSurface
+        effect="clear"
+        interactive
+        tintColor={
           disabled
             ? IOS_26_LIQUID_GLASS_ENABLED
-              ? ["rgba(113,113,122,0.48)", "rgba(82,82,91,0.34)"]
-              : ["#71717a", "#52525b"]
+              ? "rgba(113,113,122,0.48)"
+              : "rgba(113,113,122,0.34)"
             : IOS_26_LIQUID_GLASS_ENABLED
-              ? ["rgba(139,92,246,0.52)", "rgba(99,102,241,0.36)"]
-              : ["#8b5cf6", "#6366f1"]
+              ? profileGlassAccentTintFor(t, 0.78, 0.82)
+              : "rgba(139,92,246,0.34)"
         }
-        style={StyleSheet.absoluteFill}
-      />
-      {loading ? (
-        <ActivityIndicator color="#fff" />
-      ) : (
-        <Text style={styles.gradientBtnText}>{title}</Text>
-      )}
-    </ProfileGlassSurface>
-  </Pressable>
-);
+        style={[
+          styles.gradientBtn,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.gradientBtnGlass,
+        ]}
+      >
+        <LinearGradient
+          colors={
+            disabled
+              ? IOS_26_LIQUID_GLASS_ENABLED
+                ? ["rgba(113,113,122,0.62)", "rgba(82,82,91,0.48)"]
+                : ["#71717a", "#52525b"]
+              : IOS_26_LIQUID_GLASS_ENABLED
+                ? ["rgba(139,92,246,0.94)", "rgba(99,102,241,0.86)"]
+                : ["#8b5cf6", "#6366f1"]
+          }
+          style={StyleSheet.absoluteFill}
+        />
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.gradientBtnText}>{title}</Text>
+        )}
+      </ProfileGlassSurface>
+    </Pressable>
+  );
+};
 
 const ImagePickerBox = ({ label, file, onPick, t }) => (
   <View style={{ flex: 1 }}>
@@ -2704,11 +2859,19 @@ const ThemeOption = ({ label, selected, onPress, icon, t, last }) => (
     <View style={styles.themeOptionLeft}>
       <ProfileGlassSurface
         effect="clear"
-        tintColor={rgbaFromHex(t.accent, 0.18)}
+        tintColor={
+          IOS_26_LIQUID_GLASS_ENABLED
+            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+            : rgbaFromHex(t.accent, 0.18)
+        }
         style={[
           styles.themeOptionIcon,
           IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-          { backgroundColor: t.accentLight },
+          {
+            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+              : t.accentLight,
+          },
         ]}
       >
         <Feather name={icon} size={16} color={t.accent} />
@@ -2719,29 +2882,39 @@ const ThemeOption = ({ label, selected, onPress, icon, t, last }) => (
   </Pressable>
 );
 
-const DangerBtn = ({ title, icon, onPress, color }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.dangerPressable,
-      { opacity: pressed ? 0.9 : 1 },
-    ]}
-  >
-    <ProfileGlassSurface
-      effect="clear"
-      interactive
-      tintColor={rgbaFromHex(color, 0.14)}
-      style={[
-        styles.dangerBtn,
-        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-        { borderColor: color },
+const DangerBtn = ({ title, icon, onPress, color }) => {
+  const t = useTokens();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.dangerPressable,
+        { opacity: pressed ? 0.9 : 1 },
       ]}
     >
-      <Feather name={icon} size={16} color={color} />
-      <Text style={{ color, fontWeight: "700" }}>{title}</Text>
-    </ProfileGlassSurface>
-  </Pressable>
-);
+      <ProfileGlassSurface
+        effect="clear"
+        interactive
+        tintColor={rgbaFromHex(color, IOS_26_LIQUID_GLASS_ENABLED ? 0.44 : 0.14)}
+        style={[
+          styles.dangerBtn,
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+          {
+            borderColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? rgbaFromHex(color, t.dark ? 0.78 : 0.68)
+              : color,
+            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? rgbaFromHex(color, t.dark ? 0.16 : 0.14)
+              : undefined,
+          },
+        ]}
+      >
+        <Feather name={icon} size={16} color={color} />
+        <Text style={{ color, fontWeight: "800" }}>{title}</Text>
+      </ProfileGlassSurface>
+    </Pressable>
+  );
+};
 
 /* ==================== STYLES ==================== */
 const styles = StyleSheet.create({
@@ -2775,6 +2948,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
+  },
+  headerBtnGlassStrong: {
+    backgroundColor: "rgba(0,0,0,0.34)",
+    borderColor: "rgba(255,255,255,0.34)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
   },
   headerBtnPressable: {
     width: 40,
@@ -2980,7 +3161,7 @@ const styles = StyleSheet.create({
   },
   tabItemGlass: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.14)",
     overflow: "hidden",
   },
   tabItemActive: {},
@@ -3079,11 +3260,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   formInputGlass: {
-    borderColor: "rgba(255,255,255,0.18)",
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.12,
     shadowRadius: 14,
   },
   formInputGlassActive: {
@@ -3109,10 +3289,10 @@ const styles = StyleSheet.create({
   },
   gradientBtnGlass: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.32)",
     shadowColor: "#8b5cf6",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
+    shadowOpacity: 0.32,
     shadowRadius: 18,
   },
   gradientBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
@@ -3204,7 +3384,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   glassPill: {
-    borderColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
     overflow: "hidden",
   },
 

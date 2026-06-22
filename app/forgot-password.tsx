@@ -20,15 +20,61 @@ import { useRouter } from "expo-router";
 import { useForgotPasswordMutation } from "@/slices/usersApiSlice";
 import LottieView from "lottie-react-native"; // ⬅️ NEW
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 // ⬅️ NEW: asset Lottie
 const FORGOT_LOTTIE = require("@/assets/lottie/forgot-password.json");
 
-function SuccessBanner({ children }) {
+function rgbaFromHex(color, alpha) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color;
+  const value = parseInt(hex, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function ForgotGlassSurface({
+  children,
+  isDark,
+  style,
+  tintColor,
+  effect = "clear",
+  interactive = false,
+}) {
   return (
-    <View style={styles.successBanner}>
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={isDark ? "dark" : "light"}
+      glassEffectStyle={effect}
+      glassTintColor={
+        tintColor ??
+        (isDark ? "rgba(22,24,29,0.62)" : "rgba(255,255,255,0.78)")
+      }
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
+function SuccessBanner({ children, isDark }) {
+  return (
+    <ForgotGlassSurface
+      isDark={isDark}
+      tintColor={
+        isDark ? "rgba(34,197,94,0.2)" : "rgba(220,252,231,0.82)"
+      }
+      style={[
+        styles.successBanner,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
+    >
       <Text style={styles.successBannerText}>{children}</Text>
-    </View>
+    </ForgotGlassSurface>
   );
 }
 
@@ -113,9 +159,15 @@ export default function ForgotPasswordScreen() {
             contentContainerStyle={styles.container}
             keyboardShouldPersistTaps="handled"
           >
-            <View
+            <ForgotGlassSurface
+              isDark={isDark}
+              effect="regular"
+              tintColor={
+                isDark ? "rgba(22,24,29,0.68)" : "rgba(255,255,255,0.84)"
+              }
               style={[
                 styles.card,
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
                 { backgroundColor: themed.cardBg, borderColor: themed.border },
               ]}
             >
@@ -143,7 +195,7 @@ export default function ForgotPasswordScreen() {
               </Text>
 
               {!!sentTo && (
-                <SuccessBanner>
+                <SuccessBanner isDark={isDark}>
                   Nếu email tồn tại, hướng dẫn đã được gửi tới:{" "}
                   <Text style={styles.bold}>{sentTo}</Text>.
                 </SuccessBanner>
@@ -153,56 +205,81 @@ export default function ForgotPasswordScreen() {
                 <Text style={[styles.label, { color: themed.subtext }]}>
                   Email
                 </Text>
-                <TextInput
+                <ForgotGlassSurface
+                  isDark={isDark}
+                  interactive
+                  tintColor={
+                    isDark ? "rgba(43,47,54,0.66)" : "rgba(255,255,255,0.78)"
+                  }
                   style={[
-                    styles.input,
+                    styles.inputShell,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
                     {
-                      color: themed.text,
                       backgroundColor: themed.muted,
                       borderColor: themed.border,
                     },
                   ]}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="send"
-                  onSubmitEditing={handleSubmit}
-                  textContentType="emailAddress"
-                  accessibilityLabel="Email"
-                  autoFocus
-                />
+                >
+                  <TextInput
+                    style={[styles.inputInside, { color: themed.text }]}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="send"
+                    onSubmitEditing={handleSubmit}
+                    textContentType="emailAddress"
+                    accessibilityLabel="Email"
+                    autoFocus
+                  />
+                </ForgotGlassSurface>
 
                 <Pressable
                   onPress={handleSubmit}
                   disabled={!emailValid || isLoading}
-                  style={({ pressed }) => [
-                    styles.button,
-                    {
-                      backgroundColor:
-                        !emailValid || isLoading ? "#94a3b8" : themed.primary,
-                      opacity: pressed ? 0.9 : 1,
-                    },
-                  ]}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Gửi OTP"
                   testID="submit-forgot"
                 >
-                  {isLoading ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={themed.primaryText}
-                    />
-                  ) : (
-                    <Text
-                      style={[styles.buttonText, { color: themed.primaryText }]}
-                    >
-                      Gửi OTP
-                    </Text>
-                  )}
+                  <ForgotGlassSurface
+                    isDark={isDark}
+                    interactive={emailValid && !isLoading}
+                    tintColor={
+                      !emailValid || isLoading
+                        ? "rgba(148,163,184,0.56)"
+                        : rgbaFromHex(themed.primary, isDark ? 0.72 : 0.62)
+                    }
+                    style={[
+                      styles.button,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
+                      {
+                        backgroundColor:
+                          !emailValid || isLoading
+                            ? "#94a3b8"
+                            : themed.primary,
+                      },
+                    ]}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={themed.primaryText}
+                      />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.buttonText,
+                          { color: themed.primaryText },
+                        ]}
+                      >
+                        Gửi OTP
+                      </Text>
+                    )}
+                  </ForgotGlassSurface>
                 </Pressable>
 
                 <Pressable
@@ -215,7 +292,7 @@ export default function ForgotPasswordScreen() {
                   </Text>
                 </Pressable>
               </View>
-            </View>
+            </ForgotGlassSurface>
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
@@ -241,6 +318,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
+  },
+  glassPanel: {
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
   },
   // ⬇️ NEW
   animWrap: {
@@ -270,6 +354,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
+  glassPill: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+  },
   successBannerText: {
     color: "#14532d",
     fontSize: 13.5,
@@ -279,9 +368,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 6,
   },
-  input: {
+  inputShell: {
     borderRadius: 12,
     borderWidth: 1,
+    overflow: "hidden",
+  },
+  glassInput: {
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+  inputInside: {
     paddingHorizontal: 14,
     paddingVertical: Platform.select({ ios: 12, android: 10 }),
     fontSize: 16,
@@ -292,6 +387,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  glassPrimaryBtn: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.32)",
+    shadowColor: "#2563eb",
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
   buttonText: { fontSize: 16, fontWeight: "700" },
   backLink: { marginTop: 12, alignSelf: "flex-start" },

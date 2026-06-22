@@ -238,10 +238,17 @@ export default function LeaderboardSection() {
           <AppleLiquidGlassView
             fallback="view"
             glassEffectStyle="regular"
-            glassTintColor="rgba(255, 180, 0, 0.46)"
+            glassTintColor="rgba(255, 213, 64, 0.72)"
             isInteractive
             style={[styles.leaderboardHeader, styles.leaderboardHeaderGlass]}
           >
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(255, 232, 96, 0.98)", "rgba(255, 166, 0, 0.92)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
             <Ionicons name="podium" size={28} color="#FFFFFF" />
             <Text style={styles.leaderboardHeaderText}>
               Bảng xếp hạng nổi bật
@@ -341,10 +348,17 @@ export default function LeaderboardSection() {
             <AppleLiquidGlassView
               fallback="view"
               glassEffectStyle="regular"
-              glassTintColor="rgba(255, 180, 0, 0.46)"
+              glassTintColor="rgba(255, 214, 66, 0.78)"
               isInteractive
-              style={styles.viewAllGradient}
+              style={[styles.viewAllGradient, styles.viewAllGlass]}
             >
+              <LinearGradient
+                pointerEvents="none"
+                colors={["rgba(255, 225, 72, 0.98)", "rgba(255, 149, 0, 0.92)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFillObject}
+              />
               <Text style={styles.viewAllText}>Xem toàn bộ xếp hạng</Text>
               <Ionicons
                 name="arrow-forward-circle"
@@ -401,20 +415,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 16,
     gap: 12,
+    overflow: "hidden",
   },
   leaderboardHeaderGlass: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.38)",
-    shadowColor: "#FFA500",
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: "rgba(255,255,255,0.62)",
+    shadowColor: "#FFD700",
+    shadowOpacity: 0.36,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
   },
   leaderboardHeaderText: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: "900",
     color: "#FFFFFF",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
+    textShadowColor: "rgba(120,72,0,0.56)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   leaderboardCards: {
     paddingHorizontal: 16,
@@ -571,6 +589,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: "hidden",
+    shadowColor: "#FFD700",
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
   },
   viewAllGradient: {
     flexDirection: "row",
@@ -579,11 +601,19 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     gap: 10,
+    overflow: "hidden",
+  },
+  viewAllGlass: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.58)",
   },
   viewAllText: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "900",
     color: "#FFFFFF",
-    letterSpacing: 0.5,
+    letterSpacing: 0,
+    textShadowColor: "rgba(120,72,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

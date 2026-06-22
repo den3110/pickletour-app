@@ -21,8 +21,12 @@ import { setCredentials } from "@/slices/authSlice";
 import { saveUserInfo } from "@/utils/authStorage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
-import { normalizeAppRoutePath } from "@/utils/nativeTabs";
+import {
+  IOS_26_LIQUID_GLASS_ENABLED,
+  normalizeAppRoutePath,
+} from "@/utils/nativeTabs";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 /* ---------- Helpers ---------- */
 const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
@@ -62,6 +66,41 @@ const LOGO_SRC = require("@/assets/images/icon.png");
 const BG_LOTTIE = require("@/assets/lottie/animated-bg.json");
 
 const BOTTOM_ACTIONS_H = 132;
+
+function rgbaFromHex(color, alpha) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color;
+  const value = parseInt(hex, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function AuthGlassSurface({
+  children,
+  isDark,
+  style,
+  tintColor,
+  effect = "clear",
+  interactive = false,
+}) {
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={isDark ? "dark" : "light"}
+      glassEffectStyle={effect}
+      glassTintColor={
+        tintColor ??
+        (isDark ? "rgba(22,24,29,0.62)" : "rgba(255,255,255,0.76)")
+      }
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
 
 export default function LoginScreen() {
   const params = useLocalSearchParams<{
@@ -210,15 +249,26 @@ export default function LoginScreen() {
               ]}
               keyboardShouldPersistTaps="handled"
             >
-              <View
+              <AuthGlassSurface
+                isDark={isDark}
+                effect="regular"
+                tintColor={
+                  isDark ? "rgba(22,24,29,0.68)" : "rgba(255,255,255,0.82)"
+                }
                 style={[
                   styles.card,
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
                   { backgroundColor: cardBg, borderColor: border },
                 ]}
               >
-                <View
+                <AuthGlassSurface
+                  isDark={isDark}
+                  tintColor={
+                    isDark ? "rgba(32,35,41,0.7)" : "rgba(243,245,249,0.86)"
+                  }
                   style={[
                     styles.logoWrap,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
                     { backgroundColor: logoBg, borderColor: border },
                   ]}
                 >
@@ -229,7 +279,7 @@ export default function LoginScreen() {
                     transition={150}
                     cachePolicy="memory-disk"
                   />
-                </View>
+                </AuthGlassSurface>
 
                 <Text style={[styles.title, { color: textPrimary }]}>
                   Đăng nhập
@@ -239,22 +289,34 @@ export default function LoginScreen() {
                   <Text style={[styles.label, { color: textSecondary }]}>
                     Email / Số điện thoại
                   </Text>
-                  <TextInput
-                    value={loginId}
-                    onChangeText={setLoginId}
-                    placeholder="Email / Số điện thoại"
-                    placeholderTextColor="#9aa0a6"
+                  <AuthGlassSurface
+                    isDark={isDark}
+                    interactive
+                    tintColor={
+                      isDark
+                        ? "rgba(32,35,41,0.62)"
+                        : "rgba(255,255,255,0.78)"
+                    }
                     style={[
-                      styles.input,
-                      { borderColor: border, color: textPrimary },
+                      styles.inputShell,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+                      { borderColor: border },
                     ]}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType={"default"}
-                    textContentType="username"
-                    autoComplete="username"
-                    returnKeyType="next"
-                  />
+                  >
+                    <TextInput
+                      value={loginId}
+                      onChangeText={setLoginId}
+                      placeholder="Email / Số điện thoại"
+                      placeholderTextColor="#9aa0a6"
+                      style={[styles.inputInside, { color: textPrimary }]}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType={kbType}
+                      textContentType="username"
+                      autoComplete="username"
+                      returnKeyType="next"
+                    />
+                  </AuthGlassSurface>
 
                   <Text
                     style={[
@@ -264,38 +326,57 @@ export default function LoginScreen() {
                   >
                     Mật khẩu
                   </Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="••••••••"
-                    placeholderTextColor="#9aa0a6"
+                  <AuthGlassSurface
+                    isDark={isDark}
+                    interactive
+                    tintColor={
+                      isDark
+                        ? "rgba(32,35,41,0.62)"
+                        : "rgba(255,255,255,0.78)"
+                    }
                     style={[
-                      styles.input,
-                      { borderColor: border, color: textPrimary },
+                      styles.inputShell,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+                      { borderColor: border },
                     ]}
-                    secureTextEntry
-                    textContentType="password"
-                    autoComplete="password"
-                    returnKeyType="done"
-                    onSubmitEditing={onSubmit}
-                  />
+                  >
+                    <TextInput
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="••••••••"
+                      placeholderTextColor="#9aa0a6"
+                      style={[styles.inputInside, { color: textPrimary }]}
+                      secureTextEntry
+                      textContentType="password"
+                      autoComplete="password"
+                      returnKeyType="done"
+                      onSubmitEditing={onSubmit}
+                    />
+                  </AuthGlassSurface>
 
                   <Pressable
                     onPress={onSubmit}
                     disabled={isLoading}
                     style={({ pressed }) => [
-                      styles.btnSolid,
-                      {
-                        backgroundColor: tint,
-                        opacity: isLoading ? 0.7 : pressed ? 0.9 : 1,
-                      },
+                      { opacity: isLoading ? 0.7 : pressed ? 0.9 : 1 },
                     ]}
                   >
-                    {isLoading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.btnTextWhite}>Đăng nhập</Text>
-                    )}
+                    <AuthGlassSurface
+                      isDark={isDark}
+                      interactive={!isLoading}
+                      tintColor={rgbaFromHex(tint, isDark ? 0.72 : 0.62)}
+                      style={[
+                        styles.btnSolid,
+                        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
+                        { backgroundColor: tint },
+                      ]}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.btnTextWhite}>Đăng nhập</Text>
+                      )}
+                    </AuthGlassSurface>
                   </Pressable>
 
                   <Pressable
@@ -312,7 +393,7 @@ export default function LoginScreen() {
                     </Text>
                   </Pressable>
                 </View>
-              </View>
+              </AuthGlassSurface>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -320,9 +401,14 @@ export default function LoginScreen() {
         {/* ⬅️ SỬA: Chỉ hiện 2 nút khi keyboard KHÔNG hiện */}
         {((!keyboardVisible && Platform.OS === "android") ||
           Platform.OS === "ios") && (
-          <View
+          <AuthGlassSurface
+            isDark={isDark}
+            tintColor={
+              isDark ? "rgba(22,24,29,0.72)" : "rgba(255,255,255,0.86)"
+            }
             style={[
               styles.bottomActions,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.bottomActionsGlass,
               {
                 backgroundColor: cardBg,
                 borderTopColor: border,
@@ -360,7 +446,7 @@ export default function LoginScreen() {
                 Đăng ký
               </Text>
             </Pressable>
-          </View>
+          </AuthGlassSurface>
         )}
       </View>
     </>
@@ -379,6 +465,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  glassPanel: {
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+  },
   logoWrap: {
     alignSelf: "center",
     width: 110,
@@ -393,6 +486,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
+  glassControl: {
+    borderColor: "rgba(255,255,255,0.22)",
+    overflow: "hidden",
+  },
   logo: { width: 88, height: 88, borderRadius: 18 },
   title: {
     fontSize: 22,
@@ -402,9 +499,15 @@ const styles = StyleSheet.create({
   },
   form: { marginTop: 4 },
   label: { fontSize: 13, marginBottom: 6 },
-  input: {
+  inputShell: {
     borderWidth: 1,
     borderRadius: 12,
+    overflow: "hidden",
+  },
+  glassInput: {
+    borderColor: "rgba(255,255,255,0.24)",
+  },
+  inputInside: {
     paddingHorizontal: 14,
     paddingVertical: Platform.select({ ios: 12, android: 10 }),
     fontSize: 16,
@@ -414,6 +517,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+    overflow: "hidden",
+  },
+  glassPrimaryBtn: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.32)",
+    shadowColor: "#0a84ff",
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
   btnTextWhite: { color: "#fff", fontWeight: "700", fontSize: 16 },
   bottomActions: {
@@ -423,6 +535,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: 12,
     paddingHorizontal: 16,
+  },
+  bottomActionsGlass: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.26)",
+    overflow: "hidden",
   },
   btnOutlinePill: {
     width: "100%",

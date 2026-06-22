@@ -33,6 +33,8 @@ import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice";
 import { setCredentials } from "@/slices/authSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { saveUserInfo } from "@/utils/authStorage";
+import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 /* ==================== Consts & Helpers ==================== */
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -116,6 +118,43 @@ function formatDobLabel(dobStr) {
   return `${dd}/${mm}/${y}`;
 }
 
+function rgbaFromHex(color, alpha) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color;
+  const value = parseInt(hex, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function RegisterGlassSurface({
+  children,
+  style,
+  tintColor,
+  effect = "clear",
+  interactive = false,
+}) {
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
+
+  return (
+    <AppleLiquidGlassView
+      fallback="view"
+      glassColorScheme={isDark ? "dark" : "light"}
+      glassEffectStyle={effect}
+      glassTintColor={
+        tintColor ??
+        (isDark ? "rgba(22,24,29,0.62)" : "rgba(255,255,255,0.78)")
+      }
+      isInteractive={interactive}
+      style={style}
+    >
+      {children}
+    </AppleLiquidGlassView>
+  );
+}
+
 function parseDobString(dobStr) {
   if (!dobStr) return null;
   const parts = dobStr.split("-");
@@ -132,11 +171,6 @@ function cleanPhone(v) {
   if (s.startsWith("+84")) s = "0" + s.slice(3);
   s = s.replace(/[^\d]/g, "");
   return s;
-}
-
-function cleanCccd(v) {
-  if (typeof v !== "string") return "";
-  return v.trim().replace(/[^\d]/g, "");
 }
 
 async function pickImage(maxBytes = MAX_FILE_SIZE) {
@@ -195,7 +229,6 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
   const password = form.password || "";
   const confirmPassword = form.confirmPassword || "";
   const cccdRaw = (form.cccd || "").trim();
-  const cccdDigits = cleanCccd(form.cccd || "");
 
   const fields = {
     name: "",
@@ -470,9 +503,14 @@ export default function RegisterScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <View
+          <RegisterGlassSurface
+            effect="regular"
+            tintColor={
+              isDark ? "rgba(22,24,29,0.68)" : "rgba(255,255,255,0.84)"
+            }
             style={[
               styles.card,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
@@ -490,9 +528,14 @@ export default function RegisterScreen() {
                 onPress={() => safeAvatar && setViewerOpen(true)}
                 style={({ pressed }) => [{ opacity: pressed ? 0.97 : 1 }]}
               >
-                <View
+                <RegisterGlassSurface
+                  interactive={!!safeAvatar}
+                  tintColor={
+                    isDark ? "rgba(34,37,42,0.7)" : "rgba(243,245,249,0.86)"
+                  }
                   style={[
                     styles.avatarWrap,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
                     {
                       backgroundColor: isDark ? "#22252a" : "#f3f5f9",
                       borderColor: border,
@@ -524,7 +567,7 @@ export default function RegisterScreen() {
                       />
                     </View>
                   )}
-                </View>
+                </RegisterGlassSurface>
               </Pressable>
 
               <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
@@ -535,55 +578,75 @@ export default function RegisterScreen() {
                     setAvatarTemp(f);
                     setAvatarConfirmOpen(true);
                   }}
-                  style={({ pressed }) => [
-                    styles.btn,
-                    styles.btnOutline,
-                    {
-                      borderColor: border,
-                      backgroundColor: isDark ? "#22252a" : "#f3f5f9",
-                    },
-                    pressed && { opacity: 0.95 },
-                  ]}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.95 : 1 }]}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
+                  <RegisterGlassSurface
+                    interactive
+                    tintColor={
+                      isDark
+                        ? "rgba(34,37,42,0.66)"
+                        : "rgba(243,245,249,0.84)"
+                    }
+                    style={[
+                      styles.btn,
+                      styles.btnOutline,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassButton,
+                      {
+                        borderColor: border,
+                        backgroundColor: isDark ? "#22252a" : "#f3f5f9",
+                      },
+                    ]}
                   >
-                    <MaterialIcons
-                      name="photo-camera"
-                      size={18}
-                      color={textPrimary}
-                    />
-                    <Text
-                      style={[
-                        styles.btnText,
-                        {
-                          color:
-                            showErrors && validation.avatar
-                              ? danger
-                              : textPrimary,
-                        },
-                      ]}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      Chọn ảnh đại diện *
-                    </Text>
-                  </View>
+                      <MaterialIcons
+                        name="photo-camera"
+                        size={18}
+                        color={textPrimary}
+                      />
+                      <Text
+                        style={[
+                          styles.btnText,
+                          {
+                            color:
+                              showErrors && validation.avatar
+                                ? danger
+                                : textPrimary,
+                          },
+                        ]}
+                      >
+                        Chọn ảnh đại diện *
+                      </Text>
+                    </View>
+                  </RegisterGlassSurface>
                 </Pressable>
                 {!!safeAvatar && (
                   <Pressable
                     onPress={() => setAvatarUrl("")}
-                    style={({ pressed }) => [
-                      styles.btn,
-                      styles.btnTextOnly,
-                      pressed && { opacity: 0.9 },
-                    ]}
+                    style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
                   >
-                    <Text style={[styles.btnText, { color: danger }]}>
-                      Xóa ảnh
-                    </Text>
+                    <RegisterGlassSurface
+                      interactive
+                      tintColor={
+                        isDark
+                          ? "rgba(229,57,53,0.14)"
+                          : "rgba(254,226,226,0.78)"
+                      }
+                      style={[
+                        styles.btn,
+                        styles.btnTextOnly,
+                        IOS_26_LIQUID_GLASS_ENABLED && styles.glassButton,
+                      ]}
+                    >
+                      <Text style={[styles.btnText, { color: danger }]}>
+                        Xóa ảnh
+                      </Text>
+                    </RegisterGlassSurface>
                   </Pressable>
                 )}
               </View>
@@ -734,9 +797,18 @@ export default function RegisterScreen() {
                   pressed && { opacity: 0.95 },
                 ]}
               >
-                <View
+                <RegisterGlassSurface
+                  interactive
+                  tintColor={
+                    accepted
+                      ? rgbaFromHex(tint, isDark ? 0.72 : 0.62)
+                      : isDark
+                      ? "rgba(34,37,42,0.58)"
+                      : "rgba(255,255,255,0.72)"
+                  }
                   style={[
                     styles.checkboxBox,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
                     {
                       borderColor: accepted
                         ? tint
@@ -748,7 +820,7 @@ export default function RegisterScreen() {
                   ]}
                 >
                   {accepted ? <Text style={styles.checkboxTick}>✓</Text> : null}
-                </View>
+                </RegisterGlassSurface>
                 <Text style={{ color: textSecondary }}>
                   Tôi đồng ý{" "}
                   <Text
@@ -783,16 +855,28 @@ export default function RegisterScreen() {
               onPress={onSubmit}
               disabled={submitDisabled}
               style={({ pressed }) => [
-                styles.btn,
-                { backgroundColor: submitDisabled ? "#9aa0a6" : tint },
-                pressed && !submitDisabled && { opacity: 0.95 },
+                { opacity: submitDisabled ? 0.72 : pressed ? 0.95 : 1 },
               ]}
             >
-              <Text style={styles.btnTextWhite}>
-                {isLoading || uploadingAvatar || avatarSaving
-                  ? "Đang xử lý…"
-                  : "Đăng ký"}
-              </Text>
+              <RegisterGlassSurface
+                interactive={!submitDisabled}
+                tintColor={
+                  submitDisabled
+                    ? "rgba(148,163,184,0.54)"
+                    : rgbaFromHex(tint, isDark ? 0.72 : 0.62)
+                }
+                style={[
+                  styles.btn,
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
+                  { backgroundColor: submitDisabled ? "#9aa0a6" : tint },
+                ]}
+              >
+                <Text style={styles.btnTextWhite}>
+                  {isLoading || uploadingAvatar || avatarSaving
+                    ? "Đang xử lý…"
+                    : "Đăng ký"}
+                </Text>
+              </RegisterGlassSurface>
             </Pressable>
 
             {/* Login Link */}
@@ -808,7 +892,7 @@ export default function RegisterScreen() {
                 </Text>
               </Text>
             </View>
-          </View>
+          </RegisterGlassSurface>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -823,9 +907,14 @@ export default function RegisterScreen() {
       >
         {/* (Giữ nguyên nội dung modal này như cũ) */}
         <View style={styles.modalBackdropCenter}>
-          <View
+          <RegisterGlassSurface
+            effect="regular"
+            tintColor={
+              isDark ? "rgba(22,24,29,0.7)" : "rgba(255,255,255,0.88)"
+            }
             style={[
               styles.previewCard,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
@@ -868,18 +957,27 @@ export default function RegisterScreen() {
                 disabled={submitDisabled}
                 onPress={() => setOptionalModalOpen(false)}
                 style={({ pressed }) => [
-                  styles.btn,
-                  styles.btnOutline,
-                  {
-                    borderColor: border,
-                    minWidth: 110,
-                    opacity: submitDisabled ? 0.6 : pressed ? 0.95 : 1,
-                  },
+                  { opacity: submitDisabled ? 0.6 : pressed ? 0.95 : 1 },
                 ]}
               >
-                <Text style={[styles.btnText, { color: textPrimary }]}>
-                  Điền tiếp
-                </Text>
+                <RegisterGlassSurface
+                  interactive={!submitDisabled}
+                  tintColor={
+                    isDark
+                      ? "rgba(34,37,42,0.66)"
+                      : "rgba(255,255,255,0.78)"
+                  }
+                  style={[
+                    styles.btn,
+                    styles.btnOutline,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassButton,
+                    { borderColor: border, minWidth: 110 },
+                  ]}
+                >
+                  <Text style={[styles.btnText, { color: textPrimary }]}>
+                    Điền tiếp
+                  </Text>
+                </RegisterGlassSurface>
               </Pressable>
               <Pressable
                 disabled={submitDisabled}
@@ -888,22 +986,27 @@ export default function RegisterScreen() {
                   await doRegister();
                 }}
                 style={({ pressed }) => [
-                  styles.btn,
-                  {
-                    backgroundColor: tint,
-                    minWidth: 150,
-                    opacity: submitDisabled ? 0.7 : pressed ? 0.92 : 1,
-                  },
+                  { opacity: submitDisabled ? 0.7 : pressed ? 0.92 : 1 },
                 ]}
               >
-                {submitDisabled ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.btnTextWhite}>Bỏ qua và đăng ký</Text>
-                )}
+                <RegisterGlassSurface
+                  interactive={!submitDisabled}
+                  tintColor={rgbaFromHex(tint, isDark ? 0.72 : 0.62)}
+                  style={[
+                    styles.btn,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
+                    { backgroundColor: tint, minWidth: 150 },
+                  ]}
+                >
+                  {submitDisabled ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.btnTextWhite}>Bỏ qua và đăng ký</Text>
+                  )}
+                </RegisterGlassSurface>
               </Pressable>
             </View>
-          </View>
+          </RegisterGlassSurface>
         </View>
       </Modal>
 
@@ -934,9 +1037,14 @@ export default function RegisterScreen() {
           <TouchableWithoutFeedback onPress={() => setDobPickerOpen(false)}>
             <View style={{ flex: 1 }} />
           </TouchableWithoutFeedback>
-          <View
+          <RegisterGlassSurface
+            effect="regular"
+            tintColor={
+              isDark ? "rgba(22,24,29,0.72)" : "rgba(255,255,255,0.9)"
+            }
             style={[
               styles.modalCard,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
@@ -967,16 +1075,18 @@ export default function RegisterScreen() {
                 <Text style={[styles.modalBtnText, { color: tint }]}>Xong</Text>
               </Pressable>
             </View>
-            <View style={{ padding: 12, alignItems: "center" }}>
+            <View style={styles.dobPickerWrap}>
               <DateTimePicker
                 value={
                   dobDraft || parseDobString(form.dob) || new Date(2000, 0, 1)
                 }
                 mode="date"
-                display={Platform.OS === "ios" ? "compact" : "default"}
+                display="spinner"
                 maximumDate={new Date()}
                 minimumDate={new Date(1900, 0, 1)}
                 locale="vi-VN"
+                themeVariant={isDark ? "dark" : "light"}
+                style={styles.dobPicker}
                 onChange={(event, selectedDate) => {
                   if (Platform.OS === "android") {
                     if (event.type === "set" && selectedDate)
@@ -988,7 +1098,7 @@ export default function RegisterScreen() {
                 }}
               />
             </View>
-          </View>
+          </RegisterGlassSurface>
         </View>
       </Modal>
 
@@ -1033,9 +1143,14 @@ export default function RegisterScreen() {
       >
         {/* (Giữ nguyên nội dung) */}
         <View style={styles.modalBackdropCenter}>
-          <View
+          <RegisterGlassSurface
+            effect="regular"
+            tintColor={
+              isDark ? "rgba(22,24,29,0.7)" : "rgba(255,255,255,0.88)"
+            }
             style={[
               styles.previewCard,
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
               { backgroundColor: cardBg, borderColor: border },
             ]}
           >
@@ -1064,7 +1179,7 @@ export default function RegisterScreen() {
                 fontSize: 12,
               }}
             >
-              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm "Xác nhận".
+              Ảnh sẽ được tải lên và cập nhật ngay khi bạn bấm Xác nhận.
             </Text>
             <View
               style={{
@@ -1081,18 +1196,27 @@ export default function RegisterScreen() {
                   setAvatarTemp(null);
                 }}
                 style={({ pressed }) => [
-                  styles.btn,
-                  styles.btnOutline,
-                  {
-                    borderColor: border,
-                    minWidth: 100,
-                    opacity: avatarSaving ? 0.6 : pressed ? 0.95 : 1,
-                  },
+                  { opacity: avatarSaving ? 0.6 : pressed ? 0.95 : 1 },
                 ]}
               >
-                <Text style={[styles.btnText, { color: textPrimary }]}>
-                  Huỷ
-                </Text>
+                <RegisterGlassSurface
+                  interactive={!avatarSaving}
+                  tintColor={
+                    isDark
+                      ? "rgba(34,37,42,0.66)"
+                      : "rgba(255,255,255,0.78)"
+                  }
+                  style={[
+                    styles.btn,
+                    styles.btnOutline,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassButton,
+                    { borderColor: border, minWidth: 100 },
+                  ]}
+                >
+                  <Text style={[styles.btnText, { color: textPrimary }]}>
+                    Huỷ
+                  </Text>
+                </RegisterGlassSurface>
               </Pressable>
               <Pressable
                 disabled={avatarSaving || !avatarTemp}
@@ -1116,22 +1240,27 @@ export default function RegisterScreen() {
                   }
                 }}
                 style={({ pressed }) => [
-                  styles.btn,
-                  {
-                    backgroundColor: tint,
-                    minWidth: 120,
-                    opacity: avatarSaving ? 0.7 : pressed ? 0.92 : 1,
-                  },
+                  { opacity: avatarSaving ? 0.7 : pressed ? 0.92 : 1 },
                 ]}
               >
-                {avatarSaving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.btnTextWhite}>Xác nhận</Text>
-                )}
+                <RegisterGlassSurface
+                  interactive={!avatarSaving && !!avatarTemp}
+                  tintColor={rgbaFromHex(tint, isDark ? 0.72 : 0.62)}
+                  style={[
+                    styles.btn,
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
+                    { backgroundColor: tint, minWidth: 120 },
+                  ]}
+                >
+                  {avatarSaving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.btnTextWhite}>Xác nhận</Text>
+                  )}
+                </RegisterGlassSurface>
               </Pressable>
             </View>
-          </View>
+          </RegisterGlassSurface>
         </View>
       </Modal>
 
@@ -1161,6 +1290,8 @@ function SelectTrigger({
   helperText,
 }) {
   const danger = "#e53935";
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={[styles.label, { color: textSecondary }]}>
@@ -1169,27 +1300,39 @@ function SelectTrigger({
       </Text>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.input,
-          {
-            borderColor: error ? danger : border,
-            flexDirection: "row",
-            alignItems: "center",
-          },
-          pressed && { opacity: 0.95 },
-        ]}
+        style={({ pressed }) => [{ opacity: pressed ? 0.95 : 1 }]}
       >
-        <Text
-          numberOfLines={1}
-          style={{
-            color: value ? textPrimary : "#9aa0a6",
-            flex: 1,
-            fontSize: 16,
-          }}
+        <RegisterGlassSurface
+          interactive
+          tintColor={
+            error
+              ? "rgba(229,57,53,0.16)"
+              : isDark
+              ? "rgba(34,37,42,0.62)"
+              : "rgba(255,255,255,0.78)"
+          }
+          style={[
+            styles.inputShell,
+            styles.selectGlassRow,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+            {
+              borderColor: error ? danger : border,
+              backgroundColor: isDark ? "#1f2228" : "#ffffff",
+            },
+          ]}
         >
-          {value || placeholder}
-        </Text>
-        <Text style={{ color: "#9aa0a6" }}>▼</Text>
+          <Text
+            numberOfLines={1}
+            style={{
+              color: value ? textPrimary : "#9aa0a6",
+              flex: 1,
+              fontSize: 16,
+            }}
+          >
+            {value || placeholder}
+          </Text>
+          <Text style={{ color: "#9aa0a6" }}>▼</Text>
+        </RegisterGlassSurface>
       </Pressable>
       {error ? (
         <Text style={[styles.errorText, { color: danger }]}>{helperText}</Text>
@@ -1211,6 +1354,8 @@ function BottomOptionPicker({
   textPrimary,
   tint,
 }) {
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
   return (
     <Modal
       visible={visible}
@@ -1222,9 +1367,14 @@ function BottomOptionPicker({
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={{ flex: 1 }} />
         </TouchableWithoutFeedback>
-        <View
+        <RegisterGlassSurface
+          effect="regular"
+          tintColor={
+            isDark ? "rgba(22,24,29,0.72)" : "rgba(255,255,255,0.9)"
+          }
           style={[
             styles.modalCard,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
             { backgroundColor: cardBg, borderColor: border, maxHeight: "50%" },
           ]}
         >
@@ -1294,7 +1444,7 @@ function BottomOptionPicker({
               );
             }}
           />
-        </View>
+        </RegisterGlassSurface>
       </View>
     </Modal>
   );
@@ -1318,6 +1468,8 @@ function Field({
   ...props
 }) {
   const danger = "#e53935";
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
 
   // State để quản lý việc ẩn/hiện mật khẩu
   // Nếu field này không phải password (secureTextEntry=false) thì luôn hiện (isVisible=true)
@@ -1336,28 +1488,44 @@ function Field({
 
       {/* Container chứa Input và Icon */}
       <View style={{ justifyContent: "center" }}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={label}
-          placeholderTextColor="#9aa0a6"
+        <RegisterGlassSurface
+          interactive
+          tintColor={
+            error
+              ? "rgba(229,57,53,0.16)"
+              : isDark
+              ? "rgba(34,37,42,0.62)"
+              : "rgba(255,255,255,0.78)"
+          }
           style={[
-            styles.input,
+            styles.inputShell,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
             {
               borderColor: error ? danger : border,
-              color: textPrimary,
-              // Nếu là password field thì thêm padding bên phải để tránh chữ đè lên icon
-              paddingRight: secureTextEntry ? 45 : 14,
+              backgroundColor: isDark ? "#1f2228" : "#ffffff",
             },
           ]}
-          keyboardType={keyboardType}
-          // Logic: Nếu là field bảo mật (secureTextEntry=true) VÀ đang muốn ẩn (!isVisible) -> thì ẩn
-          secureTextEntry={secureTextEntry && !isVisible}
-          maxLength={maxLength}
-          autoCapitalize="none"
-          autoCorrect={false}
-          {...props}
-        />
+        >
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={label}
+            placeholderTextColor="#9aa0a6"
+            style={[
+              styles.inputInside,
+              {
+                color: textPrimary,
+                paddingRight: secureTextEntry ? 45 : 14,
+              },
+            ]}
+            keyboardType={keyboardType}
+            secureTextEntry={secureTextEntry && !isVisible}
+            maxLength={maxLength}
+            autoCapitalize="none"
+            autoCorrect={false}
+            {...props}
+          />
+        </RegisterGlassSurface>
 
         {/* Chỉ hiện icon con mắt nếu props secureTextEntry được truyền vào là true */}
         {secureTextEntry && (
@@ -1397,6 +1565,8 @@ function TermsModal({
   textSecondary,
   tint,
 }) {
+  const scheme = useColorScheme() ?? "light";
+  const isDark = scheme === "dark";
   return (
     <Modal
       visible={open}
@@ -1405,9 +1575,14 @@ function TermsModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalBackdrop}>
-        <View
+        <RegisterGlassSurface
+          effect="regular"
+          tintColor={
+            isDark ? "rgba(22,24,29,0.72)" : "rgba(255,255,255,0.9)"
+          }
           style={[
             styles.modalCard,
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassModal,
             {
               backgroundColor: cardBg,
               borderColor: border,
@@ -1431,18 +1606,25 @@ function TermsModal({
             </Text>
             <Pressable
               onPress={onAgree}
-              style={[
-                styles.modalBtn,
-                {
-                  backgroundColor: tint,
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                },
-              ]}
+              style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
             >
-              <Text style={[styles.modalBtnText, { color: "#fff" }]}>
-                Đồng ý
-              </Text>
+              <RegisterGlassSurface
+                interactive
+                tintColor={rgbaFromHex(tint, isDark ? 0.72 : 0.62)}
+                style={[
+                  styles.modalBtn,
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                  {
+                    backgroundColor: tint,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                  },
+                ]}
+              >
+                <Text style={[styles.modalBtnText, { color: "#fff" }]}>
+                  Đồng ý
+                </Text>
+              </RegisterGlassSurface>
             </Pressable>
           </View>
 
@@ -1593,7 +1775,7 @@ function TermsModal({
             <Text
               style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
             >
-              • Dịch vụ cung cấp "như hiện có". Trong phạm vi luật cho phép,
+              • Dịch vụ cung cấp như hiện có. Trong phạm vi luật cho phép,
               chúng tôi không chịu trách nhiệm cho thiệt hại gián tiếp/phát sinh
               do việc sử dụng.{"\n"}• Không điều nào ở đây loại trừ trách nhiệm
               pháp lý bắt buộc.
@@ -1647,11 +1829,11 @@ function TermsModal({
                 lineHeight: 20,
               }}
             >
-              Nhấn "Đồng ý" nghĩa là bạn đã đọc và chấp nhận Điều khoản & Chính
+              Nhấn Đồng ý nghĩa là bạn đã đọc và chấp nhận Điều khoản & Chính
               Sách.
             </Text>
           </ScrollView>
-        </View>
+        </RegisterGlassSurface>
       </View>
     </Modal>
   );
@@ -1669,6 +1851,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  glassPanel: {
+    borderColor: "rgba(255,255,255,0.24)",
+    overflow: "hidden",
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+  },
   avatarWrap: {
     width: 84,
     height: 84,
@@ -1676,6 +1865,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    overflow: "hidden",
+  },
+  glassControl: {
+    borderColor: "rgba(255,255,255,0.24)",
     overflow: "hidden",
   },
   label: { fontSize: 13, marginBottom: 6 },
@@ -1687,6 +1880,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "transparent",
   },
+  inputShell: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  inputInside: {
+    paddingHorizontal: 14,
+    paddingVertical: Platform.select({ ios: 12, android: 10 }),
+    fontSize: 16,
+  },
+  selectGlassRow: {
+    paddingHorizontal: 14,
+    paddingVertical: Platform.select({ ios: 12, android: 10 }),
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  glassInput: {
+    borderColor: "rgba(255,255,255,0.24)",
+  },
   btn: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -1694,6 +1906,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 6,
+    overflow: "hidden",
+  },
+  glassButton: {
+    borderColor: "rgba(255,255,255,0.26)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  glassPrimaryBtn: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.34)",
+    shadowColor: "#0a84ff",
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
   },
   btnText: { fontWeight: "700" },
   btnTextWhite: { color: "#fff", fontWeight: "700" },
@@ -1707,6 +1935,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  glassPill: {
+    borderColor: "rgba(255,255,255,0.28)",
+    overflow: "hidden",
   },
   checkboxTick: { color: "#fff", fontWeight: "900", lineHeight: 18 },
   errorText: { fontSize: 12, marginTop: 6 },
@@ -1728,6 +1960,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
+    overflow: "hidden",
   },
   previewCard: {
     width: "100%",
@@ -1735,12 +1968,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
+    overflow: "hidden",
+  },
+  glassModal: {
+    borderColor: "rgba(255,255,255,0.24)",
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 14 },
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 12,
+  },
+  dobPickerWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  dobPicker: {
+    width: "100%",
+    height: Platform.select({ ios: 216, android: 190 }),
   },
   modalBtn: { paddingHorizontal: 6, paddingVertical: 6 },
   modalBtnText: { fontWeight: "700" },

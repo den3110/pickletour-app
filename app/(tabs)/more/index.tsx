@@ -50,7 +50,7 @@ function MoreGlassSurface({
   effect = "regular",
   interactive = false,
   style,
-  tintColor = "rgba(18,20,26,0.62)",
+  tintColor,
 }: {
   children?: React.ReactNode;
   effect?: "regular" | "clear";
@@ -58,12 +58,18 @@ function MoreGlassSurface({
   style?: StyleProp<ViewStyle>;
   tintColor?: string;
 }) {
+  const theme = useTheme();
+  const isDark = theme.dark;
+
   return (
     <AppleLiquidGlassView
       fallback="view"
-      glassColorScheme="dark"
+      glassColorScheme={isDark ? "dark" : "light"}
       glassEffectStyle={effect}
-      glassTintColor={tintColor}
+      glassTintColor={
+        tintColor ??
+        (isDark ? "rgba(18,20,26,0.62)" : "rgba(255,255,255,0.72)")
+      }
       isInteractive={interactive}
       style={style}
     >
@@ -78,10 +84,14 @@ export default function MoreIndexScreen() {
   const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
   const isDark = theme.dark;
   const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
+  const pageBg = isDark ? theme.colors.background : "#F8FAFC";
+  const cardBg = isDark ? theme.colors.card : "rgba(255,255,255,0.9)";
+  const borderColor = isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0";
+  const subText = isDark ? "#A1A1AA" : "#64748B";
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      style={{ flex: 1, backgroundColor: pageBg }}
       edges={["top", "left", "right"]}
     >
       <Stack.Screen options={{ headerShown: false }} />
@@ -102,10 +112,16 @@ export default function MoreIndexScreen() {
           }
           style={[
             styles.heroCard,
-            IOS_26_LIQUID_GLASS_ENABLED && styles.heroCardGlass,
+            IOS_26_LIQUID_GLASS_ENABLED && [
+              styles.heroCardGlass,
+              {
+                shadowColor: isDark ? "#8B5CF6" : "#CBD5E1",
+                shadowOpacity: isDark ? 0.2 : 0.16,
+              },
+            ],
             {
-              backgroundColor: theme.colors.card,
-              borderColor: isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
+              backgroundColor: cardBg,
+              borderColor,
             },
           ]}
         >
@@ -156,7 +172,7 @@ export default function MoreIndexScreen() {
             style={[
               styles.heroDescription,
               {
-                color: isDark ? "#A1A1AA" : "#52525B",
+                color: subText,
               },
             ]}
           >
@@ -170,7 +186,7 @@ export default function MoreIndexScreen() {
             style={[
               styles.sectionTitle,
               {
-                color: isDark ? "#A1A1AA" : "#71717A",
+                color: isDark ? "#A1A1AA" : "#64748B",
               },
             ]}
           >
@@ -203,12 +219,15 @@ export default function MoreIndexScreen() {
                 }
                 style={[
                   styles.itemCard,
-                  IOS_26_LIQUID_GLASS_ENABLED && styles.itemCardGlass,
+                  IOS_26_LIQUID_GLASS_ENABLED && [
+                    styles.itemCardGlass,
+                    {
+                      shadowOpacity: isDark ? 0.24 : 0.08,
+                    },
+                  ],
                   {
-                    backgroundColor: theme.colors.card,
-                    borderColor: isDark
-                      ? "rgba(255,255,255,0.08)"
-                      : "#E5E7EB",
+                    backgroundColor: cardBg,
+                    borderColor,
                   },
                 ]}
               >
@@ -241,7 +260,7 @@ export default function MoreIndexScreen() {
                     style={[
                       styles.itemDescription,
                       {
-                        color: isDark ? "#A1A1AA" : "#52525B",
+                        color: subText,
                       },
                     ]}
                   >
