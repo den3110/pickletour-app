@@ -71,6 +71,7 @@ import {
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLabels";
 
 const normalizeGroupCode = (code) => {
   const s = String(code || "")
@@ -128,11 +129,45 @@ const canShowKOMatch = (m, groupStatusMap) => {
   return true;
 };
 
-const getRoundText = (m) => {
+const bracketIdOfMatch = (m) =>
+  String(m?.bracket?._id ?? m?.bracket ?? m?.bracketId ?? "").trim();
+
+const isKnockoutBracketType = (bracket, match) => {
+  const type = String(
+    bracket?.type || bracket?.format || match?.format || match?.type || "",
+  ).toLowerCase();
+  if (
+    !type ||
+    type.includes("group") ||
+    type.includes("playoff") ||
+    type.includes("roundelim") ||
+    type === "po"
+  ) {
+    return false;
+  }
+  return (
+    type.includes("knockout") ||
+    type.includes("singleelim") ||
+    type.includes("single-elim") ||
+    type.includes("single_elim") ||
+    type === "ko"
+  );
+};
+
+const displayRoundNumber = (m) => {
+  const fromCode = parseMatchCodeParts(m).round;
+  return Number.isFinite(fromCode) ? fromCode : matchRoundNumber(m);
+};
+
+const getRoundText = (m, matchesOfBracket = [], bracketOverride = null) => {
   if (!m) return "—";
-  if (m.roundName) return m.roundName;
-  if (m.phase) return m.phase;
-  if (m.format === "group") {
+  const bracket =
+    bracketOverride ||
+    (m?.bracket && typeof m.bracket === "object" ? m.bracket : null);
+  const bracketType = String(
+    bracket?.type || bracket?.format || m?.format || m?.type || "",
+  ).toLowerCase();
+  if (bracketType === "group" || m.format === "group") {
     const poolName = m.pool?.name || m.groupCode;
     if (poolName) {
       const trimmed = String(poolName).trim();
@@ -143,20 +178,92 @@ const getRoundText = (m) => {
     return "Vòng bảng";
   }
   if (Number.isFinite(m.swissRound)) return `Swiss - Vòng ${m.swissRound + 1}`;
-  if (Number.isFinite(m.round)) {
-    if (m.format === "knockout" || m.format === "roundElim") {
-      const roundNames = {
-        1: "Vòng 1/16",
-        2: "Vòng 1/8",
-        3: "Tứ kết",
-        4: "Bán kết",
-        5: "Chung kết",
-      };
-      return roundNames[m.round] || `Vòng ${m.round}`;
+  const round = displayRoundNumber(m);
+  if (Number.isFinite(round)) {
+    if (isKnockoutBracketType(bracket, m)) {
+      const roundMatches = (Array.isArray(matchesOfBracket)
+        ? matchesOfBracket
+        : []
+      )
+        .filter((candidate) => displayRoundNumber(candidate) === round)
+        .sort((a, b) => matchOrderNumber(a) - matchOrderNumber(b));
+      const roundMatchCount = roundMatches.length;
+      const matchIndex = roundMatches.findIndex(
+        (candidate) => String(candidate?._id || "") === String(m?._id || ""),
+      );
+      const fallbackIndex = matchOrderNumber(m);
+      const displayIndex =
+        matchIndex >= 0
+          ? matchIndex + 1
+          : Number.isFinite(fallbackIndex)
+            ? fallbackIndex + 1
+            : 1;
+
+      const label = formatKnockoutRoundLabelByMatchCount(roundMatchCount, {
+        includeIndex: true,
+        index: displayIndex,
+      });
+      if (label) return label;
     }
-    return `Vòng ${m.round}`;
+    return `Vòng ${round}`;
   }
+  if (m.roundName) return m.roundName;
+  if (m.phase) return m.phase;
   return "—";
+};
+
+const roundStageChipColors = (label, dark) => {
+  const text = String(label || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (text.includes("chung ket")) {
+    return {
+      bg: dark ? "rgba(251, 191, 36, 0.18)" : "#fff7cc",
+      fg: dark ? "#fde68a" : "#92400e",
+      bd: dark ? "rgba(251, 191, 36, 0.44)" : "#facc15",
+    };
+  }
+  if (text.includes("ban ket")) {
+    return {
+      bg: dark ? "rgba(168, 85, 247, 0.2)" : "#f3e8ff",
+      fg: dark ? "#d8b4fe" : "#7e22ce",
+      bd: dark ? "rgba(168, 85, 247, 0.48)" : "#c084fc",
+    };
+  }
+  if (text.includes("tu ket")) {
+    return {
+      bg: dark ? "rgba(59, 130, 246, 0.2)" : "#dbeafe",
+      fg: dark ? "#93c5fd" : "#1d4ed8",
+      bd: dark ? "rgba(59, 130, 246, 0.5)" : "#60a5fa",
+    };
+  }
+  if (text.includes("1/")) {
+    return {
+      bg: dark ? "rgba(20, 184, 166, 0.18)" : "#ccfbf1",
+      fg: dark ? "#5eead4" : "#0f766e",
+      bd: dark ? "rgba(20, 184, 166, 0.44)" : "#2dd4bf",
+    };
+  }
+  if (text.includes("bang") || text.includes("vong bang")) {
+    return {
+      bg: dark ? "rgba(34, 197, 94, 0.18)" : "#dcfce7",
+      fg: dark ? "#86efac" : "#166534",
+      bd: dark ? "rgba(34, 197, 94, 0.42)" : "#4ade80",
+    };
+  }
+  if (text.includes("swiss")) {
+    return {
+      bg: dark ? "rgba(99, 102, 241, 0.2)" : "#e0e7ff",
+      fg: dark ? "#a5b4fc" : "#4338ca",
+      bd: dark ? "rgba(99, 102, 241, 0.46)" : "#818cf8",
+    };
+  }
+  return {
+    bg: dark ? "rgba(148, 163, 184, 0.16)" : "#f1f5f9",
+    fg: dark ? "#cbd5e1" : "#334155",
+    bd: dark ? "rgba(148, 163, 184, 0.36)" : "#cbd5e1",
+  };
 };
 
 const TYPE_LABEL = (t) => {
@@ -565,8 +672,32 @@ const GlassFill = memo(function GlassFill({
   dark,
   tintColor,
   effectStyle = "regular",
+  native = false,
 }) {
   if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!native) {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: tintColor ?? manageGlassTint(dark) },
+        ]}
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={
+            dark
+              ? ["rgba(255,255,255,0.10)", "rgba(255,255,255,0.02)"]
+              : ["rgba(255,255,255,0.34)", "rgba(255,255,255,0.04)"]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    );
+  }
   return (
     <AppleLiquidGlassView
       pointerEvents="none"
@@ -849,50 +980,54 @@ const MiniChipBtn = memo(({ icon, label, onPress, color }) => {
       onPressOut={handlePressOut}
       style={{ borderRadius: 999 }}
     >
-      {({ pressed }) => (
-        <Animated.View
-          style={[
-            {
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor,
-              overflow: "hidden",
-              transform: [{ scale }],
-              opacity: pressed ? 0.9 : 1,
-              marginRight: 4,
-            },
-          ]}
-        >
+      <Animated.View
+        style={[
+          {
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor,
+            overflow: "hidden",
+            transform: [{ scale }],
+            marginRight: 4,
+          },
+        ]}
+      >
+        {IOS_26_LIQUID_GLASS_ENABLED ? (
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: surfaceBg }]}
+          />
+        ) : (
           <AppleLiquidGlassView
             intensity={dark ? 18 : 35}
             tint={blurTint}
             style={StyleSheet.absoluteFill}
           />
-          <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            style={[
-              styles.miniBtn,
-              {
-                borderWidth: 0,
-                backgroundColor: surfaceBg,
-              },
-            ]}
+        )}
+        <LinearGradient
+          colors={gradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            styles.miniBtn,
+            {
+              borderWidth: 0,
+              backgroundColor: surfaceBg,
+            },
+          ]}
+        >
+          <MaterialIcons name={icon} size={16} color={textColor} />
+          <Text
+            style={{ color: textColor, fontSize: 12, fontWeight: "700" }}
+            numberOfLines={1}
           >
-            <MaterialIcons name={icon} size={16} color={textColor} />
-            <Text
-              style={{ color: textColor, fontSize: 12, fontWeight: "700" }}
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-          </View>
-        </Animated.View>
-      )}
+            {label}
+          </Text>
+        </View>
+      </Animated.View>
     </Pressable>
   );
 });
@@ -972,6 +1107,32 @@ const CourtPill = memo(({ name }) => {
       </Text>
     </View>
   ) : null;
+});
+
+const StagePill = memo(function StagePill({ label }) {
+  const { dark } = useTheme();
+  if (!label || label === "—") return null;
+  const c = roundStageChipColors(label, dark);
+  return (
+    <View
+      style={[
+        styles.stagePill,
+        {
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED ? "transparent" : c.bg,
+          borderColor: c.bd,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
+    >
+      <GlassFill
+        dark={dark}
+        tintColor={IOS_26_LIQUID_GLASS_ENABLED ? c.bg : "transparent"}
+      />
+      <Text style={[styles.stagePillText, { color: c.fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
 });
 
 const ScorePill = memo(({ textVal }) => {
@@ -1201,7 +1362,9 @@ function isMatchRowCardEqual(prev, next) {
     prev.busyCourtB === next.busyCourtB &&
     prev.tour === next.tour &&
     prev.me === next.me &&
-    prev.canManage === next.canManage
+    prev.canManage === next.canManage &&
+    prev.matchesOfBracket === next.matchesOfBracket &&
+    prev.bracket === next.bracket
   );
 }
 
@@ -1218,12 +1381,15 @@ const MatchRowCard = memo(function MatchRowCard({
   onOpenVideoDlg,
   onOpenSheet,
   onOpenRefReport,
+  matchesOfBracket = [],
+  bracket = null,
 }) {
   const { colors, dark } = useTheme();
   const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
   const hasVideo = !!match?.video;
   const score = scoreText(match);
   const courtLabel = courtNameOf(match);
+  const roundLabel = getRoundText(match, matchesOfBracket, bracket);
   const ordNum =
     typeof match?.order === "number"
       ? match.order
@@ -1246,7 +1412,7 @@ const MatchRowCard = memo(function MatchRowCard({
   return (
     <Pressable
       onPress={handleOpenMatch}
-      style={({ pressed }) => [
+      style={[
         styles.matchRow,
         {
           borderColor: colors.border,
@@ -1255,17 +1421,15 @@ const MatchRowCard = memo(function MatchRowCard({
             : colors.card,
         },
         IOS_26_LIQUID_GLASS_ENABLED && styles.glassCardSurface,
-        pressed && { opacity: 0.95 },
       ]}
     >
       <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.52)} />
       <Pressable
         onPress={handleToggleSelect}
-        style={({ pressed }) => [
+        style={[
           styles.selectRow,
           { borderColor: colors.border },
           IOS_26_LIQUID_GLASS_ENABLED && styles.glassInlineControl,
-          pressed && { opacity: 0.9 },
         ]}
       >
         <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.32)} />
@@ -1315,10 +1479,10 @@ const MatchRowCard = memo(function MatchRowCard({
         <View style={styles.metaRow}>
           <StatusPill status={match?.status} />
           <CourtPill name={courtLabel} />
+          <StagePill label={roundLabel} />
           <ScorePill textVal={score} />
           <Text style={{ color: t.muted, fontSize: 12 }}>
-            {getRoundText(match)} • Thứ tự{" "}
-            {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
+            Thứ tự {ordNum != null && !Number.isNaN(ordNum) ? ordNum + 1 : "—"}
           </Text>
           <VideoPill has={hasVideo} />
         </View>
@@ -2180,7 +2344,7 @@ export default function ManageScreen() {
   const matchesByBracketId = useMemo(() => {
     const buckets = new Map();
     for (const match of mergedAllMatches) {
-      const bid = String(match?.bracket?._id || match?.bracket || "");
+      const bid = bracketIdOfMatch(match);
       if (!bid) continue;
       const list = buckets.get(bid) || [];
       list.push(match);
@@ -2191,6 +2355,49 @@ export default function ManageScreen() {
     });
     return buckets;
   }, [mergedAllMatches, filterSortMatches]);
+
+  const allMatchesByBracketId = useMemo(() => {
+    const buckets = new Map();
+    for (const match of mergedAllMatches) {
+      const bid = bracketIdOfMatch(match);
+      if (!bid) continue;
+      const list = buckets.get(bid) || [];
+      list.push(match);
+      buckets.set(bid, list);
+    }
+    buckets.forEach((list, bid) => {
+      buckets.set(
+        bid,
+        list.slice().sort((a, b) => {
+          const roundA = Number.isFinite(displayRoundNumber(a))
+            ? displayRoundNumber(a)
+            : 9999;
+          const roundB = Number.isFinite(displayRoundNumber(b))
+            ? displayRoundNumber(b)
+            : 9999;
+          if (roundA !== roundB) return roundA - roundB;
+          const orderA = Number.isFinite(matchOrderNumber(a))
+            ? matchOrderNumber(a)
+            : 9999;
+          const orderB = Number.isFinite(matchOrderNumber(b))
+            ? matchOrderNumber(b)
+            : 9999;
+          if (orderA !== orderB) return orderA - orderB;
+          return String(a?._id || "").localeCompare(String(b?._id || ""));
+        }),
+      );
+    });
+    return buckets;
+  }, [mergedAllMatches]);
+
+  const bracketById = useMemo(() => {
+    const map = new Map();
+    for (const bracket of bracketsData || []) {
+      const bid = String(bracket?._id || bracket?.id || "").trim();
+      if (bid) map.set(bid, bracket);
+    }
+    return map;
+  }, [bracketsData]);
 
   const [viewer, setViewer] = useState({ open: false, matchId: null });
   const openMatch = useCallback(
@@ -2377,6 +2584,13 @@ export default function ManageScreen() {
 
   const renderMatchRow = useCallback(
     ({ item: m }) => {
+      const bracketId = bracketIdOfMatch(m);
+      const matchesOfBracket = bracketId
+        ? allMatchesByBracketId.get(bracketId) || []
+        : [];
+      const bracket =
+        (bracketId && bracketById.get(bracketId)) ||
+        (m?.bracket && typeof m.bracket === "object" ? m.bracket : null);
       const isThisMatchLive = isLive(m);
       const isThisMatchFinished = isFinished(m);
       const pAId = pairIdOf(m?.pairA);
@@ -2410,6 +2624,8 @@ export default function ManageScreen() {
           onOpenVideoDlg={openVideoDlg}
           onOpenSheet={handleOpenSheet}
           onOpenRefReport={handleOpenRefReportRef.current}
+          matchesOfBracket={matchesOfBracket}
+          bracket={bracket}
         />
       );
     },
@@ -2417,6 +2633,8 @@ export default function ManageScreen() {
       tour,
       me,
       canManage,
+      allMatchesByBracketId,
+      bracketById,
       liveBusyByPairId,
       selectedMatchIds,
       openMatch,
@@ -4651,6 +4869,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     flexWrap: "wrap",
+  },
+  stagePill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    overflow: "hidden",
+    position: "relative",
+  },
+  stagePillText: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   busyChip: {
     flexDirection: "row",

@@ -54,6 +54,7 @@ import {
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import Ripple from "react-native-material-ripple";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLabels";
 
 /* ---------- Theme tokens (giống DashboardScreen) ---------- */
 function useTokens() {
@@ -1017,11 +1018,10 @@ function buildStandingsWithFallback(bracket, matchesReal, eventType) {
 
 /* ===================== KO / RoundElim builders ===================== */
 const koRoundTitle = (matchesCount) => {
-  const teams = matchesCount * 2;
-  if (matchesCount === 1) return "Chung kết";
-  if (matchesCount === 2) return "Bán kết";
-  if (matchesCount === 4) return "Tứ kết";
-  return `Vòng ${teams} đội`;
+  return (
+    formatKnockoutRoundLabelByMatchCount(matchesCount) ||
+    `Vòng ${matchesCount * 2} đội`
+  );
 };
 function buildRoundsFromPrefill(prefill, koMeta) {
   const useSeeds =

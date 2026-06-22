@@ -55,6 +55,7 @@ import {
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
+import { formatKnockoutRoundLabelByTeamCount } from "@/utils/tournamentRoundLabels";
 
 /* ----------------------------------------------------- */
 /* ------------------- CÁC HÀM HELPER VÀ LOGIC GIỮ NGUYÊN ------------------- */
@@ -448,11 +449,9 @@ const scheduleRoundLabel = (match, matchesOfBracket = []) => {
   const remainingRounds = Math.max(1, totalRounds - round + 1);
   const drawSize = 2 ** remainingRounds;
 
-  if (drawSize === 2) return "Chung kết";
-  if (drawSize === 4) return "Bán kết";
-  if (drawSize === 8) return "Tứ kết";
-  if (drawSize >= 16) return `Vòng 1/${drawSize}`;
-  return `Vòng ${round}`;
+  return formatKnockoutRoundLabelByTeamCount(drawSize, {
+    fallback: `Vòng ${round}`,
+  });
 };
 
 /* ----------------------------------------------------- */
@@ -484,11 +483,12 @@ const scheduleMatchStageChipLabel = (match, matchesOfBracket = []) => {
         ? fallbackIndex + 1
         : 1;
 
-  if (drawSize === 2) return "Chung kết";
-  if (drawSize === 4) return `Bán kết ${displayIndex}`;
-  if (drawSize === 8) return `Tứ kết ${displayIndex}`;
-  if (drawSize >= 16) return `1-${drawSize}`;
-  return null;
+  return (
+    formatKnockoutRoundLabelByTeamCount(drawSize, {
+      includeIndex: true,
+      index: displayIndex,
+    }) || null
+  );
 };
 
 function useThemeTokens() {
@@ -562,12 +562,49 @@ function getChipColors(type, T) {
   }
 }
 
+function getStageChipColors(label, T) {
+  const text = String(label || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const isDark = T.scheme === "dark";
+  if (text.includes("chung ket")) {
+    return {
+      bg: isDark ? "rgba(251, 191, 36, 0.18)" : "#fff7cc",
+      fg: isDark ? "#fde68a" : "#92400e",
+      bd: isDark ? "rgba(251, 191, 36, 0.44)" : "#facc15",
+    };
+  }
+  if (text.includes("ban ket")) {
+    return {
+      bg: isDark ? "rgba(168, 85, 247, 0.2)" : "#f3e8ff",
+      fg: isDark ? "#d8b4fe" : "#7e22ce",
+      bd: isDark ? "rgba(168, 85, 247, 0.48)" : "#c084fc",
+    };
+  }
+  if (text.includes("tu ket")) {
+    return {
+      bg: isDark ? "rgba(59, 130, 246, 0.2)" : "#dbeafe",
+      fg: isDark ? "#93c5fd" : "#1d4ed8",
+      bd: isDark ? "rgba(59, 130, 246, 0.5)" : "#60a5fa",
+    };
+  }
+  if (/\b1[/-]\d+\b/.test(text)) {
+    return {
+      bg: isDark ? "rgba(20, 184, 166, 0.18)" : "#ccfbf1",
+      fg: isDark ? "#5eead4" : "#0f766e",
+      bd: isDark ? "rgba(20, 184, 166, 0.44)" : "#2dd4bf",
+    };
+  }
+  return null;
+}
+
 /* ----------------------------------------------------- */
 /* ------------------- CÁC COMPONENT UI REDESIGN ------------------- */
 /* ----------------------------------------------------- */
 
-function Chip({ text, type = "default", icon, theme, style }) {
-  const c = getChipColors(type, theme);
+function Chip({ text, type = "default", icon, theme, style, colorsOverride }) {
+  const c = colorsOverride || getChipColors(type, theme);
   const isOutline = type === "outlined" || type === "finished";
 
   return (
@@ -577,7 +614,7 @@ function Chip({ text, type = "default", icon, theme, style }) {
         {
           backgroundColor: c.bg,
           borderColor: c.bd,
-          borderWidth: isOutline ? 1 : 0,
+          borderWidth: colorsOverride || isOutline ? 1 : 0,
         },
         style,
       ]}
@@ -809,7 +846,12 @@ function MatchCard({
               text={m.bracket?.name || m.phase || "Bracket"}
             />
             {stageLabel ? (
-              <Chip theme={theme} type="outlined" text={stageLabel} />
+              <Chip
+                theme={theme}
+                type="outlined"
+                text={stageLabel}
+                colorsOverride={getStageChipColors(stageLabel, theme)}
+              />
             ) : null}
           </ChipRow>
         </View>
@@ -1852,6 +1894,8 @@ export default function TournamentScheduleNative() {
         <View style={stylesNew.sheetOptionWrap}>
           {options.map((option) => {
             const active = selected === option.key;
+            const stageColors =
+              label === "Vòng" ? getStageChipColors(option.label, T) : null;
             return (
               <Pressable
                 key={option.key}
@@ -1859,20 +1903,23 @@ export default function TournamentScheduleNative() {
                 style={[
                   stylesNew.optionChip,
                   {
-                    backgroundColor: T.tabBg,
-                    borderColor: T.tabBd,
+                    backgroundColor: stageColors?.bg || T.tabBg,
+                    borderColor: stageColors?.bd || T.tabBd,
                   },
                   active && {
-                    backgroundColor: T.tabActiveBg,
-                    borderColor: T.tabActiveBd,
+                    backgroundColor: stageColors?.bg || T.tabActiveBg,
+                    borderColor: stageColors?.bd || T.tabActiveBd,
                   },
                 ]}
               >
                 <Text
                   style={[
                     stylesNew.optionChipText,
-                    { color: T.tabText },
-                    active && { color: T.tabTextActive, fontWeight: "800" },
+                    { color: stageColors?.fg || T.tabText },
+                    active && {
+                      color: stageColors?.fg || T.tabTextActive,
+                      fontWeight: "800",
+                    },
                   ]}
                   numberOfLines={1}
                 >
