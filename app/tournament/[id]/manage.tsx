@@ -4204,7 +4204,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   vsText: {
-    alignSelf: "center",
+    alignSelf: "flex-start",
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 14,
