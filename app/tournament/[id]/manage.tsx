@@ -1149,6 +1149,7 @@ const MatchRowCard = memo(function MatchRowCard({
           </Text>
           {busyCourtA ? <BusyChip court={busyCourtA} /> : null}
         </View>
+        <Text style={[styles.vsText, { color: t.muted }]}>vs</Text>
         <View style={styles.teamRow}>
           <Text
             style={[styles.teamLabel, { color: colors.text }]}
@@ -4179,6 +4180,7 @@ const styles = StyleSheet.create({
     position: "relative",
     overflow: "hidden",
   },
+  matchRowSeparator: { height: 12 },
   selectRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4200,6 +4202,13 @@ const styles = StyleSheet.create({
   teamLabel: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  vsText: {
+    alignSelf: "center",
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 14,
+    textTransform: "uppercase",
   },
   metaRow: {
     flexDirection: "row",
