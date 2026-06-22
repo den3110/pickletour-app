@@ -115,8 +115,8 @@ packagingOptions {
         applicationId 'com.pkt.pickletour'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 35
-        versionName "1.1.5"
+        versionCode 36
+        versionName "1.1.6"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
         buildConfigField "boolean", "PICKLETOUR_HOT_UPDATER_ENABLED", "${pickletourHotUpdaterEnabled}"
