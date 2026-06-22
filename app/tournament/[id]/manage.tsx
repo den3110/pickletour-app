@@ -186,6 +186,17 @@ const pairLabel = (pair) => {
     .map(playerName);
   return ps.join(" / ") || "—";
 };
+const hasResolvedPair = (pair) =>
+  Boolean(
+    pair &&
+      (pair.player1 ||
+        pair.player2 ||
+        (Array.isArray(pair.players) && pair.players.length) ||
+        pair.name ||
+        pair.teamName ||
+        pair.label ||
+        pair.displayName),
+  );
 const isConcreteTeamLabel = (value) => {
   const text = String(value || "").trim();
   if (!text) return false;
