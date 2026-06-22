@@ -7,7 +7,7 @@
 // - NEW: Skeleton loading cho danh sách giải + trận
 
 import {
-  // SafeAreaView,
+  SafeAreaView as EdgeSafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import React, {
@@ -18,7 +18,7 @@ import React, {
   useRef,
 } from "react";
 import {
-  SafeAreaView,
+  SafeAreaView as RNSafeAreaView,
   ActivityIndicator,
   FlatList,
   Platform,
@@ -70,9 +70,9 @@ function useThemeTokens() {
 
   const primary = navTheme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
   const text = navTheme?.colors?.text ?? (isDark ? "#f7f7f7" : "#0b1220");
-  const cardBg = navTheme?.colors?.card ?? (isDark ? "#11161c" : "#ffffff");
-  const border = navTheme?.colors?.border ?? (isDark ? "#212a33" : "#e8edf3");
-  const bg = navTheme?.colors?.background ?? (isDark ? "#0b0f14" : "#fafbff");
+  const cardBg = isDark ? "#11161c" : "rgba(255,255,255,0.88)";
+  const border = isDark ? "#212a33" : "#DDE5EF";
+  const bg = isDark ? "#0b0f14" : "#F6F8FC";
 
   return {
     isDark,
@@ -88,7 +88,7 @@ function useThemeTokens() {
     // text phụ & nền phụ
     sub: isDark ? "#b9c1cc" : "#586174",
     muted: isDark ? "#0f141a" : "#f3f6fb",
-    inputBg: isDark ? "#0f141a" : "#f5f7fb",
+    inputBg: isDark ? "#0f141a" : "rgba(255,255,255,0.84)",
 
     // chips
     chipBg: isDark ? "#121a22" : "#eef2f7",
@@ -125,19 +125,21 @@ function MyTournamentGlassSurface({
   children,
   effect = "clear",
   interactive = false,
+  isDark = true,
   style,
   tintColor = "rgba(17,19,24,0.58)",
 }: {
   children?: React.ReactNode;
   effect?: "regular" | "clear";
   interactive?: boolean;
+  isDark?: boolean;
   style?: StyleProp<ViewStyle>;
   tintColor?: string;
 }) {
   return (
     <AppleLiquidGlassView
       fallback="view"
-      glassColorScheme="dark"
+      glassColorScheme={isDark ? "dark" : "light"}
       glassEffectStyle={effect}
       glassTintColor={tintColor}
       isInteractive={interactive}
@@ -151,7 +153,7 @@ function MyTournamentGlassSurface({
 function myTournamentGlassTint(tokens, darkAlpha = 0.5, lightAlpha = 0.68) {
   return tokens?.isDark
     ? `rgba(17,19,24,${darkAlpha})`
-    : `rgba(255,255,255,${lightAlpha})`;
+    : `rgba(255,255,255,${Math.max(lightAlpha, 0.78)})`;
 }
 
 /* ================= Utils ================= */
@@ -514,6 +516,7 @@ function ChipToggle({ active, label, onPress, tokens, style, tone }) {
       <MyTournamentGlassSurface
         effect="clear"
         interactive
+        isDark={tokens.isDark}
         tintColor={active ? c + "24" : tokens.chipBg}
         style={[
           styles.chip,
@@ -550,6 +553,7 @@ function StatusChip({ status, tokens }) {
   return (
     <MyTournamentGlassSurface
       effect="clear"
+      isDark={tokens.isDark}
       tintColor={bg}
       style={[
         styles.chip,
@@ -600,6 +604,7 @@ function ScoreBadgeFromMatch({ m, tokens }) {
   return (
     <MyTournamentGlassSurface
       effect="clear"
+      isDark={tokens.isDark}
       tintColor={tokens.muted}
       style={[
         styles.scoreBadge,
@@ -643,6 +648,7 @@ function SkeletonMatchRow({ tokens }) {
   return (
     <MyTournamentGlassSurface
       effect="clear"
+      isDark={tokens.isDark}
       tintColor={tokens.colors.card}
       style={[
         styles.matchRow,
@@ -687,6 +693,7 @@ function SkeletonTournamentCard({ tokens }) {
   return (
     <MyTournamentGlassSurface
       effect="clear"
+      isDark={tokens.isDark}
       tintColor={tokens.colors.card}
       style={[
         styles.card,
@@ -790,6 +797,7 @@ function MatchRow({ m, onPress, tokens, eventType }) {
       <MyTournamentGlassSurface
         effect="clear"
         interactive
+        isDark={tokens.isDark}
         tintColor={tokens.colors.card}
         style={[
           styles.matchRow,
@@ -929,6 +937,7 @@ function Banner({ t, tokens, collapsed, onToggle }) {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <MyTournamentGlassSurface
               effect="clear"
+              isDark={tokens.isDark}
               tintColor={statusColor + "33"}
               style={[
                 styles.statusTag,
@@ -954,6 +963,7 @@ function Banner({ t, tokens, collapsed, onToggle }) {
               <MyTournamentGlassSurface
                 effect="clear"
                 interactive
+                isDark={tokens.isDark}
                 tintColor="rgba(255,255,255,0.18)"
                 style={[
                   styles.bannerToggleBtn,
@@ -1037,6 +1047,7 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
   return (
     <MyTournamentGlassSurface
       effect="clear"
+      isDark={tokens.isDark}
       tintColor={tokens.colors.card}
       style={[
         styles.card,
@@ -1074,20 +1085,32 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
           <MyTournamentGlassSurface
             effect="regular"
             interactive
+            isDark={tokens.isDark}
             tintColor={myTournamentGlassTint(tokens, 0.36, 0.54)}
             style={[
               styles.searchRow,
-              IOS_26_LIQUID_GLASS_ENABLED && styles.searchRowGlass,
+              IOS_26_LIQUID_GLASS_ENABLED && [
+                styles.searchRowGlass,
+                !tokens.isDark && styles.searchRowGlassLight,
+              ],
               {
                 backgroundColor: tokens.inputBg,
                 borderColor: IOS_26_LIQUID_GLASS_ENABLED
-                  ? "rgba(255,255,255,0.24)"
+                  ? tokens.isDark
+                    ? "rgba(255,255,255,0.24)"
+                    : "#DDE5EF"
                   : tokens.colors.border,
               },
             ]}
           >
             {IOS_26_LIQUID_GLASS_ENABLED && (
-              <View pointerEvents="none" style={styles.searchGlassEdge} />
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.searchGlassEdge,
+                  !tokens.isDark && styles.searchGlassEdgeLight,
+                ]}
+              />
             )}
             <MaterialIcons name="search" size={18} color={tokens.sub} />
             <TextInput
@@ -1146,6 +1169,7 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
           {filteredSortedMatches.length === 0 ? (
             <MyTournamentGlassSurface
               effect="clear"
+              isDark={tokens.isDark}
               tintColor={tokens.colors.card}
               style={[
                 styles.emptyMatches,
@@ -1181,6 +1205,7 @@ function TournamentCard({ t, onOpenMatch, tokens }) {
                   <MyTournamentGlassSurface
                     effect="clear"
                     interactive
+                    isDark={tokens.isDark}
                     tintColor={tokens.muted}
                     style={[
                       styles.showMoreBtn,
@@ -1220,6 +1245,7 @@ function LoginPrompt({ tokens }) {
     >
       <MyTournamentGlassSurface
         effect="clear"
+        isDark={tokens.isDark}
         tintColor={tokens.colors.card}
         style={[
           styles.loginCard,
@@ -1508,20 +1534,32 @@ export default function MyTournament() {
         <MyTournamentGlassSurface
           effect="regular"
           interactive
+          isDark={tokens.isDark}
           tintColor={myTournamentGlassTint(tokens, 0.36, 0.54)}
           style={[
             styles.searchRow,
-            IOS_26_LIQUID_GLASS_ENABLED && styles.searchRowGlass,
+            IOS_26_LIQUID_GLASS_ENABLED && [
+              styles.searchRowGlass,
+              !tokens.isDark && styles.searchRowGlassLight,
+            ],
             {
               backgroundColor: tokens.inputBg,
               borderColor: IOS_26_LIQUID_GLASS_ENABLED
-                ? "rgba(255,255,255,0.24)"
+                ? tokens.isDark
+                  ? "rgba(255,255,255,0.24)"
+                  : "#DDE5EF"
                 : tokens.colors.border,
             },
           ]}
         >
           {IOS_26_LIQUID_GLASS_ENABLED && (
-            <View pointerEvents="none" style={styles.searchGlassEdge} />
+            <View
+              pointerEvents="none"
+              style={[
+                styles.searchGlassEdge,
+                !tokens.isDark && styles.searchGlassEdgeLight,
+              ]}
+            />
           )}
           <MaterialIcons name="search" size={18} color={tokens.sub} />
           <TextInput
@@ -1550,18 +1588,28 @@ export default function MyTournament() {
   const EmptyState = (
     <MyTournamentGlassSurface
       effect="regular"
+      isDark={tokens.isDark}
       tintColor={myTournamentGlassTint(tokens, 0.42, 0.58)}
       style={[
         styles.emptyWrap,
-        IOS_26_LIQUID_GLASS_ENABLED && styles.emptyGlass,
+        IOS_26_LIQUID_GLASS_ENABLED && [
+          styles.emptyGlass,
+          !tokens.isDark && styles.emptyGlassLight,
+        ],
         IOS_26_LIQUID_GLASS_ENABLED && {
           backgroundColor: tokens.colors.card,
-          borderColor: "rgba(255,255,255,0.24)",
+          borderColor: tokens.isDark ? "rgba(255,255,255,0.24)" : "#DDE5EF",
         },
       ]}
     >
       {IOS_26_LIQUID_GLASS_ENABLED && (
-        <View pointerEvents="none" style={styles.emptyGlassEdge} />
+        <View
+          pointerEvents="none"
+          style={[
+            styles.emptyGlassEdge,
+            !tokens.isDark && styles.emptyGlassEdgeLight,
+          ]}
+        />
       )}
       <Text style={{ fontSize: 42, marginBottom: 6 }}>🏆</Text>
       <Text
@@ -1575,16 +1623,11 @@ export default function MyTournament() {
     </MyTournamentGlassSurface>
   );
 
-  return (
-    <BottomSheetModalProvider>
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: tokens.colors.background }}
-      >
+  const screenContent = (
+    <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
         <Stack.Screen
           options={{
-            title: "Giải của tôi",
-            headerTitleAlign: "center",
-            headerBackTitle: "Quay lại",
+            headerShown: false,
           }}
         />
 
@@ -1656,7 +1699,22 @@ export default function MyTournament() {
           matchId={matchId}
           onClose={() => setOpen(false)}
         />
-      </SafeAreaView>
+      </View>
+  );
+
+  return (
+    <BottomSheetModalProvider>
+      {IOS_26_LIQUID_GLASS_ENABLED ? (
+        <EdgeSafeAreaView edges={["top"]} style={{ flex: 1 }}>
+          {screenContent}
+        </EdgeSafeAreaView>
+      ) : (
+        <RNSafeAreaView
+          style={{ flex: 1, backgroundColor: tokens.colors.background }}
+        >
+          {screenContent}
+        </RNSafeAreaView>
+      )}
     </BottomSheetModalProvider>
   );
 }
@@ -1702,11 +1760,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 18,
   },
+  searchRowGlassLight: {
+    shadowColor: "#94A3B8",
+    shadowOpacity: 0.12,
+  },
   searchGlassEdge: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
+  },
+  searchGlassEdgeLight: {
+    borderColor: "rgba(148,163,184,0.18)",
   },
   input: {
     flex: 1,
@@ -1868,11 +1933,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.26,
     shadowRadius: 26,
   },
+  emptyGlassLight: {
+    shadowColor: "#94A3B8",
+    shadowOpacity: 0.14,
+  },
   emptyGlassEdge: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
+  },
+  emptyGlassEdgeLight: {
+    borderColor: "rgba(148,163,184,0.18)",
   },
   emptyMatches: {
     backgroundColor: "transparent",

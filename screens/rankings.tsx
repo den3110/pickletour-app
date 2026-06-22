@@ -25,14 +25,14 @@ import {
   useColorScheme,
   DeviceEventEmitter,
   InteractionManager,
-  SafeAreaView,
+  SafeAreaView as RNSafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
 import { useTheme } from "@react-navigation/native";
 import ImageViewing from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-// import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import {
@@ -1405,8 +1405,8 @@ export default function RankingListScreen({ isBack = false }) {
     [theme]
   );
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+  const screenContent = (
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <LiquidGlassBackdrop theme={theme} />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.headerArea}>
@@ -1648,7 +1648,21 @@ export default function RankingListScreen({ isBack = false }) {
         swipeToCloseEnabled
         doubleTapToZoomEnabled
       />
-    </SafeAreaView>
+    </View>
+  );
+
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <EdgeSafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        {screenContent}
+      </EdgeSafeAreaView>
+    );
+  }
+
+  return (
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+      {screenContent}
+    </RNSafeAreaView>
   );
 }
 

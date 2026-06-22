@@ -111,7 +111,6 @@ const MOBILE_APP_SHELL_PATH = "/api/auth/system/app-shell";
 const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
 const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
 const EMPTY_SAFE_AREA_EDGES = [] as const;
-const ROOT_SAFE_AREA_TOP_ONLY_EDGES = ["top"] as const;
 const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
 const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
 
@@ -660,11 +659,11 @@ function RootLayout() {
   const rootSafeAreaEdges = React.useMemo(() => {
     if (isWebViewShellActive) return EMPTY_SAFE_AREA_EDGES;
     if (isLiveHomeRoute) return EMPTY_SAFE_AREA_EDGES;
-    if (Platform.OS === "ios" && isTabsRoute) {
+    if (IOS_26_NATIVE_TABS_ENABLED) {
       return EMPTY_SAFE_AREA_EDGES;
     }
-    if (IOS_26_NATIVE_TABS_ENABLED) {
-      return ROOT_SAFE_AREA_TOP_ONLY_EDGES;
+    if (Platform.OS === "ios" && isTabsRoute) {
+      return EMPTY_SAFE_AREA_EDGES;
     }
     return ROOT_SAFE_AREA_EDGES;
   }, [isLiveHomeRoute, isTabsRoute, isWebViewShellActive]);
@@ -1905,6 +1904,36 @@ function RootLayout() {
                           >
                             <Stack.Screen
                               name="(tabs)"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="schedule/index"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="stats/user"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="tournament/stack"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="rankings/stack"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="profile/stack"
+                              options={{ headerShown: false }}
+                            />
+
+                            <Stack.Screen
+                              name="profile/[id]/index"
                               options={{ headerShown: false }}
                             />
 

@@ -70,6 +70,7 @@ import {
   mergeMatchPayload,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
+import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const normalizeGroupCode = (code) => {
   const s = String(code || "")
@@ -535,8 +536,56 @@ function getThemeTokens(colors, dark) {
   };
 }
 
+const MANAGE_GLASS_BACKGROUND = "#fff";
+
+const colorToRgba = (color, alpha) => {
+  if (typeof color !== "string") return `rgba(59, 130, 246, ${alpha})`;
+  const hex = color.trim().replace("#", "");
+  const value =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : hex;
+  if (!/^[0-9a-fA-F]{6}$/.test(value)) return color;
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const manageGlassTint = (dark, alpha = dark ? 0.6 : 0.7) =>
+  dark ? `rgba(15, 23, 42, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+
+const manageAccentTint = (color, dark, alpha = dark ? 0.24 : 0.18) =>
+  colorToRgba(color || (dark ? "#60a5fa" : "#2563eb"), alpha);
+
+const GlassFill = memo(function GlassFill({
+  dark,
+  tintColor,
+  effectStyle = "regular",
+}) {
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  return (
+    <AppleLiquidGlassView
+      pointerEvents="none"
+      fallback="view"
+      glassColorScheme={dark ? "dark" : "light"}
+      glassEffectStyle={effectStyle}
+      glassTintColor={tintColor ?? manageGlassTint(dark)}
+      style={StyleSheet.absoluteFill}
+    />
+  );
+});
+
+const ManageWhiteBackdrop = memo(function ManageWhiteBackdrop() {
+  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  return <View pointerEvents="none" style={styles.manageWhiteBackdrop} />;
+});
+
 const BtnOutline = memo(({ onPress, children, disabled }) => {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -549,45 +598,24 @@ const BtnOutline = memo(({ onPress, children, disabled }) => {
           borderWidth: 1,
           borderColor: colors.border,
           opacity: disabled ? 0.5 : 1,
+          overflow: "hidden",
+          position: "relative",
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : colors.card,
         },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
         pressed && { opacity: 0.9 },
       ]}
     >
+      <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.48)} />
       <Text style={{ color: colors.text, fontWeight: "700" }}>{children}</Text>
     </Pressable>
   );
 });
 
-const PickerChip = memo(({ label, onPress, icon, colorsTheme }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: colorsTheme?.bg,
-      },
-      pressed && { opacity: 0.9 },
-    ]}
-  >
-    {icon ? (
-      <MaterialIcons name={icon} size={14} color={colorsTheme?.fg} />
-    ) : null}
-    <Text style={{ color: colorsTheme?.fg, fontSize: 12, fontWeight: "700" }}>
-      {label}
-    </Text>
-  </Pressable>
-));
-
-const CheckChip = memo(({ checked, label, onPress }) => {
-  const onBg = "#dcfce7";
-  const onFg = "#166534";
-  const offBg = "#eef2f7";
-  const offFg = "#263238";
+const PickerChip = memo(({ label, onPress, icon, colorsTheme }) => {
+  const { dark } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -599,20 +627,81 @@ const CheckChip = memo(({ checked, label, onPress }) => {
           paddingHorizontal: 10,
           paddingVertical: 6,
           borderRadius: 999,
-          backgroundColor: checked ? onBg : offBg,
-          borderWidth: 0,
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : colorsTheme?.bg,
+          overflow: "hidden",
+          position: "relative",
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && {
+          borderWidth: 1,
+          borderColor: manageAccentTint(colorsTheme?.fg, dark, 0.3),
         },
         pressed && { opacity: 0.9 },
       ]}
     >
+      <GlassFill
+        dark={dark}
+        tintColor={manageAccentTint(colorsTheme?.bg || colorsTheme?.fg, dark)}
+      />
+      {icon ? (
+        <MaterialIcons name={icon} size={14} color={colorsTheme?.fg} />
+      ) : null}
+      <Text
+        style={{ color: colorsTheme?.fg, fontSize: 12, fontWeight: "700" }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+});
+
+const CheckChip = memo(({ checked, label, onPress }) => {
+  const { dark } = useTheme();
+  const onBg = "#dcfce7";
+  const onFg = "#166534";
+  const offBg = "#eef2f7";
+  const offFg = "#263238";
+  const inactiveFg =
+    IOS_26_LIQUID_GLASS_ENABLED && dark ? "#e5e7eb" : offFg;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : checked
+            ? onBg
+            : offBg,
+          borderWidth: IOS_26_LIQUID_GLASS_ENABLED ? 1 : 0,
+          borderColor: checked
+            ? manageAccentTint(onFg, dark, 0.32)
+            : manageGlassTint(dark, 0.42),
+          overflow: "hidden",
+          position: "relative",
+        },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <GlassFill
+        dark={dark}
+        tintColor={checked ? manageAccentTint(onFg, dark) : manageGlassTint(dark)}
+      />
       <MaterialIcons
         name={checked ? "check-box" : "check-box-outline-blank"}
         size={14}
-        color={checked ? onFg : offFg}
+        color={checked ? onFg : inactiveFg}
       />
       <Text
         style={{
-          color: checked ? onFg : offFg,
+          color: checked ? onFg : inactiveFg,
           fontSize: 12,
           fontWeight: "700",
         }}
@@ -624,12 +713,24 @@ const CheckChip = memo(({ checked, label, onPress }) => {
 });
 
 const MenuItem = memo(({ icon, label, onPress, danger }) => {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [
+        styles.menuItem,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassMenuItem,
+        pressed && { opacity: 0.9 },
+      ]}
     >
+      <GlassFill
+        dark={dark}
+        tintColor={
+          danger
+            ? manageAccentTint("#ef4444", dark, 0.14)
+            : manageGlassTint(dark, 0.36)
+        }
+      />
       <MaterialIcons
         name={icon}
         size={18}
@@ -658,13 +759,19 @@ const Pill = memo(({ label, kind = "default" }) => {
       : { bg: t.chipDefaultBg, fg: t.chipDefaultFg };
   return (
     <View
-      style={{
-        backgroundColor: st.bg,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-      }}
+      style={[
+        {
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : st.bg,
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 8,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
     >
+      <GlassFill dark={dark} tintColor={manageAccentTint(st.fg, dark, 0.16)} />
       <Text style={{ color: st.fg, fontSize: 12 }}>{label}</Text>
     </View>
   );
@@ -676,13 +783,19 @@ const StatusPill = memo(({ status }) => {
   const v = t.statusTone(status);
   return (
     <View
-      style={{
-        backgroundColor: v.bg,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-      }}
+      style={[
+        {
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : v.bg,
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 8,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
     >
+      <GlassFill dark={dark} tintColor={manageAccentTint(v.fg, dark, 0.16)} />
       <Text style={{ color: v.fg, fontSize: 12 }}>{v.label}</Text>
     </View>
   );
@@ -794,12 +907,30 @@ const VideoPill = memo(({ has }) => {
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
-          backgroundColor: has ? t.successBg : t.chipDefaultBg,
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : has
+            ? t.successBg
+            : t.chipDefaultBg,
           paddingHorizontal: 8,
           paddingVertical: 2,
           borderRadius: 999,
+          borderWidth: IOS_26_LIQUID_GLASS_ENABLED ? 1 : 0,
+          borderColor: has
+            ? manageAccentTint(t.successFg, dark, 0.26)
+            : manageGlassTint(dark, 0.42),
+          overflow: "hidden",
+          position: "relative",
         }}
       >
+        <GlassFill
+          dark={dark}
+          tintColor={
+            has
+              ? manageAccentTint(t.successFg, dark, 0.16)
+              : manageGlassTint(dark, 0.4)
+          }
+        />
         <MaterialIcons
           name="videocam"
           size={14}
@@ -820,13 +951,22 @@ const CourtPill = memo(({ name }) => {
   const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
   return name ? (
     <View
-      style={{
-        backgroundColor: t.courtBg,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 999,
-      }}
+      style={[
+        {
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : t.courtBg,
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 999,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
     >
+      <GlassFill
+        dark={dark}
+        tintColor={manageAccentTint(t.courtFg, dark, 0.16)}
+      />
       <Text style={{ color: t.courtFg, fontSize: 12 }} numberOfLines={1}>
         {name}
       </Text>
@@ -835,17 +975,21 @@ const CourtPill = memo(({ name }) => {
 });
 
 const ScorePill = memo(({ textVal }) => {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   return textVal ? (
     <View
-      style={{
-        borderColor: colors.border,
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-      }}
+      style={[
+        {
+          borderColor: colors.border,
+          borderWidth: 1,
+          paddingHorizontal: 8,
+          paddingVertical: 2,
+          borderRadius: 8,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+      ]}
     >
+      <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.36)} />
       <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
         {textVal}
       </Text>
@@ -1104,18 +1248,27 @@ const MatchRowCard = memo(function MatchRowCard({
       onPress={handleOpenMatch}
       style={({ pressed }) => [
         styles.matchRow,
-        { borderColor: colors.border, backgroundColor: colors.card },
+        {
+          borderColor: colors.border,
+          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+            ? "transparent"
+            : colors.card,
+        },
+        IOS_26_LIQUID_GLASS_ENABLED && styles.glassCardSurface,
         pressed && { opacity: 0.95 },
       ]}
     >
+      <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.52)} />
       <Pressable
         onPress={handleToggleSelect}
         style={({ pressed }) => [
           styles.selectRow,
           { borderColor: colors.border },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassInlineControl,
           pressed && { opacity: 0.9 },
         ]}
       >
+        <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.32)} />
         <MaterialIcons
           name={selected ? "check-box" : "check-box-outline-blank"}
           size={20}
@@ -1270,7 +1423,15 @@ const ManageSkeleton = () => {
     </View>
   );
   return (
-    <View style={styles.screen}>
+    <View
+      style={[
+        styles.screen,
+        IOS_26_LIQUID_GLASS_ENABLED && {
+          backgroundColor: MANAGE_GLASS_BACKGROUND,
+        },
+      ]}
+    >
+      <ManageWhiteBackdrop />
       <View
         style={[
           styles.toolbar,
@@ -2277,9 +2438,16 @@ export default function ManageScreen() {
         <View
           style={[
             styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
+            {
+              backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? "transparent"
+                : colors.card,
+              borderColor: colors.border,
+            },
+            IOS_26_LIQUID_GLASS_ENABLED && styles.glassCardSurface,
           ]}
         >
+          <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.5)} />
           <View
             style={{
               flexDirection: "row",
@@ -2353,6 +2521,7 @@ export default function ManageScreen() {
     },
     [
       colors,
+      dark,
       t,
       matchesByBracketId,
       liveBump,
@@ -2885,11 +3054,19 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             <Pressable
               onPress={() => setHdrMenuOpen(true)}
               style={({ pressed }) => [
-                { paddingHorizontal: 8, paddingVertical: 4 },
+                {
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                  overflow: "hidden",
+                  position: "relative",
+                },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassHeaderAction,
                 pressed && { opacity: 0.7 },
               ]}
               hitSlop={12}
             >
+              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.42)} />
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
               >
@@ -2908,7 +3085,15 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
           ),
         }}
       />
-      <View style={{ flex: 1 }}>
+      <View
+        style={[
+          { flex: 1 },
+          IOS_26_LIQUID_GLASS_ENABLED && {
+            backgroundColor: MANAGE_GLASS_BACKGROUND,
+          },
+        ]}
+      >
+        <ManageWhiteBackdrop />
         <View style={{ flex: 1 }}>
           <Animated.View
             style={{
@@ -2919,7 +3104,9 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               zIndex: 1,
               elevation: 1,
               transform: [{ translateY }],
-              backgroundColor: colors.background,
+              backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                ? MANAGE_GLASS_BACKGROUND
+                : colors.background,
               paddingTop: 12,
             }}
             onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
@@ -2927,10 +3114,27 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             <View
               style={[
                 styles.toolbar,
-                { borderColor: colors.border, backgroundColor: colors.card },
+                {
+                  borderColor: colors.border,
+                  backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                    ? "transparent"
+                    : colors.card,
+                },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
               ]}
             >
-              <View style={[styles.inputWrap, { borderColor: colors.border }]}>
+              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.55)} />
+              <View
+                style={[
+                  styles.inputWrap,
+                  { borderColor: colors.border },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+                ]}
+              >
+                <GlassFill
+                  dark={dark}
+                  tintColor={manageGlassTint(dark, 0.42)}
+                />
                 <MaterialIcons name="search" size={18} color={t.muted} />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
@@ -2986,7 +3190,14 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                 />
               </View>
             </View>
-            <View style={[styles.tabs, { borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.tabs,
+                { borderColor: colors.border },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassTabs,
+              ]}
+            >
+              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.42)} />
               {typesAvailable.map((tTab) => {
                 const active = tTab.type === tab;
                 return (
@@ -2997,16 +3208,32 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                       styles.tabItem,
                       {
                         backgroundColor: active
-                          ? colors.primary
+                          ? IOS_26_LIQUID_GLASS_ENABLED
+                            ? "transparent"
+                            : colors.primary
                           : "transparent",
                         borderColor: active ? colors.primary : colors.border,
                       },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassTabItem,
                       pressed && { opacity: 0.95 },
                     ]}
                   >
+                    <GlassFill
+                      dark={dark}
+                      tintColor={
+                        active
+                          ? manageAccentTint(colors.primary, dark, 0.26)
+                          : manageGlassTint(dark, 0.38)
+                      }
+                      effectStyle={active ? "clear" : "regular"}
+                    />
                     <Text
                       style={{
-                        color: active ? "#fff" : colors.text,
+                        color: active
+                          ? IOS_26_LIQUID_GLASS_ENABLED
+                            ? colors.primary
+                            : "#fff"
+                          : colors.text,
                         fontWeight: "700",
                       }}
                     >
@@ -3043,9 +3270,19 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               <View
                 style={[
                   styles.alert,
-                  { borderColor: t.infoBorder, backgroundColor: t.infoBg },
+                  {
+                    borderColor: t.infoBorder,
+                    backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                      ? "transparent"
+                      : t.infoBg,
+                  },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassAlert,
                 ]}
               >
+                <GlassFill
+                  dark={dark}
+                  tintColor={manageAccentTint(t.infoText, dark, 0.18)}
+                />
                 <Text style={{ color: t.infoText }}>
                   Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
                 </Text>
@@ -3070,17 +3307,32 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                 styles.bottomBar,
                 {
                   paddingBottom: 8 + insets.bottom,
-                  backgroundColor: colors.card,
-                  borderTopColor: colors.border,
+                  backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                    ? "transparent"
+                    : colors.card,
+                  borderTopColor: IOS_26_LIQUID_GLASS_ENABLED
+                    ? "transparent"
+                    : colors.border,
                 },
               ]}
             >
               <View
                 style={[
                   styles.bottomRow,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  {
+                    backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                      ? "transparent"
+                      : colors.card,
+                    borderColor: colors.border,
+                  },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassBottomRow,
                 ]}
               >
+                <GlassFill
+                  dark={dark}
+                  tintColor={manageGlassTint(dark, 0.62)}
+                  effectStyle="clear"
+                />
                 <Pill
                   label={`Đã chọn ${selectedMatchIds.size} trận`}
                   kind="primary"
@@ -3130,9 +3382,16 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             <View
               style={[
                 styles.menuCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                {
+                  backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                    ? "transparent"
+                    : colors.card,
+                  borderColor: colors.border,
+                },
+                IOS_26_LIQUID_GLASS_ENABLED && styles.glassMenuCard,
               ]}
             >
+              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.64)} />
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
@@ -3215,11 +3474,18 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                   style={[
                     styles.modalCard,
                     {
-                      backgroundColor: colors.card,
+                      backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                        ? "transparent"
+                        : colors.card,
                       borderColor: colors.border,
                     },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassModalCard,
                   ]}
                 >
+                  <GlassFill
+                    dark={dark}
+                    tintColor={manageGlassTint(dark, 0.66)}
+                  />
                   <View
                     style={{
                       flexDirection: "row",
@@ -3248,8 +3514,16 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                     />
                   </View>
                   <View
-                    style={[styles.inputWrap, { borderColor: colors.border }]}
+                    style={[
+                      styles.inputWrap,
+                      { borderColor: colors.border },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+                    ]}
                   >
+                    <GlassFill
+                      dark={dark}
+                      tintColor={manageGlassTint(dark, 0.42)}
+                    />
                     <MaterialIcons name="link" size={18} color={t.muted} />
                     <TextInput
                       style={[styles.input, { color: colors.text }]}
@@ -3315,11 +3589,18 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                   style={[
                     styles.modalCard,
                     {
-                      backgroundColor: colors.card,
+                      backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                        ? "transparent"
+                        : colors.card,
                       borderColor: colors.border,
                     },
+                    IOS_26_LIQUID_GLASS_ENABLED && styles.glassModalCard,
                   ]}
                 >
+                  <GlassFill
+                    dark={dark}
+                    tintColor={manageGlassTint(dark, 0.66)}
+                  />
                   <View
                     style={{
                       flexDirection: "row",
@@ -3345,8 +3626,16 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                     />
                   </View>
                   <View
-                    style={[styles.inputWrap, { borderColor: colors.border }]}
+                    style={[
+                      styles.inputWrap,
+                      { borderColor: colors.border },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassInput,
+                    ]}
                   >
+                    <GlassFill
+                      dark={dark}
+                      tintColor={manageGlassTint(dark, 0.42)}
+                    />
                     <MaterialIcons name="link" size={18} color={t.muted} />
                     <TextInput
                       style={[styles.input, { color: colors.text }]}
@@ -3376,9 +3665,12 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                       style={({ pressed }) => [
                         styles.primaryBtn,
                         {
-                          backgroundColor: colors.primary,
+                          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                            ? "transparent"
+                            : colors.primary,
                           opacity: pressed || batchingVideo ? 0.9 : 1,
                         },
+                        IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
                       ]}
                       disabled={
                         batchingVideo ||
@@ -3386,6 +3678,11 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                         selectedMatchIds.size === 0
                       }
                     >
+                      <GlassFill
+                        dark={dark}
+                        tintColor={manageAccentTint(colors.primary, dark, 0.34)}
+                        effectStyle="clear"
+                      />
                       <Text style={{ color: "#fff", fontWeight: "800" }}>
                         Gán
                       </Text>
@@ -3410,9 +3707,19 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               <View
                 style={[
                   styles.modalCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  {
+                    backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                      ? "transparent"
+                      : colors.card,
+                    borderColor: colors.border,
+                  },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassModalCard,
                 ]}
               >
+                <GlassFill
+                  dark={dark}
+                  tintColor={manageGlassTint(dark, 0.66)}
+                />
                 <View
                   style={{
                     flexDirection: "row",
@@ -3446,9 +3753,14 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                     style={({ pressed }) => [
                       styles.refRow,
                       { borderColor: colors.border },
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.glassRefRow,
                       pressed && { opacity: 0.9 },
                     ]}
                   >
+                    <GlassFill
+                      dark={dark}
+                      tintColor={manageGlassTint(dark, 0.34)}
+                    />
                     <MaterialIcons
                       name={
                         !courtFilter
@@ -3480,9 +3792,18 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                           style={({ pressed }) => [
                             styles.refRow,
                             { borderColor: colors.border },
+                            IOS_26_LIQUID_GLASS_ENABLED && styles.glassRefRow,
                             pressed && { opacity: 0.9 },
                           ]}
                         >
+                          <GlassFill
+                            dark={dark}
+                            tintColor={
+                              chosen
+                                ? manageAccentTint(colors.primary, dark, 0.2)
+                                : manageGlassTint(dark, 0.34)
+                            }
+                          />
                           <MaterialIcons
                             name={
                               chosen
@@ -4134,6 +4455,121 @@ const styles = StyleSheet.create({
   screen: { flex: 1, padding: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   alert: { borderWidth: 1, borderRadius: 12, padding: 12 },
+  manageWhiteBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: MANAGE_GLASS_BACKGROUND,
+  },
+  glassPanel: {
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  glassCardSurface: {
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.13,
+    shadowRadius: 18,
+    elevation: 5,
+  },
+  glassAlert: {
+    overflow: "hidden",
+    position: "relative",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  glassControl: {
+    borderColor: "rgba(148, 163, 184, 0.36)",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+  },
+  glassHeaderAction: {
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.34)",
+  },
+  glassInput: {
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "transparent",
+  },
+  glassTabs: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 6,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "transparent",
+  },
+  glassTabItem: {
+    overflow: "hidden",
+    position: "relative",
+  },
+  glassPill: {
+    overflow: "hidden",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.28)",
+  },
+  glassInlineControl: {
+    overflow: "hidden",
+    position: "relative",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+  },
+  glassBottomRow: {
+    overflow: "hidden",
+    position: "relative",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  glassMenuCard: {
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
+    shadowRadius: 22,
+    elevation: 12,
+  },
+  glassMenuItem: {
+    position: "relative",
+    overflow: "hidden",
+    marginHorizontal: 6,
+    borderRadius: 10,
+  },
+  glassModalCard: {
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 28,
+    elevation: 14,
+  },
+  glassRefRow: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 12,
+    borderBottomWidth: 0,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  glassPrimaryBtn: {
+    position: "relative",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
+  },
   toolbar: {
     borderWidth: 1,
     borderRadius: 12,

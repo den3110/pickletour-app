@@ -13,8 +13,9 @@ import {
   useColorScheme,
   View,
   Modal,
-  SafeAreaView,
+  SafeAreaView as RNSafeAreaView,
 } from "react-native";
+import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -930,8 +931,8 @@ export default function TournamentDashboardScreen({ isBack = false }) {
     );
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+  const screenContent = (
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <View style={styles.container}>
         {/* ✅ FlatList bọc tất cả (kể cả Header) */}
         {isLoading || isFetching ? (
@@ -1195,7 +1196,21 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         ImageComponent={ViewerImage}
         backgroundColor={isDark ? "#0b0b0c" : "#ffffff"}
       />
-    </SafeAreaView>
+    </View>
+  );
+
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <EdgeSafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        {screenContent}
+      </EdgeSafeAreaView>
+    );
+  }
+
+  return (
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+      {screenContent}
+    </RNSafeAreaView>
   );
 }
 
