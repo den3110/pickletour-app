@@ -222,6 +222,14 @@ const preStartRightSlotForSide = (side, leftSide) =>
   leftSide === side ? 2 : 1;
 const oppositeSlot = (slot) => (Number(slot) === 1 ? 2 : 1);
 const OPENING_DOUBLES_SERVER = 2;
+const sameSlotBase = (left = {}, right = {}) => {
+  const leftKeys = Object.keys(left || {});
+  const rightKeys = Object.keys(right || {});
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => Number(left?.[key]) === Number(right?.[key]));
+};
+const sameSlotsBase = (left = {}, right = {}) =>
+  sameSlotBase(left?.A, right?.A) && sameSlotBase(left?.B, right?.B);
 
 /* ✅ Luôn ưu tiên theo USER (serverId / lastServerUid)
    ✅ Chỉ fallback theo slot khi chưa có gì */
@@ -1714,10 +1722,24 @@ export default function RefereeJudgePanel({ matchId }) {
   const [ptw, setPtw] = useState(basePointsToWin);
   const [ptwBoost, setPtwBoost] = useState(false);
   const eventType = (match?.tournament?.eventType || "double").toLowerCase();
-  const gs = match?.gameScores || [];
+  const gs = Array.isArray(match?.gameScores) ? match.gameScores : [];
+  const matchStatus = String(match?.status || "").toLowerCase();
+  const hasStartEvent = Array.isArray(match?.liveLog)
+    ? match.liveLog.some(
+        (entry) => String(entry?.type || "").trim().toLowerCase() === "start",
+      )
+    : false;
+  const hasRecordedScore = gs.some(
+    (game) => Number(game?.a || 0) > 0 || Number(game?.b || 0) > 0,
+  );
+  const hasAdvancedGame =
+    Number(match?.currentGame || 0) > 0 || gs.length > 1;
   const isPreMatch =
-    (match?.status !== "live" && gs.length === 0) ||
-    match?.status === "scheduled";
+    matchStatus !== "finished" &&
+    !hasStartEvent &&
+    !hasRecordedScore &&
+    !hasAdvancedGame &&
+    !String(match?.winner || "").trim();
   const [leftRight, setLeftRight] = useState({ left: "A", right: "B" });
   const leftSide = leftRight.left;
   const rightSide = leftRight.right;
@@ -1773,7 +1795,10 @@ export default function RefereeJudgePanel({ matchId }) {
     [match?.pairB, eventType],
   );
 
-  const slotsBase = match?.slots?.base || match?.meta?.slots?.base || {};
+  const slotsBase = useMemo(
+    () => match?.slots?.base || match?.meta?.slots?.base || {},
+    [match?.meta?.slots?.base, match?.slots?.base],
+  );
   // Optimistic override: vị trí ô được cập nhật ngay khi đổi bên, không chờ server
   const [localBaseOverride, setLocalBaseOverride] = useState<{
     A: Record<string, number>;
@@ -1788,8 +1813,11 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // Clear override khi server data mới về (slotsBase thay đổi)
   useEffect(() => {
-    if (localBaseOverride) setLocalBaseOverride(null);
-  }, [slotsBase?.A, slotsBase?.B, localBaseOverride]);
+    if (!localBaseOverride) return;
+    if (sameSlotsBase(localBaseOverride, slotsBase)) {
+      setLocalBaseOverride(null);
+    }
+  }, [slotsBase, localBaseOverride]);
 
   useEffect(() => {
     if (!localBaseOverride) return undefined;
@@ -2292,7 +2320,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // ✅ THÊM: Hàm xử lý đọc điểm chuẩn Pickleball
   useEffect(() => {
     // Chỉ đọc khi: Đã bật voice, Match đang Live, và không phải lúc mới load chưa có dữ liệu
-    if (!voiceEnabled || match?.status !== "live") return;
+    if (!voiceEnabled || isPreMatch || match?.status !== "live") return;
 
     // Logic xác định điểm để đọc (Luôn đọc điểm đội GIAO BÓNG trước)
     const serverScore = activeSide === "A" ? curA : curB;
@@ -2323,6 +2351,7 @@ export default function RefereeJudgePanel({ matchId }) {
     });
   }, [
     voiceEnabled,
+    isPreMatch,
     match?.status,
     curA,
     curB,
@@ -2767,6 +2796,7 @@ export default function RefereeJudgePanel({ matchId }) {
   // Match state gates scoring; owner gate stays inside action handlers so taps can show a toast.
   const canScoreByMatchState =
     match?.status === "live" &&
+    !isPreMatch &&
     !waitingStartActive &&
     !matchDecided &&
     !gameLocked &&
