@@ -139,6 +139,7 @@ export default function LoginScreen() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [keyboardVisible, setKeyboardVisible] = useState(false); // ⬅️ THÊM
+  const passwordInputRef = React.useRef<TextInput>(null);
 
   // ⬅️ THÊM: Lắng nghe keyboard
   useEffect(() => {
@@ -166,10 +167,10 @@ export default function LoginScreen() {
     () =>
       kind === "email"
         ? "email-address"
-        : kind === "phone"
+        : kind === "phone" || /^[+\d\s().-]+$/.test((loginId || "").trim())
         ? "phone-pad"
         : "default",
-    [kind]
+    [kind, loginId]
   );
 
   const onSubmit = async () => {
@@ -320,6 +321,8 @@ export default function LoginScreen() {
                       textContentType="username"
                       autoComplete="username"
                       returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => passwordInputRef.current?.focus()}
                     />
                   </AuthGlassSurface>
 
@@ -346,6 +349,7 @@ export default function LoginScreen() {
                     ]}
                   >
                     <TextInput
+                      ref={passwordInputRef}
                       value={password}
                       onChangeText={setPassword}
                       placeholder="••••••••"
