@@ -40,6 +40,12 @@ import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  formatRatingScore,
+  getBestRatingScore,
+  getRankNoFromPayload,
+  isValidRankNo,
+} from "@/utils/rankUtils";
 
 /* ---------- Lottie asset ---------- */
 const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
@@ -430,7 +436,6 @@ function AnimatedLogo() {
   );
 }
 
-/* ---------- Athlete Island Card ---------- */
 function AthleteIsland() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const router = useRouter();
@@ -452,16 +457,19 @@ function AthleteIsland() {
   );
 
   // Logic Rank & Role
-  const rawRankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null;
-  const rankNoNumber = Number(rawRankNo);
-  const hasRankNo = Number.isFinite(rankNoNumber);
-  const shouldFetchMyRank =
-    !!userInfo?.token && userInfo?.rankDeferred === true && !hasRankNo;
-  const { isFetching: isFetchingMyRank } = useGetMyRankQuery(undefined, {
+  const storedRawRankNo = getRankNoFromPayload(userInfo);
+  const hasStoredRankNo = isValidRankNo(storedRawRankNo);
+  const shouldFetchMyRank = !!userInfo?.token && !hasStoredRankNo;
+  const { data: myRankData, isFetching: isFetchingMyRank } = useGetMyRankQuery(undefined, {
     skip: !shouldFetchMyRank,
   });
+  const fetchedRawRankNo = getRankNoFromPayload(myRankData);
+  const rawRankNo = hasStoredRankNo ? storedRawRankNo : fetchedRawRankNo;
+  const rankNoNumber = Number(rawRankNo);
+  const hasRankNo = isValidRankNo(rawRankNo);
+  const ratingScore = getBestRatingScore(myRankData, userInfo);
   const shouldHideRankBadge =
-    !!userInfo && (shouldFetchMyRank || isFetchingMyRank);
+    !!userInfo && !hasRankNo && isFetchingMyRank;
 
   let rankDisplay = "Chưa xếp hạng",
     rankIcon = "star-border",
@@ -477,6 +485,10 @@ function AthleteIsland() {
       rankIcon = "military-tech";
       rankColor = "#FFA502";
     }
+  } else if (ratingScore !== null) {
+    rankDisplay = `${formatRatingScore(ratingScore)} điểm`;
+    rankIcon = "trending-up";
+    rankColor = "#4ECDC4";
   }
 
   const roleUser = () => {

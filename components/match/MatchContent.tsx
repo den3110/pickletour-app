@@ -51,6 +51,7 @@ import {
 } from "@/utils/matchDisplay";
 import { router, useRouter } from "expo-router";
 import { useSocket } from "@/context/SocketContext";
+import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLabels";
 
 /* =====================================
  * THEME TOKENS (Modernized)
@@ -492,6 +493,104 @@ function roundsCountForBracketLocal(bracket, matchesOfThis = []) {
   if (scale) return Math.ceil(Math.log2(scale));
 
   return 1;
+}
+
+const bracketIdOfMatchLocal = (match) =>
+  String(match?.bracket?._id ?? match?.bracket ?? match?.bracketId ?? "").trim();
+
+const roundNumberOfMatchLocal = (match) => {
+  const direct = Number(match?.round ?? match?.roundNo ?? match?.roundIndex);
+  if (Number.isFinite(direct)) return direct;
+  const code = String(
+    match?.displayCode ||
+      match?.codeResolved ||
+      match?.codeDisplay ||
+      match?.globalCodeV ||
+      match?.globalCode ||
+      match?.code ||
+      match?.matchCode ||
+      match?.slotCode ||
+      "",
+  );
+  const parsed = code.match(/^V(\d+)(?:-[^-]+)?-T\d+$/i);
+  return parsed ? Number(parsed[1]) : NaN;
+};
+
+const orderNumberOfMatchLocal = (match) => {
+  const direct = Number(match?.order ?? match?.orderNo ?? match?.slot ?? match?.index);
+  if (Number.isFinite(direct)) return direct;
+  const code = String(
+    match?.displayCode ||
+      match?.codeResolved ||
+      match?.codeDisplay ||
+      match?.globalCodeV ||
+      match?.globalCode ||
+      match?.code ||
+      match?.matchCode ||
+      match?.slotCode ||
+      "",
+  );
+  const parsed = code.match(/^V\d+(?:-[^-]+)?-T(\d+)$/i);
+  return parsed ? Number(parsed[1]) - 1 : NaN;
+};
+
+const isKnockoutBracketLocal = (bracket, match) => {
+  const type = String(
+    bracket?.type || bracket?.format || match?.format || match?.type || "",
+  ).toLowerCase();
+  if (
+    !type ||
+    type.includes("group") ||
+    type.includes("playoff") ||
+    type.includes("roundelim") ||
+    type === "po"
+  ) {
+    return false;
+  }
+  return (
+    type.includes("knockout") ||
+    type.includes("singleelim") ||
+    type.includes("single-elim") ||
+    type.includes("single_elim") ||
+    type === "ko"
+  );
+};
+
+function stageChipColors(label, scheme) {
+  const isDark = scheme === "dark";
+  const text = String(label || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (text.includes("chung ket")) {
+    return {
+      bg: isDark ? "rgba(251, 191, 36, 0.24)" : "#fff1a8",
+      bd: isDark ? "rgba(251, 191, 36, 0.58)" : "#facc15",
+      text: isDark ? "#fde68a" : "#78350f",
+    };
+  }
+  if (text.includes("ban ket")) {
+    return {
+      bg: isDark ? "rgba(168, 85, 247, 0.26)" : "#ead6ff",
+      bd: isDark ? "rgba(168, 85, 247, 0.62)" : "#c084fc",
+      text: isDark ? "#e9d5ff" : "#6b21a8",
+    };
+  }
+  if (text.includes("tu ket")) {
+    return {
+      bg: isDark ? "rgba(59, 130, 246, 0.26)" : "#cfe3ff",
+      bd: isDark ? "rgba(59, 130, 246, 0.62)" : "#60a5fa",
+      text: isDark ? "#bfdbfe" : "#1e40af",
+    };
+  }
+  if (/\b1[/-]\d+\b/.test(text)) {
+    return {
+      bg: isDark ? "rgba(20, 184, 166, 0.24)" : "#bff7ec",
+      bd: isDark ? "rgba(20, 184, 166, 0.58)" : "#2dd4bf",
+      text: isDark ? "#99f6e4" : "#0f766e",
+    };
+  }
+  return null;
 }
 
 const _norm = (value) =>
@@ -2235,13 +2334,11 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
   const { data: brackets = [], isFetching: fetchingBrackets } =
     useListTournamentBracketsQuery(
-      tournamentId && needsSeedContextResolution ? tournamentId : skipToken,
+      tournamentId ? tournamentId : skipToken,
     );
   const { data: allMatchesFetched = [], isFetching: fetchingMatches } =
     useListTournamentMatchesQuery(
-      tournamentId && needsSeedContextResolution
-        ? { tournamentId, view: "bracket" }
-        : skipToken,
+      tournamentId ? { tournamentId, view: "bracket" } : skipToken,
     );
 
   const { data: verifyRes, isFetching: verifyingMgr } = useVerifyManagerQuery(
@@ -2327,6 +2424,48 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     });
     return map;
   }, [brackets]);
+
+  const roundStageLabel = useMemo(() => {
+    if (!merged) return "";
+    const bracketId = bracketIdOfMatchLocal(merged);
+    const bracket =
+      (bracketId && bracketsById.get(bracketId)) ||
+      (merged?.bracket && typeof merged.bracket === "object"
+        ? merged.bracket
+        : null);
+    if (!isKnockoutBracketLocal(bracket, merged)) return "";
+
+    const round = roundNumberOfMatchLocal(merged);
+    if (!Number.isFinite(round)) return "";
+
+    const matchesOfBracket =
+      (bracketId && byBracket?.[bracketId]?.length
+        ? byBracket[bracketId]
+        : (matchesForContext || []).filter(
+            (match) => bracketIdOfMatchLocal(match) === bracketId,
+          )) || [];
+
+    const roundMatches = matchesOfBracket
+      .filter((match) => roundNumberOfMatchLocal(match) === round)
+      .sort((a, b) => orderNumberOfMatchLocal(a) - orderNumberOfMatchLocal(b));
+    if (!roundMatches.length) return "";
+
+    const matchIndex = roundMatches.findIndex(
+      (match) => String(match?._id || "") === String(merged?._id || ""),
+    );
+    const fallbackIndex = orderNumberOfMatchLocal(merged);
+    const displayIndex =
+      matchIndex >= 0
+        ? matchIndex + 1
+        : Number.isFinite(fallbackIndex)
+          ? fallbackIndex + 1
+          : 1;
+
+    return formatKnockoutRoundLabelByMatchCount(roundMatches.length, {
+      includeIndex: true,
+      index: displayIndex,
+    });
+  }, [merged, bracketsById, byBracket, matchesForContext]);
 
   const matchIndex = useMemo(() => {
     const map = new Map();
@@ -3732,7 +3871,15 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             <Text style={[styles.cardLabel, { color: T.textSecondary }]}>
               TỈ SỐ TRẬN ĐẤU
             </Text>
-            <Chip label={formatStatus(status)} />
+            <View style={styles.scoreHeaderChips}>
+              {roundStageLabel ? (
+                <Chip
+                  label={roundStageLabel}
+                  colors={stageChipColors(roundStageLabel, T.scheme)}
+                />
+              ) : null}
+              <Chip label={formatStatus(status)} />
+            </View>
           </View>
 
           <View style={styles.matchupContainer}>
@@ -3991,8 +4138,9 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
 /* ---------- Chip Component ---------- */
 /* ---------- Chip Component (Updated) ---------- */
-const Chip = memo(({ label, onPress }) => {
+const Chip = memo(({ label, onPress, colors }) => {
   const T = useThemeTokens();
+  const chipColors = colors || T.chip;
   // Nếu có onPress thì dùng TouchableOpacity, không thì dùng View thường
   const Wrapper = onPress ? TouchableOpacity : View;
 
@@ -4002,10 +4150,10 @@ const Chip = memo(({ label, onPress }) => {
       activeOpacity={0.7}
       style={[
         styles.chip,
-        { backgroundColor: T.chip.bg, borderColor: T.chip.bd },
+        { backgroundColor: chipColors.bg, borderColor: chipColors.bd },
       ]}
     >
-      <Text style={[styles.chipText, { color: T.chip.text }]}>{label}</Text>
+      <Text style={[styles.chipText, { color: chipColors.text }]}>{label}</Text>
     </Wrapper>
   );
 });
@@ -4071,6 +4219,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    gap: 10,
+  },
+  scoreHeaderChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 6,
+    flexShrink: 1,
   },
   matchupContainer: {
     flexDirection: "row",

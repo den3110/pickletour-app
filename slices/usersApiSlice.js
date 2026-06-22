@@ -1,5 +1,10 @@
 import { apiSlice } from "./apiSlice";
 import { setCredentials } from "./authSlice";
+import {
+  getBestRatingScore,
+  getRankNoFromPayload,
+  getRankTotalFromPayload,
+} from "@/utils/rankUtils";
 
 const USERS_URL = "/api/users";
 
@@ -36,22 +41,30 @@ export const userApiSlice = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, getState, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          const payload = data?.data ?? data ?? {};
           const prev = getState().auth?.userInfo || {};
-          if (!prev?._id) return;
+          if (!(prev?._id || prev?.id || prev?.userId || prev?.token)) return;
+
+          const rankNo = getRankNoFromPayload(payload);
+          const rankTotal = getRankTotalFromPayload(payload);
+          const ratingScore = getBestRatingScore(payload);
 
           const next = {
             ...prev,
-            rank: data?.rank ?? null,
-            rankNo: data?.rankNo ?? null,
-            rankTotal: data?.rankTotal ?? null,
+            rank: payload?.rank ?? payload?.ranking ?? null,
+            rankNo,
+            rankTotal,
             rankDeferred: false,
           };
 
-          if (data?.ratingSingle !== undefined) {
-            next.ratingSingle = data.ratingSingle;
+          if (payload?.ratingSingle !== undefined) {
+            next.ratingSingle = payload.ratingSingle;
           }
-          if (data?.ratingDouble !== undefined) {
-            next.ratingDouble = data.ratingDouble;
+          if (payload?.ratingDouble !== undefined) {
+            next.ratingDouble = payload.ratingDouble;
+          }
+          if (ratingScore !== null) {
+            next.ratingScore = ratingScore;
           }
 
           dispatch(setCredentials(next));

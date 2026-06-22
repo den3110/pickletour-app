@@ -40,6 +40,10 @@ import {
   useListTournamentMatchesQuery,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
+import {
+  formatKnockoutRoundLabelByMatchCount,
+  formatKnockoutRoundLabelByTeamCount,
+} from "@/utils/tournamentRoundLabels";
 
 /* ───────────────────── Utils ───────────────────── */
 const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString() : "—");
@@ -86,8 +90,10 @@ function codeLabelForSize(size: number) {
   if (size === 2) return { code: "F", label: "Chung kết (F)" };
   if (size === 4) return { code: "SF", label: "Bán kết (SF)" };
   if (size === 8) return { code: "QF", label: "Tứ kết (QF)" };
-  const denom = Math.max(2, size / 2);
-  return { code: `R${size}`, label: `Vòng 1/${denom} (R${size})` };
+  return {
+    code: `R${size}`,
+    label: `${formatKnockoutRoundLabelByTeamCount(size)} (R${size})`,
+  };
 }
 function buildKnockoutOptions(teamCount: number) {
   if (!Number.isFinite(teamCount) || teamCount < 2) {
@@ -475,11 +481,8 @@ function RoundRobinPreview({
 
 /* ───────────────────── KO helpers/render ───────────────────── */
 const roundTitleByCount = (cnt: number) => {
-  if (cnt === 1) return "Chung kết";
-  if (cnt === 2) return "Bán kết";
-  if (cnt === 4) return "Tứ kết";
-  if (cnt === 8) return "Vòng 1/8";
-  if (cnt === 16) return "Vòng 1/16";
+  const label = formatKnockoutRoundLabelByMatchCount(cnt);
+  if (label) return label;
   return `Vòng (${cnt} trận)`;
 };
 const matchSideName = (
