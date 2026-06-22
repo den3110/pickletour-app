@@ -643,7 +643,12 @@ function getThemeTokens(colors, dark) {
   };
 }
 
-const MANAGE_GLASS_BACKGROUND = "#fff";
+const MANAGE_LIGHT_BACKGROUND = "#fff";
+const MANAGE_DARK_BACKGROUND = "#05070a";
+const manageScreenBackground = (dark) =>
+  dark ? MANAGE_DARK_BACKGROUND : MANAGE_LIGHT_BACKGROUND;
+const manageHeaderBackground = (colors, dark) =>
+  IOS_26_LIQUID_GLASS_ENABLED ? manageScreenBackground(dark) : colors.background;
 
 const colorToRgba = (color, alpha) => {
   if (typeof color !== "string") return `rgba(59, 130, 246, ${alpha})`;
@@ -660,6 +665,19 @@ const colorToRgba = (color, alpha) => {
   const g = parseInt(value.slice(2, 4), 16);
   const b = parseInt(value.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const colorWithAlpha = (color, alpha) => {
+  if (typeof color !== "string") return `rgba(15, 23, 42, ${alpha})`;
+  const value = color.trim();
+  const rgba = value.match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*[\d.]+)?\s*\)$/i,
+  );
+  if (rgba) {
+    return `rgba(${rgba[1]}, ${rgba[2]}, ${rgba[3]}, ${alpha})`;
+  }
+  if (value.startsWith("#")) return colorToRgba(value, alpha);
+  return colorToRgba(value, alpha);
 };
 
 const manageGlassTint = (dark, alpha = dark ? 0.6 : 0.7) =>
@@ -711,8 +729,17 @@ const GlassFill = memo(function GlassFill({
 });
 
 const ManageWhiteBackdrop = memo(function ManageWhiteBackdrop() {
+  const { dark } = useTheme();
   if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
-  return <View pointerEvents="none" style={styles.manageWhiteBackdrop} />;
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.manageWhiteBackdrop,
+        { backgroundColor: manageScreenBackground(dark) },
+      ]}
+    />
+  );
 });
 
 const BtnOutline = memo(({ onPress, children, disabled }) => {
@@ -1230,7 +1257,11 @@ const EdgeFadedHScroll = memo(
           <>
             <LinearGradient
               pointerEvents="none"
-              colors={[bgColor, `${bgColor}99`, `${bgColor}00`]}
+              colors={[
+                colorWithAlpha(bgColor, 1),
+                colorWithAlpha(bgColor, 0.6),
+                colorWithAlpha(bgColor, 0),
+              ]}
               locations={[0, 0.5, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -1249,7 +1280,11 @@ const EdgeFadedHScroll = memo(
           <>
             <LinearGradient
               pointerEvents="none"
-              colors={[`${bgColor}00`, `${bgColor}99`, bgColor]}
+              colors={[
+                colorWithAlpha(bgColor, 0),
+                colorWithAlpha(bgColor, 0.6),
+                colorWithAlpha(bgColor, 1),
+              ]}
               locations={[0, 0.5, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -1493,6 +1528,7 @@ const MatchRowCard = memo(function MatchRowCard({
 
 /* ---------------- SKELETON COMPONENTS ---------------- */
 const SkeletonItem = memo(({ width, height, borderRadius = 4, style }) => {
+  const { dark } = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
     const anim = Animated.loop(
@@ -1519,7 +1555,7 @@ const SkeletonItem = memo(({ width, height, borderRadius = 4, style }) => {
           width,
           height,
           borderRadius,
-          backgroundColor: "#E1E9EE",
+          backgroundColor: dark ? "#263242" : "#E1E9EE",
           opacity,
         },
         style,
@@ -1545,7 +1581,7 @@ ActionButtons.displayName = "ActionButtons";
 SkeletonItem.displayName = "SkeletonItem";
 
 const ManageSkeleton = () => {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   const RenderMatchSkeleton = () => (
     <View
       style={{
@@ -1590,8 +1626,9 @@ const ManageSkeleton = () => {
     <View
       style={[
         styles.screen,
+        { backgroundColor: colors.background },
         IOS_26_LIQUID_GLASS_ENABLED && {
-          backgroundColor: MANAGE_GLASS_BACKGROUND,
+          backgroundColor: manageScreenBackground(dark),
         },
       ]}
     >
@@ -1599,9 +1636,16 @@ const ManageSkeleton = () => {
       <View
         style={[
           styles.toolbar,
-          { borderColor: colors.border, backgroundColor: colors.card },
+          {
+            borderColor: colors.border,
+            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+              ? "transparent"
+              : colors.card,
+          },
+          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPanel,
         ]}
       >
+        <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.55)} />
         <SkeletonItem
           width="100%"
           height={40}
@@ -1627,11 +1671,15 @@ const ManageSkeleton = () => {
               styles.card,
               {
                 borderColor: colors.border,
-                backgroundColor: colors.card,
+                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                  ? "transparent"
+                  : colors.card,
                 marginBottom: 12,
               },
+              IOS_26_LIQUID_GLASS_ENABLED && styles.glassCardSurface,
             ]}
           >
+            <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.5)} />
             <View
               style={{
                 flexDirection: "row",
@@ -3146,7 +3194,13 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
     return (
       <>
         <Stack.Screen
-          options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
+          options={{
+            title: "Quản lý giải",
+            headerTitleAlign: "center",
+            headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+          }}
         />
         <ManageSkeleton />
       </>
@@ -3156,9 +3210,15 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
     return (
       <>
         <Stack.Screen
-          options={{ title: "Quản lý giải", headerTitleAlign: "center" }}
+          options={{
+            title: "Quản lý giải",
+            headerTitleAlign: "center",
+            headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+          }}
         />
-        <View style={[styles.screen]}>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <View
             style={[
               styles.alert,
@@ -3239,9 +3299,15 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
     return (
       <>
         <Stack.Screen
-          options={{ title: `${tour?.name || ""}`, headerTitleAlign: "center" }}
+          options={{
+            title: `${tour?.name || ""}`,
+            headerTitleAlign: "center",
+            headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+          }}
         />
-        <View style={[styles.screen]}>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <View
             style={[
               styles.alert,
@@ -3268,6 +3334,9 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
         options={{
           title: `${tour?.name || ""}`,
           headerTitleAlign: "center",
+          headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text },
           headerRight: () => (
             <Pressable
               onPress={() => setHdrMenuOpen(true)}
@@ -3306,8 +3375,9 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
       <View
         style={[
           { flex: 1 },
+          { backgroundColor: colors.background },
           IOS_26_LIQUID_GLASS_ENABLED && {
-            backgroundColor: MANAGE_GLASS_BACKGROUND,
+            backgroundColor: manageScreenBackground(dark),
           },
         ]}
       >
@@ -3323,7 +3393,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               elevation: 1,
               transform: [{ translateY }],
               backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                ? MANAGE_GLASS_BACKGROUND
+                ? manageScreenBackground(dark)
                 : colors.background,
               paddingTop: 12,
             }}
@@ -4675,7 +4745,6 @@ const styles = StyleSheet.create({
   alert: { borderWidth: 1, borderRadius: 12, padding: 12 },
   manageWhiteBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: MANAGE_GLASS_BACKGROUND,
   },
   glassPanel: {
     borderRadius: 18,
