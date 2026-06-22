@@ -4061,8 +4061,7 @@ export default function RefereeJudgePanel({ matchId }) {
                   !needsStartAction && s.clockAbsolute,
                   !needsStartAction && isTightLandscape && s.clockInline,
                   {
-                    color:
-                      activeBreak.type === "medical" ? "#dc2626" : "#d97706",
+                    color: breakPalette.label,
                     fontSize: 20,
                     fontWeight: "900",
                     textTransform: "uppercase",
@@ -4084,8 +4083,20 @@ export default function RefereeJudgePanel({ matchId }) {
             )}
 
             {activeBreak ? (
-              <View style={s.breakOverlay}>
-                <BreakTimer endTime={activeBreak.endTime} style={s.breakTimer} />
+              <View
+                style={[
+                  s.breakOverlay,
+                  {
+                    backgroundColor: breakPalette.overlayBg,
+                    borderColor: breakPalette.overlayBorder,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <BreakTimer
+                  endTime={activeBreak.endTime}
+                  style={[s.breakTimer, { color: breakPalette.timer }]}
+                />
 
 	                <Ripple
 	                  onPress={handleContinue}
