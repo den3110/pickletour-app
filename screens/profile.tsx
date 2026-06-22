@@ -1174,59 +1174,67 @@ export default function ProfileScreen({ isBack = false }) {
               { backgroundColor: t.surface, borderColor: t.border },
             ]}
           >
-            {TABS.map((tab) => (
-              <Pressable
-                key={tab.key}
-                onPress={() => {
-                  setActiveTab(tab.key);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-                style={({ pressed }) => [
-                  styles.tabItemPressable,
-                  { opacity: pressed ? 0.9 : 1 },
-                ]}
-              >
-                <ProfileGlassSurface
-                  effect="clear"
-                  interactive={activeTab === tab.key}
-                  tintColor={
-                    activeTab === tab.key
-                      ? rgbaFromHex(t.accent, 0.42)
-                      : glassTintFor(t, 0.18, 0.28)
-                  }
-                  style={[
-                    styles.tabItem,
-                    IOS_26_LIQUID_GLASS_ENABLED && styles.tabItemGlass,
-                    activeTab === tab.key && [
-                      styles.tabItemActive,
-                      IOS_26_LIQUID_GLASS_ENABLED && styles.tabItemGlassActive,
-                      {
-                        backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                          ? rgbaFromHex(t.accent, 0.32)
-                          : t.accent,
-                      },
-                    ],
+            {TABS.map((tab, index) => {
+              const isFirstTab = index === 0;
+              const isLastTab = index === TABS.length - 1;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => {
+                    setActiveTab(tab.key);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={({ pressed }) => [
+                    styles.tabItemPressable,
+                    isFirstTab && styles.tabItemFirst,
+                    isLastTab && styles.tabItemLast,
+                    { opacity: pressed ? 0.9 : 1 },
                   ]}
                 >
-                  <Feather
-                    name={tab.icon}
-                    size={18}
-                    color={activeTab === tab.key ? "#fff" : t.textSecondary}
-                  />
-                  <Text
+                  <ProfileGlassSurface
+                    effect="clear"
+                    interactive={activeTab === tab.key}
+                    tintColor={
+                      activeTab === tab.key
+                        ? rgbaFromHex(t.accent, 0.42)
+                        : glassTintFor(t, 0.18, 0.28)
+                    }
                     style={[
-                      styles.tabLabel,
-                      {
-                        color:
-                          activeTab === tab.key ? "#fff" : t.textSecondary,
-                      },
+                      styles.tabItem,
+                      isFirstTab && styles.tabItemFirst,
+                      isLastTab && styles.tabItemLast,
+                      IOS_26_LIQUID_GLASS_ENABLED && styles.tabItemGlass,
+                      activeTab === tab.key && [
+                        styles.tabItemActive,
+                        IOS_26_LIQUID_GLASS_ENABLED && styles.tabItemGlassActive,
+                        {
+                          backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                            ? rgbaFromHex(t.accent, 0.32)
+                            : t.accent,
+                        },
+                      ],
                     ]}
                   >
-                    {tab.label}
-                  </Text>
-                </ProfileGlassSurface>
-              </Pressable>
-            ))}
+                    <Feather
+                      name={tab.icon}
+                      size={18}
+                      color={activeTab === tab.key ? "#fff" : t.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        {
+                          color:
+                            activeTab === tab.key ? "#fff" : t.textSecondary,
+                        },
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </ProfileGlassSurface>
+                </Pressable>
+              );
+            })}
           </ProfileGlassSurface>
         </View>
 
@@ -2951,6 +2959,15 @@ const styles = StyleSheet.create({
   tabItemPressable: {
     flex: 1,
     borderRadius: 12,
+    overflow: "hidden",
+  },
+  tabItemFirst: {
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  tabItemLast: {
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
   },
   tabItem: {
     flexDirection: "row",
@@ -2959,6 +2976,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     gap: 6,
+    overflow: "hidden",
   },
   tabItemGlass: {
     borderWidth: 1,

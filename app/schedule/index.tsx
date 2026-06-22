@@ -1739,6 +1739,7 @@ const CalendarPermissionModal = ({
 
         <View style={[styles.modalFooter, { borderTopColor: C.border }]}>
           <TouchableOpacity
+            style={styles.modalButtonSecondaryPressable}
             onPress={onClose}
             activeOpacity={0.8}
             disabled={isRequesting}
@@ -1781,7 +1782,12 @@ const CalendarPermissionModal = ({
                 style={styles.modalButtonPrimaryGradient}
               >
                 {isRequesting ? (
-                  <ActivityIndicator size="small" color="#FFF" />
+                  <>
+                    <ActivityIndicator size="small" color="#FFF" />
+                    <Text style={styles.modalButtonPrimaryText}>
+                      Đang cấp quyền
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Icon name="check-circle" size={20} color="#FFF" />
@@ -2694,13 +2700,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
   },
-  modalButtonSecondary: {
+  modalButtonSecondaryPressable: {
     flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  modalButtonSecondary: {
+    minHeight: 56,
     paddingVertical: 16,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: "#E5E7EB",
     alignItems: "center",
+    justifyContent: "center",
   },
   modalButtonSecondaryText: {
     fontSize: 16,

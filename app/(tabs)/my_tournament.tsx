@@ -460,6 +460,13 @@ function SkeletonHeader({ tokens }) {
       <View style={styles.pageHeader}>
         <SkeletonBlock
           tokens={tokens}
+          width={150}
+          height={28}
+          radius={8}
+          style={{ marginBottom: 10 }}
+        />
+        <SkeletonBlock
+          tokens={tokens}
           width="100%"
           height={38}
           radius={12}
@@ -1207,6 +1214,10 @@ export default function MyTournament() {
       ]}
     >
       <View style={styles.pageHeader}>
+        <Text style={[styles.pageTitle, { color: tokens.colors.text }]}>
+          Giải của tôi
+        </Text>
+
         <MyTournamentGlassSurface
           effect="regular"
           interactive
@@ -1369,10 +1380,22 @@ const styles = StyleSheet.create({
 
   stickyHeader: {
     zIndex: 10,
-    elevation: 3,
+    elevation: 0,
     borderBottomWidth: 1,
   },
-  pageHeader: { paddingBottom: 10 },
+  pageHeader: {
+    paddingTop: Platform.OS === "android" ? 10 : 0,
+    paddingBottom: 10,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: Platform.select({
+      ios: "800",
+      android: "700",
+      default: "800",
+    }),
+    marginBottom: 10,
+  },
   pageSub: { marginTop: 6 },
 
   searchRow: {

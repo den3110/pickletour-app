@@ -27,6 +27,7 @@ import {
   Platform, // Cần cho shadow/elevation
 } from "react-native";
 import { useSelector } from "react-redux";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import {
@@ -36,10 +37,17 @@ import {
   useVerifyRefereeQuery,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetModalProvider,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 import {
   getMatchCourtStationName,
+  getMatchDisplayCode,
   getMatchPayloadId,
+  getMatchSideDisplayName,
   getPairDisplayName,
   isNewerOrEqualMatchPayload,
   isLightweightMatchPayload,
@@ -152,7 +160,12 @@ const isUsefulTeamName = (value) => {
 
 const matchCodeOf = (m) => {
   const direct =
-    m?.displayCode || m?.code || m?.matchCode || m?.slotCode || m?.globalCode;
+    getMatchDisplayCode(m) ||
+    m?.displayCode ||
+    m?.code ||
+    m?.matchCode ||
+    m?.slotCode ||
+    m?.globalCode;
   if (direct) return String(direct).trim();
   const round = Number(m?.round ?? m?.roundNo ?? m?.roundIndex);
   const order = Number(m?.order ?? m?.orderNo ?? m?.slot ?? m?.index);
@@ -188,6 +201,61 @@ const seedSourceMatch = (seed, matchIndex) => {
   return null;
 };
 
+const bracketIdOfMatch = (m) =>
+  String(m?.bracket?._id ?? m?.bracket ?? m?.bracketId ?? "").trim();
+
+const roundNumberOfMatch = (m) => {
+  const value = Number(m?.round ?? m?.roundNo ?? m?.roundIndex);
+  if (Number.isFinite(value)) return value;
+  const parsed = matchCodeOf(m).match(/^V(\d+)(?:-[^-]+)?-T\d+$/i);
+  return parsed ? Number(parsed[1]) : NaN;
+};
+
+const orderNumberOfMatch = (m) => {
+  const value = Number(m?.order ?? m?.orderNo ?? m?.slot ?? m?.index);
+  if (Number.isFinite(value)) return value;
+  const parsed = matchCodeOf(m).match(/^V\d+(?:-[^-]+)?-T(\d+)$/i);
+  return parsed ? Number(parsed[1]) - 1 : NaN;
+};
+
+const sameScheduleBranch = (a, b) => {
+  if (String(a?.branch || "main") !== String(b?.branch || "main")) return false;
+  if (String(a?.phase || "") !== String(b?.phase || "")) return false;
+  return true;
+};
+
+const inferPreviousRoundSourceMatch = (m, side, matchIndex) => {
+  if (!m || !matchIndex) return null;
+  const round = roundNumberOfMatch(m);
+  if (!Number.isFinite(round) || round <= 1) return null;
+
+  const bracketId = bracketIdOfMatch(m);
+  const candidates = Array.from(matchIndex.values()).filter((candidate) => {
+    if (!candidate) return false;
+    const candidateBracketId = bracketIdOfMatch(candidate);
+    if (bracketId && candidateBracketId && candidateBracketId !== bracketId) return false;
+    return sameScheduleBranch(candidate, m);
+  });
+
+  const byOrder = (a, b) => orderNumberOfMatch(a) - orderNumberOfMatch(b);
+  const currentRound = candidates
+    .filter((candidate) => roundNumberOfMatch(candidate) === round)
+    .sort(byOrder);
+  const previousRound = candidates
+    .filter((candidate) => roundNumberOfMatch(candidate) === round - 1)
+    .sort(byOrder);
+  if (!previousRound.length) return null;
+
+  const currentIndex = currentRound.findIndex(
+    (candidate) => String(candidate?._id || "") === String(m?._id || "")
+  );
+  const order = currentIndex >= 0 ? currentIndex : orderNumberOfMatch(m);
+  if (!Number.isFinite(order)) return null;
+
+  const sourceSlot = order * 2 + (side === "B" ? 1 : 0);
+  return previousRound[sourceSlot] || null;
+};
+
 function teamNameFrom(m, side, matchIndex = null, depth = 0) {
   if (!m) return "TBD";
   if (depth > 10) return "TBD";
@@ -212,7 +280,8 @@ function teamNameFrom(m, side, matchIndex = null, depth = 0) {
   const sourceMatch =
     (sourceId && matchIndex?.get(sourceId)) ||
     (prev && typeof prev === "object" ? prev : null) ||
-    ((isWinnerSeed || isLoserSeed) ? seedSourceMatch(seed, matchIndex) : null);
+    ((isWinnerSeed || isLoserSeed) ? seedSourceMatch(seed, matchIndex) : null) ||
+    inferPreviousRoundSourceMatch(m, side, matchIndex);
 
   if (sourceMatch) {
     const sourceByeA = isByeSeed(sourceMatch.seedA);
@@ -245,8 +314,29 @@ function teamNameFrom(m, side, matchIndex = null, depth = 0) {
     if (code) return `${isLoserSeed ? "L" : "W"}-${code}`;
   }
 
+  const fallbackName = getMatchSideDisplayName(
+    seed ? { ...m, [side === "A" ? "seedA" : "seedB"]: seed } : m,
+    side,
+    ""
+  );
+  if (isUsefulTeamName(fallbackName)) return fallbackName;
+
   return seedToName(seed) || "TBD";
 }
+
+function resolveScheduleSides(rawList) {
+  const matchIndex = new Map();
+  (rawList || []).forEach((match) => {
+    if (match?._id) matchIndex.set(String(match._id), match);
+  });
+
+  return (rawList || []).map((match) => ({
+    ...match,
+    __sideA: teamNameFrom(match, "A", matchIndex),
+    __sideB: teamNameFrom(match, "B", matchIndex),
+  }));
+}
+
 function scoreText(m) {
   if (typeof m?.scoreText === "string" && m.scoreText.trim())
     return m.scoreText;
@@ -301,12 +391,21 @@ const getBracketName = (value, fallback = "Bracket") => {
   return String(name || fallback).trim();
 };
 
-const isEliminationBracketType = (bracket) => {
+const isKnockoutBracketType = (bracket) => {
   const type = String(bracket?.type || bracket?.format || "").toLowerCase();
+  if (
+    !type ||
+    type.includes("group") ||
+    type.includes("playoff") ||
+    type.includes("roundelim") ||
+    type === "po"
+  )
+    return false;
   return (
     type.includes("knockout") ||
-    type.includes("playoff") ||
-    type.includes("elim") ||
+    type.includes("singleelim") ||
+    type.includes("single-elim") ||
+    type.includes("single_elim") ||
     type === "ko"
   );
 };
@@ -343,7 +442,7 @@ const scheduleRoundLabel = (match, matchesOfBracket = []) => {
   const round = Number(match?.round ?? match?.roundNo ?? match?.roundIndex ?? 1) || 1;
   const bracket =
     match?.bracket && typeof match.bracket === "object" ? match.bracket : null;
-  if (!isEliminationBracketType(bracket)) return `Vòng ${round}`;
+  if (!isKnockoutBracketType(bracket)) return `Vòng ${round}`;
 
   const totalRounds = roundsCountForBracket(bracket, matchesOfBracket);
   const remainingRounds = Math.max(1, totalRounds - round + 1);
@@ -361,6 +460,37 @@ const scheduleRoundLabel = (match, matchesOfBracket = []) => {
 /* ----------------------------------------------------- */
 
 // Theme Tối giản & Hiện đại
+const scheduleMatchStageChipLabel = (match, matchesOfBracket = []) => {
+  const round = roundNumberOfMatch(match) || 1;
+  const bracket =
+    match?.bracket && typeof match.bracket === "object" ? match.bracket : null;
+  if (!isKnockoutBracketType(bracket)) return null;
+
+  const totalRounds = roundsCountForBracket(bracket, matchesOfBracket);
+  const remainingRounds = Math.max(1, totalRounds - round + 1);
+  const drawSize = 2 ** remainingRounds;
+  const roundMatches = (Array.isArray(matchesOfBracket) ? matchesOfBracket : [])
+    .filter((candidate) => roundNumberOfMatch(candidate) === round)
+    .filter((candidate) => sameScheduleBranch(candidate, match))
+    .sort((a, b) => orderNumberOfMatch(a) - orderNumberOfMatch(b));
+  const matchIndex = roundMatches.findIndex(
+    (candidate) => String(candidate?._id || "") === String(match?._id || "")
+  );
+  const fallbackIndex = orderNumberOfMatch(match);
+  const displayIndex =
+    matchIndex >= 0
+      ? matchIndex + 1
+      : Number.isFinite(fallbackIndex)
+        ? fallbackIndex + 1
+        : 1;
+
+  if (drawSize === 2) return "Chung kết";
+  if (drawSize === 4) return `Bán kết ${displayIndex}`;
+  if (drawSize === 8) return `Tứ kết ${displayIndex}`;
+  if (drawSize >= 16) return `1-${drawSize}`;
+  return null;
+};
+
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
   const isDark = scheme === "dark";
@@ -512,7 +642,13 @@ function StatusChip({ m, theme }) {
 }
 
 /* Match Card (Redesign Triệt để) */
-function MatchCard({ m, onOpenMatch, theme, resolveTeamName = teamNameFrom }) {
+function MatchCard({
+  m,
+  onOpenMatch,
+  theme,
+  resolveTeamName = teamNameFrom,
+  matchesOfBracket = [],
+}) {
   const isLiveMatch = isLive(m);
   const isFinishMatch = isFinished(m);
   const statusColor = isLiveMatch
@@ -524,6 +660,7 @@ function MatchCard({ m, onOpenMatch, theme, resolveTeamName = teamNameFrom }) {
   const teamA = resolveTeamName(m, "A");
   const teamB = resolveTeamName(m, "B");
   const score = scoreText(m);
+  const stageLabel = scheduleMatchStageChipLabel(m, matchesOfBracket);
 
   const [isPressing, setIsPressing] = useState(false);
 
@@ -671,6 +808,9 @@ function MatchCard({ m, onOpenMatch, theme, resolveTeamName = teamNameFrom }) {
               type="outlined"
               text={m.bracket?.name || m.phase || "Bracket"}
             />
+            {stageLabel ? (
+              <Chip theme={theme} type="outlined" text={stageLabel} />
+            ) : null}
           </ChipRow>
         </View>
       </View>
@@ -1168,9 +1308,12 @@ export default function TournamentScheduleNative() {
   const [selectedMatchId, setSelectedMatchId] = useState(null);
 
   const T = useThemeTokens();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 900;
   const queueLimit = width >= 900 ? 6 : width >= 600 ? 4 : 3;
+  const filterSheetRef = useRef(null);
+  const filterSheetSnapPoints = useMemo(() => ["45%", "78%"], []);
 
   // --- Data Fetching & Realtime Logic (Giữ nguyên logic gốc) ---
   const {
@@ -1375,8 +1518,8 @@ export default function TournamentScheduleNative() {
     return map;
   }, [brackets]);
   const enrichedMatches = useMemo(
-    () =>
-      matches.map((m) => {
+    () => {
+      const withBracketDetails = matches.map((m) => {
         const bracketId = getBracketId(m);
         const bracketDetail = bracketById.get(bracketId);
         if (!bracketDetail) return m;
@@ -1389,7 +1532,9 @@ export default function TournamentScheduleNative() {
             ...currentBracket,
           },
         };
-      }),
+      });
+      return resolveScheduleSides(withBracketDetails);
+    },
     [bracketById, matches]
   );
   const admin = useMemo(() => isAdminUser(me), [me]);
@@ -1564,6 +1709,42 @@ export default function TournamentScheduleNative() {
     [syncRouteParams]
   );
 
+  const selectedBracketLabel = useMemo(
+    () =>
+      bracketOptions.find((option) => option.key === selectedBracket)?.label ||
+      "Tất cả bracket",
+    [bracketOptions, selectedBracket]
+  );
+  const selectedRoundLabel = useMemo(
+    () =>
+      roundOptions.find((option) => option.key === selectedRound)?.label ||
+      "Tất cả vòng",
+    [roundOptions, selectedRound]
+  );
+  const activeFilterCount =
+    (selectedBracket !== "all" ? 1 : 0) + (selectedRound !== "all" ? 1 : 0);
+  const openFilterSheet = useCallback(() => {
+    filterSheetRef.current?.present?.();
+  }, []);
+  const closeFilterSheet = useCallback(() => {
+    filterSheetRef.current?.dismiss?.();
+  }, []);
+  const resetBracketRoundFilters = useCallback(() => {
+    selectBracket("all");
+  }, [selectBracket]);
+  const renderFilterBackdrop = useCallback(
+    (props) => (
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+        pressBehavior="close"
+        opacity={0.45}
+      />
+    ),
+    []
+  );
+
   const filteredAll = useMemo(() => {
     const qnorm = q.trim().toLowerCase();
     let res = allSorted.filter((m) => {
@@ -1661,18 +1842,14 @@ export default function TournamentScheduleNative() {
   // --- Render ---
 
   // Component cho phần Filter và Tabs (để tái sử dụng cho layout 2 cột)
-  const renderOptionScroller = (label, options, selected, onSelect) => {
+  const renderFilterOptionGroup = (label, options, selected, onSelect) => {
     if (!options || options.length <= 1) return null;
     return (
-      <View style={stylesNew.filterBlock}>
+      <View style={stylesNew.filterSheetGroup}>
         <Text style={[stylesNew.filterLabel, { color: T.textSecondary }]}>
           {label}
         </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={stylesNew.optionScrollContent}
-        >
+        <View style={stylesNew.sheetOptionWrap}>
           {options.map((option) => {
             const active = selected === option.key;
             return (
@@ -1704,7 +1881,7 @@ export default function TournamentScheduleNative() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
     );
   };
@@ -1787,12 +1964,116 @@ export default function TournamentScheduleNative() {
         })}
       </View>
 
-      {renderOptionScroller("Bracket", bracketOptions, selectedBracket, selectBracket)}
-      {renderOptionScroller("Vòng", roundOptions, selectedRound, selectRound)}
+      <Pressable
+        onPress={openFilterSheet}
+        style={({ pressed }) => [
+          stylesNew.filterSummaryButton,
+          {
+            backgroundColor: T.softBg,
+            borderColor: activeFilterCount ? T.tabActiveBd : T.border,
+            opacity: pressed ? 0.82 : 1,
+          },
+        ]}
+      >
+        <View style={stylesNew.filterSummaryLeft}>
+          <MaterialIcons
+            name="tune"
+            size={18}
+            color={activeFilterCount ? T.tint : T.icon}
+          />
+          <Text style={[stylesNew.filterSummaryTitle, { color: T.text }]}>
+            Bộ lọc
+          </Text>
+          {activeFilterCount ? (
+            <View
+              style={[
+                stylesNew.filterCountBadge,
+                { backgroundColor: T.tint },
+              ]}
+            >
+              <Text style={stylesNew.filterCountText}>
+                {activeFilterCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <Text
+          style={[stylesNew.filterSummaryValue, { color: T.textSecondary }]}
+          numberOfLines={1}
+        >
+          {selectedBracketLabel} · {selectedRoundLabel}
+        </Text>
+        <MaterialIcons name="expand-more" size={20} color={T.muted} />
+      </Pressable>
     </View>
   );
 
   // Nội dung của cột Status (Trực tiếp trên sân)
+  const FilterSheet = (
+    <BottomSheetModal
+      ref={filterSheetRef}
+      snapPoints={filterSheetSnapPoints}
+      topInset={Math.max(insets.top, 12)}
+      enablePanDownToClose
+      backdropComponent={renderFilterBackdrop}
+      handleIndicatorStyle={{ backgroundColor: T.muted }}
+      backgroundStyle={{ backgroundColor: T.cardBg }}
+      enableDynamicSizing={false}
+    >
+      <BottomSheetScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          stylesNew.filterSheetContent,
+          { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+        ]}
+      >
+        <View style={stylesNew.filterSheetHeader}>
+          <View>
+            <Text style={[stylesNew.filterSheetEyebrow, { color: T.tint }]}>
+              Lịch thi đấu
+            </Text>
+            <Text style={[stylesNew.filterSheetTitle, { color: T.text }]}>
+              Bộ lọc
+            </Text>
+          </View>
+          <Pressable
+            onPress={resetBracketRoundFilters}
+            style={({ pressed }) => [
+              stylesNew.filterResetButton,
+              {
+                backgroundColor: T.softBg,
+                borderColor: T.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <Text style={[stylesNew.filterResetText, { color: T.tint }]}>
+              Đặt lại
+            </Text>
+          </Pressable>
+        </View>
+
+        {renderFilterOptionGroup(
+          "Bracket",
+          bracketOptions,
+          selectedBracket,
+          selectBracket
+        )}
+        {renderFilterOptionGroup("Vòng", roundOptions, selectedRound, selectRound)}
+
+        <Pressable
+          onPress={closeFilterSheet}
+          style={({ pressed }) => [
+            stylesNew.filterApplyButton,
+            { backgroundColor: T.tint, opacity: pressed ? 0.82 : 1 },
+          ]}
+        >
+          <Text style={stylesNew.filterApplyText}>Áp dụng</Text>
+        </Pressable>
+      </BottomSheetScrollView>
+    </BottomSheetModal>
+  );
+
   const CourtStatusContent = (
     <View
       style={[
@@ -1879,6 +2160,7 @@ export default function TournamentScheduleNative() {
               onOpenMatch={openViewer}
               theme={T}
               resolveTeamName={resolveTeamName}
+              matchesOfBracket={matchesByBracket.get(getBracketId(m) || "unknown") || []}
             />
           ))}
         </View>
@@ -2028,6 +2310,7 @@ export default function TournamentScheduleNative() {
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         {/* Content (Responsive Layout) */}
         {ResponsiveContent}
+        {FilterSheet}
 
         {/* Viewer (Bottom Sheet) */}
         <ResponsiveMatchViewer
@@ -2104,6 +2387,95 @@ const stylesNew = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 6,
     textTransform: "uppercase",
+  },
+  filterSummaryButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterSummaryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  filterSummaryTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  filterSummaryValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "right",
+  },
+  filterCountBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+  },
+  filterCountText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  filterSheetContent: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 18,
+  },
+  filterSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  filterSheetEyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  filterSheetTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  filterResetButton: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  filterResetText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  filterSheetGroup: {
+    gap: 8,
+  },
+  sheetOptionWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterApplyButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  filterApplyText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
   },
   optionScrollContent: {
     gap: 6,
