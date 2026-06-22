@@ -18,6 +18,7 @@ import {
   Linking,
   RefreshControl,
   useWindowDimensions,
+  type LayoutChangeEvent,
 } from "react-native";
 import PropTypes from "prop-types";
 import { useRoute, useTheme, useColorScheme } from "@react-navigation/native";
@@ -1673,6 +1674,31 @@ const VideoModal = ({ visible, url, onClose, t }) => {
 const BRACKET_ZOOM_MIN = 0.4;
 const BRACKET_ZOOM_MAX = 1.6;
 const BRACKET_ZOOM_STEP = 0.1;
+const BRACKET_CONNECTOR_THICKNESS = 2;
+
+type BracketLayoutRect = { x: number; y: number; w: number; h: number };
+type BracketLayoutInput =
+  | BracketLayoutRect
+  | { x: number; y: number; width: number; height: number }
+  | null;
+type TerminalLayoutHandler = (rect: BracketLayoutRect | null) => void;
+type BracketColumnsProps = {
+  rounds: any[];
+  onOpenMatch?: any;
+  championMatchId?: any;
+  focusRegId?: any;
+  setFocusRegId?: any;
+  onOpenVideo?: any;
+  t: any;
+  mirror?: boolean;
+  canvasOnly?: boolean;
+  externalZoom?: number;
+  onTerminalLayout?: TerminalLayoutHandler | null;
+};
+type SymmetricKnockoutColumnsProps = Omit<
+  BracketColumnsProps,
+  "mirror" | "canvasOnly" | "externalZoom" | "onTerminalLayout"
+>;
 
 const clampBracketZoom = (value) =>
   Math.min(BRACKET_ZOOM_MAX, Math.max(BRACKET_ZOOM_MIN, value));
@@ -1685,7 +1711,7 @@ const getInitialBracketZoom = (width) => {
   return 1;
 };
 
-function buildSymmetricSlotCounts(rounds = []) {
+function buildSymmetricSlotCounts(rounds: any[] = []) {
   const counts = (rounds || []).map((round) =>
     Math.max(1, Array.isArray(round?.seeds) ? round.seeds.length : 0)
   );
@@ -1698,7 +1724,7 @@ function buildSymmetricSlotCounts(rounds = []) {
   return counts;
 }
 
-function makeSymmetricSpacer(round, slotIndex) {
+function makeSymmetricSpacer(round: any, slotIndex: number) {
   return {
     id: `symmetric-spacer-${round?.title || "round"}-${slotIndex}`,
     __match: null,
@@ -1708,7 +1734,7 @@ function makeSymmetricSpacer(round, slotIndex) {
   };
 }
 
-function fillSymmetricSlots(round, slotCount) {
+function fillSymmetricSlots(round: any, slotCount: number) {
   const seeds = Array.isArray(round?.seeds) ? round.seeds : [];
   const safeCount = Math.max(slotCount, seeds.length, 1);
   const slots = Array.from({ length: safeCount }, (_, index) =>
@@ -1720,7 +1746,11 @@ function fillSymmetricSlots(round, slotCount) {
   return slots;
 }
 
-function splitKnockoutRound(round, side, slotCount) {
+function splitKnockoutRound(
+  round: any,
+  side: "left" | "right",
+  slotCount: number
+) {
   const seeds = fillSymmetricSlots(round, slotCount);
   const mid = Math.ceil(seeds.length / 2);
   const sourceSeeds = side === "left" ? seeds.slice(0, mid) : seeds.slice(mid);
@@ -1894,8 +1924,9 @@ const BracketColumns = ({
   t,
   mirror = false,
   canvasOnly = false,
-  externalZoom,
-}) => {
+  externalZoom = undefined,
+  onTerminalLayout = null,
+}: BracketColumnsProps) => {
   const { width: windowWidth } = useWindowDimensions();
   const initialZoom = useMemo(
     () => getInitialBracketZoom(windowWidth),
@@ -2219,10 +2250,35 @@ const BracketColumns = ({
     [colRects, wrapRects]
   );
 
+  useEffect(() => {
+    if (!onTerminalLayout) return;
+
+    const lastCol = viewRounds.length - 1;
+    const terminalIndex = (viewRounds[lastCol]?.seeds || []).findIndex(
+      (seed: { __symmetricSpacer?: boolean } | null | undefined) =>
+        !seed?.__symmetricSpacer
+    );
+    if (lastCol < 0 || terminalIndex < 0 || !contentSize.width) {
+      onTerminalLayout(null);
+      return;
+    }
+
+    const rect = absWrap(lastCol, terminalIndex);
+    if (!rect) {
+      onTerminalLayout(null);
+      return;
+    }
+
+    onTerminalLayout({
+      ...rect,
+      x: mirror ? contentSize.width - rect.x - rect.w : rect.x,
+    });
+  }, [absWrap, contentSize.width, mirror, onTerminalLayout, viewRounds]);
+
   // connectors
   const connectors = useMemo(() => {
     const L = [];
-    const TH = 2;
+    const TH = BRACKET_CONNECTOR_THICKNESS;
     const OUT = 22;
     const TO_DST = 16;
     const color = t.dark ? "#9aa0a6" : "#263238";
@@ -2343,7 +2399,10 @@ const BracketColumns = ({
                 style={[
                   styles.roundCol,
                   {
-                    marginRight: ROUND_GAP,
+                    marginRight:
+                      canvasOnly && colIdx === viewRounds.length - 1
+                        ? 0
+                        : ROUND_GAP,
                   },
                 ]}
                 onLayout={(e) => {
@@ -2377,6 +2436,10 @@ const BracketColumns = ({
                         opacity: 0,
                       },
                     ]}
+                    onLayout={(e: LayoutChangeEvent) => {
+                      const { x, y, width: w, height: h } = e.nativeEvent.layout;
+                      setWrapRect(colIdx, i, { x, y, w, h });
+                    }}
                   />
                 );
               }
@@ -2728,7 +2791,7 @@ const SymmetricKnockoutColumns = ({
   setFocusRegId,
   onOpenVideo,
   t,
-}) => {
+}: SymmetricKnockoutColumnsProps) => {
   const { width: windowWidth } = useWindowDimensions();
   const initialZoom = useMemo(
     () => getInitialBracketZoom(windowWidth),
@@ -2736,13 +2799,16 @@ const SymmetricKnockoutColumns = ({
   );
   const [zoom, setZoom] = useState(initialZoom);
   const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
+  const [bridgeRects, setBridgeRects] = useState<
+    Record<string, BracketLayoutRect>
+  >({});
   const zoomTouchedRef = useRef(false);
 
   useEffect(() => {
     if (!zoomTouchedRef.current) setZoom(initialZoom);
   }, [initialZoom]);
 
-  const setUserZoom = useCallback((next) => {
+  const setUserZoom = useCallback((next: number | ((value: number) => number)) => {
     zoomTouchedRef.current = true;
     setZoom((prev) =>
       clampBracketZoom(typeof next === "function" ? next(prev) : next)
@@ -2762,7 +2828,7 @@ const SymmetricKnockoutColumns = ({
     setZoom(initialZoom);
   }, [initialZoom]);
 
-  const onContentLayout = useCallback((e) => {
+  const onContentLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setContentSize((prev) =>
       Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
@@ -2771,6 +2837,61 @@ const SymmetricKnockoutColumns = ({
     );
   }, []);
 
+  const setBridgeRect = useCallback(
+    (key: string, layout: BracketLayoutInput) => {
+      if (!layout) {
+        setBridgeRects((prev) => {
+          if (!prev[key]) return prev;
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        return;
+      }
+
+      const measured = layout as Partial<BracketLayoutRect> & {
+        width?: number;
+        height?: number;
+      };
+      const next = {
+        x: layout.x,
+        y: layout.y,
+        w: Number.isFinite(measured.w)
+          ? Number(measured.w)
+          : Number(measured.width),
+        h: Number.isFinite(measured.h)
+          ? Number(measured.h)
+          : Number(measured.height),
+      };
+      setBridgeRects((prev) => {
+        const current = prev[key];
+        if (
+          current &&
+          Math.abs(current.x - next.x) < 1 &&
+          Math.abs(current.y - next.y) < 1 &&
+          Math.abs(current.w - next.w) < 1 &&
+          Math.abs(current.h - next.h) < 1
+        ) {
+          return prev;
+        }
+        return { ...prev, [key]: next };
+      });
+    },
+    []
+  );
+  const setLeftTerminalRect = useCallback(
+    (rect: BracketLayoutRect | null) => setBridgeRect("leftTerminal", rect),
+    [setBridgeRect]
+  );
+  const setFinalTerminalRect = useCallback(
+    (rect: BracketLayoutRect | null) => setBridgeRect("finalTerminal", rect),
+    [setBridgeRect]
+  );
+  const setRightTerminalRect = useCallback(
+    (rect: BracketLayoutRect | null) => setBridgeRect("rightTerminal", rect),
+    [setBridgeRect]
+  );
+
   const slotCounts = useMemo(() => buildSymmetricSlotCounts(rounds), [rounds]);
   const { leftRounds, rightRounds, finalRound } = useMemo(() => {
     const safeRounds = rounds || [];
@@ -2778,15 +2899,15 @@ const SymmetricKnockoutColumns = ({
     const final = safeRounds[safeRounds.length - 1] || null;
     return {
       leftRounds: branchRounds
-        .map((round, index) =>
+        .map((round: any, index: number) =>
           splitKnockoutRound(round, "left", slotCounts[index])
         )
-        .filter((round) => (round?.seeds || []).length > 0),
+        .filter((round: any) => (round?.seeds || []).length > 0),
       rightRounds: branchRounds
-        .map((round, index) =>
+        .map((round: any, index: number) =>
           splitKnockoutRound(round, "right", slotCounts[index])
         )
-        .filter((round) => (round?.seeds || []).length > 0),
+        .filter((round: any) => (round?.seeds || []).length > 0),
       finalRound: final,
     };
   }, [rounds, slotCounts]);
@@ -2809,6 +2930,143 @@ const SymmetricKnockoutColumns = ({
           transformOrigin: "top left",
         } as any)
       : null;
+
+  const bridgeLines = useMemo(() => {
+    const leftWrap = bridgeRects.leftWrap;
+    const rightWrap = bridgeRects.rightWrap;
+    const finalColumn = bridgeRects.finalColumn;
+    const finalWrap = bridgeRects.finalWrap;
+    const leftTerminal = bridgeRects.leftTerminal;
+    const rightTerminal = bridgeRects.rightTerminal;
+    const finalTerminal = bridgeRects.finalTerminal;
+
+    if (!finalColumn || !finalWrap || !finalTerminal) return null;
+
+    const absoluteRect = (
+      outer?: BracketLayoutRect,
+      inner?: BracketLayoutRect,
+      rect?: BracketLayoutRect
+    ): BracketLayoutRect | null =>
+      outer && inner && rect
+        ? {
+            x: outer.x + inner.x + rect.x,
+            y: outer.y + inner.y + rect.y,
+            w: rect.w,
+            h: rect.h,
+          }
+        : null;
+    const branchRect = (
+      outer?: BracketLayoutRect,
+      rect?: BracketLayoutRect
+    ): BracketLayoutRect | null =>
+      outer && rect
+        ? {
+            x: outer.x + rect.x,
+            y: outer.y + rect.y,
+            w: rect.w,
+            h: rect.h,
+          }
+        : null;
+
+    const finalRect = absoluteRect(finalColumn, finalWrap, finalTerminal);
+    if (!finalRect) return null;
+    const leftRect = branchRect(leftWrap, leftTerminal);
+    const rightRect = branchRect(rightWrap, rightTerminal);
+
+    const color = "rgba(25,118,210,0.42)";
+    const makeHorizontal = (
+      fromX: number,
+      toX: number,
+      y: number,
+      key: string
+    ): React.ReactNode | null => {
+      const left = Math.floor(Math.min(fromX, toX));
+      const right = Math.ceil(Math.max(fromX, toX));
+      const width = right - left;
+      if (width <= 0) return null;
+      return (
+        <View
+          key={key}
+          pointerEvents="none"
+          style={[
+            styles.symmetricFinalBridge,
+            {
+              left,
+              top: Math.round(y - BRACKET_CONNECTOR_THICKNESS / 2),
+              width,
+              backgroundColor: color,
+            },
+          ]}
+        />
+      );
+    };
+    const makeVertical = (
+      x: number,
+      fromY: number,
+      toY: number,
+      key: string
+    ): React.ReactNode | null => {
+      const top = Math.floor(Math.min(fromY, toY));
+      const bottom = Math.ceil(Math.max(fromY, toY));
+      const height = bottom - top;
+      if (height <= 0) return null;
+      return (
+        <View
+          key={key}
+          pointerEvents="none"
+          style={[
+            styles.symmetricFinalBridge,
+            {
+              left: Math.round(x - BRACKET_CONNECTOR_THICKNESS / 2),
+              top,
+              width: BRACKET_CONNECTOR_THICKNESS,
+              height,
+              backgroundColor: color,
+            },
+          ]}
+        />
+      );
+    };
+    const makeConnector = (
+      fromX: number,
+      fromY: number,
+      toX: number,
+      toY: number,
+      key: string
+    ): Array<React.ReactNode | null> => {
+      if (Math.abs(fromY - toY) < 1) {
+        return [makeHorizontal(fromX, toX, fromY, `${key}-h`)].filter(Boolean);
+      }
+
+      const midX = Math.round((fromX + toX) / 2);
+      return [
+        makeHorizontal(fromX, midX, fromY, `${key}-h1`),
+        makeVertical(midX, fromY, toY, `${key}-v`),
+        makeHorizontal(midX, toX, toY, `${key}-h2`),
+      ].filter(Boolean);
+    };
+
+    return [
+      ...(leftRect
+        ? makeConnector(
+            leftRect.x + leftRect.w,
+            leftRect.y + leftRect.h / 2,
+            finalRect.x,
+            finalRect.y + finalRect.h / 2,
+            "left"
+          )
+        : []),
+      ...(rightRect
+        ? makeConnector(
+            finalRect.x + finalRect.w,
+            finalRect.y + finalRect.h / 2,
+            rightRect.x,
+            rightRect.y + rightRect.h / 2,
+            "right"
+          )
+        : []),
+    ].filter(Boolean);
+  }, [bridgeRects]);
 
   if (!hasBranches) {
     return (
@@ -2851,28 +3109,42 @@ const SymmetricKnockoutColumns = ({
               scaledContentStyle,
             ]}
           >
-            <BracketColumns
-              rounds={leftRounds}
-              onOpenMatch={onOpenMatch}
-              championMatchId={championMatchId}
-              focusRegId={focusRegId}
-              setFocusRegId={setFocusRegId}
-              onOpenVideo={onOpenVideo}
-              t={t}
-              canvasOnly
-              externalZoom={1}
-            />
+            <View
+              onLayout={(e: LayoutChangeEvent) =>
+                setBridgeRect("leftWrap", e.nativeEvent.layout)
+              }
+              style={styles.symmetricBranchWrap}
+            >
+              <BracketColumns
+                rounds={leftRounds}
+                onOpenMatch={onOpenMatch}
+                championMatchId={championMatchId}
+                focusRegId={focusRegId}
+                setFocusRegId={setFocusRegId}
+                onOpenVideo={onOpenVideo}
+                t={t}
+                canvasOnly
+                externalZoom={1}
+                onTerminalLayout={setLeftTerminalRect}
+              />
+            </View>
 
-            <View style={styles.symmetricFinalColumn}>
+            <View pointerEvents="none" style={styles.symmetricBridgeLayer}>
+              {bridgeLines}
+            </View>
+
+            <View
+              onLayout={(e: LayoutChangeEvent) =>
+                setBridgeRect("finalColumn", e.nativeEvent.layout)
+              }
+              style={styles.symmetricFinalColumn}
+            >
               <View
-                pointerEvents="none"
-                style={[styles.symmetricFinalBridge, styles.symmetricFinalBridgeLeft]}
-              />
-              <View
-                pointerEvents="none"
-                style={[styles.symmetricFinalBridge, styles.symmetricFinalBridgeRight]}
-              />
-              <View style={styles.symmetricFinalCardWrap}>
+                onLayout={(e: LayoutChangeEvent) =>
+                  setBridgeRect("finalWrap", e.nativeEvent.layout)
+                }
+                style={styles.symmetricFinalCardWrap}
+              >
                 <BracketColumns
                   rounds={finalOnlyRounds}
                   onOpenMatch={onOpenMatch}
@@ -2883,22 +3155,31 @@ const SymmetricKnockoutColumns = ({
                   t={t}
                   canvasOnly
                   externalZoom={1}
+                  onTerminalLayout={setFinalTerminalRect}
                 />
               </View>
             </View>
 
-            <BracketColumns
-              rounds={rightRounds}
-              onOpenMatch={onOpenMatch}
-              championMatchId={championMatchId}
-              focusRegId={focusRegId}
-              setFocusRegId={setFocusRegId}
-              onOpenVideo={onOpenVideo}
-              t={t}
-              canvasOnly
-              externalZoom={1}
-              mirror
-            />
+            <View
+              onLayout={(e: LayoutChangeEvent) =>
+                setBridgeRect("rightWrap", e.nativeEvent.layout)
+              }
+              style={styles.symmetricBranchWrap}
+            >
+              <BracketColumns
+                rounds={rightRounds}
+                onOpenMatch={onOpenMatch}
+                championMatchId={championMatchId}
+                focusRegId={focusRegId}
+                setFocusRegId={setFocusRegId}
+                onOpenVideo={onOpenVideo}
+                t={t}
+                canvasOnly
+                externalZoom={1}
+                mirror
+                onTerminalLayout={setRightTerminalRect}
+              />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -4761,6 +5042,13 @@ const styles = StyleSheet.create({
   bracketMirrorCard: {
     transform: [{ scaleX: -1 }],
   },
+  symmetricBridgeLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  symmetricBranchWrap: {
+    zIndex: 1,
+  },
   symmetricKoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4771,23 +5059,15 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     justifyContent: "center",
     position: "relative",
+    zIndex: 1,
   },
   symmetricFinalCardWrap: {
     zIndex: 1,
   },
   symmetricFinalBridge: {
     position: "absolute",
-    top: "50%",
-    width: 42,
-    height: 2,
-    backgroundColor: "rgba(25,118,210,0.42)",
+    height: BRACKET_CONNECTOR_THICKNESS,
     zIndex: 0,
-  },
-  symmetricFinalBridgeLeft: {
-    left: -42,
-  },
-  symmetricFinalBridgeRight: {
-    right: -42,
   },
   roundsRow: { flexDirection: "row", gap: 30 },
   seedBox: {
