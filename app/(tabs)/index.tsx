@@ -29,6 +29,7 @@ import { Image } from "expo-image";
 import { useGetContactContentQuery } from "@/slices/cmsApiSlice";
 import { useGetTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import { useGetNewsQuery } from "@/slices/newsApiSlice";
+import { useGetMyRankQuery } from "@/slices/usersApiSlice";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -451,18 +452,28 @@ function AthleteIsland() {
   );
 
   // Logic Rank & Role
-  const rankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null;
+  const rawRankNo = userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? null;
+  const rankNoNumber = Number(rawRankNo);
+  const hasRankNo = Number.isFinite(rankNoNumber);
+  const shouldFetchMyRank =
+    !!userInfo?.token && userInfo?.rankDeferred === true && !hasRankNo;
+  const { isFetching: isFetchingMyRank } = useGetMyRankQuery(undefined, {
+    skip: !shouldFetchMyRank,
+  });
+  const shouldHideRankBadge =
+    !!userInfo && (userInfo?.rankDeferred === true || isFetchingMyRank);
+
   let rankDisplay = "Chưa xếp hạng",
     rankIcon = "star-border",
     rankColor = "#9AA0A6";
 
-  if (Number.isFinite(rankNo)) {
-    if (rankNo <= 100) {
-      rankDisplay = `TOP ${rankNo}`;
+  if (hasRankNo) {
+    if (rankNoNumber <= 100) {
+      rankDisplay = `TOP ${rankNoNumber}`;
       rankIcon = "emoji-events";
       rankColor = "#FFD700";
     } else {
-      rankDisplay = `Hạng ${rankNo}`;
+      rankDisplay = `Hạng ${rankNoNumber}`;
       rankIcon = "military-tech";
       rankColor = "#FFA502";
     }
@@ -571,15 +582,17 @@ function AthleteIsland() {
 
             {/* Right: Action or Rank */}
             {userInfo ? (
-              <LinearGradient
-                colors={[rankColor, "#FF8E53"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rankBadge}
-              >
-                <MaterialIcons name={rankIcon} size={14} color="#FFFFFF" />
-                <Text style={styles.rankText}>{rankDisplay}</Text>
-              </LinearGradient>
+              shouldHideRankBadge ? null : (
+                <LinearGradient
+                  colors={[rankColor, "#FF8E53"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.rankBadge}
+                >
+                  <MaterialIcons name={rankIcon} size={14} color="#FFFFFF" />
+                  <Text style={styles.rankText}>{rankDisplay}</Text>
+                </LinearGradient>
+              )
             ) : (
               <LinearGradient
                 colors={["#4ECDC4", "#45B7D1"]}

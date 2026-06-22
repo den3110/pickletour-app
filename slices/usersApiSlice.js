@@ -27,6 +27,37 @@ export const userApiSlice = apiSlice.injectEndpoints({
       // queryFn: async(...) => ...
       providesTags: ["Auth"],
     }),
+    getMyRank: builder.query({
+      query: () => ({
+        url: "/api/users/me/rank",
+        method: "GET",
+      }),
+      keepUnusedDataFor: 0,
+      async onQueryStarted(arg, { dispatch, getState, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const prev = getState().auth?.userInfo || {};
+          if (!prev?._id) return;
+
+          const next = {
+            ...prev,
+            rank: data?.rank ?? null,
+            rankNo: data?.rankNo ?? null,
+            rankTotal: data?.rankTotal ?? null,
+            rankDeferred: false,
+          };
+
+          if (data?.ratingSingle !== undefined) {
+            next.ratingSingle = data.ratingSingle;
+          }
+          if (data?.ratingDouble !== undefined) {
+            next.ratingDouble = data.ratingDouble;
+          }
+
+          dispatch(setCredentials(next));
+        } catch {}
+      },
+    }),
     logout: builder.mutation({
       query: () => ({
         url: `${USERS_URL}/logout`,
@@ -233,6 +264,7 @@ export const {
   useIssueOsAuthTokenMutation,
   useLazyGetOAuthAuthorizeContextQuery,
   useReauthQuery,
+  useGetMyRankQuery,
   useGetKycCheckDataQuery,
   useUpdateKycStatusMutation,
   useVerifyRegisterOtpMutation,
