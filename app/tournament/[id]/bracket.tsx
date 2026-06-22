@@ -274,7 +274,7 @@ export const seedLabel = (seed) => {
       const st = seed.ref?.stage ?? seed.ref?.stageIndex ?? "?";
       const g = seed.ref?.groupCode;
       const r = seed.ref?.rank ?? "?";
-      return g ? `V${st}-B${g}-#${r}` : `V${st}-#${r}`;
+      return g ? `V${st}-B${g}-T${r}` : `V${st}-T${r}`;
     }
     case "stageMatchWinner": {
       const r = seed.ref?.round ?? "?";
@@ -289,12 +289,12 @@ export const seedLabel = (seed) => {
     case "matchWinner": {
       const r = seed.ref?.round ?? "?";
       const t = (seed.ref?.order ?? -1) + 1;
-      return `W-R${r} #${t}`;
+      return `W-V${r}-T${t}`;
     }
     case "matchLoser": {
       const r = seed.ref?.round ?? "?";
       const t = (seed.ref?.order ?? -1) + 1;
-      return `L-R${r} #${t}`;
+      return `L-V${r}-T${t}`;
     }
     case "bye":
       return "BYE";
@@ -2921,6 +2921,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     const byId = new Map();
     const byBracketRoundOrder = new Map();
     const byStageRoundOrder = new Map();
+    const byDisplayCode = new Map();
 
     for (const m of matchesMerged || []) {
       const id = String(m?._id || "");
@@ -2936,6 +2937,26 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       const orderNum = Number(m?.order);
 
       if (id) byId.set(id, m);
+
+      const codeCandidates = [
+        m?.displayCode,
+        m?.codeResolved,
+        m?.codeDisplay,
+        m?.globalCodeV,
+        m?.globalCode,
+        m?.code,
+        m?.matchCode,
+        m?.slotCode,
+        m?.bracketCode,
+        m?.labelKey,
+        m?.meta?.code,
+        m?.meta?.label,
+      ];
+      for (const value of codeCandidates) {
+        const code = extractDisplayCodeText(value);
+        if (code) byDisplayCode.set(code.toUpperCase(), m);
+      }
+
       if (bracketId && Number.isFinite(roundNum) && Number.isFinite(orderNum)) {
         byBracketRoundOrder.set(`${bracketId}:${roundNum}:${orderNum}`, m);
       }
@@ -2944,7 +2965,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       }
     }
 
-    return { byId, byBracketRoundOrder, byStageRoundOrder };
+    return { byId, byBracketRoundOrder, byStageRoundOrder, byDisplayCode };
   }, [matchesMerged, bracketById]);
 
   const baseRoundStartByBracketId = useMemo(() => {
@@ -3015,6 +3036,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       const matchId = String(seed?.ref?.matchId || "");
       if (matchId && matchRefIndex.byId.has(matchId)) {
         return matchRefIndex.byId.get(matchId);
+      }
+
+      const labelCode = extractDisplayCodeText(seed?.label);
+      if (labelCode) {
+        const labelHit = matchRefIndex.byDisplayCode.get(labelCode.toUpperCase());
+        if (labelHit) return labelHit;
       }
 
       const roundNum = Number(seed?.ref?.round);
@@ -3160,8 +3187,20 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       );
       if (!Number.isFinite(localOrder)) return null;
 
+      const matchBracketId = String(match?.bracket?._id || match?.bracket || "");
+      const currentBracketId = String(current?._id || "");
+      const matchBracket =
+        match?.bracket && typeof match.bracket === "object" ? match.bracket : null;
+      const sourceBracket =
+        matchBracketId && currentBracketId && matchBracketId === currentBracketId
+          ? current
+          : matchBracket;
+      const sourceType = String(
+        sourceBracket?.type || matchBracket?.type || match?.format || ""
+      ).toLowerCase();
+      if (sourceType !== "knockout") return null;
+
       if (localRound > 1) {
-        const matchBracketId = String(match?.bracket?._id || match?.bracket || "");
         const bracketMatches = matchBracketId
           ? byBracket?.[matchBracketId] || []
           : currentMatches;
@@ -3193,6 +3232,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         const stageIndex =
           Number(
             sourceMatch?.bracket?.stage ??
+              sourceBracket?.stage ??
+              matchBracket?.stage ??
               current?.stage ??
               current?.stageIndex ??
               0
@@ -3212,10 +3253,10 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         };
       }
 
-      const seedRows = Array.isArray(current?.prefill?.seeds)
-        ? current.prefill.seeds
-        : Array.isArray(current?.config?.blueprint?.seeds)
-        ? current.config.blueprint.seeds
+      const seedRows = Array.isArray(sourceBracket?.prefill?.seeds)
+        ? sourceBracket.prefill.seeds
+        : Array.isArray(sourceBracket?.config?.blueprint?.seeds)
+        ? sourceBracket.config.blueprint.seeds
         : [];
       if (!seedRows.length) return null;
 
@@ -3302,11 +3343,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         if (pm && isByeMatchObj(pm)) {
           const isLoserSeed =
             seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
-          if (isLoserSeed) return "—";
+          if (isLoserSeed) return "BYE";
 
           const byeA = isByeSeed(pm?.seedA);
           const byeB = isByeSeed(pm?.seedB);
-          const winSide = byeA ? "B" : byeB ? "A" : null;
+          const winSide = byeA && byeB ? null : byeA ? "B" : byeB ? "A" : null;
+          if (!winSide) return "BYE";
 
           if (winSide) {
             const carried = resolveSideLabel(pm, winSide);
@@ -3331,8 +3373,12 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         }
 
         if (pm && pm.status === "finished" && pm.winner) {
-          const wp = pm.winner === "A" ? pm.pairA : pm.pairB;
+          const winnerSide = pm.winner === "A" ? "A" : "B";
+          const wp = winnerSide === "A" ? pm.pairA : pm.pairB;
           if (hasResolvedPair(wp)) return pairLabelNickOnly(wp, eventType, pm);
+
+          const carried = resolveSideLabel(pm, winnerSide);
+          if (isUsefulSideLabel(carried)) return carried;
         }
 
         const carriedCode = getDisplayCodeForMatch(pm);
@@ -3354,9 +3400,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         const isLoserSeed =
           seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
 
-        if (sourceMatch && isWinnerSeed && isByeMatchObj(sourceMatch)) {
+        if (
+          sourceMatch &&
+          (isWinnerSeed || isLoserSeed) &&
+          isByeMatchObj(sourceMatch)
+        ) {
           const byeA = isByeSeed(sourceMatch?.seedA);
           const byeB = isByeSeed(sourceMatch?.seedB);
+          if (isLoserSeed || (byeA && byeB)) return "BYE";
           const winSide = byeA ? "B" : byeB ? "A" : null;
 
           if (winSide) {
@@ -3377,17 +3428,22 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         }
 
         if (sourceMatch?.status === "finished" && sourceMatch?.winner) {
-          const sourcePair = isLoserSeed
+          const sourceSide = isLoserSeed
             ? sourceMatch.winner === "A"
-              ? sourceMatch.pairB
-              : sourceMatch.pairA
+              ? "B"
+              : "A"
             : sourceMatch.winner === "A"
-            ? sourceMatch.pairA
-            : sourceMatch.pairB;
+            ? "A"
+            : "B";
+          const sourcePair =
+            sourceSide === "A" ? sourceMatch.pairA : sourceMatch.pairB;
 
           if (hasResolvedPair(sourcePair)) {
             return pairLabelNickOnly(sourcePair, eventType, sourceMatch);
           }
+
+          const carried = resolveSideLabel(sourceMatch, sourceSide);
+          if (isUsefulSideLabel(carried)) return carried;
         }
 
         if ((isWinnerSeed || isLoserSeed) && isUsefulSideLabel(sourceRefLabel)) {

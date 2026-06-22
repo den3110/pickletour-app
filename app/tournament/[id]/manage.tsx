@@ -65,6 +65,7 @@ import FileViewerModal from "@/components/FileViewerModal";
 import {
   getMatchCourtStationName,
   getMatchDisplayCode,
+  getMatchSideDisplayName,
   isNewerOrEqualMatchPayload,
   mergeMatchPayload,
   normalizeMatchDisplay,
@@ -175,42 +176,68 @@ const playerName = personNickname;
 const pairLabel = (pair) => {
   if (!pair) return "—";
   if (pair.name) return pair.name;
-  const ps = [pair.player1, pair.player2].filter(Boolean).map(playerName);
+  const ps = [
+    pair.player1,
+    pair.player2,
+    ...(Array.isArray(pair.players) ? pair.players : []),
+  ]
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(playerName);
   return ps.join(" / ") || "—";
 };
-// Nhãn nguồn (seed) khi cặp đấu CHƯA xác định — đồng bộ sơ đồ giải, tránh hiện "—".
-const seedSourceLabel = (seed) => {
-  if (!seed || !seed.type) return "";
-  if (seed.label) return String(seed.label);
-  const r = seed.ref?.round ?? "?";
-  const ord = (seed.ref?.order ?? -1) + 1;
-  switch (seed.type) {
-    case "groupRank": {
-      const st = seed.ref?.stage ?? seed.ref?.stageIndex ?? "?";
-      const g = seed.ref?.groupCode;
-      const rk = seed.ref?.rank ?? "?";
-      return g ? `V${st}-B${g}-T${rk}` : `V${st}-T${rk}`;
-    }
-    case "stageMatchWinner":
-    case "matchWinner":
-      return `W-V${r}-T${ord}`;
-    case "stageMatchLoser":
-    case "matchLoser":
-      return `L-V${r}-T${ord}`;
-    case "bye":
-      return "BYE";
-    default:
-      return "";
-  }
+const isConcreteTeamLabel = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/^(BYE|TBD|Registration|Chưa có đội|—)$/i.test(text)) return false;
+  return !/^[WL]\s*-/i.test(text);
 };
-// Ưu tiên cặp đã xác định; chưa có thì hiện nguồn seed thay vì "—".
-const teamLabel = (pair, seed) => {
-  const name = pairLabel(pair);
-  if (name && name !== "—") return name;
-  return seedSourceLabel(seed) || name || "—";
+// Ưu tiên tên đã resolve sẵn giống web/sơ đồ; chưa có thì dùng resolver chung.
+const teamLabel = (match, side) => {
+  const pre = side === "A" ? match?.__sideA : match?.__sideB;
+  return pre || getMatchSideDisplayName(match, side, "—");
 };
 const matchCode = (m) =>
   getMatchDisplayCode(m) || m?.code || `R${m?.round ?? "?"}-${m?.order ?? "?"}`;
+const parseMatchCodeParts = (m) => {
+  const raw = String(
+    getMatchDisplayCode(m) || m?.code || m?.globalCode || m?.matchCode || "",
+  ).trim();
+  const hit = raw.match(/^V(\d+)(?:-[^-]+)?-T(\d+)$/i);
+  if (!hit) return { round: NaN, order: NaN };
+  return {
+    round: Number(hit[1]),
+    order: Number(hit[2]) - 1,
+  };
+};
+const matchRoundNumber = (m) => {
+  const direct = Number(m?.round ?? m?.rrRound);
+  if (Number.isFinite(direct)) return direct;
+  const global = Number(m?.globalRound);
+  if (Number.isFinite(global)) return global;
+  return parseMatchCodeParts(m).round;
+};
+const matchOrderNumber = (m) => {
+  const direct = Number(m?.order ?? m?.meta?.order);
+  if (Number.isFinite(direct)) return direct;
+  return parseMatchCodeParts(m).order;
+};
+const uniqueFiniteNumbers = (...values) =>
+  Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value)),
+    ),
+  );
+const matchRoundCandidates = (m) =>
+  uniqueFiniteNumbers(
+    m?.round ?? m?.rrRound,
+    m?.globalRound,
+    parseMatchCodeParts(m).round,
+  );
+const matchOrderCandidates = (m) =>
+  uniqueFiniteNumbers(m?.order ?? m?.meta?.order, parseMatchCodeParts(m).order);
 const pairIdOf = (p) => {
   if (!p) return "";
   if (typeof p === "string") return p;
@@ -1107,7 +1134,7 @@ const MatchRowCard = memo(function MatchRowCard({
             style={[styles.teamLabel, { color: colors.text }]}
             numberOfLines={1}
           >
-            {teamLabel(match?.pairA, match?.seedA)}
+            {teamLabel(match, "A")}
           </Text>
           {busyCourtA ? <BusyChip court={busyCourtA} /> : null}
         </View>
@@ -1116,7 +1143,7 @@ const MatchRowCard = memo(function MatchRowCard({
             style={[styles.teamLabel, { color: colors.text }]}
             numberOfLines={1}
           >
-            {teamLabel(match?.pairB, match?.seedB)}
+            {teamLabel(match, "B")}
           </Text>
           {busyCourtB ? <BusyChip court={busyCourtB} /> : null}
         </View>
@@ -1556,10 +1583,287 @@ export default function ManageScreen() {
 
   const mergedAllMatches = useMemo(() => {
     const vals = Array.from(liveMapRef.current.values());
-    return vals.filter(
+    const rawMatches = vals.filter(
       (m) => String(m?.tournament?._id || m?.tournament) === String(tid)
     );
-  }, [tid, liveBump]);
+    if (!rawMatches.length) return rawMatches;
+
+    const byId = new Map();
+    const byBRO = new Map();
+    const bySRO = new Map();
+    const bracketById = new Map();
+    const matchesByBracketId = new Map();
+    const addIndex = (map, key, match) => {
+      const bucket = map.get(key);
+      if (bucket) bucket.push(match);
+      else map.set(key, [match]);
+    };
+    const displayRoundOf = (match) => {
+      const fromCode = parseMatchCodeParts(match).round;
+      return Number.isFinite(fromCode) ? fromCode : matchRoundNumber(match);
+    };
+    const sortableDisplayRound = (match) => {
+      const value = displayRoundOf(match);
+      return Number.isFinite(value) ? value : -1;
+    };
+    const sortableMatchOrder = (match) => {
+      const value = matchOrderNumber(match);
+      return Number.isFinite(value) ? value : 0;
+    };
+    const pickIndexedSource = (matches, owner) => {
+      const list = Array.isArray(matches) ? matches : matches ? [matches] : [];
+      const ownerId = String(owner?._id || owner?.id || "");
+      const candidates = list.filter(
+        (candidate) =>
+          String(candidate?._id || candidate?.id || "") !== ownerId
+      );
+      if (candidates.length <= 1) return candidates[0] || null;
+
+      const ownerRound = displayRoundOf(owner);
+      const sameBranch = candidates.filter(
+        (candidate) =>
+          String(candidate?.branch || "main") ===
+            String(owner?.branch || "main") &&
+          String(candidate?.phase || "") === String(owner?.phase || "")
+      );
+      const branchCandidates = sameBranch.length ? sameBranch : candidates;
+      const previousCandidates = Number.isFinite(ownerRound)
+        ? branchCandidates.filter((candidate) => {
+            const candidateRound = displayRoundOf(candidate);
+            return Number.isFinite(candidateRound) && candidateRound < ownerRound;
+          })
+        : [];
+      return (previousCandidates.length ? previousCandidates : branchCandidates)
+        .slice()
+        .sort((a, b) => sortableDisplayRound(b) - sortableDisplayRound(a))[0];
+    };
+
+    (bracketsData || []).forEach((bracket) => {
+      const bracketId = String(bracket?._id || bracket?.id || "");
+      if (bracketId) bracketById.set(bracketId, bracket);
+    });
+    for (const match of rawMatches) {
+      const matchId = String(match?._id || match?.id || "");
+      if (matchId) byId.set(matchId, match);
+      const bracketId = String(match?.bracket?._id || match?.bracket || "");
+      const bracket = bracketById.get(bracketId);
+      const stage = Number(match?.bracket?.stage ?? bracket?.stage);
+      const rounds = matchRoundCandidates(match);
+      const orders = matchOrderCandidates(match);
+      if (bracketId) {
+        if (!matchesByBracketId.has(bracketId)) {
+          matchesByBracketId.set(bracketId, []);
+        }
+        matchesByBracketId.get(bracketId).push(match);
+      }
+      for (const round of rounds) {
+        for (const order of orders) {
+          if (bracketId) addIndex(byBRO, `${bracketId}:${round}:${order}`, match);
+          if (Number.isFinite(stage)) {
+            addIndex(bySRO, `${stage}:${round}:${order}`, match);
+          }
+        }
+      }
+    }
+
+    const findSource = (match, seed) => {
+      if (!seed) return null;
+      const matchId = String(seed?.ref?.matchId || "");
+      if (matchId && byId.has(matchId)) return byId.get(matchId);
+      const round = Number(seed?.ref?.round);
+      const order = Number(seed?.ref?.order);
+      if (!Number.isFinite(round) || !Number.isFinite(order)) return null;
+      const stage = Number(seed?.ref?.stageIndex ?? seed?.ref?.stage);
+      if (Number.isFinite(stage)) {
+        const hit = pickIndexedSource(bySRO.get(`${stage}:${round}:${order}`), match);
+        if (hit) return hit;
+      }
+      const bracketId = String(match?.bracket?._id || match?.bracket || "");
+      return bracketId
+        ? pickIndexedSource(byBRO.get(`${bracketId}:${round}:${order}`), match)
+        : null;
+    };
+
+    const getPlannedSeed = (match, side) => {
+      if (!match) return null;
+      const localRound = matchRoundNumber(match) || 1;
+      const localOrder = matchOrderNumber(match);
+      if (!Number.isFinite(localOrder)) return null;
+
+      const matchBracketId = String(match?.bracket?._id || match?.bracket || "");
+      const matchBracket =
+        (match?.bracket && typeof match.bracket === "object"
+          ? match.bracket
+          : null) ||
+        bracketById.get(matchBracketId) ||
+        null;
+      const sourceType = String(
+        matchBracket?.type || match?.type || match?.format || ""
+      ).toLowerCase();
+      if (sourceType !== "knockout" && sourceType !== "ko") return null;
+
+      if (localRound > 1) {
+        const bracketMatches = matchesByBracketId.get(matchBracketId) || [];
+        const sameBranch = (candidate) =>
+          String(candidate?.branch || "main") ===
+            String(match?.branch || "main") &&
+          String(candidate?.phase || "") === String(match?.phase || "");
+        const byOrder = (a, b) => sortableMatchOrder(a) - sortableMatchOrder(b);
+        const currentRoundMatches = bracketMatches
+          .filter((candidate) => matchRoundCandidates(candidate).includes(localRound))
+          .filter(sameBranch)
+          .sort(byOrder);
+        const currentIndex = currentRoundMatches.findIndex(
+          (candidate) => String(candidate?._id || "") === String(match?._id || "")
+        );
+        const sourceSlot =
+          (currentIndex >= 0 ? currentIndex : localOrder) * 2 +
+          (side === "B" ? 1 : 0);
+        const previousRoundMatches = bracketMatches
+          .filter((candidate) =>
+            matchRoundCandidates(candidate).includes(localRound - 1)
+          )
+          .filter(sameBranch)
+          .sort(byOrder);
+        const sourceMatch = previousRoundMatches[sourceSlot] || null;
+        const stageIndex = Number(
+          sourceMatch?.bracket?.stage ?? matchBracket?.stage ?? 0
+        );
+        const sourceRoundValue = matchRoundNumber(sourceMatch);
+        const sourceOrderValue = matchOrderNumber(sourceMatch);
+        const sourceRound = Number.isFinite(sourceRoundValue)
+          ? sourceRoundValue
+          : localRound - 1;
+        const sourceOrder = Number.isFinite(sourceOrderValue)
+          ? sourceOrderValue
+          : localOrder * 2 + (side === "B" ? 1 : 0);
+        const ref = {
+          stageIndex,
+          stage: stageIndex,
+          round: sourceRound,
+          order: sourceOrder,
+        };
+        if (sourceMatch?._id) ref.matchId = sourceMatch._id;
+        return {
+          type: "stageMatchWinner",
+          ref,
+          label: `W-V${localRound - 1}-T${sourceOrder + 1}`,
+        };
+      }
+
+      const seedRows = Array.isArray(matchBracket?.prefill?.seeds)
+        ? matchBracket.prefill.seeds
+        : Array.isArray(matchBracket?.config?.blueprint?.seeds)
+          ? matchBracket.config.blueprint.seeds
+          : [];
+      if (!seedRows.length) return null;
+      const pairNo = localOrder + 1;
+      const planned =
+        seedRows.find((entry) => Number(entry?.pair) === pairNo) ||
+        seedRows[localOrder] ||
+        null;
+      const plannedSeed = side === "A" ? planned?.A : planned?.B;
+      return plannedSeed?.type ? plannedSeed : null;
+    };
+
+    const isByeSeedObj = (seed) =>
+      seed?.type === "bye" || /\bBYE\b/i.test(seed?.label || "");
+    const isByeObj = (match) =>
+      Boolean(match && (isByeSeedObj(match.seedA) || isByeSeedObj(match.seedB)));
+    const seedRefTypes = new Set([
+      "matchWinner",
+      "matchLoser",
+      "stageMatchWinner",
+      "stageMatchLoser",
+    ]);
+    const isUseful = (value) =>
+      Boolean(value && !/^(BYE|TBD|Registration)$/i.test(String(value).trim()));
+
+    const resolveName = (match, side, depth = 0) => {
+      if (!match || depth > 12) return "";
+      const pair = side === "A" ? match.pairA : match.pairB;
+      if (hasResolvedPair(pair)) return pairLabel(pair);
+
+      const rawSeed = side === "A" ? match.seedA : match.seedB;
+      const plannedSeed = getPlannedSeed(match, side);
+      const rawSeedType = String(rawSeed?.type || "");
+      const isEmptyRegistrationSeed =
+        rawSeedType === "registration" &&
+        !rawSeed?.label &&
+        !rawSeed?.ref?.registration &&
+        !rawSeed?.ref?.reg &&
+        !rawSeed?.ref?.id &&
+        !rawSeed?.ref?._id;
+      const seed =
+        rawSeed?.type && !isEmptyRegistrationSeed
+          ? rawSeed
+          : plannedSeed || rawSeed;
+      const seedType = String(seed?.type || "");
+      const isLoser =
+        seedType === "matchLoser" || seedType === "stageMatchLoser";
+
+      const prev = side === "A" ? match.previousA : match.previousB;
+      let source = prev
+        ? byId.get(String(prev?._id || prev)) ||
+          (typeof prev === "object" ? prev : null)
+        : null;
+      if (!source && seedRefTypes.has(seedType)) source = findSource(match, seed);
+
+      if (source) {
+        if (isByeObj(source)) {
+          const sourceByeA = isByeSeedObj(source.seedA);
+          const sourceByeB = isByeSeedObj(source.seedB);
+          if (isLoser || (sourceByeA && sourceByeB)) return "BYE";
+          const carried = resolveName(source, sourceByeA ? "B" : "A", depth + 1);
+          if (isUseful(carried)) return carried;
+        } else if (source.status === "finished" && source.winner) {
+          const sourceSide = isLoser
+            ? source.winner === "A"
+              ? "B"
+              : "A"
+            : source.winner === "A"
+              ? "A"
+              : "B";
+          const sourcePair =
+            sourceSide === "A" ? source.pairA : source.pairB;
+          if (hasResolvedPair(sourcePair)) return pairLabel(sourcePair);
+          const carried = resolveName(source, sourceSide, depth + 1);
+          if (isUseful(carried)) return carried;
+        }
+      }
+
+      if (source && seedRefTypes.has(seedType)) {
+        const sourceCode = matchCode(source);
+        if (sourceCode && sourceCode !== "—") {
+          return `${isLoser ? "L" : "W"}-${sourceCode}`;
+        }
+      }
+
+      const matchWithSeed = seed
+        ? {
+            ...match,
+            [side === "A" ? "seedA" : "seedB"]: seed,
+          }
+        : match;
+      return getMatchSideDisplayName(matchWithSeed, side, "");
+    };
+
+    return rawMatches.map((match) => {
+      const sideA = resolveName(match, "A");
+      const sideB = resolveName(match, "B");
+      return {
+        ...match,
+        __sideA: sideA,
+        __sideB: sideB,
+        resolvedSideNameA: isConcreteTeamLabel(sideA)
+          ? sideA
+          : match?.resolvedSideNameA,
+        resolvedSideNameB: isConcreteTeamLabel(sideB)
+          ? sideB
+          : match?.resolvedSideNameB,
+      };
+    });
+  }, [tid, liveBump, bracketsData]);
 
   const liveBusyByPairId = useMemo(() => {
     const mp = new Map();
@@ -1590,7 +1894,17 @@ export default function ManageScreen() {
     return /bye/i.test(`${a} ${b}`);
   }, []);
   const isByeMatch = useCallback(
-    (m) => isByePair(m?.pairA) || isByePair(m?.pairB),
+    (m) => {
+      if (m?.isBye || m?.bye) return true;
+      if (isByePair(m?.pairA) || isByePair(m?.pairB)) return true;
+      const aOK =
+        hasResolvedPair(m?.pairA) ||
+        isConcreteTeamLabel(m?.__sideA || m?.resolvedSideNameA || m?.teamAName);
+      const bOK =
+        hasResolvedPair(m?.pairB) ||
+        isConcreteTeamLabel(m?.__sideB || m?.resolvedSideNameB || m?.teamBName);
+      return !(aOK && bOK);
+    },
     [isByePair]
   );
 
@@ -1663,8 +1977,8 @@ export default function ManageScreen() {
           if (kw) {
             const text = [
               matchCode(m),
-              pairLabel(m?.pairA),
-              pairLabel(m?.pairB),
+              teamLabel(m, "A"),
+              teamLabel(m, "B"),
               m?.status,
               m?.video,
               courtNameOf(m),
@@ -2089,8 +2403,8 @@ export default function ManageScreen() {
   const buildRowsForBracket = useCallback((matches) => {
     return matches.map((m) => {
       const code = matchCode(m);
-      const a = pairLabel(m?.pairA);
-      const b = pairLabel(m?.pairB);
+      const a = teamLabel(m, "A");
+      const b = teamLabel(m, "B");
       const court = courtNameOf(m) || "—";
       const order =
         Number.isFinite(m?.order) || typeof m?.order === "number"
@@ -2374,8 +2688,8 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
           code: code,
           court: courtNameOf(m),
           referee: refereeNames(m),
-          team1: pairLabel(m?.pairA),
-          team2: pairLabel(m?.pairB),
+          team1: teamLabel(m, "A"),
+          team2: teamLabel(m, "B"),
           logoUrl: tour?.image,
         });
 
