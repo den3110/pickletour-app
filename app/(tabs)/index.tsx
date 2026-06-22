@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { Stack, router, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import Hero from "@/components/Hero";
 import {
   AntDesign,
@@ -32,9 +32,6 @@ import { useGetNewsQuery } from "@/slices/newsApiSlice";
 import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
-import { useReauthQuery } from "@/slices/usersApiSlice";
-import { setCredentials } from "@/slices/authSlice";
-import { saveUserInfo } from "@/utils/authStorage";
 import ImageViewing from "react-native-image-viewing";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
@@ -1392,24 +1389,7 @@ export default function HomeScreen() {
     );
     return () => listener.remove();
   }, []);
-  const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
-  const hasRankNo = Number.isFinite(
-    +(userInfo?.rankNo ?? userInfo?.rank?.rankNo ?? NaN)
-  );
-  const { data: reauthData } = useReauthQuery(undefined, {
-    skip: !userInfo || hasRankNo,
-  });
-
-  useEffect(() => {
-    if (reauthData) {
-      const normalized = reauthData?.user
-        ? { ...reauthData.user, token: reauthData.token }
-        : reauthData;
-      dispatch(setCredentials(normalized));
-      saveUserInfo(normalized);
-    }
-  }, [reauthData, dispatch]);
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const bg = isDark ? "#0f1115" : "#F5F7FA";

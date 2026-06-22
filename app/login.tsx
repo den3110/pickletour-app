@@ -18,7 +18,6 @@ import { router, Stack, Redirect, useLocalSearchParams } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { useLoginMutation } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
-import { saveUserInfo } from "@/utils/authStorage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
 import {
@@ -190,7 +189,6 @@ export default function LoginScreen() {
       const normalized = res?.user ? { ...res.user, token: res.token } : res;
 
       dispatch(setCredentials(normalized));
-      await saveUserInfo(normalized);
 
       router.replace(returnTo as any);
     } catch (err) {

@@ -133,7 +133,7 @@ function getDetailedDeviceFields() {
 // ============== Raw baseQuery (headers) ==============
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: BASE_URL,
-  prepareHeaders: async (headers, { getState }) => {
+  prepareHeaders: async (headers, { getState, endpoint }) => {
     // 1) X-Request-Id (từ web)
     try {
       const requestId = generateRequestId();
@@ -149,10 +149,11 @@ const rawBaseQuery = fetchBaseQuery({
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
     // 3) Version & device headers
+    const shouldReadPushToken = endpoint !== "login";
     const [deviceId, deviceName, pushToken] = await Promise.all([
       getDeviceId(),
       getDeviceName(),
-      getPushToken(),
+      shouldReadPushToken ? getPushToken() : Promise.resolve(null),
     ]);
 
     const { brand, modelName, modelId, marketing } = getDetailedDeviceFields();
