@@ -2223,89 +2223,122 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const BentoCard = ({ gradient, icon, value, label, onInfoPress }) => (
-  <ProfileGlassSurface
-    effect="clear"
-    interactive
-    tintColor={rgbaFromHex(gradient[0], 0.38)}
-    style={[
-      styles.bentoCard,
-      IOS_26_LIQUID_GLASS_ENABLED && styles.bentoCardGlass,
-    ]}
-  >
-    <LinearGradient
-      colors={
-        IOS_26_LIQUID_GLASS_ENABLED
-          ? gradient.map((color, index) => rgbaFromHex(color, index ? 0.34 : 0.5))
-          : gradient
-      }
-      style={StyleSheet.absoluteFill}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    />
-    {!!onInfoPress && (
-      <Pressable
-        onPress={onInfoPress}
-        hitSlop={12}
-        style={styles.bentoInfoPressable}
-      >
-        <ProfileGlassSurface
-          effect="clear"
-          interactive
-          tintColor="rgba(255,255,255,0.18)"
-          style={styles.bentoInfoBtn}
+const bentoGlassGradient = (gradient, t) =>
+  IOS_26_LIQUID_GLASS_ENABLED
+    ? gradient.map((color, index) =>
+        rgbaFromHex(color, t.dark ? (index ? 0.68 : 0.82) : (index ? 0.82 : 0.96)),
+      )
+    : gradient;
+
+const BentoCard = ({ gradient, icon, value, label, onInfoPress }) => {
+  const t = useTokens();
+
+  return (
+    <ProfileGlassSurface
+      effect="clear"
+      interactive
+      tintColor={rgbaFromHex(gradient[0], t.dark ? 0.54 : 0.7)}
+      style={[
+        styles.bentoCard,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.bentoCardGlass,
+        IOS_26_LIQUID_GLASS_ENABLED && {
+          borderColor: rgbaFromHex(gradient[0], t.dark ? 0.52 : 0.42),
+          backgroundColor: rgbaFromHex(gradient[0], t.dark ? 0.18 : 0.12),
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={bentoGlassGradient(gradient, t)}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      {IOS_26_LIQUID_GLASS_ENABLED && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.38)", "rgba(255,255,255,0.02)"]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.65, y: 1 }}
+        />
+      )}
+      {!!onInfoPress && (
+        <Pressable
+          onPress={onInfoPress}
+          hitSlop={12}
+          style={styles.bentoInfoPressable}
         >
-          <Feather name="info" size={18} color="rgba(255,255,255,0.95)" />
-        </ProfileGlassSurface>
-      </Pressable>
-    )}
+          <ProfileGlassSurface
+            effect="clear"
+            interactive
+            tintColor="rgba(255,255,255,0.28)"
+            style={styles.bentoInfoBtn}
+          >
+            <Feather name="info" size={18} color="#FFFFFF" />
+          </ProfileGlassSurface>
+        </Pressable>
+      )}
 
-    <ProfileGlassSurface
-      effect="clear"
-      tintColor="rgba(255,255,255,0.18)"
-      style={styles.bentoIcon}
-    >
-      <Feather name={icon} size={20} color="rgba(255,255,255,0.9)" />
-    </ProfileGlassSurface>
+      <ProfileGlassSurface
+        effect="clear"
+        tintColor="rgba(255,255,255,0.28)"
+        style={styles.bentoIcon}
+      >
+        <Feather name={icon} size={20} color="#FFFFFF" />
+      </ProfileGlassSurface>
 
-    <Text style={styles.bentoValue}>{value}</Text>
-    <Text style={styles.bentoLabel}>{label}</Text>
-  </ProfileGlassSurface>
-);
-
-const BentoCardWide = ({ gradient, icon, value, label }) => (
-  <ProfileGlassSurface
-    effect="clear"
-    interactive
-    tintColor={rgbaFromHex(gradient[0], 0.38)}
-    style={[
-      styles.bentoCardWide,
-      IOS_26_LIQUID_GLASS_ENABLED && styles.bentoCardGlass,
-    ]}
-  >
-    <LinearGradient
-      colors={
-        IOS_26_LIQUID_GLASS_ENABLED
-          ? gradient.map((color, index) => rgbaFromHex(color, index ? 0.34 : 0.5))
-          : gradient
-      }
-      style={StyleSheet.absoluteFill}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-    />
-    <ProfileGlassSurface
-      effect="clear"
-      tintColor="rgba(255,255,255,0.18)"
-      style={styles.bentoIcon}
-    >
-      <Feather name={icon} size={22} color="rgba(255,255,255,0.9)" />
-    </ProfileGlassSurface>
-    <View style={{ marginLeft: 16 }}>
       <Text style={styles.bentoValue}>{value}</Text>
       <Text style={styles.bentoLabel}>{label}</Text>
-    </View>
-  </ProfileGlassSurface>
-);
+    </ProfileGlassSurface>
+  );
+};
+
+const BentoCardWide = ({ gradient, icon, value, label }) => {
+  const t = useTokens();
+
+  return (
+    <ProfileGlassSurface
+      effect="clear"
+      interactive
+      tintColor={rgbaFromHex(gradient[0], t.dark ? 0.54 : 0.7)}
+      style={[
+        styles.bentoCardWide,
+        IOS_26_LIQUID_GLASS_ENABLED && styles.bentoCardGlass,
+        IOS_26_LIQUID_GLASS_ENABLED && {
+          borderColor: rgbaFromHex(gradient[0], t.dark ? 0.52 : 0.42),
+          backgroundColor: rgbaFromHex(gradient[0], t.dark ? 0.18 : 0.12),
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={bentoGlassGradient(gradient, t)}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+      {IOS_26_LIQUID_GLASS_ENABLED && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0.02)"]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.75, y: 1 }}
+        />
+      )}
+      <ProfileGlassSurface
+        effect="clear"
+        tintColor="rgba(255,255,255,0.28)"
+        style={styles.bentoIcon}
+      >
+        <Feather name={icon} size={22} color="#FFFFFF" />
+      </ProfileGlassSurface>
+      <View style={{ marginLeft: 16 }}>
+        <Text style={styles.bentoValue}>{value}</Text>
+        <Text style={styles.bentoLabel}>{label}</Text>
+      </View>
+    </ProfileGlassSurface>
+  );
+};
 
 const Card = ({ title, children, t }) => (
   <ProfileGlassSurface
