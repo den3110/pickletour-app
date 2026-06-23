@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-import { Platform } from "react-native";
+import { BackHandler, Platform } from "react-native";
 
 const PENDING_JS_CRASH_KEY = "@pickletour/pending-js-crash-feedback";
 
@@ -98,14 +98,20 @@ export async function triggerCrashFeedbackTestCrash() {
     if (Constants.appOwnership !== "expo") {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const crashlytics = require("@react-native-firebase/crashlytics").default;
+      await crashlytics().setCrashlyticsCollectionEnabled?.(true);
       crashlytics().crash();
-      return;
     }
   } catch {}
 
   setTimeout(() => {
     throw error;
-  }, 0);
+  }, 450);
+
+  if (Platform.OS === "android") {
+    setTimeout(() => {
+      BackHandler.exitApp();
+    }, 900);
+  }
 }
 
 export async function getPendingCrashFeedback(): Promise<PendingCrashFeedback | null> {
