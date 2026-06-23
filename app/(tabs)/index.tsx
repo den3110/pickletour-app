@@ -1,5 +1,5 @@
 // app/index.jsx  (Home)
-import React, { useMemo, useEffect, useRef, useState } from "react";
+import React, { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
   ScrollView,
   View,
@@ -15,7 +15,7 @@ import {
   DeviceEventEmitter,
 } from "react-native";
 import { Stack, router, useRouter } from "expo-router";
-import { useTheme } from "@react-navigation/native";
+import { useIsFocused, useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import Hero from "@/components/Hero";
 import {
@@ -38,6 +38,7 @@ import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -55,6 +56,7 @@ const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.8;
 const CARD_MARGIN = 16;
+const NEWS_CARD_WIDTH = CARD_WIDTH * 0.85;
 
 /* ---------- Fallback Data ---------- */
 const FALLBACK = {
@@ -341,8 +343,13 @@ function ProButton({ onPress, children, colors, style, icon }) {
 /* ---------- 🆕 Animated Status Chip ---------- */
 function AnimatedStatusChip() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const isFocused = useIsFocused();
   useEffect(() => {
-    Animated.loop(
+    if (!isFocused) {
+      scaleAnim.stopAnimation();
+      return undefined;
+    }
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 1.05,
@@ -355,8 +362,10 @@ function AnimatedStatusChip() {
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isFocused, scaleAnim]);
 
   return (
     <Animated.View
@@ -781,7 +790,10 @@ function FeaturesGrid() {
 }
 
 /* ---------- Tournament Card ---------- */
-function TournamentCard({ tournament, theme }) {
+const TournamentCard = React.memo(function TournamentCard({
+  tournament,
+  theme,
+}) {
   const isDark = !!theme?.dark;
   const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
@@ -896,7 +908,7 @@ function TournamentCard({ tournament, theme }) {
       />
     </AppleLiquidGlassView>
   );
-}
+});
 
 /* ---------- Tournaments Section ---------- */
 function TournamentsSection() {
@@ -914,6 +926,20 @@ function TournamentsSection() {
     if (!Array.isArray(tournaments)) return [];
     return tournaments.filter((t) => t.status === "upcoming").slice(0, 5);
   }, [tournaments]);
+
+  const renderTournamentItem = useCallback(
+    ({ item }) => <TournamentCard tournament={item} theme={theme} />,
+    [theme]
+  );
+
+  const getTournamentItemLayout = useCallback(
+    (_data, index) => ({
+      length: CARD_WIDTH + CARD_MARGIN,
+      offset: (CARD_WIDTH + CARD_MARGIN) * index,
+      index,
+    }),
+    []
+  );
 
   const scrollToIndex = (index) => {
     if (flatListRef.current && upcomingTournaments.length > 0) {
@@ -1057,12 +1083,15 @@ function TournamentsSection() {
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => String(item._id)}
-        renderItem={({ item }) => (
-          <TournamentCard tournament={item} theme={theme} />
-        )}
+        renderItem={renderTournamentItem}
+        getItemLayout={getTournamentItemLayout}
         contentContainerStyle={styles.tournamentsList}
         snapToInterval={CARD_WIDTH + CARD_MARGIN}
         decelerationRate="fast"
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={Platform.OS === "android"}
         onMomentumScrollEnd={(event) => {
           const index = Math.round(
             event.nativeEvent.contentOffset.x / (CARD_WIDTH + CARD_MARGIN)
@@ -1105,7 +1134,7 @@ function TournamentsSection() {
 }
 
 /* ---------- News Card ---------- */
-function NewsCard({ news, theme }) {
+const NewsCard = React.memo(function NewsCard({ news, theme }) {
   const [imageError, setImageError] = useState(false);
   const isDark = !!theme?.dark;
   const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
@@ -1170,7 +1199,7 @@ function NewsCard({ news, theme }) {
       </View>
     </AppleLiquidGlassView>
   );
-}
+});
 
 /* ---------- News Section ---------- */
 function NewsSection() {
@@ -1183,6 +1212,18 @@ function NewsSection() {
   const topNews = useMemo(
     () => (Array.isArray(news) ? news.slice(0, 5) : []),
     [news]
+  );
+  const renderNewsItem = useCallback(
+    ({ item }) => <NewsCard news={item} theme={theme} />,
+    [theme]
+  );
+  const getNewsItemLayout = useCallback(
+    (_data, index) => ({
+      length: NEWS_CARD_WIDTH + 12,
+      offset: (NEWS_CARD_WIDTH + 12) * index,
+      index,
+    }),
+    []
   );
 
   if (isLoading || topNews.length === 0) return null;
@@ -1219,8 +1260,13 @@ function NewsSection() {
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => String(item._id)}
-        renderItem={({ item }) => <NewsCard news={item} theme={theme} />}
+        renderItem={renderNewsItem}
+        getItemLayout={getNewsItemLayout}
         contentContainerStyle={styles.newsList}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={3}
+        removeClippedSubviews={Platform.OS === "android"}
         ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
       />
     </View>
@@ -1335,11 +1381,21 @@ function ContactCard() {
   );
 }
 
-function HomeLiquidGlassBackdrop({ isDark }: { isDark: boolean }) {
+function HomeLiquidGlassBackdrop({
+  isDark,
+  active,
+}: {
+  isDark: boolean;
+  active: boolean;
+}) {
   const anim = useRef(new Animated.Value(0)).current;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
 
   useEffect(() => {
-    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled || !active) {
+      anim.stopAnimation();
+      return undefined;
+    }
 
     const loop = Animated.loop(
       Animated.sequence([
@@ -1357,9 +1413,9 @@ function HomeLiquidGlassBackdrop({ isDark }: { isDark: boolean }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [active, anim, liquidGlassEnabled]);
 
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],
@@ -1403,6 +1459,8 @@ function HomeLiquidGlassBackdrop({ isDark }: { isDark: boolean }) {
 
 export default function HomeScreen() {
   const scrollViewRef = React.useRef(null);
+  const heroLottieRef = React.useRef<any>(null);
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   React.useEffect(() => {
     const listener = DeviceEventEmitter.addListener(
@@ -1419,6 +1477,15 @@ export default function HomeScreen() {
   const isDark = !!theme?.dark;
   const bg = isDark ? "#0f1115" : "#F5F7FA";
   const heroTopBleed = Platform.OS === "ios" ? insets.top : 0;
+
+  useEffect(() => {
+    if (!SHOULD_RENDER_NATIVE_LOTTIE || !BG_3D) return;
+    if (isFocused) {
+      heroLottieRef.current?.play?.();
+    } else {
+      heroLottieRef.current?.pause?.();
+    }
+  }, [isFocused]);
 
   return (
     <>
@@ -1501,7 +1568,7 @@ export default function HomeScreen() {
         }}
       />
       <View style={[styles.homeRoot, { backgroundColor: bg }]}>
-        <HomeLiquidGlassBackdrop isDark={isDark} />
+        <HomeLiquidGlassBackdrop isDark={isDark} active={isFocused} />
         <ScrollView
           ref={scrollViewRef}
           style={styles.homeScroll}
@@ -1511,8 +1578,9 @@ export default function HomeScreen() {
           <View style={[styles.hero3dWrap, { height: 240 + heroTopBleed }]}>
             {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
               <LottieView
+                ref={heroLottieRef}
                 source={BG_3D}
-                autoPlay
+                autoPlay={isFocused}
                 speed={0.2}
                 loop
                 resizeMode="cover"
@@ -2116,7 +2184,7 @@ const styles = StyleSheet.create({
 
   /* 💎 PREMIUM NEWS CARD */
   newsCard: {
-    width: CARD_WIDTH * 0.85,
+    width: NEWS_CARD_WIDTH,
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,

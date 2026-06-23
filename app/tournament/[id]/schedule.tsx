@@ -27,6 +27,7 @@ import {
   Platform, // Cần cho shadow/elevation
 } from "react-native";
 import { useSelector } from "react-redux";
+import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
@@ -703,28 +704,32 @@ function MatchCard({
 
   // Animation cho Live match
   const pulseAnim = useRef(new Animated.Value(0.2)).current;
+  const screenFocused = useIsFocused();
   useEffect(() => {
-    if (isLiveMatch) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.6,
-            duration: 1000,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.2,
-            duration: 1000,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
+    if (!isLiveMatch || !screenFocused) {
+      pulseAnim.stopAnimation();
       pulseAnim.setValue(0);
+      return undefined;
     }
-  }, [isLiveMatch, pulseAnim]);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.6,
+          duration: 1000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.2,
+          duration: 1000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isLiveMatch, pulseAnim, screenFocused]);
 
   const stripOpacity = isLiveMatch ? pulseAnim : 1;
 
@@ -1333,6 +1338,7 @@ export default function TournamentScheduleNative() {
   const routeParams = useLocalSearchParams();
   const id = normalizeParam(routeParams.id);
   const router = useRouter();
+  const isFocused = useIsFocused();
   const me = useSelector((s) => s.auth?.userInfo || null);
   const [q, setQ] = useState("");
   const routeTab = normalizeParam(routeParams.tab || routeParams.status);
@@ -1476,8 +1482,12 @@ export default function TournamentScheduleNative() {
     () => (id ? [String(id)] : []),
     [id]
   );
+  const activeTournamentRoomIds = useMemo(
+    () => (isFocused ? tournamentRoomIds : []),
+    [isFocused, tournamentRoomIds]
+  );
 
-  useSocketRoomSet(socket, tournamentRoomIds, {
+  useSocketRoomSet(socket, activeTournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -1489,7 +1499,7 @@ export default function TournamentScheduleNative() {
   });
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isFocused) return;
     const onUpsert = (p) => queueUpsert(p);
     const onInvalidate = (payload) => {
       const tournamentId = String(payload?.tournamentId || "").trim();
@@ -1519,7 +1529,15 @@ export default function TournamentScheduleNative() {
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, id, refetchBrackets, refetchMatches, refetchTournament]);
+  }, [
+    isFocused,
+    socket,
+    queueUpsert,
+    id,
+    refetchBrackets,
+    refetchMatches,
+    refetchTournament,
+  ]);
 
   const bracketsKey = useMemo(
     () =>
@@ -1543,13 +1561,18 @@ export default function TournamentScheduleNative() {
     joinedMatchesRef.current = new Set();
   }, [bracketsKey, matchesKey]);
 
+  const liveMatchesSnapshot = useMemo(
+    () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),
+    [liveBump]
+  );
+
   // --- Data Processing (Giữ nguyên logic xử lý data) ---
   const matches = useMemo(
     () =>
-      Array.from(liveMapRef.current.values()).filter(
+      liveMatchesSnapshot.filter(
         (m) => String(m?.tournament?._id || m?.tournament) === String(id)
       ),
-    [id, liveBump]
+    [id, liveMatchesSnapshot]
   );
   const bracketById = useMemo(() => {
     const map = new Map();

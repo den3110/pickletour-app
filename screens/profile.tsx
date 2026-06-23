@@ -70,6 +70,7 @@ import { buildLoginHref, runMobileLogoutFlow } from "@/services/authSession";
 import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
 import { triggerCrashFeedbackTestCrash } from "@/services/crashFeedbackService";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassPreference } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const { SaveFormat } = ImageManipulator;
@@ -387,6 +388,12 @@ export default function ProfileScreen({ isBack = false }) {
   const insets = useSafeAreaInsets();
   const t = useTokens();
   const scheme = t.dark ? "dark" : "light";
+  const {
+    isLiquidGlassAvailable,
+    isPreferenceLoaded,
+    liquidGlassPreferenceEnabled,
+    setLiquidGlassPreferenceEnabled,
+  } = useLiquidGlassPreference();
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);
@@ -799,6 +806,12 @@ export default function ProfileScreen({ isBack = false }) {
           await unregisterDeviceToken({ deviceId }).unwrap();
         } catch {}
     }
+  };
+
+  const toggleLiquidGlassHighlight = async (enabled) => {
+    if (!isLiquidGlassAvailable) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await setLiquidGlassPreferenceEnabled(enabled);
   };
 
   const status = user?.cccdStatus || "unverified";
@@ -1663,6 +1676,63 @@ export default function ProfileScreen({ isBack = false }) {
                       style={{ marginBottom: 12 }}
                     />
                   )}
+                  <View
+                    style={[
+                      styles.switchRow,
+                      {
+                        borderBottomWidth: 1,
+                        borderBottomColor: t.border,
+                        marginBottom: 12,
+                        paddingBottom: 12,
+                      },
+                    ]}
+                  >
+                    <View style={styles.switchLeft}>
+                      <ProfileGlassSurface
+                        effect="clear"
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
+                        style={[
+                          styles.switchIcon,
+                          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
+                        ]}
+                      >
+                        <Feather name="zap" size={16} color={t.accent} />
+                      </ProfileGlassSurface>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchLabel, { color: t.text }]}>
+                          Giao diện nổi bật
+                        </Text>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          {isLiquidGlassAvailable
+                            ? "Bật Liquid Glass trên iOS 26, tắt để dùng giao diện truyền thống."
+                            : "Thiết bị này đang dùng giao diện truyền thống."}
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      disabled={!isLiquidGlassAvailable || !isPreferenceLoaded}
+                      value={
+                        isLiquidGlassAvailable && liquidGlassPreferenceEnabled
+                      }
+                      onValueChange={toggleLiquidGlassHighlight}
+                      trackColor={{ false: t.border, true: t.accent }}
+                      thumbColor="#fff"
+                    />
+                  </View>
                   <ThemeOption
                     label="Theo hệ thống"
                     selected={prefTheme === "system"}
@@ -3448,7 +3518,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  switchLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  switchLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   switchIcon: {
     width: 36,
     height: 36,
@@ -3456,7 +3526,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  switchLabel: { fontSize: 15 },
+  switchLabel: { fontSize: 15, fontWeight: "600" },
+  switchHint: { marginTop: 4, fontSize: 12, lineHeight: 16 },
 
   dangerRow: { flexDirection: "row", gap: 12 },
   dangerPressable: {

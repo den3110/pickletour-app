@@ -48,6 +48,7 @@ import {
 import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -211,9 +212,13 @@ ProfileGlassSurface.displayName = "ProfileGlassSurface";
 
 const ProfileLiquidBackdrop = React.memo(({ colors }) => {
   const anim = useRef(new Animated.Value(0)).current;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
 
   React.useEffect(() => {
-    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) {
+      anim.stopAnimation();
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, {
@@ -230,9 +235,9 @@ const ProfileLiquidBackdrop = React.memo(({ colors }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [anim, liquidGlassEnabled]);
 
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],

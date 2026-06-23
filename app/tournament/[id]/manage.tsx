@@ -28,13 +28,14 @@ import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@react-navigation/native";
+import { useIsFocused, useTheme } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as LegacyFS from "expo-file-system/legacy";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import {
   useGetTournamentQuery,
   useAdminGetBracketsQuery,
@@ -692,7 +693,8 @@ const GlassFill = memo(function GlassFill({
   effectStyle = "regular",
   native = false,
 }) {
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
   if (!native) {
     return (
       <View
@@ -730,7 +732,8 @@ const GlassFill = memo(function GlassFill({
 
 const ManageWhiteBackdrop = memo(function ManageWhiteBackdrop() {
   const { dark } = useTheme();
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
   return (
     <View
       pointerEvents="none"
@@ -1705,6 +1708,7 @@ export default function ManageScreen() {
   const { id } = useLocalSearchParams();
   const tid = Array.isArray(id) ? id[0] : id;
 
+  const isFocused = useIsFocused();
   const { colors, dark } = useTheme();
   const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
 
@@ -1868,8 +1872,12 @@ export default function ManageScreen() {
   }, [allMatches, tour]);
 
   const tournamentRoomIds = useMemo(() => (tid ? [String(tid)] : []), [tid]);
+  const activeTournamentRoomIds = useMemo(
+    () => (isFocused ? tournamentRoomIds : []),
+    [isFocused, tournamentRoomIds]
+  );
 
-  useSocketRoomSet(socket, tournamentRoomIds, {
+  useSocketRoomSet(socket, activeTournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -1881,7 +1889,7 @@ export default function ManageScreen() {
   });
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isFocused) return;
     const queueUpsert = (payload) => {
       const incRaw = payload?.data ?? payload?.match ?? payload;
       const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
@@ -1964,11 +1972,15 @@ export default function ManageScreen() {
         rafRef.current = null;
       }
     };
-  }, [socket, tid, tour]);
+  }, [isFocused, socket, tid, tour]);
+
+  const liveMatchesSnapshot = useMemo(
+    () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),
+    [liveBump]
+  );
 
   const mergedAllMatches = useMemo(() => {
-    const vals = Array.from(liveMapRef.current.values());
-    const rawMatches = vals.filter(
+    const rawMatches = liveMatchesSnapshot.filter(
       (m) => String(m?.tournament?._id || m?.tournament) === String(tid)
     );
     if (!rawMatches.length) return rawMatches;
@@ -2248,7 +2260,7 @@ export default function ManageScreen() {
           : match?.resolvedSideNameB,
       };
     });
-  }, [tid, liveBump, bracketsData]);
+  }, [tid, liveMatchesSnapshot, bracketsData]);
 
   const liveBusyByPairId = useMemo(() => {
     const mp = new Map();

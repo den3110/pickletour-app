@@ -30,6 +30,7 @@ import {
   StatusBar,
 } from "react-native";
 import RenderHTML from "react-native-render-html";
+import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -52,6 +53,7 @@ import { roundTo3 } from "@/utils/roundTo3";
 import { getFeeAmount } from "@/utils/fee";
 import { getPlayerDisplayName } from "@/utils/matchDisplay";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -177,9 +179,14 @@ function RegisterGlassSurface({
 
 function RegisterLiquidBackdrop({ C }: { C: ReturnType<typeof useThemeColors> }) {
   const anim = useRef(new Animated.Value(0)).current;
+  const isFocused = useIsFocused();
+  const liquidGlassEnabled = useLiquidGlassEnabled();
 
   useEffect(() => {
-    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled || !isFocused) {
+      anim.stopAnimation();
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, {
@@ -196,9 +203,9 @@ function RegisterLiquidBackdrop({ C }: { C: ReturnType<typeof useThemeColors> })
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [anim, isFocused, liquidGlassEnabled]);
 
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],
@@ -386,8 +393,13 @@ const SkeletonItem = ({
 }) => {
   const C = useThemeColors();
   const opacity = useRef(new Animated.Value(0.3)).current;
+  const isFocused = useIsFocused();
 
   useEffect(() => {
+    if (!isFocused) {
+      opacity.stopAnimation();
+      return undefined;
+    }
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
@@ -404,7 +416,7 @@ const SkeletonItem = ({
     );
     animation.start();
     return () => animation.stop();
-  }, [opacity]);
+  }, [isFocused, opacity]);
 
   return (
     <Animated.View
@@ -515,9 +527,10 @@ const TournamentSkeleton = () => {
 const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
   const [timeLeft, setTimeLeft] = useState("");
   const C = useThemeColors();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
-    if (!deadline) return;
+    if (!deadline || !isFocused) return;
     const target = new Date(deadline).getTime();
     if (isNaN(target)) return;
 
@@ -537,7 +550,7 @@ const TournamentCountdown = memo(({ deadline }: { deadline?: string }) => {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [deadline]);
+  }, [deadline, isFocused]);
 
   if (!deadline || !timeLeft) return null;
   const isEnded = timeLeft === "Đã kết thúc";

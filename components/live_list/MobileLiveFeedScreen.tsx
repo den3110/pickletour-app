@@ -1492,7 +1492,8 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
   });
 
   const { data: probeData, refetch: refetchProbe } = useGetLiveFeedProbeQuery(probeArgs, {
-    pollingInterval: 15000,
+    pollingInterval: isFocused ? 15000 : 0,
+    skipPollingIfUnfocused: true,
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });

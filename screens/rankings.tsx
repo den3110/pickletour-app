@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useDispatch, useSelector } from "react-redux";
-import { useTheme } from "@react-navigation/native";
+import { useIsFocused, useTheme } from "@react-navigation/native";
 import ImageViewing from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
@@ -44,6 +44,7 @@ import { setKeyword } from "@/slices/rankingUiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import RankingChart from "@/components/RankingChart";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 /* ================= Config ================= */
@@ -412,11 +413,15 @@ const ScoreBlock = memo(({ label, score, color, theme }) => (
 ));
 ScoreBlock.displayName = "ScoreBlock";
 
-const LiquidGlassBackdrop = memo(({ theme }) => {
+const LiquidGlassBackdrop = memo(({ theme, active = true }) => {
   const anim = useRef(new Animated.Value(0)).current;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
 
   useEffect(() => {
-    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled || !active) {
+      anim.stopAnimation();
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, {
@@ -433,9 +438,9 @@ const LiquidGlassBackdrop = memo(({ theme }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [active, anim, liquidGlassEnabled]);
 
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],
@@ -484,7 +489,7 @@ const SkeletonCard = memo(() => {
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
           toValue: 1,
@@ -497,8 +502,10 @@ const SkeletonCard = memo(() => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
 
   const bg = theme.isDark ? "#2a2d36" : "#e1e4e8";
   return (
@@ -1151,6 +1158,7 @@ MemoizedChartView.displayName = "MemoizedChartView";
 
 /* ================= MAIN SCREEN ================= */
 export default function RankingListScreen({ isBack = false }) {
+  const isFocused = useIsFocused();
   const theme = useThemeColors();
   const dispatch = useDispatch();
   const router = useRouter();
@@ -1407,7 +1415,7 @@ export default function RankingListScreen({ isBack = false }) {
 
   const screenContent = (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <LiquidGlassBackdrop theme={theme} />
+      <LiquidGlassBackdrop theme={theme} active={isFocused} />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.headerArea}>
           <View style={styles.topBar}>

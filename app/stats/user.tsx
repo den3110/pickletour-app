@@ -43,6 +43,7 @@ import {
 } from "@/slices/userStatsApiSlice";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 if (
@@ -100,9 +101,13 @@ const statsGlassAccentTint = (alpha = 0.26) =>
 
 function StatsLiquidBackdrop({ theme }: any) {
   const anim = useRef(new Animated.Value(0)).current;
+  const liquidGlassEnabled = useLiquidGlassEnabled();
 
   useEffect(() => {
-    if (!IOS_26_LIQUID_GLASS_ENABLED) return;
+    if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) {
+      anim.stopAnimation();
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, {
@@ -119,9 +124,9 @@ function StatsLiquidBackdrop({ theme }: any) {
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [anim, liquidGlassEnabled]);
 
-  if (!IOS_26_LIQUID_GLASS_ENABLED) return null;
+  if (!IOS_26_LIQUID_GLASS_ENABLED || !liquidGlassEnabled) return null;
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],

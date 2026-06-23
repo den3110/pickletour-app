@@ -43,7 +43,7 @@ import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
-import { useTheme } from "@react-navigation/native";
+import { useIsFocused, useTheme } from "@react-navigation/native";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
@@ -1295,6 +1295,7 @@ function LoginPrompt({ tokens }) {
 export default function MyTournament() {
   const tokens = useThemeTokens();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const [open, setOpen] = useState(false);
   const [matchId, setMatchId] = useState(null);
 
@@ -1421,12 +1422,16 @@ export default function MyTournament() {
     [tournamentsRaw]
   );
   const tournamentRoomIdsRef = useRef(new Set<string>());
+  const activeTournamentRoomIds = useMemo(
+    () => (isFocused ? tournamentRoomIds : []),
+    [isFocused, tournamentRoomIds]
+  );
 
   useEffect(() => {
-    tournamentRoomIdsRef.current = new Set(tournamentRoomIds);
-  }, [tournamentRoomIds]);
+    tournamentRoomIdsRef.current = new Set(activeTournamentRoomIds);
+  }, [activeTournamentRoomIds]);
 
-  useSocketRoomSet(socket, tournamentRoomIds, {
+  useSocketRoomSet(socket, activeTournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -1436,7 +1441,7 @@ export default function MyTournament() {
   });
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isFocused) return;
 
     const onUpsert = (payload) => queueUpsert(payload);
     const onInvalidate = (payload: any) => {
@@ -1468,7 +1473,12 @@ export default function MyTournament() {
         rafRef.current = null;
       }
     };
-  }, [socket, queueUpsert, refetch]);
+  }, [isFocused, socket, queueUpsert, refetch]);
+
+  const liveMatchesSnapshot = useMemo(
+    () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),
+    [liveBump]
+  );
 
   useEffect(() => {
     subscribedBracketsRef.current = new Set();
@@ -1478,8 +1488,7 @@ export default function MyTournament() {
   // Merge realtime vào từng giải
   const liveMatchesByTid = useMemo(() => {
     const mp = new Map();
-    const all = Array.from(liveMapRef.current.values());
-    for (const m of all) {
+    for (const m of liveMatchesSnapshot) {
       const tid = m?.tournament?._id || m?.tournament;
       if (!tid) continue;
       const k = String(tid);
@@ -1487,7 +1496,7 @@ export default function MyTournament() {
       mp.get(k).push(m);
     }
     return mp;
-  }, [liveBump]);
+  }, [liveMatchesSnapshot]);
 
   const tournamentsMerged = useMemo(() => {
     return tournamentsRaw.map((t) => {

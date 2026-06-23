@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 type LiquidGlassTone = "default" | "accent" | "field" | "danger";
@@ -56,6 +57,9 @@ export default function LiquidGlassSurface({
   tintAlpha,
   tone = active ? "accent" : "default",
 }: LiquidGlassSurfaceProps) {
+  const liquidGlassEnabled = useLiquidGlassEnabled();
+  const glassActive = IOS_26_LIQUID_GLASS_ENABLED && liquidGlassEnabled;
+
   return (
     <AppleLiquidGlassView
       fallback={fallback}
@@ -64,9 +68,9 @@ export default function LiquidGlassSurface({
       glassTintColor={glassTint(isDark, tone, active, tintAlpha)}
       isInteractive={active}
       style={[
-        IOS_26_LIQUID_GLASS_ENABLED && styles.surface,
-        tone === "field" && IOS_26_LIQUID_GLASS_ENABLED && styles.field,
-        active && IOS_26_LIQUID_GLASS_ENABLED && styles.active,
+        glassActive && styles.surface,
+        tone === "field" && glassActive && styles.field,
+        active && glassActive && styles.active,
         style,
       ]}
     >

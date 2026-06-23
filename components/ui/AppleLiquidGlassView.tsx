@@ -3,6 +3,7 @@ import { StyleSheet, View, type ViewStyle } from "react-native";
 import { BlurView, type BlurViewProps } from "expo-blur";
 import { GlassView, type GlassViewProps } from "expo-glass-effect";
 
+import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
 type AppleLiquidGlassViewProps = BlurViewProps & {
@@ -27,7 +28,9 @@ export default function AppleLiquidGlassView({
   tint = "default",
   ...viewProps
 }: AppleLiquidGlassViewProps) {
-  if (IOS_26_LIQUID_GLASS_ENABLED) {
+  const isLiquidGlassEnabled = useLiquidGlassEnabled();
+
+  if (IOS_26_LIQUID_GLASS_ENABLED && isLiquidGlassEnabled) {
     const flattenedStyle = StyleSheet.flatten(viewProps.style) as
       | ViewStyle
       | undefined;

@@ -37,6 +37,7 @@ import { SocketProvider } from "../context/SocketContext";
 import { ChatBotPageContextProvider } from "@/context/ChatBotPageContext";
 import { PikoraHost } from "@/components/chatbot/PikoraHost";
 import { PikoraProvider } from "@/components/chatbot/PikoraProvider";
+import { GlassAppearanceProvider } from "@/context/GlassAppearanceContext";
 import { resolvePikoraNavigationTarget } from "@/components/chatbot/pikoraNavigation";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import { loadExpoNotifications } from "@/lib/expoNotifications";
@@ -1652,17 +1653,18 @@ function RootLayout() {
               {!isWebViewShellActive && mobileAppShellReady ? (
                 <MatchLiveActivityBootstrap />
               ) : null}
-              <SafeAreaProvider>
-                <SafeAreaView
-                  style={{ flex: 1, backgroundColor: bg }}
-                  edges={rootSafeAreaEdges}
-                >
-                  <View
-                    style={{ flex: 1 }}
-                    onLayout={onLayoutRoot}
-                    collapsable={false}
+              <GlassAppearanceProvider>
+                <SafeAreaProvider>
+                  <SafeAreaView
+                    style={{ flex: 1, backgroundColor: bg }}
+                    edges={rootSafeAreaEdges}
                   >
-                    <ThemeProvider value={navTheme}>
+                    <View
+                      style={{ flex: 1 }}
+                      onLayout={onLayoutRoot}
+                      collapsable={false}
+                    >
+                      <ThemeProvider value={navTheme}>
                       {!mobileAppShellReady ? (
                         <View
                           style={{
@@ -2180,10 +2182,11 @@ function RootLayout() {
                           />
                         </View>
                       )}
-                    </ThemeProvider>
-                  </View>
-                </SafeAreaView>
-              </SafeAreaProvider>
+                      </ThemeProvider>
+                    </View>
+                  </SafeAreaView>
+                </SafeAreaProvider>
+              </GlassAppearanceProvider>
             </Boot>
           </SocketProvider>
           <AppBootSplash isAppReady={isBootSplashReady} isDark={isDark} />

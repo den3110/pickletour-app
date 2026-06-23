@@ -38,7 +38,15 @@ interface CustomTabBarProps extends BottomTabBarProps {
   isDark: boolean;
 }
 
-function CustomTabBarButton({
+const getRouteFocusState = (
+  route: any,
+  state: BottomTabBarProps["state"],
+) => {
+  const originalIndex = state.routes.findIndex((r) => r.key === route.key);
+  return state.index === originalIndex;
+};
+
+const CustomTabBarButton = React.memo(function CustomTabBarButton({
   route,
   visibleIndex,
   floatingButtonIndex,
@@ -58,8 +66,7 @@ function CustomTabBarButton({
   inactiveTint: string;
 }) {
   const { options } = descriptors[route.key];
-  const originalIndex = state.routes.findIndex((r) => r.key === route.key);
-  const isFocused = state.index === originalIndex;
+  const isFocused = getRouteFocusState(route, state);
 
   const scale = useSharedValue(isFocused ? 1 : 0.9);
   const opacity = useSharedValue(isFocused ? 1 : 0.6);
@@ -138,7 +145,19 @@ function CustomTabBarButton({
       </Animated.View>
     </TouchableOpacity>
   );
-}
+}, (prev, next) => {
+  return (
+    prev.route.key === next.route.key &&
+    prev.visibleIndex === next.visibleIndex &&
+    prev.floatingButtonIndex === next.floatingButtonIndex &&
+    prev.activeTint === next.activeTint &&
+    prev.inactiveTint === next.inactiveTint &&
+    getRouteFocusState(prev.route, prev.state) ===
+      getRouteFocusState(next.route, next.state) &&
+    prev.descriptors[prev.route.key]?.options ===
+      next.descriptors[next.route.key]?.options
+  );
+});
 
 export function CustomTabBar({
   state,

@@ -348,6 +348,10 @@ export default function RefereeCenterScreen() {
     () => (id ? [String(id)] : []),
     [id]
   );
+  const activeTournamentRoomIds = useMemo(
+    () => (isFocused ? tournamentRoomIds : []),
+    [isFocused, tournamentRoomIds]
+  );
   const tournamentIdsRef = useRef(new Set());
   const watchedStationIdsRef = useRef(new Set());
   const lastRealtimeRefreshAtRef = useRef(0);
@@ -364,10 +368,10 @@ export default function RefereeCenterScreen() {
     [socket]
   );
   useEffect(() => {
-    tournamentIdsRef.current = new Set(tournamentRoomIds);
-  }, [tournamentRoomIds]);
+    tournamentIdsRef.current = new Set(activeTournamentRoomIds);
+  }, [activeTournamentRoomIds]);
 
-  useSocketRoomSet(socket, tournamentRoomIds, {
+  useSocketRoomSet(socket, activeTournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -523,7 +527,7 @@ export default function RefereeCenterScreen() {
 
   // Socket listeners
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isFocused) return;
 
     const onUpsert = (payload) => queueUpsertRef.current?.(payload);
     const onRemove = (payload) => {
@@ -621,11 +625,20 @@ export default function RefereeCenterScreen() {
         rafRef.current = null;
       }
     };
-  }, [socket, triggerRealtimeRefresh]);
+  }, [isFocused, socket, triggerRealtimeRefresh]);
+
+  const liveMatchesSnapshot = useMemo(
+    () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),
+    [liveBump]
+  );
 
   // Matches đã merge realtime (chỉ của giải hiện tại)
-  const mergedAllMatches = Array.from(liveMapRef.current.values()).filter(
-    (m) => String(m?.tournament?._id || m?.tournament) === String(id)
+  const mergedAllMatches = useMemo(
+    () =>
+      liveMatchesSnapshot.filter(
+        (m) => String(m?.tournament?._id || m?.tournament) === String(id)
+      ),
+    [id, liveMatchesSnapshot]
   );
 
   // Tabs động THEO THỨ TỰ BRACKET (order từ BE)
@@ -650,11 +663,16 @@ export default function RefereeCenterScreen() {
     return Array.from(ids).sort();
   }, [allMatches, mergedAllMatches, stationTabs]);
 
-  useEffect(() => {
-    watchedStationIdsRef.current = new Set(watchedStationIds);
-  }, [watchedStationIds]);
+  const activeWatchedStationIds = useMemo(
+    () => (isFocused ? watchedStationIds : []),
+    [isFocused, watchedStationIds]
+  );
 
-  useSocketRoomSet(socket, watchedStationIds, {
+  useEffect(() => {
+    watchedStationIdsRef.current = new Set(activeWatchedStationIds);
+  }, [activeWatchedStationIds]);
+
+  useSocketRoomSet(socket, activeWatchedStationIds, {
     subscribeEvent: "court-station:watch",
     unsubscribeEvent: "court-station:unwatch",
     payloadKey: "stationId",
@@ -868,19 +886,25 @@ export default function RefereeCenterScreen() {
 
   // Viewer
   const [viewer, setViewer] = useState({ open: false, matchId: null });
-  const openMatch = (mid) => setViewer({ open: true, matchId: mid });
-  const closeMatch = () => setViewer({ open: false, matchId: null });
+  const openMatch = useCallback(
+    (mid) => setViewer({ open: true, matchId: mid }),
+    []
+  );
+  const closeMatch = useCallback(
+    () => setViewer({ open: false, matchId: null }),
+    []
+  );
 
   // Refresh
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       await Promise.all([refetchTour(), refetchBrackets(), refetchMatches()]);
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [refetchBrackets, refetchMatches, refetchTour]);
 
   useEffect(() => {
     if (isFocused) {
@@ -896,7 +920,7 @@ export default function RefereeCenterScreen() {
   const hasError = tourErr || brErr || mErr;
 
   /* ----------- small UI (themed) ----------- */
-  function Pill({ label, kind = "default" }) {
+  const Pill = useCallback(({ label, kind = "default" }) => {
     const bg = kind === "primary" ? T.pillPrimaryBg : T.pillDefaultBg;
     const fg = kind === "primary" ? T.pillPrimaryFg : T.pillDefaultFg;
     return (
@@ -911,9 +935,9 @@ export default function RefereeCenterScreen() {
         <Text style={{ color: fg, fontSize: 12 }}>{label}</Text>
       </View>
     );
-  }
+  }, [T.pillDefaultBg, T.pillDefaultFg, T.pillPrimaryBg, T.pillPrimaryFg]);
 
-  const MiniChipBtn = ({ icon, label, onPress, color = T.tint }) => (
+  const MiniChipBtn = useCallback(({ icon, label, onPress, color = T.tint }) => (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
@@ -930,9 +954,9 @@ export default function RefereeCenterScreen() {
         {label}
       </Text>
     </Pressable>
-  );
+  ), [T.tint]);
 
-  const VideoPill = ({ has }) => (
+  const VideoPill = useCallback(({ has }) => (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
       <View
         style={{
@@ -960,9 +984,9 @@ export default function RefereeCenterScreen() {
         </Text>
       </View>
     </View>
-  );
+  ), [T.pillDefaultBg, T.pillDefaultFg, T.stFinishedBg, T.stFinishedFg]);
 
-  const ActionButtons = ({ m }) => {
+  const ActionButtons = useCallback(({ m }) => {
     const has = !!m?.video;
     const canStart = isUserRefereeOfMatch(m, me) && m?.status !== "finished";
     return (
@@ -991,10 +1015,10 @@ export default function RefereeCenterScreen() {
         )}
       </ScrollView>
     );
-  };
+  }, [MiniChipBtn, me]);
 
   /* ----------- row render ----------- */
-  const renderMatchRow = ({ item: m }) => {
+  const renderMatchRow = useCallback(({ item: m }) => {
     const hasVideo = !!m?.video;
     const courtLabel = courtLabelOf(m);
     const sets = extractGameSets(m);
@@ -1115,9 +1139,9 @@ export default function RefereeCenterScreen() {
         </View>
       </Pressable>
     );
-  };
+  }, [ActionButtons, T, VideoPill, openMatch]);
 
-  const renderBracket = ({ item: b }) => {
+  const renderBracket = useCallback(({ item: b }) => {
     const bid = String(b?._id);
     const matches = mergedAllMatches.filter(
       (m) => String(m?.bracket?._id ?? m?.bracket) === bid
@@ -1164,12 +1188,16 @@ export default function RefereeCenterScreen() {
             renderItem={renderMatchRow}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
             scrollEnabled={false}
-            extraData={`${sortKey}|${sortDir}|${q}|${liveBump}`}
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            updateCellsBatchingPeriod={60}
+            removeClippedSubviews={Platform.OS === "android"}
           />
         )}
       </View>
     );
-  };
+  }, [Pill, T, filterSortMatches, mergedAllMatches, renderMatchRow]);
 
   /* ----------- guards ----------- */
   if (isInitialLoading) {
@@ -1349,6 +1377,11 @@ export default function RefereeCenterScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={{ paddingBottom: 24 }}
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            updateCellsBatchingPeriod={60}
+            removeClippedSubviews={Platform.OS === "android"}
             ListEmptyComponent={
               <View
                 style={[
@@ -1361,7 +1394,6 @@ export default function RefereeCenterScreen() {
                 </Text>
               </View>
             }
-            extraData={liveBump}
           />
         ) : tab === TAB_ALL ? (
           <FlatList
@@ -1372,6 +1404,11 @@ export default function RefereeCenterScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={{ paddingBottom: 24 }}
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            updateCellsBatchingPeriod={60}
+            removeClippedSubviews={Platform.OS === "android"}
             ListEmptyComponent={
               <View
                 style={[
@@ -1384,7 +1421,6 @@ export default function RefereeCenterScreen() {
                 </Text>
               </View>
             }
-            extraData={liveBump}
           />
         ) : (
           <FlatList
@@ -1395,6 +1431,11 @@ export default function RefereeCenterScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={{ paddingBottom: 24 }}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            updateCellsBatchingPeriod={80}
+            removeClippedSubviews={Platform.OS === "android"}
             ListEmptyComponent={
               <View
                 style={[
