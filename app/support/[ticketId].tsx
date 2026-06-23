@@ -28,15 +28,9 @@ import {
   useSendMessageMutation,
 } from "@/slices/supportApiSlice";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
+import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 
 type Picked = { uri: string; name?: string; mime?: string; size?: number };
-
-function guessMime(uri: string) {
-  const ext = (uri.split(".").pop() || "jpg").toLowerCase();
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  return "image/jpeg";
-}
 
 // Logic tạo trích dẫn (Quote)
 function quoteText(text: string, date: string) {
@@ -153,14 +147,11 @@ export default function SupportThreadScreen() {
 
   const uploadOne = useCallback(
     async (img: Picked) => {
-      const uri = img.uri;
-      const mime = img.mime || guessMime(uri);
-      const ext = (uri.split(".").pop() || "jpg").toLowerCase();
-      const name = img.name || `supp_${Date.now()}.${ext}`;
+      const file = await prepareSupportImageForUpload(img, "support");
 
       const res: any = await uploadFile({
         folder: "support",
-        file: { uri, name, type: mime },
+        file,
         options: {
           format: "webp",
           width: 1280,
@@ -175,8 +166,8 @@ export default function SupportThreadScreen() {
       return {
         url,
         mime: body.mime || "image/webp",
-        name: body.filename || body.name || name,
-        size: body.size || img.size || 0,
+        name: body.filename || body.name || file.name,
+        size: body.size || file.size || img.size || 0,
       };
     },
     [uploadFile]

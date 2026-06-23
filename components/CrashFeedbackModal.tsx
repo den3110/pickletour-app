@@ -27,6 +27,7 @@ import {
 } from "@/services/crashFeedbackService";
 import { useCreateTicketMutation } from "@/slices/supportApiSlice";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
+import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 
 type PickedImage = {
   uri: string;
@@ -37,19 +38,6 @@ type PickedImage = {
 
 const MAX_IMAGES = 5;
 const CRASH_UPLOAD_FOLDER = "support-crash";
-
-function guessMime(uri: string) {
-  const ext = (uri.split(".").pop() || "jpg").toLowerCase();
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  return "image/jpeg";
-}
-
-function guessName(img: PickedImage) {
-  if (img.name) return img.name;
-  const ext = (img.uri.split(".").pop() || "jpg").toLowerCase();
-  return `crash_feedback_${Date.now()}.${ext}`;
-}
 
 export default function CrashFeedbackModal() {
   const insets = useSafeAreaInsets();
@@ -144,12 +132,10 @@ export default function CrashFeedbackModal() {
 
   const uploadOne = React.useCallback(
     async (img: PickedImage) => {
-      const uri = img.uri;
-      const mime = img.mime || guessMime(uri);
-      const name = guessName(img);
+      const file = await prepareSupportImageForUpload(img, "crash_feedback");
       const res: any = await uploadImage({
         folder: CRASH_UPLOAD_FOLDER,
-        file: { uri, name, type: mime },
+        file,
         options: {
           format: "webp",
           width: 1280,
@@ -165,8 +151,8 @@ export default function CrashFeedbackModal() {
       return {
         url,
         mime: body.mime || "image/webp",
-        name: body.filename || body.name || name,
-        size: body.size || img.size || 0,
+        name: body.filename || body.name || file.name,
+        size: body.size || file.size || img.size || 0,
       };
     },
     [uploadImage],
