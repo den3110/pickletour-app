@@ -27,7 +27,7 @@ import {
   useGetTicketDetailQuery,
   useSendMessageMutation,
 } from "@/slices/supportApiSlice";
-import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
+import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 
 type Picked = { uri: string; name?: string; mime?: string; size?: number };
 
@@ -81,7 +81,8 @@ export default function SupportThreadScreen() {
   });
 
   const [sendMessage, { isLoading: sending }] = useSendMessageMutation();
-  const [uploadFile, { isLoading: uploading }] = useUploadAvatarMutation();
+  const [uploadFile, { isLoading: uploading }] =
+    useUploadImageToFolderMutation();
 
   const [text, setText] = useState("");
   const [images, setImages] = useState<Picked[]>([]);
@@ -157,18 +158,24 @@ export default function SupportThreadScreen() {
       const ext = (uri.split(".").pop() || "jpg").toLowerCase();
       const name = img.name || `supp_${Date.now()}.${ext}`;
 
-      const fd = new FormData();
-      fd.append("file", { uri, name, type: mime } as any);
-
-      const res: any = await uploadFile(fd).unwrap();
+      const res: any = await uploadFile({
+        folder: "support",
+        file: { uri, name, type: mime },
+        options: {
+          format: "webp",
+          width: 1280,
+          height: 1280,
+          quality: 82,
+        },
+      }).unwrap();
       const body = typeof res === "string" ? { url: res } : res || {};
       const url = body.url || body?.data?.url;
       if (!url) throw new Error("Upload failed");
 
       return {
         url,
-        mime: body.mime || mime,
-        name: body.name || name,
+        mime: body.mime || "image/webp",
+        name: body.filename || body.name || name,
         size: body.size || img.size || 0,
       };
     },
@@ -196,7 +203,7 @@ export default function SupportThreadScreen() {
 
       await refetch();
       scrollToEnd(true);
-    } catch (e: any) {
+    } catch {
       Alert.alert("Lỗi", "Không thể gửi tin nhắn.");
     }
   }, [id, images, refetch, scrollToEnd, sendMessage, text, uploadOne]);

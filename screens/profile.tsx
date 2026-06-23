@@ -68,6 +68,10 @@ import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
 import { buildLoginHref, runMobileLogoutFlow } from "@/services/authSession";
 import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
+import {
+  CRASH_FEEDBACK_TEST_EVENT,
+  recordJsCrashForFeedback,
+} from "@/services/crashFeedbackService";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
@@ -806,6 +810,18 @@ export default function ProfileScreen({ isBack = false }) {
   const avatarUrl = normalizeUrl(form.avatar) || "";
   const coverUrl = normalizeUrl(form.cover) || "";
 
+  const handleCrashFeedbackTest = async () => {
+    try {
+      await recordJsCrashForFeedback(
+        new Error("Admin test crash feedback từ trang hồ sơ"),
+        true,
+      );
+      DeviceEventEmitter.emit(CRASH_FEEDBACK_TEST_EVENT);
+    } catch {
+      Alert.alert("Lỗi", "Không thể tạo phản hồi lỗi test lúc này.");
+    }
+  };
+
   // ===== ANIMATED STYLES (PURE TRANSFORM) =====
 
   // 1. Header Container: Dùng TranslateY để "kéo" header lên thay vì giảm height
@@ -1360,6 +1376,12 @@ export default function ProfileScreen({ isBack = false }) {
                       title="Vào trang quản trị"
                       onPress={() => router.push("/admin/home")}
                     />
+                    <View style={{ marginTop: 10 }}>
+                      <GradientBtn
+                        title="Test phản hồi lỗi app"
+                        onPress={handleCrashFeedbackTest}
+                      />
+                    </View>
                   </Card>
                 )}
               </>
@@ -2736,7 +2758,7 @@ const FormDatePicker = ({ label, value, onChange, icon, highlighted, t }) => {
   );
 };
 
-const GradientBtn = ({ title, onPress, disabled, loading }) => {
+const GradientBtn = ({ title, onPress, disabled = false, loading = false }) => {
   const t = useTokens();
   return (
     <Pressable

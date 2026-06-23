@@ -18,7 +18,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Image as ExpoImage } from "expo-image";
 
 import { useCreateTicketMutation } from "@/slices/supportApiSlice";
-import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
+import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 
 type Picked = { uri: string; name?: string; mime?: string; size?: number };
 
@@ -39,7 +39,8 @@ export default function SupportNewScreen() {
   const [images, setImages] = useState<Picked[]>([]);
 
   const [createTicket, { isLoading: creating }] = useCreateTicketMutation();
-  const [uploadFile, { isLoading: uploading }] = useUploadAvatarMutation();
+  const [uploadFile, { isLoading: uploading }] =
+    useUploadImageToFolderMutation();
 
   const colors = useMemo(
     () => ({
@@ -91,18 +92,20 @@ export default function SupportNewScreen() {
     const ext = (uri.split(".").pop() || "jpg").toLowerCase();
     const name = img.name || `support_${Date.now()}.${ext}`;
 
-    const fd = new FormData();
-    fd.append("file", {
-      uri,
-      name,
-      type: mime,
-    } as any);
-
-    const res = await uploadFile(fd).unwrap();
+    const res = await uploadFile({
+      folder: "support",
+      file: { uri, name, type: mime },
+      options: {
+        format: "webp",
+        width: 1280,
+        height: 1280,
+        quality: 82,
+      },
+    }).unwrap();
     return {
       url: res.url,
-      mime: res.mime || mime,
-      name: res.name || name,
+      mime: res.mime || "image/webp",
+      name: res.filename || res.name || name,
       size: res.size || img.size || 0,
     };
   };

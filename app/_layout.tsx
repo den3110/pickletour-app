@@ -42,6 +42,7 @@ import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import { loadExpoNotifications } from "@/lib/expoNotifications";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
+import CrashFeedbackModal from "@/components/CrashFeedbackModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
@@ -57,8 +58,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
 import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 import { enableFreeze } from "react-native-screens";
+import { installJsCrashReporter } from "@/services/crashFeedbackService";
 
 enableFreeze(true);
+installJsCrashReporter();
 
 const HOT_UPDATER_ENABLED =
   process.env.EXPO_PUBLIC_ENABLE_HOT_UPDATER === "1" &&
@@ -2200,6 +2203,7 @@ function RootLayout() {
               otaCheckInFlightRef.current = false;
             }}
           />
+          <CrashFeedbackModal />
           <Toast />
         </BottomSheetModalProvider>
       </GestureHandlerRootView>

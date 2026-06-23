@@ -17,6 +17,30 @@ function toFormData(payload, field) {
   return fd;
 }
 
+function toFolderImageFormData(payload) {
+  const fd = new FormData();
+  const file = payload?.file || payload;
+  const options = payload?.options || {};
+
+  if (file && file.uri) {
+    fd.append("image", {
+      uri: file.uri,
+      name: file.name || "image.jpg",
+      type: file.type || file.mime || "image/jpeg",
+    });
+  } else {
+    fd.append("image", file);
+  }
+
+  Object.entries(options).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      fd.append(key, String(value));
+    }
+  });
+
+  return fd;
+}
+
 export const uploadApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // ---------- Upload Avatar ----------
@@ -106,6 +130,18 @@ export const uploadApiSlice = apiSlice.injectEndpoints({
         };
       },
     }),
+    uploadImageToFolder: builder.mutation({
+      query: ({ folder = "misc", file, options } = {}) => {
+        const safeFolder = encodeURIComponent(String(folder || "misc").trim());
+
+        return {
+          url: `/api/upload/${safeFolder}`,
+          method: "POST",
+          body: toFolderImageFormData({ file, options }),
+        };
+      },
+      extraOptions: { skip404Redirect: true },
+    }),
   }),
 });
 
@@ -113,4 +149,5 @@ export const {
   useUploadAvatarMutation,
   useUploadCccdMutation,
   useUploadRealAvatarMutation,
+  useUploadImageToFolderMutation,
 } = uploadApiSlice;
