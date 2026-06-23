@@ -68,10 +68,7 @@ import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
 import { buildLoginHref, runMobileLogoutFlow } from "@/services/authSession";
 import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
-import {
-  CRASH_FEEDBACK_TEST_EVENT,
-  recordJsCrashForFeedback,
-} from "@/services/crashFeedbackService";
+import { triggerCrashFeedbackTestCrash } from "@/services/crashFeedbackService";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 
@@ -810,16 +807,8 @@ export default function ProfileScreen({ isBack = false }) {
   const avatarUrl = normalizeUrl(form.avatar) || "";
   const coverUrl = normalizeUrl(form.cover) || "";
 
-  const handleCrashFeedbackTest = async () => {
-    try {
-      await recordJsCrashForFeedback(
-        new Error("Admin test crash feedback từ trang hồ sơ"),
-        true,
-      );
-      DeviceEventEmitter.emit(CRASH_FEEDBACK_TEST_EVENT);
-    } catch {
-      Alert.alert("Lỗi", "Không thể tạo phản hồi lỗi test lúc này.");
-    }
+  const handleCrashFeedbackTest = () => {
+    void triggerCrashFeedbackTestCrash();
   };
 
   // ===== ANIMATED STYLES (PURE TRANSFORM) =====
@@ -1378,7 +1367,7 @@ export default function ProfileScreen({ isBack = false }) {
                     />
                     <View style={{ marginTop: 10 }}>
                       <GradientBtn
-                        title="Test phản hồi lỗi app"
+                        title="Test văng app"
                         onPress={handleCrashFeedbackTest}
                       />
                     </View>

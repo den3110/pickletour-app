@@ -5,7 +5,6 @@ import React from "react";
 import {
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,7 +22,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   buildCrashFeedbackDetails,
   clearPendingCrashFeedback,
-  CRASH_FEEDBACK_TEST_EVENT,
   getPendingCrashFeedback,
   type PendingCrashFeedback,
 } from "@/services/crashFeedbackService";
@@ -93,15 +91,10 @@ export default function CrashFeedbackModal() {
     };
 
     const timer = setTimeout(openPendingFeedback, 900);
-    const sub = DeviceEventEmitter.addListener(
-      CRASH_FEEDBACK_TEST_EVENT,
-      openPendingFeedback,
-    );
 
     return () => {
       mounted = false;
       clearTimeout(timer);
-      sub.remove();
     };
   }, []);
 

@@ -4,7 +4,6 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 
 const PENDING_JS_CRASH_KEY = "@pickletour/pending-js-crash-feedback";
-export const CRASH_FEEDBACK_TEST_EVENT = "crashFeedback:test";
 
 type CrashFeedbackSource = "js" | "native";
 
@@ -89,6 +88,24 @@ export async function recordJsCrashForFeedback(
   if (!isFatal) return;
   const payload = normalizeError(error, isFatal);
   await AsyncStorage.setItem(PENDING_JS_CRASH_KEY, JSON.stringify(payload));
+}
+
+export async function triggerCrashFeedbackTestCrash() {
+  const error = new Error("Admin test crash feedback từ trang hồ sơ");
+  await recordJsCrashForFeedback(error, true).catch(() => {});
+
+  try {
+    if (Constants.appOwnership !== "expo") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const crashlytics = require("@react-native-firebase/crashlytics").default;
+      crashlytics().crash();
+      return;
+    }
+  } catch {}
+
+  setTimeout(() => {
+    throw error;
+  }, 0);
 }
 
 export async function getPendingCrashFeedback(): Promise<PendingCrashFeedback | null> {
