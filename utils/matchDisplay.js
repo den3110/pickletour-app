@@ -673,8 +673,18 @@ export const normalizeMatchDisplay = (match, fallbackSource = null) => {
         }
       : match?.tournament;
 
-  const pairA = normalizePairDisplay(match?.pairA, match);
-  const pairB = normalizePairDisplay(match?.pairB, match);
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(match, key);
+  const pairASource = hasOwn("pairA") ? match?.pairA : fallbackSource?.pairA;
+  const pairBSource = hasOwn("pairB") ? match?.pairB : fallbackSource?.pairB;
+  const teamsSource = hasOwn("teams") ? match?.teams : fallbackSource?.teams;
+  const pairA = normalizePairDisplay(
+    pairASource,
+    hasOwn("pairA") ? match : fallbackSource || match
+  );
+  const pairB = normalizePairDisplay(
+    pairBSource,
+    hasOwn("pairB") ? match : fallbackSource || match
+  );
 
   const next = {
     ...match,
@@ -682,13 +692,13 @@ export const normalizeMatchDisplay = (match, fallbackSource = null) => {
     pairA,
     pairB,
     teams:
-      match?.teams && typeof match.teams === "object"
+      teamsSource && typeof teamsSource === "object"
         ? {
-            ...match.teams,
-            A: normalizeTeamDisplay(match.teams?.A, mode),
-            B: normalizeTeamDisplay(match.teams?.B, mode),
+            ...teamsSource,
+            A: normalizeTeamDisplay(teamsSource?.A, mode),
+            B: normalizeTeamDisplay(teamsSource?.B, mode),
           }
-        : match?.teams,
+        : teamsSource,
     court: normalizeRefEntity(match?.court),
     bracket: normalizeRefEntity(match?.bracket),
     previousA: normalizeRefEntity(match?.previousA),
@@ -864,9 +874,23 @@ const mergePlayer = (current, incoming, source) => {
   return normalizePlayerDisplay({ ...(current || {}), ...incoming }, source);
 };
 
+const valueIdOf = (value) => {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    return String(value?._id ?? value?.id ?? value?.user?._id ?? value?.user ?? "");
+  }
+  return String(value);
+};
+
 const mergePair = (current, incoming, source) => {
   if (incoming == null) return normalizePairDisplay(current, source);
-  if (typeof incoming !== "object") return incoming;
+  if (typeof incoming !== "object") {
+    const currentId = valueIdOf(current);
+    if (current && typeof current === "object" && String(incoming) === currentId) {
+      return normalizePairDisplay(current, source);
+    }
+    return incoming;
+  }
   return normalizePairDisplay(
     {
       ...(current || {}),

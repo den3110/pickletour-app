@@ -1991,6 +1991,14 @@ export default function RefereeJudgePanel({ matchId }) {
   const activeServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
   const isOpeningServe = Boolean(serve?.opening);
+  const isOpeningServeLocked =
+    eventType !== "single" &&
+    Number(curA) === 0 &&
+    Number(curB) === 0 &&
+    (waitingStartActive ||
+      match?.status !== "live" ||
+      isOpeningServe ||
+      activeServerNum === OPENING_DOUBLES_SERVER);
 
   // Nhớ người giao gần nhất để icon không “nhảy theo ô”
   const lastServerUidRef = useRef("");
@@ -2070,16 +2078,59 @@ export default function RefereeJudgePanel({ matchId }) {
 
   // ✅ forcedUid phải ưu tiên cao nhất để khỏi nhảy 2 lần
   const serverUidShow = forcedUid || baseServerUidShow;
+
+  const buildPreStartServe = useCallback(
+    ({ preferCurrentServerId = true } = {}) => {
+      const isDouble = eventType !== "single";
+      const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
+      const slotServerId =
+        getUidAtSlotNow(activeSide, rightSlot) ||
+        getUidAtSlotNow(activeSide, oppositeSlot(rightSlot)) ||
+        "";
+      const currentServerId = serve?.serverId ? String(serve.serverId) : "";
+      const localServerId = localServeOverride?.serverId
+        ? String(localServeOverride.serverId)
+        : "";
+      const serverId =
+        localServerId ||
+        (preferCurrentServerId ? currentServerId : "") ||
+        slotServerId ||
+        serverUidShow ||
+        currentServerId ||
+        lastServerUidRef.current ||
+        "";
+
+      return {
+        side: activeSide,
+        server: isDouble ? OPENING_DOUBLES_SERVER : 1,
+        serverId,
+        opening: isDouble,
+      };
+    },
+    [
+      activeSide,
+      eventType,
+      getUidAtSlotNow,
+      leftSide,
+      localServeOverride?.serverId,
+      serve?.serverId,
+      serverUidShow,
+    ],
+  );
   // ✅ INIT serve đầu game:
   // - double pickleball: 0-0-2 (opening serve chỉ có 1 lượt giao)
   // - single: 0-0-1 (server #1)
   // Tự động set người giao bóng chuẩn theo bên đang đứng khi tỉ số 0-0
   const initServeDoneRef = useRef({});
+  const initServePendingRef = useRef({});
 
   useEffect(() => {
     if (!match?._id) return;
 
-    const inited = !!initServeDoneRef.current[curIdx];
+    const initServeKey = `${match._id}:${curIdx}`;
+    const inited =
+      !!initServeDoneRef.current[initServeKey] ||
+      !!initServePendingRef.current[initServeKey];
     const is000 = Number(curA) === 0 && Number(curB) === 0;
     const isUserMatch = String(userMatch) === "true";
 
@@ -2096,50 +2147,35 @@ export default function RefereeJudgePanel({ matchId }) {
       return;
     }
 
-    const isDouble = eventType !== "single";
-    const wantServerNum = isDouble ? OPENING_DOUBLES_SERVER : 1;
-    const wantOpening = isDouble;
-
-    const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
-    const uidRight =
-      getUidAtSlotNow(activeSide, rightSlot) ||
-      getUidAtSlotNow(activeSide, oppositeSlot(rightSlot)) ||
-      "";
+    const nextServe = buildPreStartServe({
+      preferCurrentServerId: !isUserMatch,
+    });
+    const nextServerId = nextServe.serverId ? String(nextServe.serverId) : "";
 
     // Nếu UID tính ra KHÁC với UID đang lưu trên server (hoặc server chưa có)
     // -> Gửi lệnh SET đè lên ngay lập tức
-    if (uidRight && currentServerId !== uidRight) {
+    if (nextServerId && currentServerId !== nextServerId) {
       // Cập nhật UI tạm thời để không bị nhảy
-      lastServerUidRef.current = uidRight;
-      setLocalServeOverride({
-        side: activeSide,
-        server: wantServerNum,
-        serverId: uidRight,
-        opening: wantOpening,
-      });
+      lastServerUidRef.current = nextServerId;
+      setLocalServeOverride(nextServe);
 
-      socket?.emit(
-        "serve:set",
-        {
-          matchId: match._id,
-          side: activeSide,
-          server: wantServerNum,
-          serverId: uidRight,
-          opening: wantOpening,
-          userMatch,
-        },
-        (ack) => {
-          if (ack?.ok) {
-            initServeDoneRef.current[curIdx] = true;
-            lastServerUidRef.current = uidRight;
-            return;
-          }
+      initServePendingRef.current[initServeKey] = true;
+      Promise.resolve()
+        .then(() => liveApi.setServe(nextServe))
+        .then(() => {
+          initServeDoneRef.current[initServeKey] = true;
+          lastServerUidRef.current = nextServerId;
+        })
+        .catch(() => {
+          delete initServeDoneRef.current[initServeKey];
           setLocalServeOverride(null);
-        },
-      );
+        })
+        .finally(() => {
+          delete initServePendingRef.current[initServeKey];
+        });
     } else if (currentServerId) {
       // Nếu đúng rồi thì thôi, đánh dấu đã init
-      initServeDoneRef.current[curIdx] = true;
+      initServeDoneRef.current[initServeKey] = true;
       lastServerUidRef.current = currentServerId;
     }
   }, [
@@ -2147,21 +2183,11 @@ export default function RefereeJudgePanel({ matchId }) {
     curIdx,
     curA,
     curB,
-    activeSide,
     serve?.serverId,
-    serve?.order,
-    serve?.server,
-    serve?.opening,
-    socket,
-    eventType,
-    playersA,
-    playersB,
-    baseA,
-    baseB,
-    getUidAtSlotNow,
+    buildPreStartServe,
+    liveApi,
     userMatch,
     waitingStartActive,
-    leftSide,
   ]);
 
   useEffect(() => {
@@ -2471,6 +2497,23 @@ export default function RefereeJudgePanel({ matchId }) {
   const onStart = useCallback(async () => {
     if (!match || !ensureLiveOwner()) return;
     try {
+      const startServe = buildPreStartServe({
+        preferCurrentServerId: !isUserMatch,
+      });
+      if (startServe.serverId) {
+        const startServeKey = `${match._id}:${curIdx}`;
+        lastServerUidRef.current = String(startServe.serverId);
+        if (startServe.opening) {
+          openingServerRef.current = {
+            gameIndex: curIdx,
+            side: startServe.side,
+            uid: String(startServe.serverId),
+          };
+        }
+        setLocalServeOverride(startServe);
+        initServeDoneRef.current[startServeKey] = true;
+        await liveApi.setServe(startServe);
+      }
       await liveApi.start();
       if (liveSync?.online) {
         await liveApi.setBreak({
@@ -2488,7 +2531,15 @@ export default function RefereeJudgePanel({ matchId }) {
           textOf(e?.data?.message) || textOf(e?.error) || "Không thể bắt đầu",
       });
     }
-  }, [match, ensureLiveOwner, liveApi, liveSync?.online, isUserMatch]);
+  }, [
+    match,
+    curIdx,
+    ensureLiveOwner,
+    buildPreStartServe,
+    liveApi,
+    liveSync?.online,
+    isUserMatch,
+  ]);
 
   const finishMatchNow = useCallback(async (winner) => {
     if (!match || !ensureLiveOwner()) return;
@@ -3046,6 +3097,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const toggleServerNum = useCallback(() => {
     if (!ensureLiveOwner()) return;
     if (!match?._id) return;
+    if (isOpeningServeLocked) return;
     const team = activeSide === "A" ? playersA : playersB;
     if (!team?.length || team.length < 2) return;
 
@@ -3101,6 +3153,7 @@ export default function RefereeJudgePanel({ matchId }) {
     curB,
     serve?.opening,
     waitingStartActive,
+    isOpeningServeLocked,
     eventType,
     ensureLiveOwner,
     liveApi,
@@ -3396,6 +3449,7 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const midUsesServeToggle =
     eventType === "single" ||
+    isOpeningServeLocked ||
     waitingStartActive ||
     match?.status !== "live" ||
     isOpeningServe ||
@@ -3677,7 +3731,7 @@ export default function RefereeJudgePanel({ matchId }) {
                 {/* Toggle người giao #1/#2 */}
                 <Ripple
                   onPress={toggleServerNum}
-                  disabled={incBusy || undoBusy}
+                  disabled={incBusy || undoBusy || isOpeningServeLocked}
                   style={[
                     s.btnOutlineSm,
                     useCompactTopActions && s.topSecondaryBtnCompact,
@@ -3690,7 +3744,8 @@ export default function RefereeJudgePanel({ matchId }) {
                       backgroundColor: t.colors.card,
                       borderColor: t.colors.border,
                     },
-                    (incBusy || undoBusy) && s.btnDisabled,
+                    (incBusy || undoBusy || isOpeningServeLocked) &&
+                      s.btnDisabled,
                   ]}
                   rippleContainerBorderRadius={10}
                 >

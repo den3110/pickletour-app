@@ -1181,18 +1181,22 @@ export function useRefereeLiveSyncMatch(
         shouldOverlayQueue
           ? rebuildLiveSyncSnapshot(incoming, queue)
           : incoming;
-      setDerivedState((prev) => {
-        const nextData = prev.data
-          ? mergeMatchPayload(prev.data, baseSnapshot, prev.data)
-          : baseSnapshot;
-        if (!nextData) return prev;
-        if (prev.data && !isNewerOrEqualMatchPayload(prev.data, nextData)) {
-          return prev;
-        }
-        dataRef.current = nextData;
-        return { ...prev, loading: false, data: nextData, error: null };
-      });
-      await persistState({ snapshot: incoming });
+      const currentData = dataRef.current;
+      const nextData = currentData
+        ? mergeMatchPayload(currentData, baseSnapshot, currentData)
+        : normalizeMatchDisplay(baseSnapshot, persistRef.current.snapshot);
+      if (!nextData) return;
+      if (currentData && !isNewerOrEqualMatchPayload(currentData, nextData)) {
+        return;
+      }
+      dataRef.current = nextData;
+      setDerivedState((prev) => ({
+        ...prev,
+        loading: false,
+        data: nextData,
+        error: null,
+      }));
+      await persistState({ snapshot: normalizeMatchDisplay(nextData) });
     };
 
     const onSnapshot = (payload) =>
@@ -1221,14 +1225,17 @@ export function useRefereeLiveSyncMatch(
           ? rebuildLiveSyncSnapshot(mergedSnapshot, queue)
           : mergedSnapshot;
 
+      if (!nextData) return;
+      const currentData = dataRef.current;
+      if (currentData && !isNewerOrEqualMatchPayload(currentData, nextData)) {
+        return;
+      }
       dataRef.current = nextData;
-      await persistState({ snapshot: normalizeMatchDisplay(mergedSnapshot) });
+      await persistState({ snapshot: normalizeMatchDisplay(nextData) });
       setDerivedState((prev) => ({
         ...prev,
         loading: false,
-        data: prev.data
-          ? mergeMatchPayload(prev.data, nextData, prev.data)
-          : nextData,
+        data: nextData,
         error: null,
       }));
     };
