@@ -36,6 +36,7 @@ import { Image } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import {
   getMatchDisplayCode,
+  getMatchSideDisplayName,
   getPlayerDisplayName,
   resolveDisplayMode,
 } from "@/utils/matchDisplay";
@@ -147,8 +148,14 @@ const userIdOf = (u) => {
 const playersOf = (reg, eventType = "double") => {
   const et = (eventType || "double").toLowerCase();
   if (!reg) return [];
+  if (Array.isArray(reg)) return reg.filter(Boolean);
   if (et === "single") {
-    const u = reg.player1 || reg.p1 || reg.user || reg;
+    const u =
+      reg.player1 ||
+      reg.p1 ||
+      (Array.isArray(reg.players) ? reg.players[0] : null) ||
+      reg.user ||
+      reg;
     return u ? [u] : [];
   }
   const p1 =
@@ -160,6 +167,63 @@ const playersOf = (reg, eventType = "double") => {
     reg.p2 ||
     (Array.isArray(reg.players) ? reg.players[1] : null);
   return [p1, p2].filter(Boolean);
+};
+
+const sideKeyOf = (side) => (String(side).toUpperCase() === "B" ? "B" : "A");
+
+const sideSourceOf = (match, side) => {
+  const key = sideKeyOf(side);
+  return (
+    match?.[`pair${key}`] ||
+    match?.teams?.[key] ||
+    match?.[`team${key}`] ||
+    match?.[`side${key}`] ||
+    null
+  );
+};
+
+const syntheticPlayerFromName = (name, side) => {
+  const label = textOf(name).trim();
+  if (!label) return null;
+  const id = `side-${sideKeyOf(side)}:${label}`;
+  return {
+    _id: id,
+    id,
+    uid: id,
+    nickname: label,
+    nickName: label,
+    fullName: label,
+    name: label,
+    displayName: label,
+  };
+};
+
+const playerHasDisplayName = (player, source) =>
+  Boolean(
+    getPlayerDisplayName(player, source) ||
+      textOf(player?.displayName) ||
+      textOf(player?.nickname) ||
+      textOf(player?.nickName) ||
+      textOf(player?.fullName) ||
+      textOf(player?.name)
+  );
+
+const playersForSide = (match, side, eventType = "double") => {
+  const key = sideKeyOf(side);
+  const source = sideSourceOf(match, key);
+  const players = playersOf(source, eventType);
+  if (players.some((player) => playerHasDisplayName(player, match))) {
+    return players;
+  }
+
+  const fallbackName =
+    getMatchSideDisplayName(match, key, key === "B" ? "Đội B" : "Đội A") ||
+    textOf(source?.displayName) ||
+    textOf(source?.teamName) ||
+    textOf(source?.label) ||
+    textOf(source?.name);
+  const synthetic = syntheticPlayerFromName(fallbackName, key);
+  return synthetic ? [synthetic] : [];
 };
 
 const needWins = (bestOf = 3) => Math.floor(bestOf / 2) + 1;
@@ -1787,12 +1851,12 @@ export default function RefereeJudgePanel({ matchId }) {
   const needsStartAction = isPreMatch || waitingStartActive;
 
   const playersA = useMemo(
-    () => playersOf(match?.pairA, eventType),
-    [match?.pairA, eventType],
+    () => playersForSide(match, "A", eventType),
+    [match, eventType],
   );
   const playersB = useMemo(
-    () => playersOf(match?.pairB, eventType),
-    [match?.pairB, eventType],
+    () => playersForSide(match, "B", eventType),
+    [match, eventType],
   );
 
   const slotsBase = useMemo(
