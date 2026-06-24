@@ -1723,7 +1723,6 @@ export default function ManageScreen() {
   const {
     data: tour,
     isLoading: tourLoading,
-    isFetching: tourFetching,
     error: tourErr,
     refetch: refetchTour,
   } = useGetTournamentQuery(tid, {
@@ -1734,7 +1733,6 @@ export default function ManageScreen() {
   const {
     data: bracketsData = [],
     isLoading: brLoading,
-    isFetching: brFetching,
     error: brErr,
     refetch: refetchBrackets,
   } = useAdminGetBracketsQuery(tid, {
@@ -1745,7 +1743,6 @@ export default function ManageScreen() {
   const {
     data: matchPage,
     isLoading: mLoading,
-    isFetching: mFetching,
     error: mErr,
     refetch: refetchMatches,
   } = useAdminListMatchesByTournamentQuery(
@@ -2852,7 +2849,7 @@ export default function ManageScreen() {
 
   const isInitialLoading = tourLoading || brLoading || mLoading;
   const hasError = tourErr || brErr || mErr;
-  const isRetryingError = refreshing || tourFetching || brFetching || mFetching;
+  const isRetryingError = refreshing;
 
   const buildRowsForBracket = useCallback((matches) => {
     return matches.map((m) => {
@@ -3552,9 +3549,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             }}
             refreshControl={
               <RefreshControl
-                refreshing={
-                  refreshing || tourFetching || brFetching || mFetching
-                }
+                refreshing={refreshing}
                 onRefresh={onRefresh}
                 progressViewOffset={headerHeight + 20}
                 tintColor={colors.primary}

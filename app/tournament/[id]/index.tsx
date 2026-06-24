@@ -440,7 +440,6 @@ export default function TournamentOverviewScreen() {
 
   const {
     data: regs = [],
-    isLoading: rLoading,
     error: rError,
     refetch: refetchRegs,
   } = useGetRegistrationsQuery(id);
@@ -555,11 +554,19 @@ export default function TournamentOverviewScreen() {
     setSelectedMatchId(null);
   }, []);
 
-  const onRefresh = useCallback(() => {
-    refetchTournament();
-    refetchMatches();
-    refetchBrackets();
-    refetchRegs();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await Promise.all([
+        refetchTournament(),
+        refetchMatches(),
+        refetchBrackets(),
+        refetchRegs(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   }, [refetchTournament, refetchMatches, refetchBrackets, refetchRegs]);
 
   const fmtDate = useCallback(
@@ -652,7 +659,7 @@ export default function TournamentOverviewScreen() {
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={
             <RefreshControl
-              refreshing={loading || rLoading}
+              refreshing={refreshing}
               onRefresh={onRefresh}
             />
           }

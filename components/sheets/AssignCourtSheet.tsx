@@ -14,6 +14,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
@@ -31,6 +32,8 @@ import {
   useGetTournamentCourtClusterRuntimeQuery,
   useRemoveTournamentCourtStationQueueItemMutation,
 } from "@/slices/courtClustersAdminApiSlice";
+
+const ASSIGN_CONNECTOR_COLOR = "#29b6f6";
 
 const sid = (value) => {
   if (!value) return "";
@@ -95,6 +98,24 @@ const assignmentModeLabel = (mode) =>
 const Row = ({ children, style }) => (
   <View style={[styles.row, style]}>{children}</View>
 );
+
+const sameLayout = (a, b) =>
+  Boolean(a && b) &&
+  a.x === b.x &&
+  a.y === b.y &&
+  a.width === b.width &&
+  a.height === b.height;
+
+const getLayout = (event) => event?.nativeEvent?.layout || null;
+
+const safeRefetch = (enabled, refetch) => {
+  if (!enabled || typeof refetch !== "function") return undefined;
+  try {
+    return refetch();
+  } catch {
+    return undefined;
+  }
+};
 
 function QueueDetailSheet({ open, onClose, station, onSelectMatch }) {
   const t = useTokens();
@@ -244,15 +265,21 @@ export default function AssignCourtSheet({
   const [selectedClusterId, setSelectedClusterId] = useState("");
   const [queueDetailStationId, setQueueDetailStationId] = useState("");
   const [viewerMatchId, setViewerMatchId] = useState("");
+  const [connectorRootLayout, setConnectorRootLayout] = useState(null);
+  const [assignmentSummaryLayout, setAssignmentSummaryLayout] = useState(null);
+  const [stationListLayout, setStationListLayout] = useState(null);
+  const [stationCardLayouts, setStationCardLayouts] = useState({});
 
-  const Card = ({ children, highlighted = false }) => (
+  const Card = ({ children, highlighted = false, style, onLayout }) => (
     <View
+      onLayout={onLayout}
       style={[
         styles.card,
         {
           backgroundColor: t.colors.card,
-          borderColor: highlighted ? t.colors.primary : t.colors.border,
+          borderColor: highlighted ? ASSIGN_CONNECTOR_COLOR : t.colors.border,
         },
+        style,
       ]}
     >
       {children}
@@ -402,6 +429,12 @@ export default function AssignCourtSheet({
     }
   );
 
+  const canRefetchClusterOptions = Boolean(open && normalizedTournamentId);
+  const canRefetchRuntime = Boolean(open && normalizedTournamentId && selectedClusterId);
+  const canRefetchLegacyCourts = Boolean(
+    open && tournamentId && bracketId && !isClusterRuntimeMode
+  );
+
   const [assignLegacyMatch, { isLoading: assigningLegacy }] =
     useAdminAssignMatchToCourtMutation();
   const [clearLegacyCourt, { isLoading: clearingLegacy }] =
@@ -419,6 +452,10 @@ export default function AssignCourtSheet({
     if (!open) {
       setQueueDetailStationId("");
       setViewerMatchId("");
+      setConnectorRootLayout(null);
+      setAssignmentSummaryLayout(null);
+      setStationListLayout(null);
+      setStationCardLayouts({});
     }
   }, [open]);
 
@@ -430,7 +467,7 @@ export default function AssignCourtSheet({
       unsubscribeEvent: "court-cluster:unwatch",
       payloadKey: "clusterId",
       onResync: () => {
-        refetchRuntime?.();
+        safeRefetch(canRefetchRuntime, refetchRuntime);
       },
     }
   );
@@ -443,7 +480,7 @@ export default function AssignCourtSheet({
     const handleClusterUpdate = (payload) => {
       const clusterId = sid(payload?.cluster?._id || payload?.clusterId);
       if (clusterId !== selectedClusterId) return;
-      refetchRuntime?.();
+      safeRefetch(canRefetchRuntime, refetchRuntime);
     };
 
     const handleStationUpdate = (payload) => {
@@ -451,7 +488,7 @@ export default function AssignCourtSheet({
         payload?.cluster?._id || payload?.clusterId || payload?.station?.clusterId
       );
       if (clusterId !== selectedClusterId) return;
-      refetchRuntime?.();
+      safeRefetch(canRefetchRuntime, refetchRuntime);
     };
 
     socket.on?.("court-cluster:update", handleClusterUpdate);
@@ -460,7 +497,7 @@ export default function AssignCourtSheet({
       socket.off?.("court-cluster:update", handleClusterUpdate);
       socket.off?.("court-station:update", handleStationUpdate);
     };
-  }, [isClusterRuntimeMode, open, refetchRuntime, selectedClusterId, socket]);
+  }, [canRefetchRuntime, isClusterRuntimeMode, open, refetchRuntime, selectedClusterId, socket]);
 
   const stations = useMemo(() => runtime?.stations || [], [runtime?.stations]);
   const matchId = sid(match?._id);
@@ -501,10 +538,53 @@ export default function AssignCourtSheet({
   const queuedStation = queuedInfo?.station || null;
   const queuedStationId = sid(queuedStation?._id);
   const queuedIndex = queuedInfo?.index ?? -1;
+  const connectorStationId = currentStationId || queuedStationId;
   const sharedTournamentCount = Number(runtime?.sharedTournamentCount || 0);
   const sharedTournamentNames = Array.isArray(runtime?.sharedTournaments)
     ? runtime.sharedTournaments.map((item) => text(item?.name)).filter(Boolean)
     : [];
+
+  const connectorPath = useMemo(() => {
+    if (
+      !connectorStationId ||
+      !connectorRootLayout ||
+      !assignmentSummaryLayout ||
+      !stationListLayout
+    ) {
+      return null;
+    }
+    const stationLayout = stationCardLayouts[connectorStationId];
+    if (!stationLayout) return null;
+
+    const sourceX = Math.max(14, assignmentSummaryLayout.x + 2);
+    const sourceY =
+      assignmentSummaryLayout.y + Math.max(assignmentSummaryLayout.height * 0.5, 24);
+    const targetX = Math.max(14, stationListLayout.x + stationLayout.x + 2);
+    const targetY =
+      stationListLayout.y +
+      stationLayout.y +
+      Math.min(Math.max(stationLayout.height * 0.5, 42), 96);
+    const connectorX = 8;
+
+    return {
+      d: `M ${sourceX} ${sourceY} L ${connectorX} ${sourceY} L ${connectorX} ${targetY} L ${targetX} ${targetY}`,
+      width: Math.max(connectorRootLayout.width, 1),
+      height: Math.max(connectorRootLayout.height, 1),
+    };
+  }, [
+    assignmentSummaryLayout,
+    connectorRootLayout,
+    connectorStationId,
+    stationCardLayouts,
+    stationListLayout,
+  ]);
+
+  useEffect(() => {
+    setConnectorRootLayout(null);
+    setAssignmentSummaryLayout(null);
+    setStationListLayout(null);
+    setStationCardLayouts({});
+  }, [matchId, selectedClusterId]);
 
   useEffect(() => {
     if (!queueDetailStationId) return;
@@ -539,7 +619,7 @@ export default function AssignCourtSheet({
       await clearLegacyCourt({ tid: tournamentId, matchId: match._id }).unwrap();
       Alert.alert("Thành công", "Đã bỏ gán sân");
       onAssigned?.();
-      refetchLegacyCourts?.();
+      safeRefetch(canRefetchLegacyCourts, refetchLegacyCourts);
     } catch (error) {
       Alert.alert("Lỗi", error?.data?.message || error?.error || "Gỡ sân thất bại");
     }
@@ -565,7 +645,7 @@ export default function AssignCourtSheet({
     if (!queuedStationId || !matchId) return;
     try {
       await removeQueueItem({ tournamentId: normalizedTournamentId, stationId: queuedStationId, matchId }).unwrap();
-      await refetchRuntime?.();
+      await safeRefetch(canRefetchRuntime, refetchRuntime);
       onAssigned?.();
     } catch (error) {
       Alert.alert("Lỗi", error?.data?.message || error?.message || "Bỏ trận khỏi hàng đợi thất bại");
@@ -576,12 +656,46 @@ export default function AssignCourtSheet({
     if (!currentStationId) return;
     try {
       await freeCourtStation({ tournamentId: normalizedTournamentId, stationId: currentStationId }).unwrap();
-      await refetchRuntime?.();
+      await safeRefetch(canRefetchRuntime, refetchRuntime);
       onAssigned?.();
     } catch (error) {
       Alert.alert("Lỗi", error?.data?.message || error?.message || "Bỏ gán sân thất bại");
     }
   };
+  const updateConnectorRootLayout = (event) => {
+    const layout = getLayout(event);
+    if (!layout) return;
+    setConnectorRootLayout((current) =>
+      sameLayout(current, layout) ? current : layout
+    );
+  };
+
+  const updateAssignmentSummaryLayout = (event) => {
+    const layout = getLayout(event);
+    if (!layout) return;
+    setAssignmentSummaryLayout((current) =>
+      sameLayout(current, layout) ? current : layout
+    );
+  };
+
+  const updateStationListLayout = (event) => {
+    const layout = getLayout(event);
+    if (!layout) return;
+    setStationListLayout((current) =>
+      sameLayout(current, layout) ? current : layout
+    );
+  };
+
+  const updateStationCardLayout = (stationId, event) => {
+    const layout = getLayout(event);
+    if (!stationId || !layout) return;
+    setStationCardLayouts((current) =>
+      sameLayout(current[stationId], layout)
+        ? current
+        : { ...current, [stationId]: layout }
+    );
+  };
+
   const renderRuntimeStationCard = (station) => {
     const stationId = sid(station?._id);
     const assignmentMode = String(station?.assignmentMode || "manual").toLowerCase();
@@ -614,7 +728,12 @@ export default function AssignCourtSheet({
         : "Gán trực tiếp";
 
     return (
-      <Card key={stationId} highlighted={isCurrent || isQueued}>
+      <Card
+        key={stationId}
+        highlighted={isCurrent || isQueued}
+        onLayout={(event) => updateStationCardLayout(stationId, event)}
+        style={styles.connectorSurface}
+      >
         <Row style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
           <View style={{ flex: 1, gap: 4 }}>
             <Row style={{ alignItems: "center", gap: 8 }}>
@@ -784,8 +903,39 @@ export default function AssignCourtSheet({
           />
         ) : null}
 
+        <View
+          onLayout={updateConnectorRootLayout}
+          style={[
+            styles.runtimeConnectorRoot,
+            connectorStationId ? styles.runtimeConnectorRootActive : null,
+          ]}
+        >
+          {connectorPath ? (
+            <Svg
+              width={connectorPath.width}
+              height={connectorPath.height}
+              viewBox={`0 0 ${connectorPath.width} ${connectorPath.height}`}
+              pointerEvents="none"
+              style={styles.assignmentConnectorSvg}
+            >
+              <Path
+                d={connectorPath.d}
+                fill="none"
+                stroke={ASSIGN_CONNECTOR_COLOR}
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.78}
+              />
+            </Svg>
+          ) : null}
+
         {currentStationId || queuedStationId ? (
-          <Card highlighted>
+          <Card
+            highlighted
+            onLayout={updateAssignmentSummaryLayout}
+            style={styles.connectorSurface}
+          >
             <Text style={{ color: t.colors.text, fontWeight: "700" }}>
               {currentStationId
                 ? `Trận đang ở ${currentStation?.name || "sân"}`
@@ -808,7 +958,10 @@ export default function AssignCourtSheet({
             </Text>
           </View>
         ) : (
-          <View style={{ gap: 10 }}>
+          <View
+            onLayout={updateStationListLayout}
+            style={[styles.runtimeStationList, styles.connectorSurface]}
+          >
             {stations.map(renderRuntimeStationCard)}
             {!stations.length ? (
               <View style={[styles.infoBox, { backgroundColor: t.chipInfoBg, borderColor: t.chipInfoBd }]}>
@@ -817,6 +970,7 @@ export default function AssignCourtSheet({
             ) : null}
           </View>
         )}
+        </View>
       </View>
     );
   };
@@ -940,9 +1094,9 @@ export default function AssignCourtSheet({
                   <IconBtn
                     name="refresh"
                     onPress={() => {
-                      refetchClusterOptions?.();
-                      refetchRuntime?.();
-                      refetchLegacyCourts?.();
+                      safeRefetch(canRefetchClusterOptions, refetchClusterOptions);
+                      safeRefetch(canRefetchRuntime, refetchRuntime);
+                      safeRefetch(canRefetchLegacyCourts, refetchLegacyCourts);
                     }}
                   />
                   <IconBtn name="close" onPress={onClose} />
@@ -1033,6 +1187,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     minWidth: 150,
     gap: 4,
+  },
+  runtimeConnectorRoot: {
+    position: "relative",
+    gap: 12,
+  },
+  runtimeConnectorRootActive: {
+    paddingLeft: 18,
+  },
+  assignmentConnectorSvg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    zIndex: 0,
+  },
+  connectorSurface: {
+    position: "relative",
+    zIndex: 1,
+  },
+  runtimeStationList: {
+    gap: 10,
   },
   stationChipWrap: {
     flexDirection: "row",

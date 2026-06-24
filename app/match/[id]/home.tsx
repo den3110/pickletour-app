@@ -1,5 +1,5 @@
 // app/match/[id]/home.tsx
-import React, { useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useMemo, useCallback, useState } from "react";
 import {
   ActivityIndicator,
   View,
@@ -95,12 +95,13 @@ export default function MatchHomePage() {
   const T = useThemeTokens();
   const matchId = id ? String(id) : "";
 
-  const { data, isLoading, isFetching, refetch, error } =
+  const { data, isLoading, refetch, error } =
     useGetMatchPublicQuery(matchId ? matchId : (skipToken as any));
 
   // Chuẩn hoá object trận từ API
   const match = useMemo(() => normalizeMatchDisplay(data) ?? null, [data]);
   const title = useMemo(() => buildVsTitle(match), [match]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useMatchLiveActivity(match, {
     enabled: Boolean(match?._id),
@@ -112,11 +113,14 @@ export default function MatchHomePage() {
   // Refresh thủ công
   const onRefresh = useCallback(async () => {
     try {
+      setRefreshing(true);
       await refetch().unwrap();
       Toast.show({ type: "success", text1: "Đã làm mới dữ liệu trận" });
     } catch (e: any) {
       const msg = e?.data?.message || e?.message || "Không làm mới được";
       Toast.show({ type: "error", text1: "Lỗi", text2: msg });
+    } finally {
+      setRefreshing(false);
     }
   }, [refetch]);
 
@@ -219,7 +223,7 @@ export default function MatchHomePage() {
           ]}
           refreshControl={
             <RefreshControl
-              refreshing={isFetching}
+              refreshing={refreshing}
               onRefresh={onRefresh}
               colors={[T.tint]} // Android
               tintColor={T.tint} // iOS
@@ -239,7 +243,7 @@ export default function MatchHomePage() {
           ]}
           refreshControl={
             <RefreshControl
-              refreshing={isFetching}
+              refreshing={refreshing}
               onRefresh={onRefresh}
               colors={[T.tint]}
               tintColor={T.tint}
@@ -266,7 +270,7 @@ export default function MatchHomePage() {
           <MatchContent
             m={match}
             isLoading={isLoading}
-            liveLoading={isFetching}
+            liveLoading={refreshing}
             onSaved={onRefresh}
           />
         </View>
