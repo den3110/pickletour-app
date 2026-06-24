@@ -1338,7 +1338,6 @@ export default function TournamentScheduleNative() {
   const routeParams = useLocalSearchParams();
   const id = normalizeParam(routeParams.id);
   const router = useRouter();
-  const isFocused = useIsFocused();
   const me = useSelector((s) => s.auth?.userInfo || null);
   const [q, setQ] = useState("");
   const routeTab = normalizeParam(routeParams.tab || routeParams.status);
@@ -1482,12 +1481,8 @@ export default function TournamentScheduleNative() {
     () => (id ? [String(id)] : []),
     [id]
   );
-  const activeTournamentRoomIds = useMemo(
-    () => (isFocused ? tournamentRoomIds : []),
-    [isFocused, tournamentRoomIds]
-  );
 
-  useSocketRoomSet(socket, activeTournamentRoomIds, {
+  useSocketRoomSet(socket, tournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -1499,7 +1494,7 @@ export default function TournamentScheduleNative() {
   });
 
   useEffect(() => {
-    if (!socket || !isFocused) return;
+    if (!socket) return;
     const onUpsert = (p) => queueUpsert(p);
     const onInvalidate = (payload) => {
       const tournamentId = String(payload?.tournamentId || "").trim();
@@ -1530,7 +1525,6 @@ export default function TournamentScheduleNative() {
       }
     };
   }, [
-    isFocused,
     socket,
     queueUpsert,
     id,

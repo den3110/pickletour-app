@@ -28,7 +28,7 @@ import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useIsFocused, useTheme } from "@react-navigation/native";
+import { useTheme } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -1708,7 +1708,6 @@ export default function ManageScreen() {
   const { id } = useLocalSearchParams();
   const tid = Array.isArray(id) ? id[0] : id;
 
-  const isFocused = useIsFocused();
   const { colors, dark } = useTheme();
   const t = useMemo(() => getThemeTokens(colors, dark), [colors, dark]);
 
@@ -1872,12 +1871,8 @@ export default function ManageScreen() {
   }, [allMatches, tour]);
 
   const tournamentRoomIds = useMemo(() => (tid ? [String(tid)] : []), [tid]);
-  const activeTournamentRoomIds = useMemo(
-    () => (isFocused ? tournamentRoomIds : []),
-    [isFocused, tournamentRoomIds]
-  );
 
-  useSocketRoomSet(socket, activeTournamentRoomIds, {
+  useSocketRoomSet(socket, tournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -1889,7 +1884,7 @@ export default function ManageScreen() {
   });
 
   useEffect(() => {
-    if (!socket || !isFocused) return;
+    if (!socket) return;
     const queueUpsert = (payload) => {
       const incRaw = payload?.data ?? payload?.match ?? payload;
       const id = incRaw?._id ?? incRaw?.id ?? incRaw?.matchId;
@@ -1972,7 +1967,7 @@ export default function ManageScreen() {
         rafRef.current = null;
       }
     };
-  }, [isFocused, socket, tid, tour]);
+  }, [socket, tid, tour]);
 
   const liveMatchesSnapshot = useMemo(
     () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),

@@ -348,10 +348,6 @@ export default function RefereeCenterScreen() {
     () => (id ? [String(id)] : []),
     [id]
   );
-  const activeTournamentRoomIds = useMemo(
-    () => (isFocused ? tournamentRoomIds : []),
-    [isFocused, tournamentRoomIds]
-  );
   const tournamentIdsRef = useRef(new Set());
   const watchedStationIdsRef = useRef(new Set());
   const lastRealtimeRefreshAtRef = useRef(0);
@@ -368,10 +364,10 @@ export default function RefereeCenterScreen() {
     [socket]
   );
   useEffect(() => {
-    tournamentIdsRef.current = new Set(activeTournamentRoomIds);
-  }, [activeTournamentRoomIds]);
+    tournamentIdsRef.current = new Set(tournamentRoomIds);
+  }, [tournamentRoomIds]);
 
-  useSocketRoomSet(socket, activeTournamentRoomIds, {
+  useSocketRoomSet(socket, tournamentRoomIds, {
     subscribeEvent: "tournament:subscribe",
     unsubscribeEvent: "tournament:unsubscribe",
     payloadKey: "tournamentId",
@@ -527,7 +523,7 @@ export default function RefereeCenterScreen() {
 
   // Socket listeners
   useEffect(() => {
-    if (!socket || !isFocused) return;
+    if (!socket) return;
 
     const onUpsert = (payload) => queueUpsertRef.current?.(payload);
     const onRemove = (payload) => {
@@ -625,7 +621,7 @@ export default function RefereeCenterScreen() {
         rafRef.current = null;
       }
     };
-  }, [isFocused, socket, triggerRealtimeRefresh]);
+  }, [socket, triggerRealtimeRefresh]);
 
   const liveMatchesSnapshot = useMemo(
     () => (liveBump < 0 ? [] : Array.from(liveMapRef.current.values())),
@@ -663,16 +659,11 @@ export default function RefereeCenterScreen() {
     return Array.from(ids).sort();
   }, [allMatches, mergedAllMatches, stationTabs]);
 
-  const activeWatchedStationIds = useMemo(
-    () => (isFocused ? watchedStationIds : []),
-    [isFocused, watchedStationIds]
-  );
-
   useEffect(() => {
-    watchedStationIdsRef.current = new Set(activeWatchedStationIds);
-  }, [activeWatchedStationIds]);
+    watchedStationIdsRef.current = new Set(watchedStationIds);
+  }, [watchedStationIds]);
 
-  useSocketRoomSet(socket, activeWatchedStationIds, {
+  useSocketRoomSet(socket, watchedStationIds, {
     subscribeEvent: "court-station:watch",
     unsubscribeEvent: "court-station:unwatch",
     payloadKey: "stationId",
