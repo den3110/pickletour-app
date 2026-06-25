@@ -440,7 +440,14 @@ const hasVideo = (m) => !!getVideoUrl(m);
 // trạng thái vẫn giữ màu đặc thù để phân biệt nhanh
 const statusColors = (m) => {
   const st = String(m?.status || "").toLowerCase();
-  if (st === "finished") return { bg: "#2e7d32", fg: "#fff", key: "done" };
+  const byeAdvance =
+    isByeMatchObj(m) &&
+    (m?.pairA || m?.pairB || m?.winner === "A" || m?.winner === "B");
+  if (
+    st === "finished" ||
+    byeAdvance
+  )
+    return { bg: "#2e7d32", fg: "#fff", key: "done" };
   if (st === "live") return { bg: "#ef6c00", fg: "#fff", key: "live" };
   const ready =
     (m?.pairA || m?.pairB) && (m?.assignedAt || m?.court || m?.scheduledAt);
@@ -2513,20 +2520,21 @@ const BracketColumns = ({
                         const vid = hasVideo(m);
 
                         if (byeCard) {
+                          const color = statusColors(m);
                           return (
                             <View
                               style={[
                                 styles.seedHeader,
                                 {
                                   borderBottomColor: t.divider,
-                                  backgroundColor: t.headerBg,
+                                  backgroundColor: color.bg,
                                 },
                               ]}
                             >
                               <Text
                                 style={[
                                   styles.seedHeaderCode,
-                                  { color: t.colors.text },
+                                  { color: color.fg },
                                 ]}
                                 numberOfLines={1}
                               >
@@ -2537,7 +2545,7 @@ const BracketColumns = ({
                                   <Text
                                     style={[
                                       styles.seedHeaderText,
-                                      { color: t.colors.text },
+                                      { color: color.fg },
                                     ]}
                                     numberOfLines={1}
                                   >
@@ -2548,7 +2556,7 @@ const BracketColumns = ({
                                   <Text
                                     style={[
                                       styles.seedHeaderText,
-                                      { color: t.colors.text },
+                                      { color: color.fg },
                                     ]}
                                     numberOfLines={1}
                                   >
@@ -2563,7 +2571,7 @@ const BracketColumns = ({
                                     <Text
                                       style={[
                                         styles.seedHeaderText,
-                                        { color: t.colors.text },
+                                        { color: color.fg },
                                       ]}
                                     >
                                       🎥
@@ -4757,7 +4765,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                     style={[styles.colorDot, { backgroundColor: "#2e7d32" }]}
                   />
                   <Text style={[styles.metaSmall, { color: t.subtext }]}>
-                    Xanh: hoàn thành
+                    Xanh: hoàn thành / BYE đi tiếp
                   </Text>
                 </View>
                 <View style={styles.colorLegendItem}>

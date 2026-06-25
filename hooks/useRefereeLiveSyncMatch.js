@@ -165,10 +165,12 @@ export function useRefereeLiveSyncMatch(
       const currentDeviceId = trim(deviceRef.current.deviceId);
       const ownerUserId = trim(owner.userId);
       const ownerDeviceId = trim(owner.deviceId);
+      // Owner if it's the same device OR the same referee account (from another
+      // device/tab). Must stay in sync with the server's liveOwnerMatchesIdentity
+      // so the same referee is never locked out across their own devices.
       const isSelf =
-        ownerDeviceId || currentDeviceId
-          ? Boolean(ownerDeviceId && currentDeviceId && ownerDeviceId === currentDeviceId)
-          : Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
+        Boolean(ownerDeviceId && currentDeviceId && ownerDeviceId === currentDeviceId) ||
+        Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
       return {
         ...owner,
         isSelf,
