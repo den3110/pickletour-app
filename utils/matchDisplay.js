@@ -383,14 +383,16 @@ export const getMatchDisplayCode = (match, fallbackIndex = undefined) => {
   if (!match || typeof match !== "object") return "";
 
   const directCandidates = [
-    match?.displayCode,
-    match?.codeDisplay,
     match?.codeResolved,
-    match?.codeGroup,
+    match?.code,
     match?.globalCodeV,
     match?.globalCode,
+    match?.codeDisplay,
+    match?.codeGroup,
+    match?.displayCode,
+    match?.meta?.code,
+    match?._code,
     match?.matchCode,
-    match?.code,
     match?.slotCode,
     match?.bracketCode,
   ];

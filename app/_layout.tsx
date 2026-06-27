@@ -61,7 +61,9 @@ import { IOS_26_NATIVE_TABS_ENABLED } from "@/utils/nativeTabs";
 import { enableFreeze } from "react-native-screens";
 import { installJsCrashReporter } from "@/services/crashFeedbackService";
 
-enableFreeze(true);
+const ENABLE_SCREEN_FREEZE = Platform.OS !== "android";
+
+enableFreeze(ENABLE_SCREEN_FREEZE);
 installJsCrashReporter();
 
 const HOT_UPDATER_ENABLED =
@@ -984,6 +986,8 @@ function RootLayout() {
         return;
       }
       const updateId = String(updateInfo?.id || "").trim();
+      const pendingUpdate = await getPendingHotUpdate();
+      const pendingBundleId = String(pendingUpdate?.bundleId || "").trim();
       const currentBundleId = (() => {
         try {
           return String(HotUpdater.getBundleId?.() || "").trim();
@@ -991,13 +995,21 @@ function RootLayout() {
           return "";
         }
       })();
+
+      if (updateId && pendingBundleId === updateId) {
+        otaIgnoredUpdateIdRef.current = updateId;
+        otaCheckInFlightRef.current = false;
+        return;
+      }
+
       if (
         Platform.OS === "android" &&
         updateId &&
         currentBundleId &&
-        updateId.localeCompare(currentBundleId) <= 0
+        updateId === currentBundleId
       ) {
         otaIgnoredUpdateIdRef.current = updateId;
+        await clearPendingHotUpdate();
         otaCheckInFlightRef.current = false;
         return;
       }
@@ -1896,7 +1908,7 @@ function RootLayout() {
                               contentStyle: {
                                 backgroundColor: bg,
                               },
-                              freezeOnBlur: true,
+                              freezeOnBlur: ENABLE_SCREEN_FREEZE,
 
                               // ✅ GLOBAL: tất cả chevron-back tự ăn theme (theo tintColor)
                               headerLeft: ({ canGoBack, tintColor }) => {

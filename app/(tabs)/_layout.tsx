@@ -29,6 +29,7 @@ const ACTIVE_TAB_TINT = {
 };
 
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";
+const ENABLE_ANDROID_SCREEN_DETACH = Platform.OS !== "android";
 
 const HOME_LOTTIE_COLOR_FILTERS = (color: string) => [
   { keypath: "Fill 1", color },
@@ -251,8 +252,8 @@ export default function TabLayout() {
         headerShown: false,
         tabBarHideOnKeyboard: true,
         lazy: true,
-        freezeOnBlur: true,
-        detachInactiveScreens: true,
+        freezeOnBlur: ENABLE_ANDROID_SCREEN_DETACH,
+        detachInactiveScreens: ENABLE_ANDROID_SCREEN_DETACH,
         animation: "none",
       }}
     >

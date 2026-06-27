@@ -20,10 +20,10 @@ import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 // Bỏ dòng khai báo SCREEN_WIDTH ở ngoài này đi nhé
 // const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-export const TAB_BAR_HEIGHT = 65;
-const FLOATING_BUTTON_SIZE = 60;
+export const TAB_BAR_HEIGHT = 56;
+const FLOATING_BUTTON_SIZE = 54;
 const CURVE_WIDTH = 100;
-const CURVE_HEIGHT = 20;
+const CURVE_HEIGHT = 16;
 const shouldHideRoute = (routeName?: string) => {
   const normalized = String(routeName || "").trim().toLowerCase();
   return (
@@ -174,7 +174,9 @@ export function CustomTabBar({
   const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
   const extraPaddingBottom =
-    Platform.OS === "ios" ? Math.max(insets.bottom, 10) : Math.max(insets.bottom, 16);
+    Platform.OS === "ios"
+      ? Math.max(insets.bottom, 10)
+      : Math.min(Math.max(insets.bottom, 8), 12);
 
   const visibleRoutes = React.useMemo(
     () =>

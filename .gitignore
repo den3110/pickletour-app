@@ -43,6 +43,7 @@ yarn.lock
 # local build/cache artifacts
 .tmp-hotupdater/
 *.aab
+*.apk
 android/app/release/
 android/app/_disabled_native/
 
