@@ -46,6 +46,7 @@ import {
   mergeMatchPayload,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
+import { buildRefereeMatchRoute } from "@/utils/refereeMatchRoute";
 
 /* ---------------- THEME ---------------- */
 function useThemeTokens() {
@@ -296,7 +297,7 @@ const stationTabLabelOf = (station) => {
 };
 
 // Đường dẫn “trang bắt trận”
-const refereeRouteOf = (m) => `/match/${m._id}/referee`;
+const refereeRouteOf = (m) => buildRefereeMatchRoute(m);
 
 /* --------- trạng thái: thứ tự nhóm cố định (live → assigned → queued → scheduled → finished) --------- */
 const _normStatus = (s) => String(s || "").toLowerCase();

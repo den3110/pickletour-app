@@ -20,6 +20,7 @@ import {
   useDeleteUserMatchMutation,
 } from "@/slices/userMatchesApiSlice";
 import { ScrollView } from "react-native-gesture-handler";
+import { buildRefereeMatchRoute } from "@/utils/refereeMatchRoute";
 
 /* ====== Utils ====== */
 const RANGE_OPTIONS = [
@@ -179,10 +180,7 @@ function MatchCard({ item, onPress }) {
   // ----------------------
 
   const handleStartMatch = () => {
-    router.push({
-      pathname: `/match/${item._id}/referee`,
-      params: { userMatch: "true" },
-    });
+    router.push(buildRefereeMatchRoute(item, { userMatch: "true" }));
   };
 
   const handleGoLive = () => {

@@ -5,6 +5,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as ScreenOrientation from "expo-screen-orientation";
 
 import RefereeJudgePanel from "@/components/match/RefereeScorePanel.native";
+import { parseRefereeMatchSnapshotParam } from "@/utils/refereeMatchRoute";
 
 const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
 const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
@@ -13,6 +14,10 @@ export default function RefereeScreen() {
   const params = useLocalSearchParams();
 
   const matchId = useMemo(() => String(params?.id ?? ""), [params?.id]);
+  const initialMatch = useMemo(
+    () => parseRefereeMatchSnapshotParam(params?.refereeMatchSnapshot),
+    [params?.refereeMatchSnapshot],
+  );
 
   const appState = useRef(AppState.currentState);
   const isUnmounting = useRef(false);
@@ -112,5 +117,5 @@ export default function RefereeScreen() {
 
   if (!matchId) return null;
 
-  return <RefereeJudgePanel matchId={matchId} />;
+  return <RefereeJudgePanel matchId={matchId} initialMatch={initialMatch} />;
 }

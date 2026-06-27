@@ -71,6 +71,7 @@ import {
   mergeMatchPayload,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
+import { buildRefereeMatchRoute } from "@/utils/refereeMatchRoute";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLabels";
 
@@ -465,7 +466,7 @@ const refereeNames = (m) => {
   const r1 = m?.referee || m?.mainReferee || null;
   return r1 ? personNickname(r1) : "";
 };
-const refereeRouteOf = (m) => `/match/${m._id}/referee`;
+const refereeRouteOf = (m) => buildRefereeMatchRoute(m);
 
 const buildRefReportHTML = ({
   tourName,

@@ -50,6 +50,7 @@ import * as Speech from "expo-speech";
 import { useLiveMatch } from "@/hooks/useLiveMatch";
 import { useMatchLiveActivity } from "@/hooks/useMatchLiveActivity";
 import { BASE_URL } from "@/slices/apiSlice";
+import { mergeRefereeMatchSnapshot } from "@/utils/refereeMatchRoute";
 
 const VOICE_API_URL = `${BASE_URL}/api/voice/parse`;
 /* ---------- Theme tokens ---------- */
@@ -137,13 +138,75 @@ const liveSyncRejectedMessage = (
   return message || fallback;
 };
 const userIdOf = (u) => {
-  // 1. Ưu tiên lấy ID user hệ thống (nếu có)
-  const id = u?.user?._id || u?.user || u?._id || u?.id || u?.uid;
-  if (id) return String(id);
+  return playerIdCandidatesOf(u)[0] || "";
+};
+const safeIdentityTextOf = (value) => {
+  const text = textOf(value);
+  return text === "[object Object]" ? "" : text;
+};
+const identityTextOf = (value) => {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    return (
+      identityTextOf(value?._id) ||
+      identityTextOf(value?.id) ||
+      identityTextOf(value?.uid) ||
+      identityTextOf(value?.fullName) ||
+      identityTextOf(value?.name) ||
+      identityTextOf(value?.displayName) ||
+      identityTextOf(value?.shortName) ||
+      identityTextOf(value?.nickName) ||
+      identityTextOf(value?.nickname) ||
+      safeIdentityTextOf(value)
+    );
+  }
+  return safeIdentityTextOf(value);
+};
+const playerIdCandidatesOf = (player) => {
+  if (player == null) return [];
+  if (typeof player !== "object") return [identityTextOf(player)].filter(Boolean);
 
-  // 2. Nếu là UserMatch (Guest/Khách) không có ID -> dùng Tên làm định danh
-  // Cần đảm bảo tên khác nhau, nếu trùng tên thì logic này vẫn rủi ro nhẹ nhưng đỡ hơn là ""
-  return u?.fullName || u?.name || u?.displayName || u?.nickName || "";
+  const nestedUser = player?.user;
+  const nestedProfile = player?.profile;
+  const candidates = [
+    nestedUser?._id,
+    nestedUser?.id,
+    nestedUser?.uid,
+    nestedUser,
+    player?._id,
+    player?.id,
+    player?.uid,
+    nestedProfile?._id,
+    nestedProfile?.id,
+    nestedProfile?.uid,
+    player?.fullName,
+    player?.name,
+    player?.displayName,
+    player?.shortName,
+    player?.nickName,
+    player?.nickname,
+    nestedUser?.fullName,
+    nestedUser?.name,
+    nestedUser?.displayName,
+    nestedUser?.shortName,
+    nestedUser?.nickName,
+    nestedUser?.nickname,
+    nestedProfile?.fullName,
+    nestedProfile?.name,
+    nestedProfile?.displayName,
+    nestedProfile?.shortName,
+    nestedProfile?.nickName,
+    nestedProfile?.nickname,
+  ]
+    .map((value) => identityTextOf(value))
+    .filter(Boolean);
+
+  return [...new Set(candidates)];
+};
+const playerMatchesId = (player, value) => {
+  const target = textOf(value);
+  if (!target) return false;
+  return playerIdCandidatesOf(player).some((candidate) => candidate === target);
 };
 const playersOf = (reg, eventType = "double") => {
   const et = (eventType || "double").toLowerCase();
@@ -182,10 +245,27 @@ const sideSourceOf = (match, side) => {
   );
 };
 
-const syntheticPlayerFromName = (name, side) => {
+const isReferenceSideLabel = (value) => {
+  const label = textOf(value).trim();
+  if (!label) return false;
+  return /^(?:[WL]\s*-|V\d+(?:-|$))/i.test(label);
+};
+
+const isGenericSideLabel = (value) => {
+  const label = textOf(value).trim();
+  if (!label) return true;
+  return /^(?:TBD|Registration|\u0110\u1ed9i [AB]|Doi [AB]|-|\u2014)$/i.test(
+    label,
+  );
+};
+
+const isUsefulSideLabel = (value) =>
+  !isGenericSideLabel(value) && !isReferenceSideLabel(value);
+
+const syntheticPlayerFromName = (name, side, index = 0) => {
   const label = textOf(name).trim();
   if (!label) return null;
-  const id = `side-${sideKeyOf(side)}:${label}`;
+  const id = `side-${sideKeyOf(side)}:${index}:${label}`;
   return {
     _id: id,
     id,
@@ -198,32 +278,72 @@ const syntheticPlayerFromName = (name, side) => {
   };
 };
 
-const playerHasDisplayName = (player, source) =>
-  Boolean(
-    getPlayerDisplayName(player, source) ||
-      textOf(player?.displayName) ||
-      textOf(player?.nickname) ||
-      textOf(player?.nickName) ||
-      textOf(player?.fullName) ||
-      textOf(player?.name)
-  );
+const syntheticPlayersFromLabel = (name, side, eventType = "double") => {
+  const label = textOf(name).trim();
+  if (!label) return [];
+  const parts =
+    String(eventType || "").toLowerCase() === "single"
+      ? [label]
+      : label
+          .split(/\s*\/\s*/g)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .slice(0, 2);
+  const source = parts.length ? parts : [label];
+  return source
+    .map((part, index) => syntheticPlayerFromName(part, side, index))
+    .filter(Boolean);
+};
+
+const playerDisplayLabel = (player, source) =>
+  getPlayerDisplayName(player, source) ||
+  textOf(player?.displayName) ||
+  textOf(player?.nickname) ||
+  textOf(player?.nickName) ||
+  textOf(player?.fullName) ||
+  textOf(player?.name);
 
 const playersForSide = (match, side, eventType = "double") => {
   const key = sideKeyOf(side);
   const source = sideSourceOf(match, key);
   const players = playersOf(source, eventType);
-  if (players.some((player) => playerHasDisplayName(player, match))) {
-    return players;
+  const namedPlayers = players.filter((player) =>
+    isUsefulSideLabel(playerDisplayLabel(player, match)),
+  );
+  if (namedPlayers.length) {
+    if (
+      String(eventType || "").toLowerCase() !== "single" &&
+      namedPlayers.length === 1
+    ) {
+      const onlyName = playerDisplayLabel(namedPlayers[0], match);
+      if (onlyName.includes("/")) {
+        return syntheticPlayersFromLabel(onlyName, key, eventType);
+      }
+    }
+    return namedPlayers;
+  }
+
+  const candidates = [
+    getMatchSideDisplayName(match, key, ""),
+    textOf(match?.[`__side${key}`]),
+    textOf(match?.[`resolvedSideName${key}`]),
+    textOf(match?.[`team${key}Name`]),
+    textOf(match?.[`pair${key}Name`]),
+    textOf(match?.[`side${key}Name`]),
+    textOf(source?.displayName),
+    textOf(source?.teamName),
+    textOf(source?.label),
+    textOf(source?.name),
+  ];
+  const resolvedName = candidates.find(isUsefulSideLabel);
+  if (resolvedName) {
+    return syntheticPlayersFromLabel(resolvedName, key, eventType);
   }
 
   const fallbackName =
-    getMatchSideDisplayName(match, key, key === "B" ? "Đội B" : "Đội A") ||
-    textOf(source?.displayName) ||
-    textOf(source?.teamName) ||
-    textOf(source?.label) ||
-    textOf(source?.name);
-  const synthetic = syntheticPlayerFromName(fallbackName, key);
-  return synthetic ? [synthetic] : [];
+    candidates.find((value) => textOf(value).trim()) ||
+    (key === "B" ? "\u0110\u1ed9i B" : "\u0110\u1ed9i A");
+  return syntheticPlayersFromLabel(fallbackName, key, eventType);
 };
 
 const needWins = (bestOf = 3) => Math.floor(bestOf / 2) + 1;
@@ -236,6 +356,31 @@ const isGameWin = (a = 0, b = 0, ptw = 11, wbt = true) => {
 };
 const currentSlotFromBase = (base, teamScore) =>
   Number(teamScore) % 2 === 0 ? base : base === 1 ? 2 : 1;
+
+const resolveBaseSlotForPlayer = (player, teamBase = {}) => {
+  const keys = playerIdCandidatesOf(player);
+  for (const key of keys) {
+    const slot = Number(teamBase?.[key]);
+    if (slot === 1 || slot === 2) return slot;
+  }
+  return null;
+};
+
+const normalizeSlotsBaseForPlayers = (players, rawTeamBase = {}) => {
+  const teamBase =
+    rawTeamBase && typeof rawTeamBase === "object" ? { ...rawTeamBase } : {};
+  (Array.isArray(players) ? players : [])
+    .filter(Boolean)
+    .slice(0, 2)
+    .forEach((player, index) => {
+      const existingSlot = resolveBaseSlotForPlayer(player, teamBase);
+      if (existingSlot === 1 || existingSlot === 2) return;
+      const fallbackKey = playerIdCandidatesOf(player)[0] || userIdOf(player);
+      if (!fallbackKey) return;
+      teamBase[fallbackKey] = index === 0 ? 1 : 2;
+    });
+  return teamBase;
+};
 
 const breakTypeFromNote = (note) => {
   const prefix = textOf(note).split(":")[0].trim().toLowerCase();
@@ -275,8 +420,8 @@ const getCurrentSlotOfUser = ({
   scoreA = 0,
   scoreB = 0,
 }) => {
-  const uid = userIdOf(user);
-  const base = teamKey === "A" ? baseA?.[uid] : baseB?.[uid];
+  const teamBase = teamKey === "A" ? baseA : baseB;
+  const base = resolveBaseSlotForPlayer(user, teamBase);
   if (!base) return null;
   const ts = teamKey === "A" ? Number(scoreA || 0) : Number(scoreB || 0);
   return currentSlotFromBase(Number(base), ts);
@@ -504,8 +649,10 @@ const TeamSimple = memo(
     const p1 = ordered[0];
     const p2 = ordered[1];
 
-    const isServerP1 = teamKey === activeSide && userIdOf(p1) === serverUidShow;
-    const isServerP2 = teamKey === activeSide && userIdOf(p2) === serverUidShow;
+    const isServerP1 =
+      teamKey === activeSide && playerMatchesId(p1, serverUidShow);
+    const isServerP2 =
+      teamKey === activeSide && playerMatchesId(p2, serverUidShow);
 
     return (
       <View
@@ -1692,7 +1839,7 @@ const normalizeRefereeLayout = (layout) =>
     ? { left: "B", right: "A" }
     : { left: "A", right: "B" };
 
-export default function RefereeJudgePanel({ matchId }) {
+export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
   const params = useLocalSearchParams();
   const { userMatch } = params;
   useUserMatchHeader(userMatch && "user");
@@ -1733,7 +1880,7 @@ export default function RefereeJudgePanel({ matchId }) {
   const useWideAiryScoreboard = scoreboardMode === "airyWide";
 
   const {
-    data: match,
+    data: liveMatch,
     loading: isLoading,
     error,
     refetch,
@@ -1744,6 +1891,10 @@ export default function RefereeJudgePanel({ matchId }) {
     optimisticUpdates: false,
     persistCache: false,
   });
+  const match = useMemo(
+    () => mergeRefereeMatchSnapshot(liveMatch, initialMatch),
+    [liveMatch, initialMatch],
+  );
   const socket = useSocket();
 
   // ===== NEW: court modal state =====
@@ -1925,19 +2076,11 @@ export default function RefereeJudgePanel({ matchId }) {
 
   const baseA = useMemo(() => {
     const raw = localBaseOverride?.A || slotsBase?.A || {};
-    const out = { ...raw };
-    const ids = playersA.map(userIdOf);
-    if (ids[0] && !out[ids[0]]) out[ids[0]] = 1;
-    if (ids[1] && !out[ids[1]]) out[ids[1]] = 2;
-    return out;
+    return normalizeSlotsBaseForPlayers(playersA, raw);
   }, [slotsBase?.A, localBaseOverride?.A, playersA]);
   const baseB = useMemo(() => {
     const raw = localBaseOverride?.B || slotsBase?.B || {};
-    const out = { ...raw };
-    const ids = playersB.map(userIdOf);
-    if (ids[0] && !out[ids[0]]) out[ids[0]] = 1;
-    if (ids[1] && !out[ids[1]]) out[ids[1]] = 2;
-    return out;
+    return normalizeSlotsBaseForPlayers(playersB, raw);
   }, [slotsBase?.B, localBaseOverride?.B, playersB]);
 
   const slotsNowA = useMemo(() => {
@@ -1988,9 +2131,16 @@ export default function RefereeJudgePanel({ matchId }) {
     opening: eventType !== "single",
   };
   const activeSide = serve?.side === "B" ? "B" : "A";
-  const activeServerNum =
+  const rawActiveServerNum =
     Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
+  const activeServerNum =
+    needsStartAction && eventType !== "single"
+      ? OPENING_DOUBLES_SERVER
+      : rawActiveServerNum;
   const isOpeningServe = Boolean(serve?.opening);
+  const isPreStartOrOpening =
+    needsStartAction ||
+    (Number(curA) === 0 && Number(curB) === 0 && isOpeningServe);
   const isOpeningServeLocked =
     eventType !== "single" &&
     Number(curA) === 0 &&
@@ -2023,7 +2173,43 @@ export default function RefereeJudgePanel({ matchId }) {
     serverUidShow: "",
   });
 
+  const uidBelongsToSide = useCallback(
+    (uid, side) => {
+      const value = textOf(uid).trim();
+      if (!value) return false;
+      const list = sideKeyOf(side) === "B" ? playersB : playersA;
+      return list.some((player) => playerMatchesId(player, value));
+    },
+    [playersA, playersB],
+  );
+
   // Đầu game opening serve (0-0-2) icon phải nằm ở ô phải/even
+  const firstPlayerIdOfSide = useCallback(
+    (side) => {
+      const list = sideKeyOf(side) === "B" ? playersB : playersA;
+      return userIdOf(list?.[0]) || "";
+    },
+    [playersA, playersB],
+  );
+
+  const openingRightServerUid = useMemo(() => {
+    if (eventType === "single" || !isPreStartOrOpening) return "";
+    const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
+    return (
+      getUidAtSlotNow(activeSide, rightSlot) ||
+      getUidAtSlotNow(activeSide, oppositeSlot(rightSlot)) ||
+      firstPlayerIdOfSide(activeSide) ||
+      ""
+    );
+  }, [
+    activeSide,
+    eventType,
+    firstPlayerIdOfSide,
+    getUidAtSlotNow,
+    isPreStartOrOpening,
+    leftSide,
+  ]);
+
   const pinnedOpeningServer =
     openingServerRef.current.gameIndex === curIdx &&
     openingServerRef.current.side === activeSide
@@ -2031,7 +2217,10 @@ export default function RefereeJudgePanel({ matchId }) {
       : "";
 
   // raw từ server (có thể "nhảy" sau khi inc điểm)
-  const rawServerUid = serve?.serverId ? String(serve.serverId) : "";
+  const rawServerUidValue = serve?.serverId ? String(serve.serverId) : "";
+  const rawServerUid = uidBelongsToSide(rawServerUidValue, activeSide)
+    ? rawServerUidValue
+    : "";
 
   // ✅ forced uid còn hiệu lực thì ưu tiên tuyệt đối
   const forcedUid =
@@ -2039,7 +2228,8 @@ export default function RefereeJudgePanel({ matchId }) {
     Date.now() < forcedServerRef.current.until &&
     forcedServerRef.current.gameIndex === curIdx &&
     forcedServerRef.current.side === activeSide &&
-    Number(forcedServerRef.current.serverNum) === Number(activeServerNum)
+    Number(forcedServerRef.current.serverNum) === Number(activeServerNum) &&
+    uidBelongsToSide(forcedServerRef.current.uid, activeSide)
       ? forcedServerRef.current.uid
       : "";
 
@@ -2059,21 +2249,48 @@ export default function RefereeJudgePanel({ matchId }) {
         Number(curA) === Number(prevSnap.curA));
 
   const stablePrevUid =
-    prevSnap.serverUidShow || lastServerUidRef.current || "";
+    (uidBelongsToSide(prevSnap.serverUidShow, activeSide)
+      ? prevSnap.serverUidShow
+      : "") ||
+    (!isPreStartOrOpening && uidBelongsToSide(lastServerUidRef.current, activeSide)
+      ? lastServerUidRef.current
+      : "") ||
+    "";
 
   // ✅ serverUidShow:
   // - nếu đúng case "đang giao ghi điểm" => GIỮ UID CŨ để icon không nhảy xuống ô dưới
   // - bình thường => ưu tiên rawServerUid, rồi pin opening serve, rồi last ref
   // ✅ base logic như cũ
+  const validLastServerUid = uidBelongsToSide(lastServerUidRef.current, activeSide)
+    ? lastServerUidRef.current
+    : "";
+  const fallbackSlot = isPreStartOrOpening
+    ? preStartRightSlotForSide(activeSide, leftSide)
+    : activeServerNum;
+  const fallbackServerUid =
+    getUidAtSlotNow(activeSide, fallbackSlot) ||
+    (isPreStartOrOpening
+      ? getUidAtSlotNow(activeSide, oppositeSlot(fallbackSlot))
+      : "") ||
+    firstPlayerIdOfSide(activeSide) ||
+    "";
+  const staleLastServerUid = isPreStartOrOpening ? "" : validLastServerUid;
+  const openingCorrectedUid =
+    eventType !== "single" && isPreStartOrOpening && openingRightServerUid
+      ? openingRightServerUid
+      : "";
   const baseServerUidShow = serveSideScored
     ? stablePrevUid ||
+      openingCorrectedUid ||
       rawServerUid ||
       (isOpeningServe ? pinnedOpeningServer : "") ||
-      lastServerUidRef.current ||
+      fallbackServerUid ||
       ""
-    : rawServerUid ||
+    : openingCorrectedUid ||
+      rawServerUid ||
       (isOpeningServe ? pinnedOpeningServer : "") ||
-      lastServerUidRef.current ||
+      fallbackServerUid ||
+      staleLastServerUid ||
       "";
 
   // ✅ forcedUid phải ưu tiên cao nhất để khỏi nhảy 2 lần
@@ -2087,17 +2304,21 @@ export default function RefereeJudgePanel({ matchId }) {
         getUidAtSlotNow(activeSide, rightSlot) ||
         getUidAtSlotNow(activeSide, oppositeSlot(rightSlot)) ||
         "";
-      const currentServerId = serve?.serverId ? String(serve.serverId) : "";
+      const currentServerIdRaw = serve?.serverId ? String(serve.serverId) : "";
+      const currentServerId = uidBelongsToSide(currentServerIdRaw, activeSide)
+        ? currentServerIdRaw
+        : "";
       const localServerId = localServeOverride?.serverId
         ? String(localServeOverride.serverId)
         : "";
       const serverId =
         localServerId ||
+        openingRightServerUid ||
         (preferCurrentServerId ? currentServerId : "") ||
         slotServerId ||
         serverUidShow ||
         currentServerId ||
-        lastServerUidRef.current ||
+        validLastServerUid ||
         "";
 
       return {
@@ -2113,8 +2334,11 @@ export default function RefereeJudgePanel({ matchId }) {
       getUidAtSlotNow,
       leftSide,
       localServeOverride?.serverId,
+      openingRightServerUid,
       serve?.serverId,
       serverUidShow,
+      uidBelongsToSide,
+      validLastServerUid,
     ],
   );
   // ✅ INIT serve đầu game:
@@ -2127,7 +2351,9 @@ export default function RefereeJudgePanel({ matchId }) {
   useEffect(() => {
     if (!match?._id) return;
 
-    const initServeKey = `${match._id}:${curIdx}`;
+    const initServeKey = `${match._id}:${curIdx}:${activeSide}:${
+      openingRightServerUid || ""
+    }`;
     const inited =
       !!initServeDoneRef.current[initServeKey] ||
       !!initServePendingRef.current[initServeKey];
@@ -2137,13 +2363,32 @@ export default function RefereeJudgePanel({ matchId }) {
     // Nếu không phải 0-0 (đang đánh dở) hoặc đã init phiên này rồi thì thôi
     if ((!is000 && !waitingStartActive) || inited) return;
 
-    const currentServerId = serve?.serverId ? String(serve.serverId) : "";
+    const currentServerIdRaw = serve?.serverId ? String(serve.serverId) : "";
+    const currentServerId = uidBelongsToSide(currentServerIdRaw, activeSide)
+      ? currentServerIdRaw
+      : "";
+    const currentServerNum =
+      Number(serve?.order ?? serve?.server ?? 1) === 2 ? 2 : 1;
+    const currentOpening = Boolean(serve?.opening);
+    const isDouble = eventType !== "single";
+    const expectedServerId = openingRightServerUid || currentServerId;
+    const serveAlreadyCorrect =
+      Boolean(expectedServerId) &&
+      currentServerId === expectedServerId &&
+      (!isDouble ||
+        !isPreStartOrOpening ||
+        (currentServerNum === OPENING_DOUBLES_SERVER && currentOpening));
 
     // ⚠️ QUAN TRỌNG:
     // - Với Match thường: Nếu DB có data rồi thì tin tưởng DB.
     // - Với UserMatch: Kể cả DB có data, ta vẫn phải kiểm tra xem nó có đúng logic "Trọng tài" không.
-    if (!isUserMatch && currentServerId) {
-      lastServerUidRef.current = currentServerId;
+    if (
+      !isUserMatch &&
+      currentServerId &&
+      (!isDouble || !isPreStartOrOpening || serveAlreadyCorrect)
+    ) {
+      initServeDoneRef.current[initServeKey] = true;
+      lastServerUidRef.current = expectedServerId || currentServerId;
       return;
     }
 
@@ -2154,9 +2399,26 @@ export default function RefereeJudgePanel({ matchId }) {
 
     // Nếu UID tính ra KHÁC với UID đang lưu trên server (hoặc server chưa có)
     // -> Gửi lệnh SET đè lên ngay lập tức
-    if (nextServerId && currentServerId !== nextServerId) {
+    const needsServeSync =
+      nextServerId &&
+      (currentServerId !== nextServerId ||
+        currentServerNum !== Number(nextServe.server) ||
+        currentOpening !== Boolean(nextServe.opening));
+    if (needsServeSync) {
       // Cập nhật UI tạm thời để không bị nhảy
       lastServerUidRef.current = nextServerId;
+      openingServerRef.current = {
+        gameIndex: curIdx,
+        side: activeSide,
+        uid: nextServerId,
+      };
+      forcedServerRef.current = {
+        uid: nextServerId,
+        until: Date.now() + 2500,
+        gameIndex: curIdx,
+        side: activeSide,
+        serverNum: Number(nextServe.server),
+      };
       setLocalServeOverride(nextServe);
 
       initServePendingRef.current[initServeKey] = true;
@@ -2183,7 +2445,15 @@ export default function RefereeJudgePanel({ matchId }) {
     curIdx,
     curA,
     curB,
+    eventType,
+    isPreStartOrOpening,
+    openingRightServerUid,
+    serve?.opening,
+    serve?.order,
+    serve?.server,
     serve?.serverId,
+    uidBelongsToSide,
+    activeSide,
     buildPreStartServe,
     liveApi,
     userMatch,
@@ -2196,9 +2466,13 @@ export default function RefereeJudgePanel({ matchId }) {
     if (!isOpeningServe) return;
 
     const rightSlot = preStartRightSlotForSide(activeSide, leftSide);
+    const serverIdFromPayload = serve?.serverId ? String(serve.serverId) : "";
+    const validPayloadServerId = uidBelongsToSide(serverIdFromPayload, activeSide)
+      ? serverIdFromPayload
+      : "";
     const uid =
-      (serve?.serverId ? String(serve.serverId) : "") ||
-      lastServerUidRef.current ||
+      openingRightServerUid ||
+      validPayloadServerId ||
       getUidAtSlotNow?.(activeSide, rightSlot) ||
       getUidAtSlotNow?.(activeSide, oppositeSlot(rightSlot)) ||
       "";
@@ -2214,7 +2488,9 @@ export default function RefereeJudgePanel({ matchId }) {
     activeSide,
     activeServerNum,
     isOpeningServe,
+    openingRightServerUid,
     serve?.serverId,
+    uidBelongsToSide,
     getUidAtSlotNow,
     leftSide,
   ]);
@@ -2501,8 +2777,17 @@ export default function RefereeJudgePanel({ matchId }) {
         preferCurrentServerId: !isUserMatch,
       });
       if (startServe.serverId) {
-        const startServeKey = `${match._id}:${curIdx}`;
+        const startServeKey = `${match._id}:${curIdx}:${startServe.side}:${
+          startServe.serverId || ""
+        }`;
         lastServerUidRef.current = String(startServe.serverId);
+        forcedServerRef.current = {
+          uid: String(startServe.serverId),
+          until: Date.now() + 2500,
+          gameIndex: curIdx,
+          side: startServe.side,
+          serverNum: Number(startServe.server),
+        };
         if (startServe.opening) {
           openingServerRef.current = {
             gameIndex: curIdx,
@@ -3505,7 +3790,7 @@ export default function RefereeJudgePanel({ matchId }) {
   }, [serve?.serverId]);
 
   /* ========== render ========== */
-  const showInitialSkeleton = !isLandscape || (isLoading && !match);
+  const showInitialSkeleton = !isLandscape || (isLoading && !liveMatch);
   if (showInitialSkeleton)
     return (
       <RefereeJudgeSkeleton
