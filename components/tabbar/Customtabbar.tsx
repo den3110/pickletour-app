@@ -173,7 +173,8 @@ export function CustomTabBar({
     rootOptions.tabBarActiveTintColor ?? (isDark ? "#A78BFA" : "#8B5CF6");
   const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
-  const extraPaddingBottom = Platform.OS === "ios" ? Math.max(insets.bottom, 10) : 0;
+  const extraPaddingBottom =
+    Platform.OS === "ios" ? Math.max(insets.bottom, 10) : Math.max(insets.bottom, 16);
 
   const visibleRoutes = React.useMemo(
     () =>
@@ -218,7 +219,6 @@ export function CustomTabBar({
         styles.wrapper,
         {
           height: TAB_BAR_HEIGHT + CURVE_HEIGHT + extraPaddingBottom,
-          bottom: 0,
         },
       ]}
     >
@@ -315,7 +315,7 @@ export function CustomTabBar({
                   ? "rgba(28, 28, 30, 0.85)"
                   : "rgba(255, 255, 255, 0.85)",
                 height: TAB_BAR_HEIGHT + extraPaddingBottom,
-                paddingBottom: 0,
+                paddingBottom: extraPaddingBottom,
               },
             ]}
           >
@@ -343,9 +343,7 @@ export function CustomTabBar({
 
 const styles = StyleSheet.create({
   wrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+    width: "100%",
   },
   floatingButtonAbsolute: {
     position: "absolute",

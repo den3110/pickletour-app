@@ -879,6 +879,7 @@ function RootLayout() {
 
       setHotUpdateProgress(1);
       setHotUpdateStatus("done");
+      otaIgnoredUpdateIdRef.current = pendingPayload.bundleId;
       setHotUpdateMessage("Bản cập nhật đã tải xong. Đang mở lại ứng dụng...");
 
       setTimeout(() => {
@@ -982,6 +983,24 @@ function RootLayout() {
         otaCheckInFlightRef.current = false;
         return;
       }
+      const updateId = String(updateInfo?.id || "").trim();
+      const currentBundleId = (() => {
+        try {
+          return String(HotUpdater.getBundleId?.() || "").trim();
+        } catch {
+          return "";
+        }
+      })();
+      if (
+        Platform.OS === "android" &&
+        updateId &&
+        currentBundleId &&
+        updateId.localeCompare(currentBundleId) <= 0
+      ) {
+        otaIgnoredUpdateIdRef.current = updateId;
+        otaCheckInFlightRef.current = false;
+        return;
+      }
       const recoveredBundleId = await getRecoveredHotUpdateBundle();
       const crashedBundleIds = (() => {
         try {
@@ -1068,7 +1087,6 @@ function RootLayout() {
         message: updateInfo?.message,
       });
       Alert.alert(title, message, buttons, { cancelable: false });
-      otaCheckInFlightRef.current = false;
     } catch (error) {
       console.error("[HotUpdater] Check error:", error);
       otaCheckInFlightRef.current = false;

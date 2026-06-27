@@ -2047,26 +2047,8 @@ const BracketColumns = ({
         ).map((t) => ({ ...t })),
       })),
     }));
-    for (let c = 0; c < copy.length - 1; c++) {
-      const cur = copy[c];
-      const nxt = copy[c + 1];
-      if (!cur?.seeds?.length || !nxt?.seeds?.length) continue;
-      cur.seeds.forEach((s, i) => {
-        if (!seedHasBye(s)) return;
-        const adv = nonByeName(s);
-        if (!adv) return;
-        const dstIdx = Math.floor(i / 2);
-        const side = i % 2; // 0 => A, 1 => B
-        if (nxt.seeds[dstIdx]) {
-          const curName = nxt.seeds[dstIdx].teams?.[side]?.name;
-          if (isPendingTeamLabel(curName) || isByeLabel(curName)) {
-            nxt.seeds[dstIdx].teams[side] = { name: adv };
-          }
-        }
-      });
-    }
     return copy;
-  }, [rounds, seedHasBye, nonByeName]);
+  }, [rounds]);
 
   const ROUND_GAP = 64;
   const INNER_GAP = 36;
@@ -2421,6 +2403,7 @@ const BracketColumns = ({
                   <Text
                     style={[
                       styles.roundTitle,
+                      mirror && styles.bracketMirrorLabel,
                       { backgroundColor: t.headerBg, color: t.colors.text },
                     ]}
                   >
@@ -5048,6 +5031,9 @@ const styles = StyleSheet.create({
     transform: [{ scaleX: -1 }],
   },
   bracketMirrorCard: {
+    transform: [{ scaleX: -1 }],
+  },
+  bracketMirrorLabel: {
     transform: [{ scaleX: -1 }],
   },
   symmetricBridgeLayer: {
