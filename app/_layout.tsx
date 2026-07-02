@@ -46,7 +46,6 @@ import HotUpdateModal from "@/components/HotUpdateModal";
 import CrashFeedbackModal from "@/components/CrashFeedbackModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import CheckpointRealtimeGate from "@/components/auth/CheckpointRealtimeGate";
-import TopLeftAccountMenu from "@/components/auth/TopLeftAccountMenu";
 import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 import Constants from "expo-constants";
@@ -2215,10 +2214,6 @@ function RootLayout() {
                         </PikoraProvider>
                       </ChatBotPageContextProvider>
                       )}
-
-                      {!isWebViewShellActive && mobileAppShellReady ? (
-                        <TopLeftAccountMenu />
-                      ) : null}
 
                       {!isWebViewShellActive && mobileAppShellReady ? (
                         <CheckpointRealtimeGate />
