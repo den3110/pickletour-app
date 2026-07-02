@@ -72,6 +72,10 @@ import { triggerCrashFeedbackTestCrash } from "@/services/crashFeedbackService";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassPreference } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import {
+  getTournamentConsoleEnabled,
+  setTournamentConsoleEnabled as saveTournamentConsoleEnabled,
+} from "@/utils/tournamentConsolePreference";
 
 const { SaveFormat } = ImageManipulator;
 
@@ -767,6 +771,8 @@ export default function ProfileScreen({ isBack = false }) {
 
   const [prefTheme, setPrefTheme] = useState("system");
   const [pushEnabled, setPushEnabled] = useState(true);
+  const [tournamentConsoleEnabled, setTournamentConsoleEnabled] =
+    useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
 
   useEffect(() => {
@@ -777,6 +783,7 @@ export default function ProfileScreen({ isBack = false }) {
       setPushEnabled(
         ((await SecureStore.getItemAsync(PREF_PUSH_ENABLED)) || "1") === "1",
       );
+      setTournamentConsoleEnabled(await getTournamentConsoleEnabled());
     })();
   }, []);
 
@@ -806,6 +813,11 @@ export default function ProfileScreen({ isBack = false }) {
           await unregisterDeviceToken({ deviceId }).unwrap();
         } catch {}
     }
+  };
+
+  const toggleTournamentConsole = async (enabled) => {
+    setTournamentConsoleEnabled(enabled);
+    await saveTournamentConsoleEnabled(enabled);
   };
 
   const toggleLiquidGlassHighlight = async (enabled) => {
@@ -1755,6 +1767,50 @@ export default function ProfileScreen({ isBack = false }) {
                     t={t}
                     last
                   />
+                </Card>
+                <Card title="Giải đấu" t={t}>
+                  <View style={styles.switchRow}>
+                    <View style={styles.switchLeft}>
+                      <ProfileGlassSurface
+                        effect="clear"
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
+                        style={[
+                          styles.switchIcon,
+                          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
+                        ]}
+                      >
+                        <Feather name="grid" size={16} color={t.accent} />
+                      </ProfileGlassSurface>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchLabel, { color: t.text }]}>
+                          Giao diện quản lý giải mới
+                        </Text>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          Bật để nút Quản lý giải mở giao diện mới.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={tournamentConsoleEnabled}
+                      onValueChange={toggleTournamentConsole}
+                      trackColor={{ false: t.border, true: t.accent }}
+                      thumbColor="#fff"
+                    />
+                  </View>
                 </Card>
                 <Card title="Thông báo" t={t}>
                   <View style={styles.switchRow}>

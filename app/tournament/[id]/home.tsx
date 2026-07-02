@@ -5,9 +5,10 @@
 // - No extra UI libs; small Chip/Pill/Progress components are implemented locally
 // - Table UI is reproduced with FlatList row items
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  DeviceEventEmitter,
   FlatList,
   Modal,
   Pressable,
@@ -36,6 +37,10 @@ import {
   getPlayerDisplayName,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
+import {
+  getTournamentConsoleEnabled,
+  TOURNAMENT_CONSOLE_PREF_EVENT,
+} from "@/utils/tournamentConsolePreference";
 
 /* ======================== Helpers ======================== */
 const TYPE_LABEL = (t) => {
@@ -114,6 +119,23 @@ export default function OverviewScreen() {
   const t = useTokens();
   const { id } = useLocalSearchParams();
   const me = useSelector((s) => s.auth?.userInfo || null);
+  const [tournamentConsoleEnabled, setTournamentConsoleEnabled] =
+    useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getTournamentConsoleEnabled().then((enabled) => {
+      if (alive) setTournamentConsoleEnabled(enabled);
+    });
+    const sub = DeviceEventEmitter.addListener(
+      TOURNAMENT_CONSOLE_PREF_EVENT,
+      setTournamentConsoleEnabled,
+    );
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
 
   // 1) Data
   const {
@@ -624,27 +646,16 @@ export default function OverviewScreen() {
                   borderColor: t.colors.border,
                 },
               ]}
-              onPress={() => router.push(`/tournament/${id}/manage`)}
+              onPress={() =>
+                router.push(
+                  `/tournament/${id}/${
+                    tournamentConsoleEnabled ? "console" : "manage"
+                  }`,
+                )
+              }
             >
               <Text style={[styles.btnText, { color: t.colors.text }]}>
                 Quản lý giải
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.btn,
-                {
-                  backgroundColor: t.colors.primary,
-                  borderWidth: 1,
-                  borderColor: t.colors.primary,
-                  gap: 6,
-                },
-              ]}
-              onPress={() => router.push(`/tournament/${id}/console`)}
-            >
-              <MaterialIcons name="space-dashboard" size={16} color="#fff" />
-              <Text style={[styles.btnText, { color: "#fff" }]}>
-                Quản lý giải mới
               </Text>
             </Pressable>
             <Pressable
