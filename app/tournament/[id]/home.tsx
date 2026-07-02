@@ -596,8 +596,10 @@ export default function OverviewScreen() {
         >
           Tổng quan: {tour?.name}
         </Text>
-        <HStack style={{ alignItems: "center", marginBottom: 12 }}>
-          <HStack style={{ gap: 8 }}>
+        <HStack
+          style={{ alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}
+        >
+          <HStack style={{ gap: 8, flexWrap: "wrap" }}>
             <Pressable
               style={[
                 styles.btn,
@@ -642,7 +644,7 @@ export default function OverviewScreen() {
             >
               <MaterialIcons name="space-dashboard" size={16} color="#fff" />
               <Text style={[styles.btnText, { color: "#fff" }]}>
-                Console mới
+                Quản lý giải mới
               </Text>
             </Pressable>
             <Pressable
