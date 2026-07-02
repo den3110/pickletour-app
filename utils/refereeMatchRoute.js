@@ -1,7 +1,9 @@
 import {
+  getMatchDisplayCode,
   getMatchSideDisplayName,
   getPairDisplayName,
   getPlayerDisplayName,
+  getStrongMatchDisplayCode,
   normalizeMatchDisplay,
 } from "@/utils/matchDisplay";
 
@@ -19,6 +21,29 @@ const isUsefulLabel = (value) => {
     return false;
   }
   return !isReferenceLabel(text);
+};
+
+const codeParts = (value) => {
+  const code = trimText(value).toUpperCase();
+  const parsed = code.match(/^V(\d+)(?:-B[A-Z0-9]+)?-T(\d+)$/i);
+  if (!parsed) return null;
+  return {
+    code,
+    round: Number(parsed[1]),
+    order: Number(parsed[2]),
+    hasGroup: /-B[A-Z0-9]+-/i.test(code),
+  };
+};
+
+const shouldKeepSnapshotCode = (snapshotCode, matchCode) => {
+  const snapshot = codeParts(snapshotCode);
+  if (!snapshot) return false;
+  const current = codeParts(matchCode);
+  if (!current) return true;
+  if (snapshot.code === current.code) return true;
+  if (snapshot.order !== current.order) return false;
+  if (snapshot.round > current.round) return true;
+  return snapshot.round === current.round && snapshot.hasGroup && !current.hasGroup;
 };
 
 const compactPlayer = (player, source) => {
@@ -109,12 +134,21 @@ const sideLabel = (match, side) => {
 export const buildRefereeMatchRoute = (match, extraParams = {}) => {
   const id = trimText(match?._id ?? match?.id ?? match?.matchId);
   const normalized = normalizeMatchDisplay(match || {});
+  const displayCode = getMatchDisplayCode(normalized);
   const sideA = sideLabel(normalized, "A");
   const sideB = sideLabel(normalized, "B");
   const pairA = compactPair(normalized?.pairA, normalized);
   const pairB = compactPair(normalized?.pairB, normalized);
   const snapshot = {
     ...(id ? { _id: id, id, matchId: id } : {}),
+    ...(displayCode
+      ? {
+          displayCode,
+          codeDisplay: displayCode,
+          codeResolved: displayCode,
+          matchCode: displayCode,
+        }
+      : {}),
     ...(normalized?.displayNameMode
       ? { displayNameMode: normalized.displayNameMode }
       : {}),
@@ -230,6 +264,19 @@ export const mergeRefereeMatchSnapshot = (match, snapshot) => {
 
   mergeSideNames(next, normalizedSnapshot, "A");
   mergeSideNames(next, normalizedSnapshot, "B");
+
+  const snapshotCode =
+    getStrongMatchDisplayCode(normalizedSnapshot) ||
+    getMatchDisplayCode(normalizedSnapshot);
+  const matchCode =
+    getStrongMatchDisplayCode(normalizedMatch) ||
+    getMatchDisplayCode(normalizedMatch);
+  if (shouldKeepSnapshotCode(snapshotCode, matchCode)) {
+    next.displayCode = snapshotCode;
+    next.codeDisplay = snapshotCode;
+    next.codeResolved = snapshotCode;
+    next.matchCode = snapshotCode;
+  }
 
   return normalizeMatchDisplay(next, normalizedSnapshot);
 };

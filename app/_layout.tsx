@@ -45,6 +45,8 @@ import ForceUpdateModal from "@/components/ForceUpdateModal";
 import HotUpdateModal from "@/components/HotUpdateModal";
 import CrashFeedbackModal from "@/components/CrashFeedbackModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
+import CheckpointRealtimeGate from "@/components/auth/CheckpointRealtimeGate";
+import TopLeftAccountMenu from "@/components/auth/TopLeftAccountMenu";
 import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 import Constants from "expo-constants";
@@ -2066,6 +2068,34 @@ function RootLayout() {
                             />
 
                             <Stack.Screen
+                              name="tournament/[id]/console/index"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
+
+                            <Stack.Screen
+                              name="tournament/[id]/console/matches"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
+
+                            <Stack.Screen
+                              name="tournament/[id]/console/operations"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
+
+                            <Stack.Screen
+                              name="tournament/[id]/console/people"
+                              options={{
+                                headerShown: false,
+                              }}
+                            />
+
+                            <Stack.Screen
                               name="tournament/[id]/schedule"
                               options={{
                                 headerTitleAlign: "center",
@@ -2185,6 +2215,14 @@ function RootLayout() {
                         </PikoraProvider>
                       </ChatBotPageContextProvider>
                       )}
+
+                      {!isWebViewShellActive && mobileAppShellReady ? (
+                        <TopLeftAccountMenu />
+                      ) : null}
+
+                      {!isWebViewShellActive && mobileAppShellReady ? (
+                        <CheckpointRealtimeGate />
+                      ) : null}
 
                       <StatusBar
                         style={isDark ? "light" : "dark"}

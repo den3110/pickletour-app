@@ -755,8 +755,28 @@ function toDateSafe(x) {
   const t = ts(x);
   return t ? new Date(t) : null;
 }
+function isStartedMatchStatus(status) {
+  return [
+    "live",
+    "ongoing",
+    "playing",
+    "inprogress",
+    "on_court",
+    "oncourt",
+    "finished",
+    "done",
+    "completed",
+    "final",
+    "ended",
+    "over",
+    "closed",
+  ].includes(String(status || "").toLowerCase());
+}
 function pickDisplayTime(m) {
-  return m?.scheduledAt ?? m?.startedAt ?? m?.assignedAt ?? null;
+  if (isStartedMatchStatus(m?.status)) {
+    return m?.startedAt ?? m?.scheduledAt ?? m?.assignedAt ?? null;
+  }
+  return m?.scheduledAt ?? m?.assignedAt ?? null;
 }
 function formatClock(d) {
   if (!d) return "";
@@ -3328,9 +3348,12 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   );
   const timeLabel = useMemo(() => {
     if (!displayTime) return null;
-    if (status !== "finished") return `Giờ đấu: ${formatClock(displayTime)}`;
-    return `Bắt đầu: ${formatClock(displayTime)}`;
-  }, [displayTime, status]);
+    const hasStartedAt = Boolean(toDateSafe(merged?.startedAt));
+    if (hasStartedAt && isStartedMatchStatus(status)) {
+      return `Bắt đầu: ${formatClock(displayTime)}`;
+    }
+    return `Giờ đấu: ${formatClock(displayTime)}`;
+  }, [displayTime, merged?.startedAt, status]);
   // 1. Logic tạo nội dung chi tiết
   const showMatchRules = useCallback(() => {
     const r = merged?.rules || {};

@@ -40,6 +40,17 @@ export const supportApiSlice = apiSlice.injectEndpoints({
         { type: "SupportTicket", id: arg.ticketId },
       ],
     }),
+    rateSupportTicket: builder.mutation({
+      query: ({ ticketId, score, comment = "" }) => ({
+        url: `/api/support/tickets/${ticketId}/rating`,
+        method: "PATCH",
+        body: { score, comment },
+      }),
+      invalidatesTags: (res, err, arg) => [
+        { type: "SupportTicket", id: "LIST" },
+        { type: "SupportTicket", id: arg.ticketId },
+      ],
+    }),
   }),
 });
 
@@ -48,6 +59,7 @@ export const {
   useGetTicketDetailQuery,
   useCreateTicketMutation,
   useSendSupportMessageMutation,
+  useRateSupportTicketMutation,
 } = supportApiSlice;
 
 export const useSendMessageMutation = useSendSupportMessageMutation;

@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
+import { forceCheckpoint } from "./checkpointUiSlice";
 
 // ================= Base URL =================
 
@@ -294,6 +295,19 @@ const baseQuery = async (args, api, extraOptions) => {
     return result;
   }
 
+  if (status === 423 && result?.error?.data?.checkpointRequired) {
+    try {
+      api.dispatch(
+        forceCheckpoint({
+          checkpoint: result.error.data.checkpoint || null,
+          required: true,
+          source: "api_lock",
+        }),
+      );
+    } catch {}
+    return result;
+  }
+
   if (status === 404) {
     console.log(result)
     const requestMeta = describeBaseQueryArgs(args);
@@ -367,6 +381,7 @@ export const apiSlice = createApi({
     "ClubMember",
     "JoinRequest",
     "Auth",
+    "Checkpoint",
     "MarkedDates",
     "UpcomingMatches",
     "Schedule",

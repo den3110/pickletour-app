@@ -133,6 +133,15 @@ const KYC_BG = {
 };
 
 const prettyDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
+const safeImageUri = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    return normalizeUrl(raw) || "";
+  } catch {
+    return "";
+  }
+};
 const roleText = (r) =>
   r === "admin" ? "Admin" : r === "referee" ? "Trọng tài" : "User";
 const getEvalProvinces = (u) =>
@@ -304,6 +313,13 @@ export default function AdminUsersScreen() {
     }
   }, [users]);
 
+  /* Modals state */
+  const [edit, setEdit] = useState(null);
+  const [kyc, setKyc] = useState(null);
+  const [kycReviewing, setKycReviewing] = useState(false);
+  const [del, setDel] = useState(null);
+  const [score, setScore] = useState(null);
+
   /* Common handler */
   const handle = async (promise, successMsg) => {
     try {
@@ -314,6 +330,22 @@ export default function AdminUsersScreen() {
     } catch (err) {
       Alert.alert("Lỗi", err?.data?.message || err?.error || "Đã xảy ra lỗi");
       throw err;
+    }
+  };
+
+  const reviewKyc = async (action) => {
+    if (!kyc?._id || kycReviewing) return;
+    try {
+      setKycReviewing(true);
+      await reviewKycMut({ id: kyc._id, action }).unwrap();
+      setKyc(null);
+      requestAnimationFrame(() => {
+        Promise.resolve(refetch()).catch(() => {});
+      });
+    } catch (err) {
+      Alert.alert("Lỗi", err?.data?.message || err?.error || "Đã xảy ra lỗi");
+    } finally {
+      setKycReviewing(false);
     }
   };
 
@@ -340,12 +372,6 @@ export default function AdminUsersScreen() {
       Alert.alert("Lỗi", err?.data?.message || err?.error || "Đã xảy ra lỗi");
     }
   };
-
-  /* Modals state */
-  const [edit, setEdit] = useState(null);
-  const [kyc, setKyc] = useState(null);
-  const [del, setDel] = useState(null);
-  const [score, setScore] = useState(null);
 
   /* Header */
   const Header = (
@@ -680,24 +706,40 @@ export default function AdminUsersScreen() {
 
                 <View style={{ marginTop: 8 }}>
                   <Row style={{ justifyContent: "space-between" }}>
-                    {["front", "back"].map((side) => (
-                      <Pressable
-                        key={side}
-                        style={{
-                          width: "49%",
-                          height: 220,
-                          borderRadius: 8,
-                          overflow: "hidden",
-                          backgroundColor: tokens.muted,
-                        }}
-                      >
-                        <ExpoImage
-                          source={{ uri: normalizeUrl(kyc.cccdImages?.[side]) }}
-                          style={{ width: "100%", height: "100%" }}
-                          contentFit="contain"
-                        />
-                      </Pressable>
-                    ))}
+                    {["front", "back"].map((side) => {
+                      const uri = safeImageUri(kyc.cccdImages?.[side]);
+                      return (
+                        <Pressable
+                          key={side}
+                          style={{
+                            width: "49%",
+                            height: 220,
+                            borderRadius: 8,
+                            overflow: "hidden",
+                            backgroundColor: tokens.muted,
+                          }}
+                        >
+                          {uri ? (
+                            <ExpoImage
+                              source={{ uri }}
+                              style={{ width: "100%", height: "100%" }}
+                              contentFit="contain"
+                            />
+                          ) : (
+                            <View style={styles.imagePlaceholder}>
+                              <MaterialIcons
+                                name="image-not-supported"
+                                size={28}
+                                color={tokens.iconMuted}
+                              />
+                              <Text style={styles.imagePlaceholderText}>
+                                Không có ảnh
+                              </Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      );
+                    })}
                   </Row>
 
                   <View style={styles.infoBox}>
@@ -739,35 +781,35 @@ export default function AdminUsersScreen() {
 
                   <Row style={{ justifyContent: "flex-end", marginTop: 10 }}>
                     <Pressable
-                      style={[styles.btn, styles.btnDanger]}
-                      onPress={() =>
-                        handle(
-                          reviewKycMut({
-                            id: kyc._id,
-                            action: "reject",
-                          }).unwrap(),
-                          "Đã từ chối KYC"
-                        ).then(() => setKyc(null))
-                      }
+                      style={[
+                        styles.btn,
+                        styles.btnDanger,
+                        kycReviewing && styles.btnDisabled,
+                      ]}
+                      disabled={kycReviewing}
+                      onPress={() => reviewKyc("reject")}
                     >
                       <MaterialIcons name="cancel" size={16} color="#fff" />
                       <Text style={styles.btnText}>Từ chối</Text>
                     </Pressable>
                     <View style={{ width: 8 }} />
                     <Pressable
-                      style={[styles.btn, styles.btnSuccess]}
-                      onPress={() =>
-                        handle(
-                          reviewKycMut({
-                            id: kyc._id,
-                            action: "approve",
-                          }).unwrap(),
-                          "Đã duyệt KYC"
-                        ).then(() => setKyc(null))
-                      }
+                      style={[
+                        styles.btn,
+                        styles.btnSuccess,
+                        kycReviewing && styles.btnDisabled,
+                      ]}
+                      disabled={kycReviewing}
+                      onPress={() => reviewKyc("approve")}
                     >
-                      <MaterialIcons name="verified" size={16} color="#fff" />
-                      <Text style={styles.btnText}>Duyệt</Text>
+                      {kycReviewing ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <MaterialIcons name="verified" size={16} color="#fff" />
+                      )}
+                      <Text style={styles.btnText}>
+                        {kycReviewing ? "Đang xử lý" : "Duyệt"}
+                      </Text>
                     </Pressable>
                   </Row>
                 </View>
@@ -1562,6 +1604,18 @@ function makeStyles(tokens) {
       padding: 10,
       backgroundColor: tokens.cardBg,
     },
+    imagePlaceholder: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+    },
+    imagePlaceholderText: {
+      marginTop: 8,
+      color: tokens.textSecondary,
+      fontSize: 13,
+      fontWeight: "600",
+    },
     infoLabel: { width: 120, color: tokens.textSecondary, fontSize: 13 },
     infoValue: {
       fontWeight: "600",
@@ -1592,6 +1646,7 @@ function makeStyles(tokens) {
     btnSuccess: { backgroundColor: "#2e7d32" },
     btnDanger: { backgroundColor: "#d32f2f" },
     btnGhost: { backgroundColor: tokens.muted },
+    btnDisabled: { opacity: 0.65 },
 
     confirmBox: {
       position: "absolute",

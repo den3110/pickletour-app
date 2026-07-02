@@ -21,6 +21,7 @@ import {
   useLoginMutation,
 } from "@/slices/usersApiSlice";
 import { setCredentials } from "@/slices/authSlice";
+import { forceCheckpoint } from "@/slices/checkpointUiSlice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from "lottie-react-native";
 import {
@@ -191,6 +192,26 @@ export default function LoginScreen() {
 
     try {
       const res = await login(payload).unwrap();
+      if (res?.checkpointRequired && res?.checkpoint?.token) {
+        dispatch(
+          forceCheckpoint({
+            checkpoint: res.checkpoint,
+            mandate: res.mandate || null,
+            returnTo,
+            source: "login",
+          }),
+        );
+        return;
+      }
+
+      if (res?.checkpointRequired) {
+        Alert.alert(
+          "Cần xác minh",
+          "Tài khoản cần checkpoint nhưng máy chủ chưa trả token xác minh. Vui lòng thử lại.",
+        );
+        return;
+      }
+
       const normalized = res?.user ? { ...res.user, token: res.token } : res;
 
       dispatch(setCredentials(normalized));

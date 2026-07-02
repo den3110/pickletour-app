@@ -629,6 +629,23 @@ export default function OverviewScreen() {
               </Text>
             </Pressable>
             <Pressable
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: t.colors.primary,
+                  borderWidth: 1,
+                  borderColor: t.colors.primary,
+                  gap: 6,
+                },
+              ]}
+              onPress={() => router.push(`/tournament/${id}/console`)}
+            >
+              <MaterialIcons name="space-dashboard" size={16} color="#fff" />
+              <Text style={[styles.btnText, { color: "#fff" }]}>
+                Console mới
+              </Text>
+            </Pressable>
+            <Pressable
               style={[styles.btnPrimary, { backgroundColor: t.colors.primary }]}
               onPress={() => router.push(`/tournament/${id}/draw`)}
             >

@@ -6,6 +6,7 @@ import adminUiReducer from "@/slices/adminUiSlice"; // nếu có
 import versionReducer from "@/slices/versionUiSlice"; // nếu có
 import botContextReducer from "@/slices/botContextSlice";
 import userMatchHeaderSlice from "@/slices/userMatchHeaderSlice"
+import checkpointUiReducer from "@/slices/checkpointUiSlice";
 const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -15,6 +16,7 @@ const store = configureStore({
     version: versionReducer,
     botContext: botContextReducer,
     userMatchHeader: userMatchHeaderSlice,
+    checkpointUi: checkpointUiReducer,
   },
   middleware: (getDefault) =>
     getDefault()

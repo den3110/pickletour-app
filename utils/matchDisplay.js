@@ -383,16 +383,16 @@ export const getMatchDisplayCode = (match, fallbackIndex = undefined) => {
   if (!match || typeof match !== "object") return "";
 
   const directCandidates = [
+    match?.displayCode,
+    match?.codeDisplay,
     match?.codeResolved,
-    match?.code,
+    match?.codeGroup,
     match?.globalCodeV,
     match?.globalCode,
-    match?.codeDisplay,
-    match?.codeGroup,
-    match?.displayCode,
+    match?.matchCode,
+    match?.code,
     match?.meta?.code,
     match?._code,
-    match?.matchCode,
     match?.slotCode,
     match?.bracketCode,
   ];
@@ -407,6 +407,54 @@ export const getMatchDisplayCode = (match, fallbackIndex = undefined) => {
   if (fromLabel) return fromLabel;
 
   return buildFallbackMatchDisplayCode(match, fallbackIndex);
+};
+
+export const getStrongMatchDisplayCode = (match) => {
+  if (!match || typeof match !== "object") return "";
+  const candidates = [
+    match?.displayCode,
+    match?.codeDisplay,
+    match?.codeResolved,
+    match?.codeGroup,
+    match?.globalCodeV,
+    match?.globalCode,
+    match?.matchCode,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeMatchCodeCandidate(candidate);
+    if (normalized) return normalized;
+  }
+  return "";
+};
+
+const displayCodeParts = (value) => {
+  const code = normalizeMatchCodeCandidate(value);
+  if (!code) return null;
+  const parsed = code.match(/^V(\d+)(?:-B[A-Z0-9]+)?-T(\d+)$/i);
+  if (!parsed) return null;
+  return {
+    code,
+    round: Number(parsed[1]),
+    order: Number(parsed[2]),
+    hasGroup: /-B[A-Z0-9]+-/i.test(code),
+  };
+};
+
+const shouldKeepStableDisplayCode = (stableCode, incomingCode) => {
+  if (!stableCode) return false;
+  if (!incomingCode) return true;
+  if (stableCode === incomingCode) return true;
+
+  const stable = displayCodeParts(stableCode);
+  const incoming = displayCodeParts(incomingCode);
+  if (!stable || !incoming) return false;
+  if (stable.order !== incoming.order) return false;
+
+  if (stable.round > incoming.round) return true;
+  if (stable.round === incoming.round && stable.hasGroup && !incoming.hasGroup) {
+    return true;
+  }
+  return false;
 };
 
 const sideKeyOf = (side) => (String(side).toUpperCase() === "B" ? "B" : "A");
@@ -909,6 +957,9 @@ export const mergeMatchPayload = (current, raw, fallbackSource = null) => {
   if (!incomingRaw || typeof incomingRaw !== "object") return current || null;
   const incoming = normalizeMatchDisplay(incomingRaw, fallbackSource || current);
   if (!current) return incoming;
+  const stableDisplayCode = getStrongMatchDisplayCode(current);
+  const incomingDisplayCode =
+    getStrongMatchDisplayCode(incoming) || getMatchDisplayCode(incoming);
 
   const merged = {
     ...current,
@@ -959,6 +1010,11 @@ export const mergeMatchPayload = (current, raw, fallbackSource = null) => {
           }
         : current?.teams,
   };
+  if (shouldKeepStableDisplayCode(stableDisplayCode, incomingDisplayCode)) {
+    merged.displayCode = stableDisplayCode;
+    merged.codeDisplay = stableDisplayCode;
+    merged.codeResolved = stableDisplayCode;
+  }
 
   return normalizeMatchDisplay(merged, fallbackSource || current);
 };
