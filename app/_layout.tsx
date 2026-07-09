@@ -111,6 +111,7 @@ const HOT_UPDATE_NOTIFY_KEY = "__PICKLETOUR_HOTUPDATE_NOTIFY__";
 const HOT_UPDATE_RELOAD_EVENT = "hotupdater:before-reload";
 const HOT_UPDATE_RELOAD_KEY = "__PICKLETOUR_HOTUPDATE_RELOAD__";
 const HOT_UPDATE_PENDING_KEY = "__PICKLETOUR_HOTUPDATE_PENDING__";
+const HOT_UPDATE_APPLIED_BUNDLE_KEY = "__PICKLETOUR_HOTUPDATE_APPLIED_BUNDLE__";
 const HOT_UPDATE_RECOVERED_BUNDLE_KEY = "__PICKLETOUR_HOTUPDATE_RECOVERED_BUNDLE__";
 const HOT_UPDATE_TELEMETRY_PATH = "/api/ota/report-status";
 const HOT_UPDATE_API_FALLBACK = "https://pickletour.vn";
@@ -361,6 +362,24 @@ const clearPendingHotUpdate = async () => {
   await SecureStore.deleteItemAsync(HOT_UPDATE_PENDING_KEY);
 };
 
+const saveAppliedHotUpdateBundle = async (bundleId?: string | null) => {
+  const id = String(bundleId || "").trim();
+  if (!id) return;
+  await SecureStore.setItemAsync(HOT_UPDATE_APPLIED_BUNDLE_KEY, id);
+};
+
+const getAppliedHotUpdateBundle = async () => {
+  try {
+    return (await SecureStore.getItemAsync(HOT_UPDATE_APPLIED_BUNDLE_KEY)) || "";
+  } catch {
+    return "";
+  }
+};
+
+const clearAppliedHotUpdateBundle = async () => {
+  await SecureStore.deleteItemAsync(HOT_UPDATE_APPLIED_BUNDLE_KEY);
+};
+
 const saveRecoveredHotUpdateBundle = async (bundleId?: string | null) => {
   const id = String(bundleId || "").trim();
   if (!id) return;
@@ -459,6 +478,7 @@ const handleHotUpdateNotifyTelemetry = async (payload: {
 
   if (payload.status === "RECOVERED") {
     const recoveredBundleId = payload.crashedBundleId || pending?.bundleId;
+    await clearAppliedHotUpdateBundle();
     await saveRecoveredHotUpdateBundle(recoveredBundleId);
     await reportHotUpdateTelemetry({
       status: "recovered",
@@ -489,9 +509,13 @@ const handleHotUpdateNotifyTelemetry = async (payload: {
       message: pending.message,
     });
 
-    if (success) {
-      await clearPendingHotUpdate();
+    if (!success && __DEV__) {
+      console.warn(
+        "[HotUpdater] Promoted telemetry failed; clearing local pending state.",
+      );
     }
+    await saveAppliedHotUpdateBundle(pending.bundleId);
+    await clearPendingHotUpdate();
   }
 };
 
@@ -987,6 +1011,8 @@ function RootLayout() {
         return;
       }
       const updateId = String(updateInfo?.id || "").trim();
+      const updateStatus = String(updateInfo?.status || "UPDATE").toUpperCase();
+      const isRollbackUpdate = updateStatus === "ROLLBACK";
       const pendingUpdate = await getPendingHotUpdate();
       const pendingBundleId = String(pendingUpdate?.bundleId || "").trim();
       const currentBundleId = (() => {
@@ -996,8 +1022,18 @@ function RootLayout() {
           return "";
         }
       })();
+      const appliedBundleId = await getAppliedHotUpdateBundle();
 
-      if (updateId && pendingBundleId === updateId) {
+      if (!isRollbackUpdate && updateId && appliedBundleId === updateId) {
+        otaIgnoredUpdateIdRef.current = updateId;
+        if (pendingBundleId === updateId) {
+          await clearPendingHotUpdate();
+        }
+        otaCheckInFlightRef.current = false;
+        return;
+      }
+
+      if (!isRollbackUpdate && updateId && pendingBundleId === updateId) {
         otaIgnoredUpdateIdRef.current = updateId;
         otaCheckInFlightRef.current = false;
         return;
@@ -1005,11 +1041,13 @@ function RootLayout() {
 
       if (
         Platform.OS === "android" &&
+        !isRollbackUpdate &&
         updateId &&
         currentBundleId &&
-        updateId === currentBundleId
+        updateId.localeCompare(currentBundleId) <= 0
       ) {
         otaIgnoredUpdateIdRef.current = updateId;
+        await saveAppliedHotUpdateBundle(updateId);
         await clearPendingHotUpdate();
         otaCheckInFlightRef.current = false;
         return;

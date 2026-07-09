@@ -1374,17 +1374,17 @@ export default function PublicProfileScreen() {
   const lastSeen = base?.lastSeen;
 
   const latestSingle = useMemo(() => {
-    for (const r of ratingRaw) if (Number.isFinite(r.single)) return r.single;
     const fromSummary = Number(summaryScore?.single);
     if (Number.isFinite(fromSummary)) return fromSummary;
+    for (const r of ratingRaw) if (Number.isFinite(r.single)) return r.single;
     const fb = base?.levelPoint?.single ?? base?.levelPoint?.score;
     return Number.isFinite(Number(fb)) ? Number(fb) : NaN;
   }, [ratingRaw, summaryScore?.single, base]);
 
   const latestDouble = useMemo(() => {
-    for (const r of ratingRaw) if (Number.isFinite(r.double)) return r.double;
     const fromSummary = Number(summaryScore?.double);
     if (Number.isFinite(fromSummary)) return fromSummary;
+    for (const r of ratingRaw) if (Number.isFinite(r.double)) return r.double;
     const fb = base?.levelPoint?.double;
     return Number.isFinite(Number(fb)) ? Number(fb) : NaN;
   }, [ratingRaw, summaryScore?.double, base]);

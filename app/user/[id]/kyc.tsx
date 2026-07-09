@@ -8,6 +8,7 @@ import {
   Alert,
   StatusBar,
   Animated, // ✅ Import Animated
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router, Stack } from "expo-router";

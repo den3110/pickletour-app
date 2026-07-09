@@ -275,6 +275,8 @@ const maskPhone = (phone?: string) => {
   const d = String(phone).replace(/\D/g, "");
   return "*******" + (d.slice(-3) || "???");
 };
+const phoneForRole = (phone?: string, canManage = false) =>
+  canManage ? String(phone || "—") : maskPhone(phone);
 const normalizeNoAccent = (s?: string) =>
   (s || "")
     .normalize("NFD")
@@ -1063,7 +1065,7 @@ const RegItem = memo(function RegItem({
                 }}
               >
                 <Text style={{ color: C.textSecondary, fontSize: 11 }}>
-                  {maskPhone(pl?.phone)}
+                  {phoneForRole(pl?.phone, canManage)}
                 </Text>
                 <View
                   style={{
