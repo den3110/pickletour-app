@@ -2069,6 +2069,21 @@ export default function ManageScreen() {
         if (hit) return hit;
       }
       const bracketId = String(match?.bracket?._id || match?.bracket || "");
+      // Seed trỏ sang stage KHÁC stage của trận chủ mà không tìm thấy trận nguồn —
+      // trận đó có thể KHÔNG TỒN TẠI (blueprint sơ loại bị rút gọn, vd chỉ sinh
+      // V2-T1..T5 nhưng seed vẫn trỏ V2-T6). KHÔNG rơi xuống tra theo bracket của
+      // TRẬN CHỦ (vớ nhầm trận cùng round/order của chính nhánh này → "W-V2-T6"
+      // hiển thị "W-V4-T6"); trả null để nhãn dựng từ seed.
+      const ownerStage = Number(
+        match?.bracket?.stage ?? bracketById.get(bracketId)?.stage
+      );
+      if (
+        Number.isFinite(stage) &&
+        Number.isFinite(ownerStage) &&
+        stage !== ownerStage
+      ) {
+        return null;
+      }
       return bracketId
         ? pickIndexedSource(byBRO.get(`${bracketId}:${round}:${order}`), match)
         : null;

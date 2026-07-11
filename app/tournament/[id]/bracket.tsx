@@ -12,6 +12,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
+  Easing,
   StyleSheet,
   Modal,
   Pressable,
@@ -635,6 +637,37 @@ function computeChampionGate(allMatches) {
   return { allowed: true, matchId: fm._id || null, pair: champion };
 }
 
+const CHAMPION_PAGE_FIREWORKS = [
+  { left: "11%", top: "18%", color: "#60a5fa", delay: 0, scale: 1.08 },
+  { left: "28%", top: "12%", color: "#facc15", delay: 260, scale: 0.86 },
+  { left: "51%", top: "20%", color: "#fb7185", delay: 520, scale: 1 },
+  { left: "72%", top: "15%", color: "#22c55e", delay: 120, scale: 0.92 },
+  { left: "88%", top: "28%", color: "#f97316", delay: 420, scale: 0.78 },
+  { left: "18%", top: "66%", color: "#a78bfa", delay: 860, scale: 0.76 },
+  { left: "63%", top: "70%", color: "#38bdf8", delay: 1080, scale: 0.82 },
+  { left: "83%", top: "60%", color: "#facc15", delay: 1420, scale: 0.68 },
+];
+const CHAMPION_PAGE_FIREWORK_RAYS = Array.from(
+  { length: 16 },
+  (_, index) => index * 22.5
+);
+const CHAMPION_CONFETTI_COLORS = [
+  "#facc15",
+  "#60a5fa",
+  "#22c55e",
+  "#fb7185",
+  "#f97316",
+  "#a78bfa",
+];
+const CHAMPION_PAGE_CONFETTI = Array.from({ length: 44 }, (_, index) => ({
+  left: `${(index * 19 + 7) % 100}%`,
+  delay: (index % 14) * 120,
+  duration: 3000 + (index % 6) * 180,
+  drift: ((index % 9) - 4) * 12,
+  rotate: (index * 47) % 360,
+  color: CHAMPION_CONFETTI_COLORS[index % CHAMPION_CONFETTI_COLORS.length],
+}));
+
 /* ===================== Group helpers ===================== */
 
 // === Hoàn tất vòng bảng theo từng bảng/nhóm ===
@@ -1109,6 +1142,157 @@ function buildEmptyRoundsByScale(scale /* 2^n */) {
   if (last) last.seeds = last.seeds.map((s) => ({ ...s, __lastCol: true }));
   return rounds;
 }
+
+function isRenderableByeAdvanceSourceSeed(seed: any): boolean {
+  if (!seed) return false;
+  if (seed.__match) return true;
+
+  return (seed.teams || []).some((team: any) => {
+    const name = String(team?.name || "").trim();
+    return name && !isPendingTeamLabel(name) && !isByeLabel(name);
+  });
+}
+
+function inferSyntheticByeAdvanceSeedType(seeds: any, index: number): string {
+  if (!Array.isArray(seeds)) return "stageMatchWinner";
+  const orderedSeeds = seeds
+    .map((seed: any, seedIndex: number) => ({ seed, seedIndex }))
+    .sort(
+      (a: any, b: any) =>
+        Math.abs(a.seedIndex - index) - Math.abs(b.seedIndex - index) ||
+        a.seedIndex - b.seedIndex
+    );
+
+  for (const { seed } of orderedSeeds) {
+    const match = seed?.__match;
+    const refs = [match?.seedA, match?.seedB];
+    for (const refSeed of refs) {
+      const type = String(refSeed?.type || "");
+      if (type === "stageMatchLoser" || type === "matchLoser") {
+        return "stageMatchLoser";
+      }
+      if (type === "stageMatchWinner" || type === "matchWinner") {
+        return "stageMatchWinner";
+      }
+    }
+  }
+
+  return "stageMatchWinner";
+}
+
+function makeSyntheticByeAdvanceSeed(
+  sourceSeed: any,
+  round: number,
+  order: number,
+  sourceSide: "A" | "B",
+  seedType: string
+): any {
+  const sourceMatch = sourceSeed?.__match || null;
+  const sourceRound = Number(sourceMatch?.round ?? sourceSeed?.__round ?? round - 1);
+  const sourceOrder = Number(
+    sourceMatch?.order ?? (sourceSide === "A" ? order * 2 : order * 2 + 1)
+  );
+  if (!Number.isFinite(sourceRound) || !Number.isFinite(sourceOrder)) {
+    return null;
+  }
+
+  const ref: any = {
+    round: sourceRound,
+    order: sourceOrder,
+  };
+  const stage = Number(
+    sourceMatch?.bracket?.stage ??
+      sourceMatch?.bracket?.stageIndex ??
+      sourceMatch?.stage ??
+      sourceMatch?.stageIndex
+  );
+  if (Number.isFinite(stage)) {
+    ref.stage = stage;
+    ref.stageIndex = stage;
+  }
+  if (sourceMatch?._id) ref.matchId = sourceMatch._id;
+
+  const resolvedSeedType =
+    seedType === "stageMatchLoser" ? "stageMatchLoser" : "stageMatchWinner";
+  const refPrefix = resolvedSeedType === "stageMatchLoser" ? "L" : "W";
+  const sourceSeedRef = {
+    type: resolvedSeedType,
+    ref,
+    label: `${refPrefix}-V${sourceRound}-T${sourceOrder + 1}`,
+  };
+  const byeSeed = { type: "bye", label: "BYE" };
+  const id = `synthetic-bye-${round}-${order}-${sourceRound}-${sourceOrder}`;
+  const match = {
+    _id: id,
+    __syntheticByeAdvance: true,
+    round,
+    order,
+    status: "finished",
+    winner: sourceSide,
+    bracket: sourceMatch?.bracket,
+    branch: sourceMatch?.branch,
+    phase: sourceMatch?.phase,
+    format: sourceMatch?.format,
+    seedA: sourceSide === "A" ? sourceSeedRef : byeSeed,
+    seedB: sourceSide === "A" ? byeSeed : sourceSeedRef,
+    previousA: sourceSide === "A" ? sourceMatch || undefined : undefined,
+    previousB: sourceSide === "B" ? sourceMatch || undefined : undefined,
+    meta: { virtualBye: true },
+  };
+
+  return {
+    id,
+    __match: match,
+    __round: round,
+    teams: [
+      { name: sourceSide === "A" ? sourceSeedRef.label : "BYE" },
+      { name: sourceSide === "B" ? sourceSeedRef.label : "BYE" },
+    ],
+  };
+}
+
+function fillSyntheticByeAdvanceSeeds(
+  previousSeeds: any,
+  seeds: any,
+  round: number
+): void {
+  if (!Array.isArray(previousSeeds) || !previousSeeds.length || !Array.isArray(seeds)) {
+    return;
+  }
+
+  seeds.forEach((seed, index) => {
+    if (seed?.__match) return;
+
+    const sourceA = previousSeeds[index * 2];
+    const sourceB = previousSeeds[index * 2 + 1];
+    const hasSourceA = isRenderableByeAdvanceSourceSeed(sourceA);
+    const hasSourceB = isRenderableByeAdvanceSourceSeed(sourceB);
+    if (hasSourceA === hasSourceB) return;
+
+    const synthetic = makeSyntheticByeAdvanceSeed(
+      hasSourceA ? sourceA : sourceB,
+      round,
+      index,
+      hasSourceA ? "A" : "B",
+      inferSyntheticByeAdvanceSeedType(seeds, index)
+    );
+    if (synthetic) seeds[index] = synthetic;
+  });
+}
+
+function fillSyntheticByeAdvanceRounds(rounds: any): void {
+  if (!Array.isArray(rounds)) return;
+  for (let roundIndex = 1; roundIndex < rounds.length; roundIndex += 1) {
+    const previousSeeds = rounds[roundIndex - 1]?.seeds;
+    const seeds = rounds[roundIndex]?.seeds;
+    const round =
+      Number(seeds?.[0]?.__round) ||
+      Number(rounds[roundIndex]?.__round) ||
+      roundIndex + 1;
+    fillSyntheticByeAdvanceSeeds(previousSeeds, seeds, round);
+  }
+}
+
 function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
   const prefillSeeds = Array.isArray(bracket?.prefill?.seeds)
     ? bracket.prefill.seeds
@@ -1140,7 +1324,7 @@ function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
   const matchesInRound = (r) => {
     if (r === 1) return r1Pairs;
     let prev = r1Pairs;
-    for (let i = 2; i <= r; i++) prev = Math.floor(prev / 2) || 1;
+    for (let i = 2; i <= r; i++) prev = Math.ceil(prev / 2) || 1;
     return Math.max(1, prev);
   };
 
@@ -1194,6 +1378,7 @@ function buildRoundElimRounds(bracket, brMatches, resolveSideLabel) {
 
     rounds.push({ title: `Vòng ${r}`, seeds });
   }
+  fillSyntheticByeAdvanceRounds(rounds);
   const last = rounds[rounds.length - 1];
   if (last) last.seeds = last.seeds.map((s) => ({ ...s, __lastCol: true }));
   return rounds;
@@ -1288,6 +1473,7 @@ function buildRoundsWithPlaceholders(
     return { title: koRoundTitle(need), seeds };
   });
 
+  fillSyntheticByeAdvanceRounds(res);
   const last = res[res.length - 1];
   if (last) last.seeds = last.seeds.map((s) => ({ ...s, __lastCol: true }));
   return res;
@@ -1346,6 +1532,244 @@ const Card = ({ children, style, onPress, disabled, t }) => {
   }
   return <View style={baseStyle}>{children}</View>;
 };
+
+function ChampionFireworkBurst({ firework, progress }) {
+  const opacity = progress.interpolate({
+    inputRange: [0, 0.12, 0.82, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+  const coreScale = progress.interpolate({
+    inputRange: [0, 0.2, 0.46, 1],
+    outputRange: [0.2, 1, 1.9, 0.2],
+  });
+  const rayOpacity = progress.interpolate({
+    inputRange: [0, 0.16, 1],
+    outputRange: [0, 1, 0],
+  });
+  const rayDistance = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -46],
+  });
+  const rayScaleY = progress.interpolate({
+    inputRange: [0, 0.18, 1],
+    outputRange: [0.16, 1, 1],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.championFirework,
+        {
+          left: firework.left,
+          top: firework.top,
+          opacity,
+          transform: [{ scale: firework.scale }],
+        },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.championFireworkCore,
+          {
+            backgroundColor: firework.color,
+            shadowColor: firework.color,
+            transform: [{ scale: coreScale }],
+          },
+        ]}
+      />
+      {CHAMPION_PAGE_FIREWORK_RAYS.map((angle, rayIndex) => (
+        <Animated.View
+          key={angle}
+          style={[
+            styles.championFireworkRay,
+            {
+              height: 24 + (rayIndex % 4) * 3,
+              backgroundColor: firework.color,
+              shadowColor: firework.color,
+              opacity: rayOpacity,
+              transform: [
+                { rotate: `${angle}deg` },
+                { translateY: rayDistance },
+                { scaleY: rayScaleY },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </Animated.View>
+  );
+}
+
+function ChampionPageFireworks({ triggerKey }) {
+  const { height } = useWindowDimensions();
+  const [visible, setVisible] = useState(Boolean(triggerKey));
+  const fireworkValuesRef = useRef(
+    CHAMPION_PAGE_FIREWORKS.map(() => new Animated.Value(0))
+  );
+  const confettiValuesRef = useRef(
+    CHAMPION_PAGE_CONFETTI.map(() => new Animated.Value(0))
+  );
+
+  useEffect(() => {
+    if (!triggerKey) {
+      setVisible(false);
+      return undefined;
+    }
+
+    setVisible(true);
+    const fireworkValues = fireworkValuesRef.current;
+    const confettiValues = confettiValuesRef.current;
+    fireworkValues.forEach((value) => value.setValue(0));
+    confettiValues.forEach((value) => value.setValue(0));
+
+    const animation = Animated.parallel([
+      ...CHAMPION_PAGE_FIREWORKS.map((firework, index) =>
+        Animated.sequence([
+          Animated.delay(firework.delay),
+          Animated.timing(fireworkValues[index], {
+            toValue: 1,
+            duration: 1800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      ...CHAMPION_PAGE_CONFETTI.map((piece, index) =>
+        Animated.sequence([
+          Animated.delay(piece.delay),
+          Animated.timing(confettiValues[index], {
+            toValue: 1,
+            duration: piece.duration,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ]);
+
+    animation.start(({ finished }) => {
+      if (finished) setVisible(false);
+    });
+
+    return () => animation.stop();
+  }, [triggerKey]);
+
+  if (!triggerKey || !visible) return null;
+
+  const fallDistance = Math.max(height, 560) + 80;
+
+  return (
+    <View pointerEvents="none" style={styles.championPageFireworks}>
+      {CHAMPION_PAGE_CONFETTI.map((piece, index) => {
+        const progress = confettiValuesRef.current[index];
+        const opacity = progress.interpolate({
+          inputRange: [0, 0.12, 0.88, 1],
+          outputRange: [0, 1, 1, 0],
+        });
+        const translateY = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-28, fallDistance],
+        });
+        const translateX = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, piece.drift],
+        });
+        const rotate = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [`${piece.rotate}deg`, `${piece.rotate + 520}deg`],
+        });
+
+        return (
+          <Animated.View
+            key={`${piece.left}-${index}`}
+            style={[
+              styles.championConfetti,
+              {
+                left: piece.left,
+                width: index % 3 === 0 ? 5 : 4,
+                height: index % 4 === 0 ? 16 : 11,
+                backgroundColor: piece.color,
+                shadowColor: piece.color,
+                opacity,
+                transform: [{ translateX }, { translateY }, { rotate }],
+              },
+            ]}
+          />
+        );
+      })}
+
+      {CHAMPION_PAGE_FIREWORKS.map((firework, index) => (
+        <ChampionFireworkBurst
+          key={`${firework.left}-${firework.top}-${index}`}
+          firework={firework}
+          progress={fireworkValuesRef.current[index]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ChampionCelebrationBanner({ championName, t }) {
+  return (
+    <View
+      style={[
+        styles.championBanner,
+        {
+          borderColor: t.dark ? "rgba(250,204,21,0.42)" : "rgba(217,119,6,0.36)",
+          backgroundColor: t.dark ? "rgba(250,204,21,0.09)" : "#fff7ed",
+        },
+      ]}
+    >
+      <View style={styles.championBannerSparkles} pointerEvents="none">
+        {CHAMPION_CONFETTI_COLORS.map((color, index) => (
+          <View
+            key={color}
+            style={[
+              styles.championBannerSpark,
+              {
+                backgroundColor: color,
+                left: `${10 + index * 15}%`,
+                top: index % 2 === 0 ? 8 : 28,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View
+        style={[
+          styles.championTrophyBadge,
+          {
+            borderColor: t.dark ? "rgba(250,204,21,0.55)" : "rgba(217,119,6,0.4)",
+            backgroundColor: t.dark
+              ? "rgba(250,204,21,0.16)"
+              : "rgba(251,191,36,0.2)",
+          },
+        ]}
+      >
+        <Text style={styles.championTrophyText}>🏆</Text>
+      </View>
+      <View style={styles.championBannerCopy}>
+        <Text
+          style={[
+            styles.championBannerOverline,
+            { color: t.dark ? "#fde68a" : "#92400e" },
+          ]}
+        >
+          Nhà vô địch
+        </Text>
+        <Text
+          style={[styles.championBannerName, { color: t.colors.text }]}
+          numberOfLines={2}
+        >
+          {championName}
+        </Text>
+        <Text style={[styles.championBannerSubtitle, { color: t.subtext }]}>
+          Chúc mừng đội đã hoàn thành hành trình và giành chiến thắng chung cuộc.
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 const SectionTitle = ({ children, mb = 8, t }) => (
   <Text
@@ -2474,8 +2898,12 @@ const BracketColumns = ({
                   }}
                 >
                   <Card
-                    onPress={m ? () => onOpenMatch(m) : undefined}
-                    disabled={!m}
+                    onPress={
+                      m && !m.__syntheticByeAdvance
+                        ? () => onOpenMatch(m)
+                        : undefined
+                    }
+                    disabled={!m || m.__syntheticByeAdvance}
                     t={t}
                     style={[
                       styles.seedBox,
@@ -3564,6 +3992,29 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     () => (current ? byBracket[current._id] || [] : []),
     [byBracket, current]
   );
+  const currentMainMatches = useMemo(
+    () => (currentMatches || []).filter((m) => !isThirdPlaceMatch(m)),
+    [currentMatches]
+  );
+  const isCurrentKnockout =
+    !!current && current.type !== "group" && current.type !== "roundElim";
+  const currentChampionGate = useMemo(
+    () =>
+      isCurrentKnockout
+        ? computeChampionGate(currentMainMatches)
+        : { allowed: false, matchId: null, pair: null },
+    [currentMainMatches, isCurrentKnockout]
+  );
+  const currentChampionPair = currentChampionGate.allowed
+    ? currentChampionGate.pair
+    : null;
+  const currentChampionName = useMemo(
+    () =>
+      currentChampionPair
+        ? pairLabelNickOnly(currentChampionPair, tour?.eventType, tour)
+        : "",
+    [currentChampionPair, tour]
+  );
 
   const findSourceMatchFromSeed = useCallback(
     (ownerMatch, seed) => {
@@ -3594,9 +4045,25 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         if (hit) return hit;
       }
 
+      // Seed trỏ sang stage KHÁC stage của trận chủ (feeder liên bracket) mà các bước
+      // trên không tìm thấy — trận nguồn có thể KHÔNG TỒN TẠI (blueprint sơ loại bị
+      // rút gọn, vd chỉ sinh V2-T1..T5 nhưng seed vẫn trỏ V2-T6). KHÔNG rơi xuống tra
+      // theo bracket của TRẬN CHỦ: sẽ vớ nhầm trận cùng round/order của chính nhánh
+      // này (bug "W-V2-T6" hiển thị "W-V4-T6"). Trả null để nhãn dựng từ seed/ref.
       const bracketId = String(
         ownerMatch?.bracket?._id || ownerMatch?.bracket || ""
       );
+      const ownerStage = Number(
+        ownerMatch?.bracket?.stage ?? bracketById.get(bracketId)?.stage
+      );
+      if (
+        Number.isFinite(stageNum) &&
+        Number.isFinite(ownerStage) &&
+        stageNum !== ownerStage
+      ) {
+        return null;
+      }
+
       if (bracketId) {
         return (
           matchRefIndex.byBracketRoundOrder.get(
@@ -3607,7 +4074,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
       return null;
     },
-    [matchRefIndex]
+    [matchRefIndex, bracketById]
   );
 
   const getDisplayCodeForMatch = useCallback(
@@ -4551,9 +5018,10 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   };
 
   const renderKO = () => {
-    const championGate = computeChampionGate(currentMatches);
-    const finalMatchId = championGate.allowed ? championGate.matchId : null;
-    const championPair = championGate.allowed ? championGate.pair : null;
+    const finalMatchId = currentChampionGate.allowed
+      ? currentChampionGate.matchId
+      : null;
+    const championPair = currentChampionPair;
 
     const scaleForCurrent = readBracketScale(current);
     const uniqueRoundsCount = new Set(currentMatches.map((m) => m.round ?? 1))
@@ -4603,21 +5071,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         </View>
 
         {!!championPair && (
-          <Card
-            t={t}
-            style={{
-              padding: 10,
-              borderColor: t.success,
-              backgroundColor: t.dark ? "rgba(34,197,94,0.12)" : "#f1fff2",
-            }}
-          >
-            <Text style={{ color: t.colors.text }}>
-              Vô địch:{" "}
-              <Text style={styles.bold}>
-                {pairLabelNickOnly(championPair, tour?.eventType, tour)}
-              </Text>
-            </Text>
-          </Card>
+          <ChampionCelebrationBanner championName={currentChampionName} t={t} />
         )}
 
         <SymmetricKnockoutColumns
@@ -4670,8 +5124,9 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   };
 
   const renderKOBracketOnly = () => {
-    const championGate = computeChampionGate(currentMatches);
-    const finalMatchId = championGate.allowed ? championGate.matchId : null;
+    const finalMatchId = currentChampionGate.allowed
+      ? currentChampionGate.matchId
+      : null;
     const scaleForCurrent = readBracketScale(current);
     const uniqueRoundsCount = new Set(currentMatches.map((m) => m.round ?? 1))
       .size;
@@ -4824,6 +5279,8 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             t={t}
           />
         </ScrollView>
+
+        <ChampionPageFireworks triggerKey={currentChampionName} />
 
         {current && current.type !== "group" && !isFullscreen && (
           <FullscreenFAB onPress={enterFullscreen} bottomGap={80} t={t} />
@@ -5171,6 +5628,108 @@ const styles = StyleSheet.create({
 
   // KO meta
   koMeta: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  championPageFireworks: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
+    overflow: "hidden",
+  },
+  championConfetti: {
+    position: "absolute",
+    top: -24,
+    borderRadius: 3,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  championFirework: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  championFireworkCore: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    shadowOpacity: 0.7,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  championFireworkRay: {
+    position: "absolute",
+    left: 2,
+    top: 2,
+    width: 4,
+    borderRadius: 999,
+    shadowOpacity: 0.7,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  championBanner: {
+    position: "relative",
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    shadowColor: "#f59e0b",
+    shadowOpacity: 0.14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  championBannerSparkles: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  championBannerSpark: {
+    position: "absolute",
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    opacity: 0.55,
+  },
+  championTrophyBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  championTrophyText: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  championBannerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  championBannerOverline: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  championBannerName: {
+    marginTop: 2,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "900",
+  },
+  championBannerSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
+  },
 
   // footnote
   note: { marginTop: 8, fontSize: 12 },

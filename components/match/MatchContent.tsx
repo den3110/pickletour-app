@@ -2690,9 +2690,25 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         if (byStage) return byStage;
       }
 
+      // Seed trỏ sang stage KHÁC stage của trận chủ (feeder liên bracket) mà các bước
+      // trên không tìm thấy — trận nguồn có thể KHÔNG TỒN TẠI (blueprint sơ loại bị
+      // rút gọn, vd chỉ sinh V2-T1..T5 nhưng seed vẫn trỏ V2-T6). KHÔNG rơi xuống tra
+      // theo bracket của TRẬN CHỦ: sẽ vớ nhầm trận cùng round/order của chính nhánh
+      // này (bug "W-V2-T6" hiển thị "W-V4-T6"). Trả null để nhãn dựng từ seed/ref.
       const bracketId = String(
         ownerMatch?.bracket?._id || ownerMatch?.bracket || "",
       );
+      const ownerStage = Number(
+        ownerMatch?.bracket?.stage ?? bracketsById.get(bracketId)?.stage,
+      );
+      if (
+        Number.isFinite(stageNum) &&
+        Number.isFinite(ownerStage) &&
+        stageNum !== ownerStage
+      ) {
+        return null;
+      }
+
       if (bracketId) {
         return (
           matchRefIndex.byBracketRoundOrder.get(
@@ -2703,7 +2719,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
       return null;
     },
-    [matchRefIndex],
+    [matchRefIndex, bracketsById],
   );
 
   const getDisplayCodeForMatch = useCallback(
