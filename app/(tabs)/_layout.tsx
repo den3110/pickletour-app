@@ -24,8 +24,8 @@ const HOME_LOTTIE = SHOULD_RENDER_NATIVE_LOTTIE
 const CHATBOT_ICON = require("@/assets/images/icon-chatbot.png");
 
 const ACTIVE_TAB_TINT = {
-  light: "#8B5CF6",
-  dark: "#A78BFA",
+  light: "#1877F2",
+  dark: "#7CC0FF",
 };
 
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";

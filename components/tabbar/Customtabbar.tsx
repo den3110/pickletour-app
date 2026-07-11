@@ -170,13 +170,16 @@ export function CustomTabBar({
   const insets = useSafeAreaInsets();
   const rootOptions = descriptors[state.routes[0]?.key]?.options ?? {};
   const activeTint =
-    rootOptions.tabBarActiveTintColor ?? (isDark ? "#A78BFA" : "#8B5CF6");
+    rootOptions.tabBarActiveTintColor ?? (isDark ? "#7CC0FF" : "#1877F2");
   const inactiveTint = rootOptions.tabBarInactiveTintColor ?? "#8E8E93";
 
+  // Edge-to-edge: root SafeAreaView không đệm bottom ở tabs nữa, tab bar phải tự
+  // chừa đủ insets.bottom (nav 3 nút ~48px, gesture ~16-24px) — KHÔNG clamp trần,
+  // clamp sẽ làm nav bar hệ thống đè lên hàng icon.
   const extraPaddingBottom =
     Platform.OS === "ios"
       ? Math.max(insets.bottom, 10)
-      : Math.min(Math.max(insets.bottom, 8), 12);
+      : Math.max(insets.bottom, 8);
 
   const visibleRoutes = React.useMemo(
     () =>

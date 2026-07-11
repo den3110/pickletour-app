@@ -11,6 +11,7 @@ import React, {
 import {
   ActivityIndicator, // ✅ Đã thêm
   Animated,
+  Easing,
   FlatList,
   Keyboard,
   Pressable,
@@ -28,6 +29,12 @@ import {
   SafeAreaView as RNSafeAreaView,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
 import { useDispatch, useSelector } from "react-redux";
 import { useIsFocused, useTheme } from "@react-navigation/native";
 import ImageViewing from "react-native-image-viewing";
@@ -37,6 +44,7 @@ import * as Haptics from "expo-haptics";
 
 import {
   useGetRankingsListQuery,
+  useGetRankingsPodiumAnnouncementsQuery,
   useGetRankingsPodiums30dQuery,
 } from "@/slices/rankingsApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
@@ -60,6 +68,52 @@ const COLORS = {
   scoreGrey: "#94a3b8",
 };
 const SCORE_STALE_MONTHS = 4;
+const ACHIEVEMENT_VISIBLE_LIMIT = 3;
+const PODIUM_MARQUEE_ITEM_WIDTH = 320;
+
+const ACHIEVEMENT_TONES = {
+  yellow: { bg: "#facc15", fg: "#422006", border: "#fde68a" },
+  gold: { bg: "#facc15", fg: "#422006", border: "#fde68a" },
+  bronze: { bg: "#b45309", fg: "#fff7ed", border: "#fb923c" },
+  grey: { bg: "#64748b", fg: "#f8fafc", border: "#cbd5e1" },
+  gray: { bg: "#64748b", fg: "#f8fafc", border: "#cbd5e1" },
+  blue: { bg: "#2563eb", fg: "#eff6ff", border: "#93c5fd" },
+  cyan: { bg: "#0891b2", fg: "#ecfeff", border: "#67e8f9" },
+  green: { bg: "#16a34a", fg: "#f0fdf4", border: "#86efac" },
+  red: { bg: "#dc2626", fg: "#fef2f2", border: "#fca5a5" },
+  purple: { bg: "#7c3aed", fg: "#faf5ff", border: "#c4b5fd" },
+  navy: { bg: "#1e3a8a", fg: "#eff6ff", border: "#93c5fd" },
+};
+
+const PODIUM_MARQUEE_META = {
+  gold: {
+    label: "Vô địch",
+    action: "vô địch giải",
+    icon: "trophy",
+    colors: ["#fff7ad", "#facc15", "#f59e0b"],
+    text: "#422006",
+    accent: "#facc15",
+    glow: "rgba(250,204,21,0.34)",
+  },
+  silver: {
+    label: "Hạng nhì",
+    action: "đạt hạng nhì tại giải",
+    icon: "medal",
+    colors: ["#f8fafc", "#cbd5e1", "#94a3b8"],
+    text: "#102033",
+    accent: "#cbd5e1",
+    glow: "rgba(203,213,225,0.3)",
+  },
+  bronze: {
+    label: "Đồng hạng ba",
+    action: "đồng hạng ba tại giải",
+    icon: "medal-outline",
+    colors: ["#78350f", "#b45309", "#f97316"],
+    text: "#fff7ed",
+    accent: "#fb923c",
+    glow: "rgba(251,146,60,0.3)",
+  },
+};
 
 const fmt3 = (x) => {
   if (x === null) return "***";
@@ -249,6 +303,113 @@ const getScoreColor = (r, theme) => {
   return COLORS.scoreGrey;
 };
 
+const toneOfAchievement = (tone) =>
+  ACHIEVEMENT_TONES[String(tone || "").toLowerCase()] || ACHIEVEMENT_TONES.grey;
+
+const iconOfAchievement = (item = {}) => {
+  const id = String(item.id || "").toLowerCase();
+  const category = String(item.category || "").toLowerCase();
+  const tone = String(item.tone || "").toLowerCase();
+  if (id.includes("gold") || id.includes("champion") || tone === "yellow")
+    return "trophy";
+  if (id.includes("silver")) return "medal";
+  if (id.includes("bronze") || tone === "bronze") return "medal-outline";
+  if (id.includes("kyc") || category.includes("xác thực"))
+    return "shield-checkmark";
+  if (id.includes("tour") || category.includes("thi đấu")) return "flag";
+  if (id.includes("score") || category.includes("điểm")) return "speedometer";
+  if (tone === "red") return "alert-circle";
+  return "sparkles";
+};
+
+const normalizeRankingAchievements = (items) =>
+  (Array.isArray(items) ? items : [])
+    .map((item, index) => ({
+      id: String(item?.id || item?._id || `achievement-${index}`),
+      label: String(item?.label || item?.title || "").trim(),
+      category: String(item?.category || "Chip nổi bật").trim(),
+      explain: String(item?.explain || item?.description || "").trim(),
+      tone: String(item?.tone || item?.color || "grey").toLowerCase(),
+      effect: String(item?.effect || item?.tone || "glow").toLowerCase(),
+    }))
+    .filter((item) => item.label);
+
+const buildFallbackAchievements = ({ ranking, user, status, podium }) => {
+  const out = [];
+  const rank = Number(ranking?.globalRank || ranking?.rank || 0);
+  const totalTours = Number(
+    ranking?.totalTours || ranking?.totalFinishedTours || 0
+  );
+
+  if (Number.isFinite(rank) && rank > 0 && rank <= 10) {
+    out.push({
+      id: "global-top",
+      label: rank === 1 ? "Top 1" : `Top ${rank}`,
+      category: "Thứ hạng",
+      explain: `Đang nằm trong top ${rank} toàn bảng.`,
+      tone: rank === 1 ? "yellow" : "blue",
+    });
+  }
+  if (podium?.medal) {
+    out.push({
+      id: `podium-${podium.medal}`,
+      label: medalLabel(podium.medal),
+      category: "Huy chương",
+      explain: podium.label || "Có thành tích podium gần đây.",
+      tone:
+        podium.medal === "gold"
+          ? "yellow"
+          : podium.medal === "bronze"
+          ? "bronze"
+          : "grey",
+    });
+  }
+  if (status === "verified") {
+    out.push({
+      id: "kyc-verified",
+      label: "Đã KYC",
+      category: "Xác thực hồ sơ",
+      explain: "Hồ sơ định danh đã được xác thực.",
+      tone: "green",
+    });
+  }
+  if (totalTours >= 1) {
+    out.push({
+      id: `tour-count-${totalTours}`,
+      label: totalTours === 1 ? "Đã thi đấu" : `+${totalTours} giải`,
+      category: "Kinh nghiệm thi đấu",
+      explain: `Đã ghi nhận ${totalTours} giải đã hoàn tất trong dữ liệu ranking.`,
+      tone: totalTours >= 10 ? "navy" : "cyan",
+    });
+  }
+  if (hasAnyScore(ranking) && isScoreStale(ranking)) {
+    out.push({
+      id: "needs-review",
+      label: "Cần chấm lại",
+      category: "Độ mới điểm",
+      explain: "Điểm có dấu hiệu cũ, nên cập nhật hoặc chấm lại.",
+      tone: "red",
+    });
+  }
+  if (!hasAnyScore(ranking)) {
+    out.push({
+      id: "no-score",
+      label: "Chưa có điểm",
+      category: "Điểm trình",
+      explain: "Chưa có điểm đơn, đôi, mix hoặc điểm tích lũy.",
+      tone: "grey",
+    });
+  }
+
+  return out.filter((item) => item.label);
+};
+
+const buildMobileAchievements = ({ ranking, user, status, podium }) => {
+  const backend = normalizeRankingAchievements(ranking?.achievements);
+  if (backend.length) return backend;
+  return buildFallbackAchievements({ ranking, user, status, podium });
+};
+
 const glassScheme = (theme) => (theme.isDark ? "dark" : "light");
 const glassSurfaceTint = (theme, light = 0.58, dark = 0.58) =>
   theme.isDark
@@ -392,6 +553,280 @@ const InfoTag = memo(({ icon, text, theme }) => (
   </AppleLiquidGlassView>
 ));
 InfoTag.displayName = "InfoTag";
+
+const AchievementChip = memo(({ item, theme, onPress, compact = false }) => {
+  const tone = toneOfAchievement(item?.tone);
+  return (
+    <TouchableOpacity activeOpacity={0.86} onPress={onPress}>
+      <LinearGradient
+        colors={[tone.bg, tone.border]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.achievementChip,
+          compact && styles.achievementChipCompact,
+          { borderColor: tone.border, shadowColor: tone.bg },
+        ]}
+      >
+        <Ionicons
+          name={iconOfAchievement(item)}
+          size={compact ? 12 : 13}
+          color={tone.fg}
+          style={{ marginRight: 4 }}
+        />
+        <Text
+          style={[styles.achievementChipText, { color: tone.fg }]}
+          numberOfLines={1}
+        >
+          {item?.label}
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+});
+AchievementChip.displayName = "AchievementChip";
+
+const AchievementSummary = memo(({ achievements, theme, onOpen }) => {
+  if (!Array.isArray(achievements) || achievements.length === 0) return null;
+  const visible = achievements.slice(0, ACHIEVEMENT_VISIBLE_LIMIT);
+  const hiddenCount = Math.max(0, achievements.length - visible.length);
+
+  return (
+    <View style={styles.achievementRow}>
+      {visible.map((item) => (
+        <AchievementChip
+          key={item.id}
+          item={item}
+          theme={theme}
+          onPress={onOpen}
+          compact
+        />
+      ))}
+      {hiddenCount > 0 && (
+        <TouchableOpacity activeOpacity={0.86} onPress={onOpen}>
+          <View
+            style={[
+              styles.achievementMoreChip,
+              { backgroundColor: theme.inputBg, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.achievementMoreText, { color: theme.text }]}>
+              +{hiddenCount}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+AchievementSummary.displayName = "AchievementSummary";
+
+const PodiumCelebrationItem = memo(({ item, theme, onPress }) => {
+  const meta = PODIUM_MARQUEE_META[item?.medal] || PODIUM_MARQUEE_META.gold;
+  return (
+    <TouchableOpacity activeOpacity={0.88} onPress={() => onPress?.(item)}>
+      <View
+        style={[
+          styles.podiumMarqueeItem,
+          {
+            borderColor: theme.isDark
+              ? "rgba(255,255,255,0.14)"
+              : "rgba(15,23,42,0.12)",
+            backgroundColor: theme.isDark
+              ? "rgba(15,23,42,0.86)"
+              : "rgba(30,41,59,0.84)",
+            shadowColor: meta.accent,
+          },
+        ]}
+      >
+        <LinearGradient colors={meta.colors} style={styles.podiumIconBubble}>
+          <MaterialCommunityIcons name={meta.icon} size={18} color={meta.text} />
+        </LinearGradient>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={[styles.podiumOverline, { color: meta.accent }]}
+            numberOfLines={1}
+          >
+            Chúc mừng {meta.label}
+          </Text>
+          <Text style={styles.podiumMessage} numberOfLines={1}>
+            {item?.teamLabel} {meta.action} {item?.tournamentName}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+PodiumCelebrationItem.displayName = "PodiumCelebrationItem";
+
+const PodiumCelebrationMarquee = memo(({ items = [], theme, onPressItem }) => {
+  const base = useMemo(
+    () =>
+      (Array.isArray(items) ? items : []).filter(
+        (item) => item?.teamLabel && item?.tournamentName && item?.medal
+      ),
+    [items]
+  );
+  const group = useMemo(() => {
+    if (!base.length) return [];
+    const repeat = Math.max(2, Math.ceil(8 / base.length));
+    return Array.from({ length: repeat }, () => base).flat();
+  }, [base]);
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!group.length) return undefined;
+    const distance = PODIUM_MARQUEE_ITEM_WIDTH * group.length;
+    translateX.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(translateX, {
+        toValue: -distance,
+        duration: Math.max(24000, group.length * 5000),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [group.length, translateX]);
+
+  if (!base.length) return null;
+
+  return (
+    <View style={styles.podiumMarqueeWrap}>
+      <Animated.View
+        style={[
+          styles.podiumMarqueeTrack,
+          { transform: [{ translateX }] },
+        ]}
+      >
+        {[...group, ...group].map((item, index) => (
+          <PodiumCelebrationItem
+            key={`${item?.id || item?.teamLabel}-${index}`}
+            item={item}
+            theme={theme}
+            onPress={onPressItem}
+          />
+        ))}
+      </Animated.View>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.podiumMarqueeFadeLeft,
+          { backgroundColor: theme.bg },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.podiumMarqueeFadeRight,
+          { backgroundColor: theme.bg },
+        ]}
+      />
+    </View>
+  );
+});
+PodiumCelebrationMarquee.displayName = "PodiumCelebrationMarquee";
+
+const AchievementsBottomSheet = memo(
+  ({ sheetRef, state, theme, onDismiss }) => {
+    const renderBackdrop = useCallback(
+      (props) => (
+        <BottomSheetBackdrop
+          {...props}
+          appearsOnIndex={0}
+          disappearsOnIndex={-1}
+          pressBehavior="close"
+        />
+      ),
+      []
+    );
+    const achievements = state?.achievements || [];
+    const user = state?.user || {};
+    const displayName = user?.nickname || user?.name || "--";
+
+    return (
+      <BottomSheetModal
+        ref={sheetRef}
+        snapPoints={["42%", "78%"]}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{ backgroundColor: theme.card }}
+        handleIndicatorStyle={{ backgroundColor: theme.subText }}
+        onDismiss={onDismiss}
+      >
+        <BottomSheetScrollView
+          contentContainerStyle={[
+            styles.achievementSheetContent,
+            { backgroundColor: theme.card },
+          ]}
+        >
+          <View style={styles.achievementSheetHeader}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={[styles.achievementSheetTitle, { color: theme.text }]}
+                numberOfLines={1}
+              >
+                Chip nổi bật - {displayName}
+              </Text>
+              <Text style={[styles.achievementSheetSub, { color: theme.subText }]}>
+                {achievements.length} chip nổi bật đã được chọn lọc
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => sheetRef.current?.dismiss?.()}
+              hitSlop={10}
+            >
+              <Ionicons name="close" size={22} color={theme.subText} />
+            </TouchableOpacity>
+          </View>
+
+          {achievements.length ? (
+            achievements.map((item) => {
+              const tone = toneOfAchievement(item?.tone);
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.achievementSheetRow,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.inputBg,
+                    },
+                  ]}
+                >
+                  <AchievementChip item={item} theme={theme} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={[
+                        styles.achievementCategory,
+                        { color: tone.border },
+                      ]}
+                    >
+                      {item.category}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.achievementExplain,
+                        { color: theme.subText },
+                      ]}
+                    >
+                      {item.explain || "Chip nổi bật trên bảng xếp hạng."}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={[styles.achievementExplain, { color: theme.subText }]}>
+              Chưa có chip nổi bật phù hợp.
+            </Text>
+          )}
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    );
+  }
+);
+AchievementsBottomSheet.displayName = "AchievementsBottomSheet";
 
 const ScoreBlock = memo(({ label, score, color, theme }) => (
   <AppleLiquidGlassView
@@ -824,10 +1259,12 @@ const RankingCard = memo(
     onOpenGrade,
     onOpenKyc,
     onGoToTournament,
+    onOpenAchievements,
   }) => {
     const theme = useThemeColors();
     const r = item;
-    const u = r?.user || {};
+    const rankingUser = r?.user;
+    const u = useMemo(() => rankingUser || {}, [rankingUser]);
     const avatarSrc = u?.avatar || PLACE;
     const age = calcAge(u);
 
@@ -843,6 +1280,19 @@ const RankingCard = memo(
     const allowGrade = canGradeUser(me, u?.province);
     const allowKyc = canViewKycAdmin(me, effectiveStatus);
     const verifyChip = getVerifyChip(effectiveStatus, r?.tierColor);
+    const achievements = useMemo(
+      () =>
+        buildMobileAchievements({
+          ranking: r,
+          user: u,
+          status: effectiveStatus,
+          podium,
+        }),
+      [r, u, effectiveStatus, podium]
+    );
+    const openAchievements = useCallback(() => {
+      onOpenAchievements?.(u, achievements);
+    }, [achievements, onOpenAchievements, u]);
 
     return (
       <FlameCard medal={podium?.medal} theme={theme}>
@@ -961,6 +1411,12 @@ const RankingCard = memo(
           )}
         </View>
 
+        <AchievementSummary
+          achievements={achievements}
+          theme={theme}
+          onOpen={openAchievements}
+        />
+
         <View style={styles.scoreGrid}>
           <ScoreBlock
             label="ĐIỂM ĐÔI"
@@ -1075,10 +1531,11 @@ const RankingCard = memo(
   },
   (prev, next) => {
     return (
-      prev.item?._id === next.item?._id &&
+      prev.item === next.item &&
       prev.scorePatch === next.scorePatch &&
       prev.cccdPatch === next.cccdPatch &&
       prev.podium?.medal === next.podium?.medal &&
+      prev.podium?.label === next.podium?.label &&
       prev.me?.role === next.me?.role
     );
   }
@@ -1191,6 +1648,10 @@ export default function RankingListScreen({ isBack = false }) {
   });
   const { data: podiumData, refetch: refetchPodiums } =
     useGetRankingsPodiums30dQuery();
+  const {
+    data: podiumAnnouncementData,
+    refetch: refetchPodiumAnnouncements,
+  } = useGetRankingsPodiumAnnouncementsQuery({ days: 7, limit: 36 });
 
   const scrollViewRef = useRef(null);
   useEffect(() => {
@@ -1252,6 +1713,20 @@ export default function RankingListScreen({ isBack = false }) {
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerImages, setViewerImages] = useState([]);
+  const achievementSheetRef = useRef(null);
+  const [achievementSheet, setAchievementSheet] = useState({
+    open: false,
+    user: null,
+    achievements: [],
+  });
+
+  useEffect(() => {
+    if (!achievementSheet.open) return undefined;
+    const frame = requestAnimationFrame(() => {
+      achievementSheetRef.current?.present?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [achievementSheet.open, achievementSheet.user?._id]);
 
   // Callbacks
   const openZoom = useCallback((src) => {
@@ -1285,6 +1760,18 @@ export default function RankingListScreen({ isBack = false }) {
     },
     [router]
   );
+
+  const openAchievements = useCallback((user, achievements) => {
+    setAchievementSheet({
+      open: true,
+      user: user || null,
+      achievements: Array.isArray(achievements) ? achievements : [],
+    });
+  }, []);
+
+  const closeAchievements = useCallback(() => {
+    setAchievementSheet({ open: false, user: null, achievements: [] });
+  }, []);
 
   const goToTournament = useCallback(
     (t) => {
@@ -1348,6 +1835,13 @@ export default function RankingListScreen({ isBack = false }) {
     return out;
   }, [podiumData]);
 
+  const podiumAnnouncementItems = useMemo(() => {
+    if (Array.isArray(podiumAnnouncementData)) return podiumAnnouncementData;
+    return Array.isArray(podiumAnnouncementData?.items)
+      ? podiumAnnouncementData.items
+      : [];
+  }, [podiumAnnouncementData]);
+
   const renderItem = useCallback(
     ({ item }) => (
       <RankingCard
@@ -1360,9 +1854,18 @@ export default function RankingListScreen({ isBack = false }) {
         onOpenGrade={openGrade}
         onOpenKyc={openKyc}
         onGoToTournament={goToTournament}
+        onOpenAchievements={openAchievements}
       />
     ),
-    [podiumByUser, me, openZoom, openGrade, openKyc, goToTournament]
+    [
+      podiumByUser,
+      me,
+      openZoom,
+      openGrade,
+      openKyc,
+      goToTournament,
+      openAchievements,
+    ]
   );
 
   const initialLoading =
@@ -1372,6 +1875,11 @@ export default function RankingListScreen({ isBack = false }) {
   const HeaderComponent = useMemo(
     () => (
       <View style={{ marginBottom: 16 }}>
+        <PodiumCelebrationMarquee
+          items={podiumAnnouncementItems}
+          theme={theme}
+          onPressItem={goToTournament}
+        />
         <AppleLiquidGlassView
           fallback="view"
           glassColorScheme={glassScheme(theme)}
@@ -1410,7 +1918,7 @@ export default function RankingListScreen({ isBack = false }) {
         </AppleLiquidGlassView>
       </View>
     ),
-    [theme]
+    [goToTournament, podiumAnnouncementItems, theme]
   );
 
   const screenContent = (
@@ -1531,6 +2039,7 @@ export default function RankingListScreen({ isBack = false }) {
               onPress={() => {
                 refetchList();
                 refetchPodiums();
+                refetchPodiumAnnouncements();
               }}
               style={{ marginTop: 10 }}
             >
@@ -1584,6 +2093,7 @@ export default function RankingListScreen({ isBack = false }) {
                   setPage(0);
                   refetchList();
                   refetchPodiums();
+                  refetchPodiumAnnouncements();
                 }}
                 theme={theme}
               />
@@ -1655,6 +2165,12 @@ export default function RankingListScreen({ isBack = false }) {
         backgroundColor={theme.isDark ? "#000" : "#F5F5F5"}
         swipeToCloseEnabled
         doubleTapToZoomEnabled
+      />
+      <AchievementsBottomSheet
+        sheetRef={achievementSheetRef}
+        state={achievementSheet}
+        theme={theme}
+        onDismiss={closeAchievements}
       />
     </View>
   );
@@ -1790,6 +2306,71 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center" },
   dot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   legendText: { fontSize: 12, fontWeight: "600" },
+  podiumMarqueeWrap: {
+    height: 72,
+    marginHorizontal: -16,
+    marginTop: -2,
+    marginBottom: 12,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  podiumMarqueeTrack: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  podiumMarqueeItem: {
+    width: PODIUM_MARQUEE_ITEM_WIDTH,
+    minHeight: 54,
+    marginHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    overflow: "hidden",
+  },
+  podiumIconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  podiumOverline: {
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 13,
+    textTransform: "uppercase",
+  },
+  podiumMessage: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  podiumMarqueeFadeLeft: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    opacity: 0.94,
+  },
+  podiumMarqueeFadeRight: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    opacity: 0.94,
+  },
   card: {
     borderRadius: 24,
     padding: 16,
@@ -1853,7 +2434,51 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    marginBottom: 10,
+  },
+  achievementRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
     marginBottom: 16,
+  },
+  achievementChip: {
+    minHeight: 26,
+    maxWidth: 180,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  achievementChipCompact: {
+    minHeight: 24,
+    maxWidth: 136,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  achievementChipText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  achievementMoreChip: {
+    minHeight: 24,
+    minWidth: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 9,
+  },
+  achievementMoreText: {
+    fontSize: 11,
+    fontWeight: "800",
   },
   infoTag: {
     flexDirection: "row",
@@ -1942,5 +2567,44 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  achievementSheetContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  achievementSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 6,
+    paddingBottom: 14,
+  },
+  achievementSheetTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  achievementSheetSub: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  achievementSheetRow: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  achievementCategory: {
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 3,
+  },
+  achievementExplain: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "500",
   },
 });

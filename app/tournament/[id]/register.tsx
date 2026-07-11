@@ -277,6 +277,40 @@ const maskPhone = (phone?: string) => {
 };
 const phoneForRole = (phone?: string, canManage = false) =>
   canManage ? String(phone || "—") : maskPhone(phone);
+const SCORE_TIER_COLORS: Record<
+  string,
+  { text: string; border: string; bg: string }
+> = {
+  blue: {
+    text: "#1976d2",
+    border: "rgba(25,118,210,0.55)",
+    bg: "rgba(25,118,210,0.08)",
+  },
+  yellow: {
+    text: "#ff9800",
+    border: "rgba(255,152,0,0.55)",
+    bg: "rgba(255,152,0,0.08)",
+  },
+  red: {
+    text: "#f44336",
+    border: "rgba(244,67,54,0.55)",
+    bg: "rgba(244,67,54,0.08)",
+  },
+  grey: {
+    text: "#616161",
+    border: "rgba(97,97,97,0.55)",
+    bg: "rgba(97,97,97,0.08)",
+  },
+  gray: {
+    text: "#616161",
+    border: "rgba(97,97,97,0.55)",
+    bg: "rgba(97,97,97,0.08)",
+  },
+};
+const scoreTierChipColors = (player: any) => {
+  const tier = String(player?.scoreTierColor || "").toLowerCase();
+  return SCORE_TIER_COLORS[tier] || SCORE_TIER_COLORS.grey;
+};
 const normalizeNoAccent = (s?: string) =>
   (s || "")
     .normalize("NFD")
@@ -995,16 +1029,18 @@ const RegItem = memo(function RegItem({
 
       {/* Body Card */}
       <View style={{ padding: 12 }}>
-        {players.map((pl: any, idx: number) => (
-          <View
-            key={idx}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: idx < players.length - 1 ? 12 : 0,
-            }}
-          >
+        {players.map((pl: any, idx: number) => {
+          const scoreChip = scoreTierChipColors(pl);
+          return (
+            <View
+              key={idx}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: idx < players.length - 1 ? 12 : 0,
+              }}
+            >
             <TouchableOpacity
               onPress={() =>
                 onPreview(pl?.avatar, displayName(pl, displaySource))
@@ -1069,7 +1105,9 @@ const RegItem = memo(function RegItem({
                 </Text>
                 <View
                   style={{
-                    backgroundColor: C.chipBg,
+                    backgroundColor: scoreChip.bg,
+                    borderColor: scoreChip.border,
+                    borderWidth: 1,
                     paddingHorizontal: 6,
                     borderRadius: 4,
                   }}
@@ -1078,7 +1116,7 @@ const RegItem = memo(function RegItem({
                     style={{
                       fontSize: 10,
                       fontWeight: "700",
-                      color: C.textPrimary,
+                      color: scoreChip.text,
                     }}
                   >
                     {roundTo3(pl?.score)}
@@ -1087,7 +1125,8 @@ const RegItem = memo(function RegItem({
               </View>
             </TouchableOpacity>
           </View>
-        ))}
+          );
+        })}
 
         {!isSingles && !r.player2 && canManage && (
           <TouchableOpacity

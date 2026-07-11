@@ -120,6 +120,9 @@ const MOBILE_WEBVIEW_SESSION_SYNC_PATH = "/api/users/webview/session";
 const MOBILE_WEBVIEW_LOGOUT_PATH = "/api/users/logout";
 const EMPTY_SAFE_AREA_EDGES = [] as const;
 const ROOT_SAFE_AREA_EDGES = ["top", "bottom"] as const;
+// Android tabs: bỏ "bottom" — edge-to-edge khiến insets.bottom (~48px nav 3 nút) bị đệm
+// ở root ĐÈ THÊM padding của CustomTabBar => tab bar bị hất lên cao. Tab bar tự lo đáy.
+const TABS_SAFE_AREA_EDGES = ["top"] as const;
 const WEBVIEW_SAFE_AREA_EDGES = ["top", "bottom", "left", "right"] as const;
 
 type MobileAppShellConfig = {
@@ -695,6 +698,10 @@ function RootLayout() {
     }
     if (Platform.OS === "ios" && isTabsRoute) {
       return EMPTY_SAFE_AREA_EDGES;
+    }
+    // Android tabs: chỉ đệm top; CustomTabBar tự đệm insets.bottom cho nav bar hệ thống
+    if (isTabsRoute) {
+      return TABS_SAFE_AREA_EDGES;
     }
     return ROOT_SAFE_AREA_EDGES;
   }, [isLiveHomeRoute, isTabsRoute, isWebViewShellActive]);

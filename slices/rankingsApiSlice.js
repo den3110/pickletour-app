@@ -30,10 +30,20 @@ export const rankingsApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 30,
     }),
+    getRankingsPodiumAnnouncements: builder.query({
+      query: ({ days = 7, limit = 36 } = {}) => ({
+        url: `/api/rankings/podium-announcements?days=${encodeURIComponent(
+          days
+        )}&limit=${encodeURIComponent(limit)}`,
+        method: "GET",
+      }),
+      keepUnusedDataFor: 60,
+    }),
   }),
 });
 
 export const {
   useGetRankingsListQuery,
   useGetRankingsPodiums30dQuery,
+  useGetRankingsPodiumAnnouncementsQuery,
 } = rankingsApiSlice;
