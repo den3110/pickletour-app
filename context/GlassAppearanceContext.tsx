@@ -23,9 +23,11 @@ type GlassAppearanceContextValue = {
 
 const fallbackValue: GlassAppearanceContextValue = {
   isLiquidGlassAvailable: IOS_26_LIQUID_GLASS_ENABLED,
-  isLiquidGlassEnabled: IOS_26_LIQUID_GLASS_ENABLED,
+  // Default OFF: "Giao diện nổi bật" (Liquid Glass) only turns on when the
+  // user explicitly enables it in Profile settings.
+  isLiquidGlassEnabled: false,
   isPreferenceLoaded: false,
-  liquidGlassPreferenceEnabled: true,
+  liquidGlassPreferenceEnabled: false,
   setLiquidGlassPreferenceEnabled: async () => {},
 };
 
@@ -38,14 +40,15 @@ export function GlassAppearanceProvider({
   children: React.ReactNode;
 }) {
   const [isPreferenceLoaded, setIsPreferenceLoaded] = useState(false);
-  const [liquidGlassPreferenceEnabled, setPreferenceEnabled] = useState(true);
+  // Default OFF — only stored "1" (user explicitly enabled) turns it on.
+  const [liquidGlassPreferenceEnabled, setPreferenceEnabled] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     AsyncStorage.getItem(LIQUID_GLASS_HIGHLIGHT_PREF_KEY)
       .then((stored) => {
         if (!mounted) return;
-        setPreferenceEnabled(stored == null ? true : stored === "1");
+        setPreferenceEnabled(stored === "1");
       })
       .catch(() => {})
       .finally(() => {

@@ -95,6 +95,45 @@ export function buildFacebookPluginUrl(watchUrl?: string | null) {
   )}&show_text=0&width=560&autoplay=1&mute=0`;
 }
 
+// Dạng link live cũ của Facebook: facebook.com/watch/live/?v=<LIVE-id>.
+// Graph API trả nó trong permalink_url/watch_url nhưng Facebook đã bỏ định dạng
+// này -> mở ra "not found" (kể cả khi trận vẫn còn trên page). Link bền là
+// video_permalink_url = facebook.com/{page}/videos/{videoId}.
+const FB_DEAD_LIVE_RE = /facebook\.com\/(?:watch\/)?live\/?\?/i;
+
+function absFbUrl(value?: string | null) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (s.startsWith("/")) return `https://www.facebook.com${s}`;
+  if (!/^https?:\/\//i.test(s)) return `https://${s}`;
+  return s;
+}
+
+/** Link Facebook TỐT NHẤT để mở ngoài: ưu tiên permalink VIDEO thật, né watch/live chết. */
+export function pickBestFacebookOpenUrl(fb: any = {}) {
+  const video = absFbUrl(fb?.video_permalink_url || fb?.raw_permalink_url);
+  if (video && !FB_DEAD_LIVE_RE.test(video)) return video;
+  const vid = String(fb?.videoId || fb?.video_id || "").trim();
+  if (vid) return `https://www.facebook.com/watch/?v=${vid}`;
+  const perma = absFbUrl(fb?.permalink_url);
+  if (perma && !FB_DEAD_LIVE_RE.test(perma)) return perma;
+  const watch = absFbUrl(fb?.watch_url);
+  if (watch && !FB_DEAD_LIVE_RE.test(watch)) return watch;
+  // đường cùng: còn gì dùng nấy (hơn là không mở được)
+  return video || perma || watch || absFbUrl(fb?.embed_url) || "";
+}
+
+/** Sửa một URL Facebook sắp mở: nếu là dạng watch/live chết thì thay bằng link tốt từ facebookLive. */
+export function fixFacebookOpenUrl(url?: string | null, fb: any = {}) {
+  const s = absFbUrl(url);
+  if (!s) return "";
+  if (FB_DEAD_LIVE_RE.test(s)) {
+    const best = pickBestFacebookOpenUrl(fb);
+    if (best && !FB_DEAD_LIVE_RE.test(best)) return best;
+  }
+  return s;
+}
+
 export function buildCanonicalSessions(match: any = {}) {
   const defaultStreamKey =
     typeof match?.defaultStreamKey === "string" ? match.defaultStreamKey : "";
@@ -127,14 +166,15 @@ export function buildCanonicalSessions(match: any = {}) {
       if (!url) return null;
 
       if (kind === "iframe_html" && embedHtml) {
+        const safeOpen = fixFacebookOpenUrl(openUrl || url, match?.facebookLive);
         return {
           key: stream?.key || "server1",
           provider: "facebook",
           kind: "iframe_html",
           label: stream?.displayLabel || "Server 1",
           providerLabel: stream?.providerLabel || "Facebook",
-          watchUrl: openUrl || url,
-          openUrl: openUrl || url,
+          watchUrl: safeOpen,
+          openUrl: safeOpen,
           embedHtml,
           canInlineEmbed: true,
           primary,
@@ -144,15 +184,17 @@ export function buildCanonicalSessions(match: any = {}) {
       }
 
       if (kind === "facebook") {
+        const safeOpen = fixFacebookOpenUrl(openUrl || url, match?.facebookLive);
         return {
           key: stream?.key || "server1",
           provider: "facebook",
           kind: "iframe",
           label: stream?.displayLabel || "Server 1",
           providerLabel: stream?.providerLabel || "Facebook",
-          watchUrl: openUrl || url,
-          openUrl: openUrl || url,
-          pluginUrl: explicitEmbedUrl || buildFacebookPluginUrl(url),
+          watchUrl: safeOpen,
+          openUrl: safeOpen,
+          pluginUrl:
+            explicitEmbedUrl || buildFacebookPluginUrl(safeOpen || url),
           canInlineEmbed: true,
           primary,
           ready: stream?.ready !== false,
@@ -222,13 +264,9 @@ export function getLiveSessions(match: any = {}) {
   if (canonicalSessions.length > 0) return canonicalSessions;
 
   const fb = match?.facebookLive || {};
-  const baseWatchUrl =
-    fb.video_permalink_url ||
-    fb.permalink_url ||
-    fb.watch_url ||
-    fb.embed_url ||
-    (fb.videoId ? `https://www.facebook.com/watch/?v=${fb.videoId}` : "") ||
-    (fb.id ? `https://www.facebook.com/watch/?v=${fb.id}` : "");
+  // Ưu tiên link VIDEO bền (né watch/live/?v=<live-id> chết); tuyệt đối không
+  // dùng fb.id (live-id) để dựng watch?v= — Facebook trả not found.
+  const baseWatchUrl = pickBestFacebookOpenUrl(fb);
 
   if (!baseWatchUrl) return [];
 

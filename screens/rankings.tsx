@@ -1536,7 +1536,10 @@ const RankingCard = memo(
       prev.cccdPatch === next.cccdPatch &&
       prev.podium?.medal === next.podium?.medal &&
       prev.podium?.label === next.podium?.label &&
-      prev.me?.role === next.me?.role
+      // So REFERENCE (không chỉ role): nút Chấm trình/KYC còn phụ thuộc
+      // me.evaluator.enabled + gradingScopes — chỉ so role sẽ nuốt update
+      // của người chấm trình không phải admin.
+      prev.me === next.me
     );
   }
 );
@@ -1590,7 +1593,12 @@ const MemoizedListView = memo(
       prev.data === next.data &&
       prev.isRefreshing === next.isRefreshing &&
       prev.theme.isDark === next.theme.isDark &&
-      prev.header === next.header
+      prev.header === next.header &&
+      // BẮT BUỘC so renderItem: closure chứa `me` (quyền admin/evaluator).
+      // Thiếu dòng này thì khi me về muộn, list bị memo chặn re-render và
+      // FlatList giữ renderItem cũ (me=undefined) → mất nút Chấm trình/KYC
+      // cho tới khi kéo refresh làm data đổi.
+      prev.renderItem === next.renderItem
     );
   }
 );
@@ -1708,7 +1716,16 @@ export default function RankingListScreen({ isBack = false }) {
     return () => clearTimeout(t);
   }, [kw, dispatch]);
 
-  const me = useGetMeQuery().data;
+  const meQuery = useGetMeQuery(undefined, { refetchOnReconnect: true });
+  const me = meQuery.data;
+  // Tự hồi phục khi request `me` lỗi lúc khởi động (race token/mạng): tab được
+  // giữ mount nên RTK Query không tự retry — không có nhánh này thì quyền
+  // admin/evaluator mất tới khi user tự kéo refresh hoặc đăng nhập lại.
+  useEffect(() => {
+    if (!meQuery.isError || meQuery.isFetching) return undefined;
+    const t = setTimeout(() => meQuery.refetch(), 1500);
+    return () => clearTimeout(t);
+  }, [meQuery.isError, meQuery.isFetching, meQuery.refetch]);
   const canSelfAssess = false;
 
   const [viewerVisible, setViewerVisible] = useState(false);

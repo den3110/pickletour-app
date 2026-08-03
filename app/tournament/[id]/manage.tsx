@@ -2207,6 +2207,10 @@ export default function ManageScreen() {
       const isLoser =
         seedType === "matchLoser" || seedType === "stageMatchLoser";
 
+      // ⛔ Seed của CHÍNH slot là BYE → "BYE", không tra previous/source
+      // (PO lẻ đội: previousB vẫn trỏ trận BYE dù seedB = bye)
+      if (isByeSeedObj(seed)) return "BYE";
+
       const prev = side === "A" ? match.previousA : match.previousB;
       let source = prev
         ? byId.get(String(prev?._id || prev)) ||
@@ -2720,6 +2724,32 @@ export default function ManageScreen() {
       const selectedCount = list.filter((m) =>
         selectedMatchIds.has(String(m._id))
       ).length;
+
+      // Chia "Trận đang xử lý" / "Trận đã kết thúc" như quản lý giải trên web.
+      // Trận gặp BYE tính là ĐÃ KẾT THÚC (không phải tỉ số BYE — chỉ xếp nhóm).
+      const isMgFinished = (m) => isFinished(m) || isByeMatch(m);
+      const activeMatches = list.filter((m) => !isMgFinished(m));
+      const finishedMatches = list.filter((m) => isMgFinished(m));
+      const splitGroups =
+        activeMatches.length > 0 && finishedMatches.length > 0;
+      const listData = splitGroups
+        ? [
+            {
+              __header: true,
+              _id: "__hdr_active",
+              label: "Trận đang xử lý",
+              count: activeMatches.length,
+            },
+            ...activeMatches,
+            {
+              __header: true,
+              _id: "__hdr_finished",
+              label: "Trận đã kết thúc",
+              count: finishedMatches.length,
+            },
+            ...finishedMatches,
+          ]
+        : list;
       return (
         <View
           style={[
@@ -2790,9 +2820,43 @@ export default function ManageScreen() {
             </View>
           ) : (
             <FlatList
-              data={list}
+              data={listData}
               keyExtractor={(m) => String(m._id)}
-              renderItem={renderMatchRow}
+              renderItem={({ item }) =>
+                item?.__header ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: item._id === "__hdr_finished" ? 14 : 2,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor:
+                          item._id === "__hdr_finished" ? "#22c55e" : "#f59e0b",
+                      }}
+                    />
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontWeight: "800",
+                        fontSize: 13,
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                    <Pill label={String(item.count)} />
+                  </View>
+                ) : (
+                  renderMatchRow({ item })
+                )
+              }
               ItemSeparatorComponent={MatchRowSeparator}
               scrollEnabled={false}
               extraData={`${liveBump}|${selBump}`}
@@ -2816,6 +2880,7 @@ export default function ManageScreen() {
       selectedMatchIds,
       toggleSelectAllIn,
       renderMatchRow,
+      isByeMatch,
     ]
   );
 
@@ -3557,6 +3622,10 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             data={bracketsOfTab}
             keyExtractor={(b) => String(b._id)}
             renderItem={renderBracket}
+            // liveBump đổi mỗi khi có cập nhật trận qua socket → ép row bracket render lại
+            // để tính lại nhóm "đang xử lý"/"đã kết thúc" REALTIME (trận live xong tự nhảy
+            // sang nhóm kết thúc như web), không chỉ đổi badge trong từng dòng.
+            extraData={`${liveBump}|${selBump}`}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             contentContainerStyle={{
               paddingTop: headerHeight + 12,

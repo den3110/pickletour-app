@@ -25,6 +25,7 @@ import Constants from "expo-constants";
 import { useSelector } from "react-redux";
 import { WebView } from "react-native-webview";
 import { CompatVideo as Video } from "@/lib/expoMediaCompat";
+import { fixFacebookOpenUrl } from "@/components/live_list/liveUtils";
 import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -1125,23 +1126,18 @@ function normalizeStreams(m) {
   for (const [label, val] of singles)
     if (isNonEmptyString(val)) pushUrl(val, { label });
 
-  const facebookSingles = finishedLike
-    ? [
-        ["Facebook Video", fb?.video_permalink_url],
-        ["Facebook Watch", fb?.watch_url],
-        ["Facebook Live", fb?.permalink_url],
-        ["Facebook Raw", fb?.raw_permalink_url],
-        ["Facebook Embed", fb?.embed_url],
-      ]
-    : [
-        ["Facebook Watch", fb?.watch_url],
-        ["Facebook Live", fb?.permalink_url],
-        ["Facebook Video", fb?.video_permalink_url],
-        ["Facebook Raw", fb?.raw_permalink_url],
-        ["Facebook Embed", fb?.embed_url],
-      ];
+  // Luôn ưu tiên link VIDEO bền (facebook.com/{page}/videos/{id}); các link
+  // dạng watch/live/?v=<live-id> đã bị Facebook bỏ (mở ra not found) nên được
+  // fixFacebookOpenUrl thay bằng bản tốt trước khi đưa vào danh sách.
+  const facebookSingles = [
+    ["Facebook Video", fb?.video_permalink_url],
+    ["Facebook Raw", fb?.raw_permalink_url],
+    ["Facebook Watch", fb?.watch_url],
+    ["Facebook Live", fb?.permalink_url],
+    ["Facebook Embed", fb?.embed_url],
+  ];
   for (const [label, val] of facebookSingles)
-    if (isNonEmptyString(val)) pushUrl(val, { label });
+    if (isNonEmptyString(val)) pushUrl(fixFacebookOpenUrl(val, fb), { label });
 
   const asStrArray = (arr) =>
     Array.isArray(arr) ? arr.filter(isNonEmptyString) : [];
@@ -2840,6 +2836,10 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         return resolveSeedReferenceLabel(seed, match);
       }
 
+      // ⛔ Seed của CHÍNH slot là BYE → "BYE", không tra previous/source
+      // (PO lẻ đội: previousB vẫn trỏ trận BYE dù seedB = bye)
+      if (isByeSeed(seed)) return "BYE";
+
       const prev = side === "A" ? match?.previousA : match?.previousB;
       if (prev) {
         const prevId =
@@ -2867,21 +2867,27 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
 
         if (sourceMatch?.status === "finished" && sourceMatch?.winner) {
           const winnerSide = sourceMatch.winner === "A" ? "A" : "B";
-          const winnerPair =
-            winnerSide === "A" ? sourceMatch.pairA : sourceMatch.pairB;
-          if (hasResolvedPair(winnerPair)) {
-            return pairDisplayName(winnerPair, currentIsSingle);
+          // seed LOSER (vé vớt PO) lấy bên THUA của trận nguồn
+          const carrySide = isLoserSeed
+            ? winnerSide === "A"
+              ? "B"
+              : "A"
+            : winnerSide;
+          const carryPair =
+            carrySide === "A" ? sourceMatch.pairA : sourceMatch.pairB;
+          if (hasResolvedPair(carryPair)) {
+            return pairDisplayName(carryPair, currentIsSingle);
           }
 
           const carried = resolvePendingSideLabelInner(
             sourceMatch,
-            winnerSide,
+            carrySide,
             depth + 1,
           );
           if (isUsefulPendingLabel(carried)) return carried;
         }
 
-        if (sourceCode) return `W-${sourceCode}`;
+        if (sourceCode) return `${isLoserSeed ? "L" : "W"}-${sourceCode}`;
         return resolveSeedReferenceLabel(seed, match);
       }
 
@@ -3675,11 +3681,13 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   }, [overlayUrl]);
 
   const handleOpenActiveStream = useCallback(() => {
-    const targetUrl =
+    const rawTarget =
       activeStream?.openUrl ||
       (activeStream?.kind === "delayed_manifest" ? "" : activeStream?.url);
+    // Né link watch/live chết của Facebook -> thay bằng permalink video bền
+    const targetUrl = fixFacebookOpenUrl(rawTarget, merged?.facebookLive);
     if (targetUrl) Linking.openURL(targetUrl);
-  }, [activeStream]);
+  }, [activeStream, merged?.facebookLive]);
 
   if (showSpinner) {
     return (

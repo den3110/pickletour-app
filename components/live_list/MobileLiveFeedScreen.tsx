@@ -43,11 +43,13 @@ import { getLiveMatchCourtText } from "./courtDisplay";
 import InfoModal from "./InfoModal";
 import {
   buildCanonicalSessions,
+  fixFacebookOpenUrl,
   getLiveSessions,
   getLiveStatusLabel,
   sid,
   timeAgo,
 } from "./liveUtils";
+import { setLiveWatchPayload } from "./liveWatchHandoff";
 
 const FEED_LIMIT = 8;
 const GLOBAL_MUTE_KEY = "pickletour-live-global-muted-v1";
@@ -1063,7 +1065,12 @@ const FeedSlide = memo(function FeedSlide({
     ? "contain"
     : "cover";
   const primaryOpenUrl = normalizeUrl(
-    asTrimmed(item?.primaryOpenUrl || session?.watchUrl || session?.openUrl || "")
+    fixFacebookOpenUrl(
+      asTrimmed(
+        item?.primaryOpenUrl || session?.watchUrl || session?.openUrl || ""
+      ),
+      item?.facebookLive
+    )
   );
   const metaText = item?.updatedAt ? relativeTime(item.updatedAt) : getLiveStatusLabel(item?.status);
   const tags = useMemo(() => buildFeedTags(item, scoreTuple), [item, scoreTuple]);
@@ -1916,25 +1923,24 @@ export default function MobileLiveFeedScreen({ isBack = false }: { isBack?: bool
 
   const handleOpenFullscreen = useCallback((item: any, session?: any, shouldPlay = true) => {
     if (!item) return;
-    const itemIndex = items.findIndex(
-      (entry: any) => sid(entry?._id || entry?.matchId || entry?.id) === sid(item?._id || item?.matchId || item?.id)
-    );
     const snapshot = getPlaybackSnapshot(item, session);
     Haptics.selectionAsync().catch(() => {});
-    setIsRestoringPortrait(false);
-    if (itemIndex >= 0) {
-      setLockedActiveIndex(itemIndex);
-      setActiveIndex(itemIndex);
-      previousActiveIndexRef.current = itemIndex;
-    }
-    setFullscreenPlaybackSeed({
-      startPosition: Number.isFinite(Number(snapshot?.currentTime)) ? Number(snapshot.currentTime) : 0,
+    // Điều hướng sang TRANG xem video riêng (/live/watch) thay cho modal
+    // fullscreen cũ — modal landscape hay bị đen hình/chỉ còn tiếng.
+    setLiveWatchPayload({
+      item,
+      sessionKey: String(session?.key || ""),
+      startPosition: Number.isFinite(Number(snapshot?.currentTime))
+        ? Number(snapshot.currentTime)
+        : 0,
       shouldPlay:
         typeof snapshot?.isPlaying === "boolean" ? snapshot.isPlaying : shouldPlay,
+      muted: false,
     });
-    setFullscreenMatch(item);
-    setFullscreenVisible(true);
-  }, [getPlaybackSnapshot, items]);
+    router.push(
+      `/live/watch?id=${encodeURIComponent(sid(item?._id || item?.matchId || item?.id))}`
+    );
+  }, [getPlaybackSnapshot]);
 
   const handleCloseFullscreen = useCallback(() => {
     setIsRestoringPortrait(true);

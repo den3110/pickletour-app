@@ -198,14 +198,18 @@ const extractCurrentV = (m) => {
     .filter((n) => Number.isFinite(n));
   return nums.length ? nums[0] : null;
 };
-const smartDepLabel = (m, prevDep) => {
+const smartDepLabel = (m, prevDep, seed = null) => {
   const raw = depLabel(prevDep);
   const currV = extractCurrentV(m);
+  // Seed LOSER (vé vớt PO) -> tiền tố "L-"; depLabel mặc định trả "W-"
+  const isLoserSeed =
+    seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
   // ép V = (V hiện tại - 1) nếu bắt được; fallback giữ nguyên
   return String(raw).replace(/\b([WL])-V(\d+)-T(\d+)\b/gi, (_s, wl, v, t) => {
     const pv = parseInt(v, 10);
     const newV = currV != null ? Math.max(1, currV - 1) : pv;
-    return `${wl}-V${newV}-T${t}`;
+    const prefix = isLoserSeed ? "L" : wl;
+    return `${prefix}-V${newV}-T${t}`;
   });
 };
 
@@ -437,7 +441,12 @@ const kickoffTime = (m) => {
 const courtName = (m) =>
   getMatchCourtDisplayText(m) || m?.venue?.name || m?.court?.name || m?.court || "";
 const getVideoUrl = (m) =>
-  m?.streamUrl || m?.videoUrl || m?.stream?.url || m?.broadcast?.url || null;
+  m?.video ||
+  m?.streamUrl ||
+  m?.videoUrl ||
+  m?.stream?.url ||
+  m?.broadcast?.url ||
+  null;
 const hasVideo = (m) => !!getVideoUrl(m);
 // trạng thái vẫn giữ màu đặc thù để phân biệt nhanh
 const statusColors = (m) => {
@@ -451,8 +460,7 @@ const statusColors = (m) => {
   )
     return { bg: "#2e7d32", fg: "#fff", key: "done" };
   if (st === "live") return { bg: "#ef6c00", fg: "#fff", key: "live" };
-  const ready =
-    (m?.pairA || m?.pairB) && (m?.assignedAt || m?.court || m?.scheduledAt);
+  const ready = (m?.pairA || m?.pairB) && courtName(m);
   if (ready) return { bg: "#f9a825", fg: "#111", key: "ready" };
   return { bg: "#9e9e9e", fg: "#fff", key: "planned" };
 };
@@ -1999,10 +2007,16 @@ const MatchModal = ({ visible, match, onClose, eventType, t }) => {
   if (!match) return null;
   const a = match.pairA
     ? pairLabelNickOnly(match.pairA, eventType, match)
-    : smartDepLabel(match, match.previousA) || seedLabel(match.seedA);
+    : match.seedA?.type === "bye" || isByeLabel(match.seedA?.label)
+      ? "BYE"
+      : smartDepLabel(match, match.previousA, match.seedA) ||
+        seedLabel(match.seedA);
   const b = match.pairB
     ? pairLabelNickOnly(match.pairB, eventType, match)
-    : smartDepLabel(match, match.previousB) || seedLabel(match.seedB);
+    : match.seedB?.type === "bye" || isByeLabel(match.seedB?.label)
+      ? "BYE"
+      : smartDepLabel(match, match.previousB, match.seedB) ||
+        seedLabel(match.seedB);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -2917,7 +2931,13 @@ const BracketColumns = ({
                     ]}
                     onLayout={(e) => {
                       const h = e.nativeEvent.layout.height;
-                      if (h && Math.abs(h - baseCardH) > 1) setBaseCardH(h);
+                      // Grow-only MAX: the tallest card decides the slot height,
+                      // regardless of onLayout order — previously the LAST measured
+                      // card won, so on first mount a short (BYE/one-line) card could
+                      // lock the slots short with no re-measure to recover.
+                      if (h && h - baseCardH > 1) {
+                        setBaseCardH((prev) => (h > prev ? h : prev));
+                      }
                     }}
                   >
                     {isChampion && <Text style={styles.trophy}>🏆</Text>}
@@ -4317,6 +4337,13 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
 
       if (hasResolvedPair(pair)) return pairLabelNickOnly(pair, eventType, m);
 
+      // ⛔ Seed của CHÍNH slot này là BYE → hiển thị "BYE", không tra previous
+      // (PO lẻ đội: V2-T7 = L-V1-T13 vs BYE nhưng previousB vẫn trỏ V1-T14 —
+      // nếu tra sẽ bê nhầm tên/mã đội THẮNG của trận trước sang slot BYE).
+      if (seed?.type === "bye" || isByeLabel(seed?.label)) {
+        return "BYE";
+      }
+
       if (seed?.type === "groupRank") {
         const st = Number(seed.ref?.stage ?? seed.ref?.stageIndex ?? 0) || 0;
         const gc = String(seed.ref?.groupCode ?? "").trim();
@@ -4342,10 +4369,13 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             : String(prev);
         const pm =
           matchIndex.get(prevId) || (typeof prev === "object" ? prev : null);
+        // Seed LOSER (nhánh vé vớt PO) phải giữ tiền tố "L-" và lấy bên THUA
+        // của trận nguồn — trước đây mọi fallback đều hard-code "W-".
+        const isLoserSeed =
+          seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
+        const depPrefix = isLoserSeed ? "L" : "W";
 
         if (pm && isByeMatchObj(pm)) {
-          const isLoserSeed =
-            seed?.type === "stageMatchLoser" || seed?.type === "matchLoser";
           if (isLoserSeed) return "BYE";
 
           const byeA = isByeSeed(pm?.seedA);
@@ -4354,7 +4384,25 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           if (!winSide) return "BYE";
 
           if (winSide) {
+            // Truy xuyên trận BYE chỉ để lấy TÊN ĐỘI THẬT; nếu kết quả vẫn là
+            // mã tham chiếu (W-/L-/V…) thì ưu tiên mã của CHÍNH trận nguồn
+            // (vd "W-V2-T9"), không lấy mã sâu hơn (vd "L-V1-T17")
+            const isRealTeamName = (value) =>
+              isUsefulSideLabel(value) &&
+              !/^[WL]-/i.test(String(value)) &&
+              !/^V\d/i.test(String(value));
+
             const carried = resolveSideLabel(pm, winSide);
+            if (isRealTeamName(carried)) return carried;
+
+            const winPair = pm[`pair${winSide}`];
+            if (hasResolvedPair(winPair)) {
+              return pairLabelNickOnly(winPair, eventType, pm);
+            }
+
+            const ownCode = getDisplayCodeForMatch(pm);
+            if (ownCode) return `${depPrefix}-${ownCode}`;
+
             if (isUsefulSideLabel(carried)) return carried;
 
             const fromSeed = resolveSeedReferenceLabel(
@@ -4362,35 +4410,36 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
               pm
             );
             if (isUsefulSideLabel(fromSeed)) return fromSeed;
-
-            const winPair = pm[`pair${winSide}`];
-            if (hasResolvedPair(winPair)) {
-              return pairLabelNickOnly(winPair, eventType, pm);
-            }
           }
 
           const carriedCode = getDisplayCodeForMatch(pm);
-          if (carriedCode) return `W-${carriedCode}`;
+          if (carriedCode) return `${depPrefix}-${carriedCode}`;
           const refLabel = resolveSeedReferenceLabel(seed, m);
           if (isUsefulSideLabel(refLabel)) return refLabel;
         }
 
         if (pm && pm.status === "finished" && pm.winner) {
           const winnerSide = pm.winner === "A" ? "A" : "B";
-          const wp = winnerSide === "A" ? pm.pairA : pm.pairB;
+          // seed LOSER lấy bên THUA của trận nguồn
+          const carrySide = isLoserSeed
+            ? winnerSide === "A"
+              ? "B"
+              : "A"
+            : winnerSide;
+          const wp = carrySide === "A" ? pm.pairA : pm.pairB;
           if (hasResolvedPair(wp)) return pairLabelNickOnly(wp, eventType, pm);
 
-          const carried = resolveSideLabel(pm, winnerSide);
+          const carried = resolveSideLabel(pm, carrySide);
           if (isUsefulSideLabel(carried)) return carried;
         }
 
         const carriedCode = getDisplayCodeForMatch(pm);
-        if (carriedCode) return `W-${carriedCode}`;
+        if (carriedCode) return `${depPrefix}-${carriedCode}`;
 
         const refLabel = resolveSeedReferenceLabel(seed, m);
         if (isUsefulSideLabel(refLabel)) return refLabel;
 
-        return smartDepLabel(m, prev);
+        return smartDepLabel(m, prev, seed);
       }
 
       if (seed && seed.type) {
@@ -4414,7 +4463,24 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           const winSide = byeA ? "B" : byeB ? "A" : null;
 
           if (winSide) {
+            // Như nhánh previous: chỉ truy xuyên khi ra tên đội thật, còn mã
+            // tham chiếu sâu thì nhường cho mã của chính trận nguồn
+            const isRealTeamName = (value) =>
+              isUsefulSideLabel(value) &&
+              !/^[WL]-/i.test(String(value)) &&
+              !/^V\d/i.test(String(value));
+
             const carried = resolveSideLabel(sourceMatch, winSide);
+            if (isRealTeamName(carried)) return carried;
+
+            const carriedPair = sourceMatch[`pair${winSide}`];
+            if (hasResolvedPair(carriedPair)) {
+              return pairLabelNickOnly(carriedPair, eventType, sourceMatch);
+            }
+
+            const ownCode = getDisplayCodeForMatch(sourceMatch);
+            if (ownCode) return `W-${ownCode}`;
+
             if (isUsefulSideLabel(carried)) return carried;
 
             const fromSeed = resolveSeedReferenceLabel(
@@ -4422,11 +4488,6 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
               sourceMatch
             );
             if (isUsefulSideLabel(fromSeed)) return fromSeed;
-
-            const carriedPair = sourceMatch[`pair${winSide}`];
-            if (hasResolvedPair(carriedPair)) {
-              return pairLabelNickOnly(carriedPair, eventType, sourceMatch);
-            }
           }
         }
 
@@ -5211,7 +5272,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                     style={[styles.colorDot, { backgroundColor: "#ef6c00" }]}
                   />
                   <Text style={[styles.metaSmall, { color: t.subtext }]}>
-                    Đỏ: đang thi đấu
+                    Cam: đang thi đấu
                   </Text>
                 </View>
                 <View style={styles.colorLegendItem}>
@@ -5227,7 +5288,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                     style={[styles.colorDot, { backgroundColor: "#9e9e9e" }]}
                   />
                   <Text style={[styles.metaSmall, { color: t.subtext }]}>
-                    Ghi: dự kiến
+                    Xám: dự kiến
                   </Text>
                 </View>
               </View>

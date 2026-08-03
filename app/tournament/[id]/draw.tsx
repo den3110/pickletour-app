@@ -499,6 +499,9 @@ const matchSideName = (
     return `Winner of R${r} #${idx}`;
   };
   if (pair) return safePairName(pair, eventType);
+  // Seed của slot là BYE → "BYE", không hiện "Winner of..." từ previous
+  const seed = side === "A" ? m?.seedA : m?.seedB;
+  if (seed?.type === "bye" || /^\s*BYE\s*$/i.test(seed?.label || "")) return "BYE";
   if (prev) return labelDep(prev);
   return "Chưa có đội";
 };
