@@ -1,6 +1,7 @@
 // app/messages/[cid].tsx — Chat window (Messenger-like)
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -205,15 +206,26 @@ export default function ChatWindow() {
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
       selectionLimit: 5,
-      quality: 0.85,
+      quality: 0.6,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium as any,
     });
     if (res.canceled || !res.assets?.length) return;
     const fd = new FormData();
     for (const a of res.assets) {
-      const uri = a.uri;
+      let uri = a.uri;
+      const isVideo = a.type === "video";
+      if (!isVideo) {
+        try {
+          const r = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 1600 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          uri = r.uri;
+        } catch {}
+      }
       const name = a.fileName || uri.split("/").pop() || "upload";
-      const type =
-        a.mimeType || (a.type === "video" ? "video/mp4" : "image/jpeg");
+      const type = a.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
       fd.append("files", { uri, name, type } as any);
     }
     try {

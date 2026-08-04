@@ -2,6 +2,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
@@ -218,18 +220,25 @@ function Composer({ onPosted }: { onPosted: () => void }) {
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
       selectionLimit: 10 - media.length,
-      quality: 0.85,
+      // 0.6 quality cho ảnh gốc trước khi ImageManipulator nén thêm — tránh nén 2 lần quá tay
+      quality: 0.6,
       videoMaxDuration: 60,
+      // Giảm chất lượng video (iOS: 0=Low, 1=Medium, 2=High)
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium as any,
     });
     if (res.canceled || !res.assets?.length) return;
 
     const fd = new FormData();
     for (const a of res.assets) {
-      const uri = a.uri;
+      let uri = a.uri;
+      const isVideo = a.type === "video";
+      if (!isVideo) {
+        // Ảnh: nén thêm bằng ImageManipulator (max cạnh 1600px, JPEG 0.7)
+        uri = await compressImageAsset(uri);
+      }
       const name = a.fileName || uri.split("/").pop() || "upload";
       const type =
-        a.mimeType ||
-        (a.type === "video" ? "video/mp4" : "image/jpeg");
+        a.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
       // React Native FormData chấp nhận {uri, name, type}
       fd.append("files", { uri, name, type } as any);
     }
@@ -513,6 +522,55 @@ function TournamentPickerModal({
  *  - Nhiều ảnh/video: horizontal ScrollView pagingEnabled, mỗi slide = full width card
  *    (không lệch trái/phải nữa).
  */
+// Nén ảnh trước khi upload — giảm dung lượng ~5-10x như FB.
+// Max cạnh dài 1600px, quality 0.7 JPEG.
+async function compressImageAsset(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1600 } }],
+      {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+    return result.uri;
+  } catch {
+    return uri; // fallback dùng bản gốc nếu compress fail
+  }
+}
+
+function InlineVideo({
+  uri,
+  width,
+  height,
+}: {
+  uri: string;
+  width: number;
+  height: number;
+}) {
+  const [ready, setReady] = useState(false);
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.muted = true;
+    p.pause();
+  });
+  useEffect(() => {
+    setReady(true);
+  }, []);
+  if (!ready) return null;
+  return (
+    <VideoView
+      style={{ width, height, borderRadius: 10, backgroundColor: "#000" }}
+      player={player}
+      contentFit="contain"
+      nativeControls
+      allowsFullscreen
+      allowsPictureInPicture={false}
+    />
+  );
+}
+
 function PostMedia({
   media,
   onOpenViewer,
@@ -529,36 +587,27 @@ function PostMedia({
     const aspect =
       m?.width && m?.height ? Number(m.width) / Number(m.height) : 1;
     const h = Math.min(480, cardContentW / (aspect || 1));
+    if (m.type === "video") {
+      return (
+        <View style={{ marginTop: 10, alignItems: "center" }}>
+          <InlineVideo uri={m.url} width={cardContentW} height={h} />
+        </View>
+      );
+    }
     return (
       <Pressable
         onPress={() => onOpenViewer(0)}
         style={{ marginTop: 10, alignItems: "center" }}
       >
-        {m.type === "image" ? (
-          <Image
-            source={{ uri: m.url }}
-            style={{
-              width: cardContentW,
-              height: h,
-              borderRadius: 10,
-            }}
-            resizeMode="cover"
-          />
-        ) : (
-          <View
-            style={{
-              width: cardContentW,
-              height: cardContentW,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#111",
-              borderRadius: 10,
-            }}
-          >
-            <Ionicons name="play-circle" size={64} color="#fff" />
-            <Text style={{ color: "#fff", marginTop: 4 }}>Video</Text>
-          </View>
-        )}
+        <Image
+          source={{ uri: m.url }}
+          style={{
+            width: cardContentW,
+            height: h,
+            borderRadius: 10,
+          }}
+          resizeMode="cover"
+        />
       </Pressable>
     );
   }
@@ -571,13 +620,23 @@ function PostMedia({
       style={{ marginTop: 10 }}
       contentContainerStyle={{ alignItems: "center" }}
     >
-      {media.slice(0, 8).map((m: any, i: number) => (
-        <Pressable
-          key={i}
-          onPress={() => onOpenViewer(i)}
-          style={{ width: cardContentW, marginRight: 8, alignItems: "center" }}
-        >
-          {m.type === "image" ? (
+      {media.slice(0, 8).map((m: any, i: number) => {
+        if (m.type === "video") {
+          return (
+            <View
+              key={i}
+              style={{ width: cardContentW, marginRight: 8, alignItems: "center" }}
+            >
+              <InlineVideo uri={m.url} width={cardContentW} height={cardContentW} />
+            </View>
+          );
+        }
+        return (
+          <Pressable
+            key={i}
+            onPress={() => onOpenViewer(i)}
+            style={{ width: cardContentW, marginRight: 8, alignItems: "center" }}
+          >
             <Image
               source={{ uri: m.url }}
               style={{
@@ -587,23 +646,9 @@ function PostMedia({
               }}
               resizeMode="cover"
             />
-          ) : (
-            <View
-              style={{
-                width: cardContentW,
-                height: cardContentW,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "#111",
-                borderRadius: 10,
-              }}
-            >
-              <Ionicons name="play-circle" size={64} color="#fff" />
-              <Text style={{ color: "#fff", marginTop: 4 }}>Video</Text>
-            </View>
-          )}
-        </Pressable>
-      ))}
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }

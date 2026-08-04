@@ -41,6 +41,7 @@ import {
   useListFeedCommentsQuery,
   useReactFeedPostMutation,
 } from "@/slices/feedApiSlice";
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 
 type Media = {
   type: "image" | "video";
@@ -313,11 +314,7 @@ function SheetCommentItem({
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
-        <View style={styles.avatarXs}>
-          <Text style={styles.avatarLetter}>
-            {authorName(comment.author)[0]?.toUpperCase()}
-          </Text>
-        </View>
+        <AuthorAvatar user={comment.author} size={28} />
         <View style={{ flex: 1 }}>
           <View style={styles.commentBubble}>
             <Text style={styles.commentAuthor}>
@@ -543,11 +540,7 @@ export function FeedMediaViewer({
               >
                 <View style={styles.bottomInner}>
                   <View style={styles.authorRow}>
-                    <View style={styles.avatarSm}>
-                      <Text style={styles.avatarLetter}>
-                        {authorName(post?.author)[0]?.toUpperCase()}
-                      </Text>
-                    </View>
+                    <AuthorAvatar user={post?.author} size={40} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.authorName}>
                         {authorName(post?.author)}
