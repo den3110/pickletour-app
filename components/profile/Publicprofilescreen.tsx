@@ -50,6 +50,8 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { FriendActions } from "@/components/social/FriendActions";
+import { OpenMessageButton } from "@/components/social/OpenMessageButton";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -2281,6 +2283,21 @@ export default function PublicProfileScreen() {
             />
           }
         >
+          {/* Social action buttons (Nhắn / Kết bạn) */}
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              paddingHorizontal: 16,
+              paddingTop: 8,
+              paddingBottom: 4,
+              justifyContent: "center",
+            }}
+          >
+            <FriendActions userId={String(id)} />
+            <OpenMessageButton userId={String(id)} />
+          </View>
+
           {/* Stats Cards */}
           <View
             style={[

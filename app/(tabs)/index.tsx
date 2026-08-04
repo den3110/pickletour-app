@@ -164,6 +164,38 @@ const FEATURES = [
     color: "#81ECEC",
     link: "/head2head",
   },
+  {
+    id: 13,
+    icon: "newspaper-outline",
+    iconLib: "Ionicons",
+    title: "Bảng tin",
+    color: "#3B82F6",
+    link: "/feed",
+  },
+  {
+    id: 16,
+    icon: "notifications-outline",
+    iconLib: "Ionicons",
+    title: "Thông báo",
+    color: "#F97316",
+    link: "/notifications",
+  },
+  {
+    id: 14,
+    icon: "chatbubbles-outline",
+    iconLib: "Ionicons",
+    title: "Nhắn tin",
+    color: "#8B5CF6",
+    link: "/messages",
+  },
+  {
+    id: 15,
+    icon: "people-outline",
+    iconLib: "Ionicons",
+    title: "Bạn bè",
+    color: "#10B981",
+    link: "/friends",
+  },
 ];
 
 /* ---------- Utils ---------- */

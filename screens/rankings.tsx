@@ -1,5 +1,12 @@
 // app/screens/RankingListScreen.jsx
 import { router, useRouter } from "expo-router";
+import { useOpenDmMutation } from "@/slices/messagesApiSlice";
+import {
+  useAcceptFriendMutation,
+  useFriendStatusQuery,
+  useRemoveFriendMutation,
+  useSendFriendRequestMutation,
+} from "@/slices/friendsApiSlice";
 import React, {
   useCallback,
   useEffect,
@@ -1262,9 +1269,90 @@ const RankingCard = memo(
     onOpenAchievements,
   }) => {
     const theme = useThemeColors();
+    const [openDm] = useOpenDmMutation();
+    const [sendFriend, { isLoading: sendingFriend }] =
+      useSendFriendRequestMutation();
+    const [acceptFriend, { isLoading: acceptingFriend }] =
+      useAcceptFriendMutation();
+    const [removeFriend, { isLoading: removingFriend }] =
+      useRemoveFriendMutation();
     const r = item;
     const rankingUser = r?.user;
     const u = useMemo(() => rankingUser || {}, [rankingUser]);
+    const isSelf = me?._id && u?._id && String(me._id) === String(u._id);
+    const shouldQueryFriend = !!me?._id && !!u?._id && !isSelf;
+    const { data: friendStatus } = useFriendStatusQuery(u?._id, {
+      skip: !shouldQueryFriend,
+    });
+    const friendState = friendStatus?.status || "none";
+    const friendEdgeId = (friendStatus as any)?.edgeId;
+    const friendBusy = sendingFriend || acceptingFriend || removingFriend;
+
+    // Cấu hình icon + label + màu tương ứng trạng thái kết bạn (kiểu Facebook).
+    let friendIcon: any = "person-add-outline";
+    let friendLabel = "Kết bạn";
+    let friendColor = theme.text;
+    let friendAction: (() => void) | null = null;
+    if (friendState === "none" || friendState === "declined") {
+      friendIcon = "person-add-outline";
+      friendLabel = "Kết bạn";
+      friendColor = theme.text;
+      friendAction = async () => {
+        if (!u?._id) return;
+        try {
+          await sendFriend(u._id).unwrap();
+        } catch {}
+      };
+    } else if (friendState === "pending_outgoing") {
+      friendIcon = "hourglass-outline";
+      friendLabel = "Huỷ lời mời";
+      friendColor = theme.subText;
+      friendAction = async () => {
+        if (!friendEdgeId) return;
+        try {
+          await removeFriend(friendEdgeId).unwrap();
+        } catch {}
+      };
+    } else if (friendState === "pending_incoming") {
+      friendIcon = "checkmark-circle-outline";
+      friendLabel = "Chấp nhận";
+      friendColor = "#10B981";
+      friendAction = async () => {
+        if (!friendEdgeId) return;
+        try {
+          await acceptFriend(friendEdgeId).unwrap();
+        } catch {}
+      };
+    } else if (friendState === "accepted") {
+      friendIcon = "people";
+      friendLabel = "Bạn bè";
+      friendColor = theme.primary;
+      friendAction = async () => {
+        if (!friendEdgeId) return;
+        // Confirm huỷ kết bạn
+        const { Alert } = await import("react-native");
+        Alert.alert("Huỷ kết bạn?", undefined, [
+          { text: "Huỷ", style: "cancel" },
+          {
+            text: "Huỷ kết bạn",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await removeFriend(friendEdgeId).unwrap();
+              } catch {}
+            },
+          },
+        ]);
+      };
+    }
+
+    const handleOpenChat = async () => {
+      if (!u?._id || isSelf) return;
+      try {
+        const conv = await openDm(u._id).unwrap();
+        router.push(`/messages/${conv._id}`);
+      } catch {}
+    };
     const avatarSrc = u?.avatar || PLACE;
     const age = calcAge(u);
 
@@ -1463,6 +1551,66 @@ const RankingCard = memo(
             </Text>
             </AppleLiquidGlassView>
           </TouchableOpacity>
+
+          {!isSelf && me?._id && (
+            <>
+              <TouchableOpacity onPress={handleOpenChat}>
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassColorScheme={glassScheme(theme)}
+                  glassEffectStyle="clear"
+                  glassTintColor={glassSurfaceTint(theme, 0.34, 0.36)}
+                  isInteractive
+                  style={[
+                    styles.actionBtn,
+                    IOS_26_LIQUID_GLASS_ENABLED && [
+                      styles.glassActionBtn,
+                      { borderColor: theme.border },
+                    ],
+                  ]}
+                >
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={20}
+                    color={theme.primary}
+                  />
+                  <Text style={[styles.actionText, { color: theme.primary }]}>
+                    Nhắn
+                  </Text>
+                </AppleLiquidGlassView>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={friendAction || undefined}
+                disabled={friendBusy || !friendAction}
+              >
+                <AppleLiquidGlassView
+                  fallback="view"
+                  glassColorScheme={glassScheme(theme)}
+                  glassEffectStyle="clear"
+                  glassTintColor={glassSurfaceTint(theme, 0.34, 0.36)}
+                  isInteractive
+                  style={[
+                    styles.actionBtn,
+                    IOS_26_LIQUID_GLASS_ENABLED && [
+                      styles.glassActionBtn,
+                      { borderColor: theme.border },
+                    ],
+                    friendBusy && { opacity: 0.5 },
+                  ]}
+                >
+                  <Ionicons
+                    name={friendIcon}
+                    size={20}
+                    color={friendColor}
+                  />
+                  <Text style={[styles.actionText, { color: friendColor }]}>
+                    {friendLabel}
+                  </Text>
+                </AppleLiquidGlassView>
+              </TouchableOpacity>
+            </>
+          )}
 
           {allowGrade && (
             <TouchableOpacity

@@ -17,8 +17,42 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { useFriendCountsQuery } from "@/slices/friendsApiSlice";
+import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 
 const MORE_ITEMS = [
+  {
+    key: "feed",
+    title: "Bảng tin",
+    description: "Chia sẻ ảnh, video, thảo luận cùng cộng đồng Pickleball.",
+    icon: "newspaper-outline" as const,
+    route: "/feed",
+    accent: "#0066FF",
+  },
+  {
+    key: "messages",
+    title: "Nhắn tin",
+    description: "Trò chuyện với người khác và nhắn cho BTC giải đấu.",
+    icon: "chatbubbles-outline" as const,
+    route: "/messages",
+    accent: "#8B5CF6",
+  },
+  {
+    key: "friends",
+    title: "Bạn bè",
+    description: "Xem danh sách bạn bè và duyệt lời mời kết bạn.",
+    icon: "people-outline" as const,
+    route: "/friends",
+    accent: "#10B981",
+  },
+  {
+    key: "notifications",
+    title: "Thông báo",
+    description: "Trung tâm thông báo: comment, tin nhắn, lời mời kết bạn…",
+    icon: "notifications-outline" as const,
+    route: "/notifications",
+    accent: "#F97316",
+  },
   {
     key: "my_tournament",
     title: "Giải của tôi",
@@ -88,6 +122,12 @@ export default function MoreIndexScreen() {
   const cardBg = isDark ? theme.colors.card : "rgba(255,255,255,0.9)";
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0";
   const subText = isDark ? "#A1A1AA" : "#64748B";
+  const { data: friendCounts } = useFriendCountsQuery(undefined, {
+    skip: !isAuthed,
+  });
+  const { data: notifCount } = useNotifUnreadCountQuery(undefined, {
+    skip: !isAuthed,
+  });
 
   return (
     <SafeAreaView
@@ -246,16 +286,54 @@ export default function MoreIndexScreen() {
                 </MoreGlassSurface>
 
                 <View style={styles.itemBody}>
-                  <Text
-                    style={[
-                      styles.itemTitle,
-                      {
-                        color: theme.colors.text,
-                      },
-                    ]}
+                  <View
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
                   >
-                    {item.title}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.itemTitle,
+                        {
+                          color: theme.colors.text,
+                        },
+                      ]}
+                    >
+                      {item.title}
+                    </Text>
+                    {item.key === "friends" && (friendCounts?.incoming ?? 0) > 0 && (
+                      <View
+                        style={{
+                          minWidth: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          paddingHorizontal: 6,
+                          backgroundColor: "#EF4444",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>
+                          {friendCounts.incoming > 99 ? "99+" : friendCounts.incoming}
+                        </Text>
+                      </View>
+                    )}
+                    {item.key === "notifications" && (notifCount?.count ?? 0) > 0 && (
+                      <View
+                        style={{
+                          minWidth: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          paddingHorizontal: 6,
+                          backgroundColor: "#EF4444",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>
+                          {notifCount.count > 99 ? "99+" : notifCount.count}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text
                     style={[
                       styles.itemDescription,
