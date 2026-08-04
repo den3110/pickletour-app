@@ -1,6 +1,6 @@
 // app/feed/post/[id].tsx — Chi tiết bài viết + comments + reply
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useSelector } from "react-redux";
 
 import {
@@ -26,6 +27,8 @@ import {
   useDeleteFeedCommentMutation,
 } from "@/slices/feedApiSlice";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
+import { MentionText } from "@/components/feed/MentionText";
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 function extractErr(err: any): string {
@@ -93,17 +96,33 @@ function CommentItem({
   return (
     <View style={{ marginBottom: 10 }}>
       <View style={styles.commentRow}>
-        <View style={styles.avatarXs}>
-          <Text style={styles.avatarLetter}>
-            {authorName(comment.author)[0]?.toUpperCase()}
-          </Text>
-        </View>
+        <Pressable
+          onPress={() =>
+            comment.author?._id &&
+            router.push(`/profile/${comment.author._id}`)
+          }
+          hitSlop={6}
+        >
+          <AuthorAvatar user={comment.author} size={32} />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <View style={styles.commentBubble}>
-            <Text style={styles.commentAuthor}>
-              {authorName(comment.author)}
-            </Text>
-            <Text style={styles.commentText}>{comment.content}</Text>
+            <Pressable
+              onPress={() =>
+                comment.author?._id &&
+                router.push(`/profile/${comment.author._id}`)
+              }
+              hitSlop={4}
+            >
+              <Text style={styles.commentAuthor}>
+                {authorName(comment.author)}
+              </Text>
+            </Pressable>
+            <MentionText
+              content={comment.content}
+              mentions={comment.mentions}
+              style={styles.commentText}
+            />
           </View>
           <View style={styles.commentMeta}>
             <Text style={styles.commentMetaText}>
@@ -151,6 +170,7 @@ function CommentItem({
 export default function FeedPostDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
+  const headerHeight = useHeaderHeight();
   const { data: post, isFetching } = useGetFeedPostQuery(String(id), {
     skip: !id,
   });
@@ -194,25 +214,43 @@ export default function FeedPostDetail() {
       <Stack.Screen options={{ title: "Chi tiết bài viết" }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
       >
-        <ScrollView contentContainerStyle={{ padding: 12 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
           <View style={styles.postCard}>
             <View style={styles.postHeader}>
-              <View style={styles.avatarSm}>
-                <Text style={styles.avatarLetter}>
-                  {authorName(post.author)[0]?.toUpperCase()}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
+              <Pressable
+                onPress={() =>
+                  post.author?._id && router.push(`/profile/${post.author._id}`)
+                }
+                hitSlop={6}
+              >
+                <AuthorAvatar user={post.author} size={40} />
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  post.author?._id && router.push(`/profile/${post.author._id}`)
+                }
+                style={{ flex: 1 }}
+                hitSlop={6}
+              >
                 <Text style={styles.postAuthor}>
                   {authorName(post.author)}
                 </Text>
                 <Text style={styles.postTime}>{fmtTime(post.createdAt)}</Text>
-              </View>
+              </Pressable>
             </View>
             {!!post.content && (
-              <Text style={styles.postContent}>{post.content}</Text>
+              <MentionText
+                content={post.content}
+                mentions={post.mentions}
+                style={styles.postContent}
+              />
             )}
             {post.media?.length > 0 && (
               (() => {

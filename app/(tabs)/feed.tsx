@@ -2,13 +2,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,7 +29,11 @@ import {
   useDeleteFeedPostMutation,
   useReportFeedPostMutation,
 } from "@/slices/feedApiSlice";
+import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
+import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
+import { MentionText } from "@/components/feed/MentionText";
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 
 const REACTION_EMOJI: Record<string, string> = {
   like: "👍",
@@ -70,12 +75,138 @@ function extractErr(err: any): string {
 
 type MediaItem = { type: "image" | "video"; url: string; mime?: string };
 
+function ScoreBadges({
+  single,
+  double,
+  size = "sm",
+}: {
+  single?: number | null;
+  double?: number | null;
+  size?: "sm" | "md";
+}) {
+  const s = Number(single || 0);
+  const d = Number(double || 0);
+  if (!s && !d) return null;
+  const fmt = (v: number) =>
+    v >= 100 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "");
+  const sizeStyle = size === "md" ? scoreStyles.badgeMd : scoreStyles.badgeSm;
+  const txtStyle = size === "md" ? scoreStyles.textMd : scoreStyles.textSm;
+  return (
+    <View style={scoreStyles.wrap}>
+      {s > 0 && (
+        <View style={[sizeStyle, { backgroundColor: "#DBEAFE" }]}>
+          <Text style={[txtStyle, { color: "#1D4ED8" }]}>Đơn {fmt(s)}</Text>
+        </View>
+      )}
+      {d > 0 && (
+        <View style={[sizeStyle, { backgroundColor: "#FCE7F3" }]}>
+          <Text style={[txtStyle, { color: "#BE185D" }]}>Đôi {fmt(d)}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const scoreStyles = StyleSheet.create({
+  wrap: {
+    flexDirection: "row",
+    gap: 4,
+    marginLeft: 6,
+    alignItems: "center",
+  },
+  badgeSm: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgeMd: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  textSm: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
+  textMd: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
+});
+
 function Composer({ onPosted }: { onPosted: () => void }) {
   const me = useSelector((s: any) => s.auth?.userInfo);
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [linkedTournament, setLinkedTournament] = useState<any>(null);
+  const [tournamentPickerOpen, setTournamentPickerOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  // Track user đã chọn từ popup (id + display name) để gửi explicit mentions.
+  const [selectedMentions, setSelectedMentions] = useState<
+    Array<{ _id: string; display: string }>
+  >([]);
+  const mentionDebounceRef = useRef<any>(null);
   const [uploadMedia] = useUploadFeedMediaMutation();
   const [createPost, { isLoading }] = useCreateFeedPostMutation();
+  const [triggerUserSearch] = useLazySearchUserQuery();
+
+  const onChangeContent = (text: string) => {
+    setContent(text);
+    // Detect current @word at caret position (approximate: use end of text since we don't track selection)
+    // Simpler: find the LAST @token before caret. We use text length as caret.
+    const caret = text.length;
+    const before = text.slice(0, caret);
+    // Cho phép nickname/tên có tối đa 3 từ (2 dấu cách): "Tùng Xíu", "Nguyen Van A"
+    // \p{L} = mọi chữ Unicode (bao gồm tiếng Việt có dấu), \p{N} = số
+    const m = before.match(
+      /(^|\s)@([\p{L}\p{N}._-]+(?: [\p{L}\p{N}._-]+){0,2})$/u
+    );
+    if (m) {
+      const q = m[2];
+      const start = before.length - q.length - 1; // position of '@'
+      setMentionQuery(q);
+      setMentionRange({ start, end: caret });
+    } else {
+      setMentionQuery(null);
+      setMentionRange(null);
+      setMentionResults([]);
+    }
+  };
+
+  useEffect(() => {
+    if (mentionQuery == null) return;
+    if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+    mentionDebounceRef.current = setTimeout(async () => {
+      if (!mentionQuery || mentionQuery.length < 1) {
+        setMentionResults([]);
+        return;
+      }
+      try {
+        const r: any = await triggerUserSearch(mentionQuery).unwrap();
+        const list = Array.isArray(r) ? r : r?.items || r?.data || [];
+        setMentionResults(list.slice(0, 6));
+      } catch {
+        setMentionResults([]);
+      }
+    }, 250);
+    return () => {
+      if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+    };
+  }, [mentionQuery, triggerUserSearch]);
+
+  const insertMention = (u: any) => {
+    if (!mentionRange) return;
+    const nick = u?.nickname || u?.name || "";
+    if (!nick || !u?._id) return;
+    const before = content.slice(0, mentionRange.start);
+    const after = content.slice(mentionRange.end);
+    const replaced = `${before}@${nick} ${after}`;
+    setContent(replaced);
+    // Ghi nhớ user đã pick — dùng khi submit để backend không phải re-guess
+    setSelectedMentions((prev) => {
+      if (prev.some((m) => m._id === String(u._id))) return prev;
+      return [...prev, { _id: String(u._id), display: nick }];
+    });
+    setMentionQuery(null);
+    setMentionRange(null);
+    setMentionResults([]);
+  };
 
   const pickMedia = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -112,10 +243,21 @@ function Composer({ onPosted }: { onPosted: () => void }) {
 
   const submit = async () => {
     if (!content.trim() && !media.length) return;
+    // Chỉ gửi mention nào display name vẫn còn trong content (user chưa xoá)
+    const stillPresent = selectedMentions
+      .filter((m) => content.includes(`@${m.display}`))
+      .map((m) => m._id);
     try {
-      await createPost({ content: content.trim(), media }).unwrap();
+      await createPost({
+        content: content.trim(),
+        media,
+        linkedTournament: linkedTournament?._id || null,
+        mentions: stillPresent,
+      } as any).unwrap();
       setContent("");
       setMedia([]);
+      setLinkedTournament(null);
+      setSelectedMentions([]);
       onPosted();
     } catch (err: any) {
       Alert.alert("Đăng thất bại", extractErr(err));
@@ -125,20 +267,66 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   return (
     <View style={styles.composer}>
       <View style={styles.composerRow}>
-        <View style={styles.avatarSm}>
-          <Text style={styles.avatarLetter}>
-            {authorName(me)[0]?.toUpperCase()}
-          </Text>
-        </View>
+        <AuthorAvatar user={me} size={40} />
         <TextInput
           style={styles.input}
           multiline
-          placeholder={`${authorName(me)} ơi, chia sẻ gì hôm nay?`}
+          placeholder={`${authorName(me)} ơi, chia sẻ gì hôm nay? (gõ @ để nhắc bạn)`}
           placeholderTextColor="#94A3B8"
           value={content}
-          onChangeText={setContent}
+          onChangeText={onChangeContent}
         />
       </View>
+
+      {/* @ mention suggestions */}
+      {mentionQuery != null && mentionResults.length > 0 && (
+        <View style={styles.mentionList}>
+          {mentionResults.map((u) => (
+            <Pressable
+              key={u._id}
+              onPress={() => insertMention(u)}
+              style={({ pressed }) => [
+                styles.mentionItem,
+                pressed && { backgroundColor: "#F1F5F9" },
+              ]}
+            >
+              <AuthorAvatar user={u} size={32} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.mentionNameRow}>
+                  <Text style={styles.mentionNick} numberOfLines={1}>
+                    @{u.nickname || u.name}
+                  </Text>
+                  <ScoreBadges
+                    single={u?.score?.single}
+                    double={u?.score?.double}
+                  />
+                </View>
+                {!!u.name && u.name !== u.nickname && (
+                  <Text style={styles.mentionName} numberOfLines={1}>
+                    {u.name}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Linked tournament chip */}
+      {linkedTournament && (
+        <View style={styles.tournamentChip}>
+          <Ionicons name="trophy" size={14} color="#F59E0B" />
+          <Text style={styles.tournamentChipText} numberOfLines={1}>
+            {linkedTournament.name}
+          </Text>
+          <Pressable
+            onPress={() => setLinkedTournament(null)}
+            hitSlop={8}
+          >
+            <Ionicons name="close-circle" size={16} color="#64748B" />
+          </Pressable>
+        </View>
+      )}
       {media.length > 0 && (
         <ScrollView horizontal style={{ marginTop: 8 }} showsHorizontalScrollIndicator={false}>
           {media.map((m, i) => (
@@ -166,6 +354,15 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           <Text style={styles.iconBtnLabel}>Ảnh / Video</Text>
         </Pressable>
         <Pressable
+          onPress={() => setTournamentPickerOpen(true)}
+          style={styles.iconBtn}
+        >
+          <Ionicons name="trophy-outline" size={22} color="#F59E0B" />
+          <Text style={[styles.iconBtnLabel, { color: "#F59E0B" }]}>
+            Gắn giải
+          </Text>
+        </Pressable>
+        <Pressable
           onPress={submit}
           disabled={isLoading || (!content.trim() && !media.length)}
           style={[
@@ -176,7 +373,136 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           <Text style={styles.postBtnText}>{isLoading ? "Đang đăng…" : "Đăng"}</Text>
         </Pressable>
       </View>
+
+      <TournamentPickerModal
+        visible={tournamentPickerOpen}
+        onClose={() => setTournamentPickerOpen(false)}
+        onPick={(t) => {
+          setLinkedTournament(t);
+          setTournamentPickerOpen(false);
+        }}
+      />
     </View>
+  );
+}
+
+function TournamentPickerModal({
+  visible,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onPick: (t: any) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [triggerSearch] = useLazySearchTournamentsQuery();
+  const debRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (debRef.current) clearTimeout(debRef.current);
+    debRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r: any = await triggerSearch({ q, limit: 20 }).unwrap();
+        const list = Array.isArray(r) ? r : r?.items || r?.data || [];
+        setItems(list);
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (debRef.current) clearTimeout(debRef.current);
+    };
+  }, [q, visible, triggerSearch]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>Gắn giải đấu</Text>
+          <Pressable onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={24} color="#0F172A" />
+          </Pressable>
+        </View>
+        <View style={styles.pickerSearchBox}>
+          <Ionicons name="search" size={18} color="#94A3B8" />
+          <TextInput
+            style={styles.pickerSearchInput}
+            placeholder="Tìm giải theo tên…"
+            placeholderTextColor="#94A3B8"
+            value={q}
+            onChangeText={setQ}
+            autoFocus
+          />
+          {q.length > 0 && (
+            <Pressable onPress={() => setQ("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color="#CBD5E1" />
+            </Pressable>
+          )}
+        </View>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(t: any) => String(t._id)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => onPick(item)}
+                style={({ pressed }) => [
+                  styles.pickerRow,
+                  pressed && { backgroundColor: "#F1F5F9" },
+                ]}
+              >
+                {item.image ? (
+                  <Image
+                    source={{ uri: item.image }}
+                    style={styles.pickerThumb}
+                  />
+                ) : (
+                  <View style={[styles.pickerThumb, styles.pickerThumbFallback]}>
+                    <Ionicons name="trophy" size={20} color="#F59E0B" />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickerName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  {(item.location || item.status) && (
+                    <Text style={styles.pickerMeta} numberOfLines={1}>
+                      {[item.location, item.status].filter(Boolean).join(" · ")}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <Text
+                style={{
+                  padding: 24,
+                  color: "#94A3B8",
+                  textAlign: "center",
+                }}
+              >
+                {q ? "Không tìm thấy giải" : "Gõ tên để tìm giải đấu…"}
+              </Text>
+            }
+          />
+        )}
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -342,24 +668,43 @@ function PostCard({ post, me }: { post: any; me: any }) {
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
-        <View style={styles.avatarSm}>
-          <Text style={styles.avatarLetter}>
-            {authorName(post.author)[0]?.toUpperCase()}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.postAuthor}>
-            {authorName(post.author)}
-            {post.isPinned && <Text style={styles.pinnedBadge}>  📌</Text>}
-          </Text>
+        <Pressable
+          onPress={() =>
+            post.author?._id && router.push(`/profile/${post.author._id}`)
+          }
+          hitSlop={6}
+        >
+          <AuthorAvatar user={post.author} size={40} />
+        </Pressable>
+        <Pressable
+          onPress={() =>
+            post.author?._id && router.push(`/profile/${post.author._id}`)
+          }
+          style={{ flex: 1 }}
+          hitSlop={6}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+            <Text style={styles.postAuthor}>
+              {authorName(post.author)}
+              {post.isPinned && <Text style={styles.pinnedBadge}>  📌</Text>}
+            </Text>
+            <ScoreBadges
+              single={post.author?.score?.single}
+              double={post.author?.score?.double}
+            />
+          </View>
           <Text style={styles.postTime}>{fmtTime(post.createdAt)}</Text>
-        </View>
+        </Pressable>
         <Pressable onPress={handleMenu} hitSlop={12}>
           <Ionicons name="ellipsis-horizontal" size={20} color="#64748B" />
         </Pressable>
       </View>
       {!!post.content && (
-        <Text style={styles.postContent}>{post.content}</Text>
+        <MentionText
+          content={post.content}
+          mentions={post.mentions}
+          style={styles.postContent}
+        />
       )}
       {post.tags?.length > 0 && (
         <View style={styles.tagRow}>
@@ -369,6 +714,32 @@ function PostCard({ post, me }: { post: any; me: any }) {
             </View>
           ))}
         </View>
+      )}
+      {post.linkedTournament && (
+        <Pressable
+          onPress={() =>
+            router.push(`/tournament/${post.linkedTournament._id}` as any)
+          }
+          style={styles.linkedTournamentCard}
+        >
+          {post.linkedTournament.image ? (
+            <Image
+              source={{ uri: post.linkedTournament.image }}
+              style={styles.linkedTournamentImg}
+            />
+          ) : (
+            <View style={[styles.linkedTournamentImg, styles.linkedTournamentFallback]}>
+              <Ionicons name="trophy" size={20} color="#F59E0B" />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.linkedTournamentLabel}>Giải đấu</Text>
+            <Text style={styles.linkedTournamentName} numberOfLines={2}>
+              {post.linkedTournament.name}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </Pressable>
       )}
       {post.media?.length > 0 && (
         <PostMedia
@@ -432,8 +803,26 @@ function PostCard({ post, me }: { post: any; me: any }) {
 
 export default function FeedScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
-  const { data, isFetching, refetch } = useListFeedQuery({});
+  const [cursor, setCursor] = useState<string | null>(null);
+  const { data, isFetching, refetch } = useListFeedQuery({
+    cursor,
+    limit: 10,
+  });
   const items = data?.items || [];
+  const hasMore = Boolean(data?.hasMore);
+  const nextCursor = data?.nextCursor as string | null | undefined;
+
+  const handleRefresh = useCallback(() => {
+    setCursor(null);
+    refetch();
+  }, [refetch]);
+
+  const loadMore = useCallback(() => {
+    if (isFetching) return;
+    if (!hasMore || !nextCursor) return;
+    if (nextCursor === cursor) return;
+    setCursor(nextCursor);
+  }, [isFetching, hasMore, nextCursor, cursor]);
 
   const renderItem = useCallback(
     ({ item }: any) => <PostCard post={item} me={me} />,
@@ -460,10 +849,33 @@ export default function FeedScreen() {
       <FlatList
         data={items}
         keyExtractor={(i: any) => i._id}
-        ListHeaderComponent={<Composer onPosted={refetch} />}
+        ListHeaderComponent={<Composer onPosted={handleRefresh} />}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} />
+          <RefreshControl
+            refreshing={isFetching && !cursor}
+            onRefresh={handleRefresh}
+          />
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          isFetching && cursor ? (
+            <View style={{ padding: 16 }}>
+              <ActivityIndicator />
+            </View>
+          ) : !hasMore && items.length > 0 ? (
+            <Text
+              style={{
+                textAlign: "center",
+                color: "#94A3B8",
+                padding: 16,
+                fontSize: 12,
+              }}
+            >
+              — Đã xem hết bài viết —
+            </Text>
+          ) : null
         }
         ListEmptyComponent={
           !isFetching ? (
@@ -483,6 +895,132 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
+  mentionList: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  mentionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F1F5F9",
+  },
+  mentionNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  mentionNick: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  mentionName: { fontSize: 12, color: "#64748B" },
+  tournamentChip: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    maxWidth: "100%",
+  },
+  tournamentChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#B45309",
+    flexShrink: 1,
+  },
+  linkedTournamentCard: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  linkedTournamentImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#FEF3C7",
+  },
+  linkedTournamentFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkedTournamentLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  linkedTournamentName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginTop: 2,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E2E8F0",
+  },
+  pickerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
+  pickerSearchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    margin: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#0F172A",
+    padding: 0,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F1F5F9",
+  },
+  pickerThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+  },
+  pickerThumbFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF7ED",
+  },
+  pickerName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  pickerMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   emptyLogin: {
     flex: 1,

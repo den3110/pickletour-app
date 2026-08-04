@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 import { useListConversationsQuery } from "@/slices/messagesApiSlice";
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 
@@ -51,14 +52,15 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
         pressed && { backgroundColor: "#F1F5F9" },
       ]}
     >
-      <View
-        style={[
-          styles.avatar,
-          conv.type === "tournament" && { backgroundColor: "#F59E0B" },
-        ]}
-      >
-        <Text style={styles.avatarLetter}>{avatarLetter}</Text>
-      </View>
+      {conv.type === "tournament" ? (
+        <View
+          style={[styles.avatar, { backgroundColor: "#F59E0B" }]}
+        >
+          <Text style={styles.avatarLetter}>{avatarLetter}</Text>
+        </View>
+      ) : (
+        <AuthorAvatar user={other} size={48} />
+      )}
       <View style={{ flex: 1 }}>
         <View style={styles.rowHeader}>
           <Text
@@ -116,7 +118,7 @@ export default function MessagesListScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title: "Nhắn tin" }} />
       <FlatList
         data={items}

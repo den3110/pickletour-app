@@ -22,12 +22,12 @@ import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 
 const MORE_ITEMS = [
   {
-    key: "feed",
-    title: "Bảng tin",
-    description: "Chia sẻ ảnh, video, thảo luận cùng cộng đồng Pickleball.",
-    icon: "newspaper-outline" as const,
-    route: "/feed",
-    accent: "#0066FF",
+    key: "live",
+    title: "Live",
+    description: "Xem livestream các trận đấu đang diễn ra.",
+    icon: "radio-outline" as const,
+    route: "/live",
+    accent: "#EF4444",
   },
   {
     key: "messages",
@@ -44,14 +44,6 @@ const MORE_ITEMS = [
     icon: "people-outline" as const,
     route: "/friends",
     accent: "#10B981",
-  },
-  {
-    key: "notifications",
-    title: "Thông báo",
-    description: "Trung tâm thông báo: comment, tin nhắn, lời mời kết bạn…",
-    icon: "notifications-outline" as const,
-    route: "/notifications",
-    accent: "#F97316",
   },
   {
     key: "my_tournament",

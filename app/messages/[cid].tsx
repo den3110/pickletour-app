@@ -1,7 +1,7 @@
 // app/messages/[cid].tsx — Chat window (Messenger-like)
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,6 +10,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -18,7 +19,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useDispatch, useSelector } from "react-redux";
+
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { MentionText } from "@/components/feed/MentionText";
+import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
+import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
 
 import {
   useGetConversationQuery,
@@ -40,13 +47,83 @@ function extractErr(err: any): string {
 }
 
 export default function ChatWindow() {
+  const headerHeight = useHeaderHeight();
   const { cid } = useLocalSearchParams<{ cid: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const dispatch = useDispatch();
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [linkedTournament, setLinkedTournament] = useState<any>(null);
+  const [tournamentPickerOpen, setTournamentPickerOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionRange, setMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  const [selectedMentions, setSelectedMentions] = useState<
+    Array<{ _id: string; display: string }>
+  >([]);
+  const mentionDebRef = useRef<any>(null);
+  const [triggerUserSearch] = useLazySearchUserQuery();
   const flatRef = useRef<FlatList<any>>(null);
   const cidStr = String(cid);
+
+  const onChangeText = (v: string) => {
+    setText(v);
+    const caret = v.length;
+    const before = v.slice(0, caret);
+    const m = before.match(
+      /(^|\s)@([\p{L}\p{N}._-]+(?: [\p{L}\p{N}._-]+){0,2})$/u
+    );
+    if (m) {
+      const q = m[2];
+      setMentionQuery(q);
+      setMentionRange({ start: before.length - q.length - 1, end: caret });
+    } else {
+      setMentionQuery(null);
+      setMentionRange(null);
+      setMentionResults([]);
+    }
+  };
+
+  useEffect(() => {
+    if (mentionQuery == null) return;
+    if (mentionDebRef.current) clearTimeout(mentionDebRef.current);
+    mentionDebRef.current = setTimeout(async () => {
+      if (!mentionQuery) {
+        setMentionResults([]);
+        return;
+      }
+      try {
+        const r: any = await triggerUserSearch(mentionQuery).unwrap();
+        const list = Array.isArray(r) ? r : r?.items || r?.data || [];
+        setMentionResults(list.slice(0, 6));
+      } catch {
+        setMentionResults([]);
+      }
+    }, 250);
+    return () => {
+      if (mentionDebRef.current) clearTimeout(mentionDebRef.current);
+    };
+  }, [mentionQuery, triggerUserSearch]);
+
+  const insertMention = (u: any) => {
+    if (!mentionRange || !u?._id) return;
+    const nick = u?.nickname || u?.name || "";
+    if (!nick) return;
+    const before = text.slice(0, mentionRange.start);
+    const after = text.slice(mentionRange.end);
+    setText(`${before}@${nick} ${after}`);
+    setSelectedMentions((prev) =>
+      prev.some((m) => m._id === String(u._id))
+        ? prev
+        : [...prev, { _id: String(u._id), display: nick }]
+    );
+    setMentionQuery(null);
+    setMentionRange(null);
+    setMentionResults([]);
+  };
 
   const { data: conv } = useGetConversationQuery(cidStr, { skip: !cid });
   const { data: msgs, isFetching } = useListMessagesQuery(
@@ -148,15 +225,22 @@ export default function ChatWindow() {
   };
 
   const submit = async () => {
-    if (!text.trim() && !attachments.length) return;
+    if (!text.trim() && !attachments.length && !linkedTournament) return;
+    const stillPresent = selectedMentions
+      .filter((m) => text.includes(`@${m.display}`))
+      .map((m) => m._id);
     try {
       await sendMessage({
         cid: cidStr,
         content: text.trim(),
         attachments,
-      }).unwrap();
+        mentions: stillPresent,
+        linkedTournament: linkedTournament?._id || null,
+      } as any).unwrap();
       setText("");
       setAttachments([]);
+      setLinkedTournament(null);
+      setSelectedMentions([]);
       // scroll về đầu (FlatList inverted → offset 0)
       flatRef.current?.scrollToOffset({ offset: 0, animated: true });
     } catch (err: any) {
@@ -185,7 +269,8 @@ export default function ChatWindow() {
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title }} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
         style={{ flex: 1 }}
       >
         {isFetching && !items.length && (
@@ -249,13 +334,11 @@ export default function ChatWindow() {
                 ]}
               >
                 {!isMine && showAvatar && (
-                  <View style={styles.avatarXs}>
-                    <Text style={styles.avatarLetter}>
-                      {authorName(item.sender)[0]?.toUpperCase()}
-                    </Text>
+                  <View style={{ marginRight: 6 }}>
+                    <AuthorAvatar user={item.sender} size={28} />
                   </View>
                 )}
-                {!isMine && !showAvatar && <View style={{ width: 32 }} />}
+                {!isMine && !showAvatar && <View style={{ width: 34 }} />}
                 <View
                   style={[
                     styles.bubble,
@@ -299,14 +382,68 @@ export default function ChatWindow() {
                       </View>
                     ))}
                   {!!item.content && (
-                    <Text
+                    <MentionText
+                      content={item.content}
+                      mentions={item.mentions}
                       style={[
                         styles.msgText,
                         { color: isMine ? "#fff" : "#0F172A" },
                       ]}
+                      mentionColor={isMine ? "#DBEAFE" : "#1877F2"}
+                    />
+                  )}
+                  {item.linkedTournament && (
+                    <Pressable
+                      onPress={() =>
+                        router.push(
+                          `/tournament/${item.linkedTournament._id}` as any
+                        )
+                      }
+                      style={[
+                        styles.msgTournamentCard,
+                        isMine && styles.msgTournamentCardMine,
+                      ]}
                     >
-                      {item.content}
-                    </Text>
+                      {item.linkedTournament.image ? (
+                        <Image
+                          source={{ uri: item.linkedTournament.image }}
+                          style={styles.msgTournamentImg}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.msgTournamentImg,
+                            styles.msgTournamentImgFallback,
+                          ]}
+                        >
+                          <Ionicons name="trophy" size={18} color="#F59E0B" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.msgTournamentLabel,
+                            isMine && { color: "#FEF3C7" },
+                          ]}
+                        >
+                          Giải đấu
+                        </Text>
+                        <Text
+                          style={[
+                            styles.msgTournamentName,
+                            isMine && { color: "#fff" },
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {item.linkedTournament.name}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={isMine ? "#DBEAFE" : "#94A3B8"}
+                      />
+                    </Pressable>
                   )}
                 </View>
               </Pressable>
@@ -339,26 +476,73 @@ export default function ChatWindow() {
               ))}
             </View>
           )}
+          {linkedTournament && (
+            <View style={styles.chatTournamentChip}>
+              <Ionicons name="trophy" size={14} color="#F59E0B" />
+              <Text style={styles.chatTournamentText} numberOfLines={1}>
+                {linkedTournament.name}
+              </Text>
+              <Pressable onPress={() => setLinkedTournament(null)} hitSlop={8}>
+                <Ionicons name="close-circle" size={16} color="#64748B" />
+              </Pressable>
+            </View>
+          )}
+          {mentionQuery != null && mentionResults.length > 0 && (
+            <View style={styles.mentionList}>
+              {mentionResults.map((u) => (
+                <Pressable
+                  key={u._id}
+                  onPress={() => insertMention(u)}
+                  style={({ pressed }) => [
+                    styles.mentionItem,
+                    pressed && { backgroundColor: "#F1F5F9" },
+                  ]}
+                >
+                  <AuthorAvatar user={u} size={28} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.mentionNick} numberOfLines={1}>
+                      @{u.nickname || u.name}
+                    </Text>
+                    {!!u.name && u.name !== u.nickname && (
+                      <Text style={styles.mentionName} numberOfLines={1}>
+                        {u.name}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <View style={styles.composerRow}>
             <Pressable onPress={pickMedia} style={styles.iconBtn}>
               <Ionicons name="image-outline" size={22} color="#0066FF" />
+            </Pressable>
+            <Pressable
+              onPress={() => setTournamentPickerOpen(true)}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="trophy-outline" size={22} color="#F59E0B" />
             </Pressable>
             <TextInput
               style={styles.input}
               placeholder="Aa"
               value={text}
-              onChangeText={setText}
+              onChangeText={onChangeText}
               multiline
               placeholderTextColor="#94A3B8"
             />
             <Pressable
               onPress={submit}
-              disabled={sending || (!text.trim() && !attachments.length)}
+              disabled={
+                sending ||
+                (!text.trim() && !attachments.length && !linkedTournament)
+              }
               style={[
                 styles.sendBtn,
-                (sending || (!text.trim() && !attachments.length)) && {
-                  opacity: 0.4,
-                },
+                (sending ||
+                  (!text.trim() &&
+                    !attachments.length &&
+                    !linkedTournament)) && { opacity: 0.4 },
               ]}
             >
               <Ionicons name="send" size={18} color="#fff" />
@@ -366,13 +550,255 @@ export default function ChatWindow() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ChatTournamentPickerModal
+        visible={tournamentPickerOpen}
+        onClose={() => setTournamentPickerOpen(false)}
+        onPick={(t) => {
+          setLinkedTournament(t);
+          setTournamentPickerOpen(false);
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+function ChatTournamentPickerModal({
+  visible,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onPick: (t: any) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [triggerSearch] = useLazySearchTournamentsQuery();
+  const debRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (debRef.current) clearTimeout(debRef.current);
+    debRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r: any = await triggerSearch({ q, limit: 20 }).unwrap();
+        const list = Array.isArray(r) ? r : r?.items || r?.data || [];
+        setItems(list);
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (debRef.current) clearTimeout(debRef.current);
+    };
+  }, [q, visible, triggerSearch]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>Gắn giải đấu</Text>
+          <Pressable onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={24} color="#0F172A" />
+          </Pressable>
+        </View>
+        <View style={styles.pickerSearchBox}>
+          <Ionicons name="search" size={18} color="#94A3B8" />
+          <TextInput
+            style={styles.pickerSearchInput}
+            placeholder="Tìm giải theo tên…"
+            placeholderTextColor="#94A3B8"
+            value={q}
+            onChangeText={setQ}
+            autoFocus
+          />
+        </View>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(t: any) => String(t._id)}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => onPick(item)}
+                style={({ pressed }) => [
+                  styles.pickerRow,
+                  pressed && { backgroundColor: "#F1F5F9" },
+                ]}
+              >
+                {item.image ? (
+                  <Image source={{ uri: item.image }} style={styles.pickerThumb} />
+                ) : (
+                  <View style={[styles.pickerThumb, styles.pickerThumbFallback]}>
+                    <Ionicons name="trophy" size={20} color="#F59E0B" />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pickerName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <Text
+                style={{
+                  padding: 24,
+                  color: "#94A3B8",
+                  textAlign: "center",
+                }}
+              >
+                {q ? "Không tìm thấy giải" : "Gõ tên để tìm giải đấu…"}
+              </Text>
+            }
+          />
+        )}
+      </SafeAreaView>
+    </Modal>
   );
 }
 
 const { width: SW } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
+  mentionList: {
+    marginHorizontal: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  mentionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F1F5F9",
+  },
+  mentionNick: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  mentionName: { fontSize: 12, color: "#64748B" },
+  chatTournamentChip: {
+    marginHorizontal: 8,
+    marginBottom: 6,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    maxWidth: "90%",
+  },
+  chatTournamentText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#B45309",
+    flexShrink: 1,
+  },
+  msgTournamentCard: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  msgTournamentCardMine: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  msgTournamentImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: "#FEF3C7",
+  },
+  msgTournamentImgFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  msgTournamentLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  msgTournamentName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginTop: 1,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E2E8F0",
+  },
+  pickerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
+  pickerSearchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    margin: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#0F172A",
+    padding: 0,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F1F5F9",
+  },
+  pickerThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+  },
+  pickerThumbFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF7ED",
+  },
+  pickerName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
   container: { flex: 1, backgroundColor: "#fff" },
   systemBar: { alignItems: "center", marginVertical: 8 },
   systemText: {

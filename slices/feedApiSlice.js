@@ -4,13 +4,36 @@ import { apiSlice } from "./apiSlice";
 export const feedApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     listFeed: builder.query({
-      query: ({ cursor, tag, limit = 20 } = {}) => {
+      query: ({ cursor, tag, limit = 10 } = {}) => {
         const p = new URLSearchParams();
         if (cursor) p.set("cursor", String(cursor));
         if (tag) p.set("tag", String(tag).toLowerCase());
         if (limit) p.set("limit", String(limit));
         const qs = p.toString();
         return { url: `/api/feed${qs ? `?${qs}` : ""}`, method: "GET" };
+      },
+      // Cache theo (tag, limit) — bỏ cursor khỏi key để các page merge vào 1 cache entry
+      serializeQueryArgs: ({ queryArgs }) => {
+        const { cursor: _c, ...rest } = queryArgs || {};
+        return rest;
+      },
+      merge: (currentCache, newResponse, { arg }) => {
+        if (!arg?.cursor) {
+          return newResponse;
+        }
+        const existingIds = new Set(
+          (currentCache?.items || []).map((i) => String(i._id))
+        );
+        const appended = (newResponse?.items || []).filter(
+          (i) => !existingIds.has(String(i._id))
+        );
+        return {
+          ...newResponse,
+          items: [...(currentCache?.items || []), ...appended],
+        };
+      },
+      forceRefetch({ currentArg, previousArg }) {
+        return currentArg?.cursor !== previousArg?.cursor;
       },
       providesTags: [{ type: "Feed", id: "LIST" }],
       keepUnusedDataFor: 30,
@@ -33,6 +56,55 @@ export const feedApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body: { type },
       }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "Feed", id: "LIST" },
+        { type: "Feed", id },
+      ],
+      async onQueryStarted({ id, type }, { dispatch, queryFulfilled, getState }) {
+        const patches = [];
+        for (const { endpointName, originalArgs } of feedApiSlice.util.selectInvalidatedBy(
+          getState(),
+          [{ type: "Feed", id: "LIST" }]
+        )) {
+          if (endpointName !== "listFeed") continue;
+          patches.push(
+            dispatch(
+              feedApiSlice.util.updateQueryData("listFeed", originalArgs, (draft) => {
+                const item = (draft?.items || []).find((p) => String(p._id) === String(id));
+                if (!item) return;
+                const prev = item.myReaction;
+                if (prev === type) {
+                  item.myReaction = null;
+                  item.reactionCount = Math.max(0, (item.reactionCount || 0) - 1);
+                } else {
+                  item.myReaction = type;
+                  if (!prev) item.reactionCount = (item.reactionCount || 0) + 1;
+                }
+              })
+            )
+          );
+        }
+        patches.push(
+          dispatch(
+            feedApiSlice.util.updateQueryData("getFeedPost", id, (draft) => {
+              if (!draft) return;
+              const prev = draft.myReaction;
+              if (prev === type) {
+                draft.myReaction = null;
+                draft.reactionCount = Math.max(0, (draft.reactionCount || 0) - 1);
+              } else {
+                draft.myReaction = type;
+                if (!prev) draft.reactionCount = (draft.reactionCount || 0) + 1;
+              }
+            })
+          )
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((p) => p.undo());
+        }
+      },
     }),
     listFeedComments: builder.query({
       query: ({ postId, parent = null, limit = 20 } = {}) => {

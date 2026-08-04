@@ -1523,7 +1523,7 @@ export default function HomeScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "",
+          headerTitle: "",
           headerTitleAlign: "left",
           headerLeft: () => (
             <View

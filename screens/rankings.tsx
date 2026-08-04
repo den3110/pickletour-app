@@ -1489,6 +1489,33 @@ const RankingCard = memo(
               </Text>
             ) : null}
           </View>
+
+          {allowGrade && (
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onOpenGrade(u, r);
+              }}
+              hitSlop={10}
+              style={{ alignSelf: "flex-start", marginLeft: 8 }}
+              accessibilityLabel="Chấm trình"
+            >
+              <AppleLiquidGlassView
+                fallback="view"
+                glassColorScheme={glassScheme(theme)}
+                glassEffectStyle="clear"
+                glassTintColor={glassAccentTint(theme.primary, 0.14)}
+                isInteractive
+                style={[
+                  styles.gradeIconBtn,
+                  { borderColor: theme.primary },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.glassGradeIconBtn,
+                ]}
+              >
+                <Ionicons name="create-outline" size={18} color={theme.primary} />
+              </AppleLiquidGlassView>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.tagsRow}>
@@ -1610,35 +1637,6 @@ const RankingCard = memo(
                 </AppleLiquidGlassView>
               </TouchableOpacity>
             </>
-          )}
-
-          {allowGrade && (
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onOpenGrade(u, r);
-              }}
-            >
-              <AppleLiquidGlassView
-                fallback="view"
-                glassColorScheme={glassScheme(theme)}
-                glassEffectStyle="clear"
-                glassTintColor={glassSurfaceTint(theme, 0.34, 0.36)}
-                isInteractive
-                style={[
-                  styles.actionBtn,
-                  IOS_26_LIQUID_GLASS_ENABLED && [
-                    styles.glassActionBtn,
-                    { borderColor: theme.border },
-                  ],
-                ]}
-              >
-              <Ionicons name="create-outline" size={20} color={theme.text} />
-              <Text style={[styles.actionText, { color: theme.text }]}>
-                Chấm trình
-              </Text>
-              </AppleLiquidGlassView>
-            </TouchableOpacity>
           )}
 
           {allowKyc && (
@@ -2553,7 +2551,18 @@ const styles = StyleSheet.create({
   glassMedalCard: {
     borderWidth: 1.5,
   },
-  cardHeader: { flexDirection: "row", marginBottom: 16 },
+  cardHeader: { flexDirection: "row", marginBottom: 16, alignItems: "flex-start" },
+  gradeIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  glassGradeIconBtn: {
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   avatarContainer: { position: "relative", width: 68, height: 68 },
   avatarBorder: {
     position: "absolute",

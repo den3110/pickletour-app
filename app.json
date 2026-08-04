@@ -20,8 +20,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Ứng dụng cần dùng camera để quét mã QR trên CCCD và chụp ảnh xác minh tài khoản.",
         "NSMicrophoneUsageDescription": "Ứng dụng cần dùng micro cho tính năng điều khiển bằng giọng nói khi chấm trận.",
+        "NSSpeechRecognitionUsageDescription": "Ứng dụng cần quyền nhận dạng giọng nói để hỗ trợ điều khiển bằng giọng nói khi chấm trận (đọc tỉ số, chuyển giao bóng...).",
         "NSPhotoLibraryUsageDescription": "Ứng dụng cần truy cập thư viện ảnh để bạn chọn ảnh đại diện và ảnh CCCD (mặt trước/mặt sau) để xác minh tài khoản.",
         "NSFaceIDUsageDescription": "Ứng dụng dùng Face ID/Touch ID/Passcode để xác thực các hành động nhạy cảm như xoá tài khoản.",
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần vị trí để hiển thị giải đấu và sân pickleball gần bạn trên bản đồ.",
         "NSCalendarsUsageDescription": "Ứng dụng cần quyền truy cập lịch để thêm trận đấu vào lịch của bạn và nhắc nhở tự động.",
         "NSRemindersUsageDescription": "Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.",
         "NSCalendarsWriteOnlyAccessUsageDescription": "Ứng dụng cần quyền để thêm sự kiện trận đấu vào lịch của bạn.",
