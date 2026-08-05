@@ -171,6 +171,7 @@ const FEATURES = [
     title: "Bảng tin",
     color: "#3B82F6",
     link: "/feed",
+    isNew: true,
   },
   {
     id: 16,
@@ -187,6 +188,7 @@ const FEATURES = [
     title: "Nhắn tin",
     color: "#8B5CF6",
     link: "/messages",
+    isNew: true,
   },
   {
     id: 15,
@@ -195,6 +197,16 @@ const FEATURES = [
     title: "Bạn bè",
     color: "#10B981",
     link: "/friends",
+    isNew: true,
+  },
+  {
+    id: 17,
+    icon: "school-outline",
+    iconLib: "Ionicons",
+    title: "Huấn luyện viên",
+    color: "#0EA5E9",
+    link: "/coaches",
+    isNew: true,
   },
 ];
 
@@ -696,6 +708,13 @@ function FeatureItem({ item, theme }) {
     return <Lib {...iconProps} />;
   };
 
+  const NewBadge = () =>
+    item.isNew ? (
+      <View style={styles.newBadge} pointerEvents="none">
+        <Text style={styles.newBadgeText}>Mới</Text>
+      </View>
+    ) : null;
+
   if (IOS_26_LIQUID_GLASS_ENABLED) {
     return (
       <TouchableOpacity
@@ -708,31 +727,34 @@ function FeatureItem({ item, theme }) {
         <Animated.View
           style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
         >
-          <AppleLiquidGlassView
-            fallback="view"
-            glassEffectStyle="regular"
-            glassTintColor={
-              isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.22)"
-            }
-            isInteractive
-            style={[
-              styles.featureIconContainer,
-              {
-                backgroundColor: isDark ? "#1F2229" : "#FFF",
-                shadowColor: item.color,
-              },
-              styles.featureIconContainerCalm,
-            ]}
-          >
-            <View
+          <View style={styles.featureIconWrap}>
+            <AppleLiquidGlassView
+              fallback="view"
+              glassEffectStyle="regular"
+              glassTintColor={
+                isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.22)"
+              }
+              isInteractive
               style={[
-                styles.featureIconBg,
-                { backgroundColor: item.color + "15" },
+                styles.featureIconContainer,
+                {
+                  backgroundColor: isDark ? "#1F2229" : "#FFF",
+                  shadowColor: item.color,
+                },
+                styles.featureIconContainerCalm,
               ]}
             >
-              {renderIcon()}
-            </View>
-          </AppleLiquidGlassView>
+              <View
+                style={[
+                  styles.featureIconBg,
+                  { backgroundColor: item.color + "15" },
+                ]}
+              >
+                {renderIcon()}
+              </View>
+            </AppleLiquidGlassView>
+            <NewBadge />
+          </View>
           <Text
             style={[styles.featureTitle, { color: text }]}
             numberOfLines={2}
@@ -755,31 +777,34 @@ function FeatureItem({ item, theme }) {
       <Animated.View
         style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
       >
-        <AppleLiquidGlassView
-          fallback="view"
-          intensity={isDark ? 68 : 55}
-          tint={isDark ? "dark" : "light"}
-          glassTintColor={
-            isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.2)"
-          }
-          isInteractive
-          style={[
-            styles.featureIconContainer,
-            {
-              backgroundColor: isDark ? "#1F2229" : "#FFF",
-              shadowColor: item.color,
-            },
-          ]}
-        >
-          <View
+        <View style={styles.featureIconWrap}>
+          <AppleLiquidGlassView
+            fallback="view"
+            intensity={isDark ? 68 : 55}
+            tint={isDark ? "dark" : "light"}
+            glassTintColor={
+              isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.2)"
+            }
+            isInteractive
             style={[
-              styles.featureIconBg,
-              { backgroundColor: item.color + "15" },
+              styles.featureIconContainer,
+              {
+                backgroundColor: isDark ? "#1F2229" : "#FFF",
+                shadowColor: item.color,
+              },
             ]}
           >
-            {renderIcon()}
-          </View>
-        </AppleLiquidGlassView>
+            <View
+              style={[
+                styles.featureIconBg,
+                { backgroundColor: item.color + "15" },
+              ]}
+            >
+              {renderIcon()}
+            </View>
+          </AppleLiquidGlassView>
+          <NewBadge />
+        </View>
         <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
           {item.title}
         </Text>
@@ -1918,6 +1943,37 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 14,
     height: 28,
+  },
+  featureIconWrap: {
+    position: "relative",
+    // Cần overflow visible để badge tràn ra ngoài icon container.
+    overflow: "visible",
+  },
+  newBadge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#EF4444",
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#EF4444",
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  newBadgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
   },
 
   tournamentsSection: { marginBottom: 8 },
