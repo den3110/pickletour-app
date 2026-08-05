@@ -12,6 +12,9 @@
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
   <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+  <!-- App chủ ý KHÔNG dùng advertising ID (privacy). Play Console declaration
+       phải khai "Không dùng AD_ID" tương ứng, xem "Cập nhật biểu mẫu khai báo"
+       trên trang tạo bản phát hành. -->
   <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
   <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>

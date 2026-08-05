@@ -57,3 +57,7 @@ ota-build
 # hot-updater
 .hot-updater/output
 abcdk-
+
+# Upload keystore — NEVER commit
+android/app/pickletour-upload.jks
+*.jks
