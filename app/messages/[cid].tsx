@@ -844,23 +844,28 @@ const styles = StyleSheet.create({
   msgTournamentCard: {
     marginTop: 6,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 8,
-    borderRadius: 10,
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
     backgroundColor: "#FFFBEB",
     borderWidth: 1,
     borderColor: "#FDE68A",
+    // Force minWidth để card không bị co khi bubble content ngắn (VD chỉ "Ok?").
+    // Bubble maxWidth = SW * 0.72 nên chọn 62% để chừa mép cho avatar + gap.
+    minWidth: SW * 0.62,
+    alignSelf: "stretch",
   },
   msgTournamentCardMine: {
     backgroundColor: "rgba(255,255,255,0.14)",
     borderColor: "rgba(255,255,255,0.28)",
   },
   msgTournamentImg: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     backgroundColor: "#FEF3C7",
+    flexShrink: 0,
   },
   msgTournamentImgFallback: {
     alignItems: "center",
@@ -879,7 +884,7 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 3,
   },
-  tourInfoText: { fontSize: 11, flexShrink: 1 },
+  tourInfoText: { fontSize: 12, flexShrink: 1, lineHeight: 16 },
   timeSeparator: {
     textAlign: "center",
     color: "#94A3B8",
@@ -895,10 +900,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   msgTournamentName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: "#0F172A",
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 18,
   },
   pickerHeader: {
     flexDirection: "row",

@@ -46,6 +46,14 @@ const MORE_ITEMS = [
     accent: "#10B981",
   },
   {
+    key: "coaches",
+    title: "Huấn luyện viên",
+    description: "Danh sách HLV chính thức, sắp xếp theo điểm trình.",
+    icon: "school-outline" as const,
+    route: "/coaches",
+    accent: "#0EA5E9",
+  },
+  {
     key: "my_tournament",
     title: "Giải của tôi",
     description: "Theo dõi các giải đã tham gia, lịch đấu và kết quả cá nhân.",
