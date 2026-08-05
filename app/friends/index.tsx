@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
+import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import { FriendActions } from "@/components/social/FriendActions";
 import { OpenMessageButton } from "@/components/social/OpenMessageButton";
 import {
@@ -40,11 +41,7 @@ function UserRow({
       onPress={() => user?._id && router.push(`/profile/${user._id}`)}
       style={styles.row}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarLetter}>
-          {authorName(user)[0]?.toUpperCase()}
-        </Text>
-      </View>
+      <AuthorAvatar user={user} size={44} />
       <View style={{ flex: 1 }}>
         <Text style={styles.name}>{authorName(user)}</Text>
         {meta ? <Text style={styles.meta}>{meta}</Text> : null}
@@ -194,7 +191,7 @@ export default function FriendsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title: "Bạn bè" }} />
       <View style={styles.tabBar}>
         <Tab id="friends" label="Bạn bè" badge={counts?.friends} />
@@ -218,6 +215,7 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: "row",
     paddingHorizontal: 12,
+    paddingTop: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
