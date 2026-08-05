@@ -77,6 +77,72 @@ function extractErr(err: any): string {
 
 type MediaItem = { type: "image" | "video"; url: string; mime?: string };
 
+function fmtTourDate(startIso?: string, endIso?: string) {
+  if (!startIso) return "";
+  const s = new Date(startIso);
+  const fmt = (d: Date) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  if (!endIso || endIso === startIso) return fmt(s);
+  const e = new Date(endIso);
+  if (
+    s.getMonth() === e.getMonth() &&
+    s.getFullYear() === e.getFullYear() &&
+    s.getDate() !== e.getDate()
+  ) {
+    return `${String(s.getDate()).padStart(2, "0")}–${fmt(e)}`;
+  }
+  return `${fmt(s)} → ${fmt(e)}`;
+}
+
+function TourFeedCard({ tour }: { tour: any }) {
+  const dateStr = fmtTourDate(tour?.startDate, tour?.endDate);
+  const reg = Number(tour?.registrationCount || 0);
+  const maxPairs = Number(tour?.maxPairs || 0);
+  return (
+    <Pressable
+      onPress={() => router.push(`/tournament/${tour._id}` as any)}
+      style={styles.linkedTournamentCard}
+    >
+      {tour.image ? (
+        <Image source={{ uri: tour.image }} style={styles.linkedTournamentImg} />
+      ) : (
+        <View style={[styles.linkedTournamentImg, styles.linkedTournamentFallback]}>
+          <Ionicons name="trophy" size={22} color="#F59E0B" />
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.linkedTournamentLabel}>Giải đấu</Text>
+        <Text style={styles.linkedTournamentName} numberOfLines={2}>
+          {tour.name}
+        </Text>
+        {tour.location ? (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="location-outline" size={12} color="#94A3B8" />
+            <Text style={styles.tourInfoText} numberOfLines={1}>
+              {tour.location}
+            </Text>
+          </View>
+        ) : null}
+        {dateStr ? (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
+            <Text style={styles.tourInfoText}>{dateStr}</Text>
+          </View>
+        ) : null}
+        {(reg > 0 || maxPairs > 0) && (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="people-outline" size={12} color="#94A3B8" />
+            <Text style={styles.tourInfoText}>
+              {reg} cặp{maxPairs > 0 ? ` / ${maxPairs}` : ""} đã đăng ký
+            </Text>
+          </View>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+    </Pressable>
+  );
+}
+
 function ScoreBadges({
   single,
   double,
@@ -761,30 +827,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
         </View>
       )}
       {post.linkedTournament && (
-        <Pressable
-          onPress={() =>
-            router.push(`/tournament/${post.linkedTournament._id}` as any)
-          }
-          style={styles.linkedTournamentCard}
-        >
-          {post.linkedTournament.image ? (
-            <Image
-              source={{ uri: post.linkedTournament.image }}
-              style={styles.linkedTournamentImg}
-            />
-          ) : (
-            <View style={[styles.linkedTournamentImg, styles.linkedTournamentFallback]}>
-              <Ionicons name="trophy" size={20} color="#F59E0B" />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.linkedTournamentLabel}>Giải đấu</Text>
-            <Text style={styles.linkedTournamentName} numberOfLines={2}>
-              {post.linkedTournament.name}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </Pressable>
+        <TourFeedCard tour={post.linkedTournament} />
       )}
       {post.media?.length > 0 && (
         <PostMedia
@@ -984,6 +1027,13 @@ const styles = StyleSheet.create({
     color: "#B45309",
     flexShrink: 1,
   },
+  tourInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  tourInfoText: { fontSize: 11, color: "#64748B", flexShrink: 1 },
   linkedTournamentCard: {
     marginTop: 10,
     flexDirection: "row",

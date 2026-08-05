@@ -41,6 +41,97 @@ import { socket } from "@/lib/socket";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 
+// Format ngày dd/MM/yyyy hoặc range dd/MM - dd/MM/yyyy
+function fmtDateRange(startIso?: string, endIso?: string) {
+  if (!startIso) return "";
+  const s = new Date(startIso);
+  const fmt = (d: Date) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}/${d.getFullYear()}`;
+  if (!endIso || endIso === startIso) return fmt(s);
+  const e = new Date(endIso);
+  if (
+    s.getMonth() === e.getMonth() &&
+    s.getFullYear() === e.getFullYear() &&
+    s.getDate() !== e.getDate()
+  ) {
+    return `${String(s.getDate()).padStart(2, "0")}–${fmt(e)}`;
+  }
+  return `${fmt(s)} → ${fmt(e)}`;
+}
+
+function TournamentBubbleCard({ tour, isMine }: { tour: any; isMine: boolean }) {
+  const dateStr = fmtDateRange(tour?.startDate, tour?.endDate);
+  const regCount = Number(tour?.registrationCount || 0);
+  const maxPairs = Number(tour?.maxPairs || 0);
+  const labelColor = isMine ? "#FEF3C7" : "#B45309";
+  const textColor = isMine ? "#fff" : "#0F172A";
+  const subColor = isMine ? "rgba(255,255,255,0.85)" : "#64748B";
+  return (
+    <Pressable
+      onPress={() => router.push(`/tournament/${tour._id}` as any)}
+      style={[
+        styles.msgTournamentCard,
+        isMine && styles.msgTournamentCardMine,
+      ]}
+    >
+      {tour.image ? (
+        <Image source={{ uri: tour.image }} style={styles.msgTournamentImg} />
+      ) : (
+        <View
+          style={[styles.msgTournamentImg, styles.msgTournamentImgFallback]}
+        >
+          <Ionicons name="trophy" size={22} color="#F59E0B" />
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.msgTournamentLabel, { color: labelColor }]}>
+          Giải đấu
+        </Text>
+        <Text
+          style={[styles.msgTournamentName, { color: textColor }]}
+          numberOfLines={2}
+        >
+          {tour.name}
+        </Text>
+        {tour.location ? (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="location-outline" size={12} color={subColor} />
+            <Text
+              style={[styles.tourInfoText, { color: subColor }]}
+              numberOfLines={1}
+            >
+              {tour.location}
+            </Text>
+          </View>
+        ) : null}
+        {dateStr ? (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="calendar-outline" size={12} color={subColor} />
+            <Text style={[styles.tourInfoText, { color: subColor }]}>
+              {dateStr}
+            </Text>
+          </View>
+        ) : null}
+        {(regCount > 0 || maxPairs > 0) && (
+          <View style={styles.tourInfoRow}>
+            <Ionicons name="people-outline" size={12} color={subColor} />
+            <Text style={[styles.tourInfoText, { color: subColor }]}>
+              {regCount} cặp{maxPairs > 0 ? ` / ${maxPairs}` : ""} đã đăng ký
+            </Text>
+          </View>
+        )}
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={isMine ? "#DBEAFE" : "#94A3B8"}
+      />
+    </Pressable>
+  );
+}
+
 function extractErr(err: any): string {
   if (err?.data?.message) return String(err.data.message);
   if (err?.message) return String(err.message);
@@ -405,57 +496,10 @@ export default function ChatWindow() {
                     />
                   )}
                   {item.linkedTournament && (
-                    <Pressable
-                      onPress={() =>
-                        router.push(
-                          `/tournament/${item.linkedTournament._id}` as any
-                        )
-                      }
-                      style={[
-                        styles.msgTournamentCard,
-                        isMine && styles.msgTournamentCardMine,
-                      ]}
-                    >
-                      {item.linkedTournament.image ? (
-                        <Image
-                          source={{ uri: item.linkedTournament.image }}
-                          style={styles.msgTournamentImg}
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.msgTournamentImg,
-                            styles.msgTournamentImgFallback,
-                          ]}
-                        >
-                          <Ionicons name="trophy" size={18} color="#F59E0B" />
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.msgTournamentLabel,
-                            isMine && { color: "#FEF3C7" },
-                          ]}
-                        >
-                          Giải đấu
-                        </Text>
-                        <Text
-                          style={[
-                            styles.msgTournamentName,
-                            isMine && { color: "#fff" },
-                          ]}
-                          numberOfLines={2}
-                        >
-                          {item.linkedTournament.name}
-                        </Text>
-                      </View>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color={isMine ? "#DBEAFE" : "#94A3B8"}
-                      />
-                    </Pressable>
+                    <TournamentBubbleCard
+                      tour={item.linkedTournament}
+                      isMine={isMine}
+                    />
                   )}
                 </View>
               </Pressable>
@@ -758,6 +802,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
+  tourInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  tourInfoText: { fontSize: 11, flexShrink: 1 },
   msgTournamentName: {
     fontSize: 13,
     fontWeight: "700",
