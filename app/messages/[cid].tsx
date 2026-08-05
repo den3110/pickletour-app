@@ -41,6 +41,46 @@ import { socket } from "@/lib/socket";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 
+const MS_5MIN = 5 * 60 * 1000;
+const pad = (n: number) => String(n).padStart(2, "0");
+const _sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+function shouldShowTimeSep(cur?: any, older?: any) {
+  if (!cur?.createdAt) return false;
+  if (!older?.createdAt) return true;
+  const c = new Date(cur.createdAt);
+  const p = new Date(older.createdAt);
+  if (!_sameDay(c, p)) return true;
+  return c.getTime() - p.getTime() > MS_5MIN;
+}
+
+function fmtTimeSep(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (_sameDay(d, now)) return time;
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (_sameDay(d, y)) return `Hôm qua ${time}`;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const dm = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  if (sameYear) return `${dm} ${time}`;
+  return `${dm}/${d.getFullYear()} ${time}`;
+}
+
+function fmtBubbleTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (_sameDay(d, now)) return time;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${time}`;
+}
+
 // Format ngày dd/MM/yyyy hoặc range dd/MM - dd/MM/yyyy
 function fmtDateRange(startIso?: string, endIso?: string) {
   if (!startIso) return "";
@@ -388,12 +428,24 @@ export default function ChatWindow() {
           renderItem={({ item, index }) => {
             const isMine =
               String(item.sender?._id || item.sender) === String(me?._id);
-            const prev = items[index + 1]; // vì inverted
+            const prev = items[index + 1]; // vì inverted → prev = older msg
+            const next = items[index - 1]; // newer msg (visually below in inverted)
             const showAvatar =
               !isMine &&
               (!prev ||
                 String(prev.sender?._id || prev.sender) !==
                   String(item.sender?._id || item.sender));
+            const showTimeSep = shouldShowTimeSep(item, prev);
+            // Hiện timestamp dưới bubble khi: là msg cuối cùng của cluster
+            // (không có next cùng sender trong 5 phút)
+            const showBubbleTime =
+              !next ||
+              String(next.sender?._id || next.sender) !==
+                String(item.sender?._id || item.sender) ||
+              (next.createdAt &&
+                new Date(next.createdAt).getTime() -
+                  new Date(item.createdAt).getTime() >
+                  MS_5MIN);
             if (item.systemKind) {
               return (
                 <View style={styles.systemBar}>
@@ -429,13 +481,14 @@ export default function ChatWindow() {
               );
             }
             return (
-              <Pressable
-                onLongPress={isMine ? () => handleDelete(item._id) : undefined}
-                style={[
-                  styles.bubbleRow,
-                  isMine ? styles.rowMine : styles.rowTheir,
-                ]}
-              >
+              <View>
+                <Pressable
+                  onLongPress={isMine ? () => handleDelete(item._id) : undefined}
+                  style={[
+                    styles.bubbleRow,
+                    isMine ? styles.rowMine : styles.rowTheir,
+                  ]}
+                >
                 {!isMine && showAvatar && (
                   <View style={{ marginRight: 6 }}>
                     <AuthorAvatar user={item.sender} size={28} />
@@ -502,7 +555,25 @@ export default function ChatWindow() {
                     />
                   )}
                 </View>
-              </Pressable>
+                </Pressable>
+                {showBubbleTime && (
+                  <Text
+                    style={[
+                      styles.bubbleTime,
+                      { textAlign: isMine ? "right" : "left" },
+                    ]}
+                  >
+                    {fmtBubbleTime(item.createdAt)}
+                  </Text>
+                )}
+                {/* Inverted list: separator ở dưới JSX = phía TRÊN visually
+                    (giữa msg này và msg cũ hơn) */}
+                {showTimeSep && (
+                  <Text style={styles.timeSeparator}>
+                    {fmtTimeSep(item.createdAt)}
+                  </Text>
+                )}
+              </View>
             );
           }}
         />
@@ -809,6 +880,20 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   tourInfoText: { fontSize: 11, flexShrink: 1 },
+  timeSeparator: {
+    textAlign: "center",
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "600",
+    marginVertical: 12,
+  },
+  bubbleTime: {
+    fontSize: 10,
+    color: "#94A3B8",
+    marginTop: 2,
+    marginBottom: 6,
+    marginHorizontal: 8,
+  },
   msgTournamentName: {
     fontSize: 13,
     fontWeight: "700",
