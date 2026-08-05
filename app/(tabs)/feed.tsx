@@ -15,6 +15,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +28,7 @@ import {
   useListFeedQuery,
   useCreateFeedPostMutation,
   useReactFeedPostMutation,
+  useShareFeedPostMutation,
   useUploadFeedMediaMutation,
   useDeleteFeedPostMutation,
   useReportFeedPostMutation,
@@ -719,8 +721,12 @@ function PostMedia({
   );
 }
 
+const WEB_BASE_URL =
+  process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://pickletour.vn";
+
 function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
+  const [sharePostMut] = useShareFeedPostMutation();
   const [deletePost] = useDeleteFeedPostMutation();
   const [reportPost] = useReportFeedPostMutation();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -729,6 +735,26 @@ function PostCard({ post, me }: { post: any; me: any }) {
 
   const isMine = String(post.author?._id) === String(me?._id);
   const isAdmin = me?.role === "admin";
+
+  const handleShare = async () => {
+    const url = `${WEB_BASE_URL}/feed/post/${post._id}`;
+    const body = (post.content || "").slice(0, 200);
+    const title =
+      (post.author?.nickname || post.author?.name || "Bài viết") +
+      " · PickleTour";
+    try {
+      const result = await Share.share({
+        title,
+        message: body ? `${body}\n${url}` : url,
+        url, // iOS ưu tiên field url
+      });
+      if (result.action !== Share.dismissedAction) {
+        sharePostMut(post._id).catch(() => {});
+      }
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.message || "Không chia sẻ được");
+    }
+  };
 
   const doReact = async (type: string) => {
     setPickerOpen(false);
@@ -851,6 +877,9 @@ function PostCard({ post, me }: { post: any; me: any }) {
       <View style={styles.statsRow}>
         <Text style={styles.statText}>{post.reactionCount || 0} cảm xúc</Text>
         <Text style={styles.statText}>{post.commentCount || 0} bình luận</Text>
+        {(post.shareCount || 0) > 0 && (
+          <Text style={styles.statText}>{post.shareCount} chia sẻ</Text>
+        )}
       </View>
       <View style={styles.actionRow}>
         <Pressable
@@ -872,7 +901,56 @@ function PostCard({ post, me }: { post: any; me: any }) {
           <Ionicons name="chatbubble-outline" size={18} color="#64748B" />
           <Text style={styles.actionLabel}>Bình luận</Text>
         </Pressable>
+        <Pressable onPress={handleShare} style={styles.actionBtn}>
+          <Ionicons name="share-social-outline" size={18} color="#64748B" />
+          <Text style={styles.actionLabel}>Chia sẻ</Text>
+        </Pressable>
       </View>
+      {post.recentComments?.length > 0 && (
+        <View style={styles.previewComments}>
+          {post.recentComments.map((c: any) => (
+            <View key={c._id} style={styles.previewCommentRow}>
+              <Pressable
+                onPress={() =>
+                  c.author?._id && router.push(`/profile/${c.author._id}`)
+                }
+                hitSlop={6}
+              >
+                <AuthorAvatar user={c.author} size={26} />
+              </Pressable>
+              <View style={styles.previewBubble}>
+                <Pressable
+                  onPress={() =>
+                    c.author?._id && router.push(`/profile/${c.author._id}`)
+                  }
+                  hitSlop={4}
+                >
+                  <Text style={styles.previewAuthor}>
+                    {authorName(c.author)}
+                  </Text>
+                </Pressable>
+                <MentionText
+                  content={c.content}
+                  mentions={c.mentions}
+                  style={styles.previewContent}
+                />
+              </View>
+            </View>
+          ))}
+          {(post.commentCount || 0) > post.recentComments.length && (
+            <Pressable
+              onPress={() => router.push(`/feed/post/${post._id}`)}
+              style={{ marginLeft: 34, marginTop: 2 }}
+              hitSlop={6}
+            >
+              <Text style={styles.previewMore}>
+                Xem thêm {post.commentCount - post.recentComments.length} bình
+                luận
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       {pickerOpen && (
         <View style={styles.reactionPicker}>
           {Object.entries(REACTION_EMOJI).map(([k, e]) => (
@@ -1247,6 +1325,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   actionLabel: { color: "#64748B", fontSize: 14 },
+  previewComments: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    gap: 8,
+  },
+  previewCommentRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  previewBubble: {
+    flex: 1,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  previewAuthor: { fontWeight: "700", color: "#0F172A", fontSize: 12 },
+  previewContent: { color: "#0F172A", fontSize: 13, marginTop: 1 },
+  previewMore: { color: "#475569", fontSize: 12, fontWeight: "600" },
   reactionPicker: {
     position: "absolute",
     left: 12,

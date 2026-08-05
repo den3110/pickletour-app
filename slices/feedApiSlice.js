@@ -106,6 +106,38 @@ export const feedApiSlice = apiSlice.injectEndpoints({
         }
       },
     }),
+    shareFeedPost: builder.mutation({
+      query: (id) => ({ url: `/api/feed/${id}/share`, method: "POST" }),
+      async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+        const patches = [];
+        for (const { endpointName, originalArgs } of feedApiSlice.util.selectInvalidatedBy(
+          getState(),
+          [{ type: "Feed", id: "LIST" }]
+        )) {
+          if (endpointName !== "listFeed") continue;
+          patches.push(
+            dispatch(
+              feedApiSlice.util.updateQueryData("listFeed", originalArgs, (draft) => {
+                const item = (draft?.items || []).find((p) => String(p._id) === String(id));
+                if (item) item.shareCount = (item.shareCount || 0) + 1;
+              })
+            )
+          );
+        }
+        patches.push(
+          dispatch(
+            feedApiSlice.util.updateQueryData("getFeedPost", id, (draft) => {
+              if (draft) draft.shareCount = (draft.shareCount || 0) + 1;
+            })
+          )
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((p) => p.undo());
+        }
+      },
+    }),
     listFeedComments: builder.query({
       query: ({ postId, parent = null, limit = 20 } = {}) => {
         const p = new URLSearchParams();
@@ -158,6 +190,7 @@ export const {
   useCreateFeedPostMutation,
   useDeleteFeedPostMutation,
   useReactFeedPostMutation,
+  useShareFeedPostMutation,
   useListFeedCommentsQuery,
   useCreateFeedCommentMutation,
   useDeleteFeedCommentMutation,
