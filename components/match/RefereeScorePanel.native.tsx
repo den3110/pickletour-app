@@ -1849,7 +1849,11 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
   const insets = useSafeAreaInsets();
   const useGlobalAndroidSafeArea = Platform.OS === "android";
   const pageSafeEdges = (useGlobalAndroidSafeArea ? [] : ["top"]) as const;
-  const pageBottomInset = useGlobalAndroidSafeArea ? 0 : insets.bottom;
+  // Referee screen KHÔNG phải tab screen — cần pad bottom bằng insets.bottom
+  // để nút "Cài đặt trận" (gear) + các control ở đáy không bị 3-button nav
+  // Android che (trước đây pageBottomInset=0 trên Android là dành cho tab
+  // screens, không phù hợp fullscreen page này).
+  const pageBottomInset = insets.bottom;
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const shortEdge = Math.min(width, height);
