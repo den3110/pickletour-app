@@ -52,6 +52,7 @@ import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { FriendActions } from "@/components/social/FriendActions";
 import { OpenMessageButton } from "@/components/social/OpenMessageButton";
+import { CoachAchievementsMobile } from "./CoachAchievementsMobile";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -2332,6 +2333,17 @@ export default function PublicProfileScreen() {
               onPress={() => handleOpenStatsSheet("rating")}
             />
           </View>
+
+          {/* Coach achievements — hiển thị nếu là HLV hoặc chính chủ (để có
+              nút "Bổ sung thành tích" ngay cả khi chưa có ai duyệt). */}
+          {(base?.isCoach || isSelf) && (baseId || id) ? (
+            <CoachAchievementsMobile
+              userId={baseId || id}
+              isSelf={!!isSelf}
+              isCoach={!!base?.isCoach}
+              isAdminViewer={!!isAdminViewer}
+            />
+          ) : null}
 
           {/* Tab Navigation */}
           <View style={styles.tabContainer} onLayout={onTabBarLayout}>
