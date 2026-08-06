@@ -38,8 +38,44 @@ export const coachesApiSlice = apiSlice.injectEndpoints({
     listCoachProvinces: builder.query({
       query: () => ({ url: `/api/coaches/provinces`, method: "GET" }),
     }),
+    applyToBeCoach: builder.mutation({
+      query: (body) => ({ url: `/api/coaches/apply`, method: "POST", body }),
+    }),
+    getMyCoachApplication: builder.query({
+      query: () => ({ url: `/api/coaches/my-application`, method: "GET" }),
+    }),
+    cancelMyCoachApplication: builder.mutation({
+      query: () => ({ url: `/api/coaches/my-application`, method: "DELETE" }),
+    }),
+    listCoachAchievements: builder.query({
+      query: (userId) => ({
+        url: `/api/coaches/${userId}/achievements`,
+        method: "GET",
+      }),
+    }),
+    createCoachAchievement: builder.mutation({
+      query: (body) => ({
+        url: `/api/coaches/achievements`,
+        method: "POST",
+        body,
+      }),
+    }),
+    deleteCoachAchievement: builder.mutation({
+      query: (id) => ({
+        url: `/api/coaches/achievements/${id}`,
+        method: "DELETE",
+      }),
+    }),
   }),
 });
 
-export const { useListCoachesQuery, useListCoachProvincesQuery } =
-  coachesApiSlice;
+export const {
+  useListCoachesQuery,
+  useListCoachProvincesQuery,
+  useApplyToBeCoachMutation,
+  useGetMyCoachApplicationQuery,
+  useCancelMyCoachApplicationMutation,
+  useListCoachAchievementsQuery,
+  useCreateCoachAchievementMutation,
+  useDeleteCoachAchievementMutation,
+} = coachesApiSlice;
