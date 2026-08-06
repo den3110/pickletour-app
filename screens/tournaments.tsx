@@ -687,6 +687,26 @@ export default function TournamentDashboardScreen({ isBack = false }) {
   };
   const canManage = (tt) => isAdmin || isManagerOf(tt);
 
+  // Trọng tài của giải: user.referee.tournaments[] chứa id giải này,
+  // hoặc backend đã trả cờ tt.isReferee cho current user.
+  const refereeTournamentIds = useMemo(() => {
+    const set = new Set();
+    const src = me?.referee?.tournaments;
+    if (Array.isArray(src)) {
+      for (const x of src) {
+        const id = x?._id || x?.tournament?._id || x?.tournament || x;
+        if (id) set.add(String(id));
+      }
+    }
+    return set;
+  }, [me?.referee?.tournaments]);
+
+  const isRefereeOf = (tt) => {
+    if (!me?._id) return false;
+    if (typeof tt?.isReferee !== "undefined") return !!tt.isReferee;
+    return refereeTournamentIds.has(String(tt?._id));
+  };
+
   const { sportType = "2", groupId = "0", status, q } = useLocalSearchParams();
 
   const initialTab = TABS.some((t) => t.key === String(status))
@@ -794,8 +814,13 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         pathname: "/tournament/[id]/bracket",
         params: { id: tt._id },
       });
+    const onPressReferee = () =>
+      router.push(`/tournament/${tt._id}/referee`);
 
-    const showRegister = canManage(tt) || tt.status === "upcoming";
+    const isRefereeOfThis = isRefereeOf(tt);
+    // Trọng tài → thay nút Đăng ký bằng nút Chấm trận.
+    const showRegister =
+      !isRefereeOfThis && (canManage(tt) || tt.status === "upcoming");
 
     return (
       <AppleLiquidGlassView
@@ -906,15 +931,25 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               Lịch đấu
             </PrimaryBtn>
 
-            {/* Đăng ký: giữ logic cũ (manager/admin luôn có, còn user thường chỉ upcoming) */}
-            {showRegister && (
+            {/* Trọng tài của giải → nút Chấm trận (thay Đăng ký) */}
+            {isRefereeOfThis ? (
               <WarningBtn
                 theme={theme}
-                icon="person-add-outline"
-                onPress={onPressRegister}
+                icon="create-outline"
+                onPress={onPressReferee}
               >
-                Đăng ký
+                Chấm trận
               </WarningBtn>
+            ) : (
+              showRegister && (
+                <WarningBtn
+                  theme={theme}
+                  icon="person-add-outline"
+                  onPress={onPressRegister}
+                >
+                  Đăng ký
+                </WarningBtn>
+              )
             )}
 
             {/* Sơ đồ luôn hiện như trước */}
