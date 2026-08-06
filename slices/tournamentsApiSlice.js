@@ -125,6 +125,15 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       providesTags: (res, err, id) => [{ type: "Tournaments", id }],
     }),
 
+    // Lịch sử đăng ký (admin/manager) — audit log CRUD registration + payment + complaint
+    getTournamentRegistrationHistory: builder.query({
+      query: ({ tourId, limit = 200 }) =>
+        `/api/tournaments/${tourId}/registration-history?limit=${limit}`,
+      providesTags: (r, e, { tourId }) => [
+        { type: "TournamentRegHistory", id: tourId },
+      ],
+    }),
+
     // ✨ LẤY DANH SÁCH TRẬN ĐẤU (bracket + check-in page)
     getMatches: builder.query({
       query: (tourId) => `/api/tournaments/${tourId}/matches`,
@@ -837,6 +846,8 @@ export const {
   useUpdatePaymentMutation,
   useCheckinMutation,
   useGetTournamentQuery,
+  useGetTournamentRegistrationHistoryQuery,
+  useLazyGetTournamentRegistrationHistoryQuery,
   useLazyGetTournamentQuery, // ✅ export thêm lazy
   useGetMatchesQuery,
   useGetTournamentMatchesForCheckinQuery,

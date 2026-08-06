@@ -38,6 +38,7 @@ import {
   useCreateRegInviteMutation,
   useGetRegistrationsQuery,
   useGetTournamentQuery,
+  useGetTournamentRegistrationHistoryQuery,
   useListMyRegInvitesQuery,
   useManagerDeleteRegistrationMutation,
   useManagerReplaceRegPlayerMutation,
@@ -1448,6 +1449,16 @@ export default function TournamentRegistrationScreen() {
   const isAdmin = !!(me?.isAdmin || me?.role === "admin");
   const canManage = isLoggedIn && (isManager || isAdmin);
 
+  // Lịch sử đăng ký (admin) — modal + lazy fetch chỉ khi mở
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const {
+    data: registrationHistory,
+    isFetching: historyLoading,
+  } = useGetTournamentRegistrationHistoryQuery(
+    { tourId: id, limit: 200 },
+    { skip: !historyOpen || !isAdmin }
+  );
+
   const pendingInvitesHere = useMemo(() => {
     if (!isLoggedIn) return [];
     return myInvites.filter(
@@ -2232,6 +2243,36 @@ export default function TournamentRegistrationScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Lịch sử đăng ký — chỉ admin thấy (giống web) */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={{ marginTop: 10 }}
+              onPress={() => setHistoryOpen(true)}
+            >
+              <RegisterGlassSurface
+                C={C}
+                interactive
+                tintColor={glassSurfaceTint(C, 0.44, 0.4)}
+                style={[
+                  styles.btnSoft,
+                  { backgroundColor: C.softBtn },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.softGlassButton,
+                ]}
+              >
+                <Ionicons name="time-outline" size={16} color={C.textPrimary} />
+                <Text
+                  style={{
+                    fontWeight: "700",
+                    color: C.textPrimary,
+                    fontSize: 13,
+                  }}
+                >
+                  Lịch sử đăng ký
+                </Text>
+              </RegisterGlassSurface>
+            </TouchableOpacity>
+          )}
+
           {/* List Count & Search Button */}
           <View
             style={{
@@ -2840,10 +2881,330 @@ export default function TournamentRegistrationScreen() {
             </RegisterGlassSurface>
           </KeyboardAvoidingView>
         </Modal>
+
+        {/* Modal Lịch sử đăng ký (admin) */}
+        <RegistrationHistoryModal
+          visible={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          data={registrationHistory}
+          loading={historyLoading}
+          C={C}
+        />
       </View>
     </>
   );
 }
+
+/* ─────────── RegistrationHistoryModal ─────────── */
+const HISTORY_META: Record<string, { color: string; icon: string }> = {
+  payment_paid: { color: "#178A45", icon: "cash-outline" },
+  payment_updated: { color: "#178A45", icon: "cash-outline" },
+  complaint_created: { color: "#ED6C02", icon: "alert-circle-outline" },
+  complaint_updated: { color: "#ED6C02", icon: "alert-circle-outline" },
+  registration_cancelled: { color: "#D32F2F", icon: "trash-outline" },
+  registration_updated: { color: "#0288D1", icon: "create-outline" },
+  checkin: { color: "#0288D1", icon: "checkmark-circle-outline" },
+  registration_created: { color: "#1976D2", icon: "person-add-outline" },
+};
+const historyMetaFor = (type: string) =>
+  HISTORY_META[type] || { color: "#64748B", icon: "time-outline" };
+
+const actorLabelFor = (actor: any) => {
+  const name = String(actor?.name || "").trim();
+  const phone = String(actor?.phone || "").trim();
+  if (name && phone) return `${name} · ${phone}`;
+  if (name) return name;
+  if (phone) return phone;
+  if (actor?.kind === "system") return "Hệ thống";
+  return "Chưa rõ người thao tác";
+};
+
+const formatHistoryDate = (value: string) => {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Chưa rõ thời gian";
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+function RegistrationHistoryModal({
+  visible,
+  onClose,
+  data,
+  loading,
+  C,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  data: any;
+  loading: boolean;
+  C: any;
+}) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+        <View
+          style={{
+            backgroundColor: C?.cardBg || "#fff",
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            maxHeight: "88%",
+            paddingBottom: 12,
+          }}
+        >
+          {/* Handle */}
+          <View
+            style={{
+              width: 40,
+              height: 4,
+              backgroundColor: "#CBD5E1",
+              borderRadius: 999,
+              alignSelf: "center",
+              marginTop: 8,
+              marginBottom: 8,
+            }}
+          />
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingBottom: 12,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: C?.border || "#E2E8F0",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 8,
+                  backgroundColor: "#0066FF",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="time" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "800",
+                    color: C?.textPrimary || "#0F172A",
+                  }}
+                  numberOfLines={1}
+                >
+                  Lịch sử đăng ký
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: C?.textSecondary || "#64748B",
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Theo dõi đăng ký, thanh toán, hủy và khiếu nại
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={22} color={C?.textSecondary || "#64748B"} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Counters */}
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 6,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+            }}
+          >
+            <View style={historyStyles.counterChip}>
+              <Text style={historyStyles.counterText}>
+                Tổng mốc: {data?.total || items.length}
+              </Text>
+            </View>
+            <View style={historyStyles.counterChip}>
+              <Text style={historyStyles.counterText}>
+                Đăng ký hiện tại: {data?.registrationCount || 0}
+              </Text>
+            </View>
+            <View style={historyStyles.counterChip}>
+              <Text style={historyStyles.counterText}>
+                Khiếu nại: {data?.complaintCount || 0}
+              </Text>
+            </View>
+          </View>
+
+          {/* Body */}
+          <ScrollView
+            style={{ maxHeight: "78%" }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, gap: 10 }}
+          >
+            {loading ? (
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <ActivityIndicator />
+              </View>
+            ) : items.length === 0 ? (
+              <View
+                style={{
+                  padding: 20,
+                  borderRadius: 12,
+                  backgroundColor: "#EFF6FF",
+                  borderWidth: 1,
+                  borderColor: "#BFDBFE",
+                }}
+              >
+                <Text style={{ color: "#1E40AF", textAlign: "center" }}>
+                  Chưa có lịch sử đăng ký cho giải này.
+                </Text>
+              </View>
+            ) : (
+              items.map((item: any) => {
+                const meta = historyMetaFor(item.type);
+                const reg = item.registration || {};
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      historyStyles.card,
+                      { borderColor: meta.color + "48" },
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <View
+                        style={[
+                          historyStyles.iconCircle,
+                          { backgroundColor: meta.color + "1F" },
+                        ]}
+                      >
+                        <Ionicons
+                          name={meta.icon as any}
+                          size={18}
+                          color={meta.color}
+                        />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 6,
+                              flexShrink: 1,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontWeight: "800",
+                                color: "#0F172A",
+                                fontSize: 14,
+                              }}
+                            >
+                              {item.title}
+                            </Text>
+                            {reg.code ? (
+                              <View style={historyStyles.regChip}>
+                                <Text style={historyStyles.regChipText}>
+                                  #{reg.code}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text style={historyStyles.timeText}>
+                            {formatHistoryDate(item.at)}
+                          </Text>
+                        </View>
+
+                        <Text style={historyStyles.regPlayers}>
+                          {reg.players || "Chưa rõ cặp đăng ký"}
+                        </Text>
+                        <Text style={historyStyles.actorText}>
+                          Người thao tác: {actorLabelFor(item.actor)}
+                        </Text>
+
+                        {Array.isArray(item.details) && item.details.length ? (
+                          <View style={{ marginTop: 6, gap: 3 }}>
+                            {item.details.map((detail: string, idx: number) => (
+                              <Text key={idx} style={historyStyles.detailText}>
+                                • {detail}
+                              </Text>
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const historyStyles = StyleSheet.create({
+  counterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 999,
+  },
+  counterText: { fontSize: 12, color: "#334155", fontWeight: "600" },
+  card: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "#fff",
+  },
+  iconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  regChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "#F1F5F9",
+  },
+  regChipText: { fontSize: 11, fontWeight: "700", color: "#334155" },
+  timeText: { fontSize: 11, color: "#64748B" },
+  regPlayers: { fontSize: 13, color: "#475569", marginTop: 4 },
+  actorText: { fontSize: 11, color: "#64748B", marginTop: 2 },
+  detailText: { fontSize: 13, color: "#334155" },
+});
 
 const styles = StyleSheet.create({
   // ... (Giữ nguyên styles cũ)
