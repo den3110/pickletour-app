@@ -3758,15 +3758,14 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               style={[
                 styles.menuCard,
                 {
-                  // Luôn dùng bg card SOLID để menu không bị dim xuyên qua backdrop tối phía sau.
+                  // Bg card SOLID — không dùng GlassFill vì AppleLiquidGlassView (iOS 26)
+                  // ép translucent bất kể tintColor alpha → dim backdrop lộ qua.
                   backgroundColor: colors.card,
                   borderColor: colors.border,
                 },
-                IOS_26_LIQUID_GLASS_ENABLED && styles.glassMenuCard,
+                styles.glassMenuCard, // giữ shadow + border-radius cho đẹp
               ]}
             >
-              {/* Glass tint đè lên bg solid — không lộ dim backdrop; tăng alpha lên 0.96 để đủ đục */}
-              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.96)} />
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
