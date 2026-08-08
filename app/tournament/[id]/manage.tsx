@@ -3758,15 +3758,15 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               style={[
                 styles.menuCard,
                 {
-                  backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                    ? "transparent"
-                    : colors.card,
+                  // Luôn dùng bg card SOLID để menu không bị dim xuyên qua backdrop tối phía sau.
+                  backgroundColor: colors.card,
                   borderColor: colors.border,
                 },
                 IOS_26_LIQUID_GLASS_ENABLED && styles.glassMenuCard,
               ]}
             >
-              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.64)} />
+              {/* Glass tint đè lên bg solid — không lộ dim backdrop; tăng alpha lên 0.96 để đủ đục */}
+              <GlassFill dark={dark} tintColor={manageGlassTint(dark, 0.96)} />
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
