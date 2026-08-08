@@ -52,6 +52,7 @@ import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import { FriendActions } from "@/components/social/FriendActions";
 import { OpenMessageButton } from "@/components/social/OpenMessageButton";
+import { UserActionsMenu } from "@/components/social/UserActionsMenu";
 import { CoachAchievementsMobile } from "./CoachAchievementsMobile";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -2297,6 +2298,10 @@ export default function PublicProfileScreen() {
           >
             <FriendActions userId={String(id)} />
             <OpenMessageButton userId={String(id)} />
+            <UserActionsMenu
+              userId={String(id)}
+              userName={base?.nickname || base?.name}
+            />
           </View>
 
           {/* Stats Cards */}

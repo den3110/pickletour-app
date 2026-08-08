@@ -10,6 +10,7 @@ import {
   useFriendStatusQuery,
   useRemoveFriendMutation,
   useSendFriendRequestMutation,
+  useUnblockUserMutation,
 } from "@/slices/friendsApiSlice";
 
 export function FriendActions({
@@ -27,6 +28,7 @@ export function FriendActions({
   const [accept, { isLoading: accepting }] = useAcceptFriendMutation();
   const [decline] = useDeclineFriendMutation();
   const [remove, { isLoading: removing }] = useRemoveFriendMutation();
+  const [unblock, { isLoading: unblocking }] = useUnblockUserMutation();
 
   if (!me || !userId) return null;
   if (data?.status === "self") return null;
@@ -139,6 +141,31 @@ export function FriendActions({
       >
         <Ionicons name="people" size={16} color="#0066FF" />
         {!compact && <Text style={styles.btnOutlineText}>Bạn bè</Text>}
+      </Pressable>
+    );
+  }
+  if (status === "blocked") {
+    // Chỉ hiện nút Bỏ chặn nếu chính viewer là người chặn — backend chỉ cho phép người chặn tự huỷ.
+    const iBlocked = String((data as any)?.blockedBy || "") === String(me?._id);
+    if (!iBlocked) return null;
+    return (
+      <Pressable
+        onPress={async () => {
+          try {
+            await unblock(userId).unwrap();
+          } catch (err: any) {
+            doErr(err);
+          }
+        }}
+        disabled={unblocking}
+        style={[styles.btn, styles.btnOutline, compact && styles.btnCompact]}
+      >
+        <Ionicons name="person-remove-outline" size={16} color="#DC2626" />
+        {!compact && (
+          <Text style={[styles.btnOutlineText, { color: "#DC2626" }]}>
+            Bỏ chặn
+          </Text>
+        )}
       </Pressable>
     );
   }

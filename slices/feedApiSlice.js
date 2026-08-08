@@ -174,6 +174,13 @@ export const feedApiSlice = apiSlice.injectEndpoints({
         body: { reason, note },
       }),
     }),
+    reportFeedComment: builder.mutation({
+      query: ({ id, reason, note }) => ({
+        url: `/api/feed/comments/${id}/reports`,
+        method: "POST",
+        body: { reason, note },
+      }),
+    }),
     uploadFeedMedia: builder.mutation({
       query: (formData) => ({
         url: `/api/feed/upload/media`,
@@ -195,5 +202,6 @@ export const {
   useCreateFeedCommentMutation,
   useDeleteFeedCommentMutation,
   useReportFeedPostMutation,
+  useReportFeedCommentMutation,
   useUploadFeedMediaMutation,
 } = feedApiSlice;

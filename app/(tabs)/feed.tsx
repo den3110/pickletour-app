@@ -33,7 +33,13 @@ import {
   useDeleteFeedPostMutation,
   useReportFeedPostMutation,
 } from "@/slices/feedApiSlice";
+import { useBlockUserMutation } from "@/slices/friendsApiSlice";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
+import {
+  confirmBlock,
+  pickReportReason,
+  reportSuccess,
+} from "@/utils/contentModeration";
 import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
@@ -729,6 +735,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
   const [sharePostMut] = useShareFeedPostMutation();
   const [deletePost] = useDeleteFeedPostMutation();
   const [reportPost] = useReportFeedPostMutation();
+  const [blockUser] = useBlockUserMutation();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -765,9 +772,34 @@ function PostCard({ post, me }: { post: any; me: any }) {
     }
   };
 
+  const doReportPost = () => {
+    pickReportReason(async (reason) => {
+      try {
+        await reportPost({ id: post._id, reason }).unwrap();
+        reportSuccess();
+      } catch (err: any) {
+        Alert.alert("Lỗi", err?.data?.message || String(err));
+      }
+    });
+  };
+
+  const doBlockAuthor = () => {
+    const uid = post.author?._id;
+    if (!uid) return;
+    const name = post.author?.nickname || post.author?.name || "user này";
+    confirmBlock(name, async () => {
+      try {
+        await blockUser(String(uid)).unwrap();
+        Alert.alert("Đã chặn", `${name} sẽ không xuất hiện nữa.`);
+      } catch (err: any) {
+        Alert.alert("Lỗi", err?.data?.message || String(err));
+      }
+    });
+  };
+
   const handleMenu = () => {
-    const options = [];
-    if (isMine || isAdmin)
+    const options: any[] = [];
+    if (isMine || isAdmin) {
       options.push({
         text: "Xoá bài viết",
         onPress: async () => {
@@ -779,26 +811,20 @@ function PostCard({ post, me }: { post: any; me: any }) {
         },
         style: "destructive" as const,
       });
-    options.push({
-      text: "Báo cáo",
-      onPress: () =>
-        Alert.prompt(
-          "Lý do báo cáo",
-          "spam / harassment / hate / nudity / violence / misinformation / impersonation / other",
-          async (reason?: string) => {
-            if (!reason) return;
-            try {
-              await reportPost({ id: post._id, reason }).unwrap();
-              Alert.alert("Đã gửi báo cáo");
-            } catch (err: any) {
-              Alert.alert("Lỗi", err?.data?.message || String(err));
-            }
-          }
-        ),
-    });
-    Alert.alert("Tuỳ chọn", "", [
+    }
+    if (!isMine) {
+      options.push({ text: "Báo cáo bài viết", onPress: doReportPost });
+      if (post.author?._id) {
+        options.push({
+          text: "Chặn người này",
+          onPress: doBlockAuthor,
+          style: "destructive" as const,
+        });
+      }
+    }
+    Alert.alert("Tuỳ chọn", undefined, [
       ...options,
-      { text: "Đóng", style: "cancel" },
+      { text: "Đóng", style: "cancel" as const },
     ]);
   };
 

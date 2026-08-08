@@ -24,6 +24,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useDispatch, useSelector } from "react-redux";
 
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { UserActionsMenu } from "@/components/social/UserActionsMenu";
 import { MentionText } from "@/components/feed/MentionText";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
@@ -408,9 +409,24 @@ export default function ChatWindow() {
     ]);
   };
 
+  const dmPeer =
+    conv?.type === "dm" ? conv?.otherParticipants?.[0] : null;
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerRight: dmPeer?._id
+            ? () => (
+                <UserActionsMenu
+                  userId={String(dmPeer._id)}
+                  userName={dmPeer?.nickname || dmPeer?.name}
+                />
+              )
+            : undefined,
+        }}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}

@@ -1669,13 +1669,21 @@ function TermsModal({
             <Text
               style={{ color: textPrimary, fontWeight: "700", marginTop: 12 }}
             >
-              3) Hành vi bị cấm
+              3) Hành vi bị cấm — Zero tolerance
             </Text>
             <Text
               style={{ color: textSecondary, marginTop: 6, lineHeight: 20 }}
             >
-              • Mạo danh, quấy rối, phát tán nội dung vi phạm pháp luật.{"\n"}•
-              Can thiệp hệ thống, dò quét lỗ hổng, truy cập trái phép.
+              PickleTour áp dụng chính sách <Text style={{ fontWeight: "700", color: textPrimary }}>không khoan nhượng (zero tolerance)</Text> với nội dung phản cảm và người dùng có hành vi lạm dụng. Nghiêm cấm:
+              {"\n"}• Nội dung khiêu dâm, bạo lực, kích động thù hằn, phân biệt chủng tộc/giới tính/tôn giáo.
+              {"\n"}• Quấy rối, đe doạ, bắt nạt, mạo danh người khác.
+              {"\n"}• Spam, lừa đảo, thông tin sai lệch, vi phạm bản quyền.
+              {"\n"}• Can thiệp hệ thống, dò quét lỗ hổng, truy cập trái phép.
+              {"\n\n"}
+              <Text style={{ fontWeight: "700", color: textPrimary }}>Công cụ dành cho bạn:</Text>
+              {"\n"}• <Text style={{ fontWeight: "700", color: textPrimary }}>Báo cáo</Text> mọi bài viết/bình luận/tin nhắn vi phạm — chúng tôi xem xét trong 24h và gỡ nếu vi phạm.
+              {"\n"}• <Text style={{ fontWeight: "700", color: textPrimary }}>Chặn</Text> bất kỳ user nào — họ sẽ biến mất khỏi bảng tin, chat và không thể liên hệ bạn.
+              {"\n"}• Tài khoản vi phạm có thể bị đình chỉ hoặc chấm dứt vĩnh viễn không cần báo trước.
             </Text>
 
             <Text

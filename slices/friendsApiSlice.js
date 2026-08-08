@@ -81,6 +81,35 @@ export const friendsApiSlice = apiSlice.injectEndpoints({
         { type: "FriendCounts", id: "ME" },
       ],
     }),
+    blockUser: builder.mutation({
+      query: (userId) => ({
+        url: `/api/friends/block/${userId}`,
+        method: "POST",
+      }),
+      // Sau khi chặn → refresh feed + chat + friend status
+      invalidatesTags: (r, e, userId) => [
+        { type: "Friend", id: userId },
+        { type: "Friend", id: "LIST" },
+        { type: "BlockedUsers", id: "LIST" },
+        { type: "Feed", id: "LIST" },
+        { type: "ChatConv", id: "LIST" },
+      ],
+    }),
+    unblockUser: builder.mutation({
+      query: (userId) => ({
+        url: `/api/friends/block/${userId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (r, e, userId) => [
+        { type: "Friend", id: userId },
+        { type: "Friend", id: "LIST" },
+        { type: "BlockedUsers", id: "LIST" },
+      ],
+    }),
+    listBlocked: builder.query({
+      query: () => ({ url: `/api/friends/blocked`, method: "GET" }),
+      providesTags: [{ type: "BlockedUsers", id: "LIST" }],
+    }),
   }),
 });
 
@@ -93,4 +122,7 @@ export const {
   useAcceptFriendMutation,
   useDeclineFriendMutation,
   useRemoveFriendMutation,
+  useBlockUserMutation,
+  useUnblockUserMutation,
+  useListBlockedQuery,
 } = friendsApiSlice;

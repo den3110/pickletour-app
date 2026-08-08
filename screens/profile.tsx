@@ -1846,6 +1846,55 @@ export default function ProfileScreen({ isBack = false }) {
                     />
                   </View>
                 </Card>
+                <Card title="Riêng tư & An toàn" t={t}>
+                  <Pressable
+                    onPress={() => router.push("/settings/blocked-users")}
+                    style={({ pressed }) => [
+                      styles.switchRow,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <View style={styles.switchLeft}>
+                      <ProfileGlassSurface
+                        effect="clear"
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
+                        style={[
+                          styles.switchIcon,
+                          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
+                        ]}
+                      >
+                        <Feather name="slash" size={16} color={t.accent} />
+                      </ProfileGlassSurface>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchLabel, { color: t.text }]}>
+                          Người đã chặn
+                        </Text>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          Xem và quản lý những user bạn đã chặn.
+                        </Text>
+                      </View>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={20}
+                      color={t.textSecondary}
+                    />
+                  </Pressable>
+                </Card>
                 <Card title="Tài khoản" t={t}>
                   <View style={styles.dangerRow}>
                     <DangerBtn

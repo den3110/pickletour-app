@@ -25,7 +25,15 @@ import {
   useListFeedCommentsQuery,
   useCreateFeedCommentMutation,
   useDeleteFeedCommentMutation,
+  useReportFeedPostMutation,
+  useReportFeedCommentMutation,
 } from "@/slices/feedApiSlice";
+import { useBlockUserMutation } from "@/slices/friendsApiSlice";
+import {
+  confirmBlock,
+  pickReportReason,
+  reportSuccess,
+} from "@/utils/contentModeration";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
@@ -73,6 +81,7 @@ function CommentItem({
     { skip: !showReplies }
   );
   const [deleteComment] = useDeleteFeedCommentMutation();
+  const [reportComment] = useReportFeedCommentMutation();
   const isMine = String(comment.author?._id) === String(me?._id);
   const isAdmin = me?.role === "admin";
 
@@ -91,6 +100,17 @@ function CommentItem({
         },
       },
     ]);
+  };
+
+  const handleReport = () => {
+    pickReportReason(async (reason) => {
+      try {
+        await reportComment({ id: String(comment._id), reason }).unwrap();
+        reportSuccess();
+      } catch (err: any) {
+        Alert.alert("Lỗi", extractErr(err));
+      }
+    });
   };
 
   return (
@@ -140,6 +160,11 @@ function CommentItem({
                 </Text>
               </Pressable>
             )}
+            {!isMine && (
+              <Pressable onPress={handleReport}>
+                <Text style={styles.commentMetaText}>Báo cáo</Text>
+              </Pressable>
+            )}
             {comment.replyCount > 0 && (
               <Pressable onPress={() => setShowReplies((v) => !v)}>
                 <Text style={[styles.commentMetaText, { fontWeight: "600" }]}>
@@ -179,10 +204,57 @@ export default function FeedPostDetail() {
     { skip: !id }
   );
   const [createComment, { isLoading: sending }] = useCreateFeedCommentMutation();
+  const [reportPostMut] = useReportFeedPostMutation();
+  const [blockUserMut] = useBlockUserMutation();
   const [text, setText] = useState("");
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+
+  const isMine = post && String(post.author?._id) === String(me?._id);
+
+  const openPostMenu = () => {
+    if (!post) return;
+    const opts: any[] = [];
+    if (!isMine) {
+      opts.push({
+        text: "Báo cáo bài viết",
+        onPress: () =>
+          pickReportReason(async (reason) => {
+            try {
+              await reportPostMut({ id: String(post._id), reason }).unwrap();
+              reportSuccess();
+            } catch (err: any) {
+              Alert.alert("Lỗi", extractErr(err));
+            }
+          }),
+      });
+      if (post.author?._id) {
+        opts.push({
+          text: "Chặn người này",
+          style: "destructive" as const,
+          onPress: () => {
+            const name =
+              post.author?.nickname || post.author?.name || "user này";
+            confirmBlock(name, async () => {
+              try {
+                await blockUserMut(String(post.author._id)).unwrap();
+                Alert.alert("Đã chặn", `${name} sẽ không xuất hiện nữa.`);
+                router.back();
+              } catch (err: any) {
+                Alert.alert("Lỗi", extractErr(err));
+              }
+            });
+          },
+        });
+      }
+    }
+    if (opts.length === 0) return;
+    Alert.alert("Tuỳ chọn", undefined, [
+      ...opts,
+      { text: "Đóng", style: "cancel" as const },
+    ]);
+  };
 
   const submit = async () => {
     if (!text.trim()) return;
@@ -244,6 +316,15 @@ export default function FeedPostDetail() {
                 </Text>
                 <Text style={styles.postTime}>{fmtTime(post.createdAt)}</Text>
               </Pressable>
+              {!isMine && (
+                <Pressable onPress={openPostMenu} hitSlop={12}>
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={20}
+                    color="#64748B"
+                  />
+                </Pressable>
+              )}
             </View>
             {!!post.content && (
               <MentionText
