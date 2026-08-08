@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour",
     "slug": "pickletour-app",
-    "version": "1.1.12",
+    "version": "1.1.13",
     "orientation": "default",
     "icon": "./assets/images/icon-circle.png",
     "scheme": "pickletourapp",
@@ -57,7 +57,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 42,
+      "versionCode": 43,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
