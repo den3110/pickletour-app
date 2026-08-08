@@ -63,6 +63,14 @@ import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
+
+// Import động HotUpdater để không crash khi native module vắng mặt (Expo Go / build cũ).
+let HotUpdater: any = null;
+try {
+  HotUpdater = require("@hot-updater/react-native").HotUpdater;
+} catch {
+  HotUpdater = null;
+}
 import {
   getMatchCourtStationName,
   getMatchDisplayCode,
@@ -3746,6 +3754,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             visible={hdrMenuOpen}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={() => setHdrMenuOpen(false)}
           >
             <Pressable
@@ -3758,14 +3767,30 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               style={[
                 styles.menuCard,
                 {
-                  // Bg card SOLID — không dùng GlassFill vì AppleLiquidGlassView (iOS 26)
-                  // ép translucent bất kể tintColor alpha → dim backdrop lộ qua.
-                  backgroundColor: colors.card,
+                  // Bg card HARDCODED solid — không dùng colors.card vì có theme
+                  // có thể trả về màu semi-transparent. iOS 26 AppleLiquidGlassView
+                  // KHÔNG dùng ở đây, chỉ shadow + border.
+                  backgroundColor: dark ? "#0F172A" : "#FFFFFF",
                   borderColor: colors.border,
+                  zIndex: 10,
+                  elevation: 24,
                 },
-                styles.glassMenuCard, // giữ shadow + border-radius cho đẹp
+                styles.glassMenuCard,
               ]}
             >
+              {/* OTA diagnostic — text bé ở đỉnh menu để prove bundle mới đang chạy */}
+              <Text
+                style={{
+                  fontSize: 9,
+                  color: dark ? "#64748B" : "#94A3B8",
+                  paddingHorizontal: 12,
+                  paddingTop: 4,
+                }}
+              >
+                {`build: bb4b594 · bundle: ${String(
+                  HotUpdater?.getBundleId?.() || "native"
+                ).slice(0, 8)}`}
+              </Text>
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
