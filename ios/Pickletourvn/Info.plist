@@ -59,6 +59,8 @@
 	<string>Allow $(PRODUCT_NAME) to access your contacts</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to use Face ID.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần vị trí để hiển thị giải đấu và sân pickleball gần bạn trên bản đồ.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Capture audio for livestreams and video recordings.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -67,6 +69,8 @@
 	<string>Allow $(PRODUCT_NAME) to access your reminders</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Ứng dụng cần quyền để tạo nhắc nhở cho trận đấu.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ứng dụng cần quyền nhận dạng giọng nói để hỗ trợ điều khiển bằng giọng nói khi chấm trận (đọc tỉ số, chuyển giao bóng...).</string>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

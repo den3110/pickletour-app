@@ -63,14 +63,6 @@ import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
-
-// Import động HotUpdater để không crash khi native module vắng mặt (Expo Go / build cũ).
-let HotUpdater: any = null;
-try {
-  HotUpdater = require("@hot-updater/react-native").HotUpdater;
-} catch {
-  HotUpdater = null;
-}
 import {
   getMatchCourtStationName,
   getMatchDisplayCode,
@@ -3475,29 +3467,6 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
         ]}
       >
         <ManageWhiteBackdrop />
-        {/* OTA DIAGNOSTIC BANNER — nếu thấy banner ĐỎ này = bundle mới đang chạy */}
-        <View
-          style={{
-            backgroundColor: "#DC2626",
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            zIndex: 999,
-            elevation: 999,
-          }}
-        >
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: "700",
-              textAlign: "center",
-            }}
-          >
-            {`OTA build ca9eca4 · bundle ${String(
-              HotUpdater?.getBundleId?.() || "native"
-            ).slice(0, 8)}`}
-          </Text>
-        </View>
         <View style={{ flex: 1 }}>
           <Animated.View
             style={{
@@ -3801,19 +3770,6 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                 styles.glassMenuCard,
               ]}
             >
-              {/* OTA diagnostic — text bé ở đỉnh menu để prove bundle mới đang chạy */}
-              <Text
-                style={{
-                  fontSize: 9,
-                  color: dark ? "#64748B" : "#94A3B8",
-                  paddingHorizontal: 12,
-                  paddingTop: 4,
-                }}
-              >
-                {`build: bb4b594 · bundle: ${String(
-                  HotUpdater?.getBundleId?.() || "native"
-                ).slice(0, 8)}`}
-              </Text>
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
