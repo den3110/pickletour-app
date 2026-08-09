@@ -662,21 +662,12 @@ export default function ChatWindow() {
                               />
                             </Pressable>
                           ) : a.type === "video" ? (
-                            <Pressable
+                            <ChatVideoThumb
+                              url={a.url}
                               onPress={() =>
                                 a.url && setVideoModal({ url: a.url })
                               }
-                            >
-                              <View
-                                style={[styles.attachImg, styles.attachVideo]}
-                              >
-                                <Ionicons
-                                  name="play-circle"
-                                  size={40}
-                                  color="#fff"
-                                />
-                              </View>
-                            </Pressable>
+                            />
                           ) : (
                             <View style={styles.fileChip}>
                               <Ionicons
@@ -897,6 +888,41 @@ export default function ChatWindow() {
         onClose={() => setVideoModal(null)}
       />
     </SafeAreaView>
+  );
+}
+
+function ChatVideoThumb({
+  url,
+  onPress,
+}: {
+  url?: string | null;
+  onPress: () => void;
+}) {
+  const player = useVideoPlayer(url || "", (p) => {
+    try {
+      p.muted = true;
+      p.loop = false;
+      p.pause();
+    } catch {}
+  });
+  return (
+    <Pressable onPress={onPress}>
+      <View style={[styles.attachImg, styles.attachVideo]}>
+        {url ? (
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFillObject}
+            contentFit="cover"
+            nativeControls={false}
+            allowsFullscreen={false}
+            allowsPictureInPicture={false}
+          />
+        ) : null}
+        <View style={styles.videoThumbOverlay} pointerEvents="none">
+          <Ionicons name="play-circle" size={44} color="#fff" />
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -1274,6 +1300,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#111",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
+  },
+  videoThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.18)",
   },
   fileChip: {
     flexDirection: "row",
