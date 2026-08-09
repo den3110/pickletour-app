@@ -37,6 +37,7 @@ import {
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 function extractErr(err: any): string {
@@ -213,6 +214,68 @@ export default function FeedPostDetail() {
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  // ===== @mention =====
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionRange, setMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  const mentionDebounceRef = React.useRef<any>(null);
+  const [triggerUserSearch] = useLazySearchUserQuery();
+
+  const onChangeText = (v: string) => {
+    setText(v);
+    const caret = v.length;
+    const before = v.slice(0, caret);
+    // Cho phép nickname/tên có tối đa 3 từ (2 dấu cách)
+    const m = before.match(
+      /(^|\s)@([\p{L}\p{N}._-]+(?: [\p{L}\p{N}._-]+){0,2})$/u
+    );
+    if (m) {
+      const q = m[2];
+      const start = before.length - q.length - 1;
+      setMentionQuery(q);
+      setMentionRange({ start, end: caret });
+    } else {
+      setMentionQuery(null);
+      setMentionRange(null);
+      setMentionResults([]);
+    }
+  };
+
+  React.useEffect(() => {
+    if (mentionQuery == null) return;
+    if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+    mentionDebounceRef.current = setTimeout(async () => {
+      if (!mentionQuery || mentionQuery.length < 1) {
+        setMentionResults([]);
+        return;
+      }
+      try {
+        const r: any = await triggerUserSearch(mentionQuery).unwrap();
+        const list = Array.isArray(r) ? r : r?.items || r?.data || [];
+        setMentionResults(list.slice(0, 6));
+      } catch {
+        setMentionResults([]);
+      }
+    }, 250);
+    return () => {
+      if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+    };
+  }, [mentionQuery, triggerUserSearch]);
+
+  const insertMention = (u: any) => {
+    if (!mentionRange) return;
+    const nick = u?.nickname || u?.name || "";
+    if (!nick || !u?._id) return;
+    const before = text.slice(0, mentionRange.start);
+    const after = text.slice(mentionRange.end);
+    setText(`${before}@${nick} ${after}`);
+    setMentionQuery(null);
+    setMentionRange(null);
+    setMentionResults([]);
+  };
 
   const isMine = post && String(post.author?._id) === String(me?._id);
 
@@ -471,6 +534,33 @@ export default function FeedPostDetail() {
               </Pressable>
             </View>
           )}
+          {/* @ mention suggestions — nằm trên TextInput */}
+          {mentionQuery != null && mentionResults.length > 0 && (
+            <View style={styles.mentionList}>
+              {mentionResults.map((u: any) => (
+                <Pressable
+                  key={u._id}
+                  onPress={() => insertMention(u)}
+                  style={({ pressed }) => [
+                    styles.mentionItem,
+                    pressed && { backgroundColor: "#F1F5F9" },
+                  ]}
+                >
+                  <AuthorAvatar user={u} size={32} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.mentionNick} numberOfLines={1}>
+                      @{u.nickname || u.name}
+                    </Text>
+                    {!!u.name && u.name !== u.nickname && (
+                      <Text style={styles.mentionName} numberOfLines={1}>
+                        {u.name}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <TextInput
               style={styles.commentInput}
@@ -478,7 +568,7 @@ export default function FeedPostDetail() {
                 replyTarget ? "Viết phản hồi…" : "Viết bình luận…"
               }
               value={text}
-              onChangeText={setText}
+              onChangeText={onChangeText}
               multiline
             />
             <Pressable
@@ -593,5 +683,30 @@ const styles = StyleSheet.create({
     backgroundColor: "#0066FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  mentionList: {
+    marginBottom: 6,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    maxHeight: 240,
+    overflow: "hidden",
+  },
+  mentionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  mentionNick: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  mentionName: {
+    fontSize: 11,
+    color: "#64748B",
   },
 });
