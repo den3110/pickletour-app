@@ -3475,6 +3475,29 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
         ]}
       >
         <ManageWhiteBackdrop />
+        {/* OTA DIAGNOSTIC BANNER — nếu thấy banner ĐỎ này = bundle mới đang chạy */}
+        <View
+          style={{
+            backgroundColor: "#DC2626",
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            zIndex: 999,
+            elevation: 999,
+          }}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: "700",
+              textAlign: "center",
+            }}
+          >
+            {`OTA build ca9eca4 · bundle ${String(
+              HotUpdater?.getBundleId?.() || "native"
+            ).slice(0, 8)}`}
+          </Text>
+        </View>
         <View style={{ flex: 1 }}>
           <Animated.View
             style={{
