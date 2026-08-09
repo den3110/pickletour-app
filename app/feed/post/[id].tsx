@@ -75,7 +75,10 @@ function CommentItem({
   me: any;
   onReply: (cid: string) => void;
 }) {
-  const [showReplies, setShowReplies] = useState(false);
+  // Trong màn Chi tiết bài viết → auto-expand toàn bộ phản hồi.
+  const [showReplies, setShowReplies] = useState(
+    Number(comment?.replyCount || 0) > 0
+  );
   const { data: replies } = useListFeedCommentsQuery(
     showReplies ? { postId, parent: comment._id } : (undefined as any),
     { skip: !showReplies }
