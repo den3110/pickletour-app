@@ -22,7 +22,11 @@ const ACTIVE_TAB_TINT = {
 };
 
 const SCROLL_TO_TOP_EVENT = "SCROLL_TO_TOP";
-const ENABLE_ANDROID_SCREEN_DETACH = Platform.OS !== "android";
+// freezeOnBlur: tạm dừng render (nhẹ, không đụng view tree) — safe cả 2 platform
+// detachInactiveScreens: gỡ view ra khỏi native tree, khi switch tab nhanh dễ gây
+// stuck (view cũ chưa attach lại thì user đã chuyển tab tiếp) → giữ nguyên tất cả
+// screen trong view tree, chỉ freeze để tiết kiệm CPU.
+const FREEZE_INACTIVE = true;
 
 const HOME_LOTTIE_COLOR_FILTERS = (color: string) => [
   { keypath: "Fill 1", color },
@@ -149,8 +153,10 @@ export default function TabLayout() {
         headerShown: false,
         tabBarHideOnKeyboard: true,
         lazy: true,
-        freezeOnBlur: ENABLE_ANDROID_SCREEN_DETACH,
-        detachInactiveScreens: ENABLE_ANDROID_SCREEN_DETACH,
+        freezeOnBlur: FREEZE_INACTIVE,
+        // KHÔNG detach — giữ screen trong view tree, chỉ freeze khi inactive.
+        // Detach + rapid tab switch = stuck view ở tab cũ.
+        detachInactiveScreens: false,
         animation: "none",
       }}
     >
