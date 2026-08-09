@@ -27,6 +27,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import { UserActionsMenu } from "@/components/social/UserActionsMenu";
+import { CallButton } from "@/components/social/CallButton";
 import { MentionText } from "@/components/feed/MentionText";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
@@ -524,10 +525,16 @@ export default function ChatWindow() {
             : undefined,
           headerRight: dmPeer?._id
             ? () => (
-                <UserActionsMenu
-                  userId={String(dmPeer._id)}
-                  userName={dmPeer?.nickname || dmPeer?.name}
-                />
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <CallButton
+                    phone={dmPeer?.phone}
+                    userName={dmPeer?.nickname || dmPeer?.name}
+                  />
+                  <UserActionsMenu
+                    userId={String(dmPeer._id)}
+                    userName={dmPeer?.nickname || dmPeer?.name}
+                  />
+                </View>
               )
             : undefined,
         }}
