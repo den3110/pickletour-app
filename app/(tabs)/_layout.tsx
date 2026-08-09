@@ -152,10 +152,11 @@ export default function TabLayout() {
         tabBarActiveTintColor: activeTabTint,
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        lazy: true,
+        // Bỏ lazy — mount TẤT CẢ tab từ đầu để switch tab tức thời, không race
+        // giữa mount+navigate lúc user tap nhanh. Trade-off: memory ban đầu cao
+        // hơn ~15MB, đổi lại UX tab switch mượt và tab bar luôn sync với screen.
+        lazy: false,
         freezeOnBlur: FREEZE_INACTIVE,
-        // KHÔNG detach — giữ screen trong view tree, chỉ freeze khi inactive.
-        // Detach + rapid tab switch = stuck view ở tab cũ.
         detachInactiveScreens: false,
         animation: "none",
       }}
