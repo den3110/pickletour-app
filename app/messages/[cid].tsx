@@ -3,6 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useVideoPlayer, VideoView } from "expo-video";
+import ImageView from "react-native-image-viewing";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -187,6 +189,13 @@ export default function ChatWindow() {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<any[]>([]);
   const [linkedTournament, setLinkedTournament] = useState<any>(null);
+  // Fullscreen viewer state cho ảnh/video trong chat bubble.
+  const [imgViewer, setImgViewer] = useState<{
+    visible: boolean;
+    images: { uri: string }[];
+    index: number;
+  }>({ visible: false, images: [], index: 0 });
+  const [videoModal, setVideoModal] = useState<{ url: string } | null>(null);
   const [tournamentPickerOpen, setTournamentPickerOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionRange, setMentionRange] = useState<{
@@ -518,41 +527,67 @@ export default function ChatWindow() {
                   ]}
                 >
                   {item.attachments?.length > 0 &&
-                    item.attachments.map((a: any, i: number) => (
-                      <View key={i} style={{ marginBottom: 4 }}>
-                        {a.type === "image" ? (
-                          <Image
-                            source={{ uri: a.url }}
-                            style={styles.attachImg}
-                          />
-                        ) : a.type === "video" ? (
-                          <View style={[styles.attachImg, styles.attachVideo]}>
-                            <Ionicons
-                              name="play-circle"
-                              size={40}
-                              color="#fff"
-                            />
-                          </View>
-                        ) : (
-                          <View style={styles.fileChip}>
-                            <Ionicons
-                              name="document-outline"
-                              size={20}
-                              color={isMine ? "#fff" : "#0F172A"}
-                            />
-                            <Text
-                              style={{
-                                color: isMine ? "#fff" : "#0F172A",
-                                marginLeft: 6,
+                    (() => {
+                      const msgImages = (item.attachments || [])
+                        .filter((x: any) => x.type === "image" && x.url)
+                        .map((x: any) => ({ uri: x.url }));
+                      return item.attachments.map((a: any, i: number) => (
+                        <View key={i} style={{ marginBottom: 4 }}>
+                          {a.type === "image" ? (
+                            <Pressable
+                              onPress={() => {
+                                const idx = msgImages.findIndex(
+                                  (im: any) => im.uri === a.url
+                                );
+                                setImgViewer({
+                                  visible: true,
+                                  images: msgImages,
+                                  index: idx < 0 ? 0 : idx,
+                                });
                               }}
-                              numberOfLines={1}
                             >
-                              {a.name || "Tệp đính kèm"}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
+                              <Image
+                                source={{ uri: a.url }}
+                                style={styles.attachImg}
+                              />
+                            </Pressable>
+                          ) : a.type === "video" ? (
+                            <Pressable
+                              onPress={() =>
+                                a.url && setVideoModal({ url: a.url })
+                              }
+                            >
+                              <View
+                                style={[styles.attachImg, styles.attachVideo]}
+                              >
+                                <Ionicons
+                                  name="play-circle"
+                                  size={40}
+                                  color="#fff"
+                                />
+                              </View>
+                            </Pressable>
+                          ) : (
+                            <View style={styles.fileChip}>
+                              <Ionicons
+                                name="document-outline"
+                                size={20}
+                                color={isMine ? "#fff" : "#0F172A"}
+                              />
+                              <Text
+                                style={{
+                                  color: isMine ? "#fff" : "#0F172A",
+                                  marginLeft: 6,
+                                }}
+                                numberOfLines={1}
+                              >
+                                {a.name || "Tệp đính kèm"}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ));
+                    })()}
                   {!!item.content && (
                     <MentionText
                       content={item.content}
@@ -702,7 +737,87 @@ export default function ChatWindow() {
           setTournamentPickerOpen(false);
         }}
       />
+
+      {/* Fullscreen image viewer — pinch/swipe/close */}
+      <ImageView
+        images={imgViewer.images}
+        imageIndex={imgViewer.index}
+        visible={imgViewer.visible}
+        onRequestClose={() =>
+          setImgViewer({ visible: false, images: [], index: 0 })
+        }
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
+        backgroundColor="#000"
+      />
+
+      {/* Fullscreen video modal */}
+      <ChatVideoModal
+        url={videoModal?.url || null}
+        onClose={() => setVideoModal(null)}
+      />
     </SafeAreaView>
+  );
+}
+
+function ChatVideoModal({
+  url,
+  onClose,
+}: {
+  url: string | null;
+  onClose: () => void;
+}) {
+  const player = useVideoPlayer(url || "", (p) => {
+    if (url) {
+      p.loop = false;
+      p.play();
+    }
+  });
+  return (
+    <Modal
+      visible={!!url}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#000",
+          justifyContent: "center",
+        }}
+      >
+        {url ? (
+          <VideoView
+            player={player}
+            style={{ width: "100%", aspectRatio: 9 / 16, maxHeight: "100%" }}
+            contentFit="contain"
+            nativeControls
+            allowsFullscreen
+            allowsPictureInPicture={false}
+          />
+        ) : null}
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={{
+            position: "absolute",
+            top: 48,
+            right: 20,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+          }}
+        >
+          <Ionicons name="close" size={22} color="#fff" />
+        </Pressable>
+      </View>
+    </Modal>
   );
 }
 
