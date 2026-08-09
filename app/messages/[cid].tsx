@@ -280,8 +280,17 @@ export default function ChatWindow() {
   // Subscribe socket room + patch cache khi có message mới
   useEffect(() => {
     if (!cid) return;
+    const subscribe = () => {
+      try {
+        socket.emit("chat:subscribe", { conversationId: cidStr });
+      } catch {}
+    };
+    // Subscribe ngay lập tức (nếu socket đang connect) + re-subscribe mỗi lần
+    // socket connect/reconnect (mất mạng chớp → socket id mới → BE không còn
+    // socket cũ trong room chat:${cid} → miss messages cho tới khi user refresh)
+    subscribe();
+    socket.on("connect", subscribe);
     try {
-      socket.emit("chat:subscribe", { conversationId: cidStr });
       markRead(cidStr);
     } catch {}
     const onNew = (payload: any) => {
@@ -326,6 +335,7 @@ export default function ChatWindow() {
       try {
         socket.emit("chat:unsubscribe", { conversationId: cidStr });
       } catch {}
+      socket.off("connect", subscribe);
       socket.off("chat:message:new", onNew);
       socket.off("chat:message:deleted", onDeleted);
     };
@@ -348,11 +358,67 @@ export default function ChatWindow() {
       allowsMultipleSelection: true,
       selectionLimit: 5,
       quality: 0.6,
+      videoMaxDuration: 240, // 4 phút
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium as any,
     });
     if (res.canceled || !res.assets?.length) return;
-    const fd = new FormData();
+
+    // Client-side check dung lượng + thời lượng trước khi upload
+    // Limit: ảnh 10MB, video 100MB / 4 phút
+    const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+    const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+    const MAX_VIDEO_DURATION_MS = 240 * 1000;
+    const rejected: string[] = [];
+    const ok: typeof res.assets = [];
     for (const a of res.assets) {
+      const isVideo = a.type === "video";
+      const size = Number(a.fileSize || 0);
+      const duration = Number(a.duration || 0); // ms
+      if (isVideo) {
+        if (size && size > MAX_VIDEO_BYTES) {
+          rejected.push(
+            `Video "${a.fileName || "video"}" ${(size / 1024 / 1024).toFixed(1)}MB > 100MB`
+          );
+          continue;
+        }
+        if (duration && duration > MAX_VIDEO_DURATION_MS) {
+          rejected.push(
+            `Video "${a.fileName || "video"}" ${(duration / 1000).toFixed(0)}s > 4 phút`
+          );
+          continue;
+        }
+      } else {
+        if (size && size > MAX_IMAGE_BYTES) {
+          rejected.push(
+            `Ảnh "${a.fileName || "ảnh"}" ${(size / 1024 / 1024).toFixed(1)}MB > 10MB`
+          );
+          continue;
+        }
+      }
+      ok.push(a);
+    }
+    if (rejected.length) {
+      Alert.alert(
+        "Một số file quá lớn",
+        rejected.join("\n") +
+          "\n\nCác file còn lại sẽ được tải lên như bình thường."
+      );
+    }
+    if (!ok.length) return;
+
+    // Placeholder uploading — hiện ngay trong preview với spinner
+    const batchKey = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempItems = ok.map((a, idx) => ({
+      _temp: true,
+      _batch: batchKey,
+      _key: `${batchKey}-${idx}`,
+      type: a.type === "video" ? "video" : "image",
+      tempUri: a.uri,
+    })) as any[];
+    setAttachments((prev) => [...prev, ...tempItems].slice(0, 10));
+
+    const fd = new FormData();
+    for (const a of ok) {
       let uri = a.uri;
       const isVideo = a.type === "video";
       if (!isVideo) {
@@ -371,14 +437,24 @@ export default function ChatWindow() {
     }
     try {
       const r: any = await uploadMedia(fd).unwrap();
-      setAttachments((prev) => [...prev, ...(r.attachments || [])].slice(0, 10));
+      setAttachments((prev) =>
+        [
+          ...prev.filter((m: any) => m._batch !== batchKey),
+          ...(r.attachments || []),
+        ].slice(0, 10)
+      );
     } catch (err: any) {
+      setAttachments((prev) => prev.filter((m: any) => m._batch !== batchKey));
       Alert.alert("Upload thất bại", extractErr(err));
     }
   };
 
   const submit = async () => {
     if (!text.trim() && !attachments.length && !linkedTournament) return;
+    if (attachments.some((m: any) => m._temp)) {
+      Alert.alert("Vui lòng chờ tải xong", "Có file đang được tải lên.");
+      return;
+    }
     const stillPresent = selectedMentions
       .filter((m) => text.includes(`@${m.display}`))
       .map((m) => m._id);
@@ -426,6 +502,26 @@ export default function ChatWindow() {
       <Stack.Screen
         options={{
           title,
+          // Header title tappable → mở profile của DM peer
+          headerTitle: dmPeer?._id
+            ? () => (
+                <Pressable
+                  onPress={() => router.push(`/profile/${String(dmPeer._id)}` as any)}
+                  hitSlop={8}
+                >
+                  <Text
+                    style={{
+                      fontSize: 17,
+                      fontWeight: "700",
+                      color: "#0F172A",
+                    }}
+                    numberOfLines={1}
+                  >
+                    {title}
+                  </Text>
+                </Pressable>
+              )
+            : undefined,
           headerRight: dmPeer?._id
             ? () => (
                 <UserActionsMenu
@@ -515,9 +611,16 @@ export default function ChatWindow() {
                   ]}
                 >
                 {!isMine && showAvatar && (
-                  <View style={{ marginRight: 6 }}>
+                  <Pressable
+                    onPress={() => {
+                      const uid = String(item.sender?._id || item.sender || "");
+                      if (uid) router.push(`/profile/${uid}` as any);
+                    }}
+                    hitSlop={6}
+                    style={{ marginRight: 6 }}
+                  >
                     <AuthorAvatar user={item.sender} size={28} />
-                  </View>
+                  </Pressable>
                 )}
                 {!isMine && !showAvatar && <View style={{ width: 34 }} />}
                 <View
@@ -633,25 +736,55 @@ export default function ChatWindow() {
         <View style={styles.composer}>
           {attachments.length > 0 && (
             <View style={styles.attachPreviewRow}>
-              {attachments.map((a, i) => (
-                <View key={i} style={styles.attachPreview}>
-                  {a.type === "image" ? (
-                    <Image source={{ uri: a.url }} style={styles.previewImg} />
-                  ) : (
-                    <View style={[styles.previewImg, styles.attachVideo]}>
-                      <Ionicons name="videocam" size={18} color="#fff" />
-                    </View>
-                  )}
-                  <Pressable
-                    style={styles.previewRemove}
-                    onPress={() =>
-                      setAttachments((prev) => prev.filter((_, j) => j !== i))
-                    }
-                  >
-                    <Ionicons name="close" size={12} color="#fff" />
-                  </Pressable>
-                </View>
-              ))}
+              {attachments.map((a: any, i) => {
+                const isTemp = !!a._temp;
+                return (
+                  <View key={a._key || i} style={styles.attachPreview}>
+                    {a.type === "image" ? (
+                      <Image
+                        source={{ uri: isTemp ? a.tempUri : a.url }}
+                        style={styles.previewImg}
+                      />
+                    ) : (
+                      <View style={[styles.previewImg, styles.attachVideo]}>
+                        <Ionicons name="videocam" size={18} color="#fff" />
+                      </View>
+                    )}
+                    {isTemp && (
+                      <View
+                        style={[
+                          StyleSheet.absoluteFillObject,
+                          {
+                            backgroundColor: "rgba(0,0,0,0.55)",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                            gap: 2,
+                          },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text style={{ color: "#fff", fontSize: 9, fontWeight: "600" }}>
+                          Đang tải…
+                        </Text>
+                      </View>
+                    )}
+                    {!isTemp && (
+                      <Pressable
+                        style={styles.previewRemove}
+                        onPress={() =>
+                          setAttachments((prev) =>
+                            prev.filter((_, j) => j !== i)
+                          )
+                        }
+                      >
+                        <Ionicons name="close" size={12} color="#fff" />
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           )}
           {linkedTournament && (
