@@ -302,6 +302,18 @@ function Composer({ onPosted }: { onPosted: () => void }) {
     });
     if (res.canceled || !res.assets?.length) return;
 
+    // Chèn placeholder "đang tải" NGAY LẬP TỨC — user thấy preview với spinner
+    // như Facebook thay vì chờ upload xong mới hiện.
+    const batchKey = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempItems = res.assets.map((a, idx) => ({
+      _temp: true,
+      _batch: batchKey,
+      _key: `${batchKey}-${idx}`,
+      type: a.type === "video" ? "video" : "image",
+      tempUri: a.uri, // preview thumbnail local
+    })) as any[];
+    setMedia((prev) => [...prev, ...tempItems].slice(0, 10));
+
     const fd = new FormData();
     for (const a of res.assets) {
       let uri = a.uri;
@@ -318,14 +330,27 @@ function Composer({ onPosted }: { onPosted: () => void }) {
     }
     try {
       const r: any = await uploadMedia(fd).unwrap();
-      setMedia((prev) => [...prev, ...(r.media || [])].slice(0, 10));
+      // Upload xong → xoá placeholder của batch này + chèn media thật
+      setMedia((prev) =>
+        [
+          ...prev.filter((m: any) => m._batch !== batchKey),
+          ...(r.media || []),
+        ].slice(0, 10)
+      );
     } catch (err: any) {
+      // Lỗi → xoá placeholder của batch này
+      setMedia((prev) => prev.filter((m: any) => m._batch !== batchKey));
       Alert.alert("Upload thất bại", extractErr(err));
     }
   };
 
   const submit = async () => {
     if (!content.trim() && !media.length) return;
+    // Không cho gửi khi còn media đang upload dở
+    if (media.some((m: any) => m._temp)) {
+      Alert.alert("Vui lòng chờ tải xong", "Có media đang được tải lên.");
+      return;
+    }
     // Chỉ gửi mention nào display name vẫn còn trong content (user chưa xoá)
     const stillPresent = selectedMentions
       .filter((m) => content.includes(`@${m.display}`))
@@ -412,23 +437,56 @@ function Composer({ onPosted }: { onPosted: () => void }) {
       )}
       {media.length > 0 && (
         <ScrollView horizontal style={{ marginTop: 8 }} showsHorizontalScrollIndicator={false}>
-          {media.map((m, i) => (
-            <View key={i} style={styles.mediaPreview}>
-              {m.type === "image" ? (
-                <Image source={{ uri: m.url }} style={styles.mediaPreviewImg} />
-              ) : (
-                <View style={[styles.mediaPreviewImg, { alignItems: "center", justifyContent: "center", backgroundColor: "#111" }]}>
-                  <Ionicons name="videocam" size={28} color="#fff" />
-                </View>
-              )}
-              <Pressable
-                onPress={() => setMedia((prev) => prev.filter((_, j) => j !== i))}
-                style={styles.mediaRemove}
-              >
-                <Ionicons name="close" size={14} color="#fff" />
-              </Pressable>
-            </View>
-          ))}
+          {media.map((m: any, i) => {
+            const isTemp = !!m._temp;
+            return (
+              <View key={m._key || i} style={styles.mediaPreview}>
+                {m.type === "image" ? (
+                  <Image
+                    source={{ uri: isTemp ? m.tempUri : m.url }}
+                    style={styles.mediaPreviewImg}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.mediaPreviewImg,
+                      { alignItems: "center", justifyContent: "center", backgroundColor: "#111" },
+                    ]}
+                  >
+                    <Ionicons name="videocam" size={28} color="#fff" />
+                  </View>
+                )}
+                {isTemp && (
+                  <View
+                    style={[
+                      StyleSheet.absoluteFillObject,
+                      {
+                        backgroundColor: "rgba(0,0,0,0.55)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 8,
+                        gap: 4,
+                      },
+                    ]}
+                    pointerEvents="none"
+                  >
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>
+                      Đang tải…
+                    </Text>
+                  </View>
+                )}
+                {!isTemp && (
+                  <Pressable
+                    onPress={() => setMedia((prev) => prev.filter((_, j) => j !== i))}
+                    style={styles.mediaRemove}
+                  >
+                    <Ionicons name="close" size={14} color="#fff" />
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       )}
       <View style={styles.composerActions}>
@@ -445,16 +503,27 @@ function Composer({ onPosted }: { onPosted: () => void }) {
             Gắn giải
           </Text>
         </Pressable>
-        <Pressable
-          onPress={submit}
-          disabled={isLoading || (!content.trim() && !media.length)}
-          style={[
-            styles.postBtn,
-            (isLoading || (!content.trim() && !media.length)) && { opacity: 0.5 },
-          ]}
-        >
-          <Text style={styles.postBtnText}>{isLoading ? "Đang đăng…" : "Đăng"}</Text>
-        </Pressable>
+        {(() => {
+          const uploadingCount = media.filter((m: any) => m._temp).length;
+          const isUploading = uploadingCount > 0;
+          const disabled =
+            isLoading || isUploading || (!content.trim() && !media.length);
+          return (
+            <Pressable
+              onPress={submit}
+              disabled={disabled}
+              style={[styles.postBtn, disabled && { opacity: 0.5 }]}
+            >
+              <Text style={styles.postBtnText}>
+                {isLoading
+                  ? "Đang đăng…"
+                  : isUploading
+                  ? `Đang tải (${uploadingCount})…`
+                  : "Đăng"}
+              </Text>
+            </Pressable>
+          );
+        })()}
       </View>
 
       <TournamentPickerModal
