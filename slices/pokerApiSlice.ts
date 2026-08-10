@@ -72,6 +72,22 @@ export const pokerApiSlice = apiSlice.injectEndpoints({
         body: { text },
       }),
     }),
+    emojiPokerRoom: builder.mutation({
+      query: ({ roomId, emoji }: { roomId: string; emoji: string }) => ({
+        url: `/api/poker/rooms/${roomId}/emoji`,
+        method: "POST",
+        body: { emoji },
+      }),
+    }),
+    revealPokerCards: builder.mutation({
+      query: (roomId: string) => ({
+        url: `/api/poker/rooms/${roomId}/reveal`,
+        method: "POST",
+      }),
+      invalidatesTags: (r, e, roomId) => [
+        { type: "PokerRoom" as any, id: roomId },
+      ],
+    }),
   }),
 });
 
@@ -84,4 +100,6 @@ export const {
   useStartPokerHandMutation,
   usePokerActionMutation,
   useChatPokerRoomMutation,
+  useEmojiPokerRoomMutation,
+  useRevealPokerCardsMutation,
 } = pokerApiSlice;

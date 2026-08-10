@@ -1,10 +1,12 @@
 // Poker table — 6 seats, cards, betting controls.
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -27,8 +29,11 @@ import {
   useStartPokerHandMutation,
   usePokerActionMutation,
   useChatPokerRoomMutation,
+  useEmojiPokerRoomMutation,
+  useRevealPokerCardsMutation,
 } from "@/slices/pokerApiSlice";
 import { useSocket } from "@/context/SocketContext";
+import { playFx } from "./pokerFx";
 
 // ── Card render ─────────────────────────────
 const SUIT_SYMBOL: Record<string, string> = {
@@ -88,6 +93,90 @@ function EmptyCard({ small }: { small?: boolean }) {
 }
 
 // ── Seat ────────────────────────────────────
+function FloatingEmoji({ emoji }: { emoji: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 1800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        top: -8,
+        alignSelf: "center",
+        transform: [
+          {
+            translateY: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, -60],
+            }),
+          },
+          {
+            scale: anim.interpolate({
+              inputRange: [0, 0.3, 1],
+              outputRange: [0.5, 1.4, 1.1],
+            }),
+          },
+        ],
+        opacity: anim.interpolate({
+          inputRange: [0, 0.7, 1],
+          outputRange: [1, 1, 0],
+        }),
+        zIndex: 100,
+      }}
+    >
+      <Text style={{ fontSize: 40 }}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
+function DealerBadge() {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [anim]);
+  return (
+    <View style={styles.dealerBadge}>
+      <View style={styles.dealerFace}>
+        <Text style={{ fontSize: 22 }}>🎩</Text>
+      </View>
+      <Text style={styles.dealerName}>DEALER</Text>
+      <Animated.View
+        style={{
+          transform: [
+            {
+              scale: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 1.15],
+              }),
+            },
+          ],
+        }}
+      >
+        <MaterialCommunityIcons name="cards" size={16} color="#FCD34D" />
+      </Animated.View>
+    </View>
+  );
+}
+
 function Avatar({
   uri,
   size = 36,
@@ -133,14 +222,18 @@ function Seat({
   isDealer,
   isActive,
   isMe,
+  isWinner,
   timerPct,
+  floatEmoji,
   onSit,
 }: {
   seat: any;
   isDealer: boolean;
   isActive: boolean;
   isMe: boolean;
+  isWinner?: boolean;
   timerPct?: number;
+  floatEmoji?: string;
   onSit?: () => void;
 }) {
   const empty = !seat.user;
@@ -161,9 +254,16 @@ function Seat({
         styles.seat,
         isActive && styles.seatActive,
         isMe && styles.seatMe,
+        isWinner && styles.seatWinner,
         seat.hasFolded && { opacity: 0.4 },
       ]}
     >
+      {floatEmoji && <FloatingEmoji emoji={floatEmoji} />}
+      {isWinner && (
+        <View style={styles.winnerCrown}>
+          <Text style={{ fontSize: 18 }}>👑</Text>
+        </View>
+      )}
       {isDealer && <View style={styles.dealerChip}><Text style={{ fontSize: 9, fontWeight: "900", color: "#0F172A" }}>D</Text></View>}
       {isActive && timerPct != null && (
         <View style={styles.timerBarWrap}>
@@ -236,10 +336,19 @@ export default function PokerTableScreen() {
   const [startHand] = useStartPokerHandMutation();
   const [act] = usePokerActionMutation();
   const [chatMut] = useChatPokerRoomMutation();
+  const [emojiMut] = useEmojiPokerRoomMutation();
+  const [revealMut] = useRevealPokerCardsMutation();
   const [raiseAmt, setRaiseAmt] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [nowTs, setNowTs] = useState(Date.now());
+  const [emojiPicker, setEmojiPicker] = useState(false);
+  // Floating emojis: {id, seatIndex, emoji}
+  const [floatingEmojis, setFloatingEmojis] = useState<any[]>([]);
+  // Track previous action for FX playback
+  const prevActionRef = useRef<any>(null);
+  const prevStageRef = useRef<string>("");
+  const prevWinnersRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -250,6 +359,18 @@ export default function PokerTableScreen() {
     const bump = () => refetch();
     socket.on("poker:room:updated", bump);
     socket.on("poker:room:chat", bump);
+    const onEmoji = (payload: any) => {
+      const eid = `${payload.seatIndex}-${Date.now()}-${Math.random()}`;
+      setFloatingEmojis((prev) => [
+        ...prev,
+        { id: eid, seatIndex: payload.seatIndex, emoji: payload.emoji },
+      ]);
+      setTimeout(() => {
+        setFloatingEmojis((prev) => prev.filter((e) => e.id !== eid));
+      }, 2000);
+    };
+    socket.on("poker:room:emoji", onEmoji);
+    socket.on("poker:room:reveal", bump);
     return () => {
       try {
         socket.emit("poker:room:unsubscribe", { roomId: rid });
@@ -257,6 +378,8 @@ export default function PokerTableScreen() {
       socket.off("connect", sub);
       socket.off("poker:room:updated", bump);
       socket.off("poker:room:chat", bump);
+      socket.off("poker:room:emoji", onEmoji);
+      socket.off("poker:room:reveal", bump);
     };
   }, [socket, id, refetch]);
 
@@ -266,6 +389,72 @@ export default function PokerTableScreen() {
     return () => clearInterval(t);
   }, []);
 
+  // FX playback theo state changes.
+  const room: any = (data as any)?.room;
+  useEffect(() => {
+    if (!room) return;
+    // Winners changed → win/lose FX cho user
+    const winners = room.winners || [];
+    const prevWinners = prevWinnersRef.current || [];
+    if (
+      winners.length > 0 &&
+      JSON.stringify(winners.map((w: any) => w.seatIndex)) !==
+        JSON.stringify(prevWinners.map((w: any) => w.seatIndex))
+    ) {
+      const iAmWinner = winners.some((w: any) =>
+        room.seats.some((s: any) => s.isYou && s.seatIndex === w.seatIndex),
+      );
+      playFx(iAmWinner ? "win" : "lose");
+    }
+    prevWinnersRef.current = winners;
+
+    // Last action change → FX theo action
+    const lastAction = (room.actions || []).slice(-1)[0];
+    if (
+      lastAction &&
+      JSON.stringify(lastAction) !== JSON.stringify(prevActionRef.current)
+    ) {
+      switch (lastAction.action) {
+        case "fold":
+          playFx("fold");
+          break;
+        case "check":
+          playFx("check");
+          break;
+        case "call":
+          playFx("call");
+          break;
+        case "raise":
+          playFx("raise");
+          break;
+        case "allin":
+          playFx("allin");
+          break;
+      }
+      prevActionRef.current = lastAction;
+    }
+
+    // Stage change deal FX
+    if (room.stage !== prevStageRef.current) {
+      if (["flop", "turn", "river", "preflop"].includes(room.stage)) {
+        playFx("deal");
+      }
+      prevStageRef.current = room.stage;
+    }
+  }, [room?.actions?.length, room?.winners?.length, room?.stage]);
+
+  // Warning tick khi ≤5s
+  useEffect(() => {
+    const dl = room?.turnDeadlineAt
+      ? new Date(room.turnDeadlineAt).getTime()
+      : 0;
+    if (!dl) return;
+    const remaining = dl - Date.now();
+    if (remaining > 0 && remaining < 5500) {
+      playFx("warning");
+    }
+  }, [Math.ceil((room?.turnDeadlineAt ? new Date(room.turnDeadlineAt).getTime() - nowTs : 0) / 1000)]);
+
   if (isLoading || !data) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0F1A2E" }}>
@@ -274,10 +463,16 @@ export default function PokerTableScreen() {
     );
   }
 
-  const room: any = (data as any).room;
   const mySeat = (room.seats || []).find((s: any) => s.isYou);
   const isMyTurn = mySeat && mySeat.seatIndex === room.activeIndex;
   const toCall = Math.max(0, room.currentBet - (mySeat?.betThisStreet || 0));
+  const canReveal =
+    mySeat &&
+    mySeat.cards?.length &&
+    room.stage === "waiting" &&
+    !(room.reveals || []).some(
+      (r: any) => r.seatIndex === mySeat.seatIndex
+    );
 
   // Timer % (remaining / total)
   const turnDur = (room.turnDurationSec || 30) * 1000;
@@ -364,6 +559,7 @@ export default function PokerTableScreen() {
                 <Text style={styles.turnBadgeText}>{timerSecLeft}s</Text>
               </View>
             )}
+            {room.stage !== "waiting" && <DealerBadge />}
           </View>
 
           {/* Seats around */}
@@ -382,8 +578,15 @@ export default function PokerTableScreen() {
                     isDealer={seatIndex === room.dealerIndex && room.stage !== "waiting"}
                     isActive={seatIndex === room.activeIndex}
                     isMe={!!seat.isYou}
+                    isWinner={(room.winners || []).some(
+                      (w: any) => w.seatIndex === seatIndex,
+                    )}
                     timerPct={
                       seatIndex === room.activeIndex ? timerPct : undefined
+                    }
+                    floatEmoji={
+                      floatingEmojis.find((e) => e.seatIndex === seatIndex)
+                        ?.emoji
                     }
                     onSit={
                       !seat.user && !mySeat ? () => doSit(seatIndex) : undefined
@@ -422,11 +625,32 @@ export default function PokerTableScreen() {
             </View>
 
             {room.stage === "waiting" && (
-              <Pressable style={styles.startBtn} onPress={doStart}>
-                <Text style={{ color: "#fff", fontWeight: "800" }}>
-                  ▶ Bắt đầu ván
-                </Text>
-              </Pressable>
+              <>
+                <Pressable style={styles.startBtn} onPress={doStart}>
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>
+                    ▶ Bắt đầu ván
+                  </Text>
+                </Pressable>
+                {canReveal && (
+                  <Pressable
+                    style={styles.revealBtn}
+                    onPress={async () => {
+                      try {
+                        await revealMut(String(id)).unwrap();
+                      } catch (err: any) {
+                        Alert.alert(
+                          "Lỗi",
+                          err?.data?.message || "Không khoe được",
+                        );
+                      }
+                    }}
+                  >
+                    <Text style={{ color: "#F59E0B", fontWeight: "800" }}>
+                      🎴 Khoe bài của tôi
+                    </Text>
+                  </Pressable>
+                )}
+              </>
             )}
 
             {isMyTurn && (
@@ -516,6 +740,37 @@ export default function PokerTableScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Emoji picker inline (khi mở) */}
+      {emojiPicker && mySeat && (
+        <View style={styles.emojiBar}>
+          {["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "👏", "🎉"].map((e) => (
+            <Pressable
+              key={e}
+              style={styles.emojiBtn}
+              onPress={async () => {
+                setEmojiPicker(false);
+                try {
+                  await emojiMut({ roomId: String(id), emoji: e }).unwrap();
+                } catch {}
+              }}
+            >
+              <Text style={{ fontSize: 24 }}>{e}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Emoji FAB */}
+      {mySeat && (
+        <Pressable
+          style={styles.emojiFab}
+          onPress={() => setEmojiPicker((v) => !v)}
+          hitSlop={10}
+        >
+          <Ionicons name="happy" size={22} color="#fff" />
+        </Pressable>
+      )}
 
       {/* Chat FAB */}
       <Pressable
@@ -764,8 +1019,108 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
   },
-  seatActive: { borderColor: "#FCD34D" },
+  seatActive: {
+    borderColor: "#FCD34D",
+    shadowColor: "#FCD34D",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
+  },
   seatMe: { borderColor: "#3B82F6" },
+  seatWinner: {
+    borderColor: "#10B981",
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  winnerCrown: {
+    position: "absolute",
+    top: -18,
+    alignSelf: "center",
+    zIndex: 10,
+  },
+  dealerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(252, 211, 77, 0.4)",
+  },
+  dealerFace: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#7C2D12",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FCD34D",
+  },
+  dealerName: {
+    color: "#FCD34D",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  emojiFab: {
+    position: "absolute",
+    right: 16,
+    bottom: 84,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F59E0B",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  emojiBar: {
+    position: "absolute",
+    right: 74,
+    bottom: 84,
+    flexDirection: "row",
+    backgroundColor: "rgba(15, 23, 42, 0.95)",
+    borderRadius: 12,
+    padding: 8,
+    gap: 4,
+    flexWrap: "wrap",
+    maxWidth: 260,
+    borderWidth: 1,
+    borderColor: "#334155",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  emojiBtn: {
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  revealBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+  },
   seatName: { color: "#fff", fontSize: 11, fontWeight: "700", maxWidth: 100 },
   seatChips: { color: "#FCD34D", fontSize: 11, fontWeight: "800", marginTop: 2 },
   seatCards: { flexDirection: "row", gap: 3, marginTop: 4 },
