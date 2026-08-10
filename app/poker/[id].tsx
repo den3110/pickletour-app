@@ -15,7 +15,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -657,6 +656,27 @@ export default function PokerTableScreen() {
     );
   }
 
+  if (room.status === "closed") {
+    return (
+      <View style={styles.loading}>
+        <Stack.Screen
+          options={{
+            title: room.name,
+            headerStyle: { backgroundColor: "#0B1220" },
+            headerTintColor: "#fff",
+          }}
+        />
+        <Text style={{ fontSize: 40, marginBottom: 12 }}>🌙</Text>
+        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>
+          Bàn đã đóng
+        </Text>
+        <Text style={{ color: "#94A3B8", marginTop: 6, textAlign: "center" }}>
+          Bàn không hoạt động quá 5 phút nên đã tự huỷ.
+        </Text>
+      </View>
+    );
+  }
+
   const mySeat = (room.seats || []).find((s: any) => s.isYou);
   const isMyTurn = mySeat && mySeat.seatIndex === room.activeIndex;
   const toCall = Math.max(0, room.currentBet - (mySeat?.betThisStreet || 0));
@@ -726,10 +746,7 @@ export default function PokerTableScreen() {
           headerTintColor: "#fff",
         }}
       />
-      <ScrollView
-        contentContainerStyle={{ padding: 10, paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.body}>
         {/* ── Bàn oval ── */}
         <View
           style={styles.tableRail}
@@ -835,43 +852,48 @@ export default function PokerTableScreen() {
                   </View>
                 );
               })}
+
+            {/* Winner overlay — nổi giữa bàn, không đè lên seat/controls */}
+            {showWinners && (
+              <View style={styles.winnerOverlay} pointerEvents="none">
+                <View style={styles.winnerBox}>
+                  <Text style={styles.winnerTitle}>
+                    🏆 Kết quả ván {room.handNumber}
+                  </Text>
+                  {room.winners.map((w: any, i: number) => {
+                    const seat = (room.seats || []).find(
+                      (s: any) => s.seatIndex === w.seatIndex,
+                    );
+                    const wname =
+                      seat?.user?.nickname ||
+                      seat?.user?.name ||
+                      `Ghế ${w.seatIndex + 1}`;
+                    return (
+                      <View key={i} style={styles.winnerLineRow}>
+                        <Text style={styles.winnerLine}>
+                          {wname} · {w.handDescription} · +
+                          {formatChips(w.amountWon)}
+                        </Text>
+                        {w.revealedCards?.length > 0 && (
+                          <View style={{ flexDirection: "row", gap: 3 }}>
+                            {w.revealedCards.map((c: string, j: number) => (
+                              <PlayingCard
+                                key={j}
+                                code={c}
+                                w={22}
+                                delay={j * 150}
+                              />
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
         </View>
-
-        {/* Winners banner — chỉ hiện sau khi board lật hết */}
-        {showWinners && (
-          <View style={styles.winnerBox}>
-            <Text style={styles.winnerTitle}>
-              🏆 Kết quả ván {room.handNumber}
-            </Text>
-            {room.winners.map((w: any, i: number) => {
-              const seat = (room.seats || []).find(
-                (s: any) => s.seatIndex === w.seatIndex,
-              );
-              const wname =
-                seat?.user?.nickname || seat?.user?.name || `Ghế ${w.seatIndex + 1}`;
-              return (
-                <View key={i} style={styles.winnerLineRow}>
-                  <Text style={styles.winnerLine}>
-                    {wname} · {w.handDescription} · +{formatChips(w.amountWon)}
-                  </Text>
-                  {w.revealedCards?.length > 0 && (
-                    <View style={{ flexDirection: "row", gap: 3 }}>
-                      {w.revealedCards.map((c: string, j: number) => (
-                        <PlayingCard
-                          key={j}
-                          code={c}
-                          w={24}
-                          delay={j * 150}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        )}
 
         {/* ── Controls ── */}
         {mySeat ? (
@@ -1006,7 +1028,7 @@ export default function PokerTableScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </View>
 
       {/* Emoji bar */}
       {emojiPicker && mySeat && (
@@ -1230,15 +1252,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B1220",
   },
 
+  body: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingBottom: 6,
+  },
+
   /* Table */
   tableRail: {
-    height: 560,
+    flex: 1,
+    minHeight: 340,
     borderRadius: 190,
     backgroundColor: "#5B2F16",
     padding: 10,
     marginHorizontal: 2,
-    marginTop: 40,
-    marginBottom: 14,
+    marginTop: 30,
+    marginBottom: 26,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.5,
@@ -1438,15 +1467,28 @@ const styles = StyleSheet.create({
   },
   betBubbleText: { color: "#FCD34D", fontSize: 10, fontWeight: "800" },
 
-  /* Winners */
+  /* Winners — overlay nổi giữa bàn */
+  winnerOverlay: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    top: "58%",
+    zIndex: 60,
+    alignItems: "center",
+  },
   winnerBox: {
-    backgroundColor: "rgba(16,185,129,0.12)",
-    borderWidth: 1,
+    backgroundColor: "rgba(3, 28, 18, 0.94)",
+    borderWidth: 1.5,
     borderColor: "#10B981",
     borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     gap: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
   },
   winnerTitle: {
     fontSize: 14,
@@ -1467,8 +1509,8 @@ const styles = StyleSheet.create({
   controls: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 14,
-    padding: 12,
-    gap: 8,
+    padding: 10,
+    gap: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
@@ -1481,7 +1523,7 @@ const styles = StyleSheet.create({
   leaveText: { color: "#EF4444", fontSize: 12, fontWeight: "700" },
   startBtn: {
     backgroundColor: "#10B981",
-    padding: 13,
+    padding: 11,
     borderRadius: 12,
     alignItems: "center",
   },
@@ -1496,7 +1538,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    padding: 13,
+    padding: 11,
     borderRadius: 12,
     alignItems: "center",
   },
