@@ -1,10 +1,11 @@
 // MLP dual detail — score sub-matches + DreamBreaker + check-in.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -72,6 +73,38 @@ export default function MlpDualDetailScreen() {
 
   const d: any = dual;
   const cfg = (d as any).tournament?.mlpConfig || {};
+  const dbCfg = cfg.dreamBreaker || {};
+  const dbPointsToWin = Number(dbCfg.pointsToWin) || 21;
+  const dbRotate = Number(dbCfg.rotationEveryPoints) || 4;
+
+  const [dbStartOpen, setDbStartOpen] = useState(false);
+
+  const currentPlayerAId = useMemo(() => {
+    const db = d?.dreamBreaker;
+    const lineup = Array.isArray(db?.lineupA) ? db.lineupA : [];
+    if (!lineup.length) return null;
+    const idx =
+      Math.floor(Math.max(0, Number(db?.scoreA || 0)) / Math.max(1, dbRotate)) %
+      lineup.length;
+    return lineup[idx];
+  }, [d?.dreamBreaker?.scoreA, d?.dreamBreaker?.lineupA, dbRotate]);
+  const currentPlayerBId = useMemo(() => {
+    const db = d?.dreamBreaker;
+    const lineup = Array.isArray(db?.lineupB) ? db.lineupB : [];
+    if (!lineup.length) return null;
+    const idx =
+      Math.floor(Math.max(0, Number(db?.scoreB || 0)) / Math.max(1, dbRotate)) %
+      lineup.length;
+    return lineup[idx];
+  }, [d?.dreamBreaker?.scoreB, d?.dreamBreaker?.lineupB, dbRotate]);
+
+  const findPlayerObj = (arr: any[], id: any) => {
+    if (!Array.isArray(arr) || !id) return null;
+    const target = String(id?._id ?? id);
+    return arr.find((p) => String(p?._id ?? p) === target) || null;
+  };
+  const currentPlayerA = findPlayerObj(d?.teamA?.players, currentPlayerAId);
+  const currentPlayerB = findPlayerObj(d?.teamB?.players, currentPlayerBId);
 
   const doCheckIn = async (side: "A" | "B") => {
     try {
@@ -147,69 +180,329 @@ export default function MlpDualDetailScreen() {
         {/* DreamBreaker */}
         {d.status === "tie_break" && !d.dreamBreaker?.triggered && (
           <View style={styles.dbBox}>
-            <Text style={styles.dbTitle}>DreamBreaker chưa bắt đầu</Text>
+            <Text style={styles.dbTitle}>🏆 DreamBreaker</Text>
             <Text style={styles.dbSub}>
-              BTC vào web quản lý để chọn lineup A/B và bấm Start.
+              Hoà slot — bắt đầu ván tie-break 1v1 luân phiên tới{" "}
+              {dbPointsToWin} điểm. Rotate mỗi {dbRotate} điểm.
             </Text>
+            <Pressable
+              style={[styles.dbBtn, styles.dbStartBtn]}
+              onPress={() => setDbStartOpen(true)}
+            >
+              <Ionicons name="play" size={16} color="#fff" />
+              <Text style={styles.dbBtnText}>Chọn lineup + Start</Text>
+            </Pressable>
           </View>
         )}
         {d.dreamBreaker?.triggered && (
           <View style={styles.dbBox}>
-            <Text style={styles.dbTitle}>🏆 DreamBreaker</Text>
+            <Text style={styles.dbTitle}>
+              🏆 DreamBreaker · Đấu tới {dbPointsToWin}
+            </Text>
             <View style={styles.dbScore}>
               <Text style={styles.dbBigScore}>{d.dreamBreaker.scoreA}</Text>
               <Text style={styles.dbSep}>—</Text>
               <Text style={styles.dbBigScore}>{d.dreamBreaker.scoreB}</Text>
             </View>
+
+            {/* Current server / rotation info */}
+            {!d.dreamBreaker.winner && (
+              <View style={styles.dbCurrentRow}>
+                <CurrentPlayerCard
+                  label={d.teamA?.name || "Team A"}
+                  player={currentPlayerA}
+                  currentScore={d.dreamBreaker.scoreA}
+                  rotate={dbRotate}
+                  lineupSize={d.dreamBreaker.lineupA?.length || 0}
+                />
+                <CurrentPlayerCard
+                  label={d.teamB?.name || "Team B"}
+                  player={currentPlayerB}
+                  currentScore={d.dreamBreaker.scoreB}
+                  rotate={dbRotate}
+                  lineupSize={d.dreamBreaker.lineupB?.length || 0}
+                />
+              </View>
+            )}
+
             {!d.dreamBreaker.winner && (
               <View style={styles.dbBtnsRow}>
                 <Pressable
-                  style={[styles.dbBtn, { backgroundColor: "#3B82F6" }]}
+                  style={[styles.dbBtn, { backgroundColor: "#3B82F6", flex: 1 }]}
                   onPress={async () => {
                     try {
                       await pointDb({
                         dualId: String(dualId),
                         side: "A",
                       }).unwrap();
-                    } catch {}
+                    } catch (err: any) {
+                      Alert.alert("Lỗi", err?.data?.message || "Không cộng điểm được");
+                    }
                   }}
                 >
-                  <Text style={styles.dbBtnText}>+1 Team A</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.dbBtn, { backgroundColor: "#EF4444" }]}
-                  onPress={async () => {
-                    try {
-                      await pointDb({
-                        dualId: String(dualId),
-                        side: "B",
-                      }).unwrap();
-                    } catch {}
-                  }}
-                >
-                  <Text style={styles.dbBtnText}>+1 Team B</Text>
+                  <Text style={styles.dbBtnText}>+1 {d.teamA?.name || "A"}</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.dbBtn, { backgroundColor: "#64748B" }]}
                   onPress={async () => {
                     try {
                       await undoDb({ dualId: String(dualId) }).unwrap();
-                    } catch {}
+                    } catch (err: any) {
+                      Alert.alert("Lỗi", err?.data?.message || "Không undo được");
+                    }
                   }}
                 >
                   <Ionicons name="arrow-undo" size={16} color="#fff" />
+                </Pressable>
+                <Pressable
+                  style={[styles.dbBtn, { backgroundColor: "#EF4444", flex: 1 }]}
+                  onPress={async () => {
+                    try {
+                      await pointDb({
+                        dualId: String(dualId),
+                        side: "B",
+                      }).unwrap();
+                    } catch (err: any) {
+                      Alert.alert("Lỗi", err?.data?.message || "Không cộng điểm được");
+                    }
+                  }}
+                >
+                  <Text style={styles.dbBtnText}>+1 {d.teamB?.name || "B"}</Text>
                 </Pressable>
               </View>
             )}
             {d.dreamBreaker.winner && (
               <Text style={styles.dbWinner}>
-                Winner: Team {d.dreamBreaker.winner}
+                🏆 Winner: {d.dreamBreaker.winner === "A" ? d.teamA?.name : d.teamB?.name}
               </Text>
             )}
           </View>
         )}
       </ScrollView>
+
+      <StartDreamBreakerModal
+        open={dbStartOpen}
+        onClose={() => setDbStartOpen(false)}
+        teamA={d.teamA}
+        teamB={d.teamB}
+        pointsToWin={dbPointsToWin}
+        rotate={dbRotate}
+        onSubmit={async (lineupA, lineupB) => {
+          try {
+            await startDb({
+              dualId: String(dualId),
+              lineupA,
+              lineupB,
+            }).unwrap();
+            setDbStartOpen(false);
+          } catch (err: any) {
+            Alert.alert("Lỗi", err?.data?.message || "Không start được");
+          }
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+function CurrentPlayerCard({
+  label,
+  player,
+  currentScore,
+  rotate,
+  lineupSize,
+}: {
+  label: string;
+  player: any;
+  currentScore: number;
+  rotate: number;
+  lineupSize: number;
+}) {
+  const rotationIdx = lineupSize
+    ? Math.floor(Math.max(0, currentScore) / Math.max(1, rotate)) % lineupSize
+    : 0;
+  const pointsInBlock = currentScore % Math.max(1, rotate);
+  const pointsUntilRotate = Math.max(0, rotate - pointsInBlock);
+  return (
+    <View style={styles.dbPlayerCard}>
+      <Text style={styles.dbPlayerTeam} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.dbPlayerName} numberOfLines={1}>
+        {player?.nickname || player?.name || "—"}
+      </Text>
+      <Text style={styles.dbPlayerRotate}>
+        Người #{rotationIdx + 1}/{lineupSize} · Còn {pointsUntilRotate}đ nữa xoay
+      </Text>
+    </View>
+  );
+}
+
+function StartDreamBreakerModal({
+  open,
+  onClose,
+  teamA,
+  teamB,
+  pointsToWin,
+  rotate,
+  onSubmit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  teamA: any;
+  teamB: any;
+  pointsToWin: number;
+  rotate: number;
+  onSubmit: (lineupA: string[], lineupB: string[]) => Promise<void>;
+}) {
+  const rosterA = Array.isArray(teamA?.players) ? teamA.players : [];
+  const rosterB = Array.isArray(teamB?.players) ? teamB.players : [];
+  const [lineupA, setLineupA] = useState<string[]>([]);
+  const [lineupB, setLineupB] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setLineupA([]);
+      setLineupB([]);
+    }
+  }, [open]);
+
+  const toggleA = (id: string) => {
+    setLineupA((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+  const toggleB = (id: string) => {
+    setLineupB((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+  const canSubmit = lineupA.length > 0 && lineupB.length > 0 && !submitting;
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(lineupA, lineupB);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={open}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.mdBackdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View style={styles.mdSheet}>
+          <View style={styles.mdHeader}>
+            <Text style={styles.mdTitle}>🏆 Start DreamBreaker</Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={22} color="#0F172A" />
+            </Pressable>
+          </View>
+          <Text style={styles.mdHint}>
+            Đấu 1v1 tới {pointsToWin} điểm · Xoay VĐV mỗi {rotate} điểm ·
+            Chọn thứ tự luân phiên cho cả 2 team.
+          </Text>
+          <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ padding: 12 }}>
+            <LineupPicker
+              label={teamA?.name || "Team A"}
+              roster={rosterA}
+              lineup={lineupA}
+              onToggle={toggleA}
+              color="#3B82F6"
+            />
+            <View style={{ height: 16 }} />
+            <LineupPicker
+              label={teamB?.name || "Team B"}
+              roster={rosterB}
+              lineup={lineupB}
+              onToggle={toggleB}
+              color="#EF4444"
+            />
+          </ScrollView>
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            style={[
+              styles.mdSubmit,
+              !canSubmit && { opacity: 0.4 },
+            ]}
+          >
+            <Ionicons name="play" size={16} color="#fff" />
+            <Text style={styles.mdSubmitText}>
+              {submitting
+                ? "Đang start…"
+                : `Start (${lineupA.length} vs ${lineupB.length})`}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function LineupPicker({
+  label,
+  roster,
+  lineup,
+  onToggle,
+  color,
+}: {
+  label: string;
+  roster: any[];
+  lineup: string[];
+  onToggle: (id: string) => void;
+  color: string;
+}) {
+  return (
+    <View>
+      <Text style={[styles.mdSectionLabel, { color }]}>
+        {label} · Đã chọn {lineup.length}
+      </Text>
+      {roster.length === 0 ? (
+        <Text style={styles.mdEmpty}>Team chưa có roster</Text>
+      ) : (
+        roster.map((p: any) => {
+          const id = String(p?._id ?? p);
+          const orderIdx = lineup.indexOf(id);
+          const isSelected = orderIdx >= 0;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => onToggle(id)}
+              style={[
+                styles.mdRosterRow,
+                isSelected && { backgroundColor: color + "18", borderColor: color },
+              ]}
+            >
+              <View
+                style={[
+                  styles.mdRosterCheck,
+                  isSelected && { backgroundColor: color, borderColor: color },
+                ]}
+              >
+                {isSelected ? (
+                  <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>
+                    {orderIdx + 1}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.mdRosterName} numberOfLines={1}>
+                {p.nickname || p.name || "VĐV"}
+              </Text>
+              {!!p.gender && (
+                <Text style={styles.mdRosterMeta}>
+                  {p.gender === "female" ? "♀" : p.gender === "male" ? "♂" : ""}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })
+      )}
+    </View>
   );
 }
 
@@ -513,5 +806,135 @@ const styles = StyleSheet.create({
     color: "#065F46",
     textAlign: "center",
     marginTop: 10,
+  },
+  dbStartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 12,
+    alignSelf: "center",
+  },
+  dbCurrentRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  dbPlayerCard: {
+    flex: 1,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+  },
+  dbPlayerTeam: {
+    fontSize: 10,
+    color: "#B45309",
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  dbPlayerName: {
+    fontSize: 15,
+    color: "#78350F",
+    fontWeight: "800",
+  },
+  dbPlayerRotate: {
+    fontSize: 10,
+    color: "#92400E",
+    marginTop: 3,
+  },
+  mdBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  mdSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "85%",
+  },
+  mdHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  mdTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  mdHint: {
+    fontSize: 12,
+    color: "#64748B",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    lineHeight: 18,
+  },
+  mdSectionLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  mdEmpty: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontStyle: "italic",
+    padding: 12,
+  },
+  mdRosterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  mdRosterCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#CBD5E1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mdRosterName: {
+    flex: 1,
+    fontSize: 14,
+    color: "#0F172A",
+    fontWeight: "600",
+  },
+  mdRosterMeta: {
+    fontSize: 14,
+    color: "#64748B",
+    marginLeft: 6,
+  },
+  mdSubmit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#10B981",
+    padding: 14,
+    margin: 12,
+    borderRadius: 12,
+  },
+  mdSubmitText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 14,
   },
 });
