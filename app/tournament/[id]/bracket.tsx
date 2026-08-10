@@ -35,6 +35,7 @@ import {
 
 import { useSocket } from "@/context/SocketContext";
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
+import MlpBracketView from "@/components/mlp/MlpBracketView";
 import { StatusBar } from "expo-status-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import {
@@ -4769,6 +4770,14 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       </View>
     );
   }
+  // MLP tournaments dùng flow riêng — hiển thị MlpBracketView (BXH ngắn,
+  // dual matches theo round, DreamBreaker status) thay vì bracket chuẩn.
+  const isMlpTour =
+    String(tour?.tournamentMode || "").toLowerCase() === "mlp";
+  if (isMlpTour) {
+    return <MlpBracketView tourId={tourId} tour={tour} />;
+  }
+
   if (!brackets.length) {
     return (
       <View
