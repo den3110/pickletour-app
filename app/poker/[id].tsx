@@ -3,11 +3,13 @@
 // chạy hết (all-in runout có kịch tính).
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
+import NetInfo from "@react-native-community/netinfo";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Easing,
   FlatList,
   Image,
@@ -528,6 +530,10 @@ export default function PokerTableScreen() {
   const [emojiPicker, setEmojiPicker] = useState(false);
   const [floatingEmojis, setFloatingEmojis] = useState<any[]>([]);
   const [tableSize, setTableSize] = useState({ w: 0, h: 0 });
+  // Connection status: "online" | "offline" | "reconnecting"
+  const [connStatus, setConnStatus] = useState<
+    "online" | "offline" | "reconnecting"
+  >("online");
 
   // ── Staged board reveal: board hiện TỪNG LÁ, không hiện cả cụm ──
   const [shownBoardCount, setShownBoardCount] = useState(0);
@@ -540,7 +546,12 @@ export default function PokerTableScreen() {
   useEffect(() => {
     if (!socket || !id) return;
     const rid = String(id);
-    const sub = () => socket.emit("poker:room:subscribe", { roomId: rid });
+    const sub = () => {
+      socket.emit("poker:room:subscribe", { roomId: rid });
+      // Bất cứ khi nào reconnect socket → fetch lại room state để nhận
+      // bài / turn / pot mới nhất, tránh UI đứng ở snapshot cũ.
+      refetch();
+    };
     sub();
     socket.on("connect", sub);
     const bump = () => refetch();
@@ -570,10 +581,64 @@ export default function PokerTableScreen() {
     };
   }, [socket, id, refetch]);
 
+  // Reconnect nếu app bị ẩn / mất mạng: nghe AppState + NetInfo + socket
+  // disconnect. Khi active lại hoặc mạng phục hồi → force refetch + connect
+  // socket + resubscribe room. Cập nhật badge trạng thái để user thấy.
+  useEffect(() => {
+    if (!id) return;
+    const rid = String(id);
+    const reconnect = () => {
+      setConnStatus("reconnecting");
+      try {
+        if (socket && !socket.connected) socket.connect?.();
+        socket?.emit("poker:room:subscribe", { roomId: rid });
+      } catch {}
+      refetch()
+        .unwrap?.()
+        .then(() => setConnStatus("online"))
+        .catch(() => {
+          // Retry mềm sau 2s nếu vẫn lỗi
+          setTimeout(reconnect, 2000);
+        });
+    };
+
+    const appSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") reconnect();
+    });
+    const netSub = NetInfo.addEventListener((s) => {
+      if (s.isConnected === false) setConnStatus("offline");
+      else if (s.isConnected && s.isInternetReachable !== false) reconnect();
+    });
+    const onDisc = () => setConnStatus("offline");
+    const onConn = () => reconnect();
+    socket?.on?.("disconnect", onDisc);
+    socket?.on?.("connect", onConn);
+
+    return () => {
+      appSub.remove();
+      netSub();
+      socket?.off?.("disconnect", onDisc);
+      socket?.off?.("connect", onConn);
+    };
+  }, [socket, id, refetch]);
+
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 250);
     return () => clearInterval(t);
   }, []);
+
+  // Polling fallback: khi offline hoặc socket không dispatch event kịp
+  // thời, refetch mỗi 5s để room state không đứng im.
+  useEffect(() => {
+    if (connStatus === "online") return;
+    const t = setInterval(() => {
+      refetch()
+        .unwrap?.()
+        .then(() => setConnStatus("online"))
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(t);
+  }, [connStatus, refetch]);
 
   const room: any = (data as any)?.room;
 
@@ -746,6 +811,22 @@ export default function PokerTableScreen() {
           headerTintColor: "#fff",
         }}
       />
+      {connStatus !== "online" && (
+        <View
+          style={[
+            styles.connBanner,
+            connStatus === "offline" && { backgroundColor: "#DC2626" },
+          ]}
+        >
+          <ActivityIndicator size="small" color="#fff" />
+          <Text style={styles.connBannerText}>
+            {connStatus === "offline"
+              ? "Mất kết nối · đang thử lại…"
+              : "Đang kết nối lại phiên chơi…"}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.body}>
         {/* ── Bàn oval ── */}
         <View
@@ -1257,6 +1338,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 6,
   },
+  connBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#D97706",
+    paddingVertical: 6,
+  },
+  connBannerText: { color: "#fff", fontSize: 12, fontWeight: "800" },
 
   /* Table */
   tableRail: {
