@@ -68,20 +68,29 @@ function preferName(p: any) {
 function buildVsTitle(m: any): string {
   if (!m) return "Chi tiết trận";
   const code = pickCode(m);
-  const a = m?.pairA
-    ? [m?.pairA?.player1, m?.pairA?.player2]
+  const mlp = m?.meta?.mlp;
+  const pairA = m?.pairA || mlp?.pairA;
+  const pairB = m?.pairB || mlp?.pairB;
+  const a = pairA
+    ? [pairA?.player1, pairA?.player2]
         .filter(Boolean)
         .map(preferName)
         .join(" & ")
     : "";
-  const b = m?.pairB
-    ? [m?.pairB?.player1, m?.pairB?.player2]
+  const b = pairB
+    ? [pairB?.player1, pairB?.player2]
         .filter(Boolean)
         .map(preferName)
         .join(" & ")
     : "";
   if (a || b) {
-    const vs = [a || "Đội A", b || "Đội B"].join(" vs ");
+    const fallbackA = mlp?.teamAName || "Đội A";
+    const fallbackB = mlp?.teamBName || "Đội B";
+    const vs = [a || fallbackA, b || fallbackB].join(" vs ");
+    return code ? `${code} • ${vs}` : vs;
+  }
+  if (mlp?.teamAName || mlp?.teamBName) {
+    const vs = `${mlp?.teamAName || "Đội A"} vs ${mlp?.teamBName || "Đội B"}`;
     return code ? `${code} • ${vs}` : vs;
   }
   return code || "Chi tiết trận";

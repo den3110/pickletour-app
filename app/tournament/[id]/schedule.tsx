@@ -270,6 +270,15 @@ function teamNameFrom(m, side, matchIndex = null, depth = 0) {
   const pairName = pairToName(pair, m);
   if (isUsefulTeamName(pairName)) return pairName;
   if (isUsefulTeamName(resolved)) return String(resolved).trim();
+  // MLP sub-match fallback — chỉ khi meta.mlp tồn tại (không đụng flow thường).
+  const mlp = m?.meta?.mlp;
+  if (mlp) {
+    const mlpName =
+      side === "A"
+        ? mlp.pairALabel || mlp.teamAName
+        : mlp.pairBLabel || mlp.teamBName;
+    if (isUsefulTeamName(mlpName)) return String(mlpName).trim();
+  }
   if (isByeSeed(seed)) return "BYE";
 
   const seedType = String(seed?.type || "");

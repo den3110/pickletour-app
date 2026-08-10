@@ -470,6 +470,7 @@ function Seat({
   floatEmoji,
   bubble,
   onSit,
+  betOffset,
 }: {
   seat: any;
   isDealer: boolean;
@@ -480,6 +481,7 @@ function Seat({
   floatEmoji?: string;
   bubble?: string;
   onSit?: () => void;
+  betOffset?: { dx: number; dy: number };
 }) {
   if (!seat.user) {
     return (
@@ -600,7 +602,18 @@ function Seat({
 
       {/* Bet display — chip stack + số chip cược ở street này */}
       {seat.betThisStreet > 0 && (
-        <View style={styles.betDisplay}>
+        <View
+          style={[
+            styles.betDisplay,
+            betOffset
+              ? {
+                  bottom: undefined,
+                  left: SEAT_W / 2 - 22 + betOffset.dx,
+                  top: 44 + betOffset.dy,
+                }
+              : null,
+          ]}
+        >
           <View style={styles.chipStack}>
             {Array.from({
               length: Math.min(
@@ -689,6 +702,12 @@ export default function PokerTableScreen() {
   const seenMsgAtRef = useRef<number>(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
+  const [lastReadMsgCount, setLastReadMsgCount] = useState(0);
+  // Chat đang mở → tin mới về là auto đọc luôn.
+  useEffect(() => {
+    if (chatOpen)
+      setLastReadMsgCount((data as any)?.room?.messages?.length || 0);
+  }, [chatOpen, (data as any)?.room?.messages?.length]);
   const [nowTs, setNowTs] = useState(Date.now());
   const [emojiPicker, setEmojiPicker] = useState(false);
   const [floatingEmojis, setFloatingEmojis] = useState<any[]>([]);
@@ -1046,6 +1065,8 @@ export default function PokerTableScreen() {
           title: room.name,
           headerStyle: { backgroundColor: "#0B1220" },
           headerTintColor: "#fff",
+          gestureEnabled: false,
+          fullScreenGestureEnabled: false,
         }}
       />
       {connStatus !== "online" && (
@@ -1135,6 +1156,15 @@ export default function PokerTableScreen() {
                   Math.max(f.y * tableSize.h - SEAT_H / 2, -10),
                   tableSize.h - SEAT_H + 14,
                 );
+                // Offset chip cược hướng về giữa bàn (pot).
+                const cx = 0.5 - f.x;
+                const cy = 0.5 - f.y;
+                const len = Math.sqrt(cx * cx + cy * cy) || 1;
+                const R = 58;
+                const betOffset = {
+                  dx: (cx / len) * R,
+                  dy: (cy / len) * R,
+                };
                 return (
                   <View
                     key={seat.seatIndex}
@@ -1187,6 +1217,7 @@ export default function PokerTableScreen() {
                           ? () => doSit(seat.seatIndex)
                           : undefined
                       }
+                      betOffset={betOffset}
                     />
                   </View>
                 );
@@ -1334,14 +1365,16 @@ export default function PokerTableScreen() {
                         onChange={setRaiseValue}
                         pot={room.pot}
                       />
-                      <ActionBtn
-                        label={`Raise ${formatChips(clamped)}`}
-                        color="#D97706"
-                        onPress={() => {
-                          doAct("raise", clamped);
-                          setRaiseValue(null);
-                        }}
-                      />
+                      <View style={{ flexDirection: "row" }}>
+                        <ActionBtn
+                          label={`RAISE ${formatChips(clamped)}`}
+                          color="#D97706"
+                          onPress={() => {
+                            doAct("raise", clamped);
+                            setRaiseValue(null);
+                          }}
+                        />
+                      </View>
                     </>
                   );
                 })()}
@@ -1403,17 +1436,28 @@ export default function PokerTableScreen() {
 
       <Pressable
         style={styles.chatFab}
-        onPress={() => setChatOpen(true)}
+        onPress={() => {
+          setChatOpen(true);
+          setLastReadMsgCount(room.messages?.length || 0);
+        }}
         hitSlop={10}
       >
         <Ionicons name="chatbubbles" size={22} color="#fff" />
-        {room.messages?.length > 0 && (
-          <View style={styles.chatBadge}>
-            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>
-              {room.messages.length > 99 ? "99+" : room.messages.length}
-            </Text>
-          </View>
-        )}
+        {(() => {
+          const msgs = room.messages || [];
+          const meId = String(me?._id || "");
+          const unread = msgs
+            .slice(lastReadMsgCount)
+            .filter((m: any) => String(m.user) !== meId).length;
+          if (unread <= 0) return null;
+          return (
+            <View style={styles.chatBadge}>
+              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>
+                {unread > 99 ? "99+" : unread}
+              </Text>
+            </View>
+          );
+        })()}
       </Pressable>
 
       <ChatModal
@@ -1426,6 +1470,7 @@ export default function PokerTableScreen() {
           try {
             await chatMut({ roomId: String(id), text: text.trim() }).unwrap();
             setChatText("");
+            setChatOpen(false);
           } catch (err: any) {
             Alert.alert("Lỗi", err?.data?.message || "Không gửi được");
           }
@@ -1603,13 +1648,21 @@ function InviteModal({
                 <Ionicons name="close" size={22} color="#94A3B8" />
               </Pressable>
             </View>
-            <View style={{ paddingHorizontal: 12 }}>
+            <View
+              style={{
+                paddingHorizontal: 12,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
               <TextInput
                 value={q}
                 onChangeText={setQ}
                 placeholder="Tìm theo tên / nickname…"
                 placeholderTextColor="#64748B"
-                style={styles.chatInput}
+                autoCorrect={false}
+                autoCapitalize="none"
+                style={[styles.chatInput, { minHeight: 42 }]}
               />
             </View>
             {selected.length > 0 && (
@@ -2242,10 +2295,10 @@ const styles = StyleSheet.create({
   chatFab: {
     position: "absolute",
     right: 16,
-    bottom: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    top: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#0066FF",
     alignItems: "center",
     justifyContent: "center",
@@ -2271,11 +2324,11 @@ const styles = StyleSheet.create({
   },
   emojiFab: {
     position: "absolute",
-    right: 16,
-    bottom: 84,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    right: 64,
+    top: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#F59E0B",
     alignItems: "center",
     justifyContent: "center",
@@ -2287,8 +2340,8 @@ const styles = StyleSheet.create({
   },
   emojiBar: {
     position: "absolute",
-    right: 70,
-    bottom: 84,
+    right: 16,
+    top: 56,
     flexDirection: "row",
     backgroundColor: "rgba(15,23,42,0.97)",
     borderRadius: 12,
@@ -2471,11 +2524,11 @@ const styles = StyleSheet.create({
   /* Invite */
   inviteFab: {
     position: "absolute",
-    right: 16,
-    bottom: 148,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    right: 112,
+    top: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#8B5CF6",
     alignItems: "center",
     justifyContent: "center",

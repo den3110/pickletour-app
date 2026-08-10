@@ -234,15 +234,41 @@ const playersOf = (reg, eventType = "double") => {
 
 const sideKeyOf = (side) => (String(side).toUpperCase() === "B" ? "B" : "A");
 
+const _playerHasIdentity = (p) => {
+  if (!p || typeof p !== "object") return false;
+  return !!(
+    p._id ||
+    p.id ||
+    p.user ||
+    (typeof p.name === "string" && p.name.trim()) ||
+    (typeof p.nickname === "string" && p.nickname.trim()) ||
+    (typeof p.fullName === "string" && p.fullName.trim())
+  );
+};
+
+const hasPairPlayerData = (obj) => {
+  if (!obj || typeof obj !== "object") return false;
+  if (_playerHasIdentity(obj.player1) || _playerHasIdentity(obj.player2)) return true;
+  if (_playerHasIdentity(obj.p1) || _playerHasIdentity(obj.p2)) return true;
+  if (Array.isArray(obj.players) && obj.players.some(_playerHasIdentity)) return true;
+  return false;
+};
+
 const sideSourceOf = (match, side) => {
   const key = sideKeyOf(side);
-  return (
-    match?.[`pair${key}`] ||
-    match?.teams?.[key] ||
-    match?.[`team${key}`] ||
-    match?.[`side${key}`] ||
-    null
-  );
+  const candidates = [
+    match?.[`pair${key}`],
+    match?.teams?.[key],
+    match?.[`team${key}`],
+    match?.[`side${key}`],
+    match?.meta?.mlp?.[`pair${key}`],
+  ];
+  // Ưu tiên source có player1/player2 thật (User doc với avatar/cccd)
+  // để tránh rơi vào syntheticPlayersFromLabel — trường hợp MLP hydrate
+  // set teams.A = {name, displayName} nhưng không có players.
+  const withPlayers = candidates.find(hasPairPlayerData);
+  if (withPlayers) return withPlayers;
+  return candidates.find(Boolean) || null;
 };
 
 const isReferenceSideLabel = (value) => {
@@ -305,6 +331,18 @@ const playerDisplayLabel = (player, source) =>
 
 const playersForSide = (match, side, eventType = "double") => {
   const key = sideKeyOf(side);
+
+  // MLP hard-preference: nếu match.meta.mlp có pairA/pairB với player User
+  // đầy đủ, dùng ngay để đảm bảo avatar/cccd đi đúng chỗ. Guard bằng
+  // player._id/name để không đụng non-MLP.
+  const mlpPair = match?.meta?.mlp?.[`pair${key}`];
+  if (mlpPair && typeof mlpPair === "object") {
+    const mlpPlayers = [mlpPair.player1, mlpPair.player2].filter(
+      (p) => p && (p._id || p.id || p.nickname || p.name),
+    );
+    if (mlpPlayers.length) return mlpPlayers;
+  }
+
   const source = sideSourceOf(match, key);
   const players = playersOf(source, eventType);
   const namedPlayers = players.filter((player) =>
@@ -2042,7 +2080,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     if (!localBaseOverride) return undefined;
     const timeoutId = setTimeout(() => {
       setLocalBaseOverride(null);
-    }, 2500);
+    }, 8000);
     return () => clearTimeout(timeoutId);
   }, [localBaseOverride]);
 
@@ -2074,7 +2112,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     if (!localServeOverride) return undefined;
     const timeoutId = setTimeout(() => {
       setLocalServeOverride(null);
-    }, 2500);
+    }, 8000);
     return () => clearTimeout(timeoutId);
   }, [localServeOverride]);
 
@@ -3265,7 +3303,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     scoreGuardRef.current = {
       a: side === "A" ? guardedA + 1 : guardedA,
       b: side === "B" ? guardedB + 1 : guardedB,
-      until: Date.now() + 1500,
+      until: Date.now() + 8000,
     };
 
     try {
@@ -3361,7 +3399,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     if (uidRight) {
       forcedServerRef.current = {
         uid: uidRight,
-        until: Date.now() + 1500,
+        until: Date.now() + 8000,
         gameIndex: curIdx,
         side: nextSide,
         serverNum: wantOrder,
@@ -3409,7 +3447,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     if (partnerId) {
       forcedServerRef.current = {
         uid: partnerId,
-        until: Date.now() + 1500,
+        until: Date.now() + 8000,
         gameIndex: curIdx,
         side: activeSide,
         serverNum: nextOrder,

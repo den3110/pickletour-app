@@ -798,6 +798,10 @@ export default function RefereeCenterScreen() {
           playerName(m?.pairA?.player2),
           playerName(m?.pairB?.player1),
           playerName(m?.pairB?.player2),
+          m?.meta?.mlp?.pairALabel,
+          m?.meta?.mlp?.pairBLabel,
+          m?.meta?.mlp?.teamAName,
+          m?.meta?.mlp?.teamBName,
           m?.status,
           m?.video,
           courtLabelOf(m),
@@ -1041,14 +1045,18 @@ export default function RefereeCenterScreen() {
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {pairLabel(m?.pairA)}
+            {pairLabel(m?.pairA) !== "—"
+              ? pairLabel(m?.pairA)
+              : m?.meta?.mlp?.pairALabel || "—"}
           </Text>
           <Text
             style={{ color: T.text }}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {pairLabel(m?.pairB)}
+            {pairLabel(m?.pairB) !== "—"
+              ? pairLabel(m?.pairB)
+              : m?.meta?.mlp?.pairBLabel || "—"}
           </Text>
 
           {/* HIỆN TỈ SỐ SET */}

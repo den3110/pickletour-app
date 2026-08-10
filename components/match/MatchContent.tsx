@@ -2830,6 +2830,24 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
         return pairDisplayName(pair, currentIsSingle);
       }
 
+      // MLP sub-match fallback — Match doc không có pairA/pairB nhưng meta.mlp
+      // chứa team + lineup synth.
+      const mlpPair =
+        side === "A" ? match?.meta?.mlp?.pairA : match?.meta?.mlp?.pairB;
+      if (hasResolvedPair(mlpPair)) {
+        return pairDisplayName(mlpPair, currentIsSingle);
+      }
+      const mlpTeamName =
+        side === "A"
+          ? match?.meta?.mlp?.teamAName
+          : match?.meta?.mlp?.teamBName;
+      const mlpLabel =
+        side === "A"
+          ? match?.meta?.mlp?.pairALabel
+          : match?.meta?.mlp?.pairBLabel;
+      if (mlpLabel) return mlpLabel;
+      if (mlpTeamName) return mlpTeamName;
+
       if (previewLabel) return previewLabel;
 
       if (seed && isSeedBlockedByUnfinishedGroup(seed)) {
