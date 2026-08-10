@@ -1,7 +1,9 @@
 // app/feed/post/[id].tsx — Chi tiết bài viết + comments + reply
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useState } from "react";
+import { useDispatch } from "react-redux";
+import { useSocket } from "@/context/SocketContext";
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +29,7 @@ import {
   useDeleteFeedCommentMutation,
   useReportFeedPostMutation,
   useReportFeedCommentMutation,
+  feedApiSlice,
 } from "@/slices/feedApiSlice";
 import { useBlockUserMutation } from "@/slices/friendsApiSlice";
 import {
@@ -200,13 +203,119 @@ export default function FeedPostDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const headerHeight = useHeaderHeight();
-  const { data: post, isFetching } = useGetFeedPostQuery(String(id), {
+  const dispatch = useDispatch();
+  const socket = useSocket();
+  const {
+    data: post,
+    isFetching,
+    refetch: refetchPost,
+  } = useGetFeedPostQuery(String(id), {
     skip: !id,
+    refetchOnMountOrArgChange: true,
   });
-  const { data: comments } = useListFeedCommentsQuery(
+  const { data: comments, refetch: refetchComments } = useListFeedCommentsQuery(
     { postId: String(id) },
-    { skip: !id }
+    { skip: !id, refetchOnMountOrArgChange: true }
   );
+
+  // Refetch mỗi lần focus lại screen — user bấm noti mở app khi screen đã
+  // mount sẵn → RTK Query cache cũ, cần force fetch để thấy reply mới.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!id) return;
+      refetchPost();
+      refetchComments();
+    }, [id, refetchPost, refetchComments])
+  );
+
+  // Socket realtime: join room feed:post:${id}, invalidate cache khi có event.
+  React.useEffect(() => {
+    if (!id || !socket) return;
+    const pid = String(id);
+    const subscribe = () => socket.emit("feed:post:subscribe", { postId: pid });
+    subscribe();
+    socket.on("connect", subscribe);
+
+    const onCommentNew = (dto: any) => {
+      if (!dto || String(dto.post) !== pid) return;
+      // Invalidate cả root comments lẫn thread reply (nếu là reply)
+      dispatch(
+        feedApiSlice.util.invalidateTags([
+          { type: "FeedComments", id: `${pid}:${dto.parent || "root"}` },
+          { type: "Feed", id: pid },
+        ]) as any
+      );
+    };
+    const onCommentDeleted = ({ postId: pp, commentId }: any) => {
+      if (String(pp) !== pid) return;
+      // Không biết chắc parent → invalidate root + tag comment level. Safest:
+      // invalidate mọi comment list của post + post detail.
+      dispatch(
+        feedApiSlice.util.invalidateTags([
+          { type: "FeedComments", id: `${pid}:root` },
+          { type: "Feed", id: pid },
+        ]) as any
+      );
+      // Reply thread có thể có nhiều — refetch active queries theo post.
+      dispatch(feedApiSlice.util.invalidateTags(["FeedComments" as any]) as any);
+    };
+    const onCommentReaction = () => {
+      dispatch(
+        feedApiSlice.util.invalidateTags(["FeedComments" as any]) as any
+      );
+    };
+    const onPostUpdated = (dto: any) => {
+      if (!dto?._id || String(dto._id) !== pid) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData("getFeedPost", pid, () => dto) as any
+      );
+    };
+    const onReactionUpdated = ({ postId: pp, reactionCount, myReaction }: any) => {
+      if (String(pp) !== pid) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData("getFeedPost", pid, (d: any) => {
+          if (!d) return;
+          if (typeof reactionCount === "number") d.reactionCount = reactionCount;
+          if (typeof myReaction !== "undefined") d.myReaction = myReaction;
+        }) as any
+      );
+    };
+    const onShareUpdated = ({ postId: pp, shareCount }: any) => {
+      if (String(pp) !== pid) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData("getFeedPost", pid, (d: any) => {
+          if (!d) return;
+          if (typeof shareCount === "number") d.shareCount = shareCount;
+        }) as any
+      );
+    };
+    const onPostDeleted = ({ postId: pp }: any) => {
+      if (String(pp) !== pid) return;
+      router.back();
+    };
+
+    socket.on("feed:comment:new", onCommentNew);
+    socket.on("feed:comment:deleted", onCommentDeleted);
+    socket.on("feed:comment:reaction:updated", onCommentReaction);
+    socket.on("feed:post:updated", onPostUpdated);
+    socket.on("feed:reaction:updated", onReactionUpdated);
+    socket.on("feed:share:updated", onShareUpdated);
+    socket.on("feed:post:deleted", onPostDeleted);
+
+    return () => {
+      try {
+        socket.emit("feed:post:unsubscribe", { postId: pid });
+      } catch {}
+      socket.off("connect", subscribe);
+      socket.off("feed:comment:new", onCommentNew);
+      socket.off("feed:comment:deleted", onCommentDeleted);
+      socket.off("feed:comment:reaction:updated", onCommentReaction);
+      socket.off("feed:post:updated", onPostUpdated);
+      socket.off("feed:reaction:updated", onReactionUpdated);
+      socket.off("feed:share:updated", onShareUpdated);
+      socket.off("feed:post:deleted", onPostDeleted);
+    };
+  }, [id, socket, dispatch]);
   const [createComment, { isLoading: sending }] = useCreateFeedCommentMutation();
   const [reportPostMut] = useReportFeedPostMutation();
   const [blockUserMut] = useBlockUserMutation();

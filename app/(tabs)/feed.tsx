@@ -1,6 +1,8 @@
 // app/feed/index.tsx — Bảng tin (list + composer + reactions + link chi tiết)
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
+import { Stack, router, useFocusEffect } from "expo-router";
+import { useDispatch } from "react-redux";
+import { useSocket } from "@/context/SocketContext";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -32,6 +34,7 @@ import {
   useUploadFeedMediaMutation,
   useDeleteFeedPostMutation,
   useReportFeedPostMutation,
+  feedApiSlice,
 } from "@/slices/feedApiSlice";
 import { useBlockUserMutation } from "@/slices/friendsApiSlice";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
@@ -1064,6 +1067,8 @@ function PostCard({ post, me }: { post: any; me: any }) {
 
 export default function FeedScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
+  const dispatch = useDispatch();
+  const socket = useSocket();
   const [cursor, setCursor] = useState<string | null>(null);
   const { data, isFetching, refetch } = useListFeedQuery({
     cursor,
@@ -1077,6 +1082,112 @@ export default function FeedScreen() {
     setCursor(null);
     refetch();
   }, [refetch]);
+
+  // Refetch khi focus lại tab (user tap noti → app active → xem post mới).
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  // Realtime: post mới / xoá / cập nhật số reaction, share.
+  useEffect(() => {
+    if (!socket) return;
+    const subscribe = () => socket.emit("feed:list:subscribe");
+    subscribe();
+    socket.on("connect", subscribe);
+
+    const invalidateList = () => {
+      dispatch(
+        feedApiSlice.util.invalidateTags([
+          { type: "Feed", id: "LIST" },
+        ]) as any
+      );
+    };
+    const onReactionUpdated = ({ postId, reactionCount, myReaction }: any) => {
+      if (!postId) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData(
+          "listFeed",
+          { limit: 10 } as any,
+          (draft: any) => {
+            const item = (draft?.items || []).find(
+              (p: any) => String(p._id) === String(postId)
+            );
+            if (!item) return;
+            if (typeof reactionCount === "number")
+              item.reactionCount = reactionCount;
+            if (typeof myReaction !== "undefined")
+              item.myReaction = myReaction;
+          }
+        ) as any
+      );
+    };
+    const onShareUpdated = ({ postId, shareCount }: any) => {
+      if (!postId) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData(
+          "listFeed",
+          { limit: 10 } as any,
+          (draft: any) => {
+            const item = (draft?.items || []).find(
+              (p: any) => String(p._id) === String(postId)
+            );
+            if (item && typeof shareCount === "number")
+              item.shareCount = shareCount;
+          }
+        ) as any
+      );
+    };
+    const onPostUpdated = (dto: any) => {
+      if (!dto?._id) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData(
+          "listFeed",
+          { limit: 10 } as any,
+          (draft: any) => {
+            const idx = (draft?.items || []).findIndex(
+              (p: any) => String(p._id) === String(dto._id)
+            );
+            if (idx >= 0) draft.items[idx] = { ...draft.items[idx], ...dto };
+          }
+        ) as any
+      );
+    };
+    const onPostDeleted = ({ postId }: any) => {
+      if (!postId) return;
+      dispatch(
+        feedApiSlice.util.updateQueryData(
+          "listFeed",
+          { limit: 10 } as any,
+          (draft: any) => {
+            if (!draft?.items) return;
+            draft.items = draft.items.filter(
+              (p: any) => String(p._id) !== String(postId)
+            );
+          }
+        ) as any
+      );
+    };
+
+    socket.on("feed:post:new", invalidateList);
+    socket.on("feed:post:updated", onPostUpdated);
+    socket.on("feed:post:deleted", onPostDeleted);
+    socket.on("feed:reaction:updated", onReactionUpdated);
+    socket.on("feed:share:updated", onShareUpdated);
+
+    return () => {
+      try {
+        socket.emit("feed:list:unsubscribe");
+      } catch {}
+      socket.off("connect", subscribe);
+      socket.off("feed:post:new", invalidateList);
+      socket.off("feed:post:updated", onPostUpdated);
+      socket.off("feed:post:deleted", onPostDeleted);
+      socket.off("feed:reaction:updated", onReactionUpdated);
+      socket.off("feed:share:updated", onShareUpdated);
+    };
+  }, [socket, dispatch]);
 
   const loadMore = useCallback(() => {
     if (isFetching) return;
