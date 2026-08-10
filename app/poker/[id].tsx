@@ -1,10 +1,15 @@
 // Poker table — 6 seats, cards, betting controls.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +26,7 @@ import {
   useLeavePokerRoomMutation,
   useStartPokerHandMutation,
   usePokerActionMutation,
+  useChatPokerRoomMutation,
 } from "@/slices/pokerApiSlice";
 import { useSocket } from "@/context/SocketContext";
 
@@ -82,24 +88,69 @@ function EmptyCard({ small }: { small?: boolean }) {
 }
 
 // ── Seat ────────────────────────────────────
+function Avatar({
+  uri,
+  size = 36,
+  fallback,
+}: {
+  uri?: string;
+  size?: number;
+  fallback?: string;
+}) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: "#1E293B",
+        }}
+      />
+    );
+  }
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: "#334155",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ color: "#fff", fontSize: size * 0.4, fontWeight: "800" }}>
+        {(fallback || "?")[0]?.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
 function Seat({
   seat,
   isDealer,
   isActive,
   isMe,
+  timerPct,
   onSit,
 }: {
   seat: any;
   isDealer: boolean;
   isActive: boolean;
   isMe: boolean;
+  timerPct?: number;
   onSit?: () => void;
 }) {
   const empty = !seat.user;
   if (empty) {
     return (
       <Pressable onPress={onSit} style={styles.emptySeat}>
-        <Text style={{ color: "#94A3B8", fontSize: 11 }}>+ Ngồi</Text>
+        <Ionicons name="add-circle" size={22} color="#94A3B8" />
+        <Text style={{ color: "#94A3B8", fontSize: 10, marginTop: 4 }}>
+          Ngồi
+        </Text>
       </Pressable>
     );
   }
@@ -114,6 +165,21 @@ function Seat({
       ]}
     >
       {isDealer && <View style={styles.dealerChip}><Text style={{ fontSize: 9, fontWeight: "900", color: "#0F172A" }}>D</Text></View>}
+      {isActive && timerPct != null && (
+        <View style={styles.timerBarWrap}>
+          <View
+            style={[
+              styles.timerBarFill,
+              {
+                width: `${Math.max(0, Math.min(100, timerPct))}%`,
+                backgroundColor:
+                  timerPct > 50 ? "#10B981" : timerPct > 25 ? "#F59E0B" : "#EF4444",
+              },
+            ]}
+          />
+        </View>
+      )}
+      <Avatar uri={seat.user?.avatar} fallback={name} size={36} />
       <Text style={styles.seatName} numberOfLines={1}>
         {name}
       </Text>
@@ -169,7 +235,11 @@ export default function PokerTableScreen() {
   const [leave] = useLeavePokerRoomMutation();
   const [startHand] = useStartPokerHandMutation();
   const [act] = usePokerActionMutation();
+  const [chatMut] = useChatPokerRoomMutation();
   const [raiseAmt, setRaiseAmt] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [nowTs, setNowTs] = useState(Date.now());
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -179,14 +249,22 @@ export default function PokerTableScreen() {
     socket.on("connect", sub);
     const bump = () => refetch();
     socket.on("poker:room:updated", bump);
+    socket.on("poker:room:chat", bump);
     return () => {
       try {
         socket.emit("poker:room:unsubscribe", { roomId: rid });
       } catch {}
       socket.off("connect", sub);
       socket.off("poker:room:updated", bump);
+      socket.off("poker:room:chat", bump);
     };
   }, [socket, id, refetch]);
+
+  // Tick countdown mỗi 250ms để timer bar mượt
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
 
   if (isLoading || !data) {
     return (
@@ -200,6 +278,15 @@ export default function PokerTableScreen() {
   const mySeat = (room.seats || []).find((s: any) => s.isYou);
   const isMyTurn = mySeat && mySeat.seatIndex === room.activeIndex;
   const toCall = Math.max(0, room.currentBet - (mySeat?.betThisStreet || 0));
+
+  // Timer % (remaining / total)
+  const turnDur = (room.turnDurationSec || 30) * 1000;
+  const turnDeadline = room.turnDeadlineAt
+    ? new Date(room.turnDeadlineAt).getTime()
+    : 0;
+  const turnRemaining = Math.max(0, turnDeadline - nowTs);
+  const timerPct = turnDeadline ? (turnRemaining / turnDur) * 100 : 0;
+  const timerSecLeft = Math.ceil(turnRemaining / 1000);
 
   const doSit = async (seatIndex: number) => {
     if (!me) {
@@ -266,6 +353,17 @@ export default function PokerTableScreen() {
                 ? "Chờ ván tiếp theo"
                 : room.stage.toUpperCase() + ` · Ván ${room.handNumber}`}
             </Text>
+            {room.activeIndex >= 0 && turnDeadline > 0 && (
+              <View
+                style={[
+                  styles.turnBadge,
+                  timerSecLeft <= 5 && { backgroundColor: "#EF4444" },
+                ]}
+              >
+                <Ionicons name="timer-outline" size={12} color="#fff" />
+                <Text style={styles.turnBadgeText}>{timerSecLeft}s</Text>
+              </View>
+            )}
           </View>
 
           {/* Seats around */}
@@ -284,6 +382,9 @@ export default function PokerTableScreen() {
                     isDealer={seatIndex === room.dealerIndex && room.stage !== "waiting"}
                     isActive={seatIndex === room.activeIndex}
                     isMe={!!seat.isYou}
+                    timerPct={
+                      seatIndex === room.activeIndex ? timerPct : undefined
+                    }
                     onSit={
                       !seat.user && !mySeat ? () => doSit(seatIndex) : undefined
                     }
@@ -415,7 +516,167 @@ export default function PokerTableScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Chat FAB */}
+      <Pressable
+        style={styles.chatFab}
+        onPress={() => setChatOpen(true)}
+        hitSlop={10}
+      >
+        <Ionicons name="chatbubbles" size={22} color="#fff" />
+        {room.messages?.length > 0 && (
+          <View style={styles.chatBadge}>
+            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>
+              {room.messages.length > 99 ? "99+" : room.messages.length}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+
+      <ChatModal
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        messages={room.messages || []}
+        me={me}
+        onSend={async (text) => {
+          if (!text.trim()) return;
+          try {
+            await chatMut({ roomId: String(id), text: text.trim() }).unwrap();
+            setChatText("");
+          } catch (err: any) {
+            Alert.alert("Lỗi", err?.data?.message || "Không gửi được");
+          }
+        }}
+        chatText={chatText}
+        setChatText={setChatText}
+      />
     </SafeAreaView>
+  );
+}
+
+function ChatModal({
+  open,
+  onClose,
+  messages,
+  me,
+  onSend,
+  chatText,
+  setChatText,
+}: {
+  open: boolean;
+  onClose: () => void;
+  messages: any[];
+  me: any;
+  onSend: (text: string) => Promise<void>;
+  chatText: string;
+  setChatText: (s: string) => void;
+}) {
+  const listRef = useRef<FlatList<any>>(null);
+  useEffect(() => {
+    if (open && messages.length > 0) {
+      setTimeout(() => {
+        try {
+          listRef.current?.scrollToEnd({ animated: true });
+        } catch {}
+      }, 100);
+    }
+  }, [open, messages.length]);
+
+  return (
+    <Modal
+      visible={open}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.chatBackdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={0}
+        >
+          <View style={styles.chatSheet}>
+            <View style={styles.chatHeader}>
+              <View style={styles.chatHandle} />
+              <View style={styles.chatHeaderRow}>
+                <Text style={styles.chatTitle}>💬 Chat trong bàn</Text>
+                <Pressable onPress={onClose} hitSlop={10}>
+                  <Ionicons name="close" size={22} color="#94A3B8" />
+                </Pressable>
+              </View>
+            </View>
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(m: any, i: number) =>
+                m._id ? String(m._id) : `m-${i}`
+              }
+              contentContainerStyle={{ padding: 12, paddingBottom: 4 }}
+              ListEmptyComponent={
+                <View style={{ padding: 20, alignItems: "center" }}>
+                  <Text style={{ color: "#94A3B8" }}>
+                    Chưa có tin nhắn. Nói gì đó với đối thủ đi!
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }) => {
+                const isMe = String(item.user) === String(me?._id);
+                return (
+                  <View
+                    style={[
+                      styles.msgRow,
+                      isMe && { flexDirection: "row-reverse" },
+                    ]}
+                  >
+                    <Avatar uri={item.avatar} fallback={item.name} size={28} />
+                    <View
+                      style={[
+                        styles.msgBubble,
+                        isMe && {
+                          backgroundColor: "#0066FF",
+                          marginLeft: 0,
+                          marginRight: 8,
+                        },
+                      ]}
+                    >
+                      {!isMe && (
+                        <Text style={styles.msgName}>{item.name}</Text>
+                      )}
+                      <Text
+                        style={[styles.msgText, isMe && { color: "#fff" }]}
+                      >
+                        {item.text}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              }}
+            />
+            <View style={styles.chatInputRow}>
+              <TextInput
+                value={chatText}
+                onChangeText={setChatText}
+                placeholder="Nhập tin nhắn…"
+                placeholderTextColor="#94A3B8"
+                style={styles.chatInput}
+                maxLength={300}
+                onSubmitEditing={() => onSend(chatText)}
+              />
+              <Pressable
+                onPress={() => onSend(chatText)}
+                disabled={!chatText.trim()}
+                style={[
+                  styles.chatSendBtn,
+                  !chatText.trim() && { opacity: 0.4 },
+                ]}
+              >
+                <Ionicons name="send" size={18} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -618,4 +879,130 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   waitText: { color: "#94A3B8", fontStyle: "italic", textAlign: "center", padding: 8 },
+
+  // Timer
+  timerBarWrap: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    right: 4,
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  timerBarFill: { height: "100%", borderRadius: 2 },
+  turnBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#0F172A",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    marginTop: 6,
+  },
+  turnBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+
+  // Chat
+  chatFab: {
+    position: "absolute",
+    right: 16,
+    bottom: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#0066FF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  chatBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#0F1A2E",
+  },
+  chatBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  chatSheet: {
+    backgroundColor: "#0F172A",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: 480,
+    minHeight: 320,
+  },
+  chatHeader: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
+  chatHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#334155",
+    marginBottom: 8,
+  },
+  chatHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+  },
+  chatTitle: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  msgRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  msgBubble: {
+    backgroundColor: "#1E293B",
+    padding: 8,
+    borderRadius: 12,
+    marginLeft: 8,
+    maxWidth: "75%",
+  },
+  msgName: { color: "#94A3B8", fontSize: 11, fontWeight: "700", marginBottom: 2 },
+  msgText: { color: "#E2E8F0", fontSize: 13, lineHeight: 18 },
+  chatInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#1E293B",
+    alignItems: "center",
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: "#1E293B",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 14,
+  },
+  chatSendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#0066FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
