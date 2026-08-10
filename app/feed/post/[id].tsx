@@ -39,6 +39,7 @@ import {
 } from "@/utils/contentModeration";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
+import { AspectImage } from "@/components/feed/AspectImage";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 
@@ -518,24 +519,23 @@ export default function FeedPostDetail() {
                 };
                 if (post.media.length === 1) {
                   const m = post.media[0];
-                  const aspect =
+                  const initAspect =
                     m?.width && m?.height
                       ? Number(m.width) / Number(m.height)
-                      : 1;
-                  const h = Math.min(480, cardW / (aspect || 1));
+                      : null;
                   return (
-                    <Pressable
-                      onPress={() => openViewer(0)}
-                      style={{ marginTop: 10, alignItems: "center" }}
-                    >
+                    <View style={{ marginTop: 10, alignItems: "center" }}>
                       {m.type === "image" ? (
-                        <Image
-                          source={{ uri: m.url }}
-                          style={{ width: cardW, height: h, borderRadius: 10 }}
-                          resizeMode="cover"
+                        <AspectImage
+                          url={m.url}
+                          width={cardW}
+                          maxHeight={480}
+                          initialAspect={initAspect}
+                          onPress={() => openViewer(0)}
                         />
                       ) : (
-                        <View
+                        <Pressable
+                          onPress={() => openViewer(0)}
                           style={{
                             width: cardW,
                             height: cardW,
@@ -546,9 +546,9 @@ export default function FeedPostDetail() {
                           }}
                         >
                           <Ionicons name="play-circle" size={64} color="#fff" />
-                        </View>
+                        </Pressable>
                       )}
-                    </Pressable>
+                    </View>
                   );
                 }
                 return (
@@ -559,10 +559,14 @@ export default function FeedPostDetail() {
                     style={{ marginTop: 10 }}
                     contentContainerStyle={{ alignItems: "center" }}
                   >
-                    {post.media.map((m: any, i: number) => (
-                      <Pressable
+                    {post.media.map((m: any, i: number) => {
+                      const initAspect =
+                        m?.width && m?.height
+                          ? Number(m.width) / Number(m.height)
+                          : null;
+                      return (
+                      <View
                         key={i}
-                        onPress={() => openViewer(i)}
                         style={{
                           width: cardW,
                           marginRight: 8,
@@ -570,17 +574,16 @@ export default function FeedPostDetail() {
                         }}
                       >
                         {m.type === "image" ? (
-                          <Image
-                            source={{ uri: m.url }}
-                            style={{
-                              width: cardW,
-                              height: cardW,
-                              borderRadius: 10,
-                            }}
-                            resizeMode="cover"
+                          <AspectImage
+                            url={m.url}
+                            width={cardW}
+                            maxHeight={cardW}
+                            initialAspect={initAspect}
+                            onPress={() => openViewer(i)}
                           />
                         ) : (
-                          <View
+                          <Pressable
+                            onPress={() => openViewer(i)}
                             style={{
                               width: cardW,
                               height: cardW,
@@ -595,10 +598,11 @@ export default function FeedPostDetail() {
                               size={64}
                               color="#fff"
                             />
-                          </View>
+                          </Pressable>
                         )}
-                      </Pressable>
-                    ))}
+                      </View>
+                      );
+                    })}
                   </ScrollView>
                 );
               })()

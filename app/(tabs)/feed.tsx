@@ -46,6 +46,7 @@ import {
 import { useLazySearchTournamentsQuery } from "@/slices/tournamentsApiSlice";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
+import { AspectImage } from "@/components/feed/AspectImage";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 
 const REACTION_EMOJI: Record<string, string> = {
@@ -730,10 +731,10 @@ function PostMedia({
 
   if (media.length === 1) {
     const m = media[0];
-    const aspect =
-      m?.width && m?.height ? Number(m.width) / Number(m.height) : 1;
-    const h = Math.min(480, cardContentW / (aspect || 1));
+    const initAspect =
+      m?.width && m?.height ? Number(m.width) / Number(m.height) : null;
     if (m.type === "video") {
+      const h = Math.min(480, cardContentW / (initAspect || 1));
       return (
         <View style={{ marginTop: 10, alignItems: "center" }}>
           <InlineVideo uri={m.url} width={cardContentW} height={h} />
@@ -741,20 +742,15 @@ function PostMedia({
       );
     }
     return (
-      <Pressable
-        onPress={() => onOpenViewer(0)}
-        style={{ marginTop: 10, alignItems: "center" }}
-      >
-        <Image
-          source={{ uri: m.url }}
-          style={{
-            width: cardContentW,
-            height: h,
-            borderRadius: 10,
-          }}
-          resizeMode="cover"
+      <View style={{ marginTop: 10, alignItems: "center" }}>
+        <AspectImage
+          url={m.url}
+          width={cardContentW}
+          maxHeight={480}
+          initialAspect={initAspect}
+          onPress={() => onOpenViewer(0)}
         />
-      </Pressable>
+      </View>
     );
   }
 
@@ -767,6 +763,8 @@ function PostMedia({
       contentContainerStyle={{ alignItems: "center" }}
     >
       {media.slice(0, 8).map((m: any, i: number) => {
+        const initAspect =
+          m?.width && m?.height ? Number(m.width) / Number(m.height) : null;
         if (m.type === "video") {
           return (
             <View
@@ -778,21 +776,18 @@ function PostMedia({
           );
         }
         return (
-          <Pressable
+          <View
             key={i}
-            onPress={() => onOpenViewer(i)}
             style={{ width: cardContentW, marginRight: 8, alignItems: "center" }}
           >
-            <Image
-              source={{ uri: m.url }}
-              style={{
-                width: cardContentW,
-                height: cardContentW,
-                borderRadius: 10,
-              }}
-              resizeMode="cover"
+            <AspectImage
+              url={m.url}
+              width={cardContentW}
+              maxHeight={cardContentW}
+              initialAspect={initAspect}
+              onPress={() => onOpenViewer(i)}
             />
-          </Pressable>
+          </View>
         );
       })}
     </ScrollView>
