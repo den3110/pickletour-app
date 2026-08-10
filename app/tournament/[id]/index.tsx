@@ -771,6 +771,30 @@ export default function TournamentOverviewScreen() {
                 <Text style={S.shortcutText}>Sơ đồ</Text>
               </Pressable>
 
+              {(tournament as any)?.tournamentMode === "mlp" && (
+                <Pressable
+                  onPress={() => go("/tournament/[id]/mlp/duals")}
+                  style={({ pressed }) => [
+                    S.shortcut,
+                    { opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <View
+                    style={[
+                      S.shortcutIcon,
+                      { backgroundColor: "#F59E0B" },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="shield-star"
+                      size={18}
+                      color="#fff"
+                    />
+                  </View>
+                  <Text style={S.shortcutText}>MLP</Text>
+                </Pressable>
+              )}
+
               {/* NOTE: nếu route đăng ký của bạn khác, đổi pathname ở đây */}
               <Pressable
                 onPress={() => go("/tournament/[id]/register")}
