@@ -204,6 +204,7 @@ function CommentItem({
   onReply,
   onOpenReactors,
   justRepliedTo,
+  requireLoginGuard,
 }: {
   comment: any;
   postId: string;
@@ -211,6 +212,7 @@ function CommentItem({
   onReply: (cid: string) => void;
   onOpenReactors: (commentId: string) => void;
   justRepliedTo?: string | null;
+  requireLoginGuard: () => boolean;
 }) {
   const [reactComment] = useReactFeedCommentMutation();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -218,6 +220,7 @@ function CommentItem({
   const reactionCount: number = comment.reactionCount || 0;
   const doReact = async (type: string) => {
     setShowReactionPicker(false);
+    if (!requireLoginGuard()) return;
     try {
       await reactComment({
         cid: String(comment._id),
@@ -424,6 +427,7 @@ function CommentItem({
                   onReply={onReply}
                   onOpenReactors={onOpenReactors}
                   justRepliedTo={justRepliedTo}
+                  requireLoginGuard={requireLoginGuard}
                 />
               </View>
             ))}
@@ -558,6 +562,18 @@ export default function FeedPostDetail() {
   const [commentMedia, setCommentMedia] = useState<any[]>([]);
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [justRepliedTo, setJustRepliedTo] = useState<string | null>(null);
+  const requireLoginGuard = React.useCallback((): boolean => {
+    if (me) return true;
+    Alert.alert(
+      "Cần đăng nhập",
+      "Bạn cần đăng nhập để thực hiện thao tác này.",
+      [
+        { text: "Huỷ", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/login" as any) },
+      ]
+    );
+    return false;
+  }, [me]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [reactorsOpen, setReactorsOpen] = useState<
@@ -674,6 +690,7 @@ export default function FeedPostDetail() {
   };
 
   const pickCommentMedia = async () => {
+    if (!requireLoginGuard()) return;
     if (commentMedia.length >= 4) {
       Alert.alert("Đã đủ 4 tệp", "Mỗi bình luận tối đa 4 ảnh/video.");
       return;
@@ -741,6 +758,7 @@ export default function FeedPostDetail() {
   };
 
   const submit = async () => {
+    if (!requireLoginGuard()) return;
     if (!text.trim() && commentMedia.length === 0) return;
     if (commentMedia.some((m: any) => m._temp)) {
       Alert.alert("Vui lòng chờ tải xong", "Có media đang được tải lên.");
@@ -981,6 +999,7 @@ export default function FeedPostDetail() {
                 setReactorsOpen({ kind: "comment", id: cid })
               }
               justRepliedTo={justRepliedTo}
+              requireLoginGuard={requireLoginGuard}
             />
           ))}
           {comments?.items?.length === 0 && (

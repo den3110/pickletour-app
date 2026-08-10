@@ -208,6 +208,59 @@ const scoreStyles = StyleSheet.create({
   textMd: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
 });
 
+function GuestBanner() {
+  return (
+    <View
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 12,
+        marginTop: 12,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <Ionicons name="log-in-outline" size={22} color="#0066FF" />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: "600", color: "#0F172A" }}>
+          Đăng nhập để đăng bài, bình luận, thả cảm xúc
+        </Text>
+        <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+          Bạn vẫn có thể xem bảng tin mà không cần đăng nhập.
+        </Text>
+      </View>
+      <Pressable
+        onPress={() => router.push("/login" as any)}
+        style={{
+          backgroundColor: "#0066FF",
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 8,
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "600", fontSize: 13 }}>
+          Đăng nhập
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function requireLogin(me: any): boolean {
+  if (me) return true;
+  Alert.alert(
+    "Cần đăng nhập",
+    "Bạn cần đăng nhập để thực hiện thao tác này.",
+    [
+      { text: "Huỷ", style: "cancel" },
+      { text: "Đăng nhập", onPress: () => router.push("/login" as any) },
+    ]
+  );
+  return false;
+}
+
 function Composer({ onPosted }: { onPosted: () => void }) {
   const me = useSelector((s: any) => s.auth?.userInfo);
   const [content, setContent] = useState("");
@@ -832,6 +885,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
 
   const doReact = async (type: string) => {
     setPickerOpen(false);
+    if (!requireLogin(me)) return;
     try {
       await react({ id: post._id, type }).unwrap();
     } catch (err: any) {
@@ -1196,27 +1250,19 @@ export default function FeedScreen() {
     [me]
   );
 
-  if (!me) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Stack.Screen options={{ title: "Bảng tin" }} />
-        <View style={styles.emptyLogin}>
-          <Text style={styles.emptyTitle}>Đăng nhập để dùng Bảng tin</Text>
-          <Pressable onPress={() => router.push("/login")} style={styles.postBtn}>
-            <Text style={styles.postBtnText}>Đăng nhập</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <Stack.Screen options={{ title: "Bảng tin" }} />
       <FlatList
         data={items}
         keyExtractor={(i: any) => i._id}
-        ListHeaderComponent={<Composer onPosted={handleRefresh} />}
+        ListHeaderComponent={
+          me ? (
+            <Composer onPosted={handleRefresh} />
+          ) : (
+            <GuestBanner />
+          )
+        }
         renderItem={renderItem}
         refreshControl={
           <RefreshControl
