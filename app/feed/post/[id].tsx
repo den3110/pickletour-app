@@ -203,12 +203,14 @@ function CommentItem({
   me,
   onReply,
   onOpenReactors,
+  justRepliedTo,
 }: {
   comment: any;
   postId: string;
   me: any;
   onReply: (cid: string) => void;
   onOpenReactors: (commentId: string) => void;
+  justRepliedTo?: string | null;
 }) {
   const [reactComment] = useReactFeedCommentMutation();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -228,10 +230,36 @@ function CommentItem({
   const [showReplies, setShowReplies] = useState(
     Number(comment?.replyCount || 0) > 0
   );
-  const { data: replies } = useListFeedCommentsQuery(
+  // User vừa post reply → parent này có justRepliedTo === comment._id →
+  // force expand để hiện phản hồi mới ngay, không phải tap "Xem N phản hồi".
+  React.useEffect(() => {
+    if (
+      justRepliedTo &&
+      String(justRepliedTo) === String(comment._id) &&
+      !showReplies
+    ) {
+      setShowReplies(true);
+    }
+  }, [justRepliedTo, comment._id, showReplies]);
+  const { data: replies, refetch: refetchReplies } = useListFeedCommentsQuery(
     showReplies ? { postId, parent: comment._id } : (undefined as any),
     { skip: !showReplies }
   );
+  // Force refetch reply list khi vừa được đánh dấu justRepliedTo — cache
+  // có thể chưa được invalidate ở round đầu do query trước đó bị skip.
+  React.useEffect(() => {
+    if (
+      justRepliedTo &&
+      String(justRepliedTo) === String(comment._id) &&
+      showReplies
+    ) {
+      setTimeout(() => {
+        try {
+          refetchReplies?.();
+        } catch {}
+      }, 50);
+    }
+  }, [justRepliedTo, comment._id, showReplies, refetchReplies]);
   const [deleteComment] = useDeleteFeedCommentMutation();
   const [reportComment] = useReportFeedCommentMutation();
   const isMine = String(comment.author?._id) === String(me?._id);
@@ -395,6 +423,7 @@ function CommentItem({
                   me={me}
                   onReply={onReply}
                   onOpenReactors={onOpenReactors}
+                  justRepliedTo={justRepliedTo}
                 />
               </View>
             ))}
@@ -528,6 +557,7 @@ export default function FeedPostDetail() {
   const [text, setText] = useState("");
   const [commentMedia, setCommentMedia] = useState<any[]>([]);
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
+  const [justRepliedTo, setJustRepliedTo] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [reactorsOpen, setReactorsOpen] = useState<
@@ -717,6 +747,7 @@ export default function FeedPostDetail() {
       return;
     }
     try {
+      const wasReplyTo = replyTarget;
       await createComment({
         postId: String(id),
         content: text.trim(),
@@ -733,6 +764,13 @@ export default function FeedPostDetail() {
       setText("");
       setCommentMedia([]);
       setReplyTarget(null);
+      // Đánh dấu comment cha để CommentItem tự expand + refetch replies.
+      // Reset về null sau vài giây để lần reply tiếp theo cùng comment cha
+      // vẫn trigger được effect.
+      if (wasReplyTo) {
+        setJustRepliedTo(String(wasReplyTo));
+        setTimeout(() => setJustRepliedTo(null), 4000);
+      }
     } catch (err: any) {
       Alert.alert("Lỗi", extractErr(err));
     }
@@ -942,6 +980,7 @@ export default function FeedPostDetail() {
               onOpenReactors={(cid) =>
                 setReactorsOpen({ kind: "comment", id: cid })
               }
+              justRepliedTo={justRepliedTo}
             />
           ))}
           {comments?.items?.length === 0 && (
