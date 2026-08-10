@@ -1357,6 +1357,106 @@ const CustomExpoImage = (props: any) => {
 };
 
 /* ===================== MAIN SCREEN ===================== */
+function MlpRegistrationRedirect({
+  tourId,
+  tourName,
+  C,
+}: {
+  tourId: string;
+  tourName: string;
+  C: any;
+}) {
+  const router = useRouter();
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: C.pageBg,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+      }}
+    >
+      <View
+        style={{
+          backgroundColor: "#FEF3C7",
+          borderRadius: 16,
+          padding: 20,
+          borderWidth: 1,
+          borderColor: "#FCD34D",
+          alignItems: "center",
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: "#B45309",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 12,
+          }}
+        >
+          <Ionicons name="shield-checkmark" size={30} color="#fff" />
+        </View>
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "900",
+            color: "#78350F",
+            marginBottom: 4,
+            textAlign: "center",
+          }}
+        >
+          Đăng ký giải MLP
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            color: "#92400E",
+            textAlign: "center",
+            marginBottom: 16,
+          }}
+        >
+          Giải MLP đăng ký theo team. Đội trưởng tạo team và mời VĐV vào
+          roster. BTC duyệt team sau đó.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.push(`/tournament/${tourId}/mlp/teams` as any)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: "#F59E0B",
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 999,
+          }}
+        >
+          <Ionicons name="people" size={16} color="#fff" />
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14 }}>
+            Vào trang team MLP
+          </Text>
+        </TouchableOpacity>
+        <Text
+          style={{
+            fontSize: 11,
+            color: "#92400E",
+            marginTop: 10,
+            textAlign: "center",
+            fontStyle: "italic",
+          }}
+        >
+          {tourName}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function TournamentRegistrationScreen() {
   const C = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -2445,6 +2545,21 @@ export default function TournamentRegistrationScreen() {
   );
 
   if (tourLoading) return <TournamentSkeleton />;
+
+  // MLP tournaments: đăng ký theo team, không phải VĐV/cặp đôi.
+  // Redirect sang trang teams MLP để captain tạo team + roster.
+  if (
+    tour &&
+    String((tour as any)?.tournamentMode || "").toLowerCase() === "mlp"
+  ) {
+    return (
+      <MlpRegistrationRedirect
+        tourId={String(id)}
+        tourName={(tour as any)?.name || ""}
+        C={C}
+      />
+    );
+  }
 
   if (!tour)
     return (

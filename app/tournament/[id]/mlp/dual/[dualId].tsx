@@ -25,6 +25,7 @@ import {
   useScoreMlpDbPointMutation,
   useUndoMlpDbPointMutation,
   useCheckInMlpDualMutation,
+  useAssignMlpLineupMutation,
 } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
 
@@ -40,6 +41,7 @@ export default function MlpDualDetailScreen() {
   const [pointDb] = useScoreMlpDbPointMutation();
   const [undoDb] = useUndoMlpDbPointMutation();
   const [checkIn] = useCheckInMlpDualMutation();
+  const [assignLineup] = useAssignMlpLineupMutation();
 
   // Realtime subscribe
   useEffect(() => {
@@ -74,6 +76,45 @@ export default function MlpDualDetailScreen() {
   const dbRotate = Number(dbCfg.rotationEveryPoints) || 4;
 
   const [dbStartOpen, setDbStartOpen] = useState(false);
+  const [lineupTarget, setLineupTarget] = useState<{
+    sub: any;
+    side: "A" | "B";
+  } | null>(null);
+
+  const tour: any = d?.tournament || {};
+  const isAdmin = !!(me?.role === "admin" || me?.isAdmin || me?.isSuperUser);
+  const isManager = useMemo(() => {
+    if (!me?._id || !tour) return false;
+    if (String(tour.createdBy?._id ?? tour.createdBy) === String(me._id))
+      return true;
+    return (tour.managers || []).some(
+      (m: any) => String(m?.user?._id ?? m?.user ?? m) === String(me._id),
+    );
+  }, [me?._id, tour]);
+  const canManage = isAdmin || isManager;
+  const isCaptainA = useMemo(
+    () =>
+      !!(
+        me?._id &&
+        d?.teamA?.captain &&
+        String(d.teamA.captain?._id || d.teamA.captain) === String(me._id)
+      ),
+    [me?._id, d?.teamA?.captain],
+  );
+  const isCaptainB = useMemo(
+    () =>
+      !!(
+        me?._id &&
+        d?.teamB?.captain &&
+        String(d.teamB.captain?._id || d.teamB.captain) === String(me._id)
+      ),
+    [me?._id, d?.teamB?.captain],
+  );
+  const isCaptainOfDual = isCaptainA || isCaptainB;
+  const canEditLineupFor = (side: "A" | "B") => {
+    if (canManage) return true;
+    return side === "A" ? isCaptainA : isCaptainB;
+  };
 
   const currentPlayerAId = useMemo(() => {
     const db = d?.dreamBreaker;
@@ -165,6 +206,12 @@ export default function MlpDualDetailScreen() {
             key={sub._id}
             sub={sub}
             slot={(cfg.slots || []).find((s: any) => s.key === sub.slotKey)}
+            canManage={canManage}
+            canEditA={canEditLineupFor("A")}
+            canEditB={canEditLineupFor("B")}
+            teamA={d.teamA}
+            teamB={d.teamB}
+            onOpenLineup={(side) => setLineupTarget({ sub, side })}
             onSync={async (scoreA, scoreB, status) => {
               try {
                 await syncSub({
@@ -304,7 +351,216 @@ export default function MlpDualDetailScreen() {
           }
         }}
       />
+
+      <SubMatchLineupModal
+        open={!!lineupTarget}
+        onClose={() => setLineupTarget(null)}
+        target={lineupTarget}
+        teamA={d.teamA}
+        teamB={d.teamB}
+        onSubmit={async (side, playerIds) => {
+          if (!lineupTarget) return;
+          // Giữ nguyên lineup bên kia (backend đã handle: captain chỉ set
+          // bên mình, bên còn lại giữ giá trị cũ). Frontend chỉ gửi bên
+          // mình + gửi bên đối thủ = giá trị hiện tại để backend giữ.
+          const currentA = (lineupTarget.sub.playersA || []).map(
+            (p: any) => String(p?._id || p),
+          );
+          const currentB = (lineupTarget.sub.playersB || []).map(
+            (p: any) => String(p?._id || p),
+          );
+          try {
+            await assignLineup({
+              dualId: String(dualId),
+              subId: String(lineupTarget.sub._id),
+              playersA: side === "A" ? playerIds : currentA,
+              playersB: side === "B" ? playerIds : currentB,
+            }).unwrap();
+            setLineupTarget(null);
+          } catch (err: any) {
+            Alert.alert("Lỗi", err?.data?.message || "Không lưu được");
+          }
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+function SubMatchLineupModal({
+  open,
+  onClose,
+  target,
+  teamA,
+  teamB,
+  onSubmit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  target: { sub: any; side: "A" | "B" } | null;
+  teamA: any;
+  teamB: any;
+  onSubmit: (side: "A" | "B", playerIds: string[]) => Promise<void>;
+}) {
+  const sub = target?.sub;
+  const side = target?.side || "A";
+  const team = side === "A" ? teamA : teamB;
+  const preselected = side === "A" ? sub?.playersA : sub?.playersB;
+  const size = sub?.matchType === "single" ? 1 : 2;
+  const [selected, setSelected] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelected(
+      Array.isArray(preselected)
+        ? preselected.map((p: any) => String(p?._id || p))
+        : [],
+    );
+  }, [open, sub?._id, side]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= size) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const canSubmit = selected.length === size && !submitting;
+  const handleSubmit = async () => {
+    if (!target) return;
+    setSubmitting(true);
+    try {
+      await onSubmit(side, selected);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={open}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.mdBackdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View style={styles.mdSheet}>
+          <View style={styles.mdHeader}>
+            <Text style={styles.mdTitle}>
+              🏸 Lineup — {sub?.slotKey}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={22} color="#0F172A" />
+            </Pressable>
+          </View>
+          <Text style={styles.mdHint}>
+            {team?.name || `Team ${side}`} · Chọn {size} VĐV cho slot{" "}
+            {sub?.slotKey} ({size === 1 ? "Đơn" : "Đôi"}).
+          </Text>
+          <ScrollView
+            style={{ maxHeight: 420 }}
+            contentContainerStyle={{ padding: 12 }}
+          >
+            {(team?.players || []).length === 0 ? (
+              <Text style={styles.mdEmpty}>Roster team chưa có VĐV</Text>
+            ) : (
+              (team?.players || []).map((p: any) => {
+                const id = String(p?._id ?? p);
+                const orderIdx = selected.indexOf(id);
+                const isSelected = orderIdx >= 0;
+                const avatarUri = p?.avatar ? normalizeUrl(p.avatar) : "";
+                const initial =
+                  String(p?.nickname || p?.name || "?")
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase() || "?";
+                const color = side === "A" ? "#3B82F6" : "#EF4444";
+                return (
+                  <Pressable
+                    key={id}
+                    onPress={() => toggle(id)}
+                    style={[
+                      styles.mdRosterRow,
+                      isSelected && {
+                        backgroundColor: color + "18",
+                        borderColor: color,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.mdRosterCheck,
+                        isSelected && {
+                          backgroundColor: color,
+                          borderColor: color,
+                        },
+                      ]}
+                    >
+                      {isSelected ? (
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontWeight: "900",
+                            fontSize: 12,
+                          }}
+                        >
+                          {orderIdx + 1}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.mdRosterAvatarWrap}>
+                      {avatarUri ? (
+                        <Image
+                          source={{ uri: avatarUri }}
+                          style={styles.mdRosterAvatar}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.mdRosterAvatar,
+                            styles.mdRosterAvatarFallback,
+                          ]}
+                        >
+                          <Text style={styles.mdRosterInitial}>
+                            {initial}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.mdRosterName} numberOfLines={1}>
+                      {p.nickname || p.name || "VĐV"}
+                    </Text>
+                    {!!p.gender && (
+                      <Text style={styles.mdRosterMeta}>
+                        {p.gender === "female"
+                          ? "♀"
+                          : p.gender === "male"
+                            ? "♂"
+                            : ""}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+          <Pressable
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            style={[styles.mdSubmit, !canSubmit && { opacity: 0.4 }]}
+          >
+            <Ionicons name="save" size={16} color="#fff" />
+            <Text style={styles.mdSubmitText}>
+              {submitting
+                ? "Đang lưu…"
+                : `Lưu lineup (${selected.length}/${size})`}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -603,10 +859,22 @@ function SubMatchCard({
   sub,
   slot,
   onSync,
+  canManage,
+  canEditA,
+  canEditB,
+  onOpenLineup,
+  teamA,
+  teamB,
 }: {
   sub: any;
   slot: any;
   onSync: (scoreA: number, scoreB: number, status: string) => Promise<void>;
+  canManage: boolean;
+  canEditA: boolean;
+  canEditB: boolean;
+  teamA: any;
+  teamB: any;
+  onOpenLineup: (side: "A" | "B") => void;
 }) {
   const [sa, setSa] = useState(String(sub.result?.scoreA ?? 0));
   const [sb, setSb] = useState(String(sub.result?.scoreB ?? 0));
@@ -639,40 +907,101 @@ function SubMatchCard({
         )}
       </View>
       <View style={styles.subPlayers}>
-        <PlayerNames list={sub.playersA} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.subTeamName} numberOfLines={1}>
+            {teamA?.name || "Team A"}
+          </Text>
+          <PlayerNames list={sub.playersA} />
+          {canEditA && (
+            <Pressable
+              onPress={() => onOpenLineup("A")}
+              style={styles.subLineupBtn}
+            >
+              <Ionicons name="people" size={12} color="#3B82F6" />
+              <Text style={styles.subLineupBtnText}>
+                {sub.playersA?.length ? "Sửa lineup" : "Chọn lineup"}
+              </Text>
+            </Pressable>
+          )}
+        </View>
         <Text style={{ marginHorizontal: 8, color: "#94A3B8" }}>vs</Text>
-        <PlayerNames list={sub.playersB} />
-      </View>
-      <View style={styles.scoreRow}>
-        <TextInput
-          value={sa}
-          onChangeText={setSa}
-          keyboardType="number-pad"
-          style={styles.scoreInput}
-        />
-        <Text style={{ fontSize: 20, color: "#94A3B8" }}>—</Text>
-        <TextInput
-          value={sb}
-          onChangeText={setSb}
-          keyboardType="number-pad"
-          style={styles.scoreInput}
-        />
-        <View style={styles.statusPicker}>
-          <StatusChip label="Chưa" v="scheduled" cur={status} on={setStatus} />
-          <StatusChip label="LIVE" v="live" cur={status} on={setStatus} />
-          <StatusChip label="Xong" v="finished" cur={status} on={setStatus} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.subTeamName} numberOfLines={1}>
+            {teamB?.name || "Team B"}
+          </Text>
+          <PlayerNames list={sub.playersB} />
+          {canEditB && (
+            <Pressable
+              onPress={() => onOpenLineup("B")}
+              style={styles.subLineupBtn}
+            >
+              <Ionicons name="people" size={12} color="#EF4444" />
+              <Text
+                style={[styles.subLineupBtnText, { color: "#EF4444" }]}
+              >
+                {sub.playersB?.length ? "Sửa lineup" : "Chọn lineup"}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
-      <Pressable
-        onPress={save}
-        disabled={saving}
-        style={[styles.saveBtn, saving && { opacity: 0.5 }]}
-      >
-        <Ionicons name="save" size={14} color="#fff" />
-        <Text style={styles.saveBtnText}>
-          {saving ? "Đang lưu…" : "Lưu"}
-        </Text>
-      </Pressable>
+      {canManage ? (
+        <>
+          <View style={styles.scoreRow}>
+            <TextInput
+              value={sa}
+              onChangeText={setSa}
+              keyboardType="number-pad"
+              style={styles.scoreInput}
+            />
+            <Text style={{ fontSize: 20, color: "#94A3B8" }}>—</Text>
+            <TextInput
+              value={sb}
+              onChangeText={setSb}
+              keyboardType="number-pad"
+              style={styles.scoreInput}
+            />
+            <View style={styles.statusPicker}>
+              <StatusChip
+                label="Chưa"
+                v="scheduled"
+                cur={status}
+                on={setStatus}
+              />
+              <StatusChip label="LIVE" v="live" cur={status} on={setStatus} />
+              <StatusChip
+                label="Xong"
+                v="finished"
+                cur={status}
+                on={setStatus}
+              />
+            </View>
+          </View>
+          <Pressable
+            onPress={save}
+            disabled={saving}
+            style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+          >
+            <Ionicons name="save" size={14} color="#fff" />
+            <Text style={styles.saveBtnText}>
+              {saving ? "Đang lưu…" : "Lưu điểm"}
+            </Text>
+          </Pressable>
+        </>
+      ) : (
+        <View style={styles.subScoreRO}>
+          <Text style={styles.subScoreROTxt}>
+            {sub.result?.scoreA ?? 0} — {sub.result?.scoreB ?? 0}
+          </Text>
+          <Text style={styles.subScoreROStatus}>
+            {status === "finished"
+              ? "Đã kết thúc"
+              : status === "live"
+                ? "Đang diễn ra"
+                : "Chưa bắt đầu"}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -776,9 +1105,48 @@ const styles = StyleSheet.create({
   subMeta: { flex: 1, fontSize: 11, color: "#64748B" },
   subPlayers: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 10,
+    gap: 4,
   },
+  subTeamName: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  subLineupBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  subLineupBtnText: {
+    fontSize: 11,
+    color: "#3B82F6",
+    fontWeight: "700",
+  },
+  subScoreRO: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    marginTop: 4,
+  },
+  subScoreROTxt: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
+  subScoreROStatus: { fontSize: 12, color: "#64748B", fontWeight: "600" },
   scoreRow: {
     flexDirection: "row",
     alignItems: "center",
