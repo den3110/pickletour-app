@@ -868,6 +868,7 @@ export default function FeedPostDetail() {
         keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
       >
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
