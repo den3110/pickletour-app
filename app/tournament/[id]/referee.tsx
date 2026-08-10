@@ -32,6 +32,7 @@ import {
 } from "@/slices/tournamentsApiSlice";
 
 import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
+import { useListMlpDualsQuery } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import { useIsFocused } from "@react-navigation/native";
@@ -712,14 +713,48 @@ export default function RefereeCenterScreen() {
       })),
     [stationTabs]
   );
+  // MLP tournaments don't use brackets/vòng bảng — chỉ hiện tab "Tất cả trận"
+  // (+ station tabs nếu có), ẩn typesAvailable (group/knockout/…).
+  const isMlpTour =
+    String(tour?.tournamentMode || "").toLowerCase() === "mlp";
   const displayTabs = useMemo(
     () => [
       ...stationTabTypes,
       { type: TAB_ALL, label: "Tất cả trận" },
-      ...typesAvailable,
+      ...(isMlpTour ? [] : typesAvailable),
     ],
-    [stationTabTypes, typesAvailable]
+    [stationTabTypes, typesAvailable, isMlpTour]
   );
+
+  // MLP duals fetch (chỉ khi tournament mode = mlp) — dùng để hiện card
+  // DreamBreaker khi dual vào tie_break và trọng tài được gán.
+  const {
+    data: mlpDualsResp,
+    refetch: refetchMlpDuals,
+  } = useListMlpDualsQuery(
+    { tourId: id },
+    { skip: !isMlpTour || !id, refetchOnFocus: true },
+  );
+  const mlpDbDuals = useMemo(() => {
+    if (!isMlpTour) return [];
+    const items = Array.isArray(mlpDualsResp?.items) ? mlpDualsResp.items : [];
+    const myId = String(me?._id || "");
+    return items.filter((dl: any) => {
+      // Chỉ hiện dual đang tie_break (chờ DreamBreaker start) hoặc đã
+      // trigger DreamBreaker chưa xong.
+      const inDb = dl?.status === "tie_break" ||
+        (dl?.dreamBreaker?.triggered && !dl?.dreamBreaker?.winner);
+      if (!inDb) return false;
+      // Trọng tài của dual hoặc bất kỳ sub-match nào → có quyền chấm.
+      const dualRefs = Array.isArray(dl?.referees) ? dl.referees : [];
+      if (dualRefs.some((r: any) => String(r?._id ?? r) === myId)) return true;
+      const subs = Array.isArray(dl?.subMatches) ? dl.subMatches : [];
+      return subs.some((s: any) => {
+        const sr = Array.isArray(s?.referees) ? s.referees : [];
+        return sr.some((r: any) => String(r?._id ?? r) === myId);
+      });
+    });
+  }, [mlpDualsResp?.items, isMlpTour, me?._id]);
 
   const [tab, setTab] = useState(TAB_ALL);
   const [q, setQ] = useState("");
@@ -1367,6 +1402,52 @@ export default function RefereeCenterScreen() {
             </View>
           ) : null}
         </View>
+
+        {isMlpTour && mlpDbDuals.length > 0 ? (
+          <View style={{ paddingHorizontal: 8, paddingTop: 8, gap: 8 }}>
+            {mlpDbDuals.map((dl: any) => {
+              const started = !!dl?.dreamBreaker?.triggered;
+              return (
+                <Pressable
+                  key={String(dl._id)}
+                  onPress={() =>
+                    router.push(`/tournament/${id}/mlp/dual/${dl._id}`)
+                  }
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#F59E0B",
+                    backgroundColor: "#FFFBEB",
+                    borderRadius: 12,
+                    padding: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#92400E",
+                      fontWeight: "900",
+                      marginBottom: 4,
+                    }}
+                  >
+                    🏆 DreamBreaker {started ? "· ĐANG DIỄN RA" : "· CẦN START"}
+                  </Text>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#78350F" }}>
+                    {dl?.teamA?.name || "Team A"} vs {dl?.teamB?.name || "Team B"}
+                  </Text>
+                  {started ? (
+                    <Text style={{ fontSize: 20, fontWeight: "900", color: "#78350F", marginTop: 4 }}>
+                      {dl?.dreamBreaker?.scoreA || 0} — {dl?.dreamBreaker?.scoreB || 0}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 12, color: "#B45309", marginTop: 4 }}>
+                      Tap để chọn lineup và start ván tie-break 1v1
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
         {String(tab).startsWith(TAB_STATION_PREFIX) ? (
           <FlatList

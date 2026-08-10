@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { normalizeUrl } from "@/utils/normalizeUri";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -63,15 +65,9 @@ export default function MlpDualDetailScreen() {
     };
   }, [socket, dualId, refetch]);
 
-  if (isLoading || !dual) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  const d: any = dual;
+  // ⚠️ Tất cả hooks phải chạy trước early return để tránh
+  // "Rendered more hooks than during the previous render".
+  const d: any = dual || {};
   const cfg = (d as any).tournament?.mlpConfig || {};
   const dbCfg = cfg.dreamBreaker || {};
   const dbPointsToWin = Number(dbCfg.pointsToWin) || 21;
@@ -97,6 +93,14 @@ export default function MlpDualDetailScreen() {
       lineup.length;
     return lineup[idx];
   }, [d?.dreamBreaker?.scoreB, d?.dreamBreaker?.lineupB, dbRotate]);
+
+  if (isLoading || !dual) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   const findPlayerObj = (arr: any[], id: any) => {
     if (!Array.isArray(arr) || !id) return null;
@@ -322,17 +326,42 @@ function CurrentPlayerCard({
     : 0;
   const pointsInBlock = currentScore % Math.max(1, rotate);
   const pointsUntilRotate = Math.max(0, rotate - pointsInBlock);
+  const avatarUri = player?.avatar ? normalizeUrl(player.avatar) : "";
+  const [imgErr, setImgErr] = useState(false);
+  const showIcon = !avatarUri || imgErr;
+  const initial =
+    String(player?.nickname || player?.name || "?")
+      .trim()
+      .charAt(0)
+      .toUpperCase() || "?";
   return (
     <View style={styles.dbPlayerCard}>
       <Text style={styles.dbPlayerTeam} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={styles.dbPlayerName} numberOfLines={1}>
-        {player?.nickname || player?.name || "—"}
-      </Text>
-      <Text style={styles.dbPlayerRotate}>
-        Người #{rotationIdx + 1}/{lineupSize} · Còn {pointsUntilRotate}đ nữa xoay
-      </Text>
+      <View style={styles.dbPlayerHead}>
+        <View style={styles.dbPlayerAvatarWrap}>
+          {showIcon ? (
+            <View style={[styles.dbPlayerAvatar, styles.dbPlayerAvatarFallback]}>
+              <Text style={styles.dbPlayerInitial}>{initial}</Text>
+            </View>
+          ) : (
+            <Image
+              source={{ uri: avatarUri }}
+              style={styles.dbPlayerAvatar}
+              onError={() => setImgErr(true)}
+            />
+          )}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.dbPlayerName} numberOfLines={1}>
+            {player?.nickname || player?.name || "—"}
+          </Text>
+          <Text style={styles.dbPlayerRotate} numberOfLines={2}>
+            Người #{rotationIdx + 1}/{lineupSize} · Còn {pointsUntilRotate}đ nữa xoay
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -469,6 +498,12 @@ function LineupPicker({
           const id = String(p?._id ?? p);
           const orderIdx = lineup.indexOf(id);
           const isSelected = orderIdx >= 0;
+          const avatarUri = p?.avatar ? normalizeUrl(p.avatar) : "";
+          const initial =
+            String(p?.nickname || p?.name || "?")
+              .trim()
+              .charAt(0)
+              .toUpperCase() || "?";
           return (
             <Pressable
               key={id}
@@ -489,6 +524,18 @@ function LineupPicker({
                     {orderIdx + 1}
                   </Text>
                 ) : null}
+              </View>
+              <View style={styles.mdRosterAvatarWrap}>
+                {avatarUri ? (
+                  <Image
+                    source={{ uri: avatarUri }}
+                    style={styles.mdRosterAvatar}
+                  />
+                ) : (
+                  <View style={[styles.mdRosterAvatar, styles.mdRosterAvatarFallback]}>
+                    <Text style={styles.mdRosterInitial}>{initial}</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.mdRosterName} numberOfLines={1}>
                 {p.nickname || p.name || "VĐV"}
@@ -848,6 +895,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#92400E",
     marginTop: 3,
+  },
+  dbPlayerHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  dbPlayerAvatarWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#F59E0B",
+  },
+  dbPlayerAvatar: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  dbPlayerAvatarFallback: {
+    backgroundColor: "#FCD34D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dbPlayerInitial: {
+    color: "#78350F",
+    fontWeight: "900",
+    fontSize: 16,
   },
   mdBackdrop: {
     flex: 1,
