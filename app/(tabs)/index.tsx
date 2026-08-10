@@ -208,6 +208,15 @@ const FEATURES = [
     link: "/coaches",
     isNew: true,
   },
+  {
+    id: 18,
+    icon: "game-controller",
+    iconLib: "Ionicons",
+    title: "Poker",
+    color: "#DC2626",
+    link: "/poker",
+    isNew: true,
+  },
 ];
 
 /* ---------- Utils ---------- */
