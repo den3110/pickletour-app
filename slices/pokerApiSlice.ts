@@ -88,6 +88,13 @@ export const pokerApiSlice = apiSlice.injectEndpoints({
         { type: "PokerRoom" as any, id: roomId },
       ],
     }),
+    invitePokerRoom: builder.mutation({
+      query: ({ roomId, userIds }: { roomId: string; userIds: string[] }) => ({
+        url: `/api/poker/rooms/${roomId}/invite`,
+        method: "POST",
+        body: { userIds },
+      }),
+    }),
   }),
 });
 
@@ -102,4 +109,5 @@ export const {
   useChatPokerRoomMutation,
   useEmojiPokerRoomMutation,
   useRevealPokerCardsMutation,
+  useInvitePokerRoomMutation,
 } = pokerApiSlice;

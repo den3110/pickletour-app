@@ -14,7 +14,9 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -34,7 +36,9 @@ import {
   useChatPokerRoomMutation,
   useEmojiPokerRoomMutation,
   useRevealPokerCardsMutation,
+  useInvitePokerRoomMutation,
 } from "@/slices/pokerApiSlice";
+import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { playFx } from "./pokerFx";
 
@@ -216,6 +220,51 @@ function FloatingEmoji({ emoji }: { emoji: string }) {
   );
 }
 
+function SpeechBubble({ text }: { text: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 8,
+      }),
+      Animated.delay(3400),
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [anim, text]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.speechBubble,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [6, 0],
+              }),
+            },
+            { scale: anim },
+          ],
+        },
+      ]}
+    >
+      <Text numberOfLines={3} style={styles.speechText}>
+        {text}
+      </Text>
+      <View style={styles.speechTail} />
+    </Animated.View>
+  );
+}
+
 function DealerFigure() {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -344,6 +393,7 @@ function Seat({
   isWinner,
   timerPct,
   floatEmoji,
+  bubble,
   onSit,
 }: {
   seat: any;
@@ -353,6 +403,7 @@ function Seat({
   isWinner?: boolean;
   timerPct?: number;
   floatEmoji?: string;
+  bubble?: string;
   onSit?: () => void;
 }) {
   if (!seat.user) {
@@ -390,6 +441,7 @@ function Seat({
   return (
     <View style={[styles.seatBox, seat.hasFolded && { opacity: 0.45 }]}>
       {floatEmoji && <FloatingEmoji emoji={floatEmoji} />}
+      {bubble ? <SpeechBubble text={bubble} /> : null}
       {isWinner && (
         <Text style={styles.crown} pointerEvents="none">
           👑
@@ -523,7 +575,12 @@ export default function PokerTableScreen() {
   const [chatMut] = useChatPokerRoomMutation();
   const [emojiMut] = useEmojiPokerRoomMutation();
   const [revealMut] = useRevealPokerCardsMutation();
-  const [raiseAmt, setRaiseAmt] = useState("");
+  const [inviteMut] = useInvitePokerRoomMutation();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [raiseValue, setRaiseValue] = useState<number | null>(null);
+  // Speech bubble chat: gần đây msg nào, hiện 4s over avatar sender
+  const [bubbles, setBubbles] = useState<Record<string, { text: string; at: number }>>({});
+  const seenMsgAtRef = useRef<number>(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [nowTs, setNowTs] = useState(Date.now());
@@ -626,6 +683,52 @@ export default function PokerTableScreen() {
     const t = setInterval(() => setNowTs(Date.now()), 250);
     return () => clearInterval(t);
   }, []);
+
+  // Speech bubble: khi có msg mới (theo timestamp `at`), gán bubble cho
+  // sender trong 4s. Chat mới trong lúc chat modal đang mở cũng vẫn hiện
+  // bubble (feedback cho người chơi khác).
+  useEffect(() => {
+    const msgs = (data as any)?.room?.messages || [];
+    if (!msgs.length) return;
+    let latestSeen = seenMsgAtRef.current;
+    let dirty = false;
+    const next = { ...bubbles };
+    for (const m of msgs) {
+      const t = new Date(m.at || 0).getTime();
+      if (t > seenMsgAtRef.current && m.user) {
+        next[String(m.user)] = { text: String(m.text || ""), at: t };
+        dirty = true;
+        if (t > latestSeen) latestSeen = t;
+      }
+    }
+    seenMsgAtRef.current = latestSeen;
+    if (dirty) setBubbles(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(data as any)?.room?.messages?.length]);
+
+  // Reset raise slider mỗi khi hết lượt của mình
+  useEffect(() => {
+    const room2: any = (data as any)?.room;
+    const my = room2?.seats?.find((s: any) => s.isYou);
+    if (!my || my.seatIndex !== room2?.activeIndex) {
+      setRaiseValue(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(data as any)?.room?.activeIndex, (data as any)?.room?.currentBet]);
+
+  // Tick cleanup bubble hết hạn
+  useEffect(() => {
+    setBubbles((prev) => {
+      const now = Date.now();
+      const next: typeof prev = {};
+      let changed = false;
+      for (const k of Object.keys(prev)) {
+        if (now - prev[k].at < 4000) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [nowTs]);
 
   // Polling fallback: khi offline hoặc socket không dispatch event kịp
   // thời, refetch mỗi 5s để room state không đứng im.
@@ -924,6 +1027,11 @@ export default function PokerTableScreen() {
                           (e) => e.seatIndex === seat.seatIndex,
                         )?.emoji
                       }
+                      bubble={
+                        seat.user?._id
+                          ? bubbles[String(seat.user._id)]?.text
+                          : undefined
+                      }
                       onSit={
                         !seat.user && !mySeat
                           ? () => doSit(seat.seatIndex)
@@ -1048,52 +1156,32 @@ export default function PokerTableScreen() {
                     onPress={() => doAct("allin")}
                   />
                 </View>
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                  <TextInput
-                    value={raiseAmt}
-                    onChangeText={setRaiseAmt}
-                    keyboardType="number-pad"
-                    placeholder={`Raise (min ${room.currentBet + room.minRaise})`}
-                    placeholderTextColor="#64748B"
-                    style={styles.raiseInput}
-                  />
-                  <ActionBtn
-                    label="Raise"
-                    color="#D97706"
-                    onPress={() => {
-                      const n = Number(raiseAmt);
-                      if (!Number.isFinite(n) || n <= 0) {
-                        Alert.alert("Nhập số raise");
-                        return;
-                      }
-                      doAct("raise", n);
-                      setRaiseAmt("");
-                    }}
-                  />
-                </View>
-                <View style={styles.quickRow}>
-                  {[
-                    room.currentBet + room.minRaise,
-                    Math.floor(room.pot * 0.5) + room.currentBet,
-                    room.pot + room.currentBet,
-                  ]
-                    .filter(
-                      (n) =>
-                        n > room.currentBet &&
-                        n <= mySeat.chips + mySeat.betThisStreet,
-                    )
-                    .map((n, i) => (
-                      <Pressable
-                        key={i}
-                        onPress={() => setRaiseAmt(String(n))}
-                        style={styles.quickBet}
-                      >
-                        <Text style={styles.quickBetText}>
-                          {formatChips(n)}
-                        </Text>
-                      </Pressable>
-                    ))}
-                </View>
+                {(() => {
+                  const minRaise = room.currentBet + room.minRaise;
+                  const maxRaise = mySeat.chips + mySeat.betThisStreet;
+                  if (maxRaise <= minRaise) return null; // không đủ chip
+                  const cur = raiseValue ?? minRaise;
+                  const clamped = Math.min(Math.max(cur, minRaise), maxRaise);
+                  return (
+                    <>
+                      <RaiseSlider
+                        min={minRaise}
+                        max={maxRaise}
+                        value={clamped}
+                        onChange={setRaiseValue}
+                        pot={room.pot}
+                      />
+                      <ActionBtn
+                        label={`Raise ${formatChips(clamped)}`}
+                        color="#D97706"
+                        onPress={() => {
+                          doAct("raise", clamped);
+                          setRaiseValue(null);
+                        }}
+                      />
+                    </>
+                  );
+                })()}
               </>
             )}
             {mySeat && !isMyTurn && room.stage !== "waiting" && (
@@ -1141,6 +1229,15 @@ export default function PokerTableScreen() {
         </Pressable>
       )}
 
+      {/* Invite FAB — luôn hiển thị (không cần ngồi vào bàn cũng mời được) */}
+      <Pressable
+        style={styles.inviteFab}
+        onPress={() => setInviteOpen(true)}
+        hitSlop={10}
+      >
+        <Ionicons name="person-add" size={20} color="#fff" />
+      </Pressable>
+
       <Pressable
         style={styles.chatFab}
         onPress={() => setChatOpen(true)}
@@ -1173,11 +1270,287 @@ export default function PokerTableScreen() {
         chatText={chatText}
         setChatText={setChatText}
       />
+
+      <InviteModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onSend={async (userIds) => {
+          if (!userIds.length) return;
+          try {
+            const r: any = await inviteMut({
+              roomId: String(id),
+              userIds,
+            }).unwrap();
+            Alert.alert("Đã mời", `Đã gửi lời mời cho ${r?.invited || userIds.length} người.`);
+            setInviteOpen(false);
+          } catch (err: any) {
+            Alert.alert("Lỗi", err?.data?.message || "Không gửi mời được");
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
 
 /* ═══════════════ Chat modal ═══════════════ */
+
+function RaiseSlider({
+  min,
+  max,
+  value,
+  onChange,
+  pot,
+}: {
+  min: number;
+  max: number;
+  value: number;
+  onChange: (v: number) => void;
+  pot: number;
+}) {
+  const [w, setW] = useState(0);
+  const clamp = (v: number) => Math.max(min, Math.min(max, Math.round(v)));
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          if (!w) return;
+          const x = evt.nativeEvent.locationX;
+          onChange(clamp(min + (x / w) * (max - min)));
+        },
+        onPanResponderMove: (evt) => {
+          if (!w) return;
+          const x = evt.nativeEvent.locationX;
+          onChange(clamp(min + (x / w) * (max - min)));
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [w, min, max, onChange],
+  );
+
+  const presets: { label: string; value: number }[] = [
+    { label: "MIN", value: min },
+    { label: "1/2 Pot", value: clamp(Math.floor(pot / 2) + min) },
+    { label: "POT", value: clamp(pot + min - min) },
+    { label: "ALL IN", value: max },
+  ];
+
+  return (
+    <View style={styles.raiseWrap}>
+      <View style={styles.raiseHeader}>
+        <Text style={styles.raiseLabel}>Raise</Text>
+        <Text style={styles.raiseValue}>{formatChips(value)}</Text>
+      </View>
+      <View
+        style={styles.sliderTrack}
+        onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+        {...responder.panHandlers}
+      >
+        <View style={[styles.sliderFill, { width: `${pct}%` }]} />
+        <View
+          style={[
+            styles.sliderThumb,
+            { left: `${pct}%`, marginLeft: -12 },
+          ]}
+        />
+      </View>
+      <View style={styles.presetsRow}>
+        {presets.map((p) => (
+          <Pressable
+            key={p.label}
+            onPress={() => onChange(p.value)}
+            style={[
+              styles.presetChip,
+              value === p.value && styles.presetChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.presetChipText,
+                value === p.value && { color: "#0B1220" },
+              ]}
+            >
+              {p.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function InviteModal({
+  open,
+  onClose,
+  onSend,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSend: (userIds: string[]) => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<any[]>([]);
+  const [trigger, { data, isFetching }] = useLazySearchUserQuery();
+  useEffect(() => {
+    if (!open) {
+      setQ("");
+      setSelected([]);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!q || q.length < 1) return;
+    const t = setTimeout(() => trigger(q), 300);
+    return () => clearTimeout(t);
+  }, [q, trigger]);
+  const list = useMemo(() => {
+    const raw: any = data;
+    const arr = Array.isArray(raw)
+      ? raw
+      : raw?.items || raw?.data || raw?.users || [];
+    return arr.slice(0, 30);
+  }, [data]);
+  const toggle = (u: any) => {
+    setSelected((prev) =>
+      prev.some((x) => String(x._id) === String(u._id))
+        ? prev.filter((x) => String(x._id) !== String(u._id))
+        : [...prev, u],
+    );
+  };
+
+  return (
+    <Modal
+      visible={open}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.chatBackdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={[styles.chatSheet, { maxHeight: 520 }]}>
+            <View style={styles.chatHandle} />
+            <View style={styles.chatHeaderRow}>
+              <Text style={styles.chatTitle}>👥 Mời bạn vào bàn</Text>
+              <Pressable onPress={onClose} hitSlop={10}>
+                <Ionicons name="close" size={22} color="#94A3B8" />
+              </Pressable>
+            </View>
+            <View style={{ paddingHorizontal: 12 }}>
+              <TextInput
+                value={q}
+                onChangeText={setQ}
+                placeholder="Tìm theo tên / nickname…"
+                placeholderTextColor="#64748B"
+                style={styles.chatInput}
+              />
+            </View>
+            {selected.length > 0 && (
+              <View style={styles.selectedRow}>
+                {selected.map((u: any) => (
+                  <Pressable
+                    key={u._id}
+                    onPress={() => toggle(u)}
+                    style={styles.selectedChip}
+                  >
+                    <Text style={styles.selectedChipText}>
+                      {u.nickname || u.name}
+                    </Text>
+                    <Ionicons name="close" size={12} color="#0B1220" />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <FlatList
+              data={list}
+              keyExtractor={(u: any) => String(u._id)}
+              contentContainerStyle={{ padding: 12 }}
+              ListEmptyComponent={
+                <View style={{ padding: 20, alignItems: "center" }}>
+                  {isFetching ? (
+                    <ActivityIndicator color="#94A3B8" />
+                  ) : (
+                    <Text style={{ color: "#94A3B8" }}>
+                      {q
+                        ? "Không tìm thấy user nào"
+                        : "Gõ tên hoặc nickname để tìm và mời"}
+                    </Text>
+                  )}
+                </View>
+              }
+              renderItem={({ item }) => {
+                const active = selected.some(
+                  (x: any) => String(x._id) === String(item._id),
+                );
+                return (
+                  <Pressable
+                    onPress={() => toggle(item)}
+                    style={[styles.userRow, active && styles.userRowActive]}
+                  >
+                    <Avatar
+                      uri={item.avatar}
+                      fallback={item.nickname || item.name}
+                      size={36}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.userName}>
+                        {item.nickname || item.name}
+                      </Text>
+                      {!!item.name && item.name !== item.nickname && (
+                        <Text style={styles.userSub}>{item.name}</Text>
+                      )}
+                    </View>
+                    <View
+                      style={[
+                        styles.checkBox,
+                        active && { backgroundColor: "#0066FF" },
+                      ]}
+                    >
+                      {active && (
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+            <View style={{ padding: 12 }}>
+              <Pressable
+                onPress={() => onSend(selected.map((u: any) => String(u._id)))}
+                disabled={!selected.length}
+                style={[
+                  styles.inviteBtn,
+                  !selected.length && { opacity: 0.4 },
+                ]}
+              >
+                <Ionicons name="send" size={16} color="#fff" />
+                <Text style={styles.inviteBtnText}>
+                  {selected.length
+                    ? `Gửi mời ${selected.length} người`
+                    : "Chọn người muốn mời"}
+                </Text>
+              </Pressable>
+              <Text
+                style={{
+                  color: "#64748B",
+                  fontSize: 11,
+                  marginTop: 6,
+                  textAlign: "center",
+                }}
+              >
+                Giới hạn 30 lời mời / giờ để chống spam.
+              </Text>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
 
 function ChatModal({
   open,
@@ -1800,4 +2173,156 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  /* Speech bubble */
+  speechBubble: {
+    position: "absolute",
+    top: -22,
+    alignSelf: "center",
+    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    maxWidth: 160,
+    minWidth: 44,
+    zIndex: 80,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  speechText: {
+    color: "#0B1220",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  speechTail: {
+    position: "absolute",
+    bottom: -5,
+    alignSelf: "center",
+    width: 10,
+    height: 10,
+    backgroundColor: "#fff",
+    transform: [{ rotate: "45deg" }],
+  },
+
+  /* Raise slider */
+  raiseWrap: { paddingVertical: 4 },
+  raiseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  raiseLabel: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  raiseValue: { color: "#FCD34D", fontSize: 15, fontWeight: "900" },
+  sliderTrack: {
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+    marginBottom: 6,
+  },
+  sliderFill: {
+    position: "absolute",
+    left: 0,
+    top: 4,
+    bottom: 4,
+    borderRadius: 12,
+    backgroundColor: "#D97706",
+  },
+  sliderThumb: {
+    position: "absolute",
+    top: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FCD34D",
+    borderWidth: 2,
+    borderColor: "#B45309",
+  },
+  presetsRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
+  presetChip: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D97706",
+    alignItems: "center",
+  },
+  presetChipActive: { backgroundColor: "#FCD34D", borderColor: "#FCD34D" },
+  presetChipText: { color: "#F59E0B", fontSize: 11, fontWeight: "800" },
+
+  /* Invite */
+  inviteFab: {
+    position: "absolute",
+    right: 16,
+    bottom: 148,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  selectedRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+  },
+  selectedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FCD34D",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  selectedChipText: { color: "#0B1220", fontWeight: "800", fontSize: 12 },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  userRowActive: { backgroundColor: "rgba(0,102,255,0.12)" },
+  userName: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  userSub: { color: "#94A3B8", fontSize: 11, marginTop: 2 },
+  checkBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#334155",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inviteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#8B5CF6",
+    padding: 12,
+    borderRadius: 12,
+  },
+  inviteBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
 });
