@@ -29,13 +29,24 @@ export const mlpApiSlice = apiSlice.injectEndpoints({
       ],
     }),
     updateMlpTeam: builder.mutation({
-      query: ({ teamId, ...body }: any) => ({
-        url: `/api/mlp/teams/${teamId}`,
+      query: ({ teamId, id, ...body }: any) => ({
+        url: `/api/mlp/teams/${teamId || id}`,
         method: "PATCH",
         body,
       }),
       invalidatesTags: (r, e, { tourId }) =>
         tourId ? [{ type: "MlpTeam" as any, id: tourId }] : ["MlpTeam" as any],
+    }),
+    deleteMlpTeam: builder.mutation({
+      query: (teamId: string) => ({
+        url: `/api/mlp/teams/${teamId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["MlpTeam" as any],
+    }),
+    getMlpTeam: builder.query({
+      query: (teamId: string) => ({ url: `/api/mlp/teams/${teamId}` }),
+      providesTags: (r, e, teamId) => [{ type: "MlpTeam" as any, id: teamId }],
     }),
     listMlpDuals: builder.query({
       query: ({ tourId, status }: { tourId: string; status?: string }) => {
@@ -158,6 +169,8 @@ export const {
   useListMlpTeamsQuery,
   useCreateMlpTeamMutation,
   useUpdateMlpTeamMutation,
+  useDeleteMlpTeamMutation,
+  useGetMlpTeamQuery,
   useListMlpDualsQuery,
   useGetMlpDualQuery,
   useListMlpStandingsQuery,
