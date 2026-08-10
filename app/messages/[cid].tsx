@@ -39,6 +39,7 @@ import {
   useSendDmMessageMutation,
   useUploadChatMediaMutation,
   useDeleteMessageMutation,
+  usePatchConversationMutation,
   messagesApiSlice,
 } from "@/slices/messagesApiSlice";
 import { socket } from "@/lib/socket";
@@ -269,6 +270,13 @@ export default function ChatWindow() {
   };
 
   const { data: conv } = useGetConversationQuery(cidStr, { skip: !cid });
+  const [patchConv] = usePatchConversationMutation();
+  const convMuted = !!(conv as any)?.muted;
+  const toggleConvMute = async () => {
+    try {
+      await patchConv({ cid: cidStr, muted: !convMuted } as any).unwrap();
+    } catch {}
+  };
   const { data: msgs, isFetching } = useListMessagesQuery(
     { cid: cidStr },
     { skip: !cid }
@@ -526,6 +534,17 @@ export default function ChatWindow() {
           headerRight: dmPeer?._id
             ? () => (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Pressable
+                    onPress={toggleConvMute}
+                    hitSlop={10}
+                    style={{ paddingHorizontal: 6 }}
+                  >
+                    <Ionicons
+                      name={convMuted ? "notifications-off" : "notifications-outline"}
+                      size={22}
+                      color={convMuted ? "#94A3B8" : "#0F172A"}
+                    />
+                  </Pressable>
                   <CallButton
                     phone={dmPeer?.phone}
                     userName={dmPeer?.nickname || dmPeer?.name}

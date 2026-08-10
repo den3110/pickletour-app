@@ -256,6 +256,21 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body,
       }),
     }),
+    getNotificationPrefs: builder.query({
+      query: () => ({
+        url: "/api/users/notification-prefs",
+        method: "GET",
+      }),
+      providesTags: ["NotificationPrefs"],
+    }),
+    patchNotificationPrefs: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/notification-prefs",
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["NotificationPrefs"],
+    }),
   }),
 });
 
@@ -287,5 +302,7 @@ export const {
   useGetKycCheckDataQuery,
   useUpdateKycStatusMutation,
   useVerifyRegisterOtpMutation,
-  useResendRegisterOtpMutation
+  useResendRegisterOtpMutation,
+  useGetNotificationPrefsQuery,
+  usePatchNotificationPrefsMutation,
 } = userApiSlice;

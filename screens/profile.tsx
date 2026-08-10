@@ -56,6 +56,8 @@ import {
   useGetProfileQuery,
   useLogoutMutation,
   useUpdateUserMutation,
+  useGetNotificationPrefsQuery,
+  usePatchNotificationPrefsMutation,
 } from "@/slices/usersApiSlice";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -774,6 +776,21 @@ export default function ProfileScreen({ isBack = false }) {
   const [tournamentConsoleEnabled, setTournamentConsoleEnabled] =
     useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
+  const { data: notifPrefs } = useGetNotificationPrefsQuery();
+  const [patchNotifPrefs, { isLoading: patchingNotif }] =
+    usePatchNotificationPrefsMutation();
+  const chatMuteAll = !!notifPrefs?.chatMuteAll;
+  const feedMuteAll = !!notifPrefs?.feedMuteAll;
+  const toggleChatMute = async (v: boolean) => {
+    try {
+      await patchNotifPrefs({ chatMuteAll: v }).unwrap();
+    } catch {}
+  };
+  const toggleFeedMute = async (v: boolean) => {
+    try {
+      await patchNotifPrefs({ feedMuteAll: v }).unwrap();
+    } catch {}
+  };
 
   useEffect(() => {
     (async () => {
@@ -1841,6 +1858,96 @@ export default function ProfileScreen({ isBack = false }) {
                     <Switch
                       value={pushEnabled}
                       onValueChange={togglePush}
+                      trackColor={{ false: t.border, true: t.accent }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                  <View style={styles.switchRow}>
+                    <View style={styles.switchLeft}>
+                      <ProfileGlassSurface
+                        effect="clear"
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
+                        style={[
+                          styles.switchIcon,
+                          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name="message-circle"
+                          size={16}
+                          color={t.accent}
+                        />
+                      </ProfileGlassSurface>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchLabel, { color: t.text }]}>
+                          Tắt thông báo tin nhắn
+                        </Text>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          Không nhận thông báo từ mọi cuộc trò chuyện.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={chatMuteAll}
+                      onValueChange={toggleChatMute}
+                      disabled={patchingNotif}
+                      trackColor={{ false: t.border, true: t.accent }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                  <View style={styles.switchRow}>
+                    <View style={styles.switchLeft}>
+                      <ProfileGlassSurface
+                        effect="clear"
+                        tintColor={
+                          IOS_26_LIQUID_GLASS_ENABLED
+                            ? profileGlassAccentTintFor(t, 0.46, 0.34)
+                            : rgbaFromHex(t.accent, 0.18)
+                        }
+                        style={[
+                          styles.switchIcon,
+                          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
+                          {
+                            backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
+                              ? rgbaFromHex(t.accent, t.dark ? 0.26 : 0.18)
+                              : t.accentLight,
+                          },
+                        ]}
+                      >
+                        <Feather name="book-open" size={16} color={t.accent} />
+                      </ProfileGlassSurface>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchLabel, { color: t.text }]}>
+                          Tắt thông báo bảng tin
+                        </Text>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          Không nhận noti bình luận, phản hồi, @nhắc tới.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={feedMuteAll}
+                      onValueChange={toggleFeedMute}
+                      disabled={patchingNotif}
                       trackColor={{ false: t.border, true: t.accent }}
                       thumbColor="#fff"
                     />

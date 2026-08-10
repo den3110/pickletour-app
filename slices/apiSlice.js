@@ -351,6 +351,7 @@ export const apiSlice = createApi({
     "FriendCounts",
     "Notif",
     "NotifCount",
+    "NotificationPrefs",
     "Feed",
     "FeedComments",
     "User",
