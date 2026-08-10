@@ -34,6 +34,7 @@ import {
   useReportFeedPostMutation,
   useReportFeedCommentMutation,
   useUploadFeedMediaMutation,
+  useReactFeedCommentMutation,
   feedApiSlice,
 } from "@/slices/feedApiSlice";
 import { useBlockUserMutation } from "@/slices/friendsApiSlice";
@@ -45,6 +46,7 @@ import {
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
 import { AspectImage } from "@/components/feed/AspectImage";
+import { ReactorsModal } from "@/components/feed/ReactorsModal";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 
@@ -186,17 +188,42 @@ function CommentMedia({ media }: { media: any[] }) {
   );
 }
 
+const REACTION_EMOJI: Record<string, string> = {
+  like: "👍",
+  love: "❤️",
+  haha: "😂",
+  wow: "😮",
+  sad: "😢",
+  angry: "😡",
+};
+
 function CommentItem({
   comment,
   postId,
   me,
   onReply,
+  onOpenReactors,
 }: {
   comment: any;
   postId: string;
   me: any;
   onReply: (cid: string) => void;
+  onOpenReactors: (commentId: string) => void;
 }) {
+  const [reactComment] = useReactFeedCommentMutation();
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const myReaction: string | null = comment.myReaction || null;
+  const reactionCount: number = comment.reactionCount || 0;
+  const doReact = async (type: string) => {
+    setShowReactionPicker(false);
+    try {
+      await reactComment({
+        cid: String(comment._id),
+        type,
+        postId,
+      } as any).unwrap();
+    } catch {}
+  };
   // Trong màn Chi tiết bài viết → auto-expand toàn bộ phản hồi.
   const [showReplies, setShowReplies] = useState(
     Number(comment?.replyCount || 0) > 0
@@ -288,15 +315,55 @@ function CommentItem({
           {Array.isArray(comment.media) && comment.media.length > 0 && (
             <CommentMedia media={comment.media} />
           )}
+          {showReactionPicker && (
+            <View style={styles.reactionPicker}>
+              {Object.entries(REACTION_EMOJI).map(([t, e]) => (
+                <Pressable
+                  key={t}
+                  onPress={() => doReact(t)}
+                  hitSlop={6}
+                  style={{ paddingHorizontal: 6 }}
+                >
+                  <Text style={{ fontSize: 26 }}>{e}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <View style={styles.commentMeta}>
             <Text style={styles.commentMetaText}>
               {fmtTime(comment.createdAt)}
             </Text>
+            <Pressable
+              onPress={() => doReact(myReaction ? myReaction : "like")}
+              onLongPress={() => setShowReactionPicker((v) => !v)}
+              delayLongPress={250}
+            >
+              <Text
+                style={[
+                  styles.commentMetaText,
+                  {
+                    fontWeight: "600",
+                    color: myReaction ? "#0066FF" : "#64748B",
+                  },
+                ]}
+              >
+                {myReaction
+                  ? `${REACTION_EMOJI[myReaction] || "👍"} Đã thích`
+                  : "Thích"}
+              </Text>
+            </Pressable>
             <Pressable onPress={() => onReply(comment._id)}>
               <Text style={[styles.commentMetaText, { fontWeight: "600" }]}>
                 Trả lời
               </Text>
             </Pressable>
+            {reactionCount > 0 && (
+              <Pressable onPress={() => onOpenReactors(String(comment._id))}>
+                <Text style={styles.commentMetaText}>
+                  👍 {reactionCount}
+                </Text>
+              </Pressable>
+            )}
             {(isMine || isAdmin) && (
               <Pressable onPress={handleDelete}>
                 <Text style={[styles.commentMetaText, { color: "#DC2626" }]}>
@@ -327,6 +394,7 @@ function CommentItem({
                   postId={postId}
                   me={me}
                   onReply={onReply}
+                  onOpenReactors={onOpenReactors}
                 />
               </View>
             ))}
@@ -462,6 +530,11 @@ export default function FeedPostDetail() {
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [reactorsOpen, setReactorsOpen] = useState<
+    | { kind: "post"; id: string }
+    | { kind: "comment"; id: string }
+    | null
+  >(null);
   // ===== @mention =====
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionRange, setMentionRange] = useState<{
@@ -837,6 +910,27 @@ export default function FeedPostDetail() {
             )}
           </View>
 
+          {(post.reactionCount > 0 || post.commentCount > 0) && (
+            <View style={styles.postStatsRow}>
+              {post.reactionCount > 0 && (
+                <Pressable
+                  hitSlop={4}
+                  onPress={() =>
+                    setReactorsOpen({ kind: "post", id: String(post._id) })
+                  }
+                >
+                  <Text style={styles.postStatsText}>
+                    👍 {post.reactionCount} cảm xúc
+                  </Text>
+                </Pressable>
+              )}
+              {post.commentCount > 0 && (
+                <Text style={styles.postStatsText}>
+                  💬 {post.commentCount} bình luận
+                </Text>
+              )}
+            </View>
+          )}
           <Text style={styles.sectionTitle}>Bình luận</Text>
           {(comments?.items || []).map((c: any) => (
             <CommentItem
@@ -845,6 +939,9 @@ export default function FeedPostDetail() {
               postId={String(id)}
               me={me}
               onReply={(cid) => setReplyTarget(cid)}
+              onOpenReactors={(cid) =>
+                setReactorsOpen({ kind: "comment", id: cid })
+              }
             />
           ))}
           {comments?.items?.length === 0 && (
@@ -991,6 +1088,12 @@ export default function FeedPostDetail() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <ReactorsModal
+        visible={!!reactorsOpen}
+        onClose={() => setReactorsOpen(null)}
+        postId={reactorsOpen?.kind === "post" ? reactorsOpen.id : null}
+        commentId={reactorsOpen?.kind === "comment" ? reactorsOpen.id : null}
+      />
     </SafeAreaView>
   );
 }
@@ -1091,6 +1194,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  reactionPicker: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginTop: 6,
+    alignSelf: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  postStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+  },
+  postStatsText: { fontSize: 13, color: "#475569", fontWeight: "500" },
   attachBtn: {
     marginRight: 4,
     width: 36,

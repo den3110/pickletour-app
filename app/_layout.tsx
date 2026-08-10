@@ -1291,9 +1291,17 @@ function RootLayout() {
     };
   }, [navTheme, themeApplying]);
 
-  // Fonts + failsafe
+  // Fonts + failsafe. Icon fonts được ép include vào OTA bundle qua require()
+  // — tránh bug "toàn dấu ?" khi native binary có asset registry hash khác
+  // với JS bundle mới push OTA. expo-font sẽ load từ bundle nếu native binary
+  // không cấp phát được font tương ứng.
   const [fontsLoaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    Ionicons: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"),
+    Feather: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf"),
+    MaterialIcons: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf"),
+    MaterialCommunityIcons: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf"),
+    AntDesign: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.ttf"),
   });
   const [fontTimeout, setFontTimeout] = React.useState(false);
   React.useEffect(() => {

@@ -188,6 +188,42 @@ export const feedApiSlice = apiSlice.injectEndpoints({
         body: formData,
       }),
     }),
+    reactFeedComment: builder.mutation({
+      query: ({ cid, type }) => ({
+        url: `/api/feed/comments/${cid}/reactions`,
+        method: "POST",
+        body: { type },
+      }),
+      invalidatesTags: (r, e, { postId }) =>
+        postId
+          ? [
+              { type: "FeedComments", id: `${postId}:root` },
+              { type: "FeedComments", id: `${postId}` },
+            ]
+          : ["FeedComments"],
+    }),
+    listPostReactors: builder.query({
+      query: ({ postId, type }) => {
+        const p = new URLSearchParams();
+        if (type) p.set("type", String(type));
+        const qs = p.toString();
+        return {
+          url: `/api/feed/${postId}/reactions${qs ? `?${qs}` : ""}`,
+          method: "GET",
+        };
+      },
+    }),
+    listCommentReactors: builder.query({
+      query: ({ cid, type }) => {
+        const p = new URLSearchParams();
+        if (type) p.set("type", String(type));
+        const qs = p.toString();
+        return {
+          url: `/api/feed/comments/${cid}/reactions${qs ? `?${qs}` : ""}`,
+          method: "GET",
+        };
+      },
+    }),
   }),
 });
 
@@ -204,4 +240,9 @@ export const {
   useReportFeedPostMutation,
   useReportFeedCommentMutation,
   useUploadFeedMediaMutation,
+  useReactFeedCommentMutation,
+  useListPostReactorsQuery,
+  useLazyListPostReactorsQuery,
+  useListCommentReactorsQuery,
+  useLazyListCommentReactorsQuery,
 } = feedApiSlice;
