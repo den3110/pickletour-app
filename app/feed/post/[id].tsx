@@ -76,6 +76,61 @@ const fmtTime = (iso?: string) => {
   return new Date(iso).toLocaleDateString("vi-VN");
 };
 
+function PostVideoThumb({
+  url,
+  width,
+  height,
+  onPress,
+}: {
+  url: string;
+  width: number;
+  height: number;
+  onPress: () => void;
+}) {
+  const player = useVideoPlayer(url, (p) => {
+    try {
+      p.muted = true;
+      p.loop = false;
+      p.pause();
+    } catch {}
+  });
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        width,
+        height,
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#111",
+        position: "relative",
+      }}
+    >
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={false}
+        allowsFullscreen={false}
+        allowsPictureInPicture={false}
+      />
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.18)",
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Ionicons name="play-circle" size={64} color="#fff" />
+      </View>
+    </Pressable>
+  );
+}
+
 function CommentVideoThumb({
   url,
   size,
@@ -881,19 +936,15 @@ export default function FeedPostDetail() {
                           onPress={() => openViewer(0)}
                         />
                       ) : (
-                        <Pressable
+                        <PostVideoThumb
+                          url={m.url}
+                          width={cardW}
+                          height={Math.min(
+                            480,
+                            cardW / (initAspect && initAspect > 0 ? initAspect : 1)
+                          )}
                           onPress={() => openViewer(0)}
-                          style={{
-                            width: cardW,
-                            height: cardW,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            backgroundColor: "#111",
-                            borderRadius: 10,
-                          }}
-                        >
-                          <Ionicons name="play-circle" size={64} color="#fff" />
-                        </Pressable>
+                        />
                       )}
                     </View>
                   );
@@ -929,23 +980,12 @@ export default function FeedPostDetail() {
                             onPress={() => openViewer(i)}
                           />
                         ) : (
-                          <Pressable
+                          <PostVideoThumb
+                            url={m.url}
+                            width={cardW}
+                            height={cardW}
                             onPress={() => openViewer(i)}
-                            style={{
-                              width: cardW,
-                              height: cardW,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "#111",
-                              borderRadius: 10,
-                            }}
-                          >
-                            <Ionicons
-                              name="play-circle"
-                              size={64}
-                              color="#fff"
-                            />
-                          </Pressable>
+                          />
                         )}
                       </View>
                       );
