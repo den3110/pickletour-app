@@ -41,6 +41,7 @@ import {
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { playFx } from "./pokerFx";
+import { warmupSounds } from "./pokerSounds";
 
 /* ═══════════════ Cards ═══════════════ */
 
@@ -176,6 +177,80 @@ const cardStyles = StyleSheet.create({
 });
 
 /* ═══════════════ Floating emoji + Dealer ═══════════════ */
+
+function ChipFly({
+  from,
+  to,
+  count,
+  onDone,
+}: {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  count: number;
+  onDone: () => void;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 750,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => onDone());
+  }, [anim, onDone]);
+
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const arc = -Math.min(60, Math.max(30, Math.abs(dx) * 0.15));
+
+  // stack tối đa 5 chip visual — offset nhẹ để trông như 1 nắm
+  const chips = Math.min(5, Math.max(1, count));
+
+  return (
+    <>
+      {Array.from({ length: chips }).map((_, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: from.x - 8,
+            top: from.y - 8,
+            zIndex: 90,
+            opacity: anim.interpolate({
+              inputRange: [0, 0.85, 1],
+              outputRange: [1, 1, 0],
+            }),
+            transform: [
+              {
+                translateX: anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [i * 1.5, dx + i * 1.5],
+                }),
+              },
+              {
+                translateY: anim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [-i * 1.5, arc - i * 1.5, dy - i * 1.5],
+                }),
+              },
+              {
+                scale: anim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [0.6, 1.15, 0.9],
+                }),
+              },
+            ],
+          }}
+        >
+          <View style={styles.chipIcon}>
+            <View style={styles.chipIconInner} />
+          </View>
+        </Animated.View>
+      ))}
+    </>
+  );
+}
 
 function FloatingEmoji({ emoji }: { emoji: string }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -523,11 +598,42 @@ function Seat({
         </View>
       )}
 
-      {/* Bet chip */}
+      {/* Bet display — chip stack + số chip cược ở street này */}
       {seat.betThisStreet > 0 && (
-        <View style={styles.betBubble}>
-          <Text style={{ fontSize: 9 }}>🪙</Text>
-          <Text style={styles.betBubbleText}>
+        <View style={styles.betDisplay}>
+          <View style={styles.chipStack}>
+            {Array.from({
+              length: Math.min(
+                4,
+                Math.max(
+                  1,
+                  Math.round(Math.log2(seat.betThisStreet / 5 + 1)),
+                ),
+              ),
+            }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.chipIcon,
+                  {
+                    marginTop: i === 0 ? 0 : -12,
+                    zIndex: i,
+                    backgroundColor:
+                      i === 3
+                        ? "#DC2626"
+                        : i === 2
+                          ? "#8B5CF6"
+                          : i === 1
+                            ? "#10B981"
+                            : "#FCD34D",
+                  },
+                ]}
+              >
+                <View style={styles.chipIconInner} />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.betDisplayText}>
             {formatChips(seat.betThisStreet)}
           </Text>
         </View>
@@ -587,6 +693,11 @@ export default function PokerTableScreen() {
   const [emojiPicker, setEmojiPicker] = useState(false);
   const [floatingEmojis, setFloatingEmojis] = useState<any[]>([]);
   const [tableSize, setTableSize] = useState({ w: 0, h: 0 });
+  // Track vị trí center của mỗi seat + pot (đo bằng onLayout) → dùng để bay
+  // chip từ seat sang pot khi có action call/raise/allin.
+  const seatCentersRef = useRef<Record<number, { x: number; y: number }>>({});
+  const potCenterRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [flights, setFlights] = useState<any[]>([]);
   // Connection status: "online" | "offline" | "reconnecting"
   const [connStatus, setConnStatus] = useState<
     "online" | "offline" | "reconnecting"
@@ -681,6 +792,7 @@ export default function PokerTableScreen() {
 
   useEffect(() => {
     const t = setInterval(() => setNowTs(Date.now()), 250);
+    warmupSounds();
     return () => clearInterval(t);
   }, []);
 
@@ -806,8 +918,30 @@ export default function PokerTableScreen() {
         call: "call",
         raise: "raise",
         allin: "allin",
+        post_sb: "chip",
+        post_bb: "chip",
       };
       if (fx[lastAction.action]) playFx(fx[lastAction.action]);
+      // Bắn chip từ seat → pot cho các action có tiền
+      if (
+        ["call", "raise", "allin", "post_sb", "post_bb"].includes(
+          lastAction.action,
+        )
+      ) {
+        const from = seatCentersRef.current[lastAction.seatIndex];
+        const to = potCenterRef.current;
+        if (from && to.x) {
+          const amt = Number(lastAction.amount) || 0;
+          // Số chip visual = log(amount) — 1 chip cho blind nhỏ, 5 chip cho all-in to
+          const bigBlind = Math.max(1, room.bigBlind || 10);
+          const count = Math.min(
+            5,
+            Math.max(1, Math.round(Math.log2(amt / bigBlind + 1))),
+          );
+          const fid = `${lastAction.seatIndex}-${Date.now()}-${Math.random()}`;
+          setFlights((prev) => [...prev, { id: fid, from, to, count }]);
+        }
+      }
       prevActionRef.current = lastAction;
     }
 
@@ -947,7 +1081,16 @@ export default function PokerTableScreen() {
             {/* Center: dealer + pot + board */}
             <View style={styles.tableCenter} pointerEvents="none">
               {room.stage !== "waiting" && <DealerFigure />}
-              <View style={styles.potPill}>
+              <View
+                style={styles.potPill}
+                onLayout={(e) => {
+                  const { x, y, width, height } = e.nativeEvent.layout;
+                  potCenterRef.current = {
+                    x: x + width / 2,
+                    y: y + height / 2,
+                  };
+                }}
+              >
                 <Text style={{ fontSize: 13 }}>💰</Text>
                 <Text style={styles.potText}>{formatChips(room.pot)}</Text>
               </View>
@@ -995,6 +1138,13 @@ export default function PokerTableScreen() {
                 return (
                   <View
                     key={seat.seatIndex}
+                    onLayout={(e) => {
+                      const { width, height } = e.nativeEvent.layout;
+                      seatCentersRef.current[seat.seatIndex] = {
+                        x: left + width / 2,
+                        y: top + height / 2,
+                      };
+                    }}
                     style={{
                       position: "absolute",
                       left,
@@ -1041,6 +1191,19 @@ export default function PokerTableScreen() {
                   </View>
                 );
               })}
+
+            {/* Chip flight overlay */}
+            {flights.map((f) => (
+              <ChipFly
+                key={f.id}
+                from={f.from}
+                to={f.to}
+                count={f.count}
+                onDone={() =>
+                  setFlights((prev) => prev.filter((x) => x.id !== f.id))
+                }
+              />
+            ))}
 
             {/* Winner overlay — nổi giữa bàn, không đè lên seat/controls */}
             {showWinners && (
@@ -1929,6 +2092,51 @@ const styles = StyleSheet.create({
     borderColor: "rgba(252,211,77,0.4)",
   },
   betBubbleText: { color: "#FCD34D", fontSize: 10, fontWeight: "800" },
+  betDisplay: {
+    position: "absolute",
+    bottom: -34,
+    alignItems: "center",
+    zIndex: 5,
+  },
+  chipStack: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    height: 20,
+  },
+  chipIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FCD34D",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(0,0,0,0.4)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  chipIconInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.7)",
+  },
+  betDisplayText: {
+    marginTop: 3,
+    color: "#FCD34D",
+    fontSize: 11,
+    fontWeight: "900",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
 
   /* Winners — overlay nổi giữa bàn */
   winnerOverlay: {

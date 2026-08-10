@@ -1,9 +1,10 @@
-// Poker FX helper: haptic + optional audio.
-// Dùng expo-haptics (native module đã có sẵn trong binary) — không cần
-// bundle mp3 assets nên OTA-safe. Nếu sau này add asset audio, load thêm
-// ở đây (require('@/assets/sounds/x.mp3')).
+// Poker FX helper: haptic + audio.
+// Haptic: expo-haptics (native, có sẵn trong binary).
+// Sound: expo-audio wrapper qua pokerSounds — dùng click4.mp3 với volume/rate
+// khác nhau cho từng action (OTA-safe vì require asset static).
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
+import { playSound } from "./pokerSounds";
 
 export type FxKind =
   | "chip"
@@ -19,6 +20,13 @@ export type FxKind =
   | "warning";
 
 export function playFx(kind: FxKind) {
+  // Sound
+  try {
+    if (kind !== "tick") {
+      playSound(kind as any);
+    }
+  } catch {}
+  // Haptic
   try {
     switch (kind) {
       case "chip":
