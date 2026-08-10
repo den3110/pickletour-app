@@ -154,10 +154,10 @@ export const feedApiSlice = apiSlice.injectEndpoints({
       ],
     }),
     createFeedComment: builder.mutation({
-      query: ({ postId, content, parent }) => ({
+      query: ({ postId, content, parent, media }) => ({
         url: `/api/feed/${postId}/comments`,
         method: "POST",
-        body: { content, parent },
+        body: { content, parent, media },
       }),
       invalidatesTags: (r, e, { postId, parent }) => [
         { type: "FeedComments", id: `${postId}:${parent || "root"}` },

@@ -1,6 +1,10 @@
 // app/feed/post/[id].tsx — Chi tiết bài viết + comments + reply
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { useVideoPlayer, VideoView } from "expo-video";
+import ImageView from "react-native-image-viewing";
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
@@ -29,6 +33,7 @@ import {
   useDeleteFeedCommentMutation,
   useReportFeedPostMutation,
   useReportFeedCommentMutation,
+  useUploadFeedMediaMutation,
   feedApiSlice,
 } from "@/slices/feedApiSlice";
 import { useBlockUserMutation } from "@/slices/friendsApiSlice";
@@ -68,6 +73,118 @@ const fmtTime = (iso?: string) => {
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ`;
   return new Date(iso).toLocaleDateString("vi-VN");
 };
+
+function CommentVideoThumb({
+  url,
+  size,
+}: {
+  url: string;
+  size: number;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const player = useVideoPlayer(url, (p) => {
+    try {
+      p.muted = true;
+      p.loop = false;
+      p.pause();
+    } catch {}
+  });
+  return (
+    <Pressable
+      onPress={() => {
+        try {
+          if (playing) {
+            player.pause();
+            setPlaying(false);
+          } else {
+            player.muted = false;
+            player.play();
+            setPlaying(true);
+          }
+        } catch {}
+      }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#111",
+      }}
+    >
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={playing}
+        allowsFullscreen={playing}
+        allowsPictureInPicture={false}
+      />
+      {!playing && (
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.18)",
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Ionicons name="play-circle" size={40} color="#fff" />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function CommentMedia({ media }: { media: any[] }) {
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+  const screenW = Dimensions.get("window").width;
+  // Comment thụt vào ~44 (avatar 32 + gap) + card padding 12*2 + item margin
+  const maxW = Math.max(180, screenW - 44 - 12 * 2 - 12);
+  const size = Math.min(220, maxW);
+  const imageSources = media
+    .filter((m: any) => m.type === "image" && m.url)
+    .map((m: any) => ({ uri: m.url }));
+
+  return (
+    <View style={{ marginTop: 6, flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+      {media.map((m: any, i: number) => {
+        if (m.type === "video") {
+          return <CommentVideoThumb key={i} url={m.url} size={size} />;
+        }
+        const imgIdx = imageSources.findIndex((s: any) => s.uri === m.url);
+        return (
+          <Pressable
+            key={i}
+            onPress={() => imgIdx >= 0 && setViewerIdx(imgIdx)}
+          >
+            <Image
+              source={{ uri: m.url }}
+              style={{
+                width: size,
+                height: size,
+                borderRadius: 10,
+                backgroundColor: "#0b1220",
+              }}
+              resizeMode="cover"
+            />
+          </Pressable>
+        );
+      })}
+      <ImageView
+        images={imageSources}
+        imageIndex={viewerIdx ?? 0}
+        visible={viewerIdx !== null}
+        onRequestClose={() => setViewerIdx(null)}
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
+        backgroundColor="#000"
+      />
+    </View>
+  );
+}
 
 function CommentItem({
   comment,
@@ -134,24 +251,43 @@ function CommentItem({
           <AuthorAvatar user={comment.author} size={32} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <View style={styles.commentBubble}>
+          {(!!comment.content || comment.mentions?.length > 0) && (
+            <View style={styles.commentBubble}>
+              <Pressable
+                onPress={() =>
+                  comment.author?._id &&
+                  router.push(`/profile/${comment.author._id}`)
+                }
+                hitSlop={4}
+              >
+                <Text style={styles.commentAuthor}>
+                  {authorName(comment.author)}
+                </Text>
+              </Pressable>
+              <MentionText
+                content={comment.content}
+                mentions={comment.mentions}
+                style={styles.commentText}
+              />
+            </View>
+          )}
+          {!comment.content && !(comment.mentions?.length > 0) && (
             <Pressable
               onPress={() =>
                 comment.author?._id &&
                 router.push(`/profile/${comment.author._id}`)
               }
               hitSlop={4}
+              style={{ paddingLeft: 4, paddingVertical: 2 }}
             >
               <Text style={styles.commentAuthor}>
                 {authorName(comment.author)}
               </Text>
             </Pressable>
-            <MentionText
-              content={comment.content}
-              mentions={comment.mentions}
-              style={styles.commentText}
-            />
-          </View>
+          )}
+          {Array.isArray(comment.media) && comment.media.length > 0 && (
+            <CommentMedia media={comment.media} />
+          )}
           <View style={styles.commentMeta}>
             <Text style={styles.commentMetaText}>
               {fmtTime(comment.createdAt)}
@@ -318,9 +454,11 @@ export default function FeedPostDetail() {
     };
   }, [id, socket, dispatch]);
   const [createComment, { isLoading: sending }] = useCreateFeedCommentMutation();
+  const [uploadMedia] = useUploadFeedMediaMutation();
   const [reportPostMut] = useReportFeedPostMutation();
   const [blockUserMut] = useBlockUserMutation();
   const [text, setText] = useState("");
+  const [commentMedia, setCommentMedia] = useState<any[]>([]);
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -432,15 +570,95 @@ export default function FeedPostDetail() {
     ]);
   };
 
+  const pickCommentMedia = async () => {
+    if (commentMedia.length >= 4) {
+      Alert.alert("Đã đủ 4 tệp", "Mỗi bình luận tối đa 4 ảnh/video.");
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Cần cấp quyền truy cập thư viện ảnh");
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      selectionLimit: 4 - commentMedia.length,
+      quality: 0.6,
+      videoMaxDuration: 60,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium as any,
+    });
+    if (res.canceled || !res.assets?.length) return;
+
+    const batchKey = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempItems = res.assets.map((a, idx) => ({
+      _temp: true,
+      _batch: batchKey,
+      _key: `${batchKey}-${idx}`,
+      type: a.type === "video" ? "video" : "image",
+      tempUri: a.uri,
+    })) as any[];
+    setCommentMedia((prev) => [...prev, ...tempItems].slice(0, 4));
+
+    const fd = new FormData();
+    for (const a of res.assets) {
+      let uri = a.uri;
+      const isVideo = a.type === "video";
+      if (!isVideo) {
+        try {
+          const compressed = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 1600 } }],
+            {
+              compress: 0.7,
+              format: ImageManipulator.SaveFormat.JPEG,
+            }
+          );
+          uri = compressed.uri;
+        } catch {}
+      }
+      const name = a.fileName || uri.split("/").pop() || "upload";
+      const type = a.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
+      fd.append("files", { uri, name, type } as any);
+    }
+    try {
+      const r: any = await uploadMedia(fd).unwrap();
+      setCommentMedia((prev) =>
+        [
+          ...prev.filter((m: any) => m._batch !== batchKey),
+          ...(r.media || []),
+        ].slice(0, 4)
+      );
+    } catch (err: any) {
+      setCommentMedia((prev) =>
+        prev.filter((m: any) => m._batch !== batchKey)
+      );
+      Alert.alert("Upload thất bại", extractErr(err));
+    }
+  };
+
   const submit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() && commentMedia.length === 0) return;
+    if (commentMedia.some((m: any) => m._temp)) {
+      Alert.alert("Vui lòng chờ tải xong", "Có media đang được tải lên.");
+      return;
+    }
     try {
       await createComment({
         postId: String(id),
         content: text.trim(),
         parent: replyTarget,
+        media: commentMedia.map((m: any) => ({
+          type: m.type,
+          url: m.url,
+          mime: m.mime,
+          sizeBytes: m.sizeBytes,
+          width: m.width,
+          height: m.height,
+        })),
       }).unwrap();
       setText("");
+      setCommentMedia([]);
       setReplyTarget(null);
     } catch (err: any) {
       Alert.alert("Lỗi", extractErr(err));
@@ -674,7 +892,77 @@ export default function FeedPostDetail() {
               ))}
             </View>
           )}
+          {commentMedia.length > 0 && (
+            <View style={styles.commentMediaRow}>
+              {commentMedia.map((a: any, i: number) => {
+                const isTemp = !!a._temp;
+                const uri = isTemp ? a.tempUri : a.url;
+                return (
+                  <View key={a._key || i} style={styles.commentMediaPreview}>
+                    {a.type === "image" ? (
+                      <Image
+                        source={{ uri }}
+                        style={styles.commentMediaThumb}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.commentMediaThumb,
+                          {
+                            backgroundColor: "#111",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          },
+                        ]}
+                      >
+                        <Ionicons name="videocam" size={18} color="#fff" />
+                      </View>
+                    )}
+                    {isTemp && (
+                      <View
+                        style={[
+                          StyleSheet.absoluteFillObject,
+                          {
+                            backgroundColor: "rgba(0,0,0,0.55)",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                          },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <ActivityIndicator size="small" color="#fff" />
+                      </View>
+                    )}
+                    {!isTemp && (
+                      <Pressable
+                        style={styles.commentMediaRemove}
+                        onPress={() =>
+                          setCommentMedia((prev) =>
+                            prev.filter((_, j) => j !== i)
+                          )
+                        }
+                      >
+                        <Ionicons name="close" size={12} color="#fff" />
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
           <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Pressable
+              onPress={pickCommentMedia}
+              disabled={commentMedia.length >= 4}
+              hitSlop={8}
+              style={[
+                styles.attachBtn,
+                commentMedia.length >= 4 && { opacity: 0.4 },
+              ]}
+            >
+              <Ionicons name="image-outline" size={22} color="#0066FF" />
+            </Pressable>
             <TextInput
               style={styles.commentInput}
               placeholder={
@@ -686,10 +974,16 @@ export default function FeedPostDetail() {
             />
             <Pressable
               onPress={submit}
-              disabled={sending || !text.trim()}
+              disabled={
+                sending ||
+                (!text.trim() && commentMedia.length === 0) ||
+                commentMedia.some((m: any) => m._temp)
+              }
               style={[
                 styles.sendBtn,
-                (sending || !text.trim()) && { opacity: 0.5 },
+                (sending ||
+                  (!text.trim() && commentMedia.length === 0) ||
+                  commentMedia.some((m: any) => m._temp)) && { opacity: 0.5 },
               ]}
             >
               <Ionicons name="send" size={18} color="#fff" />
@@ -794,6 +1088,38 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: "#0066FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachBtn: {
+    marginRight: 4,
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentMediaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingBottom: 6,
+  },
+  commentMediaPreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 6,
+    overflow: "hidden",
+    position: "relative",
+  },
+  commentMediaThumb: { width: "100%", height: "100%", borderRadius: 6 },
+  commentMediaRemove: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.6)",
     alignItems: "center",
     justifyContent: "center",
   },
