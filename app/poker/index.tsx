@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -141,6 +143,10 @@ export default function PokerLobbyScreen() {
         onRequestClose={() => setModalOpen(false)}
       >
         <View style={styles.modalBackdrop}>
+          <Pressable style={{ flex: 1 }} onPress={() => setModalOpen(false)} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Tạo bàn Poker</Text>
@@ -206,6 +212,7 @@ export default function PokerLobbyScreen() {
               </Pressable>
             </View>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
