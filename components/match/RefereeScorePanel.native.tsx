@@ -671,6 +671,7 @@ const TeamSimple = memo(
     compact = false,
     airy = false,
     airyWide = false,
+    teamName = "",
   }) {
     const t = useTokens();
 
@@ -706,6 +707,30 @@ const TeamSimple = memo(
           },
         ]}
       >
+        {teamName ? (
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderBottomWidth: 1,
+              borderBottomColor: t.colors.border,
+              marginBottom: compact ? 2 : 6,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: compact ? 11 : 13,
+                fontWeight: "800",
+                color: isServing ? t.colors.primary : t.colors.text,
+                textAlign: "center",
+              }}
+            >
+              {teamName}
+            </Text>
+          </View>
+        ) : null}
         <View
           style={[
             s.teamStack,
@@ -760,7 +785,8 @@ const TeamSimple = memo(
       prev.slotsNow === next.slotsNow &&
       prev.compact === next.compact &&
       prev.airy === next.airy &&
-      prev.airyWide === next.airyWide
+      prev.airyWide === next.airyWide &&
+      prev.teamName === next.teamName
     );
   },
 );
@@ -2051,6 +2077,27 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     () => playersForSide(match, "B", eventType),
     [match, eventType],
   );
+
+  // Tên đội hiển thị trên header mỗi side. MLP ưu tiên meta.mlp.teamXName.
+  // Với match thường: fallback về resolvedSideName / teamName / pairName / ""
+  const resolveTeamName = (key) => {
+    const mlpName = match?.meta?.mlp?.[`team${key}Name`];
+    if (mlpName && String(mlpName).trim()) return String(mlpName).trim();
+    const candidates = [
+      match?.[`resolvedSideName${key}`],
+      match?.[`__side${key}`],
+      match?.[`team${key}Name`],
+      match?.[`pair${key}Name`],
+      match?.[`side${key}Name`],
+    ];
+    for (const c of candidates) {
+      const s = c == null ? "" : String(c).trim();
+      if (s && !/^team\s*[ab]$/i.test(s)) return s;
+    }
+    return "";
+  };
+  const teamNameA = useMemo(() => resolveTeamName("A"), [match]);
+  const teamNameB = useMemo(() => resolveTeamName("B"), [match]);
 
   const slotsBase = useMemo(
     () => match?.slots?.base || match?.meta?.slots?.base || {},
@@ -4274,6 +4321,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
                 teamKey={leftSide}
                 players={leftSide === "A" ? playersA : playersB}
                 slotsNow={leftSide === "A" ? slotsNowA : slotsNowB}
+                teamName={leftSide === "A" ? teamNameA : teamNameB}
                 onSwap={() => swapTeamSlots(leftSide)}
                 source={match}
                 isServing={leftSide === activeSide}
@@ -4471,6 +4519,7 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
                 teamKey={rightSide}
                 players={rightSide === "A" ? playersA : playersB}
                 slotsNow={rightSide === "A" ? slotsNowA : slotsNowB}
+                teamName={rightSide === "A" ? teamNameA : teamNameB}
                 onSwap={() => swapTeamSlots(rightSide)}
                 source={match}
                 isServing={rightSide === activeSide}
