@@ -162,6 +162,14 @@ export const mlpApiSlice = apiSlice.injectEndpoints({
         { type: "MlpDual" as any, id: dualId },
       ],
     }),
+
+    /* ── Group stage pools (readonly cho mobile) ── */
+    listMlpPools: builder.query({
+      query: (tid: string) => ({
+        url: `/api/mlp/tournaments/${tid}/pools`,
+      }),
+      providesTags: (r, e, tid) => [{ type: "MlpPools" as any, id: tid }],
+    }),
   }),
 });
 
@@ -180,4 +188,5 @@ export const {
   useScoreMlpDbPointMutation,
   useUndoMlpDbPointMutation,
   useCheckInMlpDualMutation,
+  useListMlpPoolsQuery,
 } = mlpApiSlice;

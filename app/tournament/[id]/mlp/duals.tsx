@@ -1,11 +1,12 @@
 // MLP duals — list dual matches + links to Teams / BXH / detail.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -27,7 +28,33 @@ export default function MlpDualsScreen() {
     { tourId: String(id) },
     { skip: !id }
   );
-  const items = (data as any)?.items || [];
+  const rawItems = (data as any)?.items || [];
+  const [tab, setTab] = useState<string>("all"); // 'all' | poolKey | 'knockout'
+
+  // Nhóm theo phase + poolKey
+  const { poolKeys, hasKnockout } = useMemo(() => {
+    const pk = new Set<string>();
+    let hasKo = false;
+    for (const d of rawItems) {
+      if (d.phase === "group" && d.poolKey) pk.add(d.poolKey);
+      if (d.phase === "knockout") hasKo = true;
+    }
+    return {
+      poolKeys: Array.from(pk).sort(),
+      hasKnockout: hasKo,
+    };
+  }, [rawItems]);
+
+  const items = useMemo(() => {
+    if (tab === "all") return rawItems;
+    if (tab === "knockout")
+      return rawItems.filter((d: any) => d.phase === "knockout");
+    return rawItems.filter(
+      (d: any) => d.phase === "group" && d.poolKey === tab,
+    );
+  }, [rawItems, tab]);
+
+  const showTabs = poolKeys.length > 0 || hasKnockout;
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -46,6 +73,35 @@ export default function MlpDualsScreen() {
           }
         />
       </View>
+
+      {showTabs && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsRow}
+        >
+          <TabBtn
+            active={tab === "all"}
+            label={`Tất cả (${rawItems.length})`}
+            onPress={() => setTab("all")}
+          />
+          {poolKeys.map((k) => (
+            <TabBtn
+              key={k}
+              active={tab === k}
+              label={`Bảng ${k}`}
+              onPress={() => setTab(k)}
+            />
+          ))}
+          {hasKnockout && (
+            <TabBtn
+              active={tab === "knockout"}
+              label="Knockout"
+              onPress={() => setTab("knockout")}
+            />
+          )}
+        </ScrollView>
+      )}
 
       {isFetching && !items.length ? (
         <ActivityIndicator style={{ marginTop: 20 }} />
@@ -76,7 +132,13 @@ export default function MlpDualsScreen() {
               >
                 <View style={styles.cardHeader}>
                   <Text style={styles.round}>
-                    {d.round === 1 ? "Vòng bảng" : `Vòng ${d.round}`}
+                    {d.phase === "group" && d.poolKey
+                      ? `Bảng ${d.poolKey}`
+                      : d.phase === "knockout"
+                        ? `KO · Vòng ${d.knockoutRound || 1}`
+                        : d.round === 1
+                          ? "Vòng bảng"
+                          : `Vòng ${d.round}`}
                   </Text>
                   <View
                     style={[
@@ -153,6 +215,27 @@ function NavBtn({
   );
 }
 
+function TabBtn({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.tabBtn, active && styles.tabBtnActive]}
+    >
+      <Text style={[styles.tabBtnText, active && styles.tabBtnTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   nav: {
@@ -208,4 +291,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   meta: { fontSize: 12, color: "#64748B" },
+  tabsRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  tabBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+  },
+  tabBtnActive: { backgroundColor: "#0066FF" },
+  tabBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
+  tabBtnTextActive: { color: "#fff" },
 });
