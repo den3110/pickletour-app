@@ -449,30 +449,88 @@ function TeamFormModal({
                         Không tìm thấy VĐV
                       </Text>
                     ) : (
-                      searchResults.map((u: any) => (
-                        <Pressable
-                          key={u._id}
-                          style={styles.searchRow}
-                          onPress={() => addPlayer(u)}
-                        >
-                          <UserAvatar user={u} size={30} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.searchName} numberOfLines={1}>
-                              {u.nickname || u.name || "VĐV"}
-                            </Text>
-                            {u.name && u.nickname && (
-                              <Text style={styles.searchSub} numberOfLines={1}>
-                                {u.name}
+                      searchResults.map((u: any) => {
+                        const sd = Number(u?.score?.double) || 0;
+                        const ss = Number(u?.score?.single) || 0;
+                        return (
+                          <Pressable
+                            key={u._id}
+                            style={styles.searchRow}
+                            onPress={() => addPlayer(u)}
+                          >
+                            <UserAvatar user={u} size={30} />
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={styles.searchName}
+                                numberOfLines={1}
+                              >
+                                {u.nickname || u.name || "VĐV"}
                               </Text>
-                            )}
-                          </View>
-                          <Ionicons
-                            name="add-circle"
-                            size={22}
-                            color="#0066FF"
-                          />
-                        </Pressable>
-                      ))
+                              {u.name && u.nickname && (
+                                <Text
+                                  style={styles.searchSub}
+                                  numberOfLines={1}
+                                >
+                                  {u.name}
+                                </Text>
+                              )}
+                            </View>
+                            <View
+                              style={{
+                                flexDirection: "column",
+                                alignItems: "flex-end",
+                                gap: 2,
+                              }}
+                            >
+                              {sd > 0 && (
+                                <View
+                                  style={{
+                                    backgroundColor: "#DBEAFE",
+                                    paddingHorizontal: 5,
+                                    paddingVertical: 1,
+                                    borderRadius: 3,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#1E40AF",
+                                      fontSize: 9,
+                                      fontWeight: "800",
+                                    }}
+                                  >
+                                    Đôi {sd.toFixed(2)}
+                                  </Text>
+                                </View>
+                              )}
+                              {ss > 0 && (
+                                <View
+                                  style={{
+                                    backgroundColor: "#F1F5F9",
+                                    paddingHorizontal: 5,
+                                    paddingVertical: 1,
+                                    borderRadius: 3,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#334155",
+                                      fontSize: 9,
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    Đơn {ss.toFixed(2)}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Ionicons
+                              name="add-circle"
+                              size={22}
+                              color="#0066FF"
+                            />
+                          </Pressable>
+                        );
+                      })
                     )}
                   </View>
                 )}
@@ -484,38 +542,155 @@ function TeamFormModal({
                       Chưa có VĐV — {canEdit ? "tìm ở ô trên" : "captain chưa thêm"}
                     </Text>
                   ) : (
-                    players.map((p: any, idx: number) => (
-                      <View key={p._id} style={styles.rosterRow}>
-                        <Text style={styles.rosterIdx}>{idx + 1}</Text>
-                        <UserAvatar user={p} size={30} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.rosterName} numberOfLines={1}>
-                            {p.nickname || p.name || "VĐV"}
-                          </Text>
-                          <Text style={styles.rosterSub}>
-                            {p.gender === "female"
-                              ? "♀ Nữ"
-                              : p.gender === "male"
-                                ? "♂ Nam"
-                                : "—"}
-                          </Text>
+                    players.map((p: any, idx: number) => {
+                      const sd = Number(p?.score?.double) || 0;
+                      const ss = Number(p?.score?.single) || 0;
+                      return (
+                        <View key={p._id} style={styles.rosterRow}>
+                          <Text style={styles.rosterIdx}>{idx + 1}</Text>
+                          <UserAvatar user={p} size={30} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.rosterName} numberOfLines={1}>
+                              {p.nickname || p.name || "VĐV"}
+                            </Text>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 6,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <Text style={styles.rosterSub}>
+                                {p.gender === "female"
+                                  ? "♀ Nữ"
+                                  : p.gender === "male"
+                                    ? "♂ Nam"
+                                    : "—"}
+                              </Text>
+                              {sd > 0 && (
+                                <View
+                                  style={{
+                                    backgroundColor: "#DBEAFE",
+                                    paddingHorizontal: 5,
+                                    paddingVertical: 1,
+                                    borderRadius: 3,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#1E40AF",
+                                      fontSize: 10,
+                                      fontWeight: "800",
+                                    }}
+                                  >
+                                    Đôi {sd.toFixed(2)}
+                                  </Text>
+                                </View>
+                              )}
+                              {ss > 0 && (
+                                <View
+                                  style={{
+                                    backgroundColor: "#F1F5F9",
+                                    paddingHorizontal: 5,
+                                    paddingVertical: 1,
+                                    borderRadius: 3,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: "#334155",
+                                      fontSize: 10,
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    Đơn {ss.toFixed(2)}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          {canEdit && (
+                            <Pressable
+                              onPress={() => removePlayer(p._id)}
+                              hitSlop={10}
+                            >
+                              <Ionicons
+                                name="close-circle"
+                                size={22}
+                                color="#EF4444"
+                              />
+                            </Pressable>
+                          )}
                         </View>
-                        {canEdit && (
-                          <Pressable
-                            onPress={() => removePlayer(p._id)}
-                            hitSlop={10}
-                          >
-                            <Ionicons
-                              name="close-circle"
-                              size={22}
-                              color="#EF4444"
-                            />
-                          </Pressable>
-                        )}
-                      </View>
-                    ))
+                      );
+                    })
                   )}
                 </View>
+
+                {/* Tổng điểm roster */}
+                {players.length > 0 && (
+                  <View
+                    style={{
+                      marginTop: 8,
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: "#DBEAFE",
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#1E40AF",
+                          fontSize: 11,
+                          fontWeight: "800",
+                        }}
+                      >
+                        Tổng đôi:{" "}
+                        {players
+                          .reduce(
+                            (sum: number, p: any) =>
+                              sum + (Number(p?.score?.double) || 0),
+                            0,
+                          )
+                          .toFixed(2)}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        backgroundColor: "#F1F5F9",
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#334155",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        Tổng đơn:{" "}
+                        {players
+                          .reduce(
+                            (sum: number, p: any) =>
+                              sum + (Number(p?.score?.single) || 0),
+                            0,
+                          )
+                          .toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 {players.length > 0 && players.length < minRoster && (
                   <Text style={styles.warn}>
