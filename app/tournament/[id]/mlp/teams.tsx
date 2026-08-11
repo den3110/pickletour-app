@@ -36,12 +36,14 @@ const STATUS_COLOR: Record<string, string> = {
   approved: "#10B981",
   rejected: "#EF4444",
   withdrawn: "#94A3B8",
+  waitlisted: "#F59E0B",
 };
 const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ duyệt",
   approved: "Đã duyệt",
   rejected: "Từ chối",
   withdrawn: "Đã rút",
+  waitlisted: "Chờ duyệt (vượt cap)",
 };
 
 const PRESET_COLORS = [

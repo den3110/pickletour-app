@@ -288,6 +288,16 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Registrations"],
     }),
 
+    // ✅ Admin/manager duyệt registration từ waitlist → approved
+    managerSetRegStatus: builder.mutation({
+      query: ({ regId, status }) => ({
+        url: `/api/admin/tournaments/registrations/${regId}`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: ["Registrations"],
+    }),
+
     /* ========= SNAPSHOT OVERLAY (giữ) ========= */
     getOverlaySnapshot: builder.query({
       // Nếu BE của bạn khác, sửa route này cho khớp
@@ -864,6 +874,7 @@ export const {
   useListMyRegInvitesQuery,
   useRespondRegInviteMutation,
   useManagerSetRegPaymentStatusMutation,
+  useManagerSetRegStatusMutation,
   useManagerDeleteRegistrationMutation,
   useGetOverlaySnapshotQuery,
   useGetDrawStatusQuery,

@@ -37,6 +37,7 @@ import {
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
   useGetRegistrationsQuery,
+  useManagerSetRegStatusMutation,
   useGetTournamentQuery,
   useGetTournamentRegistrationHistoryQuery,
   useListMyRegInvitesQuery,
@@ -1566,17 +1567,48 @@ export default function TournamentRegistrationScreen() {
     );
   }, [myInvites, id, isLoggedIn]);
 
+  // Tách approved (chính thức) vs waitlisted (chờ duyệt)
+  const approvedRegs = useMemo(
+    () =>
+      (regs || []).filter(
+        (r: any) => !r.status || r.status === "approved",
+      ),
+    [regs],
+  );
+  const waitlistedRegs = useMemo(
+    () => (regs || []).filter((r: any) => r.status === "waitlisted"),
+    [regs],
+  );
+
   const filteredRegs = useMemo(() => {
-    if (!searchQ.trim()) return regs;
+    if (!searchQ.trim()) return approvedRegs;
     const q = normalizeNoAccent(searchQ.toLowerCase());
-    return regs.filter((r: any) => {
+    return approvedRegs.filter((r: any) => {
       const txt = `${displayName(r.player1, tour)} ${r.player1?.phone} ${displayName(
         r.player2,
         tour
       )} ${r.player2?.phone} ${regCodeOf(r)}`;
       return normalizeNoAccent(txt.toLowerCase()).includes(q);
     });
-  }, [regs, searchQ, tour]);
+  }, [approvedRegs, searchQ, tour]);
+
+  const [managerSetRegStatus] = useManagerSetRegStatusMutation();
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const handlePromoteWaitlist = useCallback(
+    async (regId: string) => {
+      try {
+        setPromotingId(regId);
+        await managerSetRegStatus({ regId, status: "approved" }).unwrap();
+        Alert.alert("Thành công", "Đã duyệt cặp đăng ký");
+        refetchRegs();
+      } catch (err: any) {
+        Alert.alert("Lỗi", err?.data?.message || "Duyệt không thành công");
+      } finally {
+        setPromotingId(null);
+      }
+    },
+    [managerSetRegStatus, refetchRegs],
+  );
 
   const handleRefresh = useCallback(() => {
     refetchRegs();
@@ -2626,6 +2658,107 @@ export default function TournamentRegistrationScreen() {
             />
           )}
           ListHeaderComponent={HeaderComponent}
+          ListFooterComponent={
+            waitlistedRegs.length > 0 ? (
+              <View
+                style={{
+                  marginTop: 16,
+                  marginHorizontal: 12,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: "#F59E0B",
+                  borderRadius: 12,
+                  backgroundColor: "#FFFBEB",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 8,
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{ color: "#78350F", fontWeight: "800", fontSize: 13 }}
+                  >
+                    ⏳ Chờ duyệt · {waitlistedRegs.length}
+                  </Text>
+                  <Text style={{ color: "#92400E", fontSize: 11, flex: 1 }}>
+                    Vượt cap · tự duyệt khi có cặp khác rút
+                  </Text>
+                </View>
+                {waitlistedRegs.map((r: any, idx: number) => {
+                  const p1 = r.player1 || {};
+                  const p2 = r.player2 || {};
+                  return (
+                    <View
+                      key={r._id}
+                      style={{
+                        backgroundColor: "#fff",
+                        borderRadius: 10,
+                        padding: 10,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: "#F59E0B",
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "800",
+                            color: "#92400E",
+                          }}
+                        >
+                          #{idx + 1} · {regCodeOf(r)}
+                        </Text>
+                        {canManage && (
+                          <TouchableOpacity
+                            disabled={promotingId === r._id}
+                            onPress={() => handlePromoteWaitlist(r._id)}
+                            style={{
+                              backgroundColor:
+                                promotingId === r._id ? "#94A3B8" : "#10B981",
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: "#fff",
+                                fontSize: 12,
+                                fontWeight: "800",
+                              }}
+                            >
+                              {promotingId === r._id
+                                ? "Đang duyệt…"
+                                : "✓ Duyệt"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 13, color: "#0F172A" }}>
+                        {p1.nickName || p1.fullName || "—"}
+                        {!isSingles && p2?.fullName
+                          ? `  /  ${p2.nickName || p2.fullName}`
+                          : ""}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null
+          }
           contentContainerStyle={{ paddingBottom: 100 }}
           refreshing={regsLoading}
           onRefresh={handleRefresh}
