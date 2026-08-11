@@ -742,16 +742,34 @@ export default function RefereeCenterScreen() {
     return items.filter((dl: any) => {
       // Chỉ hiện dual đang tie_break (chờ DreamBreaker start) hoặc đã
       // trigger DreamBreaker chưa xong.
-      const inDb = dl?.status === "tie_break" ||
+      const inDb =
+        dl?.status === "tie_break" ||
         (dl?.dreamBreaker?.triggered && !dl?.dreamBreaker?.winner);
       if (!inDb) return false;
-      // Trọng tài của dual hoặc bất kỳ sub-match nào → có quyền chấm.
+      // Trọng tài của dual → có quyền chấm.
       const dualRefs = Array.isArray(dl?.referees) ? dl.referees : [];
       if (dualRefs.some((r: any) => String(r?._id ?? r) === myId)) return true;
+      // Trọng tài của bất kỳ sub-match nào.
       const subs = Array.isArray(dl?.subMatches) ? dl.subMatches : [];
+      if (
+        subs.some((s: any) => {
+          const sr = Array.isArray(s?.referees) ? s.referees : [];
+          return sr.some((r: any) => String(r?._id ?? r) === myId);
+        })
+      )
+        return true;
+      // Fallback "trọng tài theo sân": nếu station.defaultReferees có mình.
+      const stationRefs = Array.isArray(dl?.courtStation?.defaultReferees)
+        ? dl.courtStation.defaultReferees
+        : [];
+      if (stationRefs.some((r: any) => String(r?._id ?? r) === myId))
+        return true;
+      // Sub-station.defaultReferees
       return subs.some((s: any) => {
-        const sr = Array.isArray(s?.referees) ? s.referees : [];
-        return sr.some((r: any) => String(r?._id ?? r) === myId);
+        const sSt = Array.isArray(s?.courtStation?.defaultReferees)
+          ? s.courtStation.defaultReferees
+          : [];
+        return sSt.some((r: any) => String(r?._id ?? r) === myId);
       });
     });
   }, [mlpDualsResp?.items, isMlpTour, me?._id]);
