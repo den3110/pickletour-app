@@ -67,6 +67,7 @@ import {
 import ImageView from "react-native-image-viewing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import { OpenMessageButton } from "@/components/social/OpenMessageButton";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
@@ -2240,6 +2241,7 @@ export default function TournamentRegistrationScreen() {
                           {o.labels.join(" · ")}
                         </Text>
                       </View>
+                      <OpenMessageButton userId={o.userId} compact />
                       {o.phone ? (
                         <TouchableOpacity
                           onPress={(e) => {
