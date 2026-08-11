@@ -900,6 +900,71 @@ const TournamentCard = React.memo(function TournamentCard({
             style={styles.tournamentImageGradient}
           />
           <AnimatedStatusChip />
+          {/* Format badge: MLP / TEAM — góc trên trái */}
+          {String((tournament as any)?.tournamentMode || "")
+            .toLowerCase() === "mlp" && (
+            <View
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: "#f59e0b",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.4)",
+                shadowColor: "#000",
+                shadowOpacity: 0.35,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontWeight: "900",
+                  fontSize: 11,
+                  letterSpacing: 0.8,
+                }}
+              >
+                🏆 MLP
+              </Text>
+            </View>
+          )}
+          {String((tournament as any)?.tournamentMode || "")
+            .toLowerCase() === "team" && (
+            <View
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: "#6366f1",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.4)",
+                shadowColor: "#000",
+                shadowOpacity: 0.35,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontWeight: "900",
+                  fontSize: 11,
+                  letterSpacing: 0.8,
+                }}
+              >
+                👥 TEAM
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
