@@ -1773,6 +1773,38 @@ export default function TournamentRegistrationScreen() {
     [router]
   );
 
+  // BTC = người tạo giải + đồng quản lý. Dedup theo userId, gộp label.
+  const organizers = useMemo(() => {
+    const map = new Map<string, {
+      userId: string;
+      name: string;
+      avatar: string;
+      phone: string;
+      labels: string[];
+    }>();
+    const push = (u: any, label: string) => {
+      if (!u || typeof u !== "object" || !u._id) return;
+      const uid = String(u._id);
+      if (!map.has(uid)) {
+        map.set(uid, {
+          userId: uid,
+          name: u.nickname || u.name || "BTC",
+          avatar: u.avatar || "",
+          phone: u.phone || "",
+          labels: [],
+        });
+      }
+      const entry = map.get(uid)!;
+      if (!entry.labels.includes(label)) entry.labels.push(label);
+    };
+    push((tour as any)?.createdBy, "Người tạo giải");
+    const managers = Array.isArray((tour as any)?.managers)
+      ? (tour as any).managers
+      : [];
+    managers.forEach((m: any) => push(m?.user, "Đồng quản lý"));
+    return Array.from(map.values());
+  }, [(tour as any)?.createdBy, (tour as any)?.managers]);
+
   const openComplaint = useCallback(
     (reg: any) => setComplaintDlg({ open: true, reg, text: "" }),
     []
@@ -2079,6 +2111,161 @@ export default function TournamentRegistrationScreen() {
               </View>
             </View>
           </View>
+
+          {/* BTC / Ban tổ chức */}
+          {organizers.length > 0 && (
+            <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+              <View
+                style={{
+                  backgroundColor: C.cardBg,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  padding: 12,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Ionicons
+                    name="shield-checkmark"
+                    size={16}
+                    color={C.textPrimary}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: C.textPrimary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Ban tổ chức
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: C.border,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "700",
+                        color: C.textPrimary,
+                      }}
+                    >
+                      {organizers.length}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ gap: 8 }}>
+                  {organizers.map((o) => (
+                    <TouchableOpacity
+                      key={o.userId}
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        openProfileByPlayer({ _id: o.userId })
+                      }
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: C.border,
+                        backgroundColor: C.pageBg,
+                      }}
+                    >
+                      {o.avatar ? (
+                        <ExpoImage
+                          source={{ uri: o.avatar }}
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                          }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: C.border,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontWeight: "800",
+                              color: C.textPrimary,
+                            }}
+                          >
+                            {(o.name || "?")[0]?.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "700",
+                            color: C.textPrimary,
+                          }}
+                        >
+                          {o.name}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 11,
+                            color: C.textSecondary,
+                            marginTop: 2,
+                          }}
+                        >
+                          {o.labels.join(" · ")}
+                        </Text>
+                      </View>
+                      {o.phone ? (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            Linking.openURL(`tel:${o.phone}`).catch(() => {});
+                          }}
+                          style={{
+                            padding: 8,
+                            borderRadius: 20,
+                            backgroundColor: C.border,
+                          }}
+                          hitSlop={8}
+                        >
+                          <Ionicons
+                            name="call"
+                            size={16}
+                            color={C.textPrimary}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Action Section & List Header */}
           <View
@@ -2533,6 +2720,8 @@ export default function TournamentRegistrationScreen() {
       isSingles,
       isDoubles,
       searchQ,
+      organizers,
+      openProfileByPlayer,
     ]
   );
 
