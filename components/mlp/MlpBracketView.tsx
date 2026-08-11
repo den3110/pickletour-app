@@ -406,6 +406,7 @@ function DualCard({
           team={dual?.teamA}
           score={dual?.slotWinsA}
           isWinner={teamAWinner}
+          placeholder={placeholderLabel(dual?.sourceA)}
         />
         <View style={styles.dualVs}>
           <Text style={styles.dualVsText}>vs</Text>
@@ -414,6 +415,7 @@ function DualCard({
           team={dual?.teamB}
           score={dual?.slotWinsB}
           isWinner={teamBWinner}
+          placeholder={placeholderLabel(dual?.sourceB)}
         />
       </View>
 
@@ -457,15 +459,52 @@ function DualCard({
   );
 }
 
+function placeholderLabel(source: any): string | null {
+  if (!source || !source.kind) return null;
+  if (source.kind === "poolRank") {
+    const rank = Number(source.poolRank) || 1;
+    const label =
+      rank === 1 ? "Nhất" : rank === 2 ? "Nhì" : rank === 3 ? "Ba" : `#${rank}`;
+    return `${label} bảng ${source.poolKey || "?"}`;
+  }
+  if (source.kind === "winner") {
+    return `Thắng T${(Number(source.fromMatchOrder) || 0) + 1}`;
+  }
+  return null;
+}
+
 function TeamRow({
   team,
   score,
   isWinner,
+  placeholder,
 }: {
   team: any;
   score: number;
   isWinner: boolean;
+  placeholder?: string | null;
 }) {
+  if (!team && placeholder) {
+    return (
+      <View
+        style={[
+          styles.teamRow,
+          { backgroundColor: "#FEF3C7", borderColor: "#F59E0B", borderWidth: 1, borderStyle: "dashed" as any },
+        ]}
+      >
+        <View style={[styles.teamAvatar, { backgroundColor: "#F59E0B" }]}>
+          <Text style={{ color: "#fff", fontWeight: "900" }}>?</Text>
+        </View>
+        <Text
+          style={[styles.teamName, { fontStyle: "italic", color: "#92400E" }]}
+          numberOfLines={1}
+        >
+          {placeholder}
+        </Text>
+        <Text style={[styles.teamScore, { color: "#92400E" }]}>–</Text>
+      </View>
+    );
+  }
   const logoUri = team?.logo ? normalizeUrl(team.logo) : "";
   const initial = String(team?.shortName || team?.name || "?")
     .trim()
