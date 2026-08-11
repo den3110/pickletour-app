@@ -82,6 +82,8 @@ export default function MlpTeamsScreen() {
   const cfg: any = (tour as any)?.mlpConfig || {};
   const minRoster = Number(cfg.minRosterSize) || 4;
   const maxRoster = Number(cfg.maxRosterSize) || 8;
+  const maxTeamScore =
+    Number(cfg.maxTeamScore) > 0 ? Number(cfg.maxTeamScore) : null;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<any>(null);
@@ -199,6 +201,7 @@ export default function MlpTeamsScreen() {
         team={null}
         minRoster={minRoster}
         maxRoster={maxRoster}
+        maxTeamScore={maxTeamScore}
         onSaved={() => {
           setCreateOpen(false);
           refetch();
@@ -211,6 +214,7 @@ export default function MlpTeamsScreen() {
         team={editTeam}
         minRoster={minRoster}
         maxRoster={maxRoster}
+        maxTeamScore={maxTeamScore}
         canEdit={
           !!editTeam &&
           String(editTeam?.captain?._id || editTeam?.captain) ===
@@ -233,6 +237,7 @@ function TeamFormModal({
   team,
   minRoster,
   maxRoster,
+  maxTeamScore,
   onSaved,
   canEdit = true,
 }: {
@@ -242,6 +247,7 @@ function TeamFormModal({
   team: any;
   minRoster: number;
   maxRoster: number;
+  maxTeamScore: number | null;
   onSaved: () => void;
   canEdit?: boolean;
 }) {
@@ -306,10 +312,30 @@ function TeamFormModal({
   const removePlayer = (id: string) =>
     setPlayers((prev) => prev.filter((p) => String(p._id) !== String(id)));
 
+  const totalDouble = useMemo(
+    () =>
+      players.reduce(
+        (sum: number, p: any) => sum + (Number(p?.score?.double) || 0),
+        0,
+      ),
+    [players],
+  );
+  const totalSingle = useMemo(
+    () =>
+      players.reduce(
+        (sum: number, p: any) => sum + (Number(p?.score?.single) || 0),
+        0,
+      ),
+    [players],
+  );
+  const overCap =
+    maxTeamScore != null && totalDouble > maxTeamScore;
+
   const canSubmit =
     !!name.trim() &&
     players.length >= minRoster &&
-    players.length <= maxRoster;
+    players.length <= maxRoster &&
+    !overCap;
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -318,6 +344,11 @@ function TeamFormModal({
         return Alert.alert(
           "Chưa đủ",
           `Roster cần ít nhất ${minRoster} VĐV`,
+        );
+      if (overCap)
+        return Alert.alert(
+          "Vượt giới hạn",
+          `Tổng điểm đôi ${totalDouble.toFixed(2)} vượt giới hạn ${maxTeamScore} của giải`,
         );
       return;
     }
@@ -641,7 +672,7 @@ function TeamFormModal({
                   >
                     <View
                       style={{
-                        backgroundColor: "#DBEAFE",
+                        backgroundColor: overCap ? "#FEE2E2" : "#DBEAFE",
                         paddingHorizontal: 8,
                         paddingVertical: 3,
                         borderRadius: 6,
@@ -649,19 +680,13 @@ function TeamFormModal({
                     >
                       <Text
                         style={{
-                          color: "#1E40AF",
+                          color: overCap ? "#B91C1C" : "#1E40AF",
                           fontSize: 11,
                           fontWeight: "800",
                         }}
                       >
-                        Tổng đôi:{" "}
-                        {players
-                          .reduce(
-                            (sum: number, p: any) =>
-                              sum + (Number(p?.score?.double) || 0),
-                            0,
-                          )
-                          .toFixed(2)}
+                        Tổng đôi: {totalDouble.toFixed(2)}
+                        {maxTeamScore != null ? ` / ${maxTeamScore}` : ""}
                       </Text>
                     </View>
                     <View
@@ -679,16 +704,32 @@ function TeamFormModal({
                           fontWeight: "700",
                         }}
                       >
-                        Tổng đơn:{" "}
-                        {players
-                          .reduce(
-                            (sum: number, p: any) =>
-                              sum + (Number(p?.score?.single) || 0),
-                            0,
-                          )
-                          .toFixed(2)}
+                        Tổng đơn: {totalSingle.toFixed(2)}
                       </Text>
                     </View>
+                  </View>
+                )}
+                {overCap && (
+                  <View
+                    style={{
+                      marginTop: 8,
+                      padding: 8,
+                      backgroundColor: "#FEE2E2",
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: "#FCA5A5",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#991B1B",
+                        fontSize: 12,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Tổng điểm đôi ({totalDouble.toFixed(2)}) vượt giới hạn{" "}
+                      {maxTeamScore} của giải. Vui lòng bỏ bớt VĐV điểm cao.
+                    </Text>
                   </View>
                 )}
 
