@@ -2078,11 +2078,17 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     [match, eventType],
   );
 
-  // Tên đội hiển thị trên header mỗi side. MLP ưu tiên meta.mlp.teamXName.
-  // Với match thường: fallback về resolvedSideName / teamName / pairName / ""
+  // Tên đội hiển thị trên header mỗi side.
+  // MLP: CHỈ dùng meta.mlp.teamXName. KHÔNG fallback về resolvedSideName /
+  //   pairName / sideName vì các field đó thường bị upstream gán = "Tung /
+  //   Có cháu đây" (tên VĐV concat) → header nhấp nháy sang tên VĐV mỗi
+  //   khi realtime refetch. Với MLP nếu thiếu meta.mlp.teamXName → để rỗng.
+  // Không MLP: dùng fallback cũ để không đổi hành vi giải thường.
+  const isMlpMatch = !!match?.meta?.mlp?.dualId;
   const resolveTeamName = (key) => {
     const mlpName = match?.meta?.mlp?.[`team${key}Name`];
     if (mlpName && String(mlpName).trim()) return String(mlpName).trim();
+    if (isMlpMatch) return "";
     const candidates = [
       match?.[`resolvedSideName${key}`],
       match?.[`__side${key}`],
@@ -2096,8 +2102,16 @@ export default function RefereeJudgePanel({ matchId, initialMatch = null }) {
     }
     return "";
   };
-  const teamNameA = useMemo(() => resolveTeamName("A"), [match]);
-  const teamNameB = useMemo(() => resolveTeamName("B"), [match]);
+  const teamNameA = useMemo(
+    () => resolveTeamName("A"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [match?.meta?.mlp?.teamAName, isMlpMatch, match?.resolvedSideNameA, match?.__sideA, match?.teamAName, match?.pairAName, match?.sideAName],
+  );
+  const teamNameB = useMemo(
+    () => resolveTeamName("B"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [match?.meta?.mlp?.teamBName, isMlpMatch, match?.resolvedSideNameB, match?.__sideB, match?.teamBName, match?.pairBName, match?.sideBName],
+  );
 
   const slotsBase = useMemo(
     () => match?.slots?.base || match?.meta?.slots?.base || {},
