@@ -121,8 +121,10 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
   const goToTeams = () => router.push(`/tournament/${tourId}/mlp/teams`);
   const goToDuals = () => router.push(`/tournament/${tourId}/mlp/duals`);
   const goToStandings = () => router.push(`/tournament/${tourId}/mlp/standings`);
-  const openDual = (dl: any) =>
+  const openDual = (dl: any) => {
+    if (!dl?.teamA && !dl?.teamB) return;
     router.push(`/tournament/${tourId}/mlp/dual/${dl._id}`);
+  };
 
   return (
     <ScrollView
