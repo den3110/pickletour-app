@@ -1615,27 +1615,73 @@ export default function TournamentRegistrationScreen() {
     if (isLoggedIn) refetchInvites();
   }, [refetchRegs, refetchInvites, isLoggedIn]);
 
+  const performCreateInvite = useCallback(
+    async (payload: any) => {
+      try {
+        const res: any = await createInvite(payload).unwrap();
+        if (
+          res?.status === "waitlisted" ||
+          res?.invite?.desiredStatus === "waitlisted"
+        ) {
+          Alert.alert(
+            "Đã ghi nhận",
+            res?.message ||
+              "Đã tạo đăng ký ở trạng thái CHỜ DUYỆT (vượt cap).",
+          );
+        } else {
+          Alert.alert("Thành công", "Đã gửi đăng ký/lời mời");
+        }
+        if (isAdmin) setP1Admin(null);
+        setP2(null);
+        setMsg("");
+        handleRefresh();
+      } catch (e: any) {
+        Alert.alert("Lỗi", e?.data?.message || "Đăng ký thất bại");
+      }
+    },
+    [createInvite, isAdmin, handleRefresh],
+  );
+
   const handleSubmit = useCallback(async () => {
     if (!isLoggedIn) return Alert.alert("Thông báo", "Vui lòng đăng nhập.");
     const p1Id = isAdmin ? p1Admin?._id : me?._id;
     if (!p1Id) return Alert.alert("Lỗi", "Thiếu thông tin VĐV 1");
     if (isDoubles && !p2?._id) return Alert.alert("Lỗi", "Thiếu VĐV 2");
 
-    try {
-      await createInvite({
-        tourId: id,
-        message: msg,
-        player1Id: String(p1Id),
-        player2Id: p2?._id,
-      }).unwrap();
-      Alert.alert("Thành công", "Đã gửi đăng ký/lời mời");
-      if (isAdmin) setP1Admin(null);
-      setP2(null);
-      setMsg("");
-      handleRefresh();
-    } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Đăng ký thất bại");
+    const basePayload = {
+      tourId: id,
+      message: msg,
+      player1Id: String(p1Id),
+      player2Id: p2?._id,
+    };
+
+    // Admin + cap đầy → hỏi Chờ hay Duyệt luôn
+    const maxPairs = Number((tour as any)?.maxPairs) || 0;
+    const currentRegs = Number((tour as any)?.stats?.registrationsCount) || 0;
+    const overCap = maxPairs > 0 && currentRegs >= maxPairs;
+    if (isAdmin && overCap) {
+      Alert.alert(
+        `Cặp thứ ${currentRegs + 1} vượt cap ${maxPairs}`,
+        `Giải đã đủ ${maxPairs} cặp. Chọn trạng thái cho cặp này:\n\n• Chờ duyệt: vào waitlist, không tính 48/48. Tự duyệt FIFO khi có cặp rút.\n• Duyệt luôn: cặp được duyệt ngay (49/48+).`,
+        [
+          { text: "Huỷ", style: "cancel" },
+          {
+            text: "⏳ Chờ duyệt",
+            onPress: () =>
+              performCreateInvite({ ...basePayload, status: "waitlisted" }),
+          },
+          {
+            text: "✓ Duyệt luôn",
+            onPress: () =>
+              performCreateInvite({ ...basePayload, status: "approved" }),
+          },
+        ],
+        { cancelable: true },
+      );
+      return;
     }
+
+    await performCreateInvite(basePayload);
   }, [
     isLoggedIn,
     isAdmin,
@@ -1645,8 +1691,8 @@ export default function TournamentRegistrationScreen() {
     p2,
     id,
     msg,
-    createInvite,
-    handleRefresh,
+    tour,
+    performCreateInvite,
   ]);
 
   const onCancelReg = useCallback(

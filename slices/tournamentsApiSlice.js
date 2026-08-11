@@ -244,13 +244,15 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
 
     // NEW: tạo lời mời đăng ký
     createRegInvite: builder.mutation({
-      query: ({ tourId, message, player1Id, player2Id }) => ({
+      query: ({ tourId, message, player1Id, player2Id, status }) => ({
         url: `/api/tournaments/${tourId}/registration-invites`,
         method: "POST",
-        body: { message, player1Id, player2Id },
+        body: { message, player1Id, player2Id, status },
       }),
       invalidatesTags: (res) =>
-        res?.invite?.status === "finalized" ? ["Registrations"] : [],
+        res?.invite?.status === "finalized" || res?.status
+          ? ["Registrations"]
+          : [],
     }),
 
     // NEW: list lời mời mình còn pending (theo từng giải)
