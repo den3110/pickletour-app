@@ -2736,15 +2736,15 @@ export default function TournamentRegistrationScreen() {
                   </Text>
                 </View>
                 {waitlistedRegs.map((r: any, idx: number) => {
-                  const p1 = r.player1 || {};
-                  const p2 = r.player2 || {};
+                  const players = [r?.player1, r?.player2].filter(Boolean);
+                  const total = totalScoreOf(r, isSingles);
                   return (
                     <View
                       key={r._id}
                       style={{
                         backgroundColor: "#fff",
                         borderRadius: 10,
-                        padding: 10,
+                        padding: 12,
                         marginBottom: 8,
                         borderWidth: 1,
                         borderColor: "#F59E0B",
@@ -2755,7 +2755,7 @@ export default function TournamentRegistrationScreen() {
                           flexDirection: "row",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          marginBottom: 6,
+                          marginBottom: 8,
                         }}
                       >
                         <Text
@@ -2763,6 +2763,8 @@ export default function TournamentRegistrationScreen() {
                             fontSize: 11,
                             fontWeight: "800",
                             color: "#92400E",
+                            fontFamily:
+                              Platform.OS === "ios" ? "Courier" : "monospace",
                           }}
                         >
                           #{idx + 1} · {regCodeOf(r)}
@@ -2774,7 +2776,7 @@ export default function TournamentRegistrationScreen() {
                             style={{
                               backgroundColor:
                                 promotingId === r._id ? "#94A3B8" : "#10B981",
-                              paddingHorizontal: 10,
+                              paddingHorizontal: 12,
                               paddingVertical: 6,
                               borderRadius: 6,
                             }}
@@ -2793,12 +2795,151 @@ export default function TournamentRegistrationScreen() {
                           </TouchableOpacity>
                         )}
                       </View>
-                      <Text style={{ fontSize: 13, color: "#0F172A" }}>
-                        {p1.nickName || p1.fullName || "—"}
-                        {!isSingles && p2?.fullName
-                          ? `  /  ${p2.nickName || p2.fullName}`
-                          : ""}
-                      </Text>
+                      {players.map((pl: any, pi: number) => {
+                        const scoreChip = scoreTierChipColors(pl);
+                        return (
+                          <View
+                            key={pi}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 10,
+                              marginBottom:
+                                pi < players.length - 1 ? 8 : 0,
+                            }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                openPreview(
+                                  pl?.avatar,
+                                  displayName(pl, tour),
+                                )
+                              }
+                            >
+                              <ExpoImage
+                                source={{
+                                  uri: normalizeUrl(pl?.avatar) || PLACE,
+                                }}
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 19,
+                                  backgroundColor: "#F1F5F9",
+                                  borderWidth: 1,
+                                  borderColor: "#F59E0B",
+                                }}
+                                contentFit="cover"
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => openProfileByPlayer(pl)}
+                              style={{ flex: 1 }}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <Text
+                                  numberOfLines={1}
+                                  style={{
+                                    fontWeight: "700",
+                                    color: "#0F172A",
+                                    fontSize: 14,
+                                  }}
+                                >
+                                  {displayName(pl, tour)}
+                                </Text>
+                                {pl?.cccdStatus === "verified" && (
+                                  <MaterialIcons
+                                    name="verified"
+                                    size={13}
+                                    color="#0066FF"
+                                  />
+                                )}
+                              </View>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  marginTop: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: "#64748B",
+                                    fontSize: 11,
+                                    fontFamily:
+                                      Platform.OS === "ios"
+                                        ? "Courier"
+                                        : "monospace",
+                                  }}
+                                >
+                                  {phoneForRole(pl?.phone, canManage)}
+                                </Text>
+                                <View
+                                  style={{
+                                    backgroundColor: scoreChip.bg,
+                                    borderColor: scoreChip.border,
+                                    borderWidth: 1,
+                                    paddingHorizontal: 6,
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: "700",
+                                      color: scoreChip.text,
+                                    }}
+                                  >
+                                    {roundTo3(pl?.score)}
+                                  </Text>
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                      {!isSingles && Number.isFinite(total) && (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "baseline",
+                            gap: 4,
+                            marginTop: 10,
+                            paddingTop: 8,
+                            borderTopWidth: 1,
+                            borderTopColor: "#FEF3C7",
+                            borderStyle: "dashed",
+                          }}
+                        >
+                          <Text
+                            style={{ fontSize: 11, color: "#64748B" }}
+                          >
+                            Tổng:
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 15,
+                              fontWeight: "800",
+                              color: "#92400E",
+                            }}
+                          >
+                            {roundTo3(total)}
+                          </Text>
+                          {cap > 0 && (
+                            <Text
+                              style={{ fontSize: 11, color: "#64748B" }}
+                            >
+                              / {cap}
+                            </Text>
+                          )}
+                        </View>
+                      )}
                     </View>
                   );
                 })}
