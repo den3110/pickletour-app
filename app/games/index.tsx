@@ -47,6 +47,36 @@ const GAMES: GameTile[] = [
     route: "/phom",
     isNew: true,
   },
+  {
+    id: "caro",
+    title: "Caro",
+    subtitle: "Gomoku · 2 người · 5 liên tiếp",
+    iconLib: "MaterialCommunityIcons",
+    icon: "grid",
+    color: "#EF4444",
+    route: "/caro",
+    isNew: true,
+  },
+  {
+    id: "xiangqi",
+    title: "Cờ Tướng",
+    subtitle: "Xiangqi · 2 người · sắp ra mắt",
+    iconLib: "MaterialCommunityIcons",
+    icon: "chess-knight",
+    color: "#B45309",
+    route: "/games/xiangqi",
+    isNew: true,
+  },
+  {
+    id: "chess",
+    title: "Cờ Vua",
+    subtitle: "Chess · 2 người · sắp ra mắt",
+    iconLib: "MaterialCommunityIcons",
+    icon: "chess-king",
+    color: "#0F172A",
+    route: "/games/chess",
+    isNew: true,
+  },
 ];
 
 export default function GamesHubScreen() {
