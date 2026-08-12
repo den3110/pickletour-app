@@ -346,7 +346,7 @@ export default function PhomRoomScreen() {
           {mySeat.cards?.length < 10 ? (
             <>
               <ActionBtn
-                label="Bốc nọc"
+                label="Bốc thẻ"
                 icon="download-outline"
                 color="#3B82F6"
                 onPress={() => doAction("draw_deck")}
@@ -367,7 +367,7 @@ export default function PhomRoomScreen() {
           ) : (
             selectedCards.length === 1 && (
               <ActionBtn
-                label={`Thảy ${selectedCards[0]}`}
+                label={`Đánh ${selectedCards[0]}`}
                 icon="arrow-forward-circle"
                 color="#DC2626"
                 onPress={() =>
