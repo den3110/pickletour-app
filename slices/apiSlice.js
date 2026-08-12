@@ -359,6 +359,8 @@ export const apiSlice = createApi({
     "PhomRoom",
     "SamRoom",
     "CaroRoom",
+    "ChessRoom",
+    "XiangqiRoom",
     "Feed",
     "FeedComments",
     "User",
