@@ -21,6 +21,7 @@ import { useSocket } from "@/context/SocketContext";
 import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
 import { ConnectionBanner, SpeechBubble } from "@/components/games/GameTableUI";
+import { playSound, warmupSounds } from "@/lib/gameSound";
 import {
   useChatXiangqiRoomMutation,
   useGetXiangqiRoomQuery,
@@ -193,13 +194,28 @@ export default function XiangqiRoomScreen() {
     }
     const from = [selected[0], selected[1]];
     const to = [actualRow, actualCol];
+    const targetHadPiece = !!board[actualRow * 9 + actualCol];
     setSelected(null);
     try {
       await move({ roomId, from, to }).unwrap();
+      playSound(targetHadPiece ? "call" : "chip");
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Nước không hợp lệ");
     }
   };
+  const confirmBack = () => {
+    if (!mySeat) {
+      router.back();
+      return;
+    }
+    Alert.alert("Thoát phòng?", "Bạn có muốn rời bàn?", [
+      { text: "Ở lại", style: "cancel" },
+      { text: "Thoát", style: "destructive", onPress: doLeave },
+    ]);
+  };
+  useEffect(() => {
+    warmupSounds();
+  }, []);
 
   if (!room) {
     return <View style={styles.loading}><Text>Đang tải…</Text></View>;
@@ -209,6 +225,9 @@ export default function XiangqiRoomScreen() {
   const seat1 = room.seats.find((s: any) => s.seatIndex === 1);
   const topSeat = mySide === "red" ? seat1 : seat0;
   const bottomSeat = mySide === "red" ? seat0 : seat1;
+  const isHost =
+    room.createdBy &&
+    String(room.createdBy._id || room.createdBy) === String(me?._id);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#78350F" }}>
@@ -216,7 +235,7 @@ export default function XiangqiRoomScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <ConnectionBanner status={connStatus} />
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+          <Pressable onPress={confirmBack} style={styles.iconBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <View style={styles.titleBox}>
@@ -304,11 +323,17 @@ export default function XiangqiRoomScreen() {
         />
 
         <View style={styles.bottomRow}>
-          {mySeat && (room.stage === "waiting" || room.stage === "showdown") && (
+          {isHost && (room.stage === "waiting" || room.stage === "showdown") && (
             <Pressable onPress={doStart} style={[styles.actionBtn, { backgroundColor: "#10B981" }]}>
               <Ionicons name="play" size={18} color="#fff" />
               <Text style={styles.actionBtnText}>{room.stage === "showdown" ? "Ván mới" : "Bắt đầu"}</Text>
             </Pressable>
+          )}
+          {!isHost && (room.stage === "waiting" || room.stage === "showdown") && (
+            <View style={[styles.actionBtn, { backgroundColor: "#334155" }]}>
+              <Ionicons name="hourglass" size={16} color="#fff" />
+              <Text style={styles.actionBtnText}>Chờ chủ phòng</Text>
+            </View>
           )}
           {mySeat && room.stage === "playing" && (
             <Pressable onPress={doResign} style={[styles.actionBtn, { backgroundColor: "#DC2626" }]}>

@@ -21,6 +21,7 @@ import { useSocket } from "@/context/SocketContext";
 import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
 import { ConnectionBanner, SpeechBubble } from "@/components/games/GameTableUI";
+import { playSound, warmupSounds } from "@/lib/gameSound";
 import {
   useCaroMoveMutation,
   useChatCaroRoomMutation,
@@ -156,10 +157,24 @@ export default function CaroRoomScreen() {
   const doMove = async (row: number, col: number) => {
     try {
       await move({ roomId, row, col }).unwrap();
+      playSound("chip");
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
   };
+  const confirmBack = () => {
+    if (!mySeat) {
+      router.back();
+      return;
+    }
+    Alert.alert("Thoát phòng?", "Bạn có muốn rời bàn?", [
+      { text: "Ở lại", style: "cancel" },
+      { text: "Thoát", style: "destructive", onPress: doLeave },
+    ]);
+  };
+  useEffect(() => {
+    warmupSounds();
+  }, []);
   const doSendChat = async () => {
     const t = chatText.trim();
     if (!t) return;
@@ -184,6 +199,9 @@ export default function CaroRoomScreen() {
   const isMyTurn = mySeat && room.activeSeatIndex === mySeat.seatIndex && room.stage === "playing";
   const seat0 = room.seats.find((s: any) => s.seatIndex === 0);
   const seat1 = room.seats.find((s: any) => s.seatIndex === 1);
+  const isHost =
+    room.createdBy &&
+    String(room.createdBy._id || room.createdBy) === String(me?._id);
 
   const winLine = new Set(
     (room.winningLine || []).map((rc: number[]) => `${rc[0]}-${rc[1]}`),
@@ -197,7 +215,7 @@ export default function CaroRoomScreen() {
         <ConnectionBanner status={connStatus} />
         {/* Top bar */}
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+          <Pressable onPress={confirmBack} style={styles.iconBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <View style={styles.titleBox}>
@@ -288,13 +306,19 @@ export default function CaroRoomScreen() {
 
         {/* Bottom actions */}
         <View style={styles.bottomRow}>
-          {mySeat && (room.stage === "waiting" || room.stage === "showdown") && (
+          {isHost && (room.stage === "waiting" || room.stage === "showdown") && (
             <Pressable onPress={doStart} style={[styles.actionBtn, { backgroundColor: "#10B981" }]}>
               <Ionicons name="play" size={18} color="#fff" />
               <Text style={styles.actionBtnText}>
                 {room.stage === "showdown" ? "Ván mới" : "Bắt đầu"}
               </Text>
             </Pressable>
+          )}
+          {!isHost && (room.stage === "waiting" || room.stage === "showdown") && (
+            <View style={[styles.actionBtn, { backgroundColor: "#334155" }]}>
+              <Ionicons name="hourglass" size={16} color="#fff" />
+              <Text style={styles.actionBtnText}>Chờ chủ phòng bắt đầu</Text>
+            </View>
           )}
           <Pressable
             onPress={() => setInviteOpen(true)}

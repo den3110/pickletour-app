@@ -22,6 +22,7 @@ import { useSocket } from "@/context/SocketContext";
 import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
 import { ConnectionBanner, SpeechBubble } from "@/components/games/GameTableUI";
+import { playSound, warmupSounds } from "@/lib/gameSound";
 import {
   useChatChessRoomMutation,
   useChessMoveMutation,
@@ -272,16 +273,31 @@ export default function ChessRoomScreen() {
       (selectedPiece === "p" && actualRow === 7);
     setSelected(null);
     try {
+      const targetHadPiece = !!board[actualRow][actualCol];
       await move({
         roomId,
         from,
         to,
         promotion: isPawnPromotion ? "q" : undefined,
       }).unwrap();
+      playSound(targetHadPiece ? "call" : "chip");
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Nước không hợp lệ");
     }
   };
+  const confirmBack = () => {
+    if (!mySeat) {
+      router.back();
+      return;
+    }
+    Alert.alert("Thoát phòng?", "Bạn có muốn rời bàn?", [
+      { text: "Ở lại", style: "cancel" },
+      { text: "Thoát", style: "destructive", onPress: doLeave },
+    ]);
+  };
+  useEffect(() => {
+    warmupSounds();
+  }, []);
 
   if (!room) {
     return (
@@ -295,6 +311,9 @@ export default function ChessRoomScreen() {
   const seat1 = room.seats.find((s: any) => s.seatIndex === 1);
   const topSeat = mySide === "w" ? seat1 : seat0;
   const bottomSeat = mySide === "w" ? seat0 : seat1;
+  const isHost =
+    room.createdBy &&
+    String(room.createdBy._id || room.createdBy) === String(me?._id);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#1E293B" }}>
@@ -302,7 +321,7 @@ export default function ChessRoomScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <ConnectionBanner status={connStatus} />
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+          <Pressable onPress={confirmBack} style={styles.iconBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <View style={styles.titleBox}>
@@ -385,7 +404,7 @@ export default function ChessRoomScreen() {
 
         {/* Bottom actions */}
         <View style={styles.bottomRow}>
-          {mySeat && (room.stage === "waiting" || room.stage === "showdown") && (
+          {isHost && (room.stage === "waiting" || room.stage === "showdown") && (
             <Pressable
               onPress={doStart}
               style={[styles.actionBtn, { backgroundColor: "#10B981" }]}
@@ -395,6 +414,12 @@ export default function ChessRoomScreen() {
                 {room.stage === "showdown" ? "Ván mới" : "Bắt đầu"}
               </Text>
             </Pressable>
+          )}
+          {!isHost && (room.stage === "waiting" || room.stage === "showdown") && (
+            <View style={[styles.actionBtn, { backgroundColor: "#334155" }]}>
+              <Ionicons name="hourglass" size={16} color="#fff" />
+              <Text style={styles.actionBtnText}>Chờ chủ phòng</Text>
+            </View>
           )}
           {mySeat && room.stage === "playing" && (
             <Pressable

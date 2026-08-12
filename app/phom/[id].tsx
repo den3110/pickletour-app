@@ -37,6 +37,7 @@ import {
   SpeechBubble,
   WoodBackground,
 } from "@/components/games/GameTableUI";
+import { playSound, warmupSounds } from "@/lib/gameSound";
 import {
   useChatPhomRoomMutation,
   useGetPhomRoomQuery,
@@ -96,6 +97,7 @@ export default function PhomRoomScreen() {
     ScreenOrientation.lockAsync(
       ScreenOrientation.OrientationLock.LANDSCAPE,
     ).catch(() => {});
+    warmupSounds();
     return () => {
       ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.PORTRAIT_UP,
@@ -119,6 +121,19 @@ export default function PhomRoomScreen() {
 
   const room = (data as any)?.room;
   const seats = room?.seats || [];
+  const isHost =
+    room?.createdBy &&
+    String(room.createdBy._id || room.createdBy) === String(me?._id);
+  const confirmBack = () => {
+    if (!mySeat) {
+      router.back();
+      return;
+    }
+    Alert.alert("Thoát phòng?", "Bạn có muốn rời bàn?", [
+      { text: "Ở lại", style: "cancel" },
+      { text: "Thoát", style: "destructive", onPress: doLeave },
+    ]);
+  };
 
   useEffect(() => {
     if (!room?.turnDeadlineAt) return setRemainSec(0);
@@ -233,10 +248,15 @@ export default function PhomRoomScreen() {
     try {
       await act({ roomId, action, ...payload }).unwrap();
       setSelectedCards([]);
-      try {
-        const { playFx } = require("@/app/poker/pokerFx");
-        playFx(action === "u" ? "win" : action.includes("discard") ? "chip" : "deal");
-      } catch {}
+      playSound(
+        action === "u" || action === "down_auto" || action === "down_manual"
+          ? "win"
+          : action === "draw_discard"
+          ? "call"
+          : action === "discard"
+          ? "chip"
+          : "deal",
+      );
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
@@ -270,7 +290,7 @@ export default function PhomRoomScreen() {
       >
         <RoundIconBtn
           icon="chevron-back"
-          onPress={() => router.back()}
+          onPress={confirmBack}
           color="#334155"
           size={40}
         />
@@ -282,10 +302,15 @@ export default function PhomRoomScreen() {
             Ván {room.handNumber || 0} · Cược {room.stake} · Buy-in {room.buyIn}
           </Text>
         </View>
-        {mySeat && room.stage === "waiting" && (
+        {isHost && (room.stage === "waiting" || room.stage === "showdown") && (
           <Pressable onPress={doStart} style={styles.startBtn}>
             <Text style={styles.startBtnText}>BẮT ĐẦU</Text>
           </Pressable>
+        )}
+        {!isHost && room.stage === "waiting" && (
+          <View style={[styles.startBtn, { backgroundColor: "#334155" }]}>
+            <Text style={styles.startBtnText}>CHỜ CHỦ PHÒNG</Text>
+          </View>
         )}
       </View>
 

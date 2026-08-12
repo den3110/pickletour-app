@@ -37,6 +37,7 @@ import {
   SpeechBubble,
   WoodBackground,
 } from "@/components/games/GameTableUI";
+import { playSound, warmupSounds } from "@/lib/gameSound";
 import {
   useBatSamMutation,
   useChatSamRoomMutation,
@@ -98,6 +99,7 @@ export default function SamRoomScreen() {
     ScreenOrientation.lockAsync(
       ScreenOrientation.OrientationLock.LANDSCAPE,
     ).catch(() => {});
+    warmupSounds();
     return () => {
       ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.PORTRAIT_UP,
@@ -121,6 +123,19 @@ export default function SamRoomScreen() {
 
   const room = (data as any)?.room;
   const seats = room?.seats || [];
+  const isHost =
+    room?.createdBy &&
+    String(room.createdBy._id || room.createdBy) === String(me?._id);
+  const confirmBack = () => {
+    if (!mySeat) {
+      router.back();
+      return;
+    }
+    Alert.alert("Thoát phòng?", "Bạn có muốn rời bàn?", [
+      { text: "Ở lại", style: "cancel" },
+      { text: "Thoát", style: "destructive", onPress: doLeave },
+    ]);
+  };
 
   useEffect(() => {
     const deadline = room?.stage === "xin_sam"
@@ -232,10 +247,7 @@ export default function SamRoomScreen() {
     try {
       await act({ roomId, action, ...payload }).unwrap();
       setSelectedCards([]);
-      try {
-        const { playFx } = require("@/app/poker/pokerFx");
-        playFx(action === "pass" ? "check" : "chip");
-      } catch {}
+      playSound(action === "pass" ? "check" : "chip");
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
@@ -282,7 +294,7 @@ export default function SamRoomScreen() {
       >
         <RoundIconBtn
           icon="chevron-back"
-          onPress={() => router.back()}
+          onPress={confirmBack}
           color="#334155"
           size={40}
         />
@@ -294,10 +306,15 @@ export default function SamRoomScreen() {
             Ván {room.handNumber || 0} · Cược {room.stake} · Buy-in {room.buyIn}
           </Text>
         </View>
-        {mySeat && room.stage === "waiting" && (
+        {isHost && (room.stage === "waiting" || room.stage === "showdown") && (
           <Pressable onPress={doStart} style={styles.startBtn}>
             <Text style={styles.startBtnText}>BẮT ĐẦU</Text>
           </Pressable>
+        )}
+        {!isHost && room.stage === "waiting" && (
+          <View style={[styles.startBtn, { backgroundColor: "#334155" }]}>
+            <Text style={styles.startBtnText}>CHỜ CHỦ PHÒNG</Text>
+          </View>
         )}
       </View>
 
