@@ -18,9 +18,11 @@ import {
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
+import { InviteFriendModal } from "@/components/games/InviteFriendModal";
 import {
   useChatSamRoomMutation,
   useGetSamRoomQuery,
+  useInviteSamRoomMutation,
   useLeaveSamRoomMutation,
   useSamActionMutation,
   useSitSamRoomMutation,
@@ -139,11 +141,14 @@ export default function SamRoomScreen() {
   const [start] = useStartSamHandMutation();
   const [sendChat] = useChatSamRoomMutation();
   const [act, { isLoading: acting }] = useSamActionMutation();
+  const [invite, { isLoading: inviting }] = useInviteSamRoomMutation();
 
   const socket = useSocket();
   const [chatOpen, setChatOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [remainSec, setRemainSec] = useState(0);
   const toggleSelect = (c: string) =>
     setSelectedCards((prev) =>
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
@@ -180,6 +185,20 @@ export default function SamRoomScreen() {
 
   const room = (data as any)?.room;
   const seats = room?.seats || [];
+
+  useEffect(() => {
+    if (!room?.turnDeadlineAt) {
+      setRemainSec(0);
+      return;
+    }
+    const tick = () => {
+      const ms = new Date(room.turnDeadlineAt).getTime() - Date.now();
+      setRemainSec(Math.max(0, Math.ceil(ms / 1000)));
+    };
+    tick();
+    const t = setInterval(tick, 500);
+    return () => clearInterval(t);
+  }, [room?.turnDeadlineAt]);
 
   const mySeat = useMemo(
     () =>
@@ -261,6 +280,9 @@ export default function SamRoomScreen() {
             🃏 {room.name}
           </Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable onPress={() => setInviteOpen(true)} style={styles.iconBtn}>
+              <Ionicons name="person-add" size={20} color="#fff" />
+            </Pressable>
             {mySeat && room.stage === "waiting" && (
               <Pressable onPress={doStart} style={styles.startBtn}>
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
@@ -275,6 +297,21 @@ export default function SamRoomScreen() {
             )}
           </View>
         </View>
+
+        {room.stage === "playing" && remainSec > 0 && (
+          <View style={styles.timerBar}>
+            <View
+              style={[
+                styles.timerFill,
+                {
+                  width: `${Math.min(100, (remainSec / (room.turnDurationSec || 30)) * 100)}%`,
+                  backgroundColor: remainSec < 5 ? "#EF4444" : "#FBBF24",
+                },
+              ]}
+            />
+            <Text style={styles.timerText}>{remainSec}s</Text>
+          </View>
+        )}
 
         <View style={styles.tableCenter}>
           <Text style={styles.tableInfo}>
@@ -383,6 +420,16 @@ export default function SamRoomScreen() {
       <Pressable onPress={() => setChatOpen(true)} style={styles.fabChat}>
         <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
       </Pressable>
+
+      <InviteFriendModal
+        visible={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        loading={inviting}
+        color="#7C3AED"
+        onInvite={async (userIds) => {
+          await invite({ roomId, userIds }).unwrap();
+        }}
+      />
 
       <Modal
         transparent
@@ -566,6 +613,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
+  },
+  timerBar: {
+    position: "absolute",
+    top: 52,
+    left: "20%",
+    right: "20%",
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    overflow: "hidden",
+    zIndex: 5,
+  },
+  timerFill: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 9,
+  },
+  timerText: {
+    color: "#0F172A",
+    fontWeight: "800",
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 18,
+    zIndex: 1,
   },
   actionBar: {
     position: "absolute",
