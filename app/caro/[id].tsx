@@ -1,10 +1,11 @@
 // Caro room — 15x15 board, tap to place X/O.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Dimensions,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -17,7 +18,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
+import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
+import { ConnectionBanner, SpeechBubble } from "@/components/games/GameTableUI";
 import {
   useCaroMoveMutation,
   useChatCaroRoomMutation,
@@ -42,10 +45,19 @@ export default function CaroRoomScreen() {
   const [invite, { isLoading: inviting }] = useInviteCaroRoomMutation();
 
   const socket = useSocket();
+  const connStatus = useGameAutoReconnect({
+    socket,
+    roomId,
+    refetch,
+    subscribeEvent: "caro:room:subscribe",
+  });
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [remainSec, setRemainSec] = useState(0);
+  const [bubbles, setBubbles] = useState<Record<string, { text: string; at: number }>>({});
+  const seenMsgAtRef = useRef(Date.now());
+  const [nowTs, setNowTs] = useState(0);
 
   useEffect(() => {
     if (!socket || !roomId) return;
@@ -73,6 +85,42 @@ export default function CaroRoomScreen() {
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [room?.turnDeadlineAt]);
+
+  // Speech bubble khi có chat mới
+  useEffect(() => {
+    const msgs = room?.messages || [];
+    if (!msgs.length) return;
+    let latestSeen = seenMsgAtRef.current;
+    let dirty = false;
+    const next = { ...bubbles };
+    for (const m of msgs) {
+      const t = new Date(m.at || 0).getTime();
+      if (t > seenMsgAtRef.current && m.user) {
+        next[String(m.user)] = { text: String(m.text || ""), at: t };
+        dirty = true;
+        if (t > latestSeen) latestSeen = t;
+      }
+    }
+    seenMsgAtRef.current = latestSeen;
+    if (dirty) setBubbles(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.messages?.length]);
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    setBubbles((prev) => {
+      const now = Date.now();
+      const next: typeof prev = {};
+      let changed = false;
+      for (const k of Object.keys(prev)) {
+        if (now - prev[k].at < 4000) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [nowTs]);
 
   const mySeat = useMemo(
     () =>
@@ -146,6 +194,7 @@ export default function CaroRoomScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <ConnectionBanner status={connStatus} />
         {/* Top bar */}
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.iconBtn}>
@@ -171,6 +220,7 @@ export default function CaroRoomScreen() {
               room.activeSeatIndex === 0 && room.stage === "playing"
             }
             onSit={() => doSit(0)}
+            bubble={seat0?.user && bubbles[String(seat0.user._id || seat0.user)]}
           />
           <View style={styles.vs}>
             <Text style={styles.vsText}>VS</Text>
@@ -193,6 +243,7 @@ export default function CaroRoomScreen() {
               room.activeSeatIndex === 1 && room.stage === "playing"
             }
             onSit={() => doSit(1)}
+            bubble={seat1?.user && bubbles[String(seat1.user._id || seat1.user)]}
           />
         </View>
 
@@ -350,12 +401,14 @@ function PlayerBox({
   color,
   isTurn,
   onSit,
+  bubble,
 }: {
   seat: any;
   mark: string;
   color: string;
   isTurn: boolean;
   onSit: () => void;
+  bubble?: { text: string; at: number } | null;
 }) {
   const u = seat?.user;
   if (!u) {
@@ -373,11 +426,21 @@ function PlayerBox({
         isTurn && { borderColor: "#FBBF24", borderWidth: 2 },
       ]}
     >
-      <Text style={[styles.markText, { color }]}>{mark}</Text>
+      {u.avatar ? (
+        <Image source={{ uri: u.avatar }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+          <Text style={{ color: "#fff", fontWeight: "800" }}>
+            {(u.nickname || u.name || "?")[0]?.toUpperCase()}
+          </Text>
+        </View>
+      )}
+      <Text style={[styles.markText, { color, fontSize: 22, lineHeight: 24 }]}>{mark}</Text>
       <Text style={styles.playerName} numberOfLines={1}>
         {u.nickname || u.name || "?"}
       </Text>
       <Text style={styles.playerChips}>💰 {seat.chips || 0}</Text>
+      {bubble ? <SpeechBubble key={bubble.at} text={bubble.text} /> : null}
     </View>
   );
 }
@@ -433,6 +496,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
+    position: "relative",
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 4,
+  },
+  avatarPlaceholder: {
+    backgroundColor: "#475569",
+    alignItems: "center",
+    justifyContent: "center",
   },
   playerEmpty: {
     flex: 1,

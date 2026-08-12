@@ -344,6 +344,38 @@ export function SpeechBubble({ text }: { text: string }) {
   );
 }
 
+/* -------- Connection status banner (offline/reconnecting) -------- */
+
+export function ConnectionBanner({
+  status,
+  topOffset = 0,
+}: {
+  status: "online" | "offline" | "reconnecting";
+  topOffset?: number;
+}) {
+  if (status === "online") return null;
+  return (
+    <View
+      style={[
+        connStyles.banner,
+        { top: topOffset },
+        status === "offline" && { backgroundColor: "#DC2626" },
+      ]}
+    >
+      <Ionicons
+        name={status === "offline" ? "cloud-offline" : "sync"}
+        size={14}
+        color="#fff"
+      />
+      <Text style={connStyles.text}>
+        {status === "offline"
+          ? "Mất kết nối — đang chờ mạng"
+          : "Đang kết nối lại…"}
+      </Text>
+    </View>
+  );
+}
+
 /* -------- Round purple button (like reference) -------- */
 
 export function RoundIconBtn({
@@ -594,6 +626,26 @@ const seatStyles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     fontSize: 11,
     fontWeight: "700",
+  },
+});
+
+const connStyles = StyleSheet.create({
+  banner: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+    backgroundColor: "#F59E0B",
+    zIndex: 100,
+  },
+  text: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 12,
   },
 });
 

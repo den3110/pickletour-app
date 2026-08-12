@@ -25,9 +25,11 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
+import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
 import {
   CardPro,
+  ConnectionBanner,
   EmptySeat,
   FeltOval,
   RoundIconBtn,
@@ -71,6 +73,12 @@ export default function PhomRoomScreen() {
   const [invite, { isLoading: inviting }] = useInvitePhomRoomMutation();
 
   const socket = useSocket();
+  const connStatus = useGameAutoReconnect({
+    socket,
+    roomId,
+    refetch,
+    subscribeEvent: "phom:room:subscribe",
+  });
   const [chatOpen, setChatOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [chatText, setChatText] = useState("");
@@ -250,6 +258,8 @@ export default function PhomRoomScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <WoodBackground />
+
+      <ConnectionBanner status={connStatus} topOffset={Math.max(0, insets.top)} />
 
       {/* Top-left back button + room title */}
       <View

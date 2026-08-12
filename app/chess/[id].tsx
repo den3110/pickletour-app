@@ -2,10 +2,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Chess } from "chess.js";
 import { Stack, useLocalSearchParams, router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Dimensions,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -18,7 +19,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
+import { useGameAutoReconnect } from "@/hook/useGameAutoReconnect";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
+import { ConnectionBanner, SpeechBubble } from "@/components/games/GameTableUI";
 import {
   useChatChessRoomMutation,
   useChessMoveMutation,
@@ -76,11 +79,20 @@ export default function ChessRoomScreen() {
   const [invite, { isLoading: inviting }] = useInviteChessRoomMutation();
 
   const socket = useSocket();
+  const connStatus = useGameAutoReconnect({
+    socket,
+    roomId,
+    refetch,
+    subscribeEvent: "chess:room:subscribe",
+  });
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState<[number, number] | null>(null);
   const [remainSec, setRemainSec] = useState(0);
+  const [bubbles, setBubbles] = useState<Record<string, { text: string; at: number }>>({});
+  const seenMsgAtRef = useRef(Date.now());
+  const [nowTs, setNowTs] = useState(0);
 
   useEffect(() => {
     if (!socket || !roomId) return;
@@ -108,6 +120,42 @@ export default function ChessRoomScreen() {
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [room?.turnDeadlineAt]);
+
+  // Speech bubble
+  useEffect(() => {
+    const msgs = room?.messages || [];
+    if (!msgs.length) return;
+    let latestSeen = seenMsgAtRef.current;
+    let dirty = false;
+    const next = { ...bubbles };
+    for (const m of msgs) {
+      const t = new Date(m.at || 0).getTime();
+      if (t > seenMsgAtRef.current && m.user) {
+        next[String(m.user)] = { text: String(m.text || ""), at: t };
+        dirty = true;
+        if (t > latestSeen) latestSeen = t;
+      }
+    }
+    seenMsgAtRef.current = latestSeen;
+    if (dirty) setBubbles(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.messages?.length]);
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    setBubbles((prev) => {
+      const now = Date.now();
+      const next: typeof prev = {};
+      let changed = false;
+      for (const k of Object.keys(prev)) {
+        if (now - prev[k].at < 4000) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [nowTs]);
 
   const mySeat = useMemo(
     () =>
@@ -252,6 +300,7 @@ export default function ChessRoomScreen() {
     <View style={{ flex: 1, backgroundColor: "#1E293B" }}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <ConnectionBanner status={connStatus} />
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.iconBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -273,6 +322,7 @@ export default function ChessRoomScreen() {
           isTurn={topSeat && room.activeSeatIndex === topSeat.seatIndex && room.stage === "playing"}
           onSit={() => topSeat && !topSeat.user && doSit(topSeat.seatIndex)}
           remainSec={remainSec}
+          bubble={topSeat?.user && bubbles[String(topSeat.user._id || topSeat.user)]}
         />
 
         {/* Board */}
@@ -330,6 +380,7 @@ export default function ChessRoomScreen() {
           }
           onSit={() => bottomSeat && !bottomSeat.user && doSit(bottomSeat.seatIndex)}
           isMine
+          bubble={bottomSeat?.user && bubbles[String(bottomSeat.user._id || bottomSeat.user)]}
         />
 
         {/* Bottom actions */}
@@ -464,6 +515,7 @@ function PlayerBar({
   onSit,
   isMine,
   remainSec,
+  bubble,
 }: {
   seat: any;
   mark: string;
@@ -473,6 +525,7 @@ function PlayerBar({
   onSit?: () => void;
   isMine?: boolean;
   remainSec?: number;
+  bubble?: { text: string; at: number } | null;
 }) {
   if (!seat?.user) {
     return (
@@ -482,6 +535,7 @@ function PlayerBar({
       </Pressable>
     );
   }
+  const u = seat.user;
   return (
     <View
       style={[
@@ -490,10 +544,19 @@ function PlayerBar({
         isTurn && { borderColor: "#FBBF24", borderWidth: 2 },
       ]}
     >
+      {u.avatar ? (
+        <Image source={{ uri: u.avatar }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+          <Text style={{ color: "#fff", fontWeight: "800" }}>
+            {(u.nickname || u.name || "?")[0]?.toUpperCase()}
+          </Text>
+        </View>
+      )}
       <Text style={[styles.pieceIcon, { color }]}>{mark}</Text>
       <View style={{ flex: 1 }}>
         <Text style={[styles.playerName, { color }]} numberOfLines={1}>
-          {seat.user?.nickname || seat.user?.name} {isMine ? "(bạn)" : ""}
+          {u.nickname || u.name} {isMine ? "(bạn)" : ""}
         </Text>
         <Text style={styles.playerChips}>💰 {seat.chips || 0}</Text>
       </View>
@@ -502,6 +565,7 @@ function PlayerBar({
           {remainSec}s
         </Text>
       )}
+      {bubble ? <SpeechBubble key={bubble.at} text={bubble.text} /> : null}
     </View>
   );
 }
@@ -517,7 +581,9 @@ const styles = StyleSheet.create({
   titleBox: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: "rgba(251,191,36,0.4)" },
   title: { color: "#fff", fontWeight: "800", fontSize: 14 },
   sub: { color: "#FBBF24", fontSize: 10, fontWeight: "700" },
-  playerBar: { flexDirection: "row", alignItems: "center", padding: 10, marginHorizontal: 12, marginVertical: 4, borderRadius: 10, gap: 10 },
+  playerBar: { flexDirection: "row", alignItems: "center", padding: 10, marginHorizontal: 12, marginVertical: 4, borderRadius: 10, gap: 10, position: "relative" },
+  avatar: { width: 36, height: 36, borderRadius: 18 },
+  avatarPlaceholder: { backgroundColor: "#475569", alignItems: "center", justifyContent: "center" },
   playerBarEmpty: { flexDirection: "row", alignItems: "center", padding: 10, marginHorizontal: 12, marginVertical: 4, borderRadius: 10, gap: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", borderStyle: "dashed", justifyContent: "center" },
   pieceIcon: { fontSize: 26 },
   playerName: { fontWeight: "800", fontSize: 14 },
