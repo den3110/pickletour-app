@@ -212,9 +212,9 @@ const FEATURES = [
     id: 18,
     icon: "game-controller",
     iconLib: "Ionicons",
-    title: "Poker",
+    title: "Games",
     color: "#DC2626",
-    link: "/poker",
+    link: "/games",
     isNew: true,
   },
 ];
