@@ -122,72 +122,225 @@ export default function MlpTeamsScreen() {
             const isMine =
               String(item?.captain?._id || item?.captain) ===
               String(me?._id || "");
+            const rosterList: any[] = Array.isArray(item?.players)
+              ? item.players
+              : [];
+            const totalD = rosterList.reduce(
+              (s, p) => s + (Number(p?.score?.double) || 0),
+              0,
+            );
+            const totalS = rosterList.reduce(
+              (s, p) => s + (Number(p?.score?.single) || 0),
+              0,
+            );
+            const overCap =
+              maxTeamScore != null && totalD > maxTeamScore;
             return (
               <Pressable
-                style={[styles.card, isMine && styles.cardMine]}
+                style={[
+                  styles.card,
+                  { flexDirection: "column", alignItems: "stretch" },
+                  isMine && styles.cardMine,
+                ]}
                 onPress={() => setEditTeam(item)}
               >
                 <View
-                  style={[
-                    styles.logo,
-                    { backgroundColor: item.color || "#0066FF" },
-                  ]}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  {item.logo ? (
-                    <Image
-                      source={{ uri: normalizeUrl(item.logo) }}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                  ) : (
-                    <Text style={styles.logoText}>
-                      {(item.shortName || item.name || "?")[0]?.toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    {isMine && (
-                      <View style={styles.mineBadge}>
-                        <Text style={styles.mineBadgeText}>Đội của tôi</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.sub}>
-                    Roster {item.players?.length || 0} VĐV · Captain:{" "}
-                    {item.captain?.nickname || item.captain?.name || "—"}
-                  </Text>
                   <View
                     style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor:
-                          (STATUS_COLOR[item.status] || "#94A3B8") + "22",
-                        borderColor:
-                          STATUS_COLOR[item.status] || "#94A3B8",
-                      },
+                      styles.logo,
+                      { backgroundColor: item.color || "#0066FF" },
                     ]}
                   >
-                    <Text
+                    {item.logo ? (
+                      <Image
+                        source={{ uri: normalizeUrl(item.logo) }}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    ) : (
+                      <Text style={styles.logoText}>
+                        {(item.shortName || item.name || "?")[0]?.toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View
                       style={{
-                        color: STATUS_COLOR[item.status] || "#94A3B8",
-                        fontSize: 11,
-                        fontWeight: "700",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      {STATUS_LABEL[item.status] || item.status}
+                      <Text style={styles.name} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {isMine && (
+                        <View style={styles.mineBadge}>
+                          <Text style={styles.mineBadgeText}>Đội của tôi</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.sub}>
+                      Roster {rosterList.length} VĐV · Captain:{" "}
+                      {item.captain?.nickname || item.captain?.name || "—"}
                     </Text>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        {
+                          backgroundColor:
+                            (STATUS_COLOR[item.status] || "#94A3B8") + "22",
+                          borderColor:
+                            STATUS_COLOR[item.status] || "#94A3B8",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: STATUS_COLOR[item.status] || "#94A3B8",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {STATUS_LABEL[item.status] || item.status}
+                      </Text>
+                    </View>
                   </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color="#94A3B8"
+                  />
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+
+                {rosterList.length > 0 && (
+                  <>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 6,
+                        marginTop: 10,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: overCap ? "#FEE2E2" : "#DBEAFE",
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "800",
+                            color: overCap ? "#B91C1C" : "#1E40AF",
+                          }}
+                        >
+                          Tổng đôi: {totalD.toFixed(2)}
+                          {maxTeamScore != null ? ` / ${maxTeamScore}` : ""}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          backgroundColor: "#F1F5F9",
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: "#334155",
+                          }}
+                        >
+                          Tổng đơn: {totalS.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 6,
+                        marginTop: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {rosterList.map((p: any) => {
+                        const sd = Number(p?.score?.double) || 0;
+                        const isFemale = p?.gender === "female";
+                        return (
+                          <View
+                            key={String(p?._id || p)}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              backgroundColor: isFemale
+                                ? "#FCE7F3"
+                                : "#DBEAFE",
+                              borderRadius: 10,
+                              paddingLeft: 4,
+                              paddingRight: 8,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            {p?.avatar ? (
+                              <Image
+                                source={{ uri: normalizeUrl(p.avatar) }}
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 10,
+                                }}
+                              />
+                            ) : (
+                              <View
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 10,
+                                  backgroundColor: "#CBD5E1",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: "800",
+                                    color: "#0F172A",
+                                  }}
+                                >
+                                  {(p?.nickname || p?.name || "?")[0]
+                                    ?.toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: "700",
+                                color: "#0F172A",
+                              }}
+                              numberOfLines={1}
+                            >
+                              {p?.nickname || p?.name || "—"} · {sd.toFixed(2)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
               </Pressable>
             );
           }}
