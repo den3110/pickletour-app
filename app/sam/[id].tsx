@@ -36,6 +36,7 @@ import {
   WoodBackground,
 } from "@/components/games/GameTableUI";
 import {
+  useBatSamMutation,
   useChatSamRoomMutation,
   useGetSamRoomQuery,
   useInviteSamRoomMutation,
@@ -43,6 +44,7 @@ import {
   useSamActionMutation,
   useSitSamRoomMutation,
   useStartSamHandMutation,
+  useXinSamMutation,
 } from "@/slices/samApiSlice";
 
 const { width: SW, height: SH } = Dimensions.get("window");
@@ -67,6 +69,8 @@ export default function SamRoomScreen() {
   const [sendChat] = useChatSamRoomMutation();
   const [act, { isLoading: acting }] = useSamActionMutation();
   const [invite, { isLoading: inviting }] = useInviteSamRoomMutation();
+  const [xinSamMut] = useXinSamMutation();
+  const [batSamMut] = useBatSamMutation();
 
   const socket = useSocket();
   const [chatOpen, setChatOpen] = useState(false);
@@ -111,15 +115,18 @@ export default function SamRoomScreen() {
   const seats = room?.seats || [];
 
   useEffect(() => {
-    if (!room?.turnDeadlineAt) return setRemainSec(0);
+    const deadline = room?.stage === "xin_sam"
+      ? room?.xinSamDeadlineAt
+      : room?.turnDeadlineAt;
+    if (!deadline) return setRemainSec(0);
     const tick = () => {
-      const ms = new Date(room.turnDeadlineAt).getTime() - Date.now();
+      const ms = new Date(deadline).getTime() - Date.now();
       setRemainSec(Math.max(0, Math.ceil(ms / 1000)));
     };
     tick();
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
-  }, [room?.turnDeadlineAt]);
+  }, [room?.turnDeadlineAt, room?.xinSamDeadlineAt, room?.stage]);
 
   useEffect(() => {
     const msgs = room?.messages || [];
@@ -225,6 +232,20 @@ export default function SamRoomScreen() {
       Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
   };
+  const doXinSam = async () => {
+    try {
+      await xinSamMut(roomId).unwrap();
+    } catch (err: any) {
+      Alert.alert("Không được", err?.data?.message || "Lỗi");
+    }
+  };
+  const doBatSam = async () => {
+    try {
+      await batSamMut(roomId).unwrap();
+    } catch (err: any) {
+      Alert.alert("Không được", err?.data?.message || "Lỗi");
+    }
+  };
 
   if (!room) {
     return (
@@ -270,7 +291,7 @@ export default function SamRoomScreen() {
         )}
       </View>
 
-      {room.stage === "playing" && remainSec > 0 && (
+      {(room.stage === "playing" || room.stage === "xin_sam") && remainSec > 0 && (
         <View
           style={[
             styles.timerBar,
@@ -281,12 +302,52 @@ export default function SamRoomScreen() {
             style={[
               styles.timerFill,
               {
-                width: `${Math.min(100, (remainSec / (room.turnDurationSec || 30)) * 100)}%`,
+                width: `${Math.min(100, (remainSec / (room.stage === "xin_sam" ? 10 : room.turnDurationSec || 30)) * 100)}%`,
                 backgroundColor: remainSec < 5 ? "#EF4444" : "#FBBF24",
               },
             ]}
           />
-          <Text style={styles.timerText}>{remainSec}s</Text>
+          <Text style={styles.timerText}>
+            {room.stage === "xin_sam" ? `Xin sâm · ${remainSec}s` : `${remainSec}s`}
+          </Text>
+        </View>
+      )}
+
+      {/* Xin Sâm / Bắt Sâm buttons overlay */}
+      {room.stage === "xin_sam" && mySeat && (
+        <View style={styles.xinSamBar}>
+          {room.samClaimerIndex < 0 && !mySeat.hasClaimedSam && (
+            <Pressable
+              onPress={doXinSam}
+              style={[styles.actionBtn, { backgroundColor: "#F59E0B" }]}
+            >
+              <Ionicons name="hand-right" size={16} color="#fff" />
+              <Text style={styles.actionBtnText}>Xin Sâm</Text>
+            </Pressable>
+          )}
+          {room.samClaimerIndex >= 0 &&
+            room.samClaimerIndex !== mySeat.seatIndex &&
+            room.samCatcherIndex < 0 && (
+              <Pressable
+                onPress={doBatSam}
+                style={[styles.actionBtn, { backgroundColor: "#DC2626" }]}
+              >
+                <Ionicons name="flash" size={16} color="#fff" />
+                <Text style={styles.actionBtnText}>Bắt Sâm</Text>
+              </Pressable>
+            )}
+          {room.samClaimerIndex >= 0 && (
+            <View style={styles.samStatusBox}>
+              <Text style={styles.samStatusText}>
+                {room.samClaimerIndex === mySeat.seatIndex
+                  ? "Bạn đã xin sâm"
+                  : `Ghế ${room.samClaimerIndex + 1} xin sâm`}
+                {room.samCatcherIndex >= 0
+                  ? ` · Ghế ${room.samCatcherIndex + 1} đã bắt`
+                  : ""}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -681,6 +742,28 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: 8,
     zIndex: 20,
+  },
+  xinSamBar: {
+    position: "absolute",
+    top: "38%",
+    left: "20%",
+    right: "20%",
+    alignItems: "center",
+    gap: 8,
+    zIndex: 25,
+  },
+  samStatusBox: {
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+  },
+  samStatusText: {
+    color: "#FBBF24",
+    fontSize: 12,
+    fontWeight: "800",
   },
   actionBtn: {
     flexDirection: "row",

@@ -86,6 +86,33 @@ export const samApiSlice = apiSlice.injectEndpoints({
         body: { userIds },
       }),
     }),
+    xinSam: builder.mutation({
+      query: (roomId: string) => ({
+        url: `/api/sam/rooms/${roomId}/xin-sam`,
+        method: "POST",
+      }),
+      invalidatesTags: (r, e, roomId) => [
+        { type: "SamRoom" as any, id: roomId },
+      ],
+    }),
+    batSam: builder.mutation({
+      query: (roomId: string) => ({
+        url: `/api/sam/rooms/${roomId}/bat-sam`,
+        method: "POST",
+      }),
+      invalidatesTags: (r, e, roomId) => [
+        { type: "SamRoom" as any, id: roomId },
+      ],
+    }),
+    skipXinSam: builder.mutation({
+      query: (roomId: string) => ({
+        url: `/api/sam/rooms/${roomId}/skip-xin-sam`,
+        method: "POST",
+      }),
+      invalidatesTags: (r, e, roomId) => [
+        { type: "SamRoom" as any, id: roomId },
+      ],
+    }),
   }),
 });
 
@@ -100,4 +127,7 @@ export const {
   useChatSamRoomMutation,
   useEmojiSamRoomMutation,
   useInviteSamRoomMutation,
+  useXinSamMutation,
+  useBatSamMutation,
+  useSkipXinSamMutation,
 } = samApiSlice;
