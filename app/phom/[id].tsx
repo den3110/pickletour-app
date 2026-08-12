@@ -379,6 +379,8 @@ export default function PhomRoomScreen() {
         const isTurn =
           room.activeIndex === seat.seatIndex && room.stage === "playing";
         const empty = !seat.user;
+        // Bỏ render frame cho hero (bottom) khi đã ngồi — tránh che hand.
+        if (i === 0 && !empty && isMine) return null;
         return (
           <View
             key={seat.seatIndex}
@@ -452,6 +454,22 @@ export default function PhomRoomScreen() {
               />
             ))}
           </ScrollView>
+        </View>
+      )}
+      {/* Hero info bar (chip + turn indicator) */}
+      {mySeat && (
+        <View
+          style={[
+            styles.heroInfo,
+            room.activeIndex === mySeat.seatIndex && room.stage === "playing" && styles.heroInfoTurn,
+          ]}
+        >
+          <Text style={styles.heroInfoText}>
+            💰 {mySeat.chips || 0}
+          </Text>
+          {room.activeIndex === mySeat.seatIndex && room.stage === "playing" && (
+            <Text style={styles.heroTurnText}>Lượt bạn</Text>
+          )}
         </View>
       )}
 
@@ -812,6 +830,36 @@ const styles = StyleSheet.create({
     right: 90,
     bottom: 6,
     paddingVertical: 6,
+  },
+  heroInfo: {
+    position: "absolute",
+    right: 70,
+    bottom: 82,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#FBBF24",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    zIndex: 15,
+  },
+  heroInfoTurn: {
+    borderColor: "#FBBF24",
+    backgroundColor: "rgba(245,158,11,0.85)",
+  },
+  heroInfoText: {
+    color: "#FBBF24",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  heroTurnText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   dánhPill: {
     position: "absolute",
