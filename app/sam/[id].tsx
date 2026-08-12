@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
@@ -32,6 +32,7 @@ import {
   FeltOval,
   RoundIconBtn,
   SeatFrame,
+  SpeechBubble,
   WoodBackground,
 } from "@/components/games/GameTableUI";
 import {
@@ -73,6 +74,9 @@ export default function SamRoomScreen() {
   const [chatText, setChatText] = useState("");
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [remainSec, setRemainSec] = useState(0);
+  const [bubbles, setBubbles] = useState<Record<string, { text: string; at: number }>>({});
+  const seenMsgAtRef = useRef(Date.now());
+  const [nowTs, setNowTs] = useState(0);
   const toggleSelect = (c: string) =>
     setSelectedCards((prev) =>
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
@@ -116,6 +120,41 @@ export default function SamRoomScreen() {
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [room?.turnDeadlineAt]);
+
+  useEffect(() => {
+    const msgs = room?.messages || [];
+    if (!msgs.length) return;
+    let latestSeen = seenMsgAtRef.current;
+    let dirty = false;
+    const next = { ...bubbles };
+    for (const m of msgs) {
+      const t = new Date(m.at || 0).getTime();
+      if (t > seenMsgAtRef.current && m.user) {
+        next[String(m.user)] = { text: String(m.text || ""), at: t };
+        dirty = true;
+        if (t > latestSeen) latestSeen = t;
+      }
+    }
+    seenMsgAtRef.current = latestSeen;
+    if (dirty) setBubbles(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.messages?.length]);
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    setBubbles((prev) => {
+      const now = Date.now();
+      const next: typeof prev = {};
+      let changed = false;
+      for (const k of Object.keys(prev)) {
+        if (now - prev[k].at < 4000) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [nowTs]);
 
   // Animation khi combo hiện tại đổi (ai đó vừa đánh)
   const playCount = (room?.plays || []).length;
@@ -328,7 +367,7 @@ export default function SamRoomScreen() {
             {empty ? (
               <EmptySeat onPress={() => doSit(seat.seatIndex)} />
             ) : (
-              <View style={{ alignItems: "center" }}>
+              <View style={{ alignItems: "center", position: "relative" }}>
                 <SeatFrame
                   user={seat.user}
                   chips={seat.chips}
@@ -336,6 +375,12 @@ export default function SamRoomScreen() {
                   isTurn={isTurn}
                   cardCount={seat.cardCount || 0}
                 />
+                {(() => {
+                  const uid = String(seat.user._id || seat.user);
+                  const bub = bubbles[uid];
+                  if (!bub) return null;
+                  return <SpeechBubble key={bub.at} text={bub.text} />;
+                })()}
                 {passed && (
                   <View style={styles.passBadge}>
                     <Text style={styles.passBadgeText}>PASS</Text>

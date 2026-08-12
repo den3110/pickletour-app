@@ -2,8 +2,8 @@
 // RoundIconBtn. Dùng cho Phỏm / Sâm (và có thể cả Poker sau).
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
-import { Image, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Image, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 
 const SUIT_SYMBOL: Record<string, string> = {
   s: "♠",
@@ -297,6 +297,53 @@ export function EmptySeat({ onPress, label = "Ngồi" }: { onPress?: () => void;
   );
 }
 
+/* -------- Speech bubble chat (bay lên avatar 4s) -------- */
+
+export function SpeechBubble({ text }: { text: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.sequence([
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 8,
+      }),
+      Animated.delay(3400),
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [anim, text]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        bubbleStyles.speech,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [6, 0],
+              }),
+            },
+            { scale: anim },
+          ],
+        },
+      ]}
+    >
+      <Text numberOfLines={3} style={bubbleStyles.speechText}>
+        {text}
+      </Text>
+      <View style={bubbleStyles.speechTail} />
+    </Animated.View>
+  );
+}
+
 /* -------- Round purple button (like reference) -------- */
 
 export function RoundIconBtn({
@@ -547,6 +594,46 @@ const seatStyles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     fontSize: 11,
     fontWeight: "700",
+  },
+});
+
+const bubbleStyles = StyleSheet.create({
+  speech: {
+    position: "absolute",
+    top: -50,
+    left: -50,
+    right: -50,
+    alignItems: "center",
+    zIndex: 25,
+  },
+  speechText: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F172A",
+    maxWidth: 160,
+    textAlign: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  speechTail: {
+    width: 12,
+    height: 12,
+    backgroundColor: "#fff",
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#E2E8F0",
+    transform: [{ rotate: "45deg" }],
+    marginTop: -6,
   },
 });
 
