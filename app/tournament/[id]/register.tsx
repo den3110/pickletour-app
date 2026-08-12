@@ -2174,7 +2174,7 @@ export default function TournamentRegistrationScreen() {
                       key={o.userId}
                       activeOpacity={0.7}
                       onPress={() =>
-                        openProfileByPlayer({ _id: o.userId })
+                        openProfileByPlayer({ user: o.userId })
                       }
                       style={{
                         flexDirection: "row",
