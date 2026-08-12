@@ -34,7 +34,7 @@ const GAMES: GameTile[] = [
     iconLib: "MaterialCommunityIcons",
     icon: "cards-outline",
     color: "#7C3AED",
-    route: "/games/sam",
+    route: "/sam",
     isNew: true,
   },
   {
@@ -44,7 +44,7 @@ const GAMES: GameTile[] = [
     iconLib: "MaterialCommunityIcons",
     icon: "cards-club",
     color: "#059669",
-    route: "/games/phom",
+    route: "/phom",
     isNew: true,
   },
 ];
