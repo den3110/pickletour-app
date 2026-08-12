@@ -1,7 +1,7 @@
 // Chess lobby
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,8 @@ import {
   useCreateChessRoomMutation,
   useListChessRoomsQuery,
 } from "@/slices/chessApiSlice";
+import { useSocket } from "@/context/SocketContext";
+import { RoomListItem } from "@/components/games/RoomListItem";
 
 export default function ChessLobbyScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -33,6 +35,17 @@ export default function ChessLobbyScreen() {
   const [stake, setStake] = useState("100");
   const [buyIn, setBuyIn] = useState("1000");
   const items = (data as any)?.items || [];
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit("chess:lobby:subscribe");
+    const onUpdate = () => refetch();
+    socket.on("chess:lobby:updated", onUpdate);
+    return () => {
+      socket.off("chess:lobby:updated", onUpdate);
+      socket.emit("chess:lobby:unsubscribe");
+    };
+  }, [socket, refetch]);
 
   const doCreate = async () => {
     if (!me) return Alert.alert("Cần đăng nhập");
@@ -79,20 +92,19 @@ export default function ChessLobbyScreen() {
           )
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/chess/${item._id}` as any)}>
-            <View style={styles.cardTop}>
-              <Text style={styles.roomName} numberOfLines={1}>{item.name}</Text>
-              <View style={[styles.stagePill, item.stage === "playing" && { backgroundColor: "#E0E7FF" }]}>
-                <Text style={{ color: item.stage === "playing" ? "#3730A3" : "#64748B", fontSize: 11, fontWeight: "800" }}>
-                  {item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.cardMeta}>
-              <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
-              <Text style={styles.metaTxt}>👥 {item.seatsTaken}/{item.maxSeats}</Text>
-            </View>
-          </Pressable>
+          <RoomListItem
+            room={item}
+            onPress={() => router.push(`/chess/${item._id}` as any)}
+            accentColor="#0F172A"
+            stagePillLabel={item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
+            stagePillActive={item.stage === "playing"}
+            meta={
+              <>
+                <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
+                <Text style={styles.metaTxt}>👥 {item.seatsTaken}/{item.maxSeats}</Text>
+              </>
+            }
+          />
         )}
       />
       <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>

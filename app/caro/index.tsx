@@ -1,7 +1,7 @@
 // Caro lobby — list rooms + create.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,8 @@ import {
   useCreateCaroRoomMutation,
   useListCaroRoomsQuery,
 } from "@/slices/caroApiSlice";
+import { useSocket } from "@/context/SocketContext";
+import { RoomListItem } from "@/components/games/RoomListItem";
 
 export default function CaroLobbyScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -36,6 +38,17 @@ export default function CaroLobbyScreen() {
   const [boardSize, setBoardSize] = useState("15");
 
   const items = (data as any)?.items || [];
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit("caro:lobby:subscribe");
+    const onUpdate = () => refetch();
+    socket.on("caro:lobby:updated", onUpdate);
+    return () => {
+      socket.off("caro:lobby:updated", onUpdate);
+      socket.emit("caro:lobby:unsubscribe");
+    };
+  }, [socket, refetch]);
 
   const doCreate = async () => {
     if (!me) {
@@ -93,42 +106,20 @@ export default function CaroLobbyScreen() {
           )
         }
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
+          <RoomListItem
+            room={item}
             onPress={() => router.push(`/caro/${item._id}` as any)}
-          >
-            <View style={styles.cardTop}>
-              <Text style={styles.roomName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <View
-                style={[
-                  styles.stagePill,
-                  item.stage === "playing" && { backgroundColor: "#DBEAFE" },
-                ]}
-              >
-                <Text
-                  style={{
-                    color:
-                      item.stage === "playing" ? "#1E40AF" : "#64748B",
-                    fontSize: 11,
-                    fontWeight: "800",
-                  }}
-                >
-                  {item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.cardMeta}>
-              <Text style={styles.metaTxt}>
-                🎯 {item.boardSize}×{item.boardSize}
-              </Text>
-              <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
-              <Text style={styles.metaTxt}>
-                👥 {item.seatsTaken}/{item.maxSeats}
-              </Text>
-            </View>
-          </Pressable>
+            accentColor="#EF4444"
+            stagePillLabel={item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
+            stagePillActive={item.stage === "playing"}
+            meta={
+              <>
+                <Text style={styles.metaTxt}>🎯 {item.boardSize}×{item.boardSize}</Text>
+                <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
+                <Text style={styles.metaTxt}>👥 {item.seatsTaken}/{item.maxSeats}</Text>
+              </>
+            }
+          />
         )}
       />
 

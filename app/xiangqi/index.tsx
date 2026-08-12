@@ -1,7 +1,7 @@
 // Xiangqi lobby
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,8 @@ import {
   useCreateXiangqiRoomMutation,
   useListXiangqiRoomsQuery,
 } from "@/slices/xiangqiApiSlice";
+import { useSocket } from "@/context/SocketContext";
+import { RoomListItem } from "@/components/games/RoomListItem";
 
 export default function XiangqiLobbyScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -33,6 +35,17 @@ export default function XiangqiLobbyScreen() {
   const [stake, setStake] = useState("100");
   const [buyIn, setBuyIn] = useState("1000");
   const items = (data as any)?.items || [];
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit("xiangqi:lobby:subscribe");
+    const onUpdate = () => refetch();
+    socket.on("xiangqi:lobby:updated", onUpdate);
+    return () => {
+      socket.off("xiangqi:lobby:updated", onUpdate);
+      socket.emit("xiangqi:lobby:unsubscribe");
+    };
+  }, [socket, refetch]);
 
   const doCreate = async () => {
     if (!me) return Alert.alert("Cần đăng nhập");
@@ -77,20 +90,19 @@ export default function XiangqiLobbyScreen() {
           ) : <ActivityIndicator style={{ marginTop: 20 }} />
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/xiangqi/${item._id}` as any)}>
-            <View style={styles.cardTop}>
-              <Text style={styles.roomName} numberOfLines={1}>{item.name}</Text>
-              <View style={[styles.stagePill, item.stage === "playing" && { backgroundColor: "#FEF3C7" }]}>
-                <Text style={{ color: item.stage === "playing" ? "#92400E" : "#64748B", fontSize: 11, fontWeight: "800" }}>
-                  {item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.cardMeta}>
-              <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
-              <Text style={styles.metaTxt}>👥 {item.seatsTaken}/{item.maxSeats}</Text>
-            </View>
-          </Pressable>
+          <RoomListItem
+            room={item}
+            onPress={() => router.push(`/xiangqi/${item._id}` as any)}
+            accentColor="#B45309"
+            stagePillLabel={item.stage === "waiting" ? "Chờ" : `Ván ${item.handNumber}`}
+            stagePillActive={item.stage === "playing"}
+            meta={
+              <>
+                <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
+                <Text style={styles.metaTxt}>👥 {item.seatsTaken}/{item.maxSeats}</Text>
+              </>
+            }
+          />
         )}
       />
       <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>

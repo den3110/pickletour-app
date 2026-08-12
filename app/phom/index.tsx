@@ -1,7 +1,7 @@
 // Phỏm lobby — list rooms + create.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,8 @@ import {
   useListPhomRoomsQuery,
   useCreatePhomRoomMutation,
 } from "@/slices/phomApiSlice";
+import { useSocket } from "@/context/SocketContext";
+import { RoomListItem } from "@/components/games/RoomListItem";
 
 export default function PhomLobbyScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -35,6 +37,17 @@ export default function PhomLobbyScreen() {
   const [buyIn, setBuyIn] = useState("500");
 
   const items = (data as any)?.items || [];
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit("phom:lobby:subscribe");
+    const onUpdate = () => refetch();
+    socket.on("phom:lobby:updated", onUpdate);
+    return () => {
+      socket.off("phom:lobby:updated", onUpdate);
+      socket.emit("phom:lobby:unsubscribe");
+    };
+  }, [socket, refetch]);
 
   const doCreate = async () => {
     if (!me) {
@@ -102,41 +115,24 @@ export default function PhomLobbyScreen() {
           )
         }
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
+          <RoomListItem
+            room={item}
             onPress={() => router.push(`/phom/${item._id}` as any)}
-          >
-            <View style={styles.cardTop}>
-              <Text style={styles.roomName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <View
-                style={[
-                  styles.stagePill,
-                  item.stage !== "waiting" && { backgroundColor: "#DCFCE7" },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: item.stage === "waiting" ? "#64748B" : "#065F46",
-                    fontSize: 11,
-                    fontWeight: "800",
-                  }}
-                >
-                  {item.stage === "waiting"
-                    ? "Chờ chơi"
-                    : `Ván ${item.handNumber}`}
+            accentColor="#059669"
+            stagePillLabel={
+              item.stage === "waiting" ? "Chờ chơi" : `Ván ${item.handNumber}`
+            }
+            stagePillActive={item.stage !== "waiting"}
+            meta={
+              <>
+                <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
+                <Text style={styles.metaTxt}>🎫 Buy-in {item.buyIn}</Text>
+                <Text style={styles.metaTxt}>
+                  👥 {item.seatsTaken}/{item.maxSeats}
                 </Text>
-              </View>
-            </View>
-            <View style={styles.cardMeta}>
-              <Text style={styles.metaTxt}>💰 Cược {item.stake}</Text>
-              <Text style={styles.metaTxt}>🎫 Buy-in {item.buyIn}</Text>
-              <Text style={styles.metaTxt}>
-                👥 {item.seatsTaken}/{item.maxSeats}
-              </Text>
-            </View>
-          </Pressable>
+              </>
+            }
+          />
         )}
       />
 
