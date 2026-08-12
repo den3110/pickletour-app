@@ -22,6 +22,7 @@ import {
   useChatSamRoomMutation,
   useGetSamRoomQuery,
   useLeaveSamRoomMutation,
+  useSamActionMutation,
   useSitSamRoomMutation,
   useStartSamHandMutation,
 } from "@/slices/samApiSlice";
@@ -137,10 +138,16 @@ export default function SamRoomScreen() {
   const [leave] = useLeaveSamRoomMutation();
   const [start] = useStartSamHandMutation();
   const [sendChat] = useChatSamRoomMutation();
+  const [act, { isLoading: acting }] = useSamActionMutation();
 
   const socket = useSocket();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const toggleSelect = (c: string) =>
+    setSelectedCards((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+    );
 
   useEffect(() => {
     ScreenOrientation.lockAsync(
@@ -222,6 +229,15 @@ export default function SamRoomScreen() {
     }
   };
 
+  const doAction = async (action: string, payload: any = {}) => {
+    try {
+      await act({ roomId, action, ...payload }).unwrap();
+      setSelectedCards([]);
+    } catch (err: any) {
+      Alert.alert("Không được", err?.data?.message || "Lỗi");
+    }
+  };
+
   if (!room) {
     return (
       <View style={styles.loading}>
@@ -299,10 +315,68 @@ export default function SamRoomScreen() {
       {mySeat && (
         <View style={styles.handStrip}>
           <ScrollView horizontal contentContainerStyle={{ gap: 4 }}>
-            {myCards.map((c: string, i: number) => (
-              <PlayingCard key={i} card={c} size={52} />
-            ))}
+            {myCards.map((c: string, i: number) => {
+              const selected = selectedCards.includes(c);
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => toggleSelect(c)}
+                  style={{
+                    transform: selected
+                      ? [{ translateY: -10 }]
+                      : [{ translateY: 0 }],
+                  }}
+                >
+                  <PlayingCard card={c} size={52} />
+                </Pressable>
+              );
+            })}
           </ScrollView>
+        </View>
+      )}
+
+      {/* Action bar */}
+      {mySeat && room.stage === "playing" && room.activeIndex === mySeat.seatIndex && (
+        <View style={styles.actionBar}>
+          {selectedCards.length > 0 && (
+            <Pressable
+              onPress={() => doAction("play", { cards: selectedCards })}
+              disabled={acting}
+              style={[styles.actionBtn, { backgroundColor: "#7C3AED" }]}
+            >
+              <Text style={styles.actionBtnText}>
+                Đánh ({selectedCards.length} lá)
+              </Text>
+            </Pressable>
+          )}
+          {room.currentCombo && (
+            <Pressable
+              onPress={() => doAction("pass")}
+              disabled={acting}
+              style={[styles.actionBtn, { backgroundColor: "#64748B" }]}
+            >
+              <Text style={styles.actionBtnText}>Pass</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* Showdown */}
+      {room.stage === "showdown" && (room.winners || []).length > 0 && (
+        <View style={styles.showdownBox}>
+          <Text style={styles.showdownTitle}>Kết quả ván {room.handNumber}</Text>
+          {(room.winners || []).map((w: any) => (
+            <Text key={w.seatIndex} style={styles.showdownRow}>
+              {w.handDescription}: {w.userName} ({w.amountWon > 0 ? "+" : ""}
+              {w.amountWon})
+            </Text>
+          ))}
+          <Pressable
+            onPress={doStart}
+            style={[styles.actionBtn, { backgroundColor: "#7C3AED", marginTop: 8 }]}
+          >
+            <Text style={styles.actionBtnText}>Ván mới</Text>
+          </Pressable>
         </View>
       )}
 
@@ -492,6 +566,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
+  },
+  actionBar: {
+    position: "absolute",
+    top: 60,
+    right: 12,
+    flexDirection: "column",
+    gap: 6,
+    zIndex: 20,
+  },
+  actionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  actionBtnText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  showdownBox: {
+    position: "absolute",
+    top: "20%",
+    left: "20%",
+    right: "20%",
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#FBBF24",
+    zIndex: 30,
+    alignItems: "center",
+  },
+  showdownTitle: {
+    color: "#FBBF24",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  showdownRow: {
+    color: "#fff",
+    fontSize: 13,
+    marginBottom: 4,
   },
   modalBackdrop: {
     flex: 1,

@@ -22,6 +22,7 @@ import {
   useChatPhomRoomMutation,
   useGetPhomRoomQuery,
   useLeavePhomRoomMutation,
+  usePhomActionMutation,
   useSitPhomRoomMutation,
   useStartPhomHandMutation,
 } from "@/slices/phomApiSlice";
@@ -143,10 +144,16 @@ export default function PhomRoomScreen() {
   const [leave] = useLeavePhomRoomMutation();
   const [start] = useStartPhomHandMutation();
   const [sendChat] = useChatPhomRoomMutation();
+  const [act, { isLoading: acting }] = usePhomActionMutation();
 
   const socket = useSocket();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const toggleSelect = (c: string) =>
+    setSelectedCards((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+    );
 
   // Lock landscape
   useEffect(() => {
@@ -228,6 +235,15 @@ export default function PhomRoomScreen() {
       setChatText("");
     } catch (err: any) {
       Alert.alert("Lỗi", err?.data?.message || "Không gửi được");
+    }
+  };
+
+  const doAction = async (action: string, payload: any = {}) => {
+    try {
+      await act({ roomId, action, ...payload }).unwrap();
+      setSelectedCards([]);
+    } catch (err: any) {
+      Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
   };
 
@@ -313,14 +329,97 @@ export default function PhomRoomScreen() {
         })}
       </View>
 
-      {/* Hand strip (my cards) */}
+      {/* Hand strip (my cards) — tap chọn */}
       {mySeat && (
         <View style={styles.handStrip}>
           <ScrollView horizontal contentContainerStyle={{ gap: 4 }}>
-            {myCards.map((c: string, i: number) => (
-              <PlayingCard key={i} card={c} size={52} />
-            ))}
+            {myCards.map((c: string, i: number) => {
+              const selected = selectedCards.includes(c);
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => toggleSelect(c)}
+                  style={{
+                    transform: selected
+                      ? [{ translateY: -10 }]
+                      : [{ translateY: 0 }],
+                  }}
+                >
+                  <PlayingCard card={c} size={52} />
+                </Pressable>
+              );
+            })}
           </ScrollView>
+        </View>
+      )}
+
+      {/* Action bar — chỉ hiện khi tới lượt */}
+      {mySeat && room.stage === "playing" && room.activeIndex === mySeat.seatIndex && (
+        <View style={styles.actionBar}>
+          {mySeat.cards?.length <= 9 && mySeat.seatIndex !== room.dealerIndex ? (
+            <>
+              <Pressable
+                onPress={() => doAction("draw_deck")}
+                disabled={acting}
+                style={[styles.actionBtn, { backgroundColor: "#3B82F6" }]}
+              >
+                <Text style={styles.actionBtnText}>Bốc nọc</Text>
+              </Pressable>
+              {selectedCards.length >= 3 && (
+                <Pressable
+                  onPress={() =>
+                    doAction("draw_discard", { meldCards: selectedCards })
+                  }
+                  disabled={acting}
+                  style={[styles.actionBtn, { backgroundColor: "#F59E0B" }]}
+                >
+                  <Text style={styles.actionBtnText}>
+                    Ăn + Hạ ({selectedCards.length} lá)
+                  </Text>
+                </Pressable>
+              )}
+            </>
+          ) : (
+            <>
+              {selectedCards.length === 1 && (
+                <Pressable
+                  onPress={() => doAction("discard", { card: selectedCards[0] })}
+                  disabled={acting}
+                  style={[styles.actionBtn, { backgroundColor: "#DC2626" }]}
+                >
+                  <Text style={styles.actionBtnText}>
+                    Thảy {selectedCards[0]}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => doAction("u")}
+                disabled={acting}
+                style={[styles.actionBtn, { backgroundColor: "#059669" }]}
+              >
+                <Text style={styles.actionBtnText}>Ù</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
+
+      {/* Showdown modal */}
+      {room.stage === "showdown" && (room.winners || []).length > 0 && (
+        <View style={styles.showdownBox}>
+          <Text style={styles.showdownTitle}>Kết quả ván {room.handNumber}</Text>
+          {(room.winners || []).map((w: any) => (
+            <Text key={w.seatIndex} style={styles.showdownRow}>
+              {w.handDescription}: {w.userName} ({w.amountWon > 0 ? "+" : ""}
+              {w.amountWon})
+            </Text>
+          ))}
+          <Pressable
+            onPress={doStart}
+            style={[styles.actionBtn, { backgroundColor: "#059669", marginTop: 8 }]}
+          >
+            <Text style={styles.actionBtnText}>Ván mới</Text>
+          </Pressable>
         </View>
       )}
 
@@ -516,6 +615,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
+  },
+  actionBar: {
+    position: "absolute",
+    top: 60,
+    right: 12,
+    flexDirection: "column",
+    gap: 6,
+    zIndex: 20,
+  },
+  actionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  actionBtnText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  showdownBox: {
+    position: "absolute",
+    top: "20%",
+    left: "20%",
+    right: "20%",
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#FBBF24",
+    zIndex: 30,
+    alignItems: "center",
+  },
+  showdownTitle: {
+    color: "#FBBF24",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  showdownRow: {
+    color: "#fff",
+    fontSize: 13,
+    marginBottom: 4,
   },
   modalBackdrop: {
     flex: 1,
