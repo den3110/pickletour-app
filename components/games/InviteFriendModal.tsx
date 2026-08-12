@@ -86,6 +86,7 @@ export function InviteFriendModal({
       visible={visible}
       animationType="fade"
       onRequestClose={onClose}
+      supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}}>

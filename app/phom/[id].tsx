@@ -454,6 +454,7 @@ export default function PhomRoomScreen() {
         visible={chatOpen}
         animationType="fade"
         onRequestClose={() => setChatOpen(false)}
+        supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
       >
         <Pressable
           style={styles.modalBackdrop}
