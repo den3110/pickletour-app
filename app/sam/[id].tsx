@@ -7,14 +7,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
   Dimensions,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
@@ -109,6 +116,16 @@ export default function SamRoomScreen() {
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [room?.turnDeadlineAt]);
+
+  // Animation khi combo hiện tại đổi (ai đó vừa đánh)
+  const playCount = (room?.plays || []).length;
+  useEffect(() => {
+    LayoutAnimation.configureNext({
+      duration: 320,
+      create: { type: "easeOut", property: "opacity" },
+      update: { type: "spring", springDamping: 0.7 },
+    });
+  }, [playCount]);
 
   const mySeat = useMemo(
     () =>
@@ -215,7 +232,12 @@ export default function SamRoomScreen() {
       </View>
 
       {room.stage === "playing" && remainSec > 0 && (
-        <View style={styles.timerBar}>
+        <View
+          style={[
+            styles.timerBar,
+            { top: Math.max(58, insets.top + 50) },
+          ]}
+        >
           <View
             style={[
               styles.timerFill,
@@ -231,19 +253,6 @@ export default function SamRoomScreen() {
 
       <View style={styles.tableWrap}>
         <FeltOval>
-          {/* Center — current combo */}
-          {room.currentCombo && (
-            <View style={styles.centerCombo}>
-              <Text style={styles.centerComboLabel}>
-                {room.currentCombo.type?.toUpperCase()}
-              </Text>
-              <View style={{ flexDirection: "row", gap: -14 }}>
-                {(room.currentCombo.cards || []).map((c: string, i: number) => (
-                  <CardPro key={i} card={c} size={44} />
-                ))}
-              </View>
-            </View>
-          )}
           {!room.currentCombo && room.stage === "playing" && (
             <Text style={styles.centerHint}>
               Chưa có bài — người đến lượt được đánh tự do
@@ -251,6 +260,49 @@ export default function SamRoomScreen() {
           )}
         </FeltOval>
       </View>
+
+      {/* Combo hiện tại — hiện trước mặt seat vừa đánh */}
+      {room.currentCombo && (() => {
+        const seatIndexToRotated = new Map<number, number>();
+        rotatedSeats.forEach((s: any, idx: number) => {
+          if (s) seatIndexToRotated.set(s.seatIndex, idx);
+        });
+        const rIdx = seatIndexToRotated.get(room.currentCombo.fromSeat) ?? 0;
+        const seatPct = [
+          { x: 50, y: 60 },
+          { x: 26, y: 50 },
+          { x: 50, y: 38 },
+          { x: 74, y: 50 },
+        ];
+        const target = seatPct[rIdx] || { x: 50, y: 50 };
+        const cards = room.currentCombo.cards || [];
+        return (
+          <View
+            style={{
+              position: "absolute",
+              left: `${target.x}%`,
+              top: `${target.y}%`,
+              transform: [
+                { translateX: -((cards.length * 16) / 2) },
+                { translateY: -30 },
+              ],
+              zIndex: 4,
+              alignItems: "center",
+            }}
+          >
+            <Text style={styles.centerComboLabel}>
+              {room.currentCombo.type?.toUpperCase()}
+            </Text>
+            <View style={{ flexDirection: "row", marginTop: 4 }}>
+              {cards.map((c: string, i: number) => (
+                <View key={i} style={{ marginLeft: i > 0 ? -18 : 0 }}>
+                  <CardPro card={c} size={44} />
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })()}
 
       {rotatedSeats.map((seat: any, i: number) => {
         if (!seat) return null;

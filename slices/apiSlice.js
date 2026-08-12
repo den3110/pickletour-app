@@ -356,6 +356,8 @@ export const apiSlice = createApi({
     "MlpDual",
     "MlpStandings",
     "PokerRoom",
+    "PhomRoom",
+    "SamRoom",
     "Feed",
     "FeedComments",
     "User",

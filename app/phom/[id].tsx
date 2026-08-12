@@ -7,14 +7,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
   Dimensions,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
@@ -111,6 +118,20 @@ export default function PhomRoomScreen() {
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [room?.turnDeadlineAt]);
+
+  // Smooth animation khi discards / seats changes (ăn bài, hạ phỏm, đánh)
+  const discardCount = (room?.discards || []).length;
+  const meldsCount = (seats || []).reduce(
+    (n: number, s: any) => n + ((s?.melds || []).length),
+    0,
+  );
+  useEffect(() => {
+    LayoutAnimation.configureNext({
+      duration: 320,
+      create: { type: "easeOut", property: "opacity" },
+      update: { type: "spring", springDamping: 0.7 },
+    });
+  }, [discardCount, meldsCount]);
 
   const mySeat = useMemo(
     () =>
@@ -217,9 +238,14 @@ export default function PhomRoomScreen() {
         )}
       </View>
 
-      {/* Timer bar */}
+      {/* Timer bar — nằm ngay dưới title bar, không đè top seat */}
       {room.stage === "playing" && remainSec > 0 && (
-        <View style={styles.timerBar}>
+        <View
+          style={[
+            styles.timerBar,
+            { top: Math.max(58, insets.top + 50) },
+          ]}
+        >
           <View
             style={[
               styles.timerFill,
@@ -236,31 +262,64 @@ export default function PhomRoomScreen() {
       {/* Felt table */}
       <View style={styles.tableWrap}>
         <FeltOval>
-          {/* Center — discard pile */}
-          <View style={styles.centerDiscardPile}>
-            {(room.discards || []).slice(-4).map((d: any, i: number) => (
-              <View
-                key={i}
-                style={{
-                  position: "absolute",
-                  left: i * 12,
-                  transform: [{ rotate: `${(i - 2) * 5}deg` }],
-                }}
-              >
-                <CardPro card={d.card} size={44} />
-              </View>
-            ))}
-            {room.deck && (
-              <View style={styles.deckStack}>
-                <CardPro card={null} hidden size={44} />
-                <Text style={styles.deckCount}>
-                  {(room as any).deckCount || 0}
-                </Text>
-              </View>
-            )}
+          {/* Center — nọc (deck stack) */}
+          <View style={styles.centerDeck}>
+            <View style={styles.deckStack}>
+              <CardPro card={null} hidden size={44} />
+              <Text style={styles.deckCount}>
+                {(room as any).deckCount || 0}
+              </Text>
+            </View>
           </View>
         </FeltOval>
       </View>
+
+      {/* Discards hiện trước mặt người vừa đánh (dùng fromSeat) */}
+      {(() => {
+        const seatIndexToRotated = new Map<number, number>();
+        rotatedSeats.forEach((s: any, idx: number) => {
+          if (s) seatIndexToRotated.set(s.seatIndex, idx);
+        });
+        // Chỉ hiện 4 lá gần nhất, nhóm theo seat
+        const byRotated: Record<number, any[]> = {};
+        (room.discards || []).slice(-8).forEach((d: any) => {
+          const r = seatIndexToRotated.get(d.fromSeat);
+          if (r == null) return;
+          if (!byRotated[r]) byRotated[r] = [];
+          byRotated[r].push(d);
+        });
+        // Đưa từng nhóm về vị trí giữa center và seat đó
+        const centerX = 50;
+        const centerY = 50;
+        // Toạ độ đích (giữa center → seat)
+        const seatPct = [
+          { x: 50, y: 65 }, // bottom
+          { x: 24, y: 50 }, // left
+          { x: 50, y: 33 }, // top
+          { x: 76, y: 50 }, // right
+        ];
+        return Object.entries(byRotated).map(([rIdx, cards]) => {
+          const target = seatPct[Number(rIdx)] || { x: centerX, y: centerY };
+          return cards.slice(-3).map((d: any, i: number) => (
+            <View
+              key={`${rIdx}-${d.card}-${i}`}
+              style={{
+                position: "absolute",
+                left: `${target.x}%`,
+                top: `${target.y}%`,
+                transform: [
+                  { translateX: -22 + i * 10 },
+                  { translateY: -30 + i * 3 },
+                  { rotate: `${(i - 1) * 6}deg` },
+                ],
+                zIndex: 3,
+              }}
+            >
+              <CardPro card={d.card} size={44} />
+            </View>
+          ));
+        });
+      })()}
 
       {/* Seats floating around table */}
       {rotatedSeats.map((seat: any, i: number) => {
@@ -604,15 +663,12 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginBottom: 90,
   },
-  centerDiscardPile: {
-    flexDirection: "row",
+  centerDeck: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
   },
   deckStack: {
     position: "relative",
-    marginLeft: 20,
   },
   deckCount: {
     position: "absolute",
