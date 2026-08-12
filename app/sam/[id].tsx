@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import React, { useEffect, useMemo, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
   Dimensions,
@@ -39,16 +40,17 @@ import {
 const { width: SW, height: SH } = Dimensions.get("window");
 
 const SEAT_LAYOUT = [
-  { position: "bottom", left: "50%", top: "78%" },
-  { position: "left", left: "8%", top: "50%" },
-  { position: "top", left: "50%", top: "12%" },
-  { position: "right", left: "92%", top: "50%" },
+  { position: "bottom", left: "50%", top: "82%" },
+  { position: "left", left: "14%", top: "52%" },
+  { position: "top", left: "50%", top: "22%" },
+  { position: "right", left: "86%", top: "52%" },
 ];
 
 export default function SamRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const roomId = String(id || "");
+  const insets = useSafeAreaInsets();
 
   const { data, refetch } = useGetSamRoomQuery(roomId, { skip: !roomId });
   const [sit] = useSitSamRoomMutation();
@@ -185,7 +187,12 @@ export default function SamRoomScreen() {
 
       <WoodBackground />
 
-      <View style={styles.topBar}>
+      <View
+        style={[
+          styles.topBar,
+          { top: Math.max(8, insets.top), left: Math.max(12, insets.left + 8), right: Math.max(80, insets.right + 68) },
+        ]}
+      >
         <RoundIconBtn
           icon="chevron-back"
           onPress={() => router.back()}
@@ -365,7 +372,12 @@ export default function SamRoomScreen() {
         </View>
       )}
 
-      <View style={styles.rightBtnStack}>
+      <View
+        style={[
+          styles.rightBtnStack,
+          { right: Math.max(12, insets.right + 8), top: Math.max(70, insets.top + 60) },
+        ]}
+      >
         <RoundIconBtn
           icon="person-add"
           color="#8B5CF6"

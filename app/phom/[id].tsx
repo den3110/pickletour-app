@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import React, { useEffect, useMemo, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
   Dimensions,
@@ -38,18 +39,20 @@ import {
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
-// Toạ độ 4 ghế quanh bàn oval landscape (hero = bottom, index 0 sau rotate)
+// Toạ độ 4 ghế quanh bàn oval landscape (hero = bottom, index 0 sau rotate).
+// Dịch top xuống để tránh Dynamic Island; dịch left/right vào để tránh nút tím + back.
 const SEAT_LAYOUT = [
-  { position: "bottom", left: "50%", top: "78%" },
-  { position: "left", left: "8%", top: "50%" },
-  { position: "top", left: "50%", top: "12%" },
-  { position: "right", left: "92%", top: "50%" },
+  { position: "bottom", left: "50%", top: "82%" },
+  { position: "left", left: "14%", top: "52%" },
+  { position: "top", left: "50%", top: "22%" },
+  { position: "right", left: "86%", top: "52%" },
 ];
 
 export default function PhomRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const roomId = String(id || "");
+  const insets = useSafeAreaInsets();
 
   const { data, refetch } = useGetPhomRoomQuery(roomId, { skip: !roomId });
   const [sit] = useSitPhomRoomMutation();
@@ -187,7 +190,12 @@ export default function PhomRoomScreen() {
       <WoodBackground />
 
       {/* Top-left back button + room title */}
-      <View style={styles.topBar}>
+      <View
+        style={[
+          styles.topBar,
+          { top: Math.max(8, insets.top), left: Math.max(12, insets.left + 8), right: Math.max(80, insets.right + 68) },
+        ]}
+      >
         <RoundIconBtn
           icon="chevron-back"
           onPress={() => router.back()}
@@ -332,10 +340,10 @@ export default function PhomRoomScreen() {
         </View>
       )}
 
-      {/* Action bar */}
+      {/* Action bar — điều kiện chỉ dựa vào số lá trong tay. */}
       {isMyTurn && (
         <View style={styles.actionBar}>
-          {mySeat.cards?.length <= 9 && mySeat.seatIndex !== room.dealerIndex ? (
+          {mySeat.cards?.length < 10 ? (
             <>
               <ActionBtn
                 label="Bốc nọc"
@@ -357,26 +365,17 @@ export default function PhomRoomScreen() {
               )}
             </>
           ) : (
-            <>
-              {selectedCards.length === 1 && (
-                <ActionBtn
-                  label={`Thảy ${selectedCards[0]}`}
-                  icon="arrow-forward-circle"
-                  color="#DC2626"
-                  onPress={() =>
-                    doAction("discard", { card: selectedCards[0] })
-                  }
-                  disabled={acting}
-                />
-              )}
+            selectedCards.length === 1 && (
               <ActionBtn
-                label="Ù"
-                icon="trophy"
-                color="#059669"
-                onPress={() => doAction("u")}
+                label={`Thảy ${selectedCards[0]}`}
+                icon="arrow-forward-circle"
+                color="#DC2626"
+                onPress={() =>
+                  doAction("discard", { card: selectedCards[0] })
+                }
                 disabled={acting}
               />
-            </>
+            )
           )}
         </View>
       )}
@@ -410,7 +409,12 @@ export default function PhomRoomScreen() {
       )}
 
       {/* Right side: purple round buttons stack */}
-      <View style={styles.rightBtnStack}>
+      <View
+        style={[
+          styles.rightBtnStack,
+          { right: Math.max(12, insets.right + 8), top: Math.max(70, insets.top + 60) },
+        ]}
+      >
         <RoundIconBtn
           icon="person-add"
           color="#8B5CF6"
