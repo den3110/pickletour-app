@@ -1,4 +1,4 @@
-// Sâm Lốc room — landscape bàn xanh, 4 ghế, hand render. Phase 2 shell.
+// Sâm Lốc room — landscape bàn xanh gỗ nâu, elegant redesign.
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -13,12 +13,19 @@ import {
   Text,
   TextInput,
   View,
-  Image,
 } from "react-native";
 import { useSelector } from "react-redux";
 
 import { useSocket } from "@/context/SocketContext";
 import { InviteFriendModal } from "@/components/games/InviteFriendModal";
+import {
+  CardPro,
+  EmptySeat,
+  FeltOval,
+  RoundIconBtn,
+  SeatFrame,
+  WoodBackground,
+} from "@/components/games/GameTableUI";
 import {
   useChatSamRoomMutation,
   useGetSamRoomQuery,
@@ -29,106 +36,14 @@ import {
   useStartSamHandMutation,
 } from "@/slices/samApiSlice";
 
-const SUIT_SYMBOL: Record<string, string> = {
-  s: "♠",
-  h: "♥",
-  d: "♦",
-  c: "♣",
-};
+const { width: SW, height: SH } = Dimensions.get("window");
 
-function suitColor(suit: string) {
-  return suit === "h" || suit === "d" ? "#DC2626" : "#0F172A";
-}
-
-function PlayingCard({
-  card,
-  size = 44,
-  hidden = false,
-}: {
-  card?: string | null;
-  size?: number;
-  hidden?: boolean;
-}) {
-  const w = size;
-  const h = Math.round(size * 1.4);
-  if (hidden || !card) {
-    return (
-      <View
-        style={[
-          styles.card,
-          { width: w, height: h, backgroundColor: "#5B21B6" },
-        ]}
-      >
-        <View style={styles.cardBackPattern} />
-      </View>
-    );
-  }
-  const rank = card[0];
-  const suit = card[1];
-  const color = suitColor(suit);
-  const display = rank === "T" ? "10" : rank;
-  return (
-    <View style={[styles.card, { width: w, height: h }]}>
-      <Text style={[styles.cardRank, { color, fontSize: size * 0.32 }]}>
-        {display}
-      </Text>
-      <Text style={[styles.cardSuit, { color, fontSize: size * 0.4 }]}>
-        {SUIT_SYMBOL[suit] || "?"}
-      </Text>
-    </View>
-  );
-}
-
-const SEAT_POSITIONS = [
-  { top: "70%", left: "50%" },
-  { top: "50%", left: "8%" },
-  { top: "10%", left: "50%" },
-  { top: "50%", right: "8%" },
+const SEAT_LAYOUT = [
+  { position: "bottom", left: "50%", top: "78%" },
+  { position: "left", left: "8%", top: "50%" },
+  { position: "top", left: "50%", top: "12%" },
+  { position: "right", left: "92%", top: "50%" },
 ];
-
-function Seat({
-  seat,
-  isMine,
-  onSit,
-  isTurn,
-}: {
-  seat: any;
-  isMine: boolean;
-  onSit: () => void;
-  isTurn: boolean;
-}) {
-  const empty = !seat?.user;
-  if (empty) {
-    return (
-      <Pressable style={styles.emptySeat} onPress={onSit}>
-        <Ionicons name="add-circle-outline" size={22} color="#94A3B8" />
-        <Text style={styles.emptySeatText}>Ngồi</Text>
-      </Pressable>
-    );
-  }
-  const u = seat.user;
-  return (
-    <View style={[styles.seat, isTurn && styles.seatTurn]}>
-      {u.avatar ? (
-        <Image source={{ uri: u.avatar }} style={styles.seatAvatar} />
-      ) : (
-        <View style={styles.seatAvatarPlaceholder}>
-          <Text style={{ color: "#fff", fontWeight: "700" }}>
-            {(u.nickname || u.name || "?")[0]?.toUpperCase()}
-          </Text>
-        </View>
-      )}
-      <Text style={styles.seatName} numberOfLines={1}>
-        {u.nickname || u.name}
-        {isMine ? " (bạn)" : ""}
-      </Text>
-      <Text style={styles.seatChips}>💰 {seat.chips || 0}</Text>
-      {seat.cardCount > 0 && !isMine && (
-        <Text style={styles.seatCardCount}>{seat.cardCount} lá</Text>
-      )}
-    </View>
-  );
-}
 
 export default function SamRoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -168,12 +83,8 @@ export default function SamRoomScreen() {
   useEffect(() => {
     if (!socket || !roomId) return;
     socket.emit("sam:room:subscribe", { roomId });
-    const onUpdate = (p: any) => {
-      if (p?.roomId === roomId) refetch();
-    };
-    const onChat = (p: any) => {
-      if (p?.roomId === roomId) refetch();
-    };
+    const onUpdate = (p: any) => p?.roomId === roomId && refetch();
+    const onChat = (p: any) => p?.roomId === roomId && refetch();
     socket.on("sam:room:updated", onUpdate);
     socket.on("sam:room:chat", onChat);
     return () => {
@@ -187,10 +98,7 @@ export default function SamRoomScreen() {
   const seats = room?.seats || [];
 
   useEffect(() => {
-    if (!room?.turnDeadlineAt) {
-      setRemainSec(0);
-      return;
-    }
+    if (!room?.turnDeadlineAt) return setRemainSec(0);
     const tick = () => {
       const ms = new Date(room.turnDeadlineAt).getTime() - Date.now();
       setRemainSec(Math.max(0, Math.ceil(ms / 1000)));
@@ -247,11 +155,14 @@ export default function SamRoomScreen() {
       Alert.alert("Lỗi", err?.data?.message || "Không gửi được");
     }
   };
-
   const doAction = async (action: string, payload: any = {}) => {
     try {
       await act({ roomId, action, ...payload }).unwrap();
       setSelectedCards([]);
+      try {
+        const { playFx } = require("@/app/poker/pokerFx");
+        playFx(action === "pass" ? "check" : "chip");
+      } catch {}
     } catch (err: any) {
       Alert.alert("Không được", err?.data?.message || "Lỗi");
     }
@@ -266,160 +177,218 @@ export default function SamRoomScreen() {
   }
 
   const myCards = mySeat?.cards || [];
+  const isMyTurn = mySeat && room.activeIndex === mySeat.seatIndex && room.stage === "playing";
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: "#2A1408" }}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      <View style={styles.table}>
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </Pressable>
+      <WoodBackground />
+
+      <View style={styles.topBar}>
+        <RoundIconBtn
+          icon="chevron-back"
+          onPress={() => router.back()}
+          color="#334155"
+          size={40}
+        />
+        <View style={styles.roomTitleBox}>
           <Text style={styles.roomTitle} numberOfLines={1}>
-            🃏 {room.name}
+            🃏 Sâm Lốc · {room.name}
           </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable onPress={() => setInviteOpen(true)} style={styles.iconBtn}>
-              <Ionicons name="person-add" size={20} color="#fff" />
-            </Pressable>
-            {mySeat && room.stage === "waiting" && (
-              <Pressable onPress={doStart} style={styles.startBtn}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>
-                  BẮT ĐẦU
-                </Text>
-              </Pressable>
-            )}
-            {mySeat && (
-              <Pressable onPress={doLeave} style={styles.iconBtn}>
-                <Ionicons name="exit-outline" size={22} color="#fff" />
-              </Pressable>
-            )}
-          </View>
+          <Text style={styles.roomSub}>
+            Ván {room.handNumber || 0} · Cược {room.stake} · Buy-in {room.buyIn}
+          </Text>
         </View>
-
-        {room.stage === "playing" && remainSec > 0 && (
-          <View style={styles.timerBar}>
-            <View
-              style={[
-                styles.timerFill,
-                {
-                  width: `${Math.min(100, (remainSec / (room.turnDurationSec || 30)) * 100)}%`,
-                  backgroundColor: remainSec < 5 ? "#EF4444" : "#FBBF24",
-                },
-              ]}
-            />
-            <Text style={styles.timerText}>{remainSec}s</Text>
-          </View>
+        {mySeat && room.stage === "waiting" && (
+          <Pressable onPress={doStart} style={styles.startBtn}>
+            <Text style={styles.startBtnText}>BẮT ĐẦU</Text>
+          </Pressable>
         )}
-
-        <View style={styles.tableCenter}>
-          <Text style={styles.tableInfo}>
-            Ván {room.handNumber || 0} · {room.stage}
-          </Text>
-          {room.currentCombo && (
-            <View style={{ flexDirection: "row", gap: -12, marginTop: 8 }}>
-              {(room.currentCombo.cards || []).map((c: string, i: number) => (
-                <PlayingCard key={i} card={c} size={38} />
-              ))}
-            </View>
-          )}
-        </View>
-
-        {rotatedSeats.map((seat: any, i: number) => {
-          if (!seat) return null;
-          const pos = SEAT_POSITIONS[i];
-          const isMine =
-            seat.user &&
-            String(seat.user._id || seat.user) === String(me?._id);
-          const isTurn = room.activeIndex === seat.seatIndex;
-          return (
-            <View
-              key={seat.seatIndex}
-              style={[styles.seatWrap, pos as any, { transform: [{ translateX: -55 }, { translateY: -40 }] }]}
-            >
-              <Seat
-                seat={seat}
-                isMine={!!isMine}
-                onSit={() => doSit(seat.seatIndex)}
-                isTurn={isTurn}
-              />
-            </View>
-          );
-        })}
       </View>
 
-      {mySeat && (
-        <View style={styles.handStrip}>
-          <ScrollView horizontal contentContainerStyle={{ gap: 4 }}>
-            {myCards.map((c: string, i: number) => {
-              const selected = selectedCards.includes(c);
-              return (
-                <Pressable
-                  key={i}
-                  onPress={() => toggleSelect(c)}
-                  style={{
-                    transform: selected
-                      ? [{ translateY: -10 }]
-                      : [{ translateY: 0 }],
-                  }}
-                >
-                  <PlayingCard card={c} size={52} />
-                </Pressable>
-              );
-            })}
+      {room.stage === "playing" && remainSec > 0 && (
+        <View style={styles.timerBar}>
+          <View
+            style={[
+              styles.timerFill,
+              {
+                width: `${Math.min(100, (remainSec / (room.turnDurationSec || 30)) * 100)}%`,
+                backgroundColor: remainSec < 5 ? "#EF4444" : "#FBBF24",
+              },
+            ]}
+          />
+          <Text style={styles.timerText}>{remainSec}s</Text>
+        </View>
+      )}
+
+      <View style={styles.tableWrap}>
+        <FeltOval>
+          {/* Center — current combo */}
+          {room.currentCombo && (
+            <View style={styles.centerCombo}>
+              <Text style={styles.centerComboLabel}>
+                {room.currentCombo.type?.toUpperCase()}
+              </Text>
+              <View style={{ flexDirection: "row", gap: -14 }}>
+                {(room.currentCombo.cards || []).map((c: string, i: number) => (
+                  <CardPro key={i} card={c} size={44} />
+                ))}
+              </View>
+            </View>
+          )}
+          {!room.currentCombo && room.stage === "playing" && (
+            <Text style={styles.centerHint}>
+              Chưa có bài — người đến lượt được đánh tự do
+            </Text>
+          )}
+        </FeltOval>
+      </View>
+
+      {rotatedSeats.map((seat: any, i: number) => {
+        if (!seat) return null;
+        const layout = SEAT_LAYOUT[i];
+        const isMine =
+          seat.user &&
+          String(seat.user._id || seat.user) === String(me?._id);
+        const isTurn =
+          room.activeIndex === seat.seatIndex && room.stage === "playing";
+        const passed = (room.passedSeats || []).includes(seat.seatIndex);
+        const empty = !seat.user;
+        return (
+          <View
+            key={seat.seatIndex}
+            style={{
+              position: "absolute",
+              left: layout.left as any,
+              top: layout.top as any,
+              transform: [{ translateX: -50 }, { translateY: -40 }],
+              zIndex: 5,
+            }}
+          >
+            {empty ? (
+              <EmptySeat onPress={() => doSit(seat.seatIndex)} />
+            ) : (
+              <View style={{ alignItems: "center" }}>
+                <SeatFrame
+                  user={seat.user}
+                  chips={seat.chips}
+                  isMine={!!isMine}
+                  isTurn={isTurn}
+                  cardCount={seat.cardCount || 0}
+                />
+                {passed && (
+                  <View style={styles.passBadge}>
+                    <Text style={styles.passBadgeText}>PASS</Text>
+                  </View>
+                )}
+                {seat.hasFinished && (
+                  <View style={styles.finishedBadge}>
+                    <Text style={styles.finishedBadgeText}>
+                      #{seat.finishOrder}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        );
+      })}
+
+      {mySeat && myCards.length > 0 && (
+        <View style={styles.handStripWrap}>
+          <ScrollView
+            horizontal
+            contentContainerStyle={{ paddingHorizontal: 12, gap: -8, alignItems: "flex-end" }}
+            showsHorizontalScrollIndicator={false}
+          >
+            {myCards.map((c: string) => (
+              <CardPro
+                key={c}
+                card={c}
+                size={62}
+                selected={selectedCards.includes(c)}
+                onPress={() => toggleSelect(c)}
+              />
+            ))}
           </ScrollView>
         </View>
       )}
 
-      {/* Action bar */}
-      {mySeat && room.stage === "playing" && room.activeIndex === mySeat.seatIndex && (
+      {isMyTurn && (
         <View style={styles.actionBar}>
           {selectedCards.length > 0 && (
-            <Pressable
+            <ActionBtn
+              label={`Đánh (${selectedCards.length})`}
+              icon="send"
+              color="#7C3AED"
               onPress={() => doAction("play", { cards: selectedCards })}
               disabled={acting}
-              style={[styles.actionBtn, { backgroundColor: "#7C3AED" }]}
-            >
-              <Text style={styles.actionBtnText}>
-                Đánh ({selectedCards.length} lá)
-              </Text>
-            </Pressable>
+            />
           )}
           {room.currentCombo && (
-            <Pressable
+            <ActionBtn
+              label="Pass"
+              icon="close-circle-outline"
+              color="#64748B"
               onPress={() => doAction("pass")}
               disabled={acting}
-              style={[styles.actionBtn, { backgroundColor: "#64748B" }]}
-            >
-              <Text style={styles.actionBtnText}>Pass</Text>
-            </Pressable>
+            />
           )}
         </View>
       )}
 
-      {/* Showdown */}
       {room.stage === "showdown" && (room.winners || []).length > 0 && (
         <View style={styles.showdownBox}>
-          <Text style={styles.showdownTitle}>Kết quả ván {room.handNumber}</Text>
+          <Text style={styles.showdownTitle}>
+            🏆 Kết quả ván {room.handNumber}
+          </Text>
           {(room.winners || []).map((w: any) => (
-            <Text key={w.seatIndex} style={styles.showdownRow}>
-              {w.handDescription}: {w.userName} ({w.amountWon > 0 ? "+" : ""}
-              {w.amountWon})
-            </Text>
+            <View key={w.seatIndex} style={styles.showdownRow}>
+              <Text style={styles.showdownName}>
+                {w.handDescription}: {w.userName}
+              </Text>
+              <Text
+                style={[
+                  styles.showdownAmt,
+                  { color: w.amountWon > 0 ? "#10B981" : "#EF4444" },
+                ]}
+              >
+                {w.amountWon > 0 ? "+" : ""}
+                {w.amountWon}
+              </Text>
+            </View>
           ))}
-          <Pressable
-            onPress={doStart}
-            style={[styles.actionBtn, { backgroundColor: "#7C3AED", marginTop: 8 }]}
-          >
-            <Text style={styles.actionBtnText}>Ván mới</Text>
+          <Pressable onPress={doStart} style={styles.newHandBtn}>
+            <Text style={styles.newHandBtnText}>Ván mới</Text>
           </Pressable>
         </View>
       )}
 
-      <Pressable onPress={() => setChatOpen(true)} style={styles.fabChat}>
-        <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
-      </Pressable>
+      <View style={styles.rightBtnStack}>
+        <RoundIconBtn
+          icon="person-add"
+          color="#8B5CF6"
+          onPress={() => setInviteOpen(true)}
+        />
+        <RoundIconBtn
+          icon="chatbubble-ellipses"
+          color="#8B5CF6"
+          onPress={() => setChatOpen(true)}
+          badge={
+            (room.messages || []).length > 0
+              ? (room.messages || []).length
+              : undefined
+          }
+        />
+        {mySeat && (
+          <RoundIconBtn
+            icon="exit"
+            color="#DC2626"
+            onPress={doLeave}
+          />
+        )}
+      </View>
 
       <InviteFriendModal
         visible={inviteOpen}
@@ -430,7 +399,6 @@ export default function SamRoomScreen() {
           await invite({ roomId, userIds }).unwrap();
         }}
       />
-
       <Modal
         transparent
         visible={chatOpen}
@@ -442,16 +410,13 @@ export default function SamRoomScreen() {
           onPress={() => setChatOpen(false)}
         >
           <Pressable style={styles.chatBox} onPress={() => {}}>
-            <Text style={styles.chatTitle}>Chat</Text>
-            <ScrollView style={{ maxHeight: 200 }}>
+            <Text style={styles.chatTitle}>💬 Chat trong bàn</Text>
+            <ScrollView style={{ maxHeight: 220 }}>
               {(room.messages || []).slice(-30).map((m: any) => (
-                <Text
-                  key={String(m._id || m.at)}
-                  style={{ color: "#0F172A", marginBottom: 4 }}
-                >
-                  <Text style={{ fontWeight: "700" }}>{m.name}: </Text>
-                  {m.text}
-                </Text>
+                <View key={String(m._id || m.at)} style={styles.chatMsg}>
+                  <Text style={styles.chatMsgName}>{m.name}:</Text>
+                  <Text style={styles.chatMsgText}>{m.text}</Text>
+                </View>
               ))}
             </ScrollView>
             <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
@@ -462,7 +427,7 @@ export default function SamRoomScreen() {
                 style={styles.chatInput}
                 onSubmitEditing={doSendChat}
               />
-              <Pressable style={styles.sendBtn} onPress={doSendChat}>
+              <Pressable style={styles.chatSendBtn} onPress={doSendChat}>
                 <Ionicons name="send" size={18} color="#fff" />
               </Pressable>
             </View>
@@ -473,20 +438,41 @@ export default function SamRoomScreen() {
   );
 }
 
-const { width: SW, height: SH } = Dimensions.get("window");
+function ActionBtn({
+  label,
+  icon,
+  color,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.actionBtn,
+        { backgroundColor: color },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Ionicons name={icon} size={16} color="#fff" />
+      <Text style={styles.actionBtnText}>{label}</Text>
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#3B1F4D" },
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#0F172A",
-  },
-  table: {
-    flex: 1,
-    position: "relative",
-    overflow: "hidden",
   },
   topBar: {
     position: "absolute",
@@ -495,217 +481,221 @@ const styles = StyleSheet.create({
     right: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    zIndex: 10,
+    gap: 10,
+    zIndex: 20,
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  roomTitle: {
+  roomTitleBox: {
     flex: 1,
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 14,
-    textAlign: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.4)",
+  },
+  roomTitle: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  roomSub: {
+    color: "#C4B5FD",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 1,
   },
   startBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
     backgroundColor: "#7C3AED",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  tableCenter: {
-    position: "absolute",
-    top: "35%",
-    left: "50%",
-    transform: [{ translateX: -80 }, { translateY: -30 }],
-    width: 160,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 100,
-    padding: 20,
-  },
-  tableInfo: { color: "#EDE9FE", fontWeight: "700", fontSize: 12 },
-  seatWrap: {
-    position: "absolute",
-    width: 110,
-    height: 80,
-  },
-  seat: {
-    width: 110,
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    gap: 2,
-  },
-  seatTurn: {
-    borderWidth: 2,
-    borderColor: "#FBBF24",
-  },
-  seatAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  seatAvatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#475569",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  seatName: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  seatChips: { color: "#FBBF24", fontSize: 10, fontWeight: "700" },
-  seatCardCount: { color: "#CBD5E1", fontSize: 9 },
-  emptySeat: {
-    width: 110,
-    height: 60,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptySeatText: { color: "#94A3B8", fontSize: 10, marginTop: 2 },
-  handStrip: {
-    position: "absolute",
-    left: 12,
-    right: 60,
-    bottom: 8,
-    padding: 6,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    borderRadius: 8,
-  },
-  card: {
-    borderRadius: 4,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#0F172A",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 2,
-    overflow: "hidden",
-  },
-  cardBackPattern: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 3,
-    borderColor: "#C4B5FD",
-    borderRadius: 4,
-  },
-  cardRank: { fontWeight: "900", position: "absolute", top: 2, left: 3 },
-  cardSuit: { fontWeight: "900" },
-  fabChat: {
-    position: "absolute",
-    right: 12,
-    bottom: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 4,
+  startBtnText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   timerBar: {
     position: "absolute",
-    top: 52,
-    left: "20%",
-    right: "20%",
+    top: 58,
+    left: "25%",
+    right: "25%",
     height: 18,
     borderRadius: 9,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     overflow: "hidden",
-    zIndex: 5,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.3)",
   },
-  timerFill: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 9,
-  },
+  timerFill: { ...StyleSheet.absoluteFillObject },
   timerText: {
     color: "#0F172A",
-    fontWeight: "800",
+    fontWeight: "900",
     fontSize: 11,
     textAlign: "center",
     lineHeight: 18,
     zIndex: 1,
   },
+  tableWrap: { flex: 1, marginTop: 40, marginBottom: 90 },
+  centerCombo: {
+    alignItems: "center",
+    gap: 6,
+  },
+  centerComboLabel: {
+    color: "#FBBF24",
+    fontWeight: "900",
+    fontSize: 11,
+    letterSpacing: 1,
+    textShadowColor: "#000",
+    textShadowRadius: 2,
+  },
+  centerHint: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 11,
+    fontStyle: "italic",
+  },
+  handStripWrap: {
+    position: "absolute",
+    left: 60,
+    right: 90,
+    bottom: 6,
+    paddingVertical: 6,
+  },
   actionBar: {
     position: "absolute",
-    top: 60,
-    right: 12,
+    top: 90,
+    right: 70,
     flexDirection: "column",
-    gap: 6,
+    gap: 8,
     zIndex: 20,
   },
   actionBtn: {
-    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
-    minWidth: 120,
-    alignItems: "center",
+    minWidth: 130,
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
   },
   actionBtnText: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 13,
+    fontSize: 12,
+  },
+  passBadge: {
+    marginTop: 2,
+    backgroundColor: "#64748B",
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  passBadgeText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 9,
+    letterSpacing: 0.5,
+  },
+  finishedBadge: {
+    marginTop: 2,
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  finishedBadgeText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 12,
   },
   showdownBox: {
     position: "absolute",
-    top: "20%",
-    left: "20%",
-    right: "20%",
+    top: "18%",
+    left: "22%",
+    right: "22%",
     padding: 16,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: "#FBBF24",
     zIndex: 30,
-    alignItems: "center",
   },
   showdownTitle: {
     color: "#FBBF24",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: "center",
   },
   showdownRow: {
-    color: "#fff",
-    fontSize: 13,
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 4,
+    paddingHorizontal: 8,
+  },
+  showdownName: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  showdownAmt: { fontSize: 12, fontWeight: "900" },
+  newHandBtn: {
+    marginTop: 12,
+    backgroundColor: "#7C3AED",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  newHandBtnText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  rightBtnStack: {
+    position: "absolute",
+    right: 12,
+    top: 100,
+    flexDirection: "column",
+    gap: 8,
+    zIndex: 15,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     alignItems: "center",
   },
   chatBox: {
     backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 12,
-    width: "80%",
-    maxWidth: 400,
+    borderRadius: 14,
+    width: "70%",
+    maxWidth: 420,
   },
-  chatTitle: { fontSize: 15, fontWeight: "800", marginBottom: 8 },
+  chatTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 8,
+    color: "#0F172A",
+  },
+  chatMsg: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 4,
+    flexWrap: "wrap",
+  },
+  chatMsgName: { fontWeight: "800", color: "#0F172A" },
+  chatMsgText: { color: "#334155", flex: 1 },
   chatInput: {
     flex: 1,
     backgroundColor: "#F1F5F9",
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  chatSendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
