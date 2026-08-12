@@ -303,13 +303,20 @@ export default function PhomRoomScreen() {
       {/* Felt table */}
       <View style={styles.tableWrap}>
         <FeltOval>
-          {/* Center — nọc (deck stack) */}
+          {/* Center — nọc (deck stack) với badge số */}
           <View style={styles.centerDeck}>
             <View style={styles.deckStack}>
-              <CardPro card={null} hidden size={44} />
-              <Text style={styles.deckCount}>
-                {(room as any).deckCount || 0}
-              </Text>
+              <View style={{ position: "absolute", top: 4, left: 4 }}>
+                <CardPro card={null} hidden size={54} />
+              </View>
+              <View style={{ position: "absolute", top: 0, left: 0 }}>
+                <CardPro card={null} hidden size={54} />
+              </View>
+              <View style={styles.deckBadge}>
+                <Text style={styles.deckBadgeText}>
+                  {(room as any).deckCount || 0}
+                </Text>
+              </View>
             </View>
           </View>
         </FeltOval>
@@ -448,43 +455,79 @@ export default function PhomRoomScreen() {
         </View>
       )}
 
-      {/* Action bar — điều kiện chỉ dựa vào số lá trong tay. */}
-      {isMyTurn && (
+      {/* Action bar: Bốc thẻ / Ăn+Hạ hiển thị bên phải; Đánh nằm inline gần hand. */}
+      {isMyTurn && mySeat.cards?.length < 10 && (
         <View style={styles.actionBar}>
-          {mySeat.cards?.length < 10 ? (
-            <>
-              <ActionBtn
-                label="Bốc thẻ"
-                icon="download-outline"
-                color="#3B82F6"
-                onPress={() => doAction("draw_deck")}
-                disabled={acting}
-              />
-              {selectedCards.length >= 3 && (
-                <ActionBtn
-                  label={`Ăn+Hạ (${selectedCards.length})`}
-                  icon="hand-left-outline"
-                  color="#F59E0B"
-                  onPress={() =>
-                    doAction("draw_discard", { meldCards: selectedCards })
-                  }
-                  disabled={acting}
-                />
-              )}
-            </>
-          ) : (
-            selectedCards.length === 1 && (
-              <ActionBtn
-                label={`Đánh ${selectedCards[0]}`}
-                icon="arrow-forward-circle"
-                color="#DC2626"
-                onPress={() =>
-                  doAction("discard", { card: selectedCards[0] })
-                }
-                disabled={acting}
-              />
-            )
+          <ActionBtn
+            label="Bốc thẻ"
+            icon="download-outline"
+            color="#3B82F6"
+            onPress={() => doAction("draw_deck")}
+            disabled={acting}
+          />
+          {selectedCards.length >= 3 && (
+            <ActionBtn
+              label={`Ăn+Hạ (${selectedCards.length})`}
+              icon="hand-left-outline"
+              color="#F59E0B"
+              onPress={() =>
+                doAction("draw_discard", { meldCards: selectedCards })
+              }
+              disabled={acting}
+            />
           )}
+        </View>
+      )}
+      {/* Nút Đánh pill nằm inline dưới bàn khi có 10 lá + chọn 1 */}
+      {isMyTurn && mySeat.cards?.length === 10 && selectedCards.length === 1 && (
+        <Pressable
+          onPress={() => doAction("discard", { card: selectedCards[0] })}
+          disabled={acting}
+          style={[styles.dánhPill, acting && { opacity: 0.5 }]}
+        >
+          <Text style={styles.dánhPillText}>Đánh</Text>
+        </Pressable>
+      )}
+      {/* Downing phase: 3 buttons */}
+      {room.stage === "downing" && mySeat && !mySeat.hasFinishedDowning && (
+        <View style={styles.downingBar}>
+          <Pressable
+            onPress={() => doAction("down_manual", { melds: [selectedCards] })}
+            disabled={acting || selectedCards.length < 3}
+            style={[
+              styles.downBtn,
+              { backgroundColor: "#3B82F6" },
+              (acting || selectedCards.length < 3) && { opacity: 0.4 },
+            ]}
+          >
+            <Text style={styles.downBtnText}>Hạ phỏm</Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              Alert.alert("Gửi bài", "Chọn 1 lá + tap vào phỏm người khác — tính năng đang hoàn thiện, hiện tại chỉ dùng Hạ tự động.")
+            }
+            style={[styles.downBtn, { backgroundColor: "#10B981" }]}
+          >
+            <Text style={styles.downBtnText}>Gửi bài</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => doAction("down_auto")}
+            disabled={acting}
+            style={[
+              styles.downBtn,
+              { backgroundColor: "#F59E0B" },
+              acting && { opacity: 0.4 },
+            ]}
+          >
+            <Text style={styles.downBtnText}>Hạ tự động</Text>
+          </Pressable>
+        </View>
+      )}
+      {room.stage === "downing" && mySeat?.hasFinishedDowning && (
+        <View style={styles.downingHint}>
+          <Text style={styles.downingHintText}>
+            ✓ Đã hạ. Chờ người khác…
+          </Text>
         </View>
       )}
 
@@ -718,6 +761,33 @@ const styles = StyleSheet.create({
   },
   deckStack: {
     position: "relative",
+    width: 60,
+    height: 82,
+  },
+  deckBadge: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -18 }, { translateY: -14 }],
+    minWidth: 36,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F59E0B",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    paddingHorizontal: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  deckBadgeText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 14,
   },
   deckCount: {
     position: "absolute",
@@ -742,6 +812,75 @@ const styles = StyleSheet.create({
     right: 90,
     bottom: 6,
     paddingVertical: 6,
+  },
+  dánhPill: {
+    position: "absolute",
+    bottom: 88,
+    alignSelf: "center",
+    paddingHorizontal: 42,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: "#F59E0B",
+    zIndex: 25,
+    borderWidth: 2,
+    borderColor: "#FBBF24",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  dánhPillText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+  downingBar: {
+    position: "absolute",
+    top: "38%",
+    left: "20%",
+    right: "20%",
+    flexDirection: "column",
+    gap: 10,
+    alignItems: "center",
+    zIndex: 25,
+  },
+  downBtn: {
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 999,
+    minWidth: 160,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  downBtnText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  downingHint: {
+    position: "absolute",
+    top: "38%",
+    left: "25%",
+    right: "25%",
+    padding: 10,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 10,
+    zIndex: 25,
+    alignItems: "center",
+  },
+  downingHintText: {
+    color: "#FBBF24",
+    fontWeight: "800",
+    fontSize: 13,
   },
   actionBar: {
     position: "absolute",
