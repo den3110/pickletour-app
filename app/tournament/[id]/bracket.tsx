@@ -58,6 +58,12 @@ import { useSocketRoomSet } from "@/hooks/useSocketRoomSet";
 import Ripple from "react-native-material-ripple";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLabels";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import ModernKnockoutBracketRN from "@/components/bracket/ModernKnockoutBracketRN";
+import ModernRoundElimBracketRN from "@/components/bracket/ModernRoundElimBracketRN";
+import { ModernBracketToggle } from "@/components/bracket/ModernBracketShared";
+
+const BRACKET_UI_VERSION_KEY = "pickletour:tournament-bracket:uiVersion";
 
 /* ---------- Theme tokens (giống DashboardScreen) ---------- */
 function useTokens() {
@@ -3646,6 +3652,33 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const [selectedGroupKeys, setSelectedGroupKeys] = useState(new Set());
   const [onlyMyGroups, setOnlyMyGroups] = useState(false);
 
+  // 🆕 v4 modern bracket UI gate — persist qua AsyncStorage
+  const [bracketUiVersion, setBracketUiVersion] = useState<"v1" | "v4">("v1");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(BRACKET_UI_VERSION_KEY);
+        if (mounted && (v === "v4" || v === "v1")) {
+          setBracketUiVersion(v);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const toggleBracketUi = useCallback(() => {
+    setBracketUiVersion((prev) => {
+      const next = prev === "v4" ? "v1" : "v4";
+      AsyncStorage.setItem(BRACKET_UI_VERSION_KEY, next).catch(() => {});
+      return next;
+    });
+  }, []);
+  const isBracketV4 = bracketUiVersion === "v4";
+
   const tourId =
     tourIdProp ||
     route?.params?.id ||
@@ -5075,15 +5108,33 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
       resolveSideLabel
     );
     return (
-      <BracketColumns
-        rounds={reRounds}
-        onOpenMatch={openMatch}
-        championMatchId={null}
-        focusRegId={focusRegId}
-        setFocusRegId={setFocusRegId}
-        onOpenVideo={openVideoFor}
-        t={t}
-      />
+      <View>
+        <ModernBracketToggle
+          isV4={isBracketV4}
+          onToggle={toggleBracketUi}
+          t={t}
+        />
+        {isBracketV4 ? (
+          <ModernRoundElimBracketRN
+            rounds={reRounds}
+            onOpenMatch={openMatch}
+            championMatchId={null}
+            resolveSideLabel={resolveSideLabel}
+            baseRoundStart={1}
+            isDark={t.dark}
+          />
+        ) : (
+          <BracketColumns
+            rounds={reRounds}
+            onOpenMatch={openMatch}
+            championMatchId={null}
+            focusRegId={focusRegId}
+            setFocusRegId={setFocusRegId}
+            onOpenVideo={openVideoFor}
+            t={t}
+          />
+        )}
+      </View>
     );
   };
 
@@ -5144,15 +5195,32 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           <ChampionCelebrationBanner championName={currentChampionName} t={t} />
         )}
 
-        <SymmetricKnockoutColumns
-          rounds={roundsToRender}
-          onOpenMatch={openMatch}
-          championMatchId={finalMatchId}
-          focusRegId={focusRegId}
-          setFocusRegId={setFocusRegId}
-          onOpenVideo={openVideoFor}
+        <ModernBracketToggle
+          isV4={isBracketV4}
+          onToggle={toggleBracketUi}
           t={t}
         />
+
+        {isBracketV4 ? (
+          <ModernKnockoutBracketRN
+            rounds={roundsToRender}
+            onOpenMatch={openMatch}
+            championMatchId={finalMatchId}
+            resolveSideLabel={resolveSideLabel}
+            baseRoundStart={1}
+            isDark={t.dark}
+          />
+        ) : (
+          <SymmetricKnockoutColumns
+            rounds={roundsToRender}
+            onOpenMatch={openMatch}
+            championMatchId={finalMatchId}
+            focusRegId={focusRegId}
+            setFocusRegId={setFocusRegId}
+            onOpenVideo={openVideoFor}
+            t={t}
+          />
+        )}
         {currentMatches.length === 0 && prefillRounds && (
           <Text style={[styles.note, { color: t.subtext }]}>
             * Đang hiển thị khung <Text style={styles.bold}>prefill</Text>
