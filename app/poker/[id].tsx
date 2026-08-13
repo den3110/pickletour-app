@@ -470,7 +470,6 @@ function Seat({
   floatEmoji,
   bubble,
   onSit,
-  betOffset,
 }: {
   seat: any;
   isDealer: boolean;
@@ -481,7 +480,6 @@ function Seat({
   floatEmoji?: string;
   bubble?: string;
   onSit?: () => void;
-  betOffset?: { dx: number; dy: number };
 }) {
   if (!seat.user) {
     return (
@@ -600,57 +598,65 @@ function Seat({
         </View>
       )}
 
-      {/* Bet display — chip stack + số chip cược ở street này */}
-      {seat.betThisStreet > 0 && (
-        <View
-          style={[
-            styles.betDisplay,
-            betOffset
-              ? {
-                  bottom: undefined,
-                  left: SEAT_W / 2 - 22 + betOffset.dx,
-                  top: 44 + betOffset.dy,
-                }
-              : null,
-          ]}
-        >
-          <View style={styles.chipStack}>
-            {Array.from({
-              length: Math.min(
-                4,
-                Math.max(
-                  1,
-                  Math.round(Math.log2(seat.betThisStreet / 5 + 1)),
-                ),
-              ),
-            }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.chipIcon,
-                  {
-                    marginTop: i === 0 ? 0 : -12,
-                    zIndex: i,
-                    backgroundColor:
-                      i === 3
-                        ? "#DC2626"
-                        : i === 2
-                          ? "#8B5CF6"
-                          : i === 1
-                            ? "#10B981"
-                            : "#FCD34D",
-                  },
-                ]}
-              >
-                <View style={styles.chipIconInner} />
-              </View>
-            ))}
+      {/* Bet chip stack đã được tách ra render riêng ở table level để không
+          che hole cards (hero) hoặc name/chips plate (non-hero). */}
+    </View>
+  );
+}
+
+/* Chip stack + amount cược của 1 seat — render ĐỘC LẬP absolutely trên table
+   (không nằm trong Seat container), position được compute bên ngoài để đảm
+   bảo luôn nằm giữa seat và tâm bàn, không đè cards/tên. */
+function BetChipStack({
+  value,
+  x,
+  y,
+}: {
+  value: number;
+  x: number;
+  y: number;
+}) {
+  if (!value || value <= 0) return null;
+  const stackCount = Math.min(
+    4,
+    Math.max(1, Math.round(Math.log2(value / 5 + 1))),
+  );
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: x - 22,
+        top: y - 18,
+        alignItems: "center",
+        zIndex: 4,
+      }}
+    >
+      <View style={styles.chipStack}>
+        {Array.from({ length: stackCount }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.chipIcon,
+              {
+                marginTop: i === 0 ? 0 : -12,
+                zIndex: i,
+                backgroundColor:
+                  i === 3
+                    ? "#DC2626"
+                    : i === 2
+                      ? "#8B5CF6"
+                      : i === 1
+                        ? "#10B981"
+                        : "#FCD34D",
+              },
+            ]}
+          >
+            <View style={styles.chipIconInner} />
           </View>
-          <Text style={styles.betDisplayText}>
-            {formatChips(seat.betThisStreet)}
-          </Text>
-        </View>
-      )}
+        ))}
+      </View>
+      <Text style={styles.betDisplayText}>{formatChips(value)}</Text>
     </View>
   );
 }
@@ -1156,15 +1162,6 @@ export default function PokerTableScreen() {
                   Math.max(f.y * tableSize.h - SEAT_H / 2, -10),
                   tableSize.h - SEAT_H + 14,
                 );
-                // Offset chip cược hướng về giữa bàn (pot).
-                const cx = 0.5 - f.x;
-                const cy = 0.5 - f.y;
-                const len = Math.sqrt(cx * cx + cy * cy) || 1;
-                const R = 58;
-                const betOffset = {
-                  dx: (cx / len) * R,
-                  dy: (cy / len) * R,
-                };
                 return (
                   <View
                     key={seat.seatIndex}
@@ -1217,9 +1214,41 @@ export default function PokerTableScreen() {
                           ? () => doSit(seat.seatIndex)
                           : undefined
                       }
-                      betOffset={betOffset}
                     />
                   </View>
+                );
+              })}
+
+            {/* Bet chip stacks — render TÁCH RIÊNG khỏi seat để không che
+                hole cards (hero) hoặc name/chips plate (non-hero). Chip đặt
+                giữa seat và tâm bàn, luôn nằm ngoài bounding box seat. */}
+            {tableSize.w > 0 &&
+              (room.seats || []).map((seat: any) => {
+                if (!seat?.betThisStreet || seat.betThisStreet <= 0) return null;
+                const posIdx =
+                  (seat.seatIndex - heroIndex + nSeats) % nSeats;
+                const f = fractions[posIdx] || { x: 0.5, y: 0.5 };
+                const seatCenterX = f.x * tableSize.w;
+                const seatCenterY = f.y * tableSize.h;
+                // Vector từ seat về tâm bàn, normalize
+                const cx = 0.5 - f.x;
+                const cy = 0.5 - f.y;
+                const len = Math.sqrt(cx * cx + cy * cy) || 1;
+                // Đẩy chip đủ xa để nằm NGOÀI seat bounding box
+                // (SEAT_W/2, SEAT_H/2 → cạnh seat) + margin an toàn.
+                const pushX = (Math.abs(cx / len) * SEAT_W) / 2 + 16;
+                const pushY = (Math.abs(cy / len) * SEAT_H) / 2 + 16;
+                const chipX =
+                  seatCenterX + (cx / len) * Math.max(pushX, pushY);
+                const chipY =
+                  seatCenterY + (cy / len) * Math.max(pushX, pushY);
+                return (
+                  <BetChipStack
+                    key={`bet-${seat.seatIndex}`}
+                    value={seat.betThisStreet}
+                    x={chipX}
+                    y={chipY}
+                  />
                 );
               })}
 
