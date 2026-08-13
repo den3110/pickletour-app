@@ -1543,10 +1543,13 @@ export default function TournamentRegistrationScreen() {
 
   const isManager = useMemo(() => {
     if (!isLoggedIn || !tour) return false;
-    if (String(tour?.createdBy) === String(me?._id)) return true;
-    return tour?.managers?.some(
-      (m: any) => String(m?.user ?? m) === String(me._id)
-    );
+    const my = String(me?._id);
+    const createdById = String(tour?.createdBy?._id ?? tour?.createdBy ?? "");
+    if (createdById && createdById === my) return true;
+    return tour?.managers?.some((m: any) => {
+      const uid = m?.user?._id ?? m?.user ?? m?._id ?? m;
+      return String(uid) === my;
+    });
   }, [isLoggedIn, me, tour]);
   const isAdmin = !!(me?.isAdmin || me?.role === "admin");
   const canManage = isLoggedIn && (isManager || isAdmin);
