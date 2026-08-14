@@ -934,6 +934,7 @@ const RegItem = memo(function RegItem({
   onOpenComplaint,
   onOpenPayment,
   onOpenPoster,
+  onDemoteToWaitlist,
   busy,
   posterBusyId,
 }: any) {
@@ -1277,6 +1278,42 @@ const RegItem = memo(function RegItem({
             </TouchableOpacity>
           )}
 
+          {canManage && onDemoteToWaitlist && (
+            <TouchableOpacity
+              onPress={() => onDemoteToWaitlist(r)}
+              disabled={busy?.demotingId === r._id}
+              style={styles.iconActionTouch}
+            >
+              <RegisterGlassSurface
+                C={C}
+                interactive={busy?.demotingId !== r._id}
+                tintColor={
+                  C.scheme === "dark"
+                    ? "rgba(217,119,6,0.22)"
+                    : "rgba(217,119,6,0.16)"
+                }
+                style={[
+                  styles.iconActionTile,
+                  { backgroundColor: C.warningBg || "rgba(217,119,6,0.12)" },
+                  IOS_26_LIQUID_GLASS_ENABLED && styles.actionGlassTile,
+                ]}
+              >
+                {busy?.demotingId === r._id ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={C.warningText || "#b45309"}
+                  />
+                ) : (
+                  <Ionicons
+                    name="hourglass-outline"
+                    size={16}
+                    color={C.warningText || "#b45309"}
+                  />
+                )}
+              </RegisterGlassSurface>
+            </TouchableOpacity>
+          )}
+
           {(canManage || isOwner) && (
             <TouchableOpacity
               onPress={() => onCancel(r)}
@@ -1612,6 +1649,50 @@ export default function TournamentRegistrationScreen() {
       }
     },
     [managerSetRegStatus, refetchRegs],
+  );
+  // Chuyển cặp đang approved (chính thức) → waitlist (chờ duyệt). Backend
+  // tự giảm counter registered và auto-promote cặp waitlist cũ nhất lên.
+  const [demotingId, setDemotingId] = useState<string | null>(null);
+  const handleDemoteToWaitlist = useCallback(
+    (reg: any) => {
+      if (!reg?._id) return;
+      const label =
+        [reg?.player1?.fullName, reg?.player2?.fullName]
+          .filter(Boolean)
+          .join(" – ") || `cặp #${String(reg._id).slice(-6)}`;
+      Alert.alert(
+        "Chuyển về chờ duyệt?",
+        `"${label}" sẽ không còn tính vào chỉ tiêu ${
+          tour?.maxPairs ? `${tour.maxPairs}/${tour.maxPairs}` : "cặp"
+        }. Cặp chờ duyệt cũ nhất sẽ tự lên chính thức nếu còn slot.`,
+        [
+          { text: "Huỷ", style: "cancel" },
+          {
+            text: "Chuyển",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setDemotingId(reg._id);
+                await managerSetRegStatus({
+                  regId: reg._id,
+                  status: "waitlisted",
+                }).unwrap();
+                Alert.alert("Thành công", "Đã chuyển cặp về chờ duyệt");
+                refetchRegs();
+              } catch (err: any) {
+                Alert.alert(
+                  "Lỗi",
+                  err?.data?.message || "Chuyển waitlist không thành công",
+                );
+              } finally {
+                setDemotingId(null);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [managerSetRegStatus, refetchRegs, tour?.maxPairs],
   );
 
   const handleRefresh = useCallback(() => {
@@ -2807,7 +2888,8 @@ export default function TournamentRegistrationScreen() {
               onOpenComplaint={openComplaint}
               onOpenPayment={openPayment}
               onOpenPoster={openPoster}
-              busy={{ settingPayment, deletingId: cancelingId }}
+              onDemoteToWaitlist={handleDemoteToWaitlist}
+              busy={{ settingPayment, deletingId: cancelingId, demotingId }}
               posterBusyId={posterBusyId}
             />
           )}
@@ -2893,7 +2975,8 @@ export default function TournamentRegistrationScreen() {
               onOpenComplaint={openComplaint}
               onOpenPayment={openPayment}
               onOpenPoster={openPoster}
-              busy={{ settingPayment, deletingId: cancelingId }}
+              onDemoteToWaitlist={handleDemoteToWaitlist}
+              busy={{ settingPayment, deletingId: cancelingId, demotingId }}
               posterBusyId={posterBusyId}
             />
           )}
