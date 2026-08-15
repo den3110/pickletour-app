@@ -63,6 +63,9 @@ import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const NAME_MODE_STORAGE_KEY = "pickletour:manage:nameDisplayMode";
 import {
   getMatchCourtStationName,
   getMatchDisplayCode,
@@ -280,10 +283,24 @@ const TYPE_LABEL = (t) => {
   if (key === "gsl") return "GSL";
   return t || "Khác";
 };
-const personNickname = (p) =>
-  p?.nickName || p?.nickname || p?.displayName || p?.fullName || p?.name || "—";
+// mode: "nickname" (mặc định) hoặc "fullName". Khi fullName không có, fall
+// back sang nickname để tránh hiển thị "—".
+const personName = (p, mode = "nickname") => {
+  if (!p) return "—";
+  const nick =
+    p?.nickName ||
+    p?.nickname ||
+    p?.user?.nickname ||
+    p?.user?.nickName ||
+    "";
+  const full =
+    p?.fullName || p?.user?.fullName || p?.name || p?.user?.name || "";
+  if (mode === "fullName") return full || nick || p?.displayName || "—";
+  return nick || full || p?.displayName || "—";
+};
+const personNickname = (p) => personName(p, "nickname");
 const playerName = personNickname;
-const pairLabel = (pair) => {
+const pairLabel = (pair, mode = "nickname") => {
   if (!pair) return "—";
   if (pair.name) return pair.name;
   const ps = [
@@ -293,7 +310,7 @@ const pairLabel = (pair) => {
   ]
     .filter(Boolean)
     .slice(0, 2)
-    .map(playerName);
+    .map((p) => personName(p, mode));
   return ps.join(" / ") || "—";
 };
 const hasResolvedPair = (pair) =>
@@ -1721,6 +1738,35 @@ export default function ManageScreen() {
   const rafRef = useRef(null);
   const [liveBump, setLiveBump] = useState(0);
 
+  // Display mode tên VĐV — mặc định "nickname", user chọn "fullName" để
+  // xem họ và tên đầy đủ. Persist AsyncStorage per-user (áp dụng cho mọi
+  // giải khi vào trang Quản lý).
+  const [nameMode, setNameMode] = useState<"nickname" | "fullName">("nickname");
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(NAME_MODE_STORAGE_KEY)
+      .then((v) => {
+        if (!mounted) return;
+        if (v === "fullName" || v === "nickname") setNameMode(v);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const changeNameMode = useCallback((next: "nickname" | "fullName") => {
+    setNameMode(next);
+    AsyncStorage.setItem(NAME_MODE_STORAGE_KEY, next).catch(() => {});
+  }, []);
+  const nameOfPlayer = useCallback(
+    (p: any) => personName(p, nameMode),
+    [nameMode],
+  );
+  const labelOfPair = useCallback(
+    (pair: any) => pairLabel(pair, nameMode),
+    [nameMode],
+  );
+
   const {
     data: tour,
     isLoading: tourLoading,
@@ -2193,7 +2239,7 @@ export default function ManageScreen() {
     const resolveName = (match, side, depth = 0) => {
       if (!match || depth > 12) return "";
       const pair = side === "A" ? match.pairA : match.pairB;
-      if (hasResolvedPair(pair)) return pairLabel(pair);
+      if (hasResolvedPair(pair)) return labelOfPair(pair);
 
       const rawSeed = side === "A" ? match.seedA : match.seedB;
       const plannedSeed = getPlannedSeed(match, side);
@@ -2241,7 +2287,7 @@ export default function ManageScreen() {
               : "B";
           const sourcePair =
             sourceSide === "A" ? source.pairA : source.pairB;
-          if (hasResolvedPair(sourcePair)) return pairLabel(sourcePair);
+          if (hasResolvedPair(sourcePair)) return labelOfPair(sourcePair);
           const carried = resolveName(source, sourceSide, depth + 1);
           if (isUseful(carried)) return carried;
         }
@@ -3776,6 +3822,20 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                 styles.glassMenuCard,
               ]}
             >
+              <MenuItem
+                icon="person"
+                label={
+                  nameMode === "fullName"
+                    ? "Tên: Họ và tên  →  Đổi Biệt danh"
+                    : "Tên: Biệt danh  →  Đổi Họ và tên"
+                }
+                onPress={() => {
+                  changeNameMode(
+                    nameMode === "fullName" ? "nickname" : "fullName",
+                  );
+                  setHdrMenuOpen(false);
+                }}
+              />
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
