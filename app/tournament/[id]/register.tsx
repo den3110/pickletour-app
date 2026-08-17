@@ -1573,8 +1573,21 @@ export default function TournamentRegistrationScreen() {
   const isDoubles = evType === "double";
   const cap = getScoreCap(tour, isSingles);
   const delta = getMaxDelta(tour);
-  const regTotal = regs?.length ?? 0;
-  const paidCount = regs.filter(
+  // Tách approved (chính thức) vs waitlisted (chờ duyệt) — dùng cho stats + list.
+  const approvedRegs = useMemo(
+    () =>
+      (regs || []).filter(
+        (r: any) => !r.status || r.status === "approved",
+      ),
+    [regs],
+  );
+  const waitlistedRegs = useMemo(
+    () => (regs || []).filter((r: any) => r.status === "waitlisted"),
+    [regs],
+  );
+  // Chỉ tính cặp chính thức (approved), KHÔNG gộp waitlist — khớp bản web.
+  const regTotal = approvedRegs.length;
+  const paidCount = approvedRegs.filter(
     (r: any) => r?.payment?.status === "Paid"
   ).length;
 
@@ -1607,19 +1620,6 @@ export default function TournamentRegistrationScreen() {
       (it: any) => String(it?.tournament?._id || it?.tournament) === String(id)
     );
   }, [myInvites, id, isLoggedIn]);
-
-  // Tách approved (chính thức) vs waitlisted (chờ duyệt)
-  const approvedRegs = useMemo(
-    () =>
-      (regs || []).filter(
-        (r: any) => !r.status || r.status === "approved",
-      ),
-    [regs],
-  );
-  const waitlistedRegs = useMemo(
-    () => (regs || []).filter((r: any) => r.status === "waitlisted"),
-    [regs],
-  );
 
   const filteredRegs = useMemo(() => {
     if (!searchQ.trim()) return approvedRegs;
