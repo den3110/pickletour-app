@@ -870,6 +870,18 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             />
             <Text style={styles.statusTextOverlay}>{statusMeta.label}</Text>
           </AppleLiquidGlassView>
+
+          {/* Format badge: MLP / TEAM — góc trên phải, khớp web */}
+          {String((tt as any)?.tournamentMode || "").toLowerCase() === "mlp" && (
+            <View style={styles.formatBadgeMlp}>
+              <Text style={styles.formatBadgeText}>🏆 MLP</Text>
+            </View>
+          )}
+          {String((tt as any)?.tournamentMode || "").toLowerCase() === "team" && (
+            <View style={styles.formatBadgeTeam}>
+              <Text style={styles.formatBadgeText}>👥 TEAM</Text>
+            </View>
+          )}
         </View>
 
         <View style={{ padding: 14 }}>
@@ -1359,6 +1371,44 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "700",
+  },
+  formatBadgeMlp: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#f59e0b",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  formatBadgeTeam: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#6366f1",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  formatBadgeText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   cardTitle: {
     fontSize: 19,
