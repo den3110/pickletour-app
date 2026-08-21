@@ -30,6 +30,7 @@ import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAdminPatchMatchMutation } from "@/slices/matchesApiSlice";
+import AdminMatchTools from "@/components/match/AdminMatchTools";
 import PublicProfileDialog from "../PublicProfileDialog";
 import RefereeJudgePanel from "./RefereeScorePanel.native";
 import {
@@ -1958,6 +1959,7 @@ const AdminToolbar = memo(
     onExitEdit,
     onSetStatus,
     onSetWinner,
+    extraTools,
   }) => {
     const T = useThemeTokens();
     const confirmWinner = useCallback(
@@ -2080,6 +2082,8 @@ const AdminToolbar = memo(
               />
             </View>
           </View>
+
+          {extraTools}
         </View>
       </View>
     );
@@ -4170,6 +4174,16 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
             onExitEdit={exitEdit}
             onSetStatus={handleSetStatus}
             onSetWinner={handleSetWinner}
+            extraTools={
+              <AdminMatchTools
+                tournamentId={tournamentId ? String(tournamentId) : null}
+                matchId={lockedId ? String(lockedId) : null}
+                match={merged}
+                isSingle={isSingle}
+                isAdmin={isAdmin}
+                onSaved={onSaved}
+              />
+            }
           />
         )}
 
