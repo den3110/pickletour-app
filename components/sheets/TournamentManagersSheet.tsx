@@ -12,7 +12,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
-} from "@gorhom/bottom-sheet";
+} from "@/components/sheets/rnModalSheet";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
 

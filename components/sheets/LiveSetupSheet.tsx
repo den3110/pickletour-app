@@ -21,7 +21,7 @@ import {
   BottomSheetBackdrop,
   BottomSheetFlatList,
   BottomSheetModal,
-} from "@gorhom/bottom-sheet";
+} from "@/components/sheets/rnModalSheet";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";

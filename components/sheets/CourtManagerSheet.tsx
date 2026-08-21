@@ -22,7 +22,7 @@ import {
   BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetScrollView,
-} from "@gorhom/bottom-sheet";
+} from "@/components/sheets/rnModalSheet";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { MaterialIcons } from "@expo/vector-icons";
 import DragList from "react-native-draglist";
