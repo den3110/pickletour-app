@@ -61,6 +61,7 @@ import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLab
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ModernKnockoutBracketRN from "@/components/bracket/ModernKnockoutBracketRN";
 import ModernRoundElimBracketRN from "@/components/bracket/ModernRoundElimBracketRN";
+import ModernGroupStageRN from "@/components/bracket/ModernGroupStageRN";
 import { ModernBracketToggle } from "@/components/bracket/ModernBracketShared";
 
 const BRACKET_UI_VERSION_KEY = "pickletour:tournament-bracket:uiVersion";
@@ -4868,6 +4869,99 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
         return mb - ma || ia - ib;
       });
 
+    // 🆕 v4 modern group stage — build payload từ CÙNG computation, chỉ đổi layer render
+    if (isBracketV4) {
+      const payload = visibleGroups.map((g) => {
+        const gi = groups.indexOf(g);
+        const key = String(g.name || g.code || g._id || String(gi + 1));
+        const labelNumeric = gi + 1;
+        const size = sizeOf(g);
+        const startIdx = starts.get(key) || 1;
+        const realMatches = currentMatches
+          .filter((m) => matchGroupLabel(m) === key)
+          .sort(
+            (a, b) =>
+              (a.round || 1) - (b.round || 1) || (a.order || 0) - (b.order || 0)
+          );
+        let matchRows: any[] = [];
+        if (realMatches.length) {
+          matchRows = realMatches.map((m, idx) => ({
+            _id: String(m._id),
+            code: groupCodeOf(m, `V${stageNo}-B${labelNumeric}-T${idx + 1}`),
+            aName: resolveSideLabel(m, "A"),
+            bName: resolveSideLabel(m, "B"),
+            time: formatTime(pickGroupKickoffTime(m)),
+            court: courtName(m),
+            score: scoreLabel(m),
+            match: m,
+          }));
+        } else if (size > 1) {
+          matchRows = buildGroupPlaceholderMatches({
+            stageNo,
+            groupIndexOneBased: labelNumeric,
+            groupKey: key,
+            teamStartIndex: startIdx,
+            teamCount: size,
+          });
+        }
+        const gStand = (sData.groups || []).find(
+          (x) => String(x.key) === String(key)
+        );
+        const standingRows = (gStand?.rows || []).map(
+          (row: any, idx: number) => ({
+            id: String(row.id || `row-${idx}`),
+            name: row.pair
+              ? safePairNick(row.pair, tour?.eventType, tour)
+              : row.name || "—",
+            pts: Number(row.pts ?? 0),
+            diff: Number.isFinite(row.pointDiff)
+              ? row.pointDiff
+              : row.setDiff ?? 0,
+            rank: row.rank || idx + 1,
+            isMine: myRegIds.has(String(row.id || "")),
+          })
+        );
+        return {
+          key,
+          labelNumeric,
+          codeLabel: g.name || g.code || "",
+          teamCount: size || 0,
+          isMine: !!groupMineMap.get(key),
+          pointsCfg: sData.points || { win: 3, draw: 1, loss: 0 },
+          matchRows,
+          standingRows,
+        };
+      });
+      return (
+        <View style={{ gap: 12 }}>
+          <View style={{ alignItems: "flex-start" }}>
+            <Ripple
+              onPress={openFilterSheet}
+              style={[
+                styles.sheetTriggerBtn,
+                {
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.card,
+                },
+              ]}
+              hitSlop={8}
+            >
+              <Text
+                style={[styles.sheetTriggerText, { color: t.colors.text }]}
+              >
+                🔎 Bộ lọc bảng
+              </Text>
+            </Ripple>
+          </View>
+          <ModernGroupStageRN
+            groups={payload}
+            isDark={!!t.dark}
+            onOpenMatch={openMatch}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={{ gap: 12 }}>
         <View style={{ alignItems: "flex-start" }}>
@@ -5380,6 +5474,11 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
                 <Text style={[styles.subTitle, { color: t.colors.text }]}>
                   Vòng bảng: {current.name}
                 </Text>
+                <ModernBracketToggle
+                  isV4={isBracketV4}
+                  onToggle={toggleBracketUi}
+                  t={t}
+                />
                 {renderLiveSpotlight()}
                 {renderGroupBlocks()}
               </Card>
