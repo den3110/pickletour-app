@@ -2684,6 +2684,30 @@ export default function ManageScreen() {
 
   const [refMgrOpen, setRefMgrOpen] = useState(false);
   const [managerMgrOpen, setManagerMgrOpen] = useState(false);
+  // ⚠️ iOS: mở BottomSheetModal (gorhom) cùng frame với việc đóng RN Modal
+  // (menu Chức năng) → native modal đang dismiss nuốt lệnh present() → sheet
+  // không hiện. Fix: giữ action chờ, chạy sau khi Modal dismiss xong
+  // (onDismiss trên iOS; Android không có onDismiss → fallback timeout).
+  const pendingMenuActionRef = useRef<null | (() => void)>(null);
+  const runAfterMenuClose = useCallback((fn: () => void) => {
+    pendingMenuActionRef.current = fn;
+    setHdrMenuOpen(false);
+    // Android không có onDismiss; iOS thêm fallback phòng onDismiss không bắn
+    // (transparent modal quirk). Guard bằng ref nên không chạy đôi.
+    setTimeout(
+      () => {
+        const f = pendingMenuActionRef.current;
+        pendingMenuActionRef.current = null;
+        f?.();
+      },
+      Platform.OS === "ios" ? 600 : 250,
+    );
+  }, []);
+  const flushPendingMenuAction = useCallback(() => {
+    const f = pendingMenuActionRef.current;
+    pendingMenuActionRef.current = null;
+    f?.();
+  }, []);
   const [assignCourtSheet, setAssignCourtSheet] = useState({
     open: false,
     match: null,
@@ -3800,6 +3824,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
             animationType="fade"
             statusBarTranslucent
             onRequestClose={() => setHdrMenuOpen(false)}
+            onDismiss={flushPendingMenuAction}
           >
             <Pressable
               style={styles.modalBackdrop}
@@ -3839,36 +3864,36 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
               <MenuItem
                 icon="how-to-reg"
                 label="Quản lý trọng tài"
-                onPress={() => {
-                  setHdrMenuOpen(false);
-                  setRefMgrOpen(true);
-                }}
+                onPress={() =>
+                  runAfterMenuClose(() => setRefMgrOpen(true))
+                }
               />
               {canManageManagers ? (
                 <MenuItem
                   icon="supervisor-account"
                   label="Quản lý người quản lý"
-                  onPress={() => {
-                    setHdrMenuOpen(false);
-                    setManagerMgrOpen(true);
-                  }}
+                  onPress={() =>
+                    runAfterMenuClose(() => setManagerMgrOpen(true))
+                  }
                 />
               ) : null}
               <MenuItem
                 icon="stadium"
                 label="Quản lý sân theo cụm"
-                onPress={() => {
-                  setHdrMenuOpen(false);
-                  setCourtMgrSheet({ open: true, bracket: null });
-                }}
+                onPress={() =>
+                  runAfterMenuClose(() =>
+                    setCourtMgrSheet({ open: true, bracket: null }),
+                  )
+                }
               />
               <MenuItem
                 icon="movie"
                 label="Thiết lập LIVE"
-                onPress={() => {
-                  setHdrMenuOpen(false);
-                  setLiveSetupSheet({ open: true, bracket: null });
-                }}
+                onPress={() =>
+                  runAfterMenuClose(() =>
+                    setLiveSetupSheet({ open: true, bracket: null }),
+                  )
+                }
               />
               <View style={{ height: 8 }} />
               <MenuItem
