@@ -60,7 +60,6 @@ import AssignRefSheet from "@/components/sheets/AssignRefSheet";
 import CourtManagerSheet from "@/components/sheets/CourtManagerSheet";
 import LiveSetupSheet from "@/components/sheets/LiveSetupSheet";
 import BatchAssignRefModal from "@/components/sheets/BatchAssignRefModal";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as IntentLauncher from "expo-intent-launcher";
 import FileViewerModal from "@/components/FileViewerModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -3490,7 +3489,12 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
   }
 
   return (
-    <BottomSheetModalProvider>
+    // ⚠️ KHÔNG bọc BottomSheetModalProvider ở đây — app/_layout.tsx đã có 1
+    // provider global bao toàn bộ Stack. Lồng 2 provider (gorhom v5) làm rối
+    // hàng đợi modal-stack → present() các sheet (Quản lý trọng tài / người
+    // quản lý / sân theo cụm / Thiết lập LIVE) không hiện. Console shell chỉ
+    // dùng provider global và chạy tốt — theo đúng pattern đó.
+    <>
       <Stack.Screen
         options={{
           title: `${tour?.name || ""}`,
@@ -4916,7 +4920,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
         matchId={viewer.matchId}
         onClose={closeMatch}
       />
-    </BottomSheetModalProvider>
+    </>
   );
 }
 
