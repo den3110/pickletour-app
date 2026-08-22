@@ -208,15 +208,17 @@ const FEATURES = [
     link: "/coaches",
     isNew: true,
   },
-  {
-    id: 18,
-    icon: "game-controller",
-    iconLib: "Ionicons",
-    title: "Games",
-    color: "#DC2626",
-    link: "/games",
-    isNew: true,
-  },
+  // Games tạm ẩn khỏi app (route /games và các game con vẫn còn trong bundle,
+  // chỉ gỡ lối vào ở màn Home). Bỏ comment để bật lại.
+  // {
+  //   id: 18,
+  //   icon: "game-controller",
+  //   iconLib: "Ionicons",
+  //   title: "Games",
+  //   color: "#DC2626",
+  //   link: "/games",
+  //   isNew: true,
+  // },
 ];
 
 /* ---------- Utils ---------- */
