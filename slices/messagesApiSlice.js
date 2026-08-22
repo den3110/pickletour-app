@@ -89,6 +89,13 @@ export const messagesApiSlice = apiSlice.injectEndpoints({
         body: { emoji },
       }),
     }),
+    pinMessage: builder.mutation({
+      query: ({ cid, messageId, pin }) => ({
+        url: `/api/chat/conversations/${cid}/pin`,
+        method: "POST",
+        body: { messageId, pin },
+      }),
+    }),
     uploadChatMedia: builder.mutation({
       query: (formData) => ({
         url: `/api/chat/upload`,
@@ -116,6 +123,7 @@ export const {
   useMarkReadMutation,
   useDeleteMessageMutation,
   useReactMessageMutation,
+  usePinMessageMutation,
   useUploadChatMediaMutation,
   useTypingMutation,
 } = messagesApiSlice;

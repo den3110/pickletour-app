@@ -31,6 +31,8 @@ import {
   useCreateFeedPostMutation,
   useReactFeedPostMutation,
   useShareFeedPostMutation,
+  useSaveFeedPostMutation,
+  useVoteFeedPollMutation,
   useUploadFeedMediaMutation,
   useDeleteFeedPostMutation,
   useReportFeedPostMutation,
@@ -267,6 +269,9 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [linkedTournament, setLinkedTournament] = useState<any>(null);
   const [tournamentPickerOpen, setTournamentPickerOpen] = useState(false);
+  const [pollDraft, setPollDraft] = useState<any>(null); // {question, options:[], multi}
+  const pollValid =
+    pollDraft && pollDraft.options.filter((o: string) => o.trim()).length >= 2;
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
   const [mentionResults, setMentionResults] = useState<any[]>([]);
@@ -402,7 +407,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   };
 
   const submit = async () => {
-    if (!content.trim() && !media.length) return;
+    if (!content.trim() && !media.length && !pollValid) return;
     // Không cho gửi khi còn media đang upload dở
     if (media.some((m: any) => m._temp)) {
       Alert.alert("Vui lòng chờ tải xong", "Có media đang được tải lên.");
@@ -418,11 +423,19 @@ function Composer({ onPosted }: { onPosted: () => void }) {
         media,
         linkedTournament: linkedTournament?._id || null,
         mentions: stillPresent,
+        poll: pollValid
+          ? {
+              question: pollDraft.question,
+              multi: pollDraft.multi,
+              options: pollDraft.options.filter((o: string) => o.trim()),
+            }
+          : undefined,
       } as any).unwrap();
       setContent("");
       setMedia([]);
       setLinkedTournament(null);
       setSelectedMentions([]);
+      setPollDraft(null);
       onPosted();
     } catch (err: any) {
       Alert.alert("Đăng thất bại", extractErr(err));
@@ -546,6 +559,123 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           })}
         </ScrollView>
       )}
+      {pollDraft && (
+        <View
+          style={{
+            marginTop: 8,
+            padding: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#E2E8F0",
+            backgroundColor: "#F8FAFC",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ fontWeight: "800", color: "#0F172A" }}>📊 Bình chọn</Text>
+            <Pressable onPress={() => setPollDraft(null)} hitSlop={8}>
+              <Ionicons name="close" size={18} color="#64748B" />
+            </Pressable>
+          </View>
+          <TextInput
+            placeholder="Câu hỏi (VD: Ai vô địch?)"
+            placeholderTextColor="#94A3B8"
+            value={pollDraft.question}
+            onChangeText={(t) => setPollDraft((p: any) => ({ ...p, question: t }))}
+            style={{
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              marginBottom: 8,
+              color: "#0F172A",
+              backgroundColor: "#fff",
+            }}
+          />
+          {pollDraft.options.map((opt: string, i: number) => (
+            <View
+              key={i}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}
+            >
+              <TextInput
+                placeholder={`Lựa chọn ${i + 1}`}
+                placeholderTextColor="#94A3B8"
+                value={opt}
+                onChangeText={(t) =>
+                  setPollDraft((p: any) => {
+                    const options = [...p.options];
+                    options[i] = t;
+                    return { ...p, options };
+                  })
+                }
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  color: "#0F172A",
+                  backgroundColor: "#fff",
+                }}
+              />
+              {pollDraft.options.length > 2 && (
+                <Pressable
+                  onPress={() =>
+                    setPollDraft((p: any) => ({
+                      ...p,
+                      options: p.options.filter((_: any, j: number) => j !== i),
+                    }))
+                  }
+                  hitSlop={8}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </Pressable>
+              )}
+            </View>
+          ))}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 }}>
+            {pollDraft.options.length < 10 && (
+              <Pressable
+                onPress={() =>
+                  setPollDraft((p: any) => ({ ...p, options: [...p.options, ""] }))
+                }
+              >
+                <Text style={{ color: "#0066FF", fontWeight: "700" }}>
+                  + Thêm lựa chọn
+                </Text>
+              </Pressable>
+            )}
+            <View style={{ flex: 1 }} />
+            <Pressable
+              onPress={() => setPollDraft((p: any) => ({ ...p, multi: !p.multi }))}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: pollDraft.multi ? "#0066FF" : "#E2E8F0",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: pollDraft.multi ? "#fff" : "#334155",
+                }}
+              >
+                Chọn nhiều: {pollDraft.multi ? "Bật" : "Tắt"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
       <View style={styles.composerActions}>
         <Pressable onPress={pickMedia} style={styles.iconBtn}>
           <Ionicons name="images-outline" size={22} color="#0066FF" />
@@ -560,11 +690,26 @@ function Composer({ onPosted }: { onPosted: () => void }) {
             Gắn giải
           </Text>
         </Pressable>
+        <Pressable
+          onPress={() =>
+            setPollDraft((p: any) =>
+              p ? p : { question: "", options: ["", ""], multi: false }
+            )
+          }
+          style={styles.iconBtn}
+        >
+          <Ionicons name="bar-chart-outline" size={22} color="#7C3AED" />
+          <Text style={[styles.iconBtnLabel, { color: "#7C3AED" }]}>
+            Bình chọn
+          </Text>
+        </Pressable>
         {(() => {
           const uploadingCount = media.filter((m: any) => m._temp).length;
           const isUploading = uploadingCount > 0;
           const disabled =
-            isLoading || isUploading || (!content.trim() && !media.length);
+            isLoading ||
+            isUploading ||
+            (!content.trim() && !media.length && !pollValid);
           return (
             <Pressable
               onPress={submit}
@@ -850,12 +995,192 @@ function PostMedia({
 const WEB_BASE_URL =
   process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://pickletour.vn";
 
+function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void }) {
+  const total = poll.totalVotes || 0;
+  const closed = poll.closesAt && new Date(poll.closesAt) < new Date();
+  return (
+    <View
+      style={{
+        marginTop: 10,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+        backgroundColor: "#F8FAFC",
+      }}
+    >
+      {!!poll.question && (
+        <Text style={{ fontWeight: "800", marginBottom: 8, color: "#0F172A" }}>
+          {poll.question}
+        </Text>
+      )}
+      {poll.options.map((o: any) => {
+        const pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
+        return (
+          <Pressable
+            key={o.id}
+            onPress={() => !closed && onVote(o.id)}
+            style={{
+              marginBottom: 6,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: o.voted ? "#0066FF" : "#E2E8F0",
+              overflow: "hidden",
+              backgroundColor: "#fff",
+            }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: `${pct}%`,
+                backgroundColor: o.voted ? "#DBEAFE" : "#EEF2F7",
+              }}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+              }}
+            >
+              <Text style={{ fontWeight: o.voted ? "800" : "500", color: "#0F172A" }}>
+                {o.voted ? "✓ " : ""}
+                {o.text}
+              </Text>
+              <Text style={{ fontWeight: "700", color: "#334155" }}>
+                {pct}% · {o.votes}
+              </Text>
+            </View>
+          </Pressable>
+        );
+      })}
+      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+        {total} lượt bình chọn{closed ? " · đã đóng" : ""}
+        {poll.multi ? " · chọn nhiều" : ""}
+      </Text>
+    </View>
+  );
+}
+
+function SharedMatchCardRN({ sm }: { sm: any }) {
+  const winA = sm.winner === "A";
+  const winB = sm.winner === "B";
+  return (
+    <Pressable
+      onPress={() => sm.matchId && router.push(`/match/${sm.matchId}` as any)}
+      style={{
+        marginTop: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          backgroundColor: "#0066FF",
+        }}
+      >
+        <Text>🏓</Text>
+        <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>
+          {sm.tournamentName || "Kết quả trận đấu"}
+          {sm.code ? ` · ${sm.code}` : ""}
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 12,
+          paddingVertical: 12,
+          gap: 8,
+        }}
+      >
+        <Text
+          style={{
+            flex: 1,
+            fontWeight: winA ? "800" : "500",
+            color: winA ? "#15803D" : "#0F172A",
+          }}
+        >
+          {sm.teamA || "Đội A"}
+        </Text>
+        <View
+          style={{
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            borderRadius: 10,
+            backgroundColor: "#E2E8F0",
+            alignItems: "center",
+            minWidth: 74,
+          }}
+        >
+          <Text style={{ fontWeight: "900", fontSize: 18, color: "#0F172A" }}>
+            {sm.scoreA} – {sm.scoreB}
+          </Text>
+          {(sm.setsA || sm.setsB) ? (
+            <Text style={{ fontSize: 11, color: "#64748B" }}>
+              Sets {sm.setsA}–{sm.setsB}
+            </Text>
+          ) : null}
+        </View>
+        <Text
+          style={{
+            flex: 1,
+            textAlign: "right",
+            fontWeight: winB ? "800" : "500",
+            color: winB ? "#15803D" : "#0F172A",
+          }}
+        >
+          {sm.teamB || "Đội B"}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
   const [deletePost] = useDeleteFeedPostMutation();
   const [reportPost] = useReportFeedPostMutation();
   const [blockUser] = useBlockUserMutation();
+  const [savePost] = useSaveFeedPostMutation();
+  const [votePoll] = useVoteFeedPollMutation();
+  const [saved, setSaved] = useState(!!post.saved);
+  const [poll, setPoll] = useState<any>(post.poll || null);
+  useEffect(() => setSaved(!!post.saved), [post.saved]);
+  useEffect(() => setPoll(post.poll || null), [post.poll]);
+  const toggleSave = async () => {
+    const next = !saved;
+    setSaved(next);
+    try {
+      await savePost({ id: post._id, save: next }).unwrap();
+    } catch {
+      setSaved(!next);
+    }
+  };
+  const doVote = async (optId: string) => {
+    if (!poll) return;
+    const optionIds = poll.multi
+      ? poll.options
+          .filter((o: any) => (o.id === optId ? !o.voted : o.voted))
+          .map((o: any) => o.id)
+      : [optId];
+    try {
+      const r: any = await votePoll({ id: post._id, optionIds }).unwrap();
+      if (r?.poll) setPoll(r.poll);
+    } catch {}
+  };
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -1002,6 +1327,8 @@ function PostCard({ post, me }: { post: any; me: any }) {
       {post.linkedTournament && (
         <TourFeedCard tour={post.linkedTournament} />
       )}
+      {post.sharedMatch && <SharedMatchCardRN sm={post.sharedMatch} />}
+      {poll && <PollBlockRN poll={poll} onVote={doVote} />}
       {post.media?.length > 0 && (
         <PostMedia
           media={post.media}
@@ -1051,6 +1378,21 @@ function PostCard({ post, me }: { post: any; me: any }) {
         <Pressable onPress={handleShare} style={styles.actionBtn}>
           <Ionicons name="share-social-outline" size={18} color="#64748B" />
           <Text style={styles.actionLabel}>Chia sẻ</Text>
+        </Pressable>
+        <Pressable onPress={toggleSave} style={styles.actionBtn}>
+          <Ionicons
+            name={saved ? "bookmark" : "bookmark-outline"}
+            size={18}
+            color={saved ? "#0066FF" : "#64748B"}
+          />
+          <Text
+            style={[
+              styles.actionLabel,
+              saved && { color: "#0066FF", fontWeight: "600" },
+            ]}
+          >
+            {saved ? "Đã lưu" : "Lưu"}
+          </Text>
         </Pressable>
       </View>
       {post.recentComments?.length > 0 && (

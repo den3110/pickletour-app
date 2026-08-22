@@ -4,6 +4,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
+import {
+  useAudioRecorder,
+  useAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from "expo-audio";
 import ImageView from "react-native-image-viewing";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -40,6 +47,7 @@ import {
   useUploadChatMediaMutation,
   useDeleteMessageMutation,
   useReactMessageMutation,
+  usePinMessageMutation,
   usePatchConversationMutation,
   messagesApiSlice,
 } from "@/slices/messagesApiSlice";
@@ -55,6 +63,64 @@ const _sameDay = (a: Date, b: Date) =>
   a.getDate() === b.getDate();
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+function AudioMessage({ url, durationSec, isMine }: { url: string; durationSec?: number; isMine: boolean }) {
+  const player = useAudioPlayer(url);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        const p: any = player;
+        // playing khi đang phát; tự reset khi hết
+        if (p?.playing === false && playing) setPlaying(false);
+      } catch {}
+    }, 400);
+    return () => clearInterval(id);
+  }, [player, playing]);
+  const toggle = () => {
+    try {
+      if (playing) {
+        player.pause();
+        setPlaying(false);
+      } else {
+        player.seekTo(0);
+        player.play();
+        setPlaying(true);
+      }
+    } catch {}
+  };
+  const secs = Number(durationSec) || 0;
+  return (
+    <Pressable
+      onPress={toggle}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: 4,
+        paddingRight: 8,
+        minWidth: 140,
+      }}
+    >
+      <Ionicons
+        name={playing ? "pause-circle" : "play-circle"}
+        size={30}
+        color={isMine ? "#fff" : "#0066FF"}
+      />
+      <View
+        style={{
+          flex: 1,
+          height: 3,
+          borderRadius: 2,
+          backgroundColor: isMine ? "rgba(255,255,255,0.5)" : "#CBD5E1",
+        }}
+      />
+      <Text style={{ fontSize: 12, color: isMine ? "#E5E7EB" : "#475569" }}>
+        {secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}` : "🎤"}
+      </Text>
+    </Pressable>
+  );
+}
 
 function replySnippet(rt: any): string {
   if (!rt) return "";
@@ -301,8 +367,86 @@ export default function ChatWindow() {
   const [markRead] = useMarkReadMutation();
   const [deleteMessage] = useDeleteMessageMutation();
   const [reactMessage] = useReactMessageMutation();
+  const [pinMessage] = usePinMessageMutation();
+  // Ghi âm tin nhắn thoại
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [recording, setRecording] = useState(false);
+  const [recSecs, setRecSecs] = useState(0);
+  const recTimerRef = useRef<any>(null);
+  const startRecording = async () => {
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Cần quyền micro", "Vui lòng cấp quyền micro để ghi âm.");
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      setRecording(true);
+      setRecSecs(0);
+      recTimerRef.current = setInterval(() => setRecSecs((s) => s + 1), 1000);
+    } catch (e: any) {
+      Alert.alert("Không ghi âm được", extractErr(e));
+    }
+  };
+  const cancelRecording = async () => {
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    setRecording(false);
+    try {
+      await audioRecorder.stop();
+    } catch {}
+  };
+  const stopAndSendRecording = async () => {
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    setRecording(false);
+    const secs = recSecs;
+    try {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      if (!uri || secs < 1) return;
+      const fd = new FormData();
+      fd.append("files", {
+        uri,
+        name: `voice_${Date.now()}.m4a`,
+        type: "audio/m4a",
+      } as any);
+      const r: any = await uploadMedia(fd).unwrap();
+      const att = (r.attachments || [])[0];
+      if (!att) return;
+      await sendMessage({
+        cid: cidStr,
+        content: "",
+        attachments: [{ ...att, durationSec: secs }],
+      } as any).unwrap();
+      flatRef.current?.scrollToOffset({ offset: 0, animated: true });
+    } catch (e: any) {
+      Alert.alert("Gửi tin thoại thất bại", extractErr(e));
+    }
+  };
   const [replyTarget, setReplyTarget] = useState<any>(null);
   const [actionMsg, setActionMsg] = useState<any>(null); // long-press action sheet
+  const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
+  useEffect(() => {
+    setPinnedMessages((conv as any)?.pinnedMessages || []);
+  }, [(conv as any)?.pinnedMessages]);
+  const pinnedIdSet = useMemo(
+    () => new Set(pinnedMessages.map((p) => String(p?._id || p))),
+    [pinnedMessages]
+  );
+  const handlePin = async (msg: any, pin: boolean) => {
+    setActionMsg(null);
+    try {
+      const r: any = await pinMessage({
+        cid: cidStr,
+        messageId: msg._id,
+        pin,
+      }).unwrap();
+      setPinnedMessages(r.pinnedMessages || []);
+    } catch (err: any) {
+      Alert.alert("Ghim thất bại", extractErr(err));
+    }
+  };
 
   const handleReact = async (mid: string, emoji: string) => {
     setActionMsg(null);
@@ -402,9 +546,14 @@ export default function ChatWindow() {
         )
       );
     };
+    const onPinned = (payload: any) => {
+      if (String(payload?.conversationId) !== cidStr) return;
+      setPinnedMessages(payload.pinnedMessages || []);
+    };
     socket.on("chat:message:new", onNew);
     socket.on("chat:message:deleted", onDeleted);
     socket.on("chat:message:reaction", onReaction);
+    socket.on("chat:pinned:updated", onPinned);
     return () => {
       try {
         socket.emit("chat:unsubscribe", { conversationId: cidStr });
@@ -413,6 +562,7 @@ export default function ChatWindow() {
       socket.off("chat:message:new", onNew);
       socket.off("chat:message:deleted", onDeleted);
       socket.off("chat:message:reaction", onReaction);
+      socket.off("chat:pinned:updated", onPinned);
     };
   }, [cid, cidStr, dispatch, markRead]);
 
@@ -634,6 +784,38 @@ export default function ChatWindow() {
         {isFetching && !items.length && (
           <ActivityIndicator style={{ marginTop: 20 }} />
         )}
+        {pinnedMessages.length > 0 && (
+          <View
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: "#E2E8F0",
+              backgroundColor: "#F8FAFC",
+            }}
+          >
+            {pinnedMessages.map((pm: any) => (
+              <View
+                key={pm._id}
+                style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 }}
+              >
+                <Ionicons name="pin" size={13} color="#F59E0B" />
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#475569" }}>
+                  {pm.sender?.nickname || pm.sender?.name || ""}:
+                </Text>
+                <Text
+                  style={{ fontSize: 12, color: "#64748B", flex: 1 }}
+                  numberOfLines={1}
+                >
+                  {replySnippet(pm)}
+                </Text>
+                <Pressable onPress={() => handlePin(pm, false)} hitSlop={8}>
+                  <Ionicons name="close" size={14} color="#94A3B8" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
         <FlatList
           ref={flatRef}
           data={items}
@@ -802,6 +984,12 @@ export default function ChatWindow() {
                               onPress={() =>
                                 a.url && setVideoModal({ url: a.url })
                               }
+                            />
+                          ) : a.type === "audio" ? (
+                            <AudioMessage
+                              url={a.url}
+                              durationSec={a.durationSec}
+                              isMine={isMine}
                             />
                           ) : (
                             <View style={styles.fileChip}>
@@ -1021,41 +1209,73 @@ export default function ChatWindow() {
               ))}
             </View>
           )}
-          <View style={styles.composerRow}>
-            <Pressable onPress={pickMedia} style={styles.iconBtn}>
-              <Ionicons name="image-outline" size={22} color="#0066FF" />
-            </Pressable>
-            <Pressable
-              onPress={() => setTournamentPickerOpen(true)}
-              style={styles.iconBtn}
-            >
-              <Ionicons name="trophy-outline" size={22} color="#F59E0B" />
-            </Pressable>
-            <TextInput
-              style={styles.input}
-              placeholder="Aa"
-              value={text}
-              onChangeText={onChangeText}
-              multiline
-              placeholderTextColor="#94A3B8"
-            />
-            <Pressable
-              onPress={submit}
-              disabled={
-                sending ||
-                (!text.trim() && !attachments.length && !linkedTournament)
-              }
+          {recording ? (
+            <View
               style={[
-                styles.sendBtn,
-                (sending ||
-                  (!text.trim() &&
-                    !attachments.length &&
-                    !linkedTournament)) && { opacity: 0.4 },
+                styles.composerRow,
+                { alignItems: "center", gap: 10 },
               ]}
             >
-              <Ionicons name="send" size={18} color="#fff" />
-            </Pressable>
-          </View>
+              <Pressable onPress={cancelRecording} hitSlop={8}>
+                <Ionicons name="trash-outline" size={24} color="#DC2626" />
+              </Pressable>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}
+              >
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: "#DC2626",
+                  }}
+                />
+                <Text style={{ color: "#0F172A", fontWeight: "700" }}>
+                  Đang ghi âm · {Math.floor(recSecs / 60)}:
+                  {String(recSecs % 60).padStart(2, "0")}
+                </Text>
+              </View>
+              <Pressable
+                onPress={stopAndSendRecording}
+                style={styles.sendBtn}
+              >
+                <Ionicons name="send" size={18} color="#fff" />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.composerRow}>
+              <Pressable onPress={pickMedia} style={styles.iconBtn}>
+                <Ionicons name="image-outline" size={22} color="#0066FF" />
+              </Pressable>
+              <Pressable
+                onPress={() => setTournamentPickerOpen(true)}
+                style={styles.iconBtn}
+              >
+                <Ionicons name="trophy-outline" size={22} color="#F59E0B" />
+              </Pressable>
+              <TextInput
+                style={styles.input}
+                placeholder="Aa"
+                value={text}
+                onChangeText={onChangeText}
+                multiline
+                placeholderTextColor="#94A3B8"
+              />
+              {!text.trim() && !attachments.length && !linkedTournament ? (
+                <Pressable onPress={startRecording} style={styles.sendBtn}>
+                  <Ionicons name="mic" size={18} color="#fff" />
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={submit}
+                  disabled={sending}
+                  style={[styles.sendBtn, sending && { opacity: 0.4 }]}
+                >
+                  <Ionicons name="send" size={18} color="#fff" />
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -1160,6 +1380,26 @@ export default function ChatWindow() {
               <Ionicons name="arrow-undo-outline" size={22} color="#0F172A" />
               <Text style={{ fontSize: 16, color: "#0F172A" }}>Trả lời</Text>
             </Pressable>
+            {actionMsg && (
+              <Pressable
+                onPress={() =>
+                  handlePin(actionMsg, !pinnedIdSet.has(String(actionMsg._id)))
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingVertical: 14,
+                  borderTopWidth: 1,
+                  borderTopColor: "#F1F5F9",
+                }}
+              >
+                <Ionicons name="pin-outline" size={22} color="#0F172A" />
+                <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                  {pinnedIdSet.has(String(actionMsg._id)) ? "Bỏ ghim" : "Ghim tin nhắn"}
+                </Text>
+              </Pressable>
+            )}
             {actionMsg &&
               (String(actionMsg.sender?._id || actionMsg.sender) ===
                 String(me?._id) ||
