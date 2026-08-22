@@ -30,7 +30,6 @@ import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAdminPatchMatchMutation } from "@/slices/matchesApiSlice";
-import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
 import AdminMatchTools from "@/components/match/AdminMatchTools";
 import PublicProfileDialog from "../PublicProfileDialog";
 import RefereeJudgePanel from "./RefereeScorePanel.native";
@@ -3622,42 +3621,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     [shownGameScores],
   );
 
-  const [createFeedPost] = useCreateFeedPostMutation();
-  const handleShareResult = async () => {
-    const last = lastGameScore(shownGameScores) || { a: 0, b: 0 };
-    const nameA = visibleTeamLabel(teamAName) || "Đội A";
-    const nameB = visibleTeamLabel(teamBName) || "Đội B";
-    try {
-      await createFeedPost({
-        content: `Kết quả trận đấu: ${nameA} vs ${nameB}`,
-        sharedMatch: {
-          matchId: merged?._id || null,
-          tournamentId: tournamentId || null,
-          tournamentName: (tour as any)?.name || "",
-          code: merged?.code || merged?.displayCode || "",
-          teamA: nameA,
-          teamB: nameB,
-          scoreA: Number(last.a) || 0,
-          scoreB: Number(last.b) || 0,
-          setsA,
-          setsB,
-          winner:
-            merged?.winner === "A" || merged?.winner === "B"
-              ? merged.winner
-              : "",
-          status,
-        },
-      } as any).unwrap();
-      Toast.show({ type: "success", text1: "Đã chia sẻ kết quả lên bảng tin" });
-    } catch (e: any) {
-      Toast.show({
-        type: "error",
-        text1: "Chia sẻ thất bại",
-        text2: e?.data?.message || e?.message,
-      });
-    }
-  };
-
   const [createLive, { isLoading: creatingLive }] =
     useCreateFacebookLiveForMatchMutation();
   const liveSheetRef = useRef(null);
@@ -4116,28 +4079,6 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               {renderServeBadgeRN("B", true)}
             </View>
           </View>
-
-          {/* Chia sẻ kết quả lên bảng tin */}
-          <Pressable
-            onPress={handleShareResult}
-            style={{
-              alignSelf: "center",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginTop: 10,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: T.tint,
-            }}
-          >
-            <Text style={{ fontSize: 14 }}>🏓</Text>
-            <Text style={{ color: T.tint, fontWeight: "700", fontSize: 13 }}>
-              Chia sẻ kết quả lên bảng tin
-            </Text>
-          </Pressable>
 
           {/* GAME SCORES TABLE */}
           {(editMode || shownGameScores.length > 0) && (
