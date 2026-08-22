@@ -3362,6 +3362,49 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   const status = merged?.status || "scheduled";
   const shownGameScores = merged?.gameScores ?? [];
 
+  // Tay giao 1/2 (chỉ hiển thị — KHÔNG đụng backend). serve.side="A"|"B",
+  // serve.order|server|member = 1|2. Bổ sung badge số cạnh đội đang giao.
+  const serveBadge = (() => {
+    const sv: any = merged?.serve;
+    if (!sv || status !== "live") return null;
+    const side =
+      sv?.side === "B" ? "B" : sv?.side === "A" ? "A" : null;
+    if (!side) return null;
+    const num =
+      Number(sv?.order ?? sv?.server ?? sv?.member ?? sv?.player ?? 1) === 2
+        ? 2
+        : 1;
+    return { side, num } as { side: "A" | "B"; num: 1 | 2 };
+  })();
+  const renderServeBadgeRN = (side: "A" | "B", alignRight = false) => {
+    if (!serveBadge || serveBadge.side !== side) return null;
+    const isDark = T.scheme === "dark";
+    return (
+      <View
+        style={{
+          marginTop: 6,
+          alignSelf: alignRight ? "flex-end" : "flex-start",
+          backgroundColor: isDark
+            ? "rgba(245,158,11,0.20)"
+            : "rgba(245,158,11,0.16)",
+          borderRadius: 999,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: "800",
+            color: isDark ? "#fbbf24" : "#b45309",
+          }}
+        >
+          🏓 Đang giao · Tay {serveBadge.num}
+        </Text>
+      </View>
+    );
+  };
+
   const streams = useMemo(() => normalizeStreams(merged || {}), [merged]);
   const pickInitialIndex = useCallback((arr) => {
     if (!arr.length) return -1;
@@ -3983,6 +4026,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   {visibleTeamLabel(teamAName)}
                 </Text>
               )}
+              {renderServeBadgeRN("A")}
             </View>
 
             {/* BIG SCORE */}
@@ -4032,6 +4076,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
                   {visibleTeamLabel(teamBName)}
                 </Text>
               )}
+              {renderServeBadgeRN("B", true)}
             </View>
           </View>
 
