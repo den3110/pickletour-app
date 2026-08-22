@@ -82,6 +82,13 @@ export const messagesApiSlice = apiSlice.injectEndpoints({
     deleteMessage: builder.mutation({
       query: (mid) => ({ url: `/api/chat/messages/${mid}`, method: "DELETE" }),
     }),
+    reactMessage: builder.mutation({
+      query: ({ mid, emoji }) => ({
+        url: `/api/chat/messages/${mid}/react`,
+        method: "POST",
+        body: { emoji },
+      }),
+    }),
     uploadChatMedia: builder.mutation({
       query: (formData) => ({
         url: `/api/chat/upload`,
@@ -108,6 +115,7 @@ export const {
   useSendDmMessageMutation,
   useMarkReadMutation,
   useDeleteMessageMutation,
+  useReactMessageMutation,
   useUploadChatMediaMutation,
   useTypingMutation,
 } = messagesApiSlice;

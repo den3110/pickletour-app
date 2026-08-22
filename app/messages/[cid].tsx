@@ -39,6 +39,7 @@ import {
   useSendDmMessageMutation,
   useUploadChatMediaMutation,
   useDeleteMessageMutation,
+  useReactMessageMutation,
   usePatchConversationMutation,
   messagesApiSlice,
 } from "@/slices/messagesApiSlice";
@@ -52,6 +53,20 @@ const _sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
+
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+function replySnippet(rt: any): string {
+  if (!rt) return "";
+  if (rt.deletedAt) return "(tin nhắn đã xoá)";
+  if (rt.content) return rt.content;
+  const a = (rt.attachments || [])[0];
+  if (a?.type === "image") return "📷 Ảnh";
+  if (a?.type === "video") return "🎬 Video";
+  if (a?.type === "audio") return "🎤 Tin thoại";
+  if (a?.type) return "📎 Tệp";
+  return "…";
+}
 
 function shouldShowTimeSep(cur?: any, older?: any) {
   if (!cur?.createdAt) return false;
@@ -285,6 +300,40 @@ export default function ChatWindow() {
   const [uploadMedia] = useUploadChatMediaMutation();
   const [markRead] = useMarkReadMutation();
   const [deleteMessage] = useDeleteMessageMutation();
+  const [reactMessage] = useReactMessageMutation();
+  const [replyTarget, setReplyTarget] = useState<any>(null);
+  const [actionMsg, setActionMsg] = useState<any>(null); // long-press action sheet
+
+  const handleReact = async (mid: string, emoji: string) => {
+    setActionMsg(null);
+    dispatch(
+      messagesApiSlice.util.updateQueryData(
+        "listMessages",
+        { cid: cidStr },
+        (draft: any) => {
+          const m = draft?.items?.find((x: any) => String(x._id) === String(mid));
+          if (!m) return;
+          const list = m.reactions || [];
+          const idx = list.findIndex(
+            (r: any) => String(r.user) === String(me?._id)
+          );
+          if (idx >= 0 && list[idx].emoji === emoji) {
+            m.reactions = list.filter((_: any, i: number) => i !== idx);
+          } else if (idx >= 0) {
+            list[idx].emoji = emoji;
+            m.reactions = [...list];
+          } else {
+            m.reactions = [...list, { user: String(me?._id), emoji }];
+          }
+        }
+      )
+    );
+    try {
+      await reactMessage({ mid, emoji }).unwrap();
+    } catch {
+      /* socket đồng bộ lại nếu lệch */
+    }
+  };
 
   // Subscribe socket room + patch cache khi có message mới
   useEffect(() => {
@@ -338,8 +387,24 @@ export default function ChatWindow() {
         )
       );
     };
+    const onReaction = (payload: any) => {
+      if (String(payload?.conversationId) !== cidStr) return;
+      dispatch(
+        messagesApiSlice.util.updateQueryData(
+          "listMessages",
+          { cid: cidStr },
+          (draft: any) => {
+            const m = draft?.items?.find(
+              (x: any) => String(x._id) === String(payload.messageId)
+            );
+            if (m) m.reactions = payload.reactions || [];
+          }
+        )
+      );
+    };
     socket.on("chat:message:new", onNew);
     socket.on("chat:message:deleted", onDeleted);
+    socket.on("chat:message:reaction", onReaction);
     return () => {
       try {
         socket.emit("chat:unsubscribe", { conversationId: cidStr });
@@ -347,6 +412,7 @@ export default function ChatWindow() {
       socket.off("connect", subscribe);
       socket.off("chat:message:new", onNew);
       socket.off("chat:message:deleted", onDeleted);
+      socket.off("chat:message:reaction", onReaction);
     };
   }, [cid, cidStr, dispatch, markRead]);
 
@@ -474,11 +540,13 @@ export default function ChatWindow() {
         attachments,
         mentions: stillPresent,
         linkedTournament: linkedTournament?._id || null,
+        replyTo: replyTarget?._id || null,
       } as any).unwrap();
       setText("");
       setAttachments([]);
       setLinkedTournament(null);
       setSelectedMentions([]);
+      setReplyTarget(null);
       // scroll về đầu (FlatList inverted → offset 0)
       flatRef.current?.scrollToOffset({ offset: 0, animated: true });
     } catch (err: any) {
@@ -627,10 +695,23 @@ export default function ChatWindow() {
                 </View>
               );
             }
+            const reactList: any[] = item.reactions || [];
+            const reactGroups = (() => {
+              const map = new Map<string, { emoji: string; count: number; mine: boolean }>();
+              for (const r of reactList) {
+                if (!r?.emoji) continue;
+                const cur = map.get(r.emoji) || { emoji: r.emoji, count: 0, mine: false };
+                cur.count += 1;
+                if (String(r.user) === String(me?._id)) cur.mine = true;
+                map.set(r.emoji, cur);
+              }
+              return Array.from(map.values());
+            })();
             return (
               <View>
                 <Pressable
-                  onLongPress={isMine ? () => handleDelete(item._id) : undefined}
+                  onLongPress={() => setActionMsg(item)}
+                  delayLongPress={250}
                   style={[
                     styles.bubbleRow,
                     isMine ? styles.rowMine : styles.rowTheir,
@@ -655,6 +736,41 @@ export default function ChatWindow() {
                     isMine ? styles.bubbleMine : styles.bubbleTheir,
                   ]}
                 >
+                  {item.replyTo && (
+                    <View
+                      style={{
+                        borderLeftWidth: 3,
+                        borderLeftColor: isMine
+                          ? "rgba(255,255,255,0.7)"
+                          : "#1877F2",
+                        paddingLeft: 6,
+                        marginBottom: 4,
+                        opacity: 0.9,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "800",
+                          color: isMine ? "#DBEAFE" : "#1877F2",
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.replyTo.sender?.nickname ||
+                          item.replyTo.sender?.name ||
+                          "Trả lời"}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: isMine ? "#E5E7EB" : "#475569",
+                        }}
+                        numberOfLines={1}
+                      >
+                        {replySnippet(item.replyTo)}
+                      </Text>
+                    </View>
+                  )}
                   {item.attachments?.length > 0 &&
                     (() => {
                       const msgImages = (item.attachments || [])
@@ -727,6 +843,41 @@ export default function ChatWindow() {
                   )}
                 </View>
                 </Pressable>
+                {reactGroups.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 4,
+                      marginTop: 2,
+                      marginLeft: isMine ? 0 : 34,
+                      justifyContent: isMine ? "flex-end" : "flex-start",
+                    }}
+                  >
+                    {reactGroups.map((g) => (
+                      <Pressable
+                        key={g.emoji}
+                        onPress={() => handleReact(String(item._id), g.emoji)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 2,
+                          paddingHorizontal: 7,
+                          paddingVertical: 1,
+                          borderRadius: 999,
+                          backgroundColor: g.mine ? "#DBEAFE" : "#E2E8F0",
+                          borderWidth: 1,
+                          borderColor: g.mine ? "#1877F2" : "transparent",
+                        }}
+                      >
+                        <Text style={{ fontSize: 12 }}>{g.emoji}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: "800", color: "#334155" }}>
+                          {g.count}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 {showBubbleTime && (
                   <Text
                     style={[
@@ -751,6 +902,35 @@ export default function ChatWindow() {
 
         {/* Composer */}
         <View style={styles.composer}>
+          {replyTarget && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderLeftWidth: 3,
+                borderLeftColor: "#1877F2",
+                backgroundColor: "#F1F5F9",
+                borderRadius: 8,
+                marginBottom: 6,
+              }}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#1877F2" }}>
+                  Đang trả lời{" "}
+                  {replyTarget.sender?.nickname || replyTarget.sender?.name || ""}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#475569" }} numberOfLines={1}>
+                  {replySnippet(replyTarget)}
+                </Text>
+              </View>
+              <Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
+                <Ionicons name="close" size={18} color="#64748B" />
+              </Pressable>
+            </View>
+          )}
           {attachments.length > 0 && (
             <View style={styles.attachPreviewRow}>
               {attachments.map((a: any, i) => {
@@ -906,6 +1086,108 @@ export default function ChatWindow() {
         url={videoModal?.url || null}
         onClose={() => setVideoModal(null)}
       />
+
+      {/* Action sheet khi long-press tin nhắn: react + reply + xoá */}
+      <Modal
+        visible={!!actionMsg}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionMsg(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setActionMsg(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingTop: 10,
+              paddingBottom: 28,
+              paddingHorizontal: 16,
+            }}
+          >
+            <View
+              style={{
+                alignSelf: "center",
+                width: 40,
+                height: 5,
+                borderRadius: 99,
+                backgroundColor: "#CBD5E1",
+                marginBottom: 12,
+              }}
+            />
+            {/* Hàng emoji */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-around",
+                paddingVertical: 8,
+                marginBottom: 8,
+              }}
+            >
+              {QUICK_EMOJIS.map((e) => (
+                <Pressable
+                  key={e}
+                  onPress={() =>
+                    actionMsg && handleReact(String(actionMsg._id), e)
+                  }
+                  hitSlop={8}
+                >
+                  <Text style={{ fontSize: 30 }}>{e}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              onPress={() => {
+                setReplyTarget(actionMsg);
+                setActionMsg(null);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                paddingVertical: 14,
+                borderTopWidth: 1,
+                borderTopColor: "#F1F5F9",
+              }}
+            >
+              <Ionicons name="arrow-undo-outline" size={22} color="#0F172A" />
+              <Text style={{ fontSize: 16, color: "#0F172A" }}>Trả lời</Text>
+            </Pressable>
+            {actionMsg &&
+              (String(actionMsg.sender?._id || actionMsg.sender) ===
+                String(me?._id) ||
+                (me as any)?.role === "admin") && (
+                <Pressable
+                  onPress={() => {
+                    const mid = String(actionMsg._id);
+                    setActionMsg(null);
+                    handleDelete(mid);
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: "#F1F5F9",
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={22} color="#DC2626" />
+                  <Text style={{ fontSize: 16, color: "#DC2626" }}>
+                    Xoá tin nhắn
+                  </Text>
+                </Pressable>
+              )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
