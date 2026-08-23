@@ -39,6 +39,9 @@ import {
   useRespondMarketOfferMutation,
 } from "@/slices/marketApiSlice";
 import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useBoostListingMutation } from "@/slices/marketApiSlice";
+import StarRatingRN from "@/components/market/StarRatingRN";
+import SellerReviewsRN from "@/components/market/SellerReviewsRN";
 
 const BLUE = "#0d6efd";
 
@@ -121,6 +124,17 @@ export default function MarketDetailScreen() {
   const [updateStatus] = useUpdateMarketStatusMutation();
   const [deleteListing] = useDeleteMarketListingMutation();
   const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
+  const [boostListing, { isLoading: boosting }] = useBoostListingMutation();
+
+  const onBoost = async () => {
+    try {
+      await boostListing(item._id).unwrap();
+      Alert.alert("Thành công", "Đã đẩy tin lên đầu · nổi bật 2 ngày");
+      refetch();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Không đẩy được tin");
+    }
+  };
 
   const [activeImg, setActiveImg] = useState(0);
   const [offerOpen, setOfferOpen] = useState(false);
@@ -344,9 +358,18 @@ export default function MarketDetailScreen() {
                 <Text style={{ fontWeight: "800", fontSize: 15 }}>{item.seller.nickname || item.seller.name}</Text>
                 {item.seller.verified && <Ionicons name="checkmark-circle" size={16} color="#2563eb" />}
               </View>
-              <Text style={{ color: "#64748B", fontSize: 12 }}>
-                {item.seller.verified ? "Đã xác minh danh tính" : "Người bán"}
-              </Text>
+              {item.seller.ratingCount > 0 ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <StarRatingRN value={item.seller.ratingAvg} size={14} />
+                  <Text style={{ color: "#64748B", fontSize: 12 }}>
+                    {item.seller.ratingAvg?.toFixed(1)} · {item.seller.ratingCount} đánh giá
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ color: "#64748B", fontSize: 12 }}>
+                  {item.seller.verified ? "Đã xác minh danh tính" : "Chưa có đánh giá"}
+                </Text>
+              )}
             </View>
             <TouchableOpacity onPress={() => router.push(`/marketplace?seller=${item.seller._id}` as any)}>
               <Text style={{ color: BLUE, fontWeight: "700" }}>Tin khác</Text>
@@ -354,9 +377,21 @@ export default function MarketDetailScreen() {
           </View>
         )}
 
-        {/* Owner: offers */}
+        {/* Owner: boost + offers */}
         {item.isOwner && (
           <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
+            {["available", "reserved"].includes(item.status) && (
+              <TouchableOpacity
+                onPress={onBoost}
+                disabled={boosting}
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#f59e0b", borderRadius: 12, paddingVertical: 12, marginBottom: 14 }}
+              >
+                <Ionicons name="rocket-outline" size={18} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                  {boosting ? "Đang đẩy…" : "Đẩy tin lên đầu (nổi bật 2 ngày)"}
+                </Text>
+              </TouchableOpacity>
+            )}
             <Text style={{ fontWeight: "800", fontSize: 15 }}>🏷️ Đề nghị mua ({item.offerCount || 0})</Text>
             <OffersManager listingId={item._id} />
           </View>
@@ -388,6 +423,14 @@ export default function MarketDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Đánh giá người bán */}
+        {item.seller && (
+          <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
+            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 10 }}>Đánh giá người bán</Text>
+            <SellerReviewsRN sellerId={item.seller._id} listingId={item._id} me={me} />
+          </View>
+        )}
       </ScrollView>
 
       {/* Bottom action bar */}

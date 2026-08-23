@@ -159,6 +159,14 @@ export default function MarketCard({
               {item.location?.province || "—"} · {timeAgo(item.createdAt)}
             </Text>
           </View>
+          {item.seller?.ratingCount > 0 && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 1 }}>
+              <Ionicons name="star" size={11} color="#f59e0b" />
+              <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "700" }}>
+                {Number(item.seller.ratingAvg).toFixed(1)}
+              </Text>
+            </View>
+          )}
           {item.seller?.verified && (
             <Ionicons name="checkmark-circle" size={13} color="#2563eb" />
           )}

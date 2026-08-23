@@ -93,6 +93,22 @@ export const marketApiSlice = apiSlice.injectEndpoints({
         method: "DELETE",
       }),
     }),
+    boostListing: builder.mutation({
+      query: (id) => ({ url: `/api/market/${id}/boost`, method: "POST" }),
+    }),
+    listSellerReviews: builder.query({
+      query: (sellerId) => ({ url: `/api/market/sellers/${sellerId}/reviews`, method: "GET" }),
+    }),
+    upsertSellerReview: builder.mutation({
+      query: ({ sellerId, rating, comment, listingId }) => ({
+        url: `/api/market/sellers/${sellerId}/reviews`,
+        method: "POST",
+        body: { rating, comment, listingId },
+      }),
+    }),
+    deleteSellerReview: builder.mutation({
+      query: ({ reviewId }) => ({ url: `/api/market/reviews/${reviewId}`, method: "DELETE" }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -114,4 +130,8 @@ export const {
   useRespondMarketOfferMutation,
   useMyMarketOffersQuery,
   useCancelMarketOfferMutation,
+  useBoostListingMutation,
+  useListSellerReviewsQuery,
+  useUpsertSellerReviewMutation,
+  useDeleteSellerReviewMutation,
 } = marketApiSlice;
