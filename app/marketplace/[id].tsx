@@ -13,6 +13,8 @@ import {
   Alert,
   useWindowDimensions,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -164,7 +166,7 @@ export default function MarketDetailScreen() {
         amount: Number(String(amount).replace(/\D/g, "")) || 0,
         message,
       }).unwrap();
-      Alert.alert("Thành công", "Đã gửi đề nghị tới người bán");
+      Alert.alert("Thành công", "Đã gửi đề nghị và nhắn tin cho người bán");
       setOfferOpen(false);
       setAmount("");
       setMessage("");
@@ -466,7 +468,11 @@ export default function MarketDetailScreen() {
 
       {/* Offer modal */}
       <Modal visible={offerOpen} transparent animationType="slide" onRequestClose={() => setOfferOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setOfferOpen(false)} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => setOfferOpen(false)} />
         <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
           <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 6 }}>Gửi đề nghị mua</Text>
           <Text style={{ color: "#64748B", marginBottom: 14 }}>
@@ -496,6 +502,7 @@ export default function MarketDetailScreen() {
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{offering ? "Đang gửi…" : "Gửi đề nghị"}</Text>
           </TouchableOpacity>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Status modal */}
