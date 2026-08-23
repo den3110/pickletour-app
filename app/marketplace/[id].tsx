@@ -165,7 +165,8 @@ export default function MarketDetailScreen() {
   const cond = CONDITION_MAP[item.condition];
   const type = TYPE_MAP[item.type];
   const status = STATUS_MAP[item.status];
-  const images: any[] = item.images?.length ? item.images : [];
+  const images: any[] =
+    (selVariant?.images?.length ? selVariant.images : item.images) || [];
   const mainImg = images[activeImg]?.url || images[activeImg] || "";
 
   const onSave = async () => {
@@ -348,7 +349,7 @@ export default function MarketDetailScreen() {
                   return (
                     <TouchableOpacity
                       key={i}
-                      onPress={() => setSelVariant(active ? null : v)}
+                      onPress={() => { setSelVariant(active ? null : v); setActiveImg(0); }}
                       style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? BLUE : "#CBD5E1", backgroundColor: active ? "#EFF6FF" : "#fff" }}
                     >
                       <Text style={{ fontWeight: "700", color: active ? BLUE : "#334155", fontSize: 13 }}>

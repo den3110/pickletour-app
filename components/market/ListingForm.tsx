@@ -93,7 +93,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
   const [showPhone, setShowPhone] = useState(false);
   const [hasVariants, setHasVariants] = useState(false);
   const [variantLabel, setVariantLabel] = useState("Phân loại");
-  const [variants, setVariants] = useState<{ name: string; price: string }[]>([]);
+  const [variants, setVariants] = useState<{ name: string; price: string; images?: any[] }[]>([]);
 
   useEffect(() => {
     if (isEdit && existing) {
@@ -103,6 +103,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         (existing.variants || []).map((v: any) => ({
           name: v.name || "",
           price: v.price ? String(v.price).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "",
+          images: v.images || [],
         }))
       );
       setImages(existing.images || []);
@@ -160,13 +161,47 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
     }
   };
 
+  const pickVariantImages = async (vi: number) => {
+    const cur = variants[vi]?.images || [];
+    if (cur.length >= 8) return Alert.alert("Tối đa 8 ảnh/loại");
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return Alert.alert("Cần quyền", "Vui lòng cấp quyền truy cập thư viện ảnh");
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 8 - cur.length,
+      quality: 0.6,
+    });
+    if (res.canceled || !res.assets?.length) return;
+    const fd = new FormData();
+    for (const a of res.assets) {
+      let uri = a.uri;
+      try {
+        const m = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1600 } }], { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG });
+        uri = m.uri;
+      } catch {}
+      const base = (uri.split("/").pop() || "photo").replace(/\.\w+$/, "");
+      fd.append("files", { uri, name: `${base}.jpg`, type: "image/jpeg" } as any);
+    }
+    try {
+      const r: any = await uploadMedia(fd).unwrap();
+      setVariants((arr) =>
+        arr.map((x, idx) =>
+          idx === vi ? { ...x, images: [...((x as any).images || []), ...(r.images || [])].slice(0, 8) } : x
+        )
+      );
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Tải ảnh thất bại");
+    }
+  };
+
   const submit = async () => {
     if (!title.trim()) return Alert.alert("Thiếu thông tin", "Vui lòng nhập tiêu đề");
     if (!images.length) return Alert.alert("Thiếu ảnh", "Vui lòng thêm ít nhất 1 ảnh");
     const useVar = type === "sell" && hasVariants;
     const cleanVariants = variants
       .filter((v) => v.name.trim())
-      .map((v) => ({ name: v.name.trim(), price: Number(String(v.price).replace(/\D/g, "")) || 0 }));
+      .map((v) => ({ name: v.name.trim(), price: Number(String(v.price).replace(/\D/g, "")) || 0, images: (v as any).images || [] }));
     if (useVar && !cleanVariants.length) {
       return Alert.alert("Thiếu phân loại", "Vui lòng thêm ít nhất 1 phân loại");
     }
@@ -310,28 +345,49 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
                   style={{ ...inputStyle, marginBottom: 10 }}
                 />
                 {variants.map((v, i) => (
-                  <View key={i} style={{ flexDirection: "row", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                    <TextInput
-                      value={v.name}
-                      onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, name: t } : x)))}
-                      placeholder="Tên loại (40, Đen-M)"
-                      placeholderTextColor="#94A3B8"
-                      style={{ ...inputStyle, flex: 1 }}
-                    />
-                    <TextInput
-                      value={v.price}
-                      onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, price: t.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") } : x)))}
-                      keyboardType="number-pad"
-                      placeholder="Giá"
-                      placeholderTextColor="#94A3B8"
-                      style={{ ...inputStyle, width: 110 }}
-                    />
-                    <TouchableOpacity onPress={() => setVariants((arr) => arr.filter((_, idx) => idx !== i))} hitSlop={6}>
-                      <Ionicons name="close-circle" size={24} color="#dc2626" />
-                    </TouchableOpacity>
+                  <View key={i} style={{ marginBottom: 10, padding: 8, borderRadius: 10, backgroundColor: "#F8FAFC" }}>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      <TextInput
+                        value={v.name}
+                        onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, name: t } : x)))}
+                        placeholder="Tên loại (40, Đen-M)"
+                        placeholderTextColor="#94A3B8"
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <TextInput
+                        value={v.price}
+                        onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, price: t.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") } : x)))}
+                        keyboardType="number-pad"
+                        placeholder="Giá"
+                        placeholderTextColor="#94A3B8"
+                        style={{ ...inputStyle, width: 100 }}
+                      />
+                      <TouchableOpacity onPress={() => setVariants((arr) => arr.filter((_, idx) => idx !== i))} hitSlop={6}>
+                        <Ionicons name="close-circle" size={24} color="#dc2626" />
+                      </TouchableOpacity>
+                    </View>
+                    {/* Ảnh của phân loại */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                      {((v as any).images || []).map((im: any, ii: number) => (
+                        <View key={ii} style={{ width: 48, height: 48 }}>
+                          <Image source={{ uri: im.url || im }} style={{ width: "100%", height: "100%", borderRadius: 8 }} />
+                          <TouchableOpacity
+                            onPress={() => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, images: ((x as any).images || []).filter((_: any, k: number) => k !== ii) } : x)))}
+                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#dc2626", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" }}
+                          >
+                            <Ionicons name="close" size={12} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {(((v as any).images || []).length < 8) && (
+                        <TouchableOpacity onPress={() => pickVariantImages(i)} style={{ width: 48, height: 48, borderWidth: 1, borderColor: "#CBD5E1", borderStyle: "dashed", borderRadius: 8, alignItems: "center", justifyContent: "center" }}>
+                          <Ionicons name="camera-outline" size={18} color="#94A3B8" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => setVariants((arr) => [...arr, { name: "", price: "" }])} style={{ paddingVertical: 8 }}>
+                <TouchableOpacity onPress={() => setVariants((arr) => [...arr, { name: "", price: "", images: [] }])} style={{ paddingVertical: 8 }}>
                   <Text style={{ color: "#0d6efd", fontWeight: "700" }}>+ Thêm phân loại</Text>
                 </TouchableOpacity>
               </View>

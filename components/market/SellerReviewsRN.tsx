@@ -18,7 +18,7 @@ export default function SellerReviewsRN({
   listingId: string;
   me: any;
 }) {
-  const { data, isLoading } = useListSellerReviewsQuery(sellerId, { skip: !sellerId });
+  const { data, isLoading, refetch } = useListSellerReviewsQuery(sellerId, { skip: !sellerId });
   const [upsert, { isLoading: saving }] = useUpsertSellerReviewMutation();
   const [del] = useDeleteSellerReviewMutation();
   const [rating, setRating] = useState(0);
@@ -38,6 +38,7 @@ export default function SellerReviewsRN({
     if (!rating) return Alert.alert("Thiếu", "Vui lòng chọn số sao");
     try {
       await upsert({ sellerId, rating, comment, listingId }).unwrap();
+      await refetch();
       Alert.alert("Thành công", "Đã gửi đánh giá");
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || "Không gửi được");
@@ -45,7 +46,7 @@ export default function SellerReviewsRN({
   };
   const remove = async () => {
     if (!data?.myReview) return;
-    try { await del({ reviewId: data.myReview._id, sellerId }).unwrap(); setRating(0); setComment(""); } catch {}
+    try { await del({ reviewId: data.myReview._id, sellerId }).unwrap(); await refetch(); setRating(0); setComment(""); } catch {}
   };
 
   return (
