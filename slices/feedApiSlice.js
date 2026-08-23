@@ -50,6 +50,9 @@ export const feedApiSlice = apiSlice.injectEndpoints({
       query: (id) => ({ url: `/api/feed/${id}`, method: "DELETE" }),
       invalidatesTags: [{ type: "Feed", id: "LIST" }],
     }),
+    updateFeedPost: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/api/feed/${id}`, method: "PATCH", body }),
+    }),
     reactFeedPost: builder.mutation({
       query: ({ id, type }) => ({
         url: `/api/feed/${id}/reactions`,
@@ -256,6 +259,7 @@ export const {
   useGetFeedPostQuery,
   useCreateFeedPostMutation,
   useDeleteFeedPostMutation,
+  useUpdateFeedPostMutation,
   useReactFeedPostMutation,
   useShareFeedPostMutation,
   useSaveFeedPostMutation,

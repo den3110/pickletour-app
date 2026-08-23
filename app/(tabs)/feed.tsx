@@ -15,7 +15,9 @@ import {
   Dimensions,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,6 +25,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,6 +40,7 @@ import {
   useVoteFeedPollMutation,
   useUploadFeedMediaMutation,
   useDeleteFeedPostMutation,
+  useUpdateFeedPostMutation,
   useReportFeedPostMutation,
   feedApiSlice,
 } from "@/slices/feedApiSlice";
@@ -1263,6 +1267,9 @@ function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
   const [deletePost] = useDeleteFeedPostMutation();
+  const [updatePost, { isLoading: savingEdit }] = useUpdateFeedPostMutation();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editText, setEditText] = useState("");
   const [reportPost] = useReportFeedPostMutation();
   const [blockUser] = useBlockUserMutation();
   const [savePost] = useSaveFeedPostMutation();
@@ -1356,6 +1363,15 @@ function PostCard({ post, me }: { post: any; me: any }) {
 
   const handleMenu = () => {
     const options: any[] = [];
+    if (isMine) {
+      options.push({
+        text: "Sửa bài viết",
+        onPress: () => {
+          setEditText(post.content || "");
+          setEditOpen(true);
+        },
+      });
+    }
     if (isMine || isAdmin) {
       options.push({
         text: "Xoá bài viết",
@@ -1419,6 +1435,47 @@ function PostCard({ post, me }: { post: any; me: any }) {
           <Ionicons name="ellipsis-horizontal" size={20} color="#64748B" />
         </Pressable>
       </View>
+
+      {/* Sửa bài viết */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => setEditOpen(false)} />
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
+            <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 10 }}>Sửa bài viết</Text>
+            <TextInput
+              value={editText}
+              onChangeText={setEditText}
+              multiline
+              placeholder="Nội dung bài viết…"
+              placeholderTextColor="#94A3B8"
+              style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, padding: 12, fontSize: 15, minHeight: 100, textAlignVertical: "top" }}
+            />
+            {(post.sharedListing || post.sharedPlay || post.sharedMatch) && (
+              <Text style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 6 }}>
+                * Phần đính kèm (sản phẩm/kèo/trận) được giữ nguyên.
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await updatePost({ id: post._id, content: editText }).unwrap();
+                  setEditOpen(false);
+                } catch (err: any) {
+                  Alert.alert("Lỗi", err?.data?.message || "Cập nhật thất bại");
+                }
+              }}
+              disabled={savingEdit}
+              style={{ marginTop: 14, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#0066FF" }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{savingEdit ? "Đang lưu…" : "Lưu"}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {!!post.content && (
         <MentionText
           content={post.content}
