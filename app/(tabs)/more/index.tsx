@@ -22,6 +22,14 @@ import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 
 const MORE_ITEMS = [
   {
+    key: "marketplace",
+    title: "Chợ Mua bán",
+    description: "Mua bán, trao đổi giày, vợt, quần áo pickleball.",
+    icon: "storefront-outline" as const,
+    route: "/marketplace",
+    accent: "#0d6efd",
+  },
+  {
     key: "live",
     title: "Live",
     description: "Xem livestream các trận đấu đang diễn ra.",
