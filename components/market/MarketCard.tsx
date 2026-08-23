@@ -9,6 +9,7 @@ import {
   TYPE_MAP,
   STATUS_MAP,
   formatPrice,
+  priceRangeLabel,
   timeAgo,
   firstImage,
 } from "@/constants/market";
@@ -126,7 +127,7 @@ export default function MarketCard({
 
       <View style={{ padding: 10, gap: 4 }}>
         <Text style={{ fontSize: 15, fontWeight: "900", color: "#0d6efd" }}>
-          {formatPrice(item.price, item.type)}
+          {priceRangeLabel(item)}
         </Text>
         <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "600", minHeight: 34, color: "#111827" }}>
           {item.title}

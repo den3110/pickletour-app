@@ -91,9 +91,20 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
   const [phone, setPhone] = useState("");
   const [zalo, setZalo] = useState("");
   const [showPhone, setShowPhone] = useState(false);
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variantLabel, setVariantLabel] = useState("Phân loại");
+  const [variants, setVariants] = useState<{ name: string; price: string }[]>([]);
 
   useEffect(() => {
     if (isEdit && existing) {
+      setHasVariants(!!existing.hasVariants);
+      setVariantLabel(existing.variantLabel || "Phân loại");
+      setVariants(
+        (existing.variants || []).map((v: any) => ({
+          name: v.name || "",
+          price: v.price ? String(v.price).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "",
+        }))
+      );
       setImages(existing.images || []);
       setTitle(existing.title || "");
       setDescription(existing.description || "");
@@ -152,6 +163,13 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
   const submit = async () => {
     if (!title.trim()) return Alert.alert("Thiếu thông tin", "Vui lòng nhập tiêu đề");
     if (!images.length) return Alert.alert("Thiếu ảnh", "Vui lòng thêm ít nhất 1 ảnh");
+    const useVar = type === "sell" && hasVariants;
+    const cleanVariants = variants
+      .filter((v) => v.name.trim())
+      .map((v) => ({ name: v.name.trim(), price: Number(String(v.price).replace(/\D/g, "")) || 0 }));
+    if (useVar && !cleanVariants.length) {
+      return Alert.alert("Thiếu phân loại", "Vui lòng thêm ít nhất 1 phân loại");
+    }
     const payload: any = {
       title,
       description,
@@ -167,6 +185,9 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
       images,
       location: { province, district },
       contact: { phone, zalo, showPhone },
+      hasVariants: useVar,
+      variantLabel,
+      variants: useVar ? cleanVariants : [],
     };
     try {
       if (isEdit) {
@@ -271,7 +292,54 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         <Label>Tình trạng</Label>
         <Chips options={CONDITIONS} value={condition} onPick={setCondition} />
 
-        {type !== "giveaway" && (
+        {/* Phân loại hàng */}
+        {type === "sell" && (
+          <>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+              <Text style={{ fontWeight: "700", color: "#111827" }}>Nhiều phân loại (size/màu — mỗi loại 1 giá)</Text>
+              <Switch value={hasVariants} onValueChange={setHasVariants} />
+            </View>
+            {hasVariants && (
+              <View style={{ marginTop: 10, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", marginBottom: 6, color: "#475569" }}>Tên nhóm phân loại</Text>
+                <TextInput
+                  value={variantLabel}
+                  onChangeText={setVariantLabel}
+                  placeholder="VD: Size, Màu sắc"
+                  placeholderTextColor="#94A3B8"
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                />
+                {variants.map((v, i) => (
+                  <View key={i} style={{ flexDirection: "row", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                    <TextInput
+                      value={v.name}
+                      onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, name: t } : x)))}
+                      placeholder="Tên loại (40, Đen-M)"
+                      placeholderTextColor="#94A3B8"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <TextInput
+                      value={v.price}
+                      onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, price: t.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") } : x)))}
+                      keyboardType="number-pad"
+                      placeholder="Giá"
+                      placeholderTextColor="#94A3B8"
+                      style={{ ...inputStyle, width: 110 }}
+                    />
+                    <TouchableOpacity onPress={() => setVariants((arr) => arr.filter((_, idx) => idx !== i))} hitSlop={6}>
+                      <Ionicons name="close-circle" size={24} color="#dc2626" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TouchableOpacity onPress={() => setVariants((arr) => [...arr, { name: "", price: "" }])} style={{ paddingVertical: 8 }}>
+                  <Text style={{ color: "#0d6efd", fontWeight: "700" }}>+ Thêm phân loại</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+
+        {type !== "giveaway" && !(type === "sell" && hasVariants) && (
           <>
             <Label>{type === "trade" ? "Giá tham khảo (₫)" : "Giá bán (₫)"}</Label>
             <TextInput

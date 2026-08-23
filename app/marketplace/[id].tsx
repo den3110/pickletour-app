@@ -27,6 +27,7 @@ import {
   STATUS_MAP,
   STATUSES,
   formatPrice,
+  priceRangeLabel,
   timeAgo,
 } from "@/constants/market";
 import {
@@ -83,6 +84,7 @@ function OffersManager({ listingId }: { listingId: string }) {
             <Text style={{ fontWeight: "700" }}>
               {o.buyer?.nickname || o.buyer?.name}{" "}
               <Text style={{ color: BLUE, fontWeight: "900" }}>· {formatPrice(o.amount, "sell")}</Text>
+              {!!o.variantName && <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}> ({o.variantName})</Text>}
             </Text>
             {!!o.message && <Text style={{ color: "#64748B", fontSize: 13 }}>“{o.message}”</Text>}
           </View>
@@ -137,6 +139,7 @@ export default function MarketDetailScreen() {
   };
 
   const [activeImg, setActiveImg] = useState(0);
+  const [selVariant, setSelVariant] = useState<any>(null);
   const [offerOpen, setOfferOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -179,6 +182,7 @@ export default function MarketDetailScreen() {
         id: item._id,
         amount: Number(String(amount).replace(/\D/g, "")) || 0,
         message,
+        variantName: selVariant?.name || "",
       }).unwrap();
       Alert.alert("Thành công", "Đã gửi đề nghị và nhắn tin cho người bán");
       setOfferOpen(false);
@@ -326,11 +330,36 @@ export default function MarketDetailScreen() {
           )}
           <Text style={{ fontSize: 19, fontWeight: "800", color: "#111827", lineHeight: 26 }}>{item.title}</Text>
           <Text style={{ fontSize: 26, fontWeight: "900", color: BLUE, marginTop: 6 }}>
-            {formatPrice(item.price, item.type)}
-            {item.negotiable && item.type === "sell" && item.price > 0 && (
+            {selVariant ? formatPrice(selVariant.price, item.type) : priceRangeLabel(item)}
+            {item.negotiable && item.type === "sell" && item.price > 0 && !item.hasVariants && (
               <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>  · Thương lượng</Text>
             )}
           </Text>
+
+          {/* Bộ chọn phân loại */}
+          {item.hasVariants && item.variants?.length > 0 && (
+            <View style={{ marginTop: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", marginBottom: 6, color: "#334155" }}>
+                {item.variantLabel || "Phân loại"}{selVariant ? `: ${selVariant.name}` : ""}
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {item.variants.map((v: any, i: number) => {
+                  const active = selVariant?.name === v.name;
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => setSelVariant(active ? null : v)}
+                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? BLUE : "#CBD5E1", backgroundColor: active ? "#EFF6FF" : "#fff" }}
+                    >
+                      <Text style={{ fontWeight: "700", color: active ? BLUE : "#334155", fontSize: 13 }}>
+                        {v.name} · {formatPrice(v.price, item.type)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           {item.type === "trade" && !!item.tradeFor && (
             <Text style={{ marginTop: 4, color: "#64748B" }}>Muốn đổi: <Text style={{ fontWeight: "700", color: "#111827" }}>{item.tradeFor}</Text></Text>
           )}
@@ -488,7 +517,14 @@ export default function MarketDetailScreen() {
             ) : null}
             <TouchableOpacity
               disabled={!["available", "reserved"].includes(item.status)}
-              onPress={() => (me ? setOfferOpen(true) : router.push("/login" as any))}
+              onPress={() => {
+                if (!me) return router.push("/login" as any);
+                if (item.hasVariants && !selVariant)
+                  return Alert.alert("Chọn phân loại", `Vui lòng chọn ${item.variantLabel || "phân loại"}`);
+                if (selVariant?.price)
+                  setAmount(String(selVariant.price).replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+                setOfferOpen(true);
+              }}
               style={{
                 flex: 1,
                 height: 48,
@@ -519,7 +555,11 @@ export default function MarketDetailScreen() {
         <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
           <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 6 }}>Gửi đề nghị mua</Text>
           <Text style={{ color: "#64748B", marginBottom: 14 }}>
-            Giá đang đăng: <Text style={{ fontWeight: "700", color: "#111827" }}>{formatPrice(item.price, item.type)}</Text>
+            {selVariant ? (
+              <>Phân loại <Text style={{ fontWeight: "700", color: "#111827" }}>{selVariant.name}</Text> · Giá đăng: <Text style={{ fontWeight: "700", color: "#111827" }}>{formatPrice(selVariant.price, item.type)}</Text></>
+            ) : (
+              <>Giá đang đăng: <Text style={{ fontWeight: "700", color: "#111827" }}>{priceRangeLabel(item)}</Text></>
+            )}
           </Text>
           <TextInput
             value={amount}

@@ -56,6 +56,18 @@ export function formatPrice(v: number, type?: string) {
   }
 }
 
+export function priceRangeLabel(item: any) {
+  if (item?.hasVariants && item.variants?.length) {
+    const prices = item.variants.map((v: any) => v.price).filter((p: number) => p > 0);
+    if (!prices.length) return "Thương lượng";
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    if (min === max) return formatPrice(min, item.type);
+    return `${formatPrice(min, item.type)} – ${formatPrice(max, item.type)}`;
+  }
+  return formatPrice(item?.price, item?.type);
+}
+
 export function timeAgo(dateStr?: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr).getTime();

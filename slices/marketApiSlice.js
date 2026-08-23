@@ -68,10 +68,10 @@ export const marketApiSlice = apiSlice.injectEndpoints({
       query: (id) => ({ url: `/api/market/${id}/save`, method: "POST" }),
     }),
     createMarketOffer: builder.mutation({
-      query: ({ id, amount, message }) => ({
+      query: ({ id, amount, message, variantName }) => ({
         url: `/api/market/${id}/offers`,
         method: "POST",
-        body: { amount, message },
+        body: { amount, message, variantName },
       }),
     }),
     listMarketOffers: builder.query({
