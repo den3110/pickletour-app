@@ -23,6 +23,7 @@ import {
   useLeaveInviteMutation,
   useDeleteInviteMutation,
 } from "@/slices/playApiSlice";
+import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
 
 const GREEN = "#16a34a";
 
@@ -46,7 +47,33 @@ export default function PlayDetailScreen() {
   const [respondJoin] = useRespondJoinMutation();
   const [leaveInvite] = useLeaveInviteMutation();
   const [deleteInvite] = useDeleteInviteMutation();
+  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
   const [note, setNote] = useState("");
+
+  const handleShareToFeed = async () => {
+    if (!me) return router.push("/login" as any);
+    try {
+      await createFeedPost({
+        content: `🏓 Kèo giao lưu: ${it.title || it.courtName || "pickleball"}`,
+        sharedPlay: {
+          playId: it._id,
+          title: it.title || it.courtName || "",
+          courtName: it.courtName || "",
+          province: it.province || "",
+          playAt: it.playAt,
+          skillMin: it.skillMin,
+          skillMax: it.skillMax,
+          slots: it.slots,
+          acceptedCount: it.acceptedCount,
+          hostName: it.host?.nickname || it.host?.name || "",
+          status: it.status,
+        },
+      }).unwrap();
+      Alert.alert("Thành công", "Đã chia sẻ kèo lên bảng tin");
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại");
+    }
+  };
 
   if (isLoading)
     return (
@@ -149,9 +176,15 @@ export default function PlayDetailScreen() {
           {/* Actions */}
           <View style={{ marginTop: 16 }}>
             {it.isHost ? (
-              <TouchableOpacity onPress={onDelete} style={{ borderWidth: 1, borderColor: "#fecaca", borderRadius: 12, paddingVertical: 12, alignItems: "center" }}>
-                <Text style={{ color: "#dc2626", fontWeight: "700" }}>Xoá kèo</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => router.push(`/play/edit/${it._id}` as any)} style={{ flex: 1, backgroundColor: GREEN, borderRadius: 12, paddingVertical: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}>
+                  <Ionicons name="create-outline" size={18} color="#fff" />
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>Sửa kèo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onDelete} style={{ borderWidth: 1, borderColor: "#fecaca", borderRadius: 12, paddingVertical: 12, alignItems: "center", paddingHorizontal: 18 }}>
+                  <Text style={{ color: "#dc2626", fontWeight: "700" }}>Xoá</Text>
+                </TouchableOpacity>
+              </View>
             ) : it.myStatus === "accepted" ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <Text style={{ color: GREEN, fontWeight: "800", flex: 1 }}>✅ Bạn đã tham gia</Text>
@@ -173,6 +206,15 @@ export default function PlayDetailScreen() {
               <Text style={{ color: "#94A3B8", fontWeight: "600" }}>Kèo đã đóng / đủ người</Text>
             )}
           </View>
+
+          <TouchableOpacity
+            onPress={handleShareToFeed}
+            disabled={sharing}
+            style={{ marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, paddingVertical: 11 }}
+          >
+            <Ionicons name="megaphone-outline" size={18} color="#334155" />
+            <Text style={{ color: "#334155", fontWeight: "700" }}>{sharing ? "Đang chia sẻ…" : "Chia sẻ kèo lên bảng tin"}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Host: pending */}

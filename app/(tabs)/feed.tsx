@@ -5,6 +5,7 @@ import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import * as ImagePicker from "expo-image-picker";
 import { CONDITION_MAP, formatPrice } from "@/constants/market";
+import { PLAY_STATUS, formatPlayTime, skillLabel } from "@/constants/play";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useState, useCallback, useEffect, useRef } from "react";
@@ -1228,6 +1229,36 @@ function SharedListingCardRN({ sl }: { sl: any }) {
   );
 }
 
+function SharedPlayCardRN({ sp }: { sp: any }) {
+  const st = PLAY_STATUS[sp.status] || PLAY_STATUS.open;
+  const slotsLeft = Math.max(0, (sp.slots || 0) - (sp.acceptedCount || 0));
+  return (
+    <Pressable
+      onPress={() => sp.playId && router.push(`/play/${sp.playId}` as any)}
+      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#16a34a" }}>
+        <Text>🏓</Text>
+        <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>Kèo giao lưu · Tìm bạn đánh</Text>
+        <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{st.label}</Text>
+        </View>
+      </View>
+      <View style={{ padding: 12 }}>
+        <Text style={{ fontWeight: "800", fontSize: 15, color: "#0F172A" }}>{sp.title || sp.courtName || "Kèo pickleball"}</Text>
+        <Text style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>🕒 {formatPlayTime(sp.playAt)}</Text>
+        <Text style={{ fontSize: 13, color: "#64748B" }}>📍 {[sp.courtName, sp.province].filter(Boolean).join(", ") || "—"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
+          <Text style={{ fontSize: 12.5, color: "#64748B", flex: 1 }}>{skillLabel(sp.skillMin, sp.skillMax)} · thiếu {slotsLeft} người</Text>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: sp.status === "open" ? "#16a34a" : "#E2E8F0" }}>
+            <Text style={{ color: sp.status === "open" ? "#fff" : "#94A3B8", fontWeight: "700", fontSize: 12.5 }}>{sp.status === "open" ? "Tham gia" : "Xem kèo"}</Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
@@ -1409,6 +1440,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
       )}
       {post.sharedMatch && <SharedMatchCardRN sm={post.sharedMatch} />}
       {post.sharedListing && <SharedListingCardRN sl={post.sharedListing} />}
+      {post.sharedPlay && <SharedPlayCardRN sp={post.sharedPlay} />}
       {poll && <PollBlockRN poll={poll} onVote={doVote} />}
       {post.media?.length > 0 && (
         <PostMedia

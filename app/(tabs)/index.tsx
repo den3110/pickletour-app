@@ -208,6 +208,24 @@ const FEATURES = [
     link: "/coaches",
     isNew: true,
   },
+  {
+    id: 19,
+    icon: "storefront-outline",
+    iconLib: "Ionicons",
+    title: "Chợ Mua bán",
+    color: "#0d6efd",
+    link: "/marketplace",
+    isNew: true,
+  },
+  {
+    id: 20,
+    icon: "tennisball-outline",
+    iconLib: "Ionicons",
+    title: "Tìm bạn đánh",
+    color: "#16a34a",
+    link: "/play",
+    isNew: true,
+  },
   // Games tạm ẩn khỏi app (route /games và các game con vẫn còn trong bundle,
   // chỉ gỡ lối vào ở màn Home). Bỏ comment để bật lại.
   // {
