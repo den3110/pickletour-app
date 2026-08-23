@@ -1,5 +1,5 @@
 // app/marketplace/index.tsx — Chợ PickleTour (mobile)
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,10 +11,11 @@ import {
   ScrollView,
   useWindowDimensions,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSelector } from "react-redux";
 import MarketCard from "@/components/market/MarketCard";
 import { CATEGORIES, CONDITIONS, TYPES, SORTS } from "@/constants/market";
@@ -48,10 +49,19 @@ export default function MarketplaceScreen() {
     return p;
   }, [q, category, condition, type, sort, page, sellerFilter]);
 
-  const { data, isFetching, isLoading, refetch } = useListMarketQuery(params);
+  const { data, isFetching, isLoading, refetch } = useListMarketQuery(params, {
+    refetchOnMountOrArgChange: true,
+  });
   const [toggleSave] = useToggleSaveMarketMutation();
   const items = data?.items || [];
   const hasMore = data?.hasMore;
+
+  // Làm mới danh sách mỗi khi màn được focus (VD: sau khi đăng tin mới quay lại)
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const cardW = (width - 12 * 3) / 2;
 
@@ -188,6 +198,16 @@ export default function MarketplaceScreen() {
           numColumns={2}
           columnWrapperStyle={{ paddingHorizontal: 12, gap: 12 }}
           contentContainerStyle={{ paddingTop: 12, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching && page === 1}
+              onRefresh={() => {
+                if (page !== 1) setPage(1);
+                else refetch();
+              }}
+              tintColor={BLUE}
+            />
+          }
           renderItem={({ item }) => (
             <MarketCard
               item={item}
