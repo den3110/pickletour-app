@@ -30,6 +30,14 @@ const MORE_ITEMS = [
     accent: "#0d6efd",
   },
   {
+    key: "play",
+    title: "Tìm bạn đánh",
+    description: "Đăng kèo giao lưu, tìm người chơi cùng trình gần bạn.",
+    icon: "tennisball-outline" as const,
+    route: "/play",
+    accent: "#16a34a",
+  },
+  {
     key: "live",
     title: "Live",
     description: "Xem livestream các trận đấu đang diễn ra.",
