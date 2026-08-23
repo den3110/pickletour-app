@@ -94,6 +94,9 @@ export default function MarketplaceScreen() {
           <Text style={{ fontSize: 20, fontWeight: "900", flex: 1, color: "#111827" }}>
             🛍️ Chợ Mua bán
           </Text>
+          <TouchableOpacity onPress={() => router.push("/marketplace/offers" as any)} hitSlop={8}>
+            <Ionicons name="pricetag-outline" size={22} color="#334155" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/marketplace/saved" as any)} hitSlop={8}>
             <Ionicons name="bookmark-outline" size={22} color="#334155" />
           </TouchableOpacity>

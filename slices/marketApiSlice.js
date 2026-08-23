@@ -84,6 +84,15 @@ export const marketApiSlice = apiSlice.injectEndpoints({
         body: { action },
       }),
     }),
+    myMarketOffers: builder.query({
+      query: () => ({ url: `/api/market/offers/mine`, method: "GET" }),
+    }),
+    cancelMarketOffer: builder.mutation({
+      query: (offerId) => ({
+        url: `/api/market/offers/${offerId}`,
+        method: "DELETE",
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -103,4 +112,6 @@ export const {
   useCreateMarketOfferMutation,
   useListMarketOffersQuery,
   useRespondMarketOfferMutation,
+  useMyMarketOffersQuery,
+  useCancelMarketOfferMutation,
 } = marketApiSlice;
