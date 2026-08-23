@@ -2,6 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import { formatPrice } from "@/constants/market";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import {
@@ -185,6 +186,61 @@ function fmtDateRange(startIso?: string, endIso?: string) {
     return `${String(s.getDate()).padStart(2, "0")}–${fmt(e)}`;
   }
   return `${fmt(s)} → ${fmt(e)}`;
+}
+
+function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean }) {
+  if (!listing) return null;
+  const img = listing.images?.[0]?.url || listing.images?.[0] || "";
+  const sold = listing.status === "sold";
+  return (
+    <Pressable
+      onPress={() =>
+        listing._id && router.push(`/marketplace/${listing._id}` as any)
+      }
+      style={{
+        marginTop: 6,
+        width: 236,
+        maxWidth: "100%",
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : "#fff",
+        borderWidth: 1,
+        borderColor: isMine ? "rgba(255,255,255,0.35)" : "#E2E8F0",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 8 }}>
+        <View style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", backgroundColor: "#F1F5F9" }}>
+          {img ? (
+            <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} />
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ fontSize: 22 }}>🛍️</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: "700", color: isMine ? "rgba(255,255,255,0.9)" : "#0066FF" }}>
+            🛍️ Sản phẩm trên Chợ
+          </Text>
+          <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "700", color: isMine ? "#fff" : "#0F172A" }}>
+            {listing.title}
+          </Text>
+          <Text style={{ fontSize: 13.5, fontWeight: "900", color: isMine ? "#fff" : "#0066FF" }}>
+            {sold ? "Đã bán" : formatPrice(listing.price, listing.type)}
+          </Text>
+        </View>
+      </View>
+      <View
+        style={{
+          paddingVertical: 6,
+          alignItems: "center",
+          backgroundColor: isMine ? "rgba(255,255,255,0.25)" : "#0066FF",
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>Xem sản phẩm →</Text>
+      </View>
+    </Pressable>
+  );
 }
 
 function TournamentBubbleCard({ tour, isMine }: { tour: any; isMine: boolean }) {
@@ -1028,6 +1084,9 @@ export default function ChatWindow() {
                       tour={item.linkedTournament}
                       isMine={isMine}
                     />
+                  )}
+                  {item.linkedListing && (
+                    <ListingChatCardRN listing={item.linkedListing} isMine={isMine} />
                   )}
                 </View>
                 </Pressable>
