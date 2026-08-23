@@ -4,6 +4,7 @@ import { Stack, router, useFocusEffect } from "expo-router";
 import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import * as ImagePicker from "expo-image-picker";
+import { CONDITION_MAP, formatPrice } from "@/constants/market";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useState, useCallback, useEffect, useRef } from "react";
@@ -1148,6 +1149,85 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
   );
 }
 
+function SharedListingCardRN({ sl }: { sl: any }) {
+  const cond = CONDITION_MAP[sl.condition];
+  const sold = sl.status === "sold";
+  const cta = sold
+    ? "Đã bán"
+    : sl.type === "trade"
+    ? "Xem / Đổi"
+    : sl.type === "giveaway"
+    ? "Nhận ngay"
+    : "Mua ngay";
+  return (
+    <Pressable
+      onPress={() =>
+        sl.listingId && router.push(`/marketplace/${sl.listingId}` as any)
+      }
+      style={{
+        marginTop: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+        overflow: "hidden",
+        flexDirection: "row",
+      }}
+    >
+      <View style={{ width: 104, height: 104, backgroundColor: "#F1F5F9" }}>
+        {sl.image ? (
+          <Image
+            source={{ uri: sl.image }}
+            style={{ width: "100%", height: "100%", opacity: sold ? 0.6 : 1 }}
+          />
+        ) : (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 30 }}>🛍️</Text>
+          </View>
+        )}
+      </View>
+      <View style={{ flex: 1, padding: 10, gap: 3 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={{ fontSize: 12 }}>🛍️</Text>
+          <Text style={{ color: "#0066FF", fontWeight: "700", fontSize: 12 }}>
+            Sản phẩm trên Chợ
+          </Text>
+        </View>
+        <Text numberOfLines={2} style={{ fontWeight: "700", fontSize: 14, color: "#111827" }}>
+          {sl.title || "Sản phẩm"}
+        </Text>
+        <Text style={{ color: "#0066FF", fontWeight: "900", fontSize: 16 }}>
+          {formatPrice(sl.price, sl.type)}
+        </Text>
+        <View
+          style={{
+            marginTop: "auto",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <Text numberOfLines={1} style={{ color: "#64748B", fontSize: 11, flex: 1 }}>
+            {[cond?.label, sl.province].filter(Boolean).join(" · ")}
+          </Text>
+          <View
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 999,
+              backgroundColor: sold ? "#E2E8F0" : "#0066FF",
+            }}
+          >
+            <Text style={{ color: sold ? "#94A3B8" : "#fff", fontWeight: "700", fontSize: 12 }}>
+              {cta}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
@@ -1328,6 +1408,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
         <TourFeedCard tour={post.linkedTournament} />
       )}
       {post.sharedMatch && <SharedMatchCardRN sm={post.sharedMatch} />}
+      {post.sharedListing && <SharedListingCardRN sl={post.sharedListing} />}
       {poll && <PollBlockRN poll={poll} onVote={doVote} />}
       {post.media?.length > 0 && (
         <PostMedia

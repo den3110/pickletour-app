@@ -36,6 +36,7 @@ import {
   useListMarketOffersQuery,
   useRespondMarketOfferMutation,
 } from "@/slices/marketApiSlice";
+import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
 
 const BLUE = "#0d6efd";
 
@@ -117,6 +118,7 @@ export default function MarketDetailScreen() {
   const [createOffer, { isLoading: offering }] = useCreateMarketOfferMutation();
   const [updateStatus] = useUpdateMarketStatusMutation();
   const [deleteListing] = useDeleteMarketListingMutation();
+  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
 
   const [activeImg, setActiveImg] = useState(0);
   const [offerOpen, setOfferOpen] = useState(false);
@@ -199,6 +201,30 @@ export default function MarketDetailScreen() {
     ]);
   };
 
+  const handleShareToFeed = async () => {
+    if (!me) return router.push("/login" as any);
+    try {
+      await createFeedPost({
+        content: `Mình đang bán trên Chợ: ${item.title}`,
+        sharedListing: {
+          listingId: item._id,
+          title: item.title,
+          price: item.price,
+          type: item.type,
+          condition: item.condition,
+          category: item.category,
+          image: images[0]?.url || images[0] || "",
+          sellerName: item.seller?.nickname || item.seller?.name || "",
+          status: item.status,
+          province: item.location?.province || "",
+        },
+      }).unwrap();
+      Alert.alert("Thành công", "Đã chia sẻ sản phẩm lên bảng tin");
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại");
+    }
+  };
+
   const specs = [
     cat && { label: "Danh mục", value: `${cat.emoji} ${cat.label}` },
     cond && { label: "Tình trạng", value: cond.label },
@@ -230,6 +256,9 @@ export default function MarketDetailScreen() {
         <Text style={{ flex: 1, fontSize: 17, fontWeight: "800", marginLeft: 4 }} numberOfLines={1}>
           Chi tiết
         </Text>
+        <TouchableOpacity onPress={handleShareToFeed} hitSlop={8} disabled={sharing} style={{ marginRight: 14 }}>
+          <Ionicons name="megaphone-outline" size={23} color={sharing ? "#94A3B8" : "#334155"} />
+        </TouchableOpacity>
         {!item.isOwner && (
           <TouchableOpacity onPress={onSave} hitSlop={8}>
             <Ionicons name={item.saved ? "heart" : "heart-outline"} size={24} color={item.saved ? "#e11d48" : "#334155"} />
