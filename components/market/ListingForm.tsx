@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { CATEGORIES, CONDITIONS, TYPES } from "@/constants/market";
 import {
   useMarketCanPostQuery,
@@ -126,9 +127,19 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
     if (res.canceled || !res.assets?.length) return;
     const fd = new FormData();
     for (const a of res.assets) {
-      const name = a.fileName || a.uri.split("/").pop() || "photo.jpg";
-      const t = a.mimeType || "image/jpeg";
-      fd.append("files", { uri: a.uri, name, type: t } as any);
+      // Convert mọi ảnh (kể cả HEIC của iPhone) sang JPEG ngay trên máy —
+      // iOS decode HEIC natively → server + web luôn hiển thị được.
+      let uri = a.uri;
+      try {
+        const m = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1600 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        uri = m.uri;
+      } catch {}
+      const base = (uri.split("/").pop() || "photo").replace(/\.\w+$/, "");
+      fd.append("files", { uri, name: `${base}.jpg`, type: "image/jpeg" } as any);
     }
     try {
       const r: any = await uploadMedia(fd).unwrap();
