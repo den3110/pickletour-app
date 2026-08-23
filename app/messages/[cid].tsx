@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { formatPrice } from "@/constants/market";
+import { formatPlayTime, skillLabel } from "@/constants/play";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import {
@@ -238,6 +239,43 @@ function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean 
         }}
       >
         <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>Xem sản phẩm →</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function PlayChatCardRN({ play, isMine }: { play: any; isMine: boolean }) {
+  if (!play) return null;
+  const slotsLeft = Math.max(0, (play.slots || 0) - (play.acceptedCount || 0));
+  return (
+    <Pressable
+      onPress={() => play._id && router.push(`/play/${play._id}` as any)}
+      style={{
+        marginTop: 6,
+        width: 240,
+        maxWidth: "100%",
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : "#fff",
+        borderWidth: 1,
+        borderColor: isMine ? "rgba(255,255,255,0.35)" : "#E2E8F0",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: isMine ? "rgba(255,255,255,0.2)" : "#16a34a" }}>
+        <Text style={{ fontSize: 12 }}>🏓</Text>
+        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Kèo giao lưu</Text>
+      </View>
+      <View style={{ padding: 10 }}>
+        <Text numberOfLines={1} style={{ fontWeight: "700", fontSize: 13.5, color: isMine ? "#fff" : "#0F172A" }}>
+          {play.title || play.courtName || "Kèo pickleball"}
+        </Text>
+        <Text style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : "#64748B" }}>🕒 {formatPlayTime(play.playAt)}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : "#64748B" }}>
+          {skillLabel(play.skillMin, play.skillMax)} · thiếu {slotsLeft}
+        </Text>
+        <View style={{ marginTop: 6, alignItems: "center", paddingVertical: 5, borderRadius: 8, backgroundColor: isMine ? "rgba(255,255,255,0.25)" : "#16a34a" }}>
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>{play.status === "open" ? "Tham gia →" : "Xem kèo →"}</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -1087,6 +1125,9 @@ export default function ChatWindow() {
                   )}
                   {item.linkedListing && (
                     <ListingChatCardRN listing={item.linkedListing} isMine={isMine} />
+                  )}
+                  {item.linkedPlay && (
+                    <PlayChatCardRN play={item.linkedPlay} isMine={isMine} />
                   )}
                 </View>
                 </Pressable>

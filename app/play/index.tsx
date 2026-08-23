@@ -102,13 +102,18 @@ export default function PlayScreen() {
   const [province, setProvince] = useState("");
   const [skill, setSkill] = useState("");
   const [page, setPage] = useState(1);
+  const [mine, setMine] = useState(false);
 
   const params = useMemo(() => {
     const p: any = { page, limit: 20 };
-    if (province) p.province = province;
-    if (skill) p.skill = skill;
+    if (mine) {
+      p.mine = 1;
+    } else {
+      if (province) p.province = province;
+      if (skill) p.skill = skill;
+    }
     return p;
-  }, [province, skill, page]);
+  }, [province, skill, page, mine]);
 
   const { data, isLoading, isFetching, refetch } = useListInvitesQuery(params, {
     refetchOnMountOrArgChange: true,
@@ -135,28 +140,45 @@ export default function PlayScreen() {
           </TouchableOpacity>
           <Text style={{ fontSize: 20, fontWeight: "900", flex: 1, color: "#111827" }}>🏓 Tìm bạn đánh</Text>
         </View>
+        {/* Tabs */}
         <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 10, height: 40 }}>
-            <Ionicons name="location-outline" size={16} color="#94A3B8" />
-            <TextInput
-              value={province}
-              onChangeText={(v) => { setProvince(v); setPage(1); }}
-              placeholder="Khu vực"
-              placeholderTextColor="#94A3B8"
-              style={{ flex: 1, marginLeft: 6, fontSize: 14, color: "#111827" }}
-            />
-          </View>
-          <View style={{ width: 110, flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 10, height: 40 }}>
-            <TextInput
-              value={skill}
-              onChangeText={(v) => { setSkill(v); setPage(1); }}
-              placeholder="Trình"
-              keyboardType="decimal-pad"
-              placeholderTextColor="#94A3B8"
-              style={{ flex: 1, fontSize: 14, color: "#111827" }}
-            />
-          </View>
+          {[{ k: false, label: "Khám phá" }, { k: true, label: "Kèo của tôi" }].map((t) => {
+            const active = mine === t.k;
+            return (
+              <TouchableOpacity
+                key={String(t.k)}
+                onPress={() => { if (t.k && !me) return router.push("/login" as any); setMine(t.k); setPage(1); }}
+                style={{ paddingHorizontal: 16, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? GREEN : "#F1F5F9" }}
+              >
+                <Text style={{ fontWeight: "700", color: active ? "#fff" : "#334155" }}>{t.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+        {!mine && (
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 10, height: 40 }}>
+              <Ionicons name="location-outline" size={16} color="#94A3B8" />
+              <TextInput
+                value={province}
+                onChangeText={(v) => { setProvince(v); setPage(1); }}
+                placeholder="Khu vực"
+                placeholderTextColor="#94A3B8"
+                style={{ flex: 1, marginLeft: 6, fontSize: 14, color: "#111827" }}
+              />
+            </View>
+            <View style={{ width: 110, flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 10, height: 40 }}>
+              <TextInput
+                value={skill}
+                onChangeText={(v) => { setSkill(v); setPage(1); }}
+                placeholder="Trình"
+                keyboardType="decimal-pad"
+                placeholderTextColor="#94A3B8"
+                style={{ flex: 1, fontSize: 14, color: "#111827" }}
+              />
+            </View>
+          </View>
+        )}
       </View>
 
       {isLoading ? (
