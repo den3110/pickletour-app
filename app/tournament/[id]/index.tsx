@@ -738,33 +738,6 @@ export default function TournamentOverviewScreen() {
                   {dateRange}
                 </Text>
               </View>
-
-              {!!(tournament as any)?.zaloGroupUrl && (
-                <Pressable
-                  onPress={() =>
-                    Linking.openURL(String((tournament as any).zaloGroupUrl))
-                  }
-                  style={({ pressed }) => ({
-                    marginTop: 4,
-                    alignSelf: "flex-start",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 7,
-                    backgroundColor: "#0068FF",
-                    paddingVertical: 8,
-                    paddingHorizontal: 14,
-                    borderRadius: 999,
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Ionicons name="chatbubbles" size={15} color="#fff" />
-                  <Text
-                    style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}
-                  >
-                    Tham gia nhóm Zalo
-                  </Text>
-                </Pressable>
-              )}
             </View>
 
             {/* shortcuts */}
@@ -836,6 +809,23 @@ export default function TournamentOverviewScreen() {
                 </View>
                 <Text style={S.shortcutText}>Đăng ký</Text>
               </Pressable>
+
+              {!!(tournament as any)?.zaloGroupUrl && (
+                <Pressable
+                  onPress={() =>
+                    Linking.openURL(String((tournament as any).zaloGroupUrl))
+                  }
+                  style={({ pressed }) => [
+                    S.shortcut,
+                    { opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <View style={[S.shortcutIcon, { backgroundColor: "#0068FF" }]}>
+                    <Ionicons name="chatbubbles" size={18} color="#fff" />
+                  </View>
+                  <Text style={S.shortcutText}>Nhóm Zalo</Text>
+                </Pressable>
+              )}
             </View>
           </LinearGradient>
 
