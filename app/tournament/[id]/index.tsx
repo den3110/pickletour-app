@@ -46,6 +46,9 @@ import {
 } from "@/utils/matchDisplay";
 
 /* -------------------- helpers (nhẹ, đủ dùng cho overview) -------------------- */
+// Nhóm Zalo cộng đồng — fallback khi giải chưa đặt link Zalo riêng.
+const DEFAULT_ZALO_GROUP = "https://zalo.me/g/yarnhm129";
+
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v || 0));
 const isLive = (m) =>
   ["live", "ongoing", "playing", "inprogress"].includes(
@@ -810,22 +813,24 @@ export default function TournamentOverviewScreen() {
                 <Text style={S.shortcutText}>Đăng ký</Text>
               </Pressable>
 
-              {!!(tournament as any)?.zaloGroupUrl && (
-                <Pressable
-                  onPress={() =>
-                    Linking.openURL(String((tournament as any).zaloGroupUrl))
-                  }
-                  style={({ pressed }) => [
-                    S.shortcut,
-                    { opacity: pressed ? 0.85 : 1 },
-                  ]}
-                >
-                  <View style={[S.shortcutIcon, { backgroundColor: "#0068FF" }]}>
-                    <Ionicons name="chatbubbles" size={18} color="#fff" />
-                  </View>
-                  <Text style={S.shortcutText}>Nhóm Zalo</Text>
-                </Pressable>
-              )}
+              <Pressable
+                onPress={() =>
+                  Linking.openURL(
+                    String(
+                      (tournament as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP
+                    )
+                  )
+                }
+                style={({ pressed }) => [
+                  S.shortcut,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <View style={[S.shortcutIcon, { backgroundColor: "#0068FF" }]}>
+                  <Ionicons name="chatbubbles" size={18} color="#fff" />
+                </View>
+                <Text style={S.shortcutText}>Nhóm Zalo</Text>
+              </Pressable>
             </View>
           </LinearGradient>
 

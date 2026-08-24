@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -25,6 +26,9 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+
+// Nhóm Zalo cộng đồng — fallback khi giải chưa đặt link Zalo riêng.
+const DEFAULT_ZALO_GROUP = "https://zalo.me/g/yarnhm129";
 
 const ViewerImage = (props) => {
   return (
@@ -972,6 +976,36 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             >
               {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
             </OutlineBtn>
+
+            {/* Nhóm Zalo — luôn hiện; dùng link riêng của giải nếu có */}
+            <Pressable
+              onPress={() =>
+                Linking.openURL(
+                  (tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP
+                )
+              }
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: 12,
+                backgroundColor: "#0068FF",
+                marginBottom: 10,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Ionicons
+                name="chatbubbles"
+                size={16}
+                color="#fff"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={{ fontWeight: "700", color: "#fff", fontSize: 13 }}>
+                Nhóm Zalo
+              </Text>
+            </Pressable>
           </View>
         </View>
       </AppleLiquidGlassView>
