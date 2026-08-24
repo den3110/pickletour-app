@@ -938,14 +938,16 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               marginBottom: -10,
             }}
           >
-            {/* ✅ FIX: Lịch đấu luôn hiện cho mọi user (kể cả khách) ở mọi trạng thái */}
-            <PrimaryBtn
-              theme={theme}
-              icon="calendar-outline"
-              onPress={onPressSchedule}
-            >
-              Lịch đấu
-            </PrimaryBtn>
+            {/* Lịch đấu — chỉ hiện khi giải đã có trận (lịch) */}
+            {Number((tt as any)?.matchesTotal) > 0 && (
+              <PrimaryBtn
+                theme={theme}
+                icon="calendar-outline"
+                onPress={onPressSchedule}
+              >
+                Lịch đấu
+              </PrimaryBtn>
+            )}
 
             {/* Trọng tài của giải → nút Chấm trận (thay Đăng ký) */}
             {isRefereeOfThis ? (
@@ -968,16 +970,18 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               )
             )}
 
-            {/* Sơ đồ luôn hiện như trước */}
-            <OutlineBtn
-              theme={theme}
-              icon="git-network-outline"
-              onPress={onPressBracket}
-            >
-              {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
-            </OutlineBtn>
+            {/* Sơ đồ — chỉ hiện khi giải đã có sơ đồ (bracket) */}
+            {Number((tt as any)?.bracketsTotal) > 0 && (
+              <OutlineBtn
+                theme={theme}
+                icon="git-network-outline"
+                onPress={onPressBracket}
+              >
+                {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
+              </OutlineBtn>
+            )}
 
-            {/* Nhóm Zalo — luôn hiện; dùng link riêng của giải nếu có */}
+            {/* Nhóm Zalo — luôn hiện; gọn để nằm cùng 1 dòng */}
             <Pressable
               onPress={() =>
                 Linking.openURL(
@@ -988,7 +992,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
-                paddingHorizontal: 16,
+                paddingHorizontal: 12,
                 paddingVertical: 9,
                 borderRadius: 12,
                 backgroundColor: "#0068FF",
@@ -1000,10 +1004,10 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 name="chatbubbles"
                 size={16}
                 color="#fff"
-                style={{ marginRight: 6 }}
+                style={{ marginRight: 5 }}
               />
               <Text style={{ fontWeight: "700", color: "#fff", fontSize: 13 }}>
-                Nhóm Zalo
+                Zalo
               </Text>
             </Pressable>
           </View>
