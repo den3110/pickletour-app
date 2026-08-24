@@ -420,6 +420,68 @@ function WarningBtn({ onPress, children, theme, icon }) {
   );
 }
 
+// Nút Zalo — cùng style pill/glass với các nút khác, chỉ đổi sang màu xanh Zalo.
+function ZaloBtn({ onPress, children, theme, icon }) {
+  const ZALO = "#0068FF";
+  if (IOS_26_LIQUID_GLASS_ENABLED) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <AppleLiquidGlassView
+          fallback="view"
+          glassColorScheme={theme.isDark ? "dark" : "light"}
+          glassEffectStyle="regular"
+          glassTintColor={
+            theme.isDark ? "rgba(0, 104, 255, 0.24)" : "rgba(255, 255, 255, 0.5)"
+          }
+          isInteractive
+          style={[
+            btnBaseStyle,
+            styles.actionGlassBtn,
+            { backgroundColor: ZALO + "20", borderColor: ZALO + "66" },
+          ]}
+        >
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={16}
+              color={ZALO}
+              style={{ marginRight: 6 }}
+            />
+          )}
+          <Text style={[styles.btnTextWhite, { color: ZALO }]}>{children}</Text>
+        </AppleLiquidGlassView>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        btnBaseStyle,
+        { backgroundColor: ZALO, marginBottom: 10 },
+        theme.btnShadow,
+        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+      ]}
+    >
+      {icon && (
+        <Ionicons
+          name={icon}
+          size={16}
+          color="#fff"
+          style={{ marginRight: 6 }}
+        />
+      )}
+      <Text style={styles.btnTextWhite}>{children}</Text>
+    </Pressable>
+  );
+}
+
 function OutlineBtn({ onPress, children, theme, icon }) {
   return (
     <Pressable
@@ -981,35 +1043,18 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               </OutlineBtn>
             )}
 
-            {/* Nhóm Zalo — luôn hiện; gọn để nằm cùng 1 dòng */}
-            <Pressable
+            {/* Nhóm Zalo — cùng style pill với các nút khác, màu xanh */}
+            <ZaloBtn
+              theme={theme}
+              icon="chatbubbles"
               onPress={() =>
                 Linking.openURL(
                   (tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP
                 )
               }
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 12,
-                paddingVertical: 9,
-                borderRadius: 12,
-                backgroundColor: "#0068FF",
-                marginBottom: 10,
-                opacity: pressed ? 0.85 : 1,
-              })}
             >
-              <Ionicons
-                name="chatbubbles"
-                size={16}
-                color="#fff"
-                style={{ marginRight: 5 }}
-              />
-              <Text style={{ fontWeight: "700", color: "#fff", fontSize: 13 }}>
-                Zalo
-              </Text>
-            </Pressable>
+              Zalo
+            </ZaloBtn>
           </View>
         </View>
       </AppleLiquidGlassView>
