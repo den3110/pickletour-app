@@ -19,6 +19,7 @@ import {
   Animated,
   Easing,
   Platform,
+  Linking,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -737,6 +738,33 @@ export default function TournamentOverviewScreen() {
                   {dateRange}
                 </Text>
               </View>
+
+              {!!(tournament as any)?.zaloGroupUrl && (
+                <Pressable
+                  onPress={() =>
+                    Linking.openURL(String((tournament as any).zaloGroupUrl))
+                  }
+                  style={({ pressed }) => ({
+                    marginTop: 4,
+                    alignSelf: "flex-start",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 7,
+                    backgroundColor: "#0068FF",
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: 999,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <Ionicons name="chatbubbles" size={15} color="#fff" />
+                  <Text
+                    style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}
+                  >
+                    Tham gia nhóm Zalo
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             {/* shortcuts */}

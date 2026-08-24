@@ -58,6 +58,10 @@ const CARD_WIDTH = SCREEN_WIDTH * 0.8;
 const CARD_MARGIN = 16;
 const NEWS_CARD_WIDTH = CARD_WIDTH * 0.85;
 
+/* ---------- Link cộng đồng chính thức của PickleTour ---------- */
+const FANPAGE_URL = "https://www.facebook.com/pickletour2025/";
+const ZALO_GROUP_URL = "https://zalo.me/g/yarnhm129";
+
 /* ---------- Fallback Data ---------- */
 const FALLBACK = {
   address: "Abcd, abcd, abcd",
@@ -68,9 +72,9 @@ const FALLBACK = {
     generalPhone: "0123456789",
   },
   socials: {
-    facebook: "https://facebook.com",
+    facebook: FANPAGE_URL,
     youtube: "https://youtube.com",
-    zalo: "#",
+    zalo: ZALO_GROUP_URL,
   },
 };
 
@@ -1494,15 +1498,19 @@ function ContactCard() {
               Kết nối với chúng tôi
             </Text>
             <View style={styles.socialButtons}>
-              {info?.socials?.facebook && (
-                <SocialButton
-                  bg="#1877F2"
-                  onPress={() => openURL(info.socials.facebook)}
-                >
-                  <FontAwesome name="facebook" size={24} color="#fff" />
-                </SocialButton>
-              )}
-              {info?.socials?.youtube && (
+              <SocialButton
+                bg="#1877F2"
+                onPress={() =>
+                  openURL(
+                    info?.socials?.facebook && info.socials.facebook !== "#"
+                      ? info.socials.facebook
+                      : FANPAGE_URL
+                  )
+                }
+              >
+                <FontAwesome name="facebook" size={24} color="#fff" />
+              </SocialButton>
+              {info?.socials?.youtube && info.socials.youtube !== "#" && (
                 <SocialButton
                   bg="#FF0000"
                   onPress={() => openURL(info.socials.youtube)}
@@ -1510,18 +1518,22 @@ function ContactCard() {
                   <AntDesign name="youtube" size={24} color="#fff" />
                 </SocialButton>
               )}
-              {info?.socials?.zalo && (
-                <SocialButton
-                  bg="#0068FF"
-                  onPress={() => openURL(info.socials.zalo)}
-                >
-                  <Image
-                    source={ZALO_SRC}
-                    style={{ width: 24, height: 24 }}
-                    contentFit="contain"
-                  />
-                </SocialButton>
-              )}
+              <SocialButton
+                bg="#0068FF"
+                onPress={() =>
+                  openURL(
+                    info?.socials?.zalo && info.socials.zalo !== "#"
+                      ? info.socials.zalo
+                      : ZALO_GROUP_URL
+                  )
+                }
+              >
+                <Image
+                  source={ZALO_SRC}
+                  style={{ width: 24, height: 24 }}
+                  contentFit="contain"
+                />
+              </SocialButton>
             </View>
           </View>
         </>
