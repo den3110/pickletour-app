@@ -44,6 +44,7 @@ import {
   reportSuccess,
 } from "@/utils/contentModeration";
 import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
+import { PostAttachments } from "@/components/feed/PostAttachments";
 import { MentionText } from "@/components/feed/MentionText";
 import { AspectImage } from "@/components/feed/AspectImage";
 import { ReactorsModal } from "@/components/feed/ReactorsModal";
@@ -995,6 +996,10 @@ export default function FeedPostDetail() {
                 );
               })()
             )}
+
+            {/* Giải đấu / bình chọn / kết quả trận được gán vào bài — giống Bảng tin */}
+            <PostAttachments post={post} />
+
             {viewerOpen && (
               <FeedMediaViewer
                 visible={viewerOpen}
