@@ -23,6 +23,7 @@ import {
   Linking,
   TouchableOpacity,
   useColorScheme,
+  FlatList,
   ScrollView,
   useWindowDimensions,
   SafeAreaView,
@@ -1585,6 +1586,25 @@ export default function TournamentRegistrationScreen() {
     () => (regs || []).filter((r: any) => r.status === "waitlisted"),
     [regs],
   );
+  // Danh sách TỪNG VĐV (tách khỏi cặp) xếp theo điểm trình giảm dần.
+  const [athletesOpen, setAthletesOpen] = useState(false);
+  const rankedAthletes = useMemo(() => {
+    const players: any[] = [];
+    const seen = new Set<string>();
+    for (const r of approvedRegs as any[]) {
+      for (const pl of [r?.player1, r?.player2]) {
+        if (!pl) continue;
+        const key = String(pl.user || pl.phone || pl.nickName || pl.fullName || "");
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        players.push(pl);
+      }
+    }
+    players.sort(
+      (a, b) => (Number(b?.score) || 0) - (Number(a?.score) || 0)
+    );
+    return players;
+  }, [approvedRegs]);
   // Chỉ tính cặp chính thức (approved), KHÔNG gộp waitlist — khớp bản web.
   const regTotal = approvedRegs.length;
   const paidCount = approvedRegs.filter(
@@ -2782,6 +2802,25 @@ export default function TournamentRegistrationScreen() {
               </RegisterGlassSurface>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            onPress={() => setAthletesOpen(true)}
+            style={{
+              marginTop: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingVertical: 12,
+              borderRadius: 12,
+              backgroundColor: "#2563EB",
+            }}
+          >
+            <Ionicons name="podium-outline" size={18} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>
+              Các VĐV đã đăng ký
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -3602,6 +3641,149 @@ export default function TournamentRegistrationScreen() {
           loading={historyLoading}
           C={C}
         />
+
+        {/* Modal: Các VĐV đã đăng ký — xếp theo điểm trình */}
+        <Modal
+          visible={athletesOpen}
+          animationType="slide"
+          onRequestClose={() => setAthletesOpen(false)}
+          presentationStyle="pageSheet"
+        >
+          <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16,
+                paddingTop: 16,
+                paddingBottom: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: C.border,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: C.textPrimary }}>
+                  Các VĐV đã đăng ký
+                </Text>
+                <Text style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
+                  {rankedAthletes.length} VĐV · xếp theo điểm trình{" "}
+                  {isSingles ? "đơn" : "đôi"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setAthletesOpen(false)} hitSlop={10}>
+                <Ionicons name="close" size={26} color={C.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={rankedAthletes}
+              keyExtractor={(item, index) =>
+                String(item?.user || item?.phone || index)
+              }
+              contentContainerStyle={{ padding: 12 }}
+              ListEmptyComponent={
+                <Text
+                  style={{
+                    textAlign: "center",
+                    color: C.textSecondary,
+                    marginTop: 40,
+                  }}
+                >
+                  Chưa có VĐV nào đăng ký.
+                </Text>
+              }
+              renderItem={({ item, index }) => {
+                const rank = index + 1;
+                const medal =
+                  rank === 1
+                    ? "#F59E0B"
+                    : rank === 2
+                    ? "#94A3B8"
+                    : rank === 3
+                    ? "#B45309"
+                    : C.textSecondary;
+                const name = item?.nickName || item?.fullName || "VĐV";
+                return (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: C.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        width: 28,
+                        textAlign: "center",
+                        fontWeight: "800",
+                        fontSize: 15,
+                        color: medal,
+                      }}
+                    >
+                      {rank}
+                    </Text>
+                    {item?.avatar ? (
+                      <ExpoImage
+                        source={{ uri: normalizeUrl(item.avatar) }}
+                        style={{ width: 40, height: 40, borderRadius: 20 }}
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: C.chipBg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ fontWeight: "800", color: C.textPrimary }}>
+                          {String(name).charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{ fontWeight: "700", color: C.textPrimary }}
+                        numberOfLines={1}
+                      >
+                        {name}
+                      </Text>
+                      {item?.fullName &&
+                      item?.nickName &&
+                      item.fullName !== item.nickName ? (
+                        <Text
+                          style={{ fontSize: 12, color: C.textSecondary }}
+                          numberOfLines={1}
+                        >
+                          {item.fullName}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 10,
+                        backgroundColor: "#2563EB",
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>
+                        {(Number(item?.score) || 0).toFixed(3)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </Modal>
       </View>
     </>
   );
