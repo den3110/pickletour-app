@@ -2160,6 +2160,29 @@ export default function TournamentScheduleNative() {
         </Text>
       </Pressable>
 
+      {manager && (
+        <Pressable
+          onPress={() => router.push(`/tournament/${id}/group-pairs`)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginHorizontal: 12,
+            marginBottom: 10,
+            paddingVertical: 11,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: T.border,
+          }}
+        >
+          <Ionicons name="people-outline" size={16} color={T.text} />
+          <Text style={{ color: T.text, fontWeight: "800", fontSize: 13 }}>
+            Thêm / Chuyển cặp (vòng bảng)
+          </Text>
+        </Pressable>
+      )}
+
       <View style={stylesNew.statusTabs}>
         {STATUS_TABS.map((it) => {
           const active = status === it.key;

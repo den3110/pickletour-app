@@ -441,6 +441,23 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: (r, e, arg) => [{ type: "Matches", id: arg.bracketId }],
     }),
 
+    addPairToGroup: builder.mutation({
+      query: ({ bracketId, groupId, regId }) => ({
+        url: `/api/draw/brackets/${bracketId}/groups/${groupId}/add-pair`,
+        method: "POST",
+        body: { regId },
+      }),
+      invalidatesTags: ["ADMIN_BRACKETS"],
+    }),
+    movePairBetweenGroups: builder.mutation({
+      query: ({ bracketId, regId, toGroupId }) => ({
+        url: `/api/draw/brackets/${bracketId}/move-pair`,
+        method: "POST",
+        body: { regId, toGroupId },
+      }),
+      invalidatesTags: ["ADMIN_BRACKETS"],
+    }),
+
     managerReplaceRegPlayer: builder.mutation({
       query: ({ regId, slot, userId }) => ({
         url: `/api/registrations/${regId}/manager/replace-player`,
@@ -919,6 +936,8 @@ export const {
   useManagerReplaceRegPlayerMutation,
   useListPublicMatchesByTournamentQuery,
   useAdminGetBracketsQuery,
+  useAddPairToGroupMutation,
+  useMovePairBetweenGroupsMutation,
   useListRefereeMatchesByTournamentQuery,
   useAdminListMatchesByTournamentQuery,
   useAdminSetMatchLiveUrlMutation,
