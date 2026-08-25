@@ -1653,6 +1653,53 @@ export default function TournamentRegistrationScreen() {
     });
   }, [approvedRegs, searchQ, tour]);
 
+  // Bộ lọc cho quản lý/admin
+  const eachCap = Number((tour as any)?.singleCap ?? 0);
+  const REG_FILTERS = useMemo(
+    () => [
+      { key: "over", label: "Vượt điểm trình" },
+      { key: "unpaid", label: "Chưa thanh toán" },
+      { key: "unrated", label: "VĐV chưa chấm trình" },
+      { key: "newbie", label: "VĐV chưa dự giải nào" },
+    ],
+    []
+  );
+  const [regFilters, setRegFilters] = useState<Set<string>>(() => new Set());
+  const toggleRegFilter = (key: string) =>
+    setRegFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const matchRegFilter = useCallback(
+    (r: any, key: string) => {
+      const EPS = 0.001;
+      const players = [r?.player1, r?.player2].filter(Boolean);
+      if (key === "over") {
+        const total = totalScoreOf(r, isSingles);
+        const overTotal = cap > 0 && total != null && total > cap + EPS;
+        const overSingle =
+          eachCap > 0 && players.some((p: any) => Number(p.score) > eachCap + EPS);
+        return overTotal || overSingle;
+      }
+      if (key === "unpaid")
+        return String(r?.payment?.status || "").toLowerCase() !== "paid";
+      if (key === "unrated")
+        return players.some((p: any) => Number(p.score) === 0);
+      if (key === "newbie")
+        return players.some((p: any) => Number(p.scoreTotalTours || 0) === 0);
+      return true;
+    },
+    [cap, eachCap, isSingles]
+  );
+  const displayRegs = useMemo(() => {
+    if (!canManage || regFilters.size === 0) return filteredRegs;
+    return filteredRegs.filter((r: any) =>
+      [...regFilters].every((k) => matchRegFilter(r, k))
+    );
+  }, [filteredRegs, regFilters, canManage, matchRegFilter]);
+
   const [managerSetRegStatus] = useManagerSetRegStatusMutation();
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const handlePromoteWaitlist = useCallback(
@@ -2784,7 +2831,7 @@ export default function TournamentRegistrationScreen() {
                     color: C.textPrimary,
                   }}
                 >
-                  {filteredRegs.length}
+                  {displayRegs.length}
                 </Text>
               </RegisterGlassSurface>
             </View>
@@ -2821,6 +2868,60 @@ export default function TournamentRegistrationScreen() {
               Các VĐV đã đăng ký
             </Text>
           </TouchableOpacity>
+
+          {canManage && (
+            <View
+              style={{
+                marginTop: 10,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: C.textSecondary,
+                  fontWeight: "700",
+                  fontSize: 12,
+                }}
+              >
+                Lọc:
+              </Text>
+              {REG_FILTERS.map((f) => {
+                const active = regFilters.has(f.key);
+                return (
+                  <Pressable
+                    key={f.key}
+                    onPress={() => toggleRegFilter(f.key)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? "#2563EB" : C.border,
+                      backgroundColor: active ? "#2563EB" : "transparent",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: active ? "#fff" : C.textPrimary,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {regFilters.size > 0 && (
+                <Text style={{ color: C.textSecondary, fontSize: 12 }}>
+                  Khớp: {displayRegs.length}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -2841,6 +2942,9 @@ export default function TournamentRegistrationScreen() {
       canManage,
       id,
       filteredRegs.length,
+      displayRegs.length,
+      regFilters,
+      REG_FILTERS,
       me,
       isSingles,
       isDoubles,
@@ -2905,7 +3009,7 @@ export default function TournamentRegistrationScreen() {
           )}
         </RegisterGlassSurface>
         <FlashList
-          data={filteredRegs}
+          data={displayRegs}
           estimatedItemSize={150}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -2992,7 +3096,7 @@ export default function TournamentRegistrationScreen() {
         {/* Main List */}
         <FlashList
           ref={listRef}
-          data={filteredRegs}
+          data={displayRegs}
           estimatedItemSize={180}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
