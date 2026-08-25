@@ -14,6 +14,7 @@ import React, {
   useState,
 } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,7 @@ import {
   useListTournamentBracketsQuery,
   useListPublicMatchesByTournamentQuery,
   useVerifyRefereeQuery,
+  useAutoScheduleTournamentMutation,
 } from "@/slices/tournamentsApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import {
@@ -1618,6 +1620,56 @@ export default function TournamentScheduleNative() {
     skip: !id || !me?._id,
   });
   const referee = !!(inferredReferee || refereeCheck?.isReferee);
+
+  const [autoSchedule, { isLoading: autoScheduling }] =
+    useAutoScheduleTournamentMutation();
+  const runAutoSchedule = useCallback(
+    async (courtsOverride?: number) => {
+      try {
+        const res: any = await autoSchedule({
+          tourId: id,
+          courts: courtsOverride,
+        }).unwrap();
+        refetchMatches?.();
+        Alert.alert(
+          "Đã xếp giờ",
+          `Đã tự động xếp giờ ${res.updated} trận trên ${res.courtCount} sân.`
+        );
+      } catch (e: any) {
+        if (e?.data?.code === "NO_COURTS") {
+          if (Platform.OS === "ios" && (Alert as any).prompt) {
+            (Alert as any).prompt(
+              "Nhập số sân",
+              "Giải chưa có sân — nhập số sân để xếp giờ:",
+              [
+                { text: "Huỷ", style: "cancel" },
+                {
+                  text: "Xếp giờ",
+                  onPress: (val: string) => {
+                    const n = Number(val);
+                    if (n > 0) runAutoSchedule(n);
+                  },
+                },
+              ],
+              "plain-text",
+              "5"
+            );
+          } else {
+            Alert.alert(
+              "Chưa có sân",
+              "Giải chưa tạo sân. Vui lòng tạo sân cho giải (hoặc dùng trang web để nhập số sân) trước khi xếp giờ."
+            );
+          }
+          return;
+        }
+        Alert.alert(
+          "Lỗi",
+          e?.data?.message || "Tự động xếp giờ thất bại. Vui lòng thử lại."
+        );
+      }
+    },
+    [autoSchedule, id, refetchMatches]
+  );
   const allSorted = useMemo(() => {
     return [...enrichedMatches].sort((a, b) => {
       const ak = orderKey(a);
@@ -1990,6 +2042,29 @@ export default function TournamentScheduleNative() {
           placeholderTextColor={T.muted}
         />
       </View>
+
+      {manager && (
+        <Pressable
+          onPress={() => !autoScheduling && runAutoSchedule()}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginHorizontal: 12,
+            marginBottom: 10,
+            paddingVertical: 11,
+            borderRadius: 12,
+            backgroundColor: T.tint,
+            opacity: autoScheduling ? 0.6 : 1,
+          }}
+        >
+          <Ionicons name="time-outline" size={17} color="#fff" />
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>
+            {autoScheduling ? "Đang xếp giờ…" : "Tự động xếp giờ thi đấu"}
+          </Text>
+        </Pressable>
+      )}
 
       <View style={stylesNew.statusTabs}>
         {STATUS_TABS.map((it) => {

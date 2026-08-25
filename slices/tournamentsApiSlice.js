@@ -74,6 +74,15 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Tournaments"],
     }),
 
+    // Tự động tính giờ bắt đầu các trận. body: { courts? }
+    autoScheduleTournament: builder.mutation({
+      query: ({ tourId, courts }) => ({
+        url: `/api/tournaments/${tourId}/auto-schedule`,
+        method: "POST",
+        body: courts ? { courts } : {},
+      }),
+    }),
+
     /* ---------------------------------- REG LIST ---------------------------------- */
     getRegistrations: builder.query({
       query: (tourId) => `/api/tournaments/${tourId}/registrations`,
@@ -864,6 +873,7 @@ export const {
 
   // đã có
   useGetTournamentsQuery,
+  useAutoScheduleTournamentMutation,
   useGetRegistrationsQuery,
   useCreateRegistrationMutation,
   useUpdatePaymentMutation,
