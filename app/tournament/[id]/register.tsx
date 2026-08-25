@@ -3809,8 +3809,13 @@ export default function TournamentRegistrationScreen() {
                     : C.textSecondary;
                 const name = item?.nickName || item?.fullName || "VĐV";
                 return (
-                  <View
-                    style={{
+                  <Pressable
+                    onPress={() => {
+                      if (!item?.user) return;
+                      setAthletesOpen(false);
+                      openProfileByPlayer(item);
+                    }}
+                    style={({ pressed }) => ({
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 12,
@@ -3818,7 +3823,8 @@ export default function TournamentRegistrationScreen() {
                       paddingHorizontal: 8,
                       borderBottomWidth: 1,
                       borderBottomColor: C.border,
-                    }}
+                      opacity: pressed ? 0.6 : 1,
+                    })}
                   >
                     <Text
                       style={{
@@ -3882,7 +3888,7 @@ export default function TournamentRegistrationScreen() {
                         {(Number(item?.score) || 0).toFixed(3)}
                       </Text>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               }}
             />
