@@ -15,6 +15,7 @@ import React, {
 } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1623,17 +1624,25 @@ export default function TournamentScheduleNative() {
 
   const [autoSchedule, { isLoading: autoScheduling }] =
     useAutoScheduleTournamentMutation();
+  const [schedModalOpen, setSchedModalOpen] = useState(false);
+  const [timeInput, setTimeInput] = useState("07:00");
   const runAutoSchedule = useCallback(
-    async (courtsOverride?: number) => {
+    async (params: { mode?: "plan" | "live"; startAt?: string; courts?: number } = {}) => {
+      const { mode = "plan", startAt, courts } = params;
       try {
         const res: any = await autoSchedule({
           tourId: id,
-          courts: courtsOverride,
+          mode,
+          startAt,
+          courts,
         }).unwrap();
         refetchMatches?.();
         Alert.alert(
-          "Đã xếp giờ",
-          `Đã tự động xếp giờ ${res.updated} trận trên ${res.courtCount} sân.`
+          mode === "live" ? "Đã tính lại theo tiến độ" : "Đã xếp giờ",
+          `Đã ${mode === "live" ? "tính lại" : "xếp giờ"} ${res.updated} trận trên ${res.courtCount} sân.` +
+            (mode === "live" && res.avgUsedMin
+              ? `\nThời lượng TB thực tế: ~${res.avgUsedMin} phút (${res.sampleCount} trận đã xong).`
+              : "")
         );
       } catch (e: any) {
         if (e?.data?.code === "NO_COURTS") {
@@ -1647,7 +1656,7 @@ export default function TournamentScheduleNative() {
                   text: "Xếp giờ",
                   onPress: (val: string) => {
                     const n = Number(val);
-                    if (n > 0) runAutoSchedule(n);
+                    if (n > 0) runAutoSchedule({ ...params, courts: n });
                   },
                 },
               ],
@@ -1670,6 +1679,42 @@ export default function TournamentScheduleNative() {
     },
     [autoSchedule, id, refetchMatches]
   );
+  const openScheduleModal = useCallback(() => {
+    // Giờ mặc định: firstMatchStartAt (nếu có) → 07:00.
+    let hhmm = "07:00";
+    const f = (tournament as any)?.firstMatchStartAt;
+    if (f) {
+      const d = new Date(f);
+      hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(
+        d.getMinutes()
+      ).padStart(2, "0")}`;
+    }
+    setTimeInput(hhmm);
+    setSchedModalOpen(true);
+  }, [tournament]);
+  const submitScheduleModal = useCallback(() => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(timeInput.trim());
+    if (!m) {
+      Alert.alert("Sai định dạng", "Nhập giờ theo dạng HH:mm, ví dụ 14:00.");
+      return;
+    }
+    const hh = Math.min(23, Number(m[1]));
+    const mm = Math.min(59, Number(m[2]));
+    const baseDate = (tournament as any)?.startDate
+      ? new Date((tournament as any).startDate)
+      : new Date();
+    const startAt = new Date(
+      baseDate.getFullYear(),
+      baseDate.getMonth(),
+      baseDate.getDate(),
+      hh,
+      mm,
+      0,
+      0
+    );
+    setSchedModalOpen(false);
+    runAutoSchedule({ mode: "plan", startAt: startAt.toISOString() });
+  }, [timeInput, tournament, runAutoSchedule]);
   const allSorted = useMemo(() => {
     return [...enrichedMatches].sort((a, b) => {
       const ak = orderKey(a);
@@ -2044,26 +2089,54 @@ export default function TournamentScheduleNative() {
       </View>
 
       {manager && (
-        <Pressable
-          onPress={() => !autoScheduling && runAutoSchedule()}
+        <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
             gap: 8,
             marginHorizontal: 12,
             marginBottom: 10,
-            paddingVertical: 11,
-            borderRadius: 12,
-            backgroundColor: T.tint,
-            opacity: autoScheduling ? 0.6 : 1,
           }}
         >
-          <Ionicons name="time-outline" size={17} color="#fff" />
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>
-            {autoScheduling ? "Đang xếp giờ…" : "Tự động xếp giờ thi đấu"}
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={() => !autoScheduling && openScheduleModal()}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              paddingVertical: 11,
+              borderRadius: 12,
+              backgroundColor: T.tint,
+              opacity: autoScheduling ? 0.6 : 1,
+            }}
+          >
+            <Ionicons name="time-outline" size={16} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>
+              {autoScheduling ? "Đang xếp…" : "Tự động xếp giờ"}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => !autoScheduling && runAutoSchedule({ mode: "live" })}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              paddingVertical: 11,
+              borderRadius: 12,
+              borderWidth: 1.5,
+              borderColor: T.tint,
+              opacity: autoScheduling ? 0.6 : 1,
+            }}
+          >
+            <Ionicons name="refresh" size={16} color={T.tint} />
+            <Text style={{ color: T.tint, fontWeight: "800", fontSize: 13 }}>
+              Tính lại theo tiến độ
+            </Text>
+          </Pressable>
+        </View>
       )}
 
       <View style={stylesNew.statusTabs}>
@@ -2466,6 +2539,90 @@ export default function TournamentScheduleNative() {
           matchId={selectedMatchId}
           onClose={closeViewer}
         />
+
+        {/* Modal nhập giờ bắt đầu trận đầu */}
+        <Modal
+          visible={schedModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSchedModalOpen(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.45)",
+              justifyContent: "center",
+              padding: 24,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: T.cardBg,
+                borderRadius: 16,
+                padding: 20,
+              }}
+            >
+              <Text
+                style={{ fontSize: 17, fontWeight: "800", color: T.text }}
+              >
+                Tự động xếp giờ
+              </Text>
+              <Text
+                style={{ fontSize: 13, color: T.muted, marginTop: 6 }}
+              >
+                Nhập giờ bắt đầu trận đầu tiên (HH:mm). Hệ thống sẽ tính giờ cho
+                toàn bộ các trận theo số sân.
+              </Text>
+              <TextInput
+                value={timeInput}
+                onChangeText={setTimeInput}
+                placeholder="07:00"
+                placeholderTextColor={T.muted}
+                keyboardType="numbers-and-punctuation"
+                style={{
+                  marginTop: 14,
+                  borderWidth: 1,
+                  borderColor: T.border,
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: T.text,
+                  textAlign: "center",
+                }}
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 10,
+                  marginTop: 18,
+                }}
+              >
+                <Pressable
+                  onPress={() => setSchedModalOpen(false)}
+                  style={{ paddingVertical: 10, paddingHorizontal: 16 }}
+                >
+                  <Text style={{ color: T.muted, fontWeight: "700" }}>Huỷ</Text>
+                </Pressable>
+                <Pressable
+                  onPress={submitScheduleModal}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 20,
+                    borderRadius: 10,
+                    backgroundColor: T.tint,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>
+                    Xếp giờ
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </BottomSheetModalProvider>
   );
