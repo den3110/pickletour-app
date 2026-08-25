@@ -21,6 +21,7 @@ import {
   TextInput,
   View,
   Linking,
+  Pressable,
   TouchableOpacity,
   useColorScheme,
   FlatList,
