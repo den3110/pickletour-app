@@ -144,6 +144,21 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
       providesTags: (res, err, id) => [{ type: "Tournaments", id }],
     }),
 
+    // Sửa chức vụ / ẩn-hiện 1 thành viên BTC (creator hoặc đồng quản lý).
+    updateOrganizer: builder.mutation({
+      query: ({ tournamentId, userId, title, hidden }) => ({
+        url: `/api/tournaments/${tournamentId}/organizers/${userId}`,
+        method: "PATCH",
+        body: {
+          ...(title !== undefined ? { title } : {}),
+          ...(hidden !== undefined ? { hidden } : {}),
+        },
+      }),
+      invalidatesTags: (r, e, arg) => [
+        { type: "Tournaments", id: arg.tournamentId },
+      ],
+    }),
+
     // Lịch sử đăng ký (admin/manager) — audit log CRUD registration + payment + complaint
     getTournamentRegistrationHistory: builder.query({
       query: ({ tourId, limit = 200 }) =>
@@ -900,6 +915,7 @@ export const {
   useUpdatePaymentMutation,
   useCheckinMutation,
   useGetTournamentQuery,
+  useUpdateOrganizerMutation,
   useGetTournamentRegistrationHistoryQuery,
   useLazyGetTournamentRegistrationHistoryQuery,
   useLazyGetTournamentQuery, // ✅ export thêm lazy
