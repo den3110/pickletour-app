@@ -18,6 +18,8 @@ import {
   useKickMemberMutation,
   useSetRoleMutation,
   useAddMemberMutation,
+  useBanMemberMutation,
+  useUnbanMemberMutation,
 } from "@/slices/clubsApiSlice";
 import * as Haptics from "expo-haptics";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -188,9 +190,48 @@ export default function ClubMembersManagerRN({ club, canManage }) {
   const [kickMember, { isLoading: kicking }] = useKickMemberMutation();
   const [setRole, { isLoading: settingRole }] = useSetRoleMutation();
   const [addMember, { isLoading: adding }] = useAddMemberMutation();
+  const [banMember] = useBanMemberMutation();
+  const [unbanMember] = useUnbanMemberMutation();
 
   const [addKey, setAddKey] = useState("");
+  const [showBanned, setShowBanned] = useState(false);
+  const { data: bannedData, refetch: refetchBanned } = useListMembersQuery(
+    { id: clubId, params: { status: "banned" } },
+    { skip: !clubId || !canManage || !showBanned }
+  );
+  const bannedMembers = useMemo(() => bannedData?.items || [], [bannedData]);
   const members = useMemo(() => data?.items || [], [data]);
+
+  const doBan = (m: any) => {
+    const name =
+      m?.user?.nickname || m?.user?.fullName || m?.user?.email || "thành viên";
+    Alert.alert("Cấm thành viên", `Cấm ${name} khỏi CLB? Người này sẽ không thể tự tham gia lại.`, [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Cấm",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await banMember({ id: clubId, userId: m?.user?._id }).unwrap();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            refetch();
+          } catch (err: any) {
+            Alert.alert("Lỗi", err?.data?.message || "Không thể cấm.");
+          }
+        },
+      },
+    ]);
+  };
+  const doUnban = async (m: any) => {
+    try {
+      await unbanMember({ id: clubId, userId: m?.user?._id }).unwrap();
+      Haptics.selectionAsync();
+      refetch();
+      refetchBanned();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err?.data?.message || "Không thể bỏ cấm.");
+    }
+  };
 
   const handleAdd = async () => {
     const key = addKey.trim();
@@ -296,6 +337,41 @@ export default function ClubMembersManagerRN({ club, canManage }) {
                     </Text>
                   </View>
 
+                  {/* Điểm trình đôi/đơn */}
+                  {(Number(m?.user?.score?.double) > 0 ||
+                    Number(m?.user?.score?.single) > 0) && (
+                    <View style={styles.scoreRow}>
+                      {Number(m?.user?.score?.double) > 0 && (
+                        <View
+                          style={[
+                            styles.scoreChip,
+                            { backgroundColor: colors.roleAdminBg },
+                          ]}
+                        >
+                          <Text
+                            style={[styles.scoreText, { color: colors.roleAdminText }]}
+                          >
+                            Đôi {Number(m.user.score.double).toFixed(3)}
+                          </Text>
+                        </View>
+                      )}
+                      {Number(m?.user?.score?.single) > 0 && (
+                        <View
+                          style={[
+                            styles.scoreChip,
+                            { backgroundColor: isDark ? "rgba(52,199,89,0.18)" : "#E4F7EC" },
+                          ]}
+                        >
+                          <Text
+                            style={[styles.scoreText, { color: isDark ? "#5DD989" : "#1B7A46" }]}
+                          >
+                            Đơn {Number(m.user.score.single).toFixed(3)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
                   {canManage && role !== "owner" && (
                     <View style={styles.actionsRow}>
                       <SmallGradBtn
@@ -311,6 +387,13 @@ export default function ClubMembersManagerRN({ club, canManage }) {
                           Haptics.selectionAsync();
                           refetch();
                         }}
+                      />
+                      <SmallDangerBtn
+                        title="Cấm"
+                        disabled={false}
+                        isDark={isDark}
+                        style={{ paddingHorizontal: 8 }}
+                        onPress={() => doBan(m)}
                       />
                       <SmallDangerBtn
                         title="Kick"
@@ -386,7 +469,25 @@ export default function ClubMembersManagerRN({ club, canManage }) {
         </View>
       )}
 
-      <View style={styles.toolbar}>
+      <View style={[styles.toolbar, { justifyContent: "space-between" }]}>
+        {canManage ? (
+          <TouchableOpacity
+            onPress={() => setShowBanned((v) => !v)}
+            style={styles.refreshBtn}
+          >
+            <Ionicons
+              name="ban"
+              size={14}
+              color="#B4232D"
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.refreshText, { color: "#B4232D" }]}>
+              {showBanned ? "Ẩn bị cấm" : "Bị cấm"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View />
+        )}
         <TouchableOpacity
           onPress={refetch}
           disabled={isFetching}
@@ -412,6 +513,41 @@ export default function ClubMembersManagerRN({ club, canManage }) {
           )}
         </TouchableOpacity>
       </View>
+
+      {canManage && showBanned && (
+        <View style={{ marginBottom: 12 }}>
+          <GradLightCard pad={14} colors={colors}>
+            <Text style={[styles.addLabel, { color: "#B4232D" }]}>
+              Thành viên bị cấm ({bannedMembers.length})
+            </Text>
+            {bannedMembers.length === 0 ? (
+              <Text style={[styles.hintText, { color: colors.subText }]}>
+                Không có thành viên nào bị cấm.
+              </Text>
+            ) : (
+              bannedMembers.map((m: any) => (
+                <View key={m._id} style={styles.bannedRow}>
+                  <UserAvatar uri={m?.user?.avatar} size={34} colors={colors} />
+                  <Text
+                    style={[styles.bannedName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {m?.user?.nickname ||
+                      m?.user?.fullName ||
+                      m?.user?.email ||
+                      "Người dùng"}
+                  </Text>
+                  <SmallGradBtn
+                    title="Bỏ cấm"
+                    onPress={() => doUnban(m)}
+                    style={{ paddingHorizontal: 12 }}
+                  />
+                </View>
+              ))
+            )}
+          </GradLightCard>
+        </View>
+      )}
 
       <View style={styles.contentWrapper}>{renderContent()}</View>
     </Section>
@@ -487,6 +623,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   pillText: { fontSize: 12, fontWeight: "700" },
+  scoreRow: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 6,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  scoreChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  scoreText: { fontSize: 10.5, fontWeight: "700" },
+  bannedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+  },
+  bannedName: { flex: 1, fontWeight: "600", fontSize: 13.5 },
   actionsRow: {
     flexDirection: "row",
     gap: 6,

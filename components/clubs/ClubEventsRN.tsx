@@ -22,7 +22,10 @@ import {
   useDeleteEventMutation,
   useCreateEventMutation,
   useUpdateEventMutation,
+  useListEventAttendeesQuery,
 } from "@/slices/clubsApiSlice";
+import { Image as ExpoImage } from "expo-image";
+import { normalizeUrl } from "@/utils/normalizeUri";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -164,6 +167,69 @@ function SmallDangerGhostBtn({
 
 const fmt = (s?: string | Date) =>
   s ? dayjs(s).format("HH:mm, DD/MM/YYYY") : "—";
+
+/* Danh sách người tham gia sự kiện (mở/đóng, fetch khi mở) */
+function EventAttendees({ clubId, event }: { clubId: string; event: any }) {
+  const [open, setOpen] = useState(false);
+  const { data, isFetching } = useListEventAttendeesQuery(
+    { id: clubId, eventId: event._id },
+    { skip: !open }
+  );
+  const attendees = data?.items || [];
+  const count = Number(event.attendeesCount || 0);
+  if (!count) return null;
+  return (
+    <View style={{ marginTop: 10 }}>
+      <TouchableOpacity
+        onPress={() => setOpen((v) => !v)}
+        style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+      >
+        <MaterialCommunityIcons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={16}
+          color="#5C6285"
+        />
+        <Text style={{ color: "#5C6285", fontWeight: "700", fontSize: 12.5 }}>
+          Người tham gia ({count})
+        </Text>
+      </TouchableOpacity>
+      {open && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          {isFetching ? (
+            <Text style={{ color: "#7780A1", fontSize: 12 }}>Đang tải…</Text>
+          ) : attendees.length === 0 ? (
+            <Text style={{ color: "#7780A1", fontSize: 12 }}>Chưa có ai.</Text>
+          ) : (
+            attendees.map((u: any) => (
+              <View
+                key={u._id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  backgroundColor: "#F3F4FF",
+                  borderRadius: 999,
+                  paddingVertical: 3,
+                  paddingHorizontal: 8,
+                  borderWidth: 1,
+                  borderColor: "#E6E8F5",
+                }}
+              >
+                <ExpoImage
+                  source={{ uri: normalizeUrl(u.avatar) }}
+                  style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: "#E0E7FF" }}
+                />
+                <Text style={{ color: "#3B3F75", fontSize: 12, fontWeight: "600" }}>
+                  {u.nickname || u.fullName || "Người dùng"}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
 
 /* ---------- Main ---------- */
 export default function ClubEventsRN({
@@ -476,6 +542,8 @@ export default function ClubEventsRN({
                 />
               </View>
             )}
+
+            <EventAttendees clubId={clubId} event={ev} />
           </GradLightCard>
         );
       })}
