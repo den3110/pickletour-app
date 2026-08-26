@@ -7,15 +7,18 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Section, EmptyState } from "./ui";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
 import {
   useListPostsQuery,
   useCreatePostMutation,
@@ -25,6 +28,9 @@ import {
   useCreatePostCommentMutation,
   useDeletePostCommentMutation,
 } from "@/slices/clubsApiSlice";
+
+const pickUrl = (res: any) =>
+  res?.url || res?.secure_url || res?.data?.url || res?.path || "";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -309,11 +315,38 @@ export default function ClubDiscussionRN({
     { skip: !clubId }
   );
   const [createPost, { isLoading: posting }] = useCreatePostMutation();
+  const [uploadAvatar, { isLoading: uploadingImg }] = useUploadAvatarMutation();
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [showImg, setShowImg] = useState(false);
 
   const items = data?.items || [];
+
+  const pickImage = async () => {
+    if (Platform.OS !== "android") {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+    }
+    const rs = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+      allowsMultipleSelection: false,
+    });
+    if (rs.canceled || !rs.assets?.[0]) return;
+    const asset = rs.assets[0];
+    const file: any = {
+      uri: asset.uri,
+      name: (asset as any).fileName || `post-${Date.now()}.jpg`,
+      type: asset.mimeType || "image/jpeg",
+    };
+    try {
+      const res: any = await uploadAvatar(file).unwrap();
+      const url = pickUrl(res);
+      if (url) setImageUrl(url);
+      else Alert.alert("Lỗi", "Server không trả URL ảnh.");
+    } catch (e) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
 
   const submit = async () => {
     if (!content.trim() && !imageUrl.trim()) {
@@ -328,7 +361,6 @@ export default function ClubDiscussionRN({
       }).unwrap();
       setContent("");
       setImageUrl("");
-      setShowImg(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       Alert.alert("Lỗi", getApiErrMsg(e));
@@ -347,21 +379,26 @@ export default function ClubDiscussionRN({
             placeholder="Chia sẻ điều gì đó với câu lạc bộ…"
             placeholderTextColor="#8A90B2"
           />
-          {showImg && (
-            <TextInput
-              style={[styles.input, { marginTop: 8 }]}
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              placeholder="Dán URL ảnh…"
-              placeholderTextColor="#8A90B2"
-              autoCapitalize="none"
-            />
+          {!!imageUrl && (
+            <View style={{ marginTop: 10 }}>
+              <ExpoImage
+                source={{ uri: normalizeUrl(imageUrl) }}
+                style={styles.previewImg}
+                contentFit="cover"
+              />
+              <TouchableOpacity
+                style={styles.removeImgBtn}
+                onPress={() => setImageUrl("")}
+              >
+                <MaterialCommunityIcons name="close" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
           )}
           <View style={styles.composerBtns}>
             <TouchableOpacity
               style={styles.primaryBtn}
               onPress={submit}
-              disabled={posting}
+              disabled={posting || uploadingImg}
             >
               <LinearGradient
                 colors={["#667eea", "#764ba2"]}
@@ -375,11 +412,13 @@ export default function ClubDiscussionRN({
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.lightBtn}
-              onPress={() => setShowImg((v) => !v)}
+              style={[styles.lightBtn, { flexDirection: "row", gap: 5 }]}
+              onPress={pickImage}
+              disabled={uploadingImg}
             >
+              <MaterialCommunityIcons name="image-outline" size={16} color="#3B3F75" />
               <Text style={styles.lightBtnText}>
-                {showImg ? "Bỏ ảnh" : "Thêm ảnh"}
+                {uploadingImg ? "Đang tải…" : "Ảnh"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -430,6 +469,23 @@ const styles = StyleSheet.create({
     borderColor: "#E6E8F5",
     backgroundColor: "#F8F9FF",
     color: "#1F2557",
+  },
+  previewImg: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: "#EEF1FF",
+  },
+  removeImgBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerBtns: { flexDirection: "row", gap: 8, marginTop: 10 },
   primaryBtn: {
