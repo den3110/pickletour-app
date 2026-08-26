@@ -29,12 +29,13 @@ import ClubEventsRN from "@/components/clubs/ClubEventsRN";
 import ClubPollsRN from "@/components/clubs/ClubPollsRN";
 import ClubMembersCarouselRN from "@/components/clubs/ClubMembersCarouselRN";
 import ClubDiscussionRN from "@/components/clubs/ClubDiscussionRN";
+import ClubGalleryRN from "@/components/clubs/ClubGalleryRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const { width: W } = Dimensions.get("window");
-const TABS = ["news", "discussion", "events", "polls"] as const;
+const TABS = ["news", "discussion", "events", "polls", "gallery"] as const;
 type TabKey = (typeof TABS)[number];
 const LOTTIE_OPACITY = 0.12; // nền Lottie nhạt
 
@@ -334,7 +335,9 @@ export default function ClubDetailPageRN() {
                             ? "Thảo luận"
                             : k === "events"
                             ? "Sự kiện"
-                            : "Khảo sát"}
+                            : k === "polls"
+                            ? "Khảo sát"
+                            : "Ảnh"}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -373,6 +376,10 @@ export default function ClubDetailPageRN() {
           )}
 
           {tab === "polls" && <ClubPollsRN club={club} canManage={canManage} />}
+
+          {tab === "gallery" && (
+            <ClubGalleryRN club={club} canManage={canManage} />
+          )}
         </Animated.ScrollView>
 
         {/* Admin FAB */}
