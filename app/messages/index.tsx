@@ -5,6 +5,7 @@ import React from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -35,6 +36,8 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
   const title =
     conv.type === "tournament"
       ? `BTC · ${conv.tournament?.name || "Giải đấu"}`
+      : conv.type === "club"
+      ? `CLB · ${conv.club?.name || "Câu lạc bộ"}`
       : authorName(other);
   const avatarLetter = title[0]?.toUpperCase() || "?";
   const preview =
@@ -58,6 +61,14 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
         >
           <Text style={styles.avatarLetter}>{avatarLetter}</Text>
         </View>
+      ) : conv.type === "club" ? (
+        conv.club?.logoUrl ? (
+          <Image source={{ uri: conv.club.logoUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: "#16a34a" }]}>
+            <Text style={styles.avatarLetter}>{avatarLetter}</Text>
+          </View>
+        )
       ) : (
         <AuthorAvatar user={other} size={48} />
       )}
