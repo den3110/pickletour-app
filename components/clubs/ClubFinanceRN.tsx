@@ -20,6 +20,12 @@ import {
   useCreateTransactionMutation,
   useUpdateTransactionMutation,
   useDeleteTransactionMutation,
+  useGetDuesConfigQuery,
+  useSetDuesConfigMutation,
+  useGetDuesPeriodQuery,
+  useGetMyDuesQuery,
+  usePayDuesMutation,
+  useUnpayDuesMutation,
 } from "@/slices/clubsApiSlice";
 
 const getApiErrMsg = (e: any) =>
@@ -47,7 +53,220 @@ function StatCard({ label, value, color }: { label: string; value: string; color
   );
 }
 
-export default function ClubFinanceRN({
+/* ---------------- Dues (phí hội viên) ---------------- */
+const PERIOD_OPTS = [
+  { k: "monthly", l: "Theo tháng" },
+  { k: "quarterly", l: "Theo quý" },
+  { k: "yearly", l: "Theo năm" },
+];
+function duesPeriodKey(date: Date, period: string) {
+  const y = date.getFullYear();
+  if (period === "yearly") return `${y}`;
+  if (period === "quarterly") return `${y}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+  return `${y}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+function duesPeriodLabel(date: Date, period: string) {
+  const y = date.getFullYear();
+  if (period === "yearly") return `Năm ${y}`;
+  if (period === "quarterly") return `Quý ${Math.floor(date.getMonth() / 3) + 1}/${y}`;
+  return `Tháng ${String(date.getMonth() + 1).padStart(2, "0")}/${y}`;
+}
+function duesStep(date: Date, period: string, dir: number) {
+  const d = new Date(date);
+  if (period === "yearly") d.setFullYear(d.getFullYear() + dir);
+  else if (period === "quarterly") d.setMonth(d.getMonth() + dir * 3);
+  else d.setMonth(d.getMonth() + dir);
+  return d;
+}
+
+function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
+  const id = club?._id;
+  const { data: cfg } = useGetDuesConfigQuery({ id }, { skip: !id });
+  const period = cfg?.period || "monthly";
+  const [cursor, setCursor] = useState(new Date());
+  const key = duesPeriodKey(cursor, period);
+
+  const { data: periodData, isLoading } = useGetDuesPeriodQuery({ id, key }, { skip: !id || !canManage });
+  const { data: mine } = useGetMyDuesQuery({ id }, { skip: !id || canManage });
+  const [payDues] = usePayDuesMutation();
+  const [unpayDues] = useUnpayDuesMutation();
+  const [setCfg] = useSetDuesConfigMutation();
+
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [cfgPeriod, setCfgPeriod] = useState("monthly");
+  const [active, setActive] = useState(false);
+  React.useEffect(() => {
+    setAmount(String(cfg?.amount || ""));
+    setCfgPeriod(cfg?.period || "monthly");
+    setActive(!!cfg?.active);
+  }, [cfg?.amount, cfg?.period, cfg?.active]);
+
+  const saveCfg = async () => {
+    try {
+      await setCfg({ id, amount: Number(String(amount).replace(/[^\d]/g, "")) || 0, period: cfgPeriod, active }).unwrap();
+      Haptics.selectionAsync();
+      setCfgOpen(false);
+    } catch (e) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
+
+  const items = periodData?.items || [];
+  const s = periodData?.summary;
+
+  const Nav = (
+    <View style={styles.navRow}>
+      <TouchableOpacity onPress={() => setCursor((c) => duesStep(c, period, -1))} style={styles.navBtn}>
+        <MaterialCommunityIcons name="chevron-left" size={22} color="#3B3F75" />
+      </TouchableOpacity>
+      <Text style={styles.navLabel}>{duesPeriodLabel(cursor, period)}</Text>
+      <TouchableOpacity onPress={() => setCursor((c) => duesStep(c, period, 1))} style={styles.navBtn}>
+        <MaterialCommunityIcons name="chevron-right" size={22} color="#3B3F75" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (!canManage) {
+    const paidKeys = new Set((mine?.payments || []).map((p: any) => p.periodKey));
+    const myPaid = paidKeys.has(key);
+    return (
+      <View>
+        <View style={styles.card}>
+          <Text style={{ color: "#5C6285", fontSize: 13.5 }}>
+            {cfg?.active
+              ? `Phí hội viên: ${fmtVnd(cfg.amount)} / ${(PERIOD_OPTS.find((p) => p.k === cfg.period)?.l || "").replace("Theo ", "")}`
+              : "CLB chưa thu phí hội viên."}
+          </Text>
+        </View>
+        {cfg?.active && (
+          <>
+            {Nav}
+            <View style={[styles.card, { alignItems: "center" }]}>
+              <Text style={{ fontWeight: "700", color: myPaid ? "#1B7A46" : "#B4232D" }}>
+                {myPaid ? `✓ Đã đóng phí ${duesPeriodLabel(cursor, period)}` : `Chưa đóng phí ${duesPeriodLabel(cursor, period)}`}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {/* Config */}
+      <View style={styles.card}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ color: "#5C6285", fontSize: 13.5, flex: 1 }}>
+            {cfg?.active
+              ? `Phí: ${fmtVnd(cfg.amount)} / ${(PERIOD_OPTS.find((p) => p.k === cfg.period)?.l || "").replace("Theo ", "")}`
+              : "Chưa bật thu phí hội viên"}
+          </Text>
+          <TouchableOpacity onPress={() => setCfgOpen((v) => !v)}>
+            <Text style={{ color: "#667eea", fontWeight: "700" }}>{cfgOpen ? "Đóng" : "Cấu hình"}</Text>
+          </TouchableOpacity>
+        </View>
+        {cfgOpen && (
+          <View style={{ marginTop: 10 }}>
+            <Text style={styles.label}>Mức phí (₫)</Text>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={(t) => setAmount(t.replace(/[^\d]/g, ""))}
+              keyboardType="numeric"
+              placeholder="VD: 100000"
+              placeholderTextColor="#8A90B2"
+            />
+            <Text style={styles.label}>Chu kỳ</Text>
+            <View style={styles.chipsWrap}>
+              {PERIOD_OPTS.map((p) => (
+                <TouchableOpacity
+                  key={p.k}
+                  style={[styles.catChip, cfgPeriod === p.k && styles.catChipActive]}
+                  onPress={() => setCfgPeriod(p.k)}
+                >
+                  <Text style={[styles.catChipText, cfgPeriod === p.k && { color: "#3B3F75" }]}>{p.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 }}
+              onPress={() => setActive((v) => !v)}
+            >
+              <MaterialCommunityIcons
+                name={active ? "checkbox-marked" : "checkbox-blank-outline"}
+                size={20}
+                color={active ? "#667eea" : "#9AA3B2"}
+              />
+              <Text style={{ color: "#4A5270" }}>Bật thu phí hội viên</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.primaryBtn, { marginTop: 12, alignSelf: "flex-start" }]} onPress={saveCfg}>
+              <LinearGradient
+                colors={["#667eea", "#764ba2"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              <Text style={styles.primaryBtnText}>Lưu</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {!cfg?.active ? (
+        <EmptyState label="Chưa bật thu phí hội viên" icon="cash-multiple" />
+      ) : (
+        <>
+          {Nav}
+          {s && (
+            <View style={styles.statsRow}>
+              <StatCard label="Đã đóng" value={`${s.paidCount}/${s.memberCount}`} color="#1B7A46" />
+              <StatCard label="Còn nợ" value={`${s.unpaidCount}`} color="#B4232D" />
+            </View>
+          )}
+          {!isLoading && (
+            <View style={styles.card}>
+              {items.map((it: any, i: number) => (
+                <View
+                  key={it.user._id}
+                  style={[styles.duesRow, i > 0 && { borderTopWidth: 1, borderTopColor: "#EEF1F8" }]}
+                >
+                  <Text style={styles.duesName} numberOfLines={1}>
+                    {it.user.nickname || it.user.fullName || "Người dùng"}
+                  </Text>
+                  {it.paid ? (
+                    <TouchableOpacity
+                      style={styles.paidBtn}
+                      onPress={() => unpayDues({ id, member: it.user._id, periodKey: key })}
+                    >
+                      <Text style={styles.paidBtnText}>✓ Đã đóng</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.markBtn}
+                      onPress={() =>
+                        payDues({ id, member: it.user._id, periodKey: key, amount: cfg?.amount || 0, method: "cash" })
+                      }
+                    >
+                      <Text style={styles.markBtnText}>Đánh dấu đóng</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              {items.length === 0 && (
+                <Text style={{ color: "#7780A1", fontSize: 13 }}>Chưa có thành viên.</Text>
+              )}
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
+function FinanceBookRN({
   club,
   canManage,
 }: {
@@ -395,8 +614,97 @@ export default function ClubFinanceRN({
   );
 }
 
+export default function ClubFinanceRN({
+  club,
+  canManage,
+}: {
+  club: any;
+  canManage: boolean;
+}) {
+  const [view, setView] = useState<"book" | "dues">("book");
+  const isMember = !!club?._my?.isMember;
+  if (!isMember) {
+    return <EmptyState label="Tham gia CLB để xem thu chi quỹ" icon="wallet-outline" />;
+  }
+  return (
+    <View>
+      <View style={styles.viewToggle}>
+        {[
+          { k: "book", l: "Sổ quỹ" },
+          { k: "dues", l: "Phí hội viên" },
+        ].map((v) => (
+          <TouchableOpacity
+            key={v.k}
+            style={[styles.viewBtn, view === v.k && styles.viewBtnActive]}
+            onPress={() => setView(v.k as any)}
+          >
+            <Text style={[styles.viewBtnText, view === v.k && { color: "#fff" }]}>{v.l}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {view === "book" ? (
+        <FinanceBookRN club={club} canManage={canManage} />
+      ) : (
+        <Section title="Phí hội viên">
+          <DuesView club={club} canManage={canManage} />
+        </Section>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  viewToggle: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginTop: 8, marginBottom: 4 },
+  viewBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#F3F4FF",
+    borderWidth: 1,
+    borderColor: "#E6E8F5",
+  },
+  viewBtnActive: { backgroundColor: "#667eea", borderColor: "#667eea" },
+  viewBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13.5 },
+
+  navRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginBottom: 8 },
+  navBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4FF",
+    borderWidth: 1,
+    borderColor: "#E6E8F5",
+  },
+  navLabel: { color: "#1F2557", fontWeight: "700", fontSize: 14.5, minWidth: 130, textAlign: "center" },
+
+  duesRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11 },
+  duesName: { flex: 1, color: "#1F2557", fontWeight: "600", fontSize: 14 },
+  paidBtn: {
+    paddingHorizontal: 14,
+    height: 34,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E4F7EC",
+    borderWidth: 1,
+    borderColor: "#B5E6C9",
+  },
+  paidBtnText: { color: "#1B7A46", fontWeight: "800", fontSize: 12.5 },
+  markBtn: {
+    paddingHorizontal: 14,
+    height: 34,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4FF",
+    borderWidth: 1,
+    borderColor: "#E6E8F5",
+  },
+  markBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 12.5 },
   statCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",
