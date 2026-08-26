@@ -28,12 +28,13 @@ import ClubAnnouncementsRN from "@/components/clubs/ClubAnnouncementsRN";
 import ClubEventsRN from "@/components/clubs/ClubEventsRN";
 import ClubPollsRN from "@/components/clubs/ClubPollsRN";
 import ClubMembersCarouselRN from "@/components/clubs/ClubMembersCarouselRN";
+import ClubDiscussionRN from "@/components/clubs/ClubDiscussionRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const { width: W } = Dimensions.get("window");
-const TABS = ["news", "events", "polls"] as const;
+const TABS = ["news", "discussion", "events", "polls"] as const;
 type TabKey = (typeof TABS)[number];
 const LOTTIE_OPACITY = 0.12; // nền Lottie nhạt
 
@@ -329,6 +330,8 @@ export default function ClubDetailPageRN() {
                         >
                           {k === "news"
                             ? "Bảng tin"
+                            : k === "discussion"
+                            ? "Thảo luận"
                             : k === "events"
                             ? "Sự kiện"
                             : "Khảo sát"}
@@ -359,6 +362,10 @@ export default function ClubDetailPageRN() {
                 </View>
               )}
             </>
+          )}
+
+          {tab === "discussion" && (
+            <ClubDiscussionRN club={club} canManage={canManage} />
           )}
 
           {tab === "events" && (
