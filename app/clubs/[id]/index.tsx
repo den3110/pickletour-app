@@ -33,12 +33,13 @@ import ClubDiscussionRN from "@/components/clubs/ClubDiscussionRN";
 import ClubGalleryRN from "@/components/clubs/ClubGalleryRN";
 import ClubFinanceRN from "@/components/clubs/ClubFinanceRN";
 import ClubSessionsRN from "@/components/clubs/ClubSessionsRN";
+import ClubMatchesRN from "@/components/clubs/ClubMatchesRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const { width: W } = Dimensions.get("window");
-const TABS = ["news", "discussion", "events", "polls", "gallery", "sessions", "finance"] as const;
+const TABS = ["news", "discussion", "events", "polls", "gallery", "sessions", "matches", "finance"] as const;
 type TabKey = (typeof TABS)[number];
 const LOTTIE_OPACITY = 0.12; // nền Lottie nhạt
 
@@ -353,6 +354,8 @@ export default function ClubDetailPageRN() {
                             ? "Ảnh"
                             : k === "sessions"
                             ? "Buổi tập"
+                            : k === "matches"
+                            ? "BXH"
                             : "Quỹ"}
                         </Text>
                       </TouchableOpacity>
@@ -401,6 +404,10 @@ export default function ClubDetailPageRN() {
 
           {tab === "sessions" && (
             <ClubSessionsRN club={club} canManage={canManage} />
+          )}
+
+          {tab === "matches" && (
+            <ClubMatchesRN club={club} canManage={canManage} />
           )}
 
           {tab === "finance" && (
