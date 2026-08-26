@@ -405,6 +405,7 @@ export const apiSlice = createApi({
     "ClubPost",
     "ClubPostComment",
     "ClubPhoto",
+    "ClubFinance",
     "Auth",
     "Checkpoint",
     "MarkedDates",

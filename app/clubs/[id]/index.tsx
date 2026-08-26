@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  ScrollView,
 } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,12 +31,13 @@ import ClubPollsRN from "@/components/clubs/ClubPollsRN";
 import ClubMembersCarouselRN from "@/components/clubs/ClubMembersCarouselRN";
 import ClubDiscussionRN from "@/components/clubs/ClubDiscussionRN";
 import ClubGalleryRN from "@/components/clubs/ClubGalleryRN";
+import ClubFinanceRN from "@/components/clubs/ClubFinanceRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
 const { width: W } = Dimensions.get("window");
-const TABS = ["news", "discussion", "events", "polls", "gallery"] as const;
+const TABS = ["news", "discussion", "events", "polls", "gallery", "finance"] as const;
 type TabKey = (typeof TABS)[number];
 const LOTTIE_OPACITY = 0.12; // nền Lottie nhạt
 
@@ -118,7 +120,10 @@ export default function ClubDetailPageRN() {
   const SEG_H = 44;
   const TRACK_PAD = 2;
   const trackW = W - OUT_PAD * 2;
-  const itemW = (trackW - TRACK_PAD * 2) / TABS.length;
+  // >4 tab: dùng bề rộng cố định + cuộn ngang; <=4 tab: chia đều lấp đầy
+  const itemW =
+    TABS.length > 4 ? 88 : (trackW - TRACK_PAD * 2) / TABS.length;
+  const contentW = itemW * TABS.length;
   const [tabIdx, setTabIdx] = useState<number>(TABS.indexOf(tab));
   const indicatorX = useRef(new Animated.Value(itemW * tabIdx)).current;
   const trackPadAnim = useRef(new Animated.Value(TRACK_PAD)).current;
@@ -282,6 +287,12 @@ export default function ClubDetailPageRN() {
           <View style={{ marginTop: 12, paddingHorizontal: OUT_PAD }}>
             <GradientCard pad={8}>
               <View style={[styles.track, { height: SEG_H }]}>
+               <ScrollView
+                 horizontal
+                 showsHorizontalScrollIndicator={false}
+                 scrollEnabled={TABS.length > 4}
+               >
+                <View style={{ width: contentW, height: SEG_H }}>
                 {/* indicator dưới */}
                 <Animated.View
                   pointerEvents="none"
@@ -309,7 +320,7 @@ export default function ClubDetailPageRN() {
                 </Animated.View>
 
                 {/* labels trên */}
-                <View style={styles.row} pointerEvents="box-none">
+                <View style={[styles.row, { width: contentW }]} pointerEvents="box-none">
                   {TABS.map((k) => {
                     const active = tab === k;
                     return (
@@ -337,12 +348,16 @@ export default function ClubDetailPageRN() {
                             ? "Sự kiện"
                             : k === "polls"
                             ? "Khảo sát"
-                            : "Ảnh"}
+                            : k === "gallery"
+                            ? "Ảnh"
+                            : "Quỹ"}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
+                </View>
+               </ScrollView>
               </View>
             </GradientCard>
           </View>
@@ -379,6 +394,10 @@ export default function ClubDetailPageRN() {
 
           {tab === "gallery" && (
             <ClubGalleryRN club={club} canManage={canManage} />
+          )}
+
+          {tab === "finance" && (
+            <ClubFinanceRN club={club} canManage={canManage} />
           )}
         </Animated.ScrollView>
 
