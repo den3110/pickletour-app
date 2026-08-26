@@ -1,5 +1,5 @@
 // components/clubs/ClubPollsRN.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Section, ProgressBar, EmptyState } from "./ui";
 import {
   useListPollsQuery,
   useCreatePollMutation,
   useVotePollMutation,
   useClosePollMutation,
+  useDeletePollMutation,
 } from "@/slices/clubsApiSlice";
 
 const getApiErrMsg = (e: any) =>
@@ -47,7 +49,6 @@ function GradLightCard({
   );
 }
 
-/* ---------- Buttons (phù hợp nền sáng) ---------- */
 function SmallPrimaryGradBtn({
   title,
   onPress,
@@ -116,9 +117,188 @@ function SmallDangerGhostBtn({
       style={styles.smallDangerBtn}
     >
       <Text style={styles.smallDangerText}>
-        {loading ? "Đang kết thúc…" : title}
+        {loading ? "Đang xử lý…" : title}
       </Text>
     </TouchableOpacity>
+  );
+}
+
+/* ---------- 1 khảo sát ---------- */
+function PollItem({
+  clubId,
+  poll,
+  canManage,
+  onRefetch,
+}: {
+  clubId: string;
+  poll: any;
+  canManage: boolean;
+  onRefetch: () => void;
+}) {
+  const [vote, { isLoading: voting }] = useVotePollMutation();
+  const [closePoll, { isLoading: closing }] = useClosePollMutation();
+  const [deletePoll] = useDeletePollMutation();
+
+  const closed = !!poll.closesAt && new Date(poll.closesAt) < new Date();
+  const people = Number(poll.voterCount || 0);
+  const myOptionIds: string[] = poll.myOptionIds || [];
+  const voted = myOptionIds.length > 0;
+
+  // lựa chọn cục bộ cho poll nhiều đáp án
+  const [sel, setSel] = useState<Set<string>>(new Set(myOptionIds));
+  useEffect(() => setSel(new Set(myOptionIds)), [poll.myOptionIds]);
+
+  const submitVote = async (optionIds: string[]) => {
+    if (!optionIds.length) return;
+    try {
+      await vote({ id: clubId, pollId: poll._id, optionIds }).unwrap();
+      Haptics.selectionAsync();
+      onRefetch();
+    } catch (e) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
+
+  const onTapOption = (oid: string) => {
+    if (closed) return;
+    if (poll.multiple) {
+      setSel((prev) => {
+        const next = new Set(prev);
+        if (next.has(oid)) next.delete(oid);
+        else next.add(oid);
+        return next;
+      });
+    } else {
+      submitVote([oid]);
+    }
+  };
+
+  const confirmClose = () =>
+    Alert.alert("Đóng khảo sát", "Đóng khảo sát này? Sẽ không nhận thêm phiếu.", [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Đóng",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await closePoll({ id: clubId, pollId: poll._id }).unwrap();
+            Haptics.selectionAsync();
+            onRefetch();
+          } catch (e) {
+            Alert.alert("Lỗi", getApiErrMsg(e));
+          }
+        },
+      },
+    ]);
+
+  const confirmDelete = () =>
+    Alert.alert("Xoá khảo sát", "Xoá khảo sát này? Toàn bộ phiếu sẽ bị xoá.", [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Xoá",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deletePoll({ id: clubId, pollId: poll._id }).unwrap();
+            Haptics.selectionAsync();
+            onRefetch();
+          } catch (e) {
+            Alert.alert("Lỗi", getApiErrMsg(e));
+          }
+        },
+      },
+    ]);
+
+  return (
+    <GradLightCard style={{ marginBottom: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text style={[styles.title, { flex: 1 }]}>
+          {poll.question || poll.title}
+        </Text>
+        {poll.multiple && (
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>Nhiều lựa chọn</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.subMeta}>{people} người đã bình chọn</Text>
+
+      {(poll.options || []).map((opt: any) => {
+        const oid = opt.id || opt._id;
+        const votes = poll.results?.[oid] ?? opt.votes ?? 0;
+        const picked = poll.multiple ? sel.has(oid) : myOptionIds.includes(oid);
+        const isMyVote = myOptionIds.includes(oid);
+
+        return (
+          <TouchableOpacity
+            key={oid}
+            activeOpacity={0.9}
+            disabled={closed || voting}
+            onPress={() => onTapOption(oid)}
+            style={[styles.option, picked && styles.optionPicked]}
+          >
+            <View style={styles.optionHead}>
+              <MaterialCommunityIcons
+                name={
+                  poll.multiple
+                    ? picked
+                      ? "checkbox-marked"
+                      : "checkbox-blank-outline"
+                    : picked
+                      ? "radiobox-marked"
+                      : "radiobox-blank"
+                }
+                size={18}
+                color={picked ? "#667eea" : "#9AA3B2"}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.optionText,
+                  isMyVote && { fontWeight: "800", color: "#2D3561" },
+                ]}
+              >
+                {opt.text}
+              </Text>
+            </View>
+            <ProgressBar progress={people ? votes / people : 0} />
+            <Text style={styles.countText}>
+              {people ? Math.round((votes / people) * 100) : 0}% • {votes} phiếu
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+
+      {/* Nút gửi cho poll nhiều đáp án */}
+      {poll.multiple && !closed && (
+        <View style={{ marginTop: 10 }}>
+          <SmallPrimaryGradBtn
+            title={voted ? "Đổi phiếu" : "Gửi bình chọn"}
+            loading={voting}
+            onPress={() => submitVote([...sel])}
+          />
+        </View>
+      )}
+
+      {voted && !closed && (
+        <Text style={styles.votedHint}>Bạn đã bình chọn</Text>
+      )}
+
+      {canManage && (
+        <View style={styles.adminRow}>
+          {!closed && (
+            <SmallLightBtn
+              title="Đóng"
+              loading={closing}
+              onPress={confirmClose}
+            />
+          )}
+          <SmallDangerGhostBtn title="Xoá" onPress={confirmDelete} />
+        </View>
+      )}
+
+      {closed && <Text style={styles.closedText}>ĐÃ KẾT THÚC</Text>}
+    </GradLightCard>
   );
 }
 
@@ -138,12 +318,11 @@ export default function ClubPollsRN({
   );
 
   const [createPoll, { isLoading: creating }] = useCreatePollMutation();
-  const [vote, { isLoading: voting }] = useVotePollMutation();
-  const [closePoll, { isLoading: closing }] = useClosePollMutation();
 
   // ----- Tạo khảo sát -----
   const [title, setTitle] = useState<string>("");
   const [opts, setOpts] = useState<string[]>(["", ""]);
+  const [multiple, setMultiple] = useState<boolean>(false);
 
   const addOption = () => setOpts((o) => [...o, ""]);
   const changeOpt = (i: number, v: string) =>
@@ -156,11 +335,16 @@ export default function ClubPollsRN({
       return;
     }
     try {
-      await createPoll({ id: clubId, title: title.trim(), options }).unwrap();
+      await createPoll({
+        id: clubId,
+        title: title.trim(),
+        options,
+        multiple,
+      }).unwrap();
       setTitle("");
       setOpts(["", ""]);
+      setMultiple(false);
       Haptics.selectionAsync();
-      Alert.alert("Thành công", "Đã tạo khảo sát.");
       refetch();
     } catch (e) {
       Alert.alert("Lỗi", getApiErrMsg(e));
@@ -195,6 +379,19 @@ export default function ClubPollsRN({
             />
           ))}
 
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setMultiple((v) => !v)}
+            style={styles.checkRow}
+          >
+            <MaterialCommunityIcons
+              name={multiple ? "checkbox-marked" : "checkbox-blank-outline"}
+              size={20}
+              color={multiple ? "#667eea" : "#9AA3B2"}
+            />
+            <Text style={styles.checkLabel}>Cho phép chọn nhiều phương án</Text>
+          </TouchableOpacity>
+
           <View style={styles.actionsRow}>
             <SmallLightBtn title="Thêm lựa chọn" onPress={addOption} />
             <SmallPrimaryGradBtn
@@ -207,92 +404,18 @@ export default function ClubPollsRN({
       )}
 
       {/* ====== Danh sách khảo sát ====== */}
-      {items.map((p: any) => {
-        const total = (p.options || []).reduce(
-          (a: number, b: any) => a + (p.results?.[b.id || b._id] || 0),
-          0
-        );
-        const closed = !!p.closedAt;
-
-        return (
-          <GradLightCard key={p._id} style={{ marginBottom: 10 }}>
-            <Text style={styles.title}>{p.title || p.question}</Text>
-
-            {(p.options || []).map((opt: any) => {
-              const oid = opt.id || opt._id;
-              const votes = p.results?.[oid] || opt.votes || 0;
-
-              return (
-                <TouchableOpacity
-                  key={oid}
-                  activeOpacity={0.9}
-                  disabled={closed || voting}
-                  onPress={async () => {
-                    try {
-                      await vote({
-                        id: clubId,
-                        pollId: p._id,
-                        optionIds: [oid],
-                      }).unwrap();
-                      Haptics.selectionAsync();
-                      refetch();
-                    } catch (e) {
-                      Alert.alert("Lỗi", getApiErrMsg(e));
-                    }
-                  }}
-                  style={styles.option}
-                >
-                  <Text style={styles.optionText}>{opt.text}</Text>
-                  <ProgressBar progress={total ? votes / total : 0} />
-                  <Text style={styles.countText}>
-                    {votes} / {total}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            {canManage && !closed && (
-              <View style={{ marginTop: 8 }}>
-                <SmallDangerGhostBtn
-                  title="Kết thúc khảo sát"
-                  loading={closing}
-                  onPress={() => {
-                    Alert.alert(
-                      "Xác nhận",
-                      "Kết thúc khảo sát này?",
-                      [
-                        { text: "Huỷ", style: "cancel" },
-                        {
-                          text: "Kết thúc",
-                          style: "destructive",
-                          onPress: async () => {
-                            try {
-                              await closePoll({
-                                id: clubId,
-                                pollId: p._id,
-                              }).unwrap();
-                              Haptics.selectionAsync();
-                              refetch();
-                            } catch (e) {
-                              Alert.alert("Lỗi", getApiErrMsg(e));
-                            }
-                          },
-                        },
-                      ],
-                      { cancelable: true }
-                    );
-                  }}
-                />
-              </View>
-            )}
-
-            {closed && <Text style={styles.closedText}>ĐÃ KẾT THÚC</Text>}
-          </GradLightCard>
-        );
-      })}
+      {items.map((p: any) => (
+        <PollItem
+          key={p._id}
+          clubId={clubId}
+          poll={p}
+          canManage={canManage}
+          onRefetch={refetch}
+        />
+      ))}
 
       {!isLoading && !isFetching && items.length === 0 && (
-        <EmptyState label="Chưa có khảo sát" icon="poll-off" />
+        <EmptyState label="Chưa có khảo sát" icon="poll" />
       )}
     </Section>
   );
@@ -314,6 +437,7 @@ const styles = StyleSheet.create({
   },
 
   title: { color: "#1F2557", fontWeight: "800", fontSize: 16 },
+  subMeta: { color: "#7780A1", marginTop: 4, fontSize: 12 },
 
   input: {
     marginTop: 10,
@@ -324,6 +448,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F9FF",
     color: "#1F2557",
   },
+
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+  },
+  checkLabel: { color: "#4A5270", fontWeight: "600" },
 
   actionsRow: {
     flexDirection: "row",
@@ -340,8 +472,27 @@ const styles = StyleSheet.create({
     borderColor: "#E6E8F5",
     backgroundColor: "#F8F9FF",
   },
-  optionText: { color: "#3E4466", marginBottom: 6, fontWeight: "600" },
+  optionPicked: {
+    borderColor: "#667eea",
+    backgroundColor: "#EEF1FF",
+  },
+  optionHead: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  optionText: { color: "#3E4466", fontWeight: "600", flex: 1 },
   countText: { color: "#5C6285", marginTop: 4, fontSize: 12 },
+
+  votedHint: { color: "#7780A1", fontSize: 12, marginTop: 8 },
+
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#EEF1FF",
+    borderWidth: 1,
+    borderColor: "#D6DCFB",
+  },
+  tagText: { color: "#4E56A6", fontSize: 11, fontWeight: "700" },
+
+  adminRow: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
 
   smallBtn: {
     height: 36,

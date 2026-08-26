@@ -6,23 +6,28 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
-  Platform,
   Alert,
+  Linking,
 } from "react-native";
 import dayjs from "dayjs";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-// ❌ bỏ community inline picker
-// import DateTimePicker from "@react-native-community/datetimepicker";
-// ✅ dùng modal picker
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Section, EmptyState } from "./ui";
+import { BASE_URL } from "@/slices/apiSlice";
 import {
   useListEventsQuery,
   useRsvpEventMutation,
   useDeleteEventMutation,
   useCreateEventMutation,
+  useUpdateEventMutation,
 } from "@/slices/clubsApiSlice";
+
+const getApiErrMsg = (e: any) =>
+  e?.data?.message ||
+  e?.error ||
+  (typeof e?.data === "string" ? e.data : "Có lỗi xảy ra.");
 
 /* ---------- Card nền sáng phủ gradient tím rất nhẹ ---------- */
 function GradLightCard({
@@ -53,10 +58,12 @@ function SmallPrimaryGradBtn({
   title,
   onPress,
   loading,
+  icon,
 }: {
   title: string;
   onPress?: () => void;
   loading?: boolean;
+  icon?: any;
 }) {
   return (
     <TouchableOpacity
@@ -72,6 +79,14 @@ function SmallPrimaryGradBtn({
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      {!!icon && (
+        <MaterialCommunityIcons
+          name={icon}
+          size={14}
+          color="#fff"
+          style={{ marginRight: 4 }}
+        />
+      )}
       <Text style={styles.smallBtnText}>{loading ? "Đang xử lý…" : title}</Text>
     </TouchableOpacity>
   );
@@ -81,19 +96,33 @@ function SmallLightBtn({
   title,
   onPress,
   loading,
+  icon,
+  active,
 }: {
   title: string;
   onPress?: () => void;
   loading?: boolean;
+  icon?: any;
+  active?: boolean;
 }) {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={styles.smallLightBtn}
+      style={[styles.smallLightBtn, active && styles.smallLightBtnActive]}
       disabled={loading}
     >
-      <Text style={styles.smallLightText}>
+      {!!icon && (
+        <MaterialCommunityIcons
+          name={icon}
+          size={14}
+          color={active ? "#1B7A46" : "#3B3F75"}
+          style={{ marginRight: 4 }}
+        />
+      )}
+      <Text
+        style={[styles.smallLightText, active && { color: "#1B7A46" }]}
+      >
         {loading ? "Đang xử lý…" : title}
       </Text>
     </TouchableOpacity>
@@ -104,10 +133,12 @@ function SmallDangerGhostBtn({
   title,
   onPress,
   loading,
+  icon,
 }: {
   title: string;
   onPress?: () => void;
   loading?: boolean;
+  icon?: any;
 }) {
   return (
     <TouchableOpacity
@@ -116,8 +147,16 @@ function SmallDangerGhostBtn({
       style={styles.smallDangerBtn}
       disabled={loading}
     >
+      {!!icon && (
+        <MaterialCommunityIcons
+          name={icon}
+          size={14}
+          color="#B4232D"
+          style={{ marginRight: 4 }}
+        />
+      )}
       <Text style={styles.smallDangerText}>
-        {loading ? "Đang xoá…" : title}
+        {loading ? "Đang xử lý…" : title}
       </Text>
     </TouchableOpacity>
   );
@@ -142,12 +181,14 @@ export default function ClubEventsRN({
   );
 
   const [createEvent, { isLoading: creating }] = useCreateEventMutation();
+  const [updateEvent, { isLoading: updating }] = useUpdateEventMutation();
   const [rsvp, { isLoading: rsvping }] = useRsvpEventMutation();
   const [del, { isLoading: deleting }] = useDeleteEventMutation();
 
   const items = useMemo(() => data?.items || [], [data]);
 
-  // ====== Tạo sự kiện (RN form) ======
+  // ====== Form tạo/sửa sự kiện ======
+  const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [location, setLocation] = useState<string>("");
@@ -162,9 +203,7 @@ export default function ClubEventsRN({
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
-  // modal handlers
   const onConfirmStart = (date: Date) => {
-    // nếu end <= start mới thì đẩy end = start + 1h
     const nextEnd = dayjs(end).isAfter(date)
       ? end
       : dayjs(date).add(1, "hour").toDate();
@@ -187,7 +226,27 @@ export default function ClubEventsRN({
   };
   const onCancelEnd = () => setShowEndPicker(false);
 
-  const submitCreate = async () => {
+  const resetForm = () => {
+    setEditId(null);
+    setTitle("");
+    setDescription("");
+    setLocation("");
+    setCapacity("0");
+    setStart(defaultStart.toDate());
+    setEnd(defaultStart.add(2, "hour").toDate());
+  };
+
+  const startEdit = (ev: any) => {
+    setEditId(ev._id);
+    setTitle(ev.title || "");
+    setDescription(ev.description || "");
+    setLocation(ev.location || "");
+    setCapacity(String(ev.capacity || 0));
+    setStart(new Date(ev.startAt || ev.startTime));
+    setEnd(new Date(ev.endAt || ev.endTime));
+  };
+
+  const submitSave = async () => {
     const cap = Number.isFinite(+capacity) ? Math.max(0, +capacity) : 0;
     if (!title.trim()) {
       Alert.alert("Thiếu thông tin", "Nhập tiêu đề sự kiện.");
@@ -200,49 +259,77 @@ export default function ClubEventsRN({
       );
       return;
     }
-    const startIso = dayjs(start).toDate().toISOString();
-    const endIso = dayjs(end).toDate().toISOString();
+    const body = {
+      title: title.trim(),
+      description: description.trim(),
+      location: location.trim(),
+      capacity: cap,
+      rsvp: cap > 0 ? "limit" : "open",
+      startAt: dayjs(start).toDate().toISOString(),
+      endAt: dayjs(end).toDate().toISOString(),
+    };
 
     try {
-      await createEvent({
-        id: clubId,
-        title: title.trim(),
-        description: description.trim(),
-        location: location.trim(),
-        capacity: cap,
-        startTime: startIso,
-        endTime: endIso,
-        startAt: startIso,
-        endAt: endIso,
-      }).unwrap();
-
+      if (editId) {
+        await updateEvent({ id: clubId, eventId: editId, ...body }).unwrap();
+      } else {
+        await createEvent({ id: clubId, ...body }).unwrap();
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTitle("");
-      setDescription("");
-      setLocation("");
-      setCapacity("0");
-      setStart(defaultStart.toDate());
-      setEnd(defaultStart.add(2, "hour").toDate());
+      resetForm();
       refetch();
     } catch (e: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
-        "Lỗi",
-        e?.data?.message ||
-          e?.error ||
-          (typeof e?.data === "string" ? e.data : "Có lỗi xảy ra.")
-      );
+      Alert.alert("Lỗi", getApiErrMsg(e));
     }
+  };
+
+  const doRsvp = async (ev: any, status: "going" | "not_going") => {
+    const next = ev.myStatus === status ? "none" : status;
+    try {
+      await rsvp({ id: clubId, eventId: ev._id, status: next }).unwrap();
+      Haptics.selectionAsync();
+      refetch();
+    } catch (e: any) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
+
+  const addToCalendar = (ev: any) => {
+    const url = `${BASE_URL}/api/clubs/${clubId}/events/${ev._id}/ics`;
+    Linking.openURL(url).catch(() =>
+      Alert.alert("Lỗi", "Không mở được tệp lịch.")
+    );
+  };
+
+  const confirmDelete = (ev: any) => {
+    Alert.alert("Xoá sự kiện", `Xoá sự kiện "${ev.title}"?`, [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Xoá",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await del({ id: clubId, eventId: ev._id }).unwrap();
+            Haptics.selectionAsync();
+            refetch();
+          } catch (e: any) {
+            Alert.alert("Lỗi", getApiErrMsg(e));
+          }
+        },
+      },
+    ]);
   };
 
   return (
     <Section title="Sự kiện" subtitle={isFetching ? "Đang tải…" : undefined}>
-      {/* ===== Form tạo sự kiện (quản lý) ===== */}
+      {/* ===== Form tạo/sửa sự kiện (quản lý) ===== */}
       {canManage && (
         <GradLightCard style={{ marginBottom: 10 }}>
-          <Text style={styles.title}>Tạo sự kiện</Text>
+          <Text style={styles.title}>
+            {editId ? "Sửa sự kiện" : "Tạo sự kiện"}
+          </Text>
 
-          {/* Tiêu đề */}
           <TextInput
             value={title}
             onChangeText={setTitle}
@@ -251,7 +338,6 @@ export default function ClubEventsRN({
             style={styles.input}
           />
 
-          {/* Mô tả */}
           <TextInput
             value={description}
             onChangeText={setDescription}
@@ -261,7 +347,6 @@ export default function ClubEventsRN({
             style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]}
           />
 
-          {/* Địa điểm */}
           <TextInput
             value={location}
             onChangeText={setLocation}
@@ -270,7 +355,6 @@ export default function ClubEventsRN({
             style={styles.input}
           />
 
-          {/* Thời gian */}
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
               style={[styles.timeBtn, { flex: 1 }]}
@@ -288,14 +372,13 @@ export default function ClubEventsRN({
             </TouchableOpacity>
           </View>
 
-          {/* Modal pickers */}
           <DateTimePickerModal
             isVisible={showStartPicker}
             mode="datetime"
             date={start}
             onConfirm={onConfirmStart}
             onCancel={onCancelStart}
-            minimumDate={new Date()}
+            minimumDate={editId ? undefined : new Date()}
             is24Hour
             minuteInterval={5}
           />
@@ -310,7 +393,6 @@ export default function ClubEventsRN({
             minuteInterval={5}
           />
 
-          {/* Sức chứa */}
           <TextInput
             value={capacity}
             onChangeText={setCapacity}
@@ -320,101 +402,80 @@ export default function ClubEventsRN({
             style={styles.input}
           />
 
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
             <SmallPrimaryGradBtn
-              title={creating ? "Đang tạo…" : "Tạo sự kiện"}
-              onPress={submitCreate}
-              loading={creating}
+              title={editId ? "Lưu thay đổi" : "Tạo sự kiện"}
+              onPress={submitSave}
+              loading={creating || updating}
             />
+            {editId && <SmallLightBtn title="Huỷ" onPress={resetForm} />}
           </View>
         </GradLightCard>
       )}
 
       {/* ===== Danh sách sự kiện ===== */}
       {items.map((ev: any) => {
-        const goingCount = ev?.stats?.going || 0;
-        const capacity = ev?.capacity || 0;
+        const goingCount = ev?.attendeesCount ?? ev?.stats?.going ?? 0;
+        const cap = ev?.capacity || 0;
+        const past = dayjs(ev.endAt || ev.endTime).isBefore(dayjs());
 
         return (
-          <GradLightCard key={ev._id} style={{ marginBottom: 10 }}>
+          <GradLightCard
+            key={ev._id}
+            style={{ marginBottom: 10, opacity: past ? 0.75 : 1 }}
+          >
             <Text style={styles.title}>{ev.title}</Text>
             <Text style={styles.meta}>
-              {fmt(ev.startTime || ev.startAt)} – {fmt(ev.endTime || ev.endAt)}{" "}
-              • {ev.location || "—"}
+              {fmt(ev.startAt || ev.startTime)} – {fmt(ev.endAt || ev.endTime)}
+              {ev.location ? ` • ${ev.location}` : ""}
             </Text>
             {!!ev.description && (
               <Text style={styles.desc}>{ev.description}</Text>
             )}
 
-            {!!capacity && (
-              <Text style={[styles.meta, { marginTop: 4 }]}>
-                {goingCount}/{capacity}
-              </Text>
+            <Text style={[styles.meta, { marginTop: 4 }]}>
+              {`${goingCount}${cap ? `/${cap}` : ""} tham gia`}
+              {past ? "  • Đã kết thúc" : ""}
+            </Text>
+
+            {!past && (
+              <View style={styles.actionsRow}>
+                <SmallLightBtn
+                  title={ev.myStatus === "going" ? "Sẽ tham gia ✓" : "Tham gia"}
+                  icon="check-circle-outline"
+                  active={ev.myStatus === "going"}
+                  loading={rsvping}
+                  onPress={() => doRsvp(ev, "going")}
+                />
+                <SmallLightBtn
+                  title="Không tham gia"
+                  icon="close-circle-outline"
+                  loading={rsvping}
+                  onPress={() => doRsvp(ev, "not_going")}
+                />
+                <SmallLightBtn
+                  title="Thêm vào lịch"
+                  icon="calendar-plus"
+                  onPress={() => addToCalendar(ev)}
+                />
+              </View>
             )}
 
-            <View style={styles.actionsRow}>
-              <SmallPrimaryGradBtn
-                title="Tham gia"
-                loading={rsvping}
-                onPress={async () => {
-                  await rsvp({
-                    id: clubId,
-                    eventId: ev._id,
-                    status: "going",
-                  }).unwrap();
-                  Haptics.selectionAsync();
-                  refetch();
-                }}
-              />
-              <SmallLightBtn
-                title="Không tham gia"
-                loading={rsvping}
-                onPress={async () => {
-                  await rsvp({
-                    id: clubId,
-                    eventId: ev._id,
-                    status: "not_going",
-                  }).unwrap();
-                  Haptics.selectionAsync();
-                  refetch();
-                }}
-              />
-              <SmallLightBtn
-                title="Huỷ RSVP"
-                loading={rsvping}
-                onPress={async () => {
-                  await rsvp({
-                    id: clubId,
-                    eventId: ev._id,
-                    status: "none",
-                  }).unwrap();
-                  Haptics.selectionAsync();
-                  refetch();
-                }}
-              />
-              {canManage && (
+            {canManage && (
+              <View style={styles.actionsRow}>
+                <SmallLightBtn
+                  title="Sửa"
+                  icon="pencil"
+                  onPress={() => startEdit(ev)}
+                />
                 <SmallDangerGhostBtn
                   title="Xoá"
+                  icon="trash-can-outline"
                   loading={deleting}
-                  onPress={async () => {
-                    try {
-                      await del({ id: clubId, eventId: ev._id }).unwrap();
-                      Haptics.selectionAsync();
-                      refetch();
-                    } catch (e: any) {
-                      Alert.alert(
-                        "Lỗi",
-                        e?.data?.message ||
-                          e?.error ||
-                          (typeof e?.data === "string"
-                            ? e.data
-                            : "Có lỗi xảy ra.")
-                      );
-                    }
-                  }}
+                  onPress={() => confirmDelete(ev)}
                 />
-              )}
-            </View>
+              </View>
+            )}
           </GradLightCard>
         );
       })}
@@ -453,6 +514,7 @@ const styles = StyleSheet.create({
   },
 
   smallBtn: {
+    flexDirection: "row",
     height: 36,
     paddingHorizontal: 14,
     borderRadius: 999,
@@ -463,6 +525,7 @@ const styles = StyleSheet.create({
   smallBtnText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
 
   smallLightBtn: {
+    flexDirection: "row",
     height: 36,
     paddingHorizontal: 14,
     borderRadius: 999,
@@ -472,9 +535,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E6E8F5",
   },
+  smallLightBtnActive: {
+    backgroundColor: "#E4F7EC",
+    borderColor: "#B5E6C9",
+  },
   smallLightText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
 
   smallDangerBtn: {
+    flexDirection: "row",
     height: 36,
     paddingHorizontal: 14,
     borderRadius: 999,
