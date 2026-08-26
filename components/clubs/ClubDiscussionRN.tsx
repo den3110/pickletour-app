@@ -22,6 +22,7 @@ import { useUploadAvatarMutation } from "@/slices/uploadApiSlice";
 import {
   useListPostsQuery,
   useCreatePostMutation,
+  useUpdatePostMutation,
   useDeletePostMutation,
   useReactPostMutation,
   useListPostCommentsQuery,
@@ -191,9 +192,13 @@ function PostItem({
 }) {
   const [react] = useReactPostMutation();
   const [delPost] = useDeletePostMutation();
+  const [updatePost] = useUpdatePostMutation();
   const [showComments, setShowComments] = useState(false);
-  const canDelete =
-    String(post.author?._id) === String(authUserId) || canManage;
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.content || "");
+  const isAuthor = String(post.author?._id) === String(authUserId);
+  const canEdit = isAuthor || canManage;
+  const canDelete = isAuthor || canManage;
 
   const doReact = async () => {
     try {
@@ -202,6 +207,29 @@ function PostItem({
     } catch (e: any) {
       if (e?.status === 401) Alert.alert("Thông báo", "Bạn cần đăng nhập.");
       else Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
+  const doPin = async () => {
+    try {
+      await updatePost({
+        id: clubId,
+        postId: post._id,
+        pinned: !post.pinned,
+      }).unwrap();
+    } catch (e) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
+    }
+  };
+  const saveEdit = async () => {
+    try {
+      await updatePost({
+        id: clubId,
+        postId: post._id,
+        content: editText,
+      }).unwrap();
+      setEditing(false);
+    } catch (e) {
+      Alert.alert("Lỗi", getApiErrMsg(e));
     }
   };
   const doDelete = () =>
@@ -225,14 +253,42 @@ function PostItem({
       <View style={styles.postHead}>
         <Avatar uri={post.author?.avatar} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.postAuthor}>
-            {post.author?.nickname || post.author?.fullName || "Người dùng"}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={styles.postAuthor}>
+              {post.author?.nickname || post.author?.fullName || "Người dùng"}
+            </Text>
+            {post.pinned && (
+              <View style={styles.pinBadge}>
+                <MaterialCommunityIcons name="pin" size={10} color="#B7791F" />
+                <Text style={styles.pinBadgeText}>Ghim</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.postTime}>
             {fmt(post.createdAt)}
             {post.visibility === "members" ? " · Chỉ thành viên" : ""}
           </Text>
         </View>
+        {canManage && (
+          <TouchableOpacity onPress={doPin} style={{ marginRight: 6 }}>
+            <MaterialCommunityIcons
+              name={post.pinned ? "pin-off" : "pin"}
+              size={17}
+              color={post.pinned ? "#B7791F" : "#9AA3B2"}
+            />
+          </TouchableOpacity>
+        )}
+        {canEdit && !editing && (
+          <TouchableOpacity
+            onPress={() => {
+              setEditText(post.content || "");
+              setEditing(true);
+            }}
+            style={{ marginRight: 6 }}
+          >
+            <MaterialCommunityIcons name="pencil" size={17} color="#9AA3B2" />
+          </TouchableOpacity>
+        )}
         {canDelete && (
           <TouchableOpacity onPress={doDelete}>
             <MaterialCommunityIcons
@@ -244,8 +300,37 @@ function PostItem({
         )}
       </View>
 
-      {!!post.content && <Text style={styles.postContent}>{post.content}</Text>}
-      {!!post.imageUrl && (
+      {editing ? (
+        <View style={{ marginTop: 10 }}>
+          <TextInput
+            style={[styles.input, { minHeight: 60, textAlignVertical: "top" }]}
+            value={editText}
+            onChangeText={setEditText}
+            multiline
+          />
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={saveEdit}>
+              <LinearGradient
+                colors={["#667eea", "#764ba2"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              <Text style={styles.primaryBtnText}>Lưu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.lightBtn}
+              onPress={() => setEditing(false)}
+            >
+              <Text style={styles.lightBtnText}>Huỷ</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        !!post.content && <Text style={styles.postContent}>{post.content}</Text>
+      )}
+      {!!post.imageUrl && !editing && (
         <ExpoImage
           source={{ uri: normalizeUrl(post.imageUrl) }}
           style={styles.postImage}
@@ -513,6 +598,18 @@ const styles = StyleSheet.create({
 
   postHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   postAuthor: { color: "#1F2557", fontWeight: "800", fontSize: 14.5 },
+  pinBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "#FFF7E6",
+    borderWidth: 1,
+    borderColor: "#FCE2A6",
+  },
+  pinBadgeText: { color: "#B7791F", fontSize: 10, fontWeight: "800" },
   postTime: { color: "#7780A1", fontSize: 11.5, marginTop: 1 },
   postContent: {
     color: "#3E4466",
