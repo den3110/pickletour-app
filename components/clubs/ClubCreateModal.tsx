@@ -142,6 +142,7 @@ export default function ClubCreateModal({
     joinPolicy: initial?.joinPolicy || "approval",
     memberVisibility: initial?.memberVisibility || "admins",
     showRolesToMembers: !!initial?.showRolesToMembers,
+    requireVerifiedPhoneToJoin: !!initial?.requireVerifiedPhoneToJoin,
     province: initial?.province || "",
     city: initial?.city || "",
     shortCode: initial?.shortCode || "",
@@ -587,6 +588,32 @@ export default function ClubCreateModal({
                   style={[
                     styles.switchDot,
                     form.showRolesToMembers && styles.switchDotOn,
+                  ]}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.rowBetween, { marginBottom: 14 }]}>
+              <Text style={[styles.fieldTitle, { color: colors.text, flex: 1, marginRight: 10 }]}>
+                Chỉ nhận thành viên đã kích hoạt SĐT (Zalo)
+              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  setForm((f: any) => ({
+                    ...f,
+                    requireVerifiedPhoneToJoin: !f.requireVerifiedPhoneToJoin,
+                  }))
+                }
+                style={[
+                  styles.switchBtn,
+                  { backgroundColor: colors.switchOff },
+                  form.requireVerifiedPhoneToJoin && styles.switchOn,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.switchDot,
+                    form.requireVerifiedPhoneToJoin && styles.switchDotOn,
                   ]}
                 />
               </TouchableOpacity>

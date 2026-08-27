@@ -128,6 +128,13 @@ export default function ResetPasswordOtpScreen() {
 
   const initialEmail = String(getParam("email", "")).toLowerCase().trim();
   const masked = String(getParam("masked", ""));
+  const channel = String(getParam("channel", ""));
+  const initialPhone = String(getParam("phone", "")).trim();
+  const isZalo = channel === "zalo";
+  // Tham số định danh dùng chung cho verify/resend/reset (email hoặc Zalo/SĐT)
+  const authArgs = isZalo
+    ? { channel: "zalo", phone: initialPhone }
+    : { email: initialEmail, platform: "app" };
   const initialTTL = Number(getParam("expiresIn", 600)) || 600;
 
   const [forgotPassword, { isLoading: isResending }] =
@@ -203,9 +210,8 @@ export default function ResetPasswordOtpScreen() {
     if (!canVerify) return;
     try {
       const res = await verifyResetOtp({
-        email: initialEmail,
+        ...authArgs,
         otp,
-        platform: "app",
       }).unwrap();
       if (typeof res?.expiresIn === "number") setSecondsLeft(res.expiresIn);
       setPhase("pwd");
@@ -232,8 +238,7 @@ export default function ResetPasswordOtpScreen() {
     try {
       setResendBusySafe(true);
       const res = await forgotPassword({
-        email: initialEmail,
-        platform: "app",
+        ...authArgs,
       }).unwrap();
 
       const ttl = typeof res?.expiresIn === "number" ? res.expiresIn : 600;
@@ -264,8 +269,7 @@ export default function ResetPasswordOtpScreen() {
     if (!canReset) return;
     try {
       await resetPassword({
-        platform: "app",
-        email: initialEmail,
+        ...authArgs,
         otp,
         password: pwd,
       }).unwrap();

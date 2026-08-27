@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useForgotPasswordMutation } from "@/slices/usersApiSlice";
+import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice";
 import LottieView from "lottie-react-native"; // ⬅️ NEW
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
@@ -82,6 +83,12 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState("");
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
+  const { data: regSettings } = useGetRegistrationSettingsQuery(undefined);
+  const zaloEnabled = (regSettings as any)?.phoneOtpEnabled === true;
+  const [mode, setMode] = useState<"email" | "zalo">("email");
+  const [phone, setPhone] = useState("");
+  const phoneValid = /^0\d{9}$/.test(phone.trim());
+  const btnValid = mode === "zalo" ? phoneValid : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -141,6 +148,32 @@ export default function ForgotPasswordScreen() {
       );
     }
   }, [emailValid, email, isLoading, forgotPassword, router]);
+
+  const handleZaloSubmit = useCallback(async () => {
+    if (!phoneValid || isLoading) return;
+    try {
+      const res: any = await forgotPassword({
+        channel: "zalo",
+        phone: phone.trim(),
+      }).unwrap();
+      if (res?.exists === false) {
+        RNAlert.alert(
+          "Không thể tiếp tục",
+          res?.message || "SĐT chưa kích hoạt hoặc không tồn tại."
+        );
+        return;
+      }
+      const params = new URLSearchParams({
+        channel: "zalo",
+        phone: phone.trim(),
+        masked: res?.masked || "",
+        expiresIn: String(typeof res?.expiresIn === "number" ? res.expiresIn : 600),
+      }).toString();
+      router.push(`/reset-password?${params}`);
+    } catch (err: any) {
+      RNAlert.alert("Thất bại", err?.data?.message || "Không gửi được OTP.");
+    }
+  }, [phoneValid, phone, isLoading, forgotPassword, router]);
 
   const goLogin = useCallback(() => {
     router.back();
@@ -202,8 +235,31 @@ export default function ForgotPasswordScreen() {
               )}
 
               <View style={styles.form}>
+                {zaloEnabled && (
+                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                    {(["email", "zalo"] as const).map((m) => (
+                      <Pressable
+                        key={m}
+                        onPress={() => setMode(m)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 9,
+                          borderRadius: 10,
+                          alignItems: "center",
+                          backgroundColor: mode === m ? themed.primary : themed.muted,
+                          borderWidth: 1,
+                          borderColor: themed.border,
+                        }}
+                      >
+                        <Text style={{ color: mode === m ? "#fff" : themed.text, fontWeight: "700", fontSize: 13 }}>
+                          {m === "email" ? "Qua Email" : "Qua Zalo (SĐT)"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 <Text style={[styles.label, { color: themed.subtext }]}>
-                  Email
+                  {mode === "zalo" ? "Số điện thoại" : "Email"}
                 </Text>
                 <ForgotGlassSurface
                   isDark={isDark}
@@ -220,26 +276,42 @@ export default function ForgotPasswordScreen() {
                     },
                   ]}
                 >
-                  <TextInput
-                    style={[styles.inputInside, { color: themed.text }]}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="you@example.com"
-                    placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="send"
-                    onSubmitEditing={handleSubmit}
-                    textContentType="emailAddress"
-                    accessibilityLabel="Email"
-                    autoFocus
-                  />
+                  {mode === "zalo" ? (
+                    <TextInput
+                      style={[styles.inputInside, { color: themed.text }]}
+                      value={phone}
+                      onChangeText={(v) => setPhone(v.replace(/[^\d]/g, ""))}
+                      placeholder="0987654321"
+                      placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
+                      keyboardType="number-pad"
+                      maxLength={11}
+                      returnKeyType="send"
+                      onSubmitEditing={handleZaloSubmit}
+                      accessibilityLabel="Số điện thoại"
+                      autoFocus
+                    />
+                  ) : (
+                    <TextInput
+                      style={[styles.inputInside, { color: themed.text }]}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="you@example.com"
+                      placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="send"
+                      onSubmitEditing={handleSubmit}
+                      textContentType="emailAddress"
+                      accessibilityLabel="Email"
+                      autoFocus
+                    />
+                  )}
                 </ForgotGlassSurface>
 
                 <Pressable
-                  onPress={handleSubmit}
-                  disabled={!emailValid || isLoading}
+                  onPress={mode === "zalo" ? handleZaloSubmit : handleSubmit}
+                  disabled={!btnValid || isLoading}
                   style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Gửi OTP"
@@ -247,9 +319,9 @@ export default function ForgotPasswordScreen() {
                 >
                   <ForgotGlassSurface
                     isDark={isDark}
-                    interactive={emailValid && !isLoading}
+                    interactive={btnValid && !isLoading}
                     tintColor={
-                      !emailValid || isLoading
+                      !btnValid || isLoading
                         ? "rgba(148,163,184,0.56)"
                         : rgbaFromHex(themed.primary, isDark ? 0.72 : 0.62)
                     }
@@ -258,7 +330,7 @@ export default function ForgotPasswordScreen() {
                       IOS_26_LIQUID_GLASS_ENABLED && styles.glassPrimaryBtn,
                       {
                         backgroundColor:
-                          !emailValid || isLoading
+                          !btnValid || isLoading
                             ? "#94a3b8"
                             : themed.primary,
                       },
