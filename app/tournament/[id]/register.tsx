@@ -1678,10 +1678,14 @@ export default function TournamentRegistrationScreen() {
       const EPS = 0.001;
       const players = [r?.player1, r?.player2].filter(Boolean);
       if (key === "over") {
+        // Chỉ tính "vượt điểm trình" khi ĐỎ = vượt QUÁ mức tối đa cho phép
+        // (cap + delta). Bằng cap+delta là "maxed" (cam), KHÔNG tính là vượt.
         const total = totalScoreOf(r, isSingles);
-        const overTotal = cap > 0 && total != null && total > cap + EPS;
+        const overTotal =
+          cap > 0 && total != null && total > cap + delta + EPS;
         const overSingle =
-          eachCap > 0 && players.some((p: any) => Number(p.score) > eachCap + EPS);
+          eachCap > 0 &&
+          players.some((p: any) => Number(p.score) > eachCap + delta + EPS);
         return overTotal || overSingle;
       }
       if (key === "unpaid")
@@ -1692,7 +1696,7 @@ export default function TournamentRegistrationScreen() {
         return players.some((p: any) => Number(p.scoreTotalTours || 0) === 0);
       return true;
     },
-    [cap, eachCap, isSingles]
+    [cap, eachCap, delta, isSingles]
   );
   const displayRegs = useMemo(() => {
     if (!canManage || regFilters.size === 0) return filteredRegs;
