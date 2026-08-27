@@ -56,6 +56,7 @@ import { FeedMediaViewer } from "@/components/feed/FeedMediaViewer";
 import { MentionText } from "@/components/feed/MentionText";
 import { AspectImage } from "@/components/feed/AspectImage";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import PlayerNameText from "@/components/PlayerNameText";
 
 const REACTION_EMOJI: Record<string, string> = {
   like: "👍",
@@ -1420,10 +1421,12 @@ function PostCard({ post, me }: { post: any; me: any }) {
           hitSlop={6}
         >
           <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-            <Text style={styles.postAuthor}>
-              {authorName(post.author)}
-              {post.isPinned && <Text style={styles.pinnedBadge}>  📌</Text>}
-            </Text>
+            <PlayerNameText
+              user={post.author}
+              name={authorName(post.author)}
+              style={styles.postAuthor}
+            />
+            {post.isPinned && <Text style={styles.pinnedBadge}>  📌</Text>}
             <ScoreBadges
               single={post.author?.score?.single}
               double={post.author?.score?.double}
@@ -1584,9 +1587,11 @@ function PostCard({ post, me }: { post: any; me: any }) {
                   }
                   hitSlop={4}
                 >
-                  <Text style={styles.previewAuthor}>
-                    {authorName(c.author)}
-                  </Text>
+                  <PlayerNameText
+                    user={c.author}
+                    name={authorName(c.author)}
+                    style={styles.previewAuthor}
+                  />
                 </Pressable>
                 <MentionText
                   content={c.content}

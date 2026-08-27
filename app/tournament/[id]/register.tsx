@@ -70,6 +70,7 @@ import ImageView from "react-native-image-viewing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { OpenMessageButton } from "@/components/social/OpenMessageButton";
+import PlayerNameText from "@/components/PlayerNameText";
 
 const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 
@@ -1084,16 +1085,16 @@ const RegItem = memo(function RegItem({
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                <Text
+                <PlayerNameText
+                  player={pl}
+                  name={displayName(pl, displaySource)}
                   numberOfLines={1}
                   style={{
                     fontWeight: "700",
                     color: C.textPrimary,
                     fontSize: 14,
                   }}
-                >
-                  {displayName(pl, displaySource)}
-                </Text>
+                />
                 {pl?.cccdStatus === "verified" && (
                   <MaterialIcons name="verified" size={14} color={C.tint} />
                 )}
@@ -3279,16 +3280,16 @@ export default function TournamentRegistrationScreen() {
                                   gap: 4,
                                 }}
                               >
-                                <Text
+                                <PlayerNameText
+                                  player={pl}
+                                  name={displayName(pl, tour)}
                                   numberOfLines={1}
                                   style={{
                                     fontWeight: "700",
                                     color: "#0F172A",
                                     fontSize: 14,
                                   }}
-                                >
-                                  {displayName(pl, tour)}
-                                </Text>
+                                />
                                 {pl?.cccdStatus === "verified" && (
                                   <MaterialIcons
                                     name="verified"

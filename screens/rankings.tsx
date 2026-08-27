@@ -61,6 +61,7 @@ import RankingChart from "@/components/RankingChart";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import PlayerNameText from "@/components/PlayerNameText";
 
 /* ================= Config ================= */
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";
@@ -1408,12 +1409,13 @@ const RankingCard = memo(
           </TouchableOpacity>
 
           <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text
+            <PlayerNameText
+              user={u}
+              name={u?.nickname || "---"}
               style={[styles.nickname, { color: theme.text }]}
               numberOfLines={1}
-            >
-              {u?.nickname || "---"}
-            </Text>
+            />
+
             <View
               style={{
                 flexDirection: "row",

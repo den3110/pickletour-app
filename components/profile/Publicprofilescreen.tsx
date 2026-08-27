@@ -54,6 +54,7 @@ import { FriendActions } from "@/components/social/FriendActions";
 import { OpenMessageButton } from "@/components/social/OpenMessageButton";
 import { UserActionsMenu } from "@/components/social/UserActionsMenu";
 import { CoachAchievementsMobile } from "./CoachAchievementsMobile";
+import PlayerNameText from "@/components/PlayerNameText";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -2176,9 +2177,12 @@ export default function PublicProfileScreen() {
               )}
             </Animated.View>
 
-            <Text style={styles.userName}>
-              {base?.name || base?.fullName || "Người dùng"}
-            </Text>
+            <PlayerNameText
+              user={base}
+              name={base?.name || base?.fullName || "Người dùng"}
+              style={styles.userName}
+            />
+
 
             <ProfileGlassSurface
               colors={colors}
