@@ -66,6 +66,7 @@ import {
 } from "@/slices/pushApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import CccdQrModal from "@/components/CccdQrModal";
+import PhoneActivationCard from "@/components/auth/PhoneActivationCard";
 import apiSlice from "@/slices/apiSlice";
 import { useTheme } from "@react-navigation/native";
 import { buildLoginHref, runMobileLogoutFlow } from "@/services/authSession";
@@ -1245,6 +1246,7 @@ export default function ProfileScreen({ isBack = false }) {
           />
         }
       >
+        <PhoneActivationCard />
         {/* ===== TAB BAR ===== */}
         <View style={[styles.tabBarContainer, { backgroundColor: t.bg }]}>
           <ProfileGlassSurface

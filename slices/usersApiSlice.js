@@ -256,6 +256,20 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body,
       }),
     }),
+    requestPhoneOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/phone/request-otp",
+        method: "POST",
+        body: body || {},
+      }),
+    }),
+    verifyPhoneActivationOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/phone/verify-otp",
+        method: "POST",
+        body,
+      }),
+    }),
     getNotificationPrefs: builder.query({
       query: () => ({
         url: "/api/users/notification-prefs",
@@ -303,6 +317,8 @@ export const {
   useUpdateKycStatusMutation,
   useVerifyRegisterOtpMutation,
   useResendRegisterOtpMutation,
+  useRequestPhoneOtpMutation,
+  useVerifyPhoneActivationOtpMutation,
   useGetNotificationPrefsQuery,
   usePatchNotificationPrefsMutation,
 } = userApiSlice;

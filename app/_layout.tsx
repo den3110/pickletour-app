@@ -46,6 +46,7 @@ import HotUpdateModal from "@/components/HotUpdateModal";
 import CrashFeedbackModal from "@/components/CrashFeedbackModal";
 import MatchLiveActivityBootstrap from "@/components/match/MatchLiveActivityBootstrap";
 import CheckpointRealtimeGate from "@/components/auth/CheckpointRealtimeGate";
+import PhoneActivationGate from "@/components/auth/PhoneActivationGate";
 import AppBootSplash from "@/components/AppBootSplash";
 import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 import Constants from "expo-constants";
@@ -2284,6 +2285,10 @@ function RootLayout() {
 
                       {!isWebViewShellActive && mobileAppShellReady ? (
                         <CheckpointRealtimeGate />
+                      ) : null}
+
+                      {!isWebViewShellActive && mobileAppShellReady ? (
+                        <PhoneActivationGate />
                       ) : null}
 
                       <StatusBar
