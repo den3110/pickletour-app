@@ -1442,6 +1442,22 @@ const RankingCard = memo(
                   {verifyChip.label}
                 </Text>
               </AppleLiquidGlassView>
+              {u?.phoneVerified ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginLeft: 6,
+                    paddingHorizontal: 7,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    backgroundColor: "rgba(22,163,74,0.12)",
+                  }}
+                >
+                  <Ionicons name="phone-portrait" size={11} color="#16a34a" style={{ marginRight: 3 }} />
+                  <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#16a34a" }}>SĐT</Text>
+                </View>
+              ) : null}
             </View>
 
             {podium ? (
