@@ -218,7 +218,7 @@ async function pickImage(maxBytes = MAX_FILE_SIZE) {
   return { uri, name, type, size };
 }
 
-function validateAll(form, avatarUrl, accepted, requireOptional) {
+function validateAll(form, avatarUrl, accepted, requireOptional, emailOptional) {
   const name = (form.name || "").trim();
   const nickname = (form.nickname || "").trim();
   const phoneRaw = cleanPhone(form.phone || "");
@@ -250,8 +250,10 @@ function validateAll(form, avatarUrl, accepted, requireOptional) {
 
   if (!nickname) fields.nickname = "Vui lòng nhập biệt danh.";
 
-  if (!email) fields.email = "Vui lòng nhập email.";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+  // Email: bắt buộc trừ khi bật OTP Zalo (emailOptional) — khi đó chỉ check định dạng nếu có nhập
+  if (!email) {
+    if (!emailOptional) fields.email = "Vui lòng nhập email.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     fields.email = "Email không hợp lệ.";
 
   if (requireOptional) {
@@ -408,9 +410,10 @@ export default function RegisterScreen() {
     handleChange("dob", `${yyyy}-${mm}-${dd}`);
   };
 
+  const emailOptional = registrationSettings?.emailOptional === true;
   const validation = useMemo(
-    () => validateAll(form, avatarUrl, accepted, requireOptional),
-    [form, avatarUrl, accepted, requireOptional]
+    () => validateAll(form, avatarUrl, accepted, requireOptional, emailOptional),
+    [form, avatarUrl, accepted, requireOptional, emailOptional]
   );
 
   const doRegister = async () => {
@@ -681,14 +684,14 @@ export default function RegisterScreen() {
               helperText={showErrors ? validation.fields.nickname : ""}
             />
             <Field
-              label="Email"
+              label={emailOptional ? "Email (không bắt buộc)" : "Email"}
               value={form.email}
               onChangeText={(v) => handleChange("email", v)}
               border={border}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="email-address"
-              required
+              required={!emailOptional}
               error={showErrors && !!validation.fields.email}
               helperText={showErrors ? validation.fields.email : ""}
             />
