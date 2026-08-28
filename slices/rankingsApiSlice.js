@@ -4,7 +4,15 @@ import { apiSlice } from "./apiSlice";
 export const rankingsApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getRankingsList: builder.query({
-      query: ({ cursor, page, limit = 12, keyword } = {}) => {
+      query: ({
+        cursor,
+        page,
+        limit = 12,
+        keyword,
+        scoreType,
+        minScore,
+        maxScore,
+      } = {}) => {
         const params = new URLSearchParams();
 
         if (cursor) params.set("cursor", String(cursor));
@@ -13,6 +21,11 @@ export const rankingsApiSlice = apiSlice.injectEndpoints({
         }
         if (limit) params.set("limit", String(limit));
         if (keyword) params.set("keyword", String(keyword).trim());
+        if (scoreType) params.set("scoreType", String(scoreType));
+        if (minScore !== undefined && minScore !== null)
+          params.set("minScore", String(minScore));
+        if (maxScore !== undefined && maxScore !== null)
+          params.set("maxScore", String(maxScore));
 
         const qs = params.toString();
 

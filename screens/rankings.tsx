@@ -62,6 +62,7 @@ import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import PlayerNameText from "@/components/PlayerNameText";
+import RangeSlider from "@/components/RangeSlider";
 
 /* ================= Config ================= */
 const PLACE = "https://dummyimage.com/100x100/cccccc/ffffff&text=?";
@@ -1786,6 +1787,15 @@ const MemoizedChartView = memo(
 MemoizedChartView.displayName = "MemoizedChartView";
 
 /* ================= MAIN SCREEN ================= */
+// ===== Lọc điểm trình theo range (thanh kéo) =====
+const SCORE_MIN = 2.0;
+const SCORE_MAX = 8.0;
+const SCORE_TYPES: { value: "single" | "double" | "mix"; label: string }[] = [
+  { value: "single", label: "Đơn" },
+  { value: "double", label: "Đôi" },
+  { value: "mix", label: "Đôi NN" },
+];
+
 export default function RankingListScreen({ isBack = false }) {
   const isFocused = useIsFocused();
   const theme = useThemeColors();
@@ -1804,6 +1814,31 @@ export default function RankingListScreen({ isBack = false }) {
 
   // Pagination State
   const [page, setPage] = useState(0);
+
+  // Lọc điểm trình
+  const [scoreType, setScoreType] = useState<"single" | "double" | "mix">(
+    "double",
+  );
+  const [range, setRange] = useState<[number, number]>([SCORE_MIN, SCORE_MAX]);
+  const [liveRange, setLiveRange] = useState<[number, number]>([
+    SCORE_MIN,
+    SCORE_MAX,
+  ]);
+  const rangeActive = range[0] > SCORE_MIN || range[1] < SCORE_MAX;
+  const onScoreTypeChange = (v: "single" | "double" | "mix") => {
+    setScoreType(v);
+    setPage(0);
+  };
+  const commitRange = (v: [number, number]) => {
+    setRange(v);
+    setLiveRange(v);
+    setPage(0);
+  };
+  const clearRange = () => {
+    setRange([SCORE_MIN, SCORE_MAX]);
+    setLiveRange([SCORE_MIN, SCORE_MAX]);
+    setPage(0);
+  };
   const [accumulatedList, setAccumulatedList] = useState([]);
   const [hasMore, setHasMore] = useState(true);
 
@@ -1817,6 +1852,9 @@ export default function RankingListScreen({ isBack = false }) {
   } = useGetRankingsListQuery({
     keyword,
     page,
+    scoreType: rangeActive ? scoreType : undefined,
+    minScore: rangeActive ? range[0] : undefined,
+    maxScore: rangeActive ? range[1] : undefined,
   });
   const { data: podiumData, refetch: refetchPodiums } =
     useGetRankingsPodiums30dQuery();
@@ -2200,6 +2238,83 @@ export default function RankingListScreen({ isBack = false }) {
           </AppleLiquidGlassView>
         </View>
       </TouchableWithoutFeedback>
+
+      {/* Lọc điểm trình theo range (thanh kéo) */}
+      <View style={{ paddingHorizontal: 16, marginTop: 4, marginBottom: 2 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 2,
+          }}
+        >
+          <Text style={{ color: theme.text, fontWeight: "700", fontSize: 13 }}>
+            Lọc theo điểm trình
+          </Text>
+          {SCORE_TYPES.map((st) => {
+            const on = scoreType === st.value;
+            return (
+              <TouchableOpacity
+                key={st.value}
+                onPress={() => onScoreTypeChange(st.value)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 14,
+                  backgroundColor: on ? theme.tint : "transparent",
+                  borderWidth: 1,
+                  borderColor: on ? theme.tint : theme.border,
+                }}
+              >
+                <Text
+                  style={{
+                    color: on ? "#fff" : theme.subText,
+                    fontSize: 12,
+                    fontWeight: "600",
+                  }}
+                >
+                  {st.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {rangeActive && (
+            <TouchableOpacity
+              onPress={clearRange}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 14,
+                backgroundColor: theme.tint,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                {liveRange[0].toFixed(1)} – {liveRange[1].toFixed(1)}
+              </Text>
+              <Ionicons name="close" size={13} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={{ paddingHorizontal: 4 }}>
+          <RangeSlider
+            min={SCORE_MIN}
+            max={SCORE_MAX}
+            step={0.1}
+            values={range}
+            onChange={setLiveRange}
+            onCommit={commitRange}
+            trackColor={theme.border}
+            activeColor={theme.tint}
+            thumbColor="#ffffff"
+            thumbBorder={theme.tint}
+          />
+        </View>
+      </View>
 
       <View style={{ flex: 1, paddingHorizontal: 16 }}>
         {error ? (
