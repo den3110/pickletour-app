@@ -2263,9 +2263,9 @@ export default function RankingListScreen({ isBack = false }) {
                   paddingHorizontal: 10,
                   paddingVertical: 4,
                   borderRadius: 14,
-                  backgroundColor: on ? theme.tint : "transparent",
+                  backgroundColor: on ? theme.primary : "transparent",
                   borderWidth: 1,
-                  borderColor: on ? theme.tint : theme.border,
+                  borderColor: on ? theme.primary : theme.border,
                 }}
               >
                 <Text
@@ -2290,7 +2290,7 @@ export default function RankingListScreen({ isBack = false }) {
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 borderRadius: 14,
-                backgroundColor: theme.tint,
+                backgroundColor: theme.primary,
               }}
             >
               <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
@@ -2309,9 +2309,9 @@ export default function RankingListScreen({ isBack = false }) {
             onChange={setLiveRange}
             onCommit={commitRange}
             trackColor={theme.border}
-            activeColor={theme.tint}
+            activeColor={theme.primary}
             thumbColor="#ffffff"
-            thumbBorder={theme.tint}
+            thumbBorder={theme.primary}
           />
         </View>
       </View>
