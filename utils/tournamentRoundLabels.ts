@@ -25,7 +25,9 @@ export function formatKnockoutRoundLabelByMatchCount(
   if (count === 2) return withIndex("Bán kết", options);
   if (count === 4) return withIndex("Tứ kết", options);
   if (count >= 8 && Number.isInteger(Math.log2(count))) {
-    return `Vòng 1/${count}`;
+    // Nhãn theo SỐ ĐỘI của vòng (= số trận × 2) để khớp web:
+    // 32 trận (64 đội) -> 1/64, 16 trận (32 đội) -> 1/32, 8 trận (16 đội) -> 1/16.
+    return `Vòng 1/${count * 2}`;
   }
   return options.fallback ?? "";
 }
