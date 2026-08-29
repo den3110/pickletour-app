@@ -256,6 +256,13 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body,
       }),
     }),
+    skipRegisterOtp: builder.mutation({
+      query: (body) => ({
+        url: "/api/users/register/skip-otp",
+        method: "POST",
+        body,
+      }),
+    }),
     requestPhoneOtp: builder.mutation({
       query: (body) => ({
         url: "/api/users/phone/request-otp",
@@ -317,6 +324,7 @@ export const {
   useUpdateKycStatusMutation,
   useVerifyRegisterOtpMutation,
   useResendRegisterOtpMutation,
+  useSkipRegisterOtpMutation,
   useRequestPhoneOtpMutation,
   useVerifyPhoneActivationOtpMutation,
   useGetNotificationPrefsQuery,

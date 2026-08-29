@@ -444,6 +444,8 @@ export default function RegisterScreen() {
             registerToken: res.registerToken,
             phoneMasked: res.phoneMasked || "",
             devOtp: res.devOtp || "",
+            canSkip: res.canSkip ? "1" : "",
+            otpSendFailed: res.otpSendFailed ? "1" : "",
           },
         });
         return;

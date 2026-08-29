@@ -26,6 +26,7 @@ import { saveUserInfo } from "@/utils/authStorage";
 import {
   useVerifyRegisterOtpMutation,
   useResendRegisterOtpMutation,
+  useSkipRegisterOtpMutation,
 } from "@/slices/usersApiSlice";
 // Theme & Icons
 import { useTheme } from "@react-navigation/native";
@@ -57,6 +58,8 @@ export default function VerifyOtpScreen() {
   const registerToken = String(params.registerToken || "");
   const phoneMasked = String(params.phoneMasked || "");
   const devOtp = String(params.devOtp || "");
+  const canSkip = String(params.canSkip || "") === "1";
+  const otpSendFailed = String(params.otpSendFailed || "") === "1";
 
   // Ref cho input ẩn
   const inputRef = useRef(null);
@@ -67,6 +70,7 @@ export default function VerifyOtpScreen() {
 
   const [verifyOtp, { isLoading: verifying }] = useVerifyRegisterOtpMutation();
   const [resendOtp, { isLoading: resending }] = useResendRegisterOtpMutation();
+  const [skipOtp, { isLoading: skipping }] = useSkipRegisterOtpMutation();
 
   const handlePressContainer = () => {
     setIsFocused(true);
@@ -135,6 +139,21 @@ export default function VerifyOtpScreen() {
       );
     }
   }, [resendOtp, registerToken]);
+
+  const onSkip = useCallback(async () => {
+    try {
+      const res = await skipOtp({ registerToken }).unwrap();
+      const normalized = res ? { ...res, token: res.token } : res;
+      dispatch(setCredentials(normalized));
+      await saveUserInfo(normalized);
+      router.replace(resolveAuxiliaryTabPath("profile"));
+    } catch (err) {
+      Alert.alert(
+        "Lỗi",
+        err?.data?.message || err?.error || "Bỏ qua thất bại"
+      );
+    }
+  }, [skipOtp, registerToken, dispatch]);
 
   // Render 6 ô vuông
   const renderCells = () => {
@@ -216,6 +235,33 @@ export default function VerifyOtpScreen() {
                 : "Vui lòng nhập mã OTP 6 số đã được gửi tới điện thoại của bạn."}
             </Text>
 
+            {otpSendFailed && (
+              <View
+                style={{
+                  backgroundColor: dark ? "#3a2a12" : "#FFF7ED",
+                  borderColor: "#F59E0B",
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 24,
+                  width: "100%",
+                }}
+              >
+                <Text
+                  style={{
+                    color: dark ? "#FBBF24" : "#B45309",
+                    fontSize: 13,
+                    textAlign: "center",
+                    lineHeight: 20,
+                  }}
+                >
+                  Không gửi được mã OTP tới số của bạn (dịch vụ đang gặp sự cố).
+                  Bạn có thể bỏ qua và kích hoạt số điện thoại sau trong phần hồ
+                  sơ.
+                </Text>
+              </View>
+            )}
+
             {/* Dev OTP Hint */}
             {/* {!!devOtp && (
               <View style={styles.devTag}>
@@ -263,6 +309,34 @@ export default function VerifyOtpScreen() {
                 <Text style={styles.btnText}>Xác nhận</Text>
               )}
             </TouchableOpacity>
+
+            {canSkip && (
+              <TouchableOpacity
+                onPress={onSkip}
+                disabled={skipping || verifying}
+                activeOpacity={0.8}
+                style={{
+                  width: "100%",
+                  height: 50,
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: "#F59E0B",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginTop: 12,
+                }}
+              >
+                {skipping ? (
+                  <ActivityIndicator color="#F59E0B" />
+                ) : (
+                  <Text
+                    style={{ color: "#F59E0B", fontWeight: "700", fontSize: 15 }}
+                  >
+                    Bỏ qua & kích hoạt sau
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* Resend Link */}
             <View style={styles.footer}>
