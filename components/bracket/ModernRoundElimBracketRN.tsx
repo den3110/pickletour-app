@@ -167,6 +167,7 @@ export default function ModernRoundElimBracketRN({
   resolveSideLabel,
   baseRoundStart = 1,
   isDark,
+  zoom = 1,
 }: {
   rounds: Round[];
   onOpenMatch?: (m: any) => void;
@@ -174,7 +175,9 @@ export default function ModernRoundElimBracketRN({
   resolveSideLabel?: ResolveSideLabel;
   baseRoundStart?: number;
   isDark: boolean;
+  zoom?: number;
 }) {
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const layout = useMemo(() => buildLayout(rounds || []), [rounds]);
   const hasLoserEdge = layout.connectors.some((c) => c.isLoser);
 
@@ -201,9 +204,17 @@ export default function ModernRoundElimBracketRN({
     >
       <View
         style={{
+          width: Math.ceil((layout.width + 24) * safeZoom),
+          height: Math.ceil((layout.height + 24) * safeZoom),
+        }}
+      >
+      <View
+        style={{
           width: layout.width + 24,
           minHeight: layout.height + 24,
           position: "relative",
+          transform: [{ scale: safeZoom }],
+          transformOrigin: "top left",
         }}
       >
         {/* Background subtle pattern */}
@@ -375,6 +386,7 @@ export default function ModernRoundElimBracketRN({
             </View>
           )),
         )}
+      </View>
       </View>
     </ScrollView>
   );

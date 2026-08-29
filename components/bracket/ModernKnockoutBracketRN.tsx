@@ -34,6 +34,7 @@ export default function ModernKnockoutBracketRN({
   resolveSideLabel,
   baseRoundStart = 1,
   isDark,
+  zoom = 1,
 }: {
   rounds: Round[];
   onOpenMatch?: (m: any) => void;
@@ -41,7 +42,9 @@ export default function ModernKnockoutBracketRN({
   resolveSideLabel?: ResolveSideLabel;
   baseRoundStart?: number;
   isDark: boolean;
+  zoom?: number;
 }) {
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const [cardRects, setCardRects] = useState<
     Map<string, { x: number; y: number; w: number; h: number }>
   >(new Map());
@@ -146,9 +149,17 @@ export default function ModernKnockoutBracketRN({
     >
       <View
         style={{
+          width: Math.ceil(rootWidth * safeZoom),
+          height: Math.ceil(rootHeight * safeZoom),
+        }}
+      >
+      <View
+        style={{
           width: rootWidth,
           minHeight: rootHeight,
           position: "relative",
+          transform: [{ scale: safeZoom }],
+          transformOrigin: "top left",
         }}
       >
         {/* Background subtle pattern */}
@@ -280,6 +291,7 @@ export default function ModernKnockoutBracketRN({
             );
           })}
         </View>
+      </View>
       </View>
     </ScrollView>
   );

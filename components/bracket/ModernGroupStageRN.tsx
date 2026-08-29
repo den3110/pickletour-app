@@ -757,11 +757,14 @@ export default function ModernGroupStageRN({
   groups,
   isDark,
   onOpenMatch,
+  zoom = 1,
 }: {
   groups: ModernGroupEntry[];
   isDark: boolean;
   onOpenMatch?: (m: any) => void;
+  zoom?: number;
 }) {
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   if (!groups?.length) {
     return (
       <View
@@ -781,7 +784,13 @@ export default function ModernGroupStageRN({
     );
   }
   return (
-    <View style={{ gap: 14 }}>
+    <View
+      style={{
+        gap: 14,
+        transform: [{ scale: safeZoom }],
+        transformOrigin: "top left",
+      }}
+    >
       {groups.map((entry, i) => (
         <ModernGroupCardRN
           key={entry.key}

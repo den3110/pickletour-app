@@ -63,6 +63,7 @@ import ModernKnockoutBracketRN from "@/components/bracket/ModernKnockoutBracketR
 import ModernRoundElimBracketRN from "@/components/bracket/ModernRoundElimBracketRN";
 import ModernGroupStageRN from "@/components/bracket/ModernGroupStageRN";
 import { ModernBracketToggle } from "@/components/bracket/ModernBracketShared";
+import CourtStatusBar from "@/components/bracket/CourtStatusBar";
 
 const BRACKET_UI_VERSION_KEY = "pickletour:tournament-bracket:uiVersion";
 
@@ -3693,6 +3694,48 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
     refetch: refetchTour,
   } = useGetTournamentQuery(tourId, { skip: !tourId });
 
+  // Admin hoặc quản lý giải -> xem panel tình trạng sân
+  const canManageTournament = useMemo(() => {
+    const me: any = userInfo;
+    if (!me) return false;
+    if (
+      me.isAdmin ||
+      me.role === "admin" ||
+      me.isSuperAdmin ||
+      me.isSuperUser ||
+      (Array.isArray(me.roles) && me.roles.includes("admin"))
+    )
+      return true;
+    const my = String(myUserId || "");
+    if (!my) return false;
+    const t2: any = tour;
+    const createdById = String(t2?.createdBy?._id ?? t2?.createdBy ?? "");
+    if (createdById && createdById === my) return true;
+    if (Array.isArray(t2?.managers))
+      return t2.managers.some(
+        (m: any) => String(m?.user?._id ?? m?.user ?? m?._id ?? m) === my,
+      );
+    return Boolean(t2?.isManager);
+  }, [userInfo, myUserId, tour]);
+
+  // Zoom cho SƠ ĐỒ MỚI (v4) — trước đây chỉ bản cũ có zoom
+  const [modernZoom, setModernZoom] = useState(1);
+  const modernZoomIn = useCallback(
+    () =>
+      setModernZoom((z) =>
+        clampBracketZoom(Number((z + BRACKET_ZOOM_STEP).toFixed(2))),
+      ),
+    [],
+  );
+  const modernZoomOut = useCallback(
+    () =>
+      setModernZoom((z) =>
+        clampBracketZoom(Number((z - BRACKET_ZOOM_STEP).toFixed(2))),
+      ),
+    [],
+  );
+  const modernZoomReset = useCallback(() => setModernZoom(1), []);
+
   const {
     data: brackets = [],
     isLoading: l2,
@@ -4957,6 +5000,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             groups={payload}
             isDark={!!t.dark}
             onOpenMatch={openMatch}
+            zoom={modernZoom}
           />
         </View>
       );
@@ -5216,6 +5260,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             resolveSideLabel={resolveSideLabel}
             baseRoundStart={1}
             isDark={t.dark}
+            zoom={modernZoom}
           />
         ) : (
           <BracketColumns
@@ -5303,6 +5348,7 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
             resolveSideLabel={resolveSideLabel}
             baseRoundStart={1}
             isDark={t.dark}
+            zoom={modernZoom}
           />
         ) : (
           <SymmetricKnockoutColumns
@@ -5467,6 +5513,30 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           </Card>
 
           <TabsBar items={tabLabels} value={tab} onChange={setTab} t={t} />
+
+          <CourtStatusBar
+            tournamentId={tourId}
+            enabled={canManageTournament}
+            t={t}
+          />
+
+          {isBracketV4 && (
+            <View
+              style={{
+                alignItems: "flex-end",
+                paddingHorizontal: 12,
+                marginBottom: 4,
+              }}
+            >
+              <ZoomControlsRN
+                zoom={modernZoom}
+                onZoomIn={modernZoomIn}
+                onZoomOut={modernZoomOut}
+                onReset={modernZoomReset}
+                t={t}
+              />
+            </View>
+          )}
 
           {current?.type === "group" ? (
             <View style={{ gap: 12 }}>
