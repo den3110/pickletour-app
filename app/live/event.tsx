@@ -135,8 +135,13 @@ export default function EventLiveScreen() {
               width={playerW}
               play
               mute={muted}
+              forceAndroidAutoplay
               videoId={current.videoId}
-              webViewProps={{ allowsInlineMediaPlayback: true }}
+              webViewProps={{
+                allowsInlineMediaPlayback: true,
+                mediaPlaybackRequiresUserAction: false,
+                androidLayerType: "hardware",
+              }}
               initialPlayerParams={{
                 rel: false,
                 modestbranding: true,
