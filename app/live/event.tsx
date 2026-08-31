@@ -21,8 +21,12 @@ import { WebView } from "react-native-webview";
 
 import { useGetEventLiveQuery } from "@/slices/eventLiveApiSlice";
 
-// HTML nhúng iframe YouTube — autoplay=1&mute=1 tự phát ngay trong WebView
-// (giống hệt bản web đang chạy tốt). baseUrl youtube.com để được phép nhúng.
+// Origin THẬT để YouTube cho phép nhúng (baseUrl=youtube.com khiến YT coi như
+// tự-nhúng-vào-chính-mình -> lỗi 152 cho MỌI video). Dùng pickletour.vn.
+const EMBED_ORIGIN = "https://pickletour.vn";
+
+// HTML nhúng iframe YouTube — autoplay=1&mute=1 tự phát ngay trong WebView.
+// Bắt buộc kèm enablejsapi + origin, và WebView baseUrl phải = EMBED_ORIGIN.
 function buildEmbedHtml(videoId: string, muted: boolean) {
   const p = [
     "autoplay=1",
@@ -34,6 +38,8 @@ function buildEmbedHtml(videoId: string, muted: boolean) {
     "fs=1",
     "controls=1",
     "color=white",
+    "enablejsapi=1",
+    `origin=${encodeURIComponent(EMBED_ORIGIN)}`,
   ].join("&");
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -188,7 +194,7 @@ export default function EventLiveScreen() {
               style={{ width: playerW, height: playerH, backgroundColor: "#000" }}
               source={{
                 html: buildEmbedHtml(current.videoId, muted),
-                baseUrl: "https://www.youtube.com",
+                baseUrl: EMBED_ORIGIN,
               }}
               originWhitelist={["*"]}
               javaScriptEnabled
