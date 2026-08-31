@@ -66,6 +66,11 @@ export default function EventLiveScreen() {
 
   const [tab, setTab] = useState<"live" | "replay">("live");
   const [current, setCurrent] = useState<Feed | null>(null);
+  // Phát tắt tiếng để autoplay chạy ngay (không lộ nút to "Watch on YouTube").
+  const [muted, setMuted] = useState(true);
+  useEffect(() => {
+    setMuted(true);
+  }, [current?.videoId]);
 
   const live: Court[] = data?.live || [];
   const replays: Court[] = data?.replays || [];
@@ -123,15 +128,32 @@ export default function EventLiveScreen() {
       {/* Player */}
       <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
         {current ? (
-          <YoutubePlayer
-            key={current.videoId}
-            height={playerH}
-            width={playerW}
-            play
-            videoId={current.videoId}
-            webViewProps={{ allowsInlineMediaPlayback: true }}
-            initialPlayerParams={{ rel: false, modestbranding: true }}
-          />
+          <>
+            <YoutubePlayer
+              key={current.videoId}
+              height={playerH}
+              width={playerW}
+              play
+              mute={muted}
+              videoId={current.videoId}
+              webViewProps={{ allowsInlineMediaPlayback: true }}
+              initialPlayerParams={{
+                rel: false,
+                modestbranding: true,
+                iv_load_policy: 3,
+                controls: true,
+                color: "white",
+              }}
+            />
+            {/* Overlay che thanh tiêu đề/kênh YouTube ở góc trên */}
+            <View pointerEvents="none" style={styles.playerTopMask} />
+            {muted ? (
+              <Pressable onPress={() => setMuted(false)} style={styles.unmuteBtn}>
+                <Ionicons name="volume-high" size={16} color="#fff" />
+                <Text style={styles.unmuteText}>Bật tiếng</Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : (
           <View style={styles.playerEmpty}>
             {isLoading ? (
@@ -377,6 +399,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#ff2d2d",
   },
   playerEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
+  playerTopMask: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  unmuteBtn: {
+    position: "absolute",
+    left: 12,
+    bottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  unmuteText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   nowRow: {
     flexDirection: "row",
     alignItems: "center",
