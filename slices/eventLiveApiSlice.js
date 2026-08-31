@@ -11,9 +11,19 @@ export const eventLiveApiSlice = apiSlice.injectEndpoints({
       query: () => ({ url: `/api/event-live/config`, method: "GET" }),
       keepUnusedDataFor: 120,
     }),
+    trackEventLiveView: builder.mutation({
+      query: (body) => ({
+        url: `/api/event-live/track`,
+        method: "POST",
+        body: body || {},
+      }),
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useGetEventLiveQuery, useGetEventLiveConfigQuery } =
-  eventLiveApiSlice;
+export const {
+  useGetEventLiveQuery,
+  useGetEventLiveConfigQuery,
+  useTrackEventLiveViewMutation,
+} = eventLiveApiSlice;

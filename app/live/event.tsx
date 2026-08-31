@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -19,7 +20,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-import { useGetEventLiveQuery } from "@/slices/eventLiveApiSlice";
+import analytics from "@/utils/analytics";
+import {
+  useGetEventLiveQuery,
+  useTrackEventLiveViewMutation,
+} from "@/slices/eventLiveApiSlice";
 
 // Origin THẬT để YouTube cho phép nhúng (baseUrl=youtube.com khiến YT coi như
 // tự-nhúng-vào-chính-mình -> lỗi 152 cho MỌI video). Dùng pickletour.vn.
@@ -102,6 +107,17 @@ export default function EventLiveScreen() {
 
   const [tab, setTab] = useState<"live" | "replay">("live");
   const [current, setCurrent] = useState<Feed | null>(null);
+  const [trackView] = useTrackEventLiveViewMutation();
+  // Ghi nhận lượt dùng (1 lần khi mở màn) — cho thống kê web/app.
+  useEffect(() => {
+    trackView({ platform: Platform.OS }).catch(() => {});
+    try {
+      analytics.logEvent?.("event_live_open", { platform: Platform.OS });
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Phát tắt tiếng để autoplay chạy ngay (không lộ nút to "Watch on YouTube").
   const [muted, setMuted] = useState(true);
   useEffect(() => {
