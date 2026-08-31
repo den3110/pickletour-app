@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -69,7 +70,11 @@ type Feed = {
   angleLabel?: string;
   angleLabelDisplay?: string;
   courtLabel?: string;
+  embeddable?: boolean;
 };
+
+const ytWatchUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
+const openYouTube = (id: string) => Linking.openURL(ytWatchUrl(id)).catch(() => {});
 type Court = {
   courtKey: string | null;
   courtLabel: string;
@@ -104,10 +109,16 @@ export default function EventLiveScreen() {
     [live],
   );
 
-  // Tự chọn feed đầu tiên khi có dữ liệu
+  // Tự chọn feed đầu tiên khi có dữ liệu — ưu tiên luồng NHÚNG được.
   useEffect(() => {
     if (current) return;
-    const first = live[0]?.angles?.[0] || replays[0]?.videos?.[0];
+    const liveFeeds = live.flatMap((c) => c.angles || []);
+    const replayFeeds = replays.flatMap((c) => c.videos || []);
+    const first =
+      liveFeeds.find((f) => f.embeddable !== false) ||
+      liveFeeds[0] ||
+      replayFeeds.find((f) => f.embeddable !== false) ||
+      replayFeeds[0];
     if (first) {
       setCurrent(first);
       if (!live.length && replays.length) setTab("replay");
@@ -152,7 +163,25 @@ export default function EventLiveScreen() {
 
       {/* Player */}
       <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
-        {current ? (
+        {current && current.embeddable === false ? (
+          // Kênh tắt nhúng (vd FPT Bóng Đá) -> không phát trong app được.
+          <View style={styles.noEmbed}>
+            <Ionicons name="logo-youtube" size={40} color="#ff2d2d" />
+            <Text style={styles.noEmbedTitle}>
+              Luồng này chỉ xem được trên YouTube
+            </Text>
+            <Text style={styles.noEmbedSub} numberOfLines={2}>
+              Kênh nguồn không cho phép nhúng video.
+            </Text>
+            <Pressable
+              onPress={() => openYouTube(current.videoId)}
+              style={styles.noEmbedBtn}
+            >
+              <Ionicons name="play" size={16} color="#0a0e1a" />
+              <Text style={styles.noEmbedBtnText}>Mở trên YouTube</Text>
+            </Pressable>
+          </View>
+        ) : current ? (
           <>
             <WebView
               key={`${current.videoId}-${muted ? "m" : "s"}`}
@@ -329,9 +358,15 @@ function CourtCard({
               ]}
             >
               <Ionicons
-                name={on ? "play" : "videocam-outline"}
+                name={
+                  f.embeddable === false
+                    ? "logo-youtube"
+                    : on
+                      ? "play"
+                      : "videocam-outline"
+                }
                 size={13}
-                color={on ? "#0a0e1a" : c}
+                color={f.embeddable === false ? "#ff2d2d" : on ? "#0a0e1a" : c}
               />
               <Text
                 style={[styles.angleText, { color: on ? "#0a0e1a" : "#e2e8f0" }]}
@@ -425,6 +460,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#ff2d2d",
   },
   playerEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
+  noEmbed: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+  },
+  noEmbedTitle: {
+    color: TXT,
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  noEmbedSub: { color: SUB, fontSize: 12.5, textAlign: "center" },
+  noEmbedBtn: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  noEmbedBtnText: { color: "#0a0e1a", fontWeight: "800", fontSize: 13.5 },
   playerTopMask: {
     position: "absolute",
     top: 0,
