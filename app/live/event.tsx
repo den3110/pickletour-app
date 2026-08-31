@@ -16,9 +16,34 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import YoutubePlayer from "react-native-youtube-iframe";
+import { WebView } from "react-native-webview";
 
 import { useGetEventLiveQuery } from "@/slices/eventLiveApiSlice";
+
+// HTML nhúng iframe YouTube — autoplay=1&mute=1 tự phát ngay trong WebView
+// (giống hệt bản web đang chạy tốt). baseUrl youtube.com để được phép nhúng.
+function buildEmbedHtml(videoId: string, muted: boolean) {
+  const p = [
+    "autoplay=1",
+    `mute=${muted ? 1 : 0}`,
+    "playsinline=1",
+    "rel=0",
+    "modestbranding=1",
+    "iv_load_policy=3",
+    "fs=1",
+    "controls=1",
+    "color=white",
+  ].join("&");
+  return `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:#000;overflow:hidden}
+.w{position:absolute;inset:0}iframe{width:100%;height:100%;border:0;display:block}</style>
+</head><body><div class="w">
+<iframe src="https://www.youtube.com/embed/${videoId}?${p}"
+ allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+ allowfullscreen></iframe>
+</div></body></html>`;
+}
 
 const BG = "#0a0e1a";
 const CARD = "#121829";
@@ -129,26 +154,22 @@ export default function EventLiveScreen() {
       <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
         {current ? (
           <>
-            <YoutubePlayer
-              key={current.videoId}
-              height={playerH}
-              width={playerW}
-              play
-              mute={muted}
-              forceAndroidAutoplay
-              videoId={current.videoId}
-              webViewProps={{
-                allowsInlineMediaPlayback: true,
-                mediaPlaybackRequiresUserAction: false,
-                androidLayerType: "hardware",
+            <WebView
+              key={`${current.videoId}-${muted ? "m" : "s"}`}
+              style={{ width: playerW, height: playerH, backgroundColor: "#000" }}
+              source={{
+                html: buildEmbedHtml(current.videoId, muted),
+                baseUrl: "https://www.youtube.com",
               }}
-              initialPlayerParams={{
-                rel: false,
-                modestbranding: true,
-                iv_load_policy: 3,
-                controls: true,
-                color: "white",
-              }}
+              originWhitelist={["*"]}
+              javaScriptEnabled
+              domStorageEnabled
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo
+              androidLayerType="hardware"
+              scrollEnabled={false}
+              bounces={false}
             />
             {/* Overlay che thanh tiêu đề/kênh YouTube ở góc trên */}
             <View pointerEvents="none" style={styles.playerTopMask} />
