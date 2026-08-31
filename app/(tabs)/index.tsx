@@ -36,6 +36,7 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import ImageViewing from "react-native-image-viewing";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
+import EventLiveBanner from "@/components/home/EventLiveBanner";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
@@ -1755,6 +1756,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ height: 16 }} />
+          <EventLiveBanner />
+
           <FeaturesGrid />
 
           <View style={{ height: 24 }} />
