@@ -140,6 +140,11 @@ function normalizeBrowserPath(rawPath: string) {
     return createStudioCourtPath(segments[1], segments[3], segments[5]);
   }
 
+  // Xem live giải đấu qua YouTube (Heineken...) -> màn riêng, KHÔNG phải tab Live hệ thống.
+  if (segments[0] === "live" && segments[1] === "event") {
+    return "/live/event";
+  }
+
   if (segments[0] === "live") {
     return "/(tabs)/live";
   }
