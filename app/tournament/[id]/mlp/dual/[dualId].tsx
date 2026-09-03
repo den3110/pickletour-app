@@ -1,7 +1,12 @@
 // MLP dual detail — score sub-matches + DreamBreaker + check-in.
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  useLocalSearchParams } from "expo-router";
+import React,
+  { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,10 +15,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";

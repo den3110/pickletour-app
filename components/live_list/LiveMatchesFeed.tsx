@@ -11,12 +11,12 @@ import {
   FlatList,
   Keyboard,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";

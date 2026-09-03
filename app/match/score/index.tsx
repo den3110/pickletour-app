@@ -1,5 +1,5 @@
 import React from 'react'
-import { Text } from 'react-native'
+import { Text } from "@/components/ui/i18nText";
 import { View } from 'react-native'
 
 const ScoreMatch = () => {

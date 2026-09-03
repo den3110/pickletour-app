@@ -4,10 +4,10 @@ import {
   Modal,
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
   ScrollView,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Ripple from "react-native-material-ripple";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";

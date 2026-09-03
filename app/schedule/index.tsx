@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -17,6 +16,7 @@ import {
   UIManager,
   Linking,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Calendar, LocaleConfig } from "react-native-calendars";
 import { DateTime } from "luxon";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";

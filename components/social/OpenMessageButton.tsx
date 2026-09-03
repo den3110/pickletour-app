@@ -1,8 +1,13 @@
 // components/social/OpenMessageButton.tsx
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Alert, Pressable, StyleSheet, Text } from "react-native";
+import { Alert,
+  Pressable,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 
 import { useOpenDmMutation } from "@/slices/messagesApiSlice";

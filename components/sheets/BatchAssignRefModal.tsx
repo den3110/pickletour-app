@@ -6,10 +6,10 @@ import {
   Platform,
   View,
   Pressable,
-  TextInput,
   ScrollView,
-  Text,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons"; // hoặc từ react-native-vector-icons
 import {
   useListTournamentRefereesQuery,

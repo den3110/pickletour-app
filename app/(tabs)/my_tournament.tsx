@@ -9,14 +9,15 @@
 import {
   SafeAreaView as EdgeSafeAreaView,
   useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import React, {
+  } from "react-native-safe-area-context";
+import React,
+  {
   useMemo,
   useState,
   useCallback,
   useEffect,
   useRef,
-} from "react";
+  } from "react";
 import {
   SafeAreaView as RNSafeAreaView,
   ActivityIndicator,
@@ -25,13 +26,13 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   useColorScheme,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";

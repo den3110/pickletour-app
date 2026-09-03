@@ -3,11 +3,12 @@ import React, { useMemo } from 'react';
 import {
   TextInput as RNTextInput,
   View,
-  Text,
   StyleSheet,
   TextInputProps as RNTextInputProps,
   ViewStyle,
-} from 'react-native';
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
+import { useLang, translate } from "@/utils/i18n";
 // 1. Import Theme Hook
 import { useTheme } from '@react-navigation/native';
 
@@ -30,6 +31,7 @@ export default function TextInput({
 }: TextInputProps) {
   // 2. Lấy theme hiện tại
   const { dark } = useTheme();
+  useLang(); // re-render khi đổi ngôn ngữ (dịch placeholder)
 
   // 3. Định nghĩa màu sắc dynamic
   const colors = useMemo(() => ({
@@ -64,6 +66,11 @@ export default function TextInput({
           style={[styles.input, { color: colors.text }, style]}
           placeholderTextColor={colors.placeholder}
           {...props}
+          placeholder={
+            typeof props.placeholder === "string"
+              ? translate(props.placeholder)
+              : props.placeholder
+          }
         />
         
         {rightIcon && <View style={styles.icon}>{rightIcon}</View>}

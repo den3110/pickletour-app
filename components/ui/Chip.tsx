@@ -1,10 +1,10 @@
 // components/ui/Chip.tsx
-import { normalizeUrl } from "@/utils/normalizeUri";
+import {
+  normalizeUrl } from "@/utils/normalizeUri";
 import React from "react";
 import {
   View,
   TouchableOpacity,
-  Text,
   StyleSheet,
   ViewStyle,
   Modal as RNModal,
@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   SafeAreaView,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 
 interface ChipProps {

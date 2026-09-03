@@ -2,17 +2,17 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Dimensions,
   Animated,
-  TextInput,
   FlatList,
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";

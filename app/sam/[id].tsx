@@ -1,8 +1,15 @@
 // Sâm Lốc room — landscape bàn xanh gỗ nâu, elegant redesign.
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, router } from "expo-router";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  useLocalSearchParams,
+  router } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Alert,
@@ -13,11 +20,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   UIManager,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

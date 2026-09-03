@@ -13,13 +13,13 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View,
   Linking,
   Platform,
   ScrollView,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 import { router, useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";

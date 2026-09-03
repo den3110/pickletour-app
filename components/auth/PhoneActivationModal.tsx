@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import {
   Modal,
   View,
-  Text,
-  TextInput,
   Pressable,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useDispatch, useSelector } from "react-redux";
 import Toast from "react-native-toast-message";
 import {

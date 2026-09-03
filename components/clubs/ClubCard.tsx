@@ -4,8 +4,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Text,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, { FadeIn } from "react-native-reanimated";

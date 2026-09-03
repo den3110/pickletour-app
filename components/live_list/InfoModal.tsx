@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   useColorScheme,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {

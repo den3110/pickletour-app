@@ -2,11 +2,14 @@ import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
-} from "@react-navigation/native";
+  } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { router, Stack, useSegments } from "expo-router";
+import { router,
+  Stack,
+  useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React,
+  { useEffect } from "react";
 import {
   ActivityIndicator,
   View,
@@ -16,9 +19,9 @@ import {
   Platform,
   BackHandler,
   Alert,
-  Text,
   TextInput,
   TouchableOpacity,
+  Text,
 } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -52,6 +55,7 @@ import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 import Constants from "expo-constants";
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
+import { initLang } from "@/utils/i18n";
 import * as SecureStore from "expo-secure-store";
 import {
   increaseLaunchCountAndGet,
@@ -647,6 +651,11 @@ function AuthSessionSync() {
 const isExpoGo = Constants.appOwnership === "expo";
 
 function RootLayout() {
+  // Nạp ngôn ngữ đã lưu (VI/EN) khi mở app.
+  React.useEffect(() => {
+    initLang();
+  }, []);
+
   const segments = useSegments();
   const isTabsRoute = segments[0] === "(tabs)";
   const isLiveHomeRoute = segments[0] === "live" && segments[1] === "home";

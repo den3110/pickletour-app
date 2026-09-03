@@ -1,6 +1,14 @@
 // components/market/SellerReviewsRN.tsx — đánh giá người bán (mobile)
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { timeAgo } from "@/constants/market";
 import StarRatingRN from "./StarRatingRN";
 import {

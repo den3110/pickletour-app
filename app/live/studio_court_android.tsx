@@ -4,9 +4,9 @@ import {
   Linking,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 
 import { useGetContactContentQuery } from "@/slices/cmsApiSlice";

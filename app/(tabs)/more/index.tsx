@@ -1,22 +1,25 @@
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
-import { router, Stack } from "expo-router";
+import { router,
+  Stack } from "expo-router";
 import React from "react";
 import { useSelector } from "react-redux";
 import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { useLang, setLang } from "@/utils/i18n";
 import { useFriendCountsQuery } from "@/slices/friendsApiSlice";
 import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 
@@ -133,6 +136,7 @@ export default function MoreIndexScreen() {
   const insets = useSafeAreaInsets();
   const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
   const isDark = theme.dark;
+  const lang = useLang();
   const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
   const pageBg = isDark ? theme.colors.background : "#F8FAFC";
   const cardBg = isDark ? theme.colors.card : "rgba(255,255,255,0.9)";
@@ -248,6 +252,74 @@ export default function MoreIndexScreen() {
           >
             Lối tắt nhanh
           </Text>
+
+          {/* Đổi ngôn ngữ / Language */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setLang(lang === "vi" ? "en" : "vi")}
+            style={({ pressed }) => [
+              styles.itemPressable,
+              { opacity: pressed ? 0.92 : 1 },
+            ]}
+          >
+            <View
+              style={[
+                styles.itemCard,
+                { backgroundColor: cardBg, borderColor },
+              ]}
+            >
+              <View
+                style={[
+                  styles.itemIconWrap,
+                  { backgroundColor: "#2563EB18" },
+                ]}
+              >
+                <Ionicons name="language" size={22} color="#2563EB" />
+              </View>
+              <View style={styles.itemBody}>
+                <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
+                  Ngôn ngữ / Language
+                </Text>
+                <Text style={{ fontSize: 13, marginTop: 2, color: theme.colors.text, opacity: 0.6 }}>
+                  {lang === "vi" ? "Tiếng Việt" : "English"}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  borderRadius: 999,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor,
+                }}
+              >
+                <Text
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    fontWeight: "800",
+                    fontSize: 13,
+                    color: lang === "vi" ? "#fff" : theme.colors.text,
+                    backgroundColor: lang === "vi" ? "#2563EB" : "transparent",
+                  }}
+                >
+                  VI
+                </Text>
+                <Text
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    fontWeight: "800",
+                    fontSize: 13,
+                    color: lang === "en" ? "#fff" : theme.colors.text,
+                    backgroundColor: lang === "en" ? "#2563EB" : "transparent",
+                  }}
+                >
+                  EN
+                </Text>
+              </View>
+            </View>
+          </Pressable>
 
           {MORE_ITEMS.map((item) => (
             <Pressable

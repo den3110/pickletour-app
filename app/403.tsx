@@ -3,11 +3,11 @@ import React, { useMemo } from "react";
 import {
   SafeAreaView,
   View,
-  Text,
   StyleSheet,
   Pressable,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 

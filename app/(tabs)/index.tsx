@@ -3,7 +3,6 @@ import React, { useCallback, useMemo, useEffect, useRef, useState } from "react"
 import {
   ScrollView,
   View,
-  Text,
   StyleSheet,
   Platform,
   Linking,
@@ -14,6 +13,7 @@ import {
   Dimensions,
   DeviceEventEmitter,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router, useRouter } from "expo-router";
 import { useIsFocused, useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";

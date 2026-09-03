@@ -2,13 +2,13 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   Alert,
   StyleSheet,
   Platform,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import * as Haptics from "expo-haptics";

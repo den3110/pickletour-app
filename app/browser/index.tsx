@@ -2,7 +2,6 @@
 import React, { useMemo, useRef, useState, useCallback } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Platform,
@@ -10,9 +9,10 @@ import {
   ActivityIndicator,
   Share,
   Linking,
-  TextInput,
   KeyboardAvoidingView,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import { WebView } from "react-native-webview";
 import * as Clipboard from "expo-clipboard";

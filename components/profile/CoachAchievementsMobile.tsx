@@ -1,8 +1,10 @@
 // components/profile/CoachAchievementsMobile.tsx
 // Section thành tích HLV trên trang profile mobile. Owner + admin thấy pending/
 // rejected + nút "Bổ sung thành tích".
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import React,
+  { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,10 +12,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import {
   useCreateCoachAchievementMutation,
   useDeleteCoachAchievementMutation,

@@ -2,10 +2,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   Switch,
   Platform,
@@ -15,6 +13,8 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";

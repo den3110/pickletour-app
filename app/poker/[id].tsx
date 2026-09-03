@@ -1,10 +1,17 @@
 // Poker table — bàn oval kiểu casino, ghế xếp quanh bàn (mình luôn ở dưới
 // cùng), bài chia/lật TỪNG LÁ có animation, winner chỉ reveal sau khi board
 // chạy hết (all-in runout có kịch tính).
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams } from "expo-router";
+import {
+  Ionicons,
+  MaterialCommunityIcons } from "@expo/vector-icons";
+import { Stack,
+  useLocalSearchParams } from "expo-router";
 import NetInfo from "@react-native-community/netinfo";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,10 +27,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 

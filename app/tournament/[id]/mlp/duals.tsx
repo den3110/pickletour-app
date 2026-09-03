@@ -1,16 +1,21 @@
 // MLP duals — list dual matches + links to Teams / BXH / detail.
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router,
+  useLocalSearchParams } from "expo-router";
+import React,
+  { useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useListMlpDualsQuery } from "@/slices/mlpApiSlice";

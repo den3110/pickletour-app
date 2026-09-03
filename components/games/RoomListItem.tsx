@@ -1,7 +1,13 @@
 // Shared game room list item — hiển thị avatars user đang trong bàn.
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 export function RoomListItem({
   room,

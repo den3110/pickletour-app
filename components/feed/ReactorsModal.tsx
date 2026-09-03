@@ -6,10 +6,10 @@ import {
   FlatList,
   Modal,
   Pressable,
-  Text,
   View,
   StyleSheet,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";

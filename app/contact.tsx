@@ -1,19 +1,23 @@
 // app/contact/index.jsx  (hoặc src/screens/ContactScreen.jsx)
-import { useGetContactContentQuery } from "@/slices/cmsApiSlice";
-import { AntDesign, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import {
+  useGetContactContentQuery } from "@/slices/cmsApiSlice";
+import { AntDesign,
+  Ionicons,
+  MaterialIcons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
-import React, { useMemo } from "react";
+import React,
+  { useMemo } from "react";
 import {
   Alert,
   Linking,
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   useColorScheme,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 const FALLBACK = {
   address: "Abcd, abcd, abcd",

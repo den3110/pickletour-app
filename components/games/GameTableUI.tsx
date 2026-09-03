@@ -1,9 +1,19 @@
 // Shared game table UI: WoodBackground, FeltOval, CardPro, SeatFrame,
 // RoundIconBtn. Dùng cho Phỏm / Sâm (và có thể cả Poker sau).
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef } from "react";
-import { Animated, Image, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import React,
+  { useEffect,
+  useRef } from "react";
+import { Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 const SUIT_SYMBOL: Record<string, string> = {
   s: "♠",

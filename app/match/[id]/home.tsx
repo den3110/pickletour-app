@@ -3,13 +3,13 @@ import React, { useEffect, useMemo, useCallback, useState } from "react";
 import {
   ActivityIndicator,
   View,
-  Text,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";

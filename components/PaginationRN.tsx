@@ -1,13 +1,13 @@
 import React, { useMemo } from "react";
 import {
   View,
-  Text,
   Pressable,
   StyleSheet,
   useColorScheme,
   AccessibilityState,
   Platform,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 type Props = {
   count: number; // tổng số trang (>=1)

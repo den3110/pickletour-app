@@ -1,9 +1,17 @@
 // components/home/EventLiveBanner.tsx — banner "cực hot" trang chủ -> màn xem live giải.
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import React,
+  { useEffect,
+  useRef } from "react";
+import { Animated,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 import { useGetEventLiveConfigQuery } from "@/slices/eventLiveApiSlice";
 

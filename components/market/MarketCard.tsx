@@ -1,6 +1,12 @@
 // components/market/MarketCard.tsx — thẻ sản phẩm Chợ (mobile)
 import React from "react";
-import { View, Text, Image, Pressable, TouchableOpacity } from "react-native";
+import {
+  View,
+  Image,
+  Pressable,
+  TouchableOpacity,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {

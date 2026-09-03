@@ -5,7 +5,12 @@
 // Cards absolute positioned, connectors bezier gradient. Reuse ModernSeedCard.
 
 import React, { useMemo, useState } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 
 import {

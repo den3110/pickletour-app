@@ -10,12 +10,12 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableWithoutFeedback,
   useColorScheme,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useRouter } from "expo-router";
 import { useForgotPasswordMutation } from "@/slices/usersApiSlice";
 import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice";

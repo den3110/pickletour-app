@@ -4,10 +4,10 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import dayjs from "dayjs";

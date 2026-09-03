@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   Alert,
   StatusBar,
-  Animated, // ✅ Import Animated
+  Animated,
+  // ✅ Import Animated
   ActivityIndicator,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { useTheme } from "@react-navigation/native";

@@ -7,12 +7,12 @@
 import React, { useEffect, useRef } from "react";
 import {
   View,
-  Text,
   Pressable,
   Animated,
   Easing,
   StyleSheet,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 import { rgba, darken, lighten } from "./ModernBracketShared";
 

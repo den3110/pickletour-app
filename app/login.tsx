@@ -1,8 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
-  Text,
-  TextInput,
   Pressable,
   StyleSheet,
   ActivityIndicator,
@@ -11,8 +9,11 @@ import {
   ScrollView,
   Alert,
   useColorScheme,
-  Keyboard, // ⬅️ THÊM
+  Keyboard,
+  // ⬅️ THÊM,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 import { router, Stack, Redirect, useLocalSearchParams } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";

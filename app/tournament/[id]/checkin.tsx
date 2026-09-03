@@ -5,12 +5,12 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   TouchableOpacity,
   useColorScheme,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import {

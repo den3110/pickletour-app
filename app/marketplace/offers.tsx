@@ -2,13 +2,13 @@
 import React from "react";
 import {
   View,
-  Text,
   Image,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";

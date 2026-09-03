@@ -2,7 +2,11 @@
 // Panel tình trạng sân (chỉ xem) cho admin/quản lý trên màn Sơ đồ giải mobile.
 // Hỗ trợ cụm sân (court-live-monitor) + fallback sân phẳng cũ.
 import React, { useMemo, useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { useGetTournamentCourtLiveMonitorQuery } from "@/slices/courtClustersAdminApiSlice";
 import { useAdminListCourtsQuery } from "@/slices/adminCourtApiSlice";

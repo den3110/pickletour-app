@@ -4,7 +4,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   useColorScheme,
   useWindowDimensions,
   View,
@@ -15,6 +14,7 @@ import {
   RefreshControl,
   InteractionManager,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import {
   BottomSheetModal,
   BottomSheetScrollView,

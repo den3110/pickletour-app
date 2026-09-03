@@ -12,10 +12,11 @@ import {
   Pressable,
   StyleSheet,
   Switch,
-  Text,
   View,
-  Alert as RNAlert, // ⬅️ NEW
+  Alert as RNAlert,
+  // ⬅️ NEW,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Ripple from "react-native-material-ripple";
 import { useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";

@@ -2,13 +2,13 @@
 import React, { useMemo } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
   useWindowDimensions,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";

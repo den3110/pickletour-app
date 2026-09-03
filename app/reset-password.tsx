@@ -15,13 +15,13 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableWithoutFeedback,
   useColorScheme,
   View,
   Alert as RNAlert,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   useForgotPasswordMutation,

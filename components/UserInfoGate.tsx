@@ -3,12 +3,12 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Modal,
   View,
-  Text,
   Pressable,
   StyleSheet,
   useColorScheme,
   Platform,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 // NOTE: chỉnh path slice này cho khớp repo của bạn

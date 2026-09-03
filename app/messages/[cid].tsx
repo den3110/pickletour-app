@@ -1,20 +1,29 @@
 // app/messages/[cid].tsx — Chat window (Messenger-like)
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { formatPrice } from "@/constants/market";
-import { formatPlayTime, skillLabel } from "@/constants/play";
-import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { formatPlayTime,
+  skillLabel } from "@/constants/play";
+import { Stack,
+  router,
+  useLocalSearchParams } from "expo-router";
+import { useVideoPlayer,
+  VideoView } from "expo-video";
 import {
   useAudioRecorder,
   useAudioPlayer,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
-} from "expo-audio";
+  } from "expo-audio";
 import ImageView from "react-native-image-viewing";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,10 +35,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useDispatch, useSelector } from "react-redux";

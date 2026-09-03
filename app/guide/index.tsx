@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
   TouchableWithoutFeedback,
   useWindowDimensions,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";

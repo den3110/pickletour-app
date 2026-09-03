@@ -10,8 +10,6 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   ActivityIndicator,
   Keyboard,
@@ -19,6 +17,8 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useDispatch } from "react-redux";
 import { setCredentials } from "@/slices/authSlice";

@@ -5,11 +5,11 @@ import {
   Pressable,
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
   Platform,
   Linking,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 

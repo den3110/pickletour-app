@@ -4,7 +4,12 @@
 // KHÔNG đụng logic; chỉ layer hiển thị.
 
 import React, { useMemo, useState, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 
 import {

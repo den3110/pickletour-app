@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, Button } from "react-native";
+import {
+  View,
+  Button,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { NativeModules } from "react-native";
 
 const { HelloModule } = NativeModules as {

@@ -5,7 +5,11 @@
 //  - gradient -> vẽ bằng react-native-svg (SvgText + LinearGradient)
 // Không cần @react-native-masked-view -> OTA được (react-native-svg đã có sẵn trong build).
 import React, { useMemo, useState } from "react";
-import { Text, View, StyleSheet } from "react-native";
+import {
+  View,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Svg, {
   Text as SvgText,
   Defs,

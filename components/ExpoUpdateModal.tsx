@@ -6,12 +6,12 @@ import React from "react";
 import {
   Modal,
   View,
-  Text,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 interface Props {
   visible: boolean;

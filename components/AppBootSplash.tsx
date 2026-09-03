@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Animated, View, Text } from "react-native";
+import {
+  StyleSheet,
+  Animated,
+  View,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 import * as SplashScreen from "expo-splash-screen";
 

@@ -6,10 +6,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";

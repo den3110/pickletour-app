@@ -4,30 +4,34 @@ import {
   Ionicons,
   MaterialCommunityIcons,
   MaterialIcons,
-} from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, {
+  } from "@expo/vector-icons";
+import { Stack,
+  useLocalSearchParams,
+  useRouter } from "expo-router";
+import React,
+  {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-} from "react";
+  } from "react";
 import {
   Alert,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useWindowDimensions,
   useColorScheme,
   View,
   Animated,
   Easing,
-  Platform, // Cần cho shadow/elevation
+  Platform,
+  // Cần cho shadow/elevation,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

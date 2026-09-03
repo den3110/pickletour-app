@@ -2,13 +2,13 @@
 import React from "react";
 import {
   TouchableOpacity,
-  Text,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
   TextStyle,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 
 interface ButtonProps {

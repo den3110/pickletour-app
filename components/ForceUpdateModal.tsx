@@ -3,7 +3,6 @@ import React, { useEffect, useCallback, useState } from "react";
 import {
   Modal,
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   BackHandler,
@@ -11,6 +10,7 @@ import {
   ActivityIndicator,
   AppState,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector, useDispatch } from "react-redux";
 import { forceClose } from "@/slices/versionUiSlice";
 

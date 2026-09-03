@@ -1,14 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
-import { createVideoPlayer, VideoView } from "expo-video";
+import { createVideoPlayer,
+  VideoView } from "expo-video";
 import { router } from "expo-router";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React,
+  { memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,13 +28,13 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   ToastAndroid,
   TouchableOpacity,
   useWindowDimensions,
   View,
   ViewToken,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { useIsFocused } from "@react-navigation/native";
 import { WebView } from "react-native-webview";

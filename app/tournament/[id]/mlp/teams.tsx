@@ -1,7 +1,13 @@
 // MLP teams — list + đăng ký team mới + captain quản roster (search VĐV).
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router,
+  useLocalSearchParams } from "expo-router";
+import React,
+  { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,10 +19,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 

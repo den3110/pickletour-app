@@ -10,10 +10,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
   Modal,
   Pressable,
-  TextInput,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -23,6 +21,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";

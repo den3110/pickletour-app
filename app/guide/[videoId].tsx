@@ -4,10 +4,10 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  Text,
   useWindowDimensions,
   TouchableOpacity,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import YoutubePlayer from "react-native-youtube-iframe";

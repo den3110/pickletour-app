@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -16,6 +15,7 @@ import {
   UIManager,
   SafeAreaView,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";

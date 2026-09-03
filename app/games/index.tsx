@@ -1,8 +1,16 @@
 // Games hub — 3 icon: Poker (đã có), Sâm (sắp ra mắt), Phỏm (sắp ra mắt).
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
+import {
+  Ionicons,
+  MaterialCommunityIcons } from "@expo/vector-icons";
+import { Stack,
+  router } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type GameTile = {

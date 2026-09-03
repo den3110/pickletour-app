@@ -1,15 +1,19 @@
 // MLP BXH team. Hỗ trợ BXH per bảng khi giải bật group stage.
-import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import {
+  Stack,
+  useLocalSearchParams } from "expo-router";
+import React,
+  { useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useListMlpStandingsQuery } from "@/slices/mlpApiSlice";

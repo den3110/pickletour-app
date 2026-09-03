@@ -8,13 +8,13 @@ import React, {
 } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
   useWindowDimensions,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 import {
   BottomSheetModal,

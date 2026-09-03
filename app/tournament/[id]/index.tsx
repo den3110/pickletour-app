@@ -9,7 +9,6 @@ import React, {
 } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -21,6 +20,7 @@ import {
   Platform,
   Linking,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

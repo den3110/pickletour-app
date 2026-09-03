@@ -2,12 +2,12 @@
 import React, { useMemo, useState, useEffect } from "react";
 import {
   ScrollView,
-  Text,
-  TextInput,
   View,
   Pressable,
   Alert,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";

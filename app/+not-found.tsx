@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
   Pressable,
   StyleSheet,
   useColorScheme,
   Platform,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 

@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   Animated,
   Dimensions,
@@ -13,6 +12,7 @@ import {
   StatusBar,
   ScrollView,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";

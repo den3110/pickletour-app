@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Pressable,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { useGetRegistrationSettingsQuery } from "@/slices/settingsApiSlice";

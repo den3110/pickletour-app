@@ -8,15 +8,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useColorScheme,
   View,
   Keyboard,
   FlatList,
   ActivityIndicator,
-  TouchableWithoutFeedback, // Thêm cái này để xử lý backdrop
+  TouchableWithoutFeedback,
+  // Thêm cái này để xử lý backdrop,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";

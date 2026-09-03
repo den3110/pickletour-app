@@ -2,12 +2,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
-  TextInput,
   Alert,
   StyleSheet,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

@@ -1,7 +1,10 @@
 // app/notifications/index.tsx — Trung tâm thông báo
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
-import React, { useEffect } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router } from "expo-router";
+import React,
+  { useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,9 +12,9 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 

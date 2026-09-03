@@ -5,13 +5,13 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   ViewStyle,
   useColorScheme,
   ScrollView,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Image as ExpoImage } from "expo-image";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { normalizeUri } from "@/utils/normalizeUri";

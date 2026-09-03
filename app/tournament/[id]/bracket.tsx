@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -22,6 +21,7 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import PropTypes from "prop-types";
 import { useRoute, useTheme, useColorScheme } from "@react-navigation/native";
 import WebViewComp from "react-native-webview";

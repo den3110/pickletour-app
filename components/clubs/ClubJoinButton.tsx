@@ -1,6 +1,12 @@
 // components/clubs/ClubJoinButton.tsx
 import React from "react";
-import { View, StyleSheet, Alert, ActivityIndicator, Text } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, {

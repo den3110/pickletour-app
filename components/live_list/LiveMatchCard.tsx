@@ -7,12 +7,12 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   ToastAndroid,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useTheme } from "@react-navigation/native";
 import { Image as ExpoImage } from "expo-image";
 import { WebView } from "react-native-webview";

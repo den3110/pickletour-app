@@ -1,6 +1,10 @@
 // components/clubs/EmptyState.tsx
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import {
+  View,
+  StyleSheet,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, BounceIn } from 'react-native-reanimated';

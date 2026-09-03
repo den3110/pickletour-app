@@ -3,9 +3,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,

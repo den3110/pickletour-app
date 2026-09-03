@@ -1,9 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
-  Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Modal,
@@ -16,6 +14,8 @@ import {
   Dimensions,
   StatusBar,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";

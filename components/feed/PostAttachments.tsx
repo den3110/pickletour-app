@@ -1,7 +1,12 @@
 // Các "gán vào bài viết" của Feed: giải đấu, bình chọn (poll), kết quả trận đấu.
 // Dùng chung cho cả Bảng tin (list) lẫn trang Chi tiết bài viết để không bị lệch.
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  View,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useVoteFeedPollMutation } from "@/slices/feedApiSlice";

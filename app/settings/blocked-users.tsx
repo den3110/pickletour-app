@@ -1,8 +1,10 @@
 // app/settings/blocked-users.tsx
 // Danh sách user đã chặn — cho phép user bỏ chặn.
 // Apple Guideline 1.2 yêu cầu block phải reversible và người dùng biết mình đã chặn ai.
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
@@ -11,9 +13,9 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {

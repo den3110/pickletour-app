@@ -1,16 +1,19 @@
 // app/friends/index.tsx — Trang Bạn bè (3 tab)
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
-import React, { useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router } from "expo-router";
+import React,
+  { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 

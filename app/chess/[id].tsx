@@ -1,8 +1,15 @@
 // Chess room 8x8 với Unicode chess pieces + move highlight
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { Chess } from "chess.js";
-import { Stack, useLocalSearchParams, router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Stack,
+  useLocalSearchParams,
+  router } from "expo-router";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -11,10 +18,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 

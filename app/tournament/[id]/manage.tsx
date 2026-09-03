@@ -15,8 +15,6 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   ScrollView,
   Animated,
@@ -24,6 +22,8 @@ import {
   KeyboardAvoidingView,
   RefreshControl,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useSelector } from "react-redux";
 import { MaterialIcons } from "@expo/vector-icons";

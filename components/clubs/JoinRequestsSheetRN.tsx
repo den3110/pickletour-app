@@ -1,5 +1,10 @@
 import React from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 import { GlassCard, EmptyState, SecondaryBtn } from "./ui";
 import {

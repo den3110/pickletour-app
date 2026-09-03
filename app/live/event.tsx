@@ -1,9 +1,14 @@
 // app/live/event.tsx — Xem live giải đấu (Heineken Pickleball World Cup 2026)
 // Nhiều sân · nhiều góc camera. 2 tab: Trực tiếp / Xem lại.
-import { Ionicons } from "@expo/vector-icons";
-import { router, Stack } from "expo-router";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { router,
+  Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useMemo, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,10 +18,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 

@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   Alert,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   Dimensions,
   Platform,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";

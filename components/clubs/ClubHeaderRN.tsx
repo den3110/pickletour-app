@@ -1,6 +1,12 @@
 // components/clubs/ClubHeaderRN.tsx
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import {
+  View,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";

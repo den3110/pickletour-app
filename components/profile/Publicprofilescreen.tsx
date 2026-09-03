@@ -2,7 +2,6 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
@@ -15,6 +14,7 @@ import {
   Platform,
   RefreshControl,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";

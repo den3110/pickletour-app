@@ -1,14 +1,25 @@
 // app/feed/index.tsx — Bảng tin (list + composer + reactions + link chi tiết)
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useFocusEffect } from "expo-router";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router,
+  useFocusEffect } from "expo-router";
 import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import * as ImagePicker from "expo-image-picker";
-import { CONDITION_MAP, formatPrice } from "@/constants/market";
-import { PLAY_STATUS, formatPlayTime, skillLabel } from "@/constants/play";
+import { CONDITION_MAP,
+  formatPrice } from "@/constants/market";
+import { PLAY_STATUS,
+  formatPlayTime,
+  skillLabel } from "@/constants/play";
 import * as ImageManipulator from "expo-image-manipulator";
-import { useVideoPlayer, VideoView } from "expo-video";
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useVideoPlayer,
+  VideoView } from "expo-video";
+import React,
+  { useState,
+  useCallback,
+  useEffect,
+  useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,11 +34,11 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 

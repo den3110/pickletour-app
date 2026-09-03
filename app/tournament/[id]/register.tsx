@@ -1,13 +1,17 @@
 // app/screens/TournamentRegistrationScreen.tsx
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, {
+import {
+  Stack,
+  useLocalSearchParams,
+  useRouter } from "expo-router";
+import React,
+  {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   memo,
-} from "react";
+  } from "react";
 import { useSelector } from "react-redux";
 import {
   ActivityIndicator,
@@ -17,8 +21,6 @@ import {
   Modal,
   Platform,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   Linking,
   Pressable,
@@ -31,6 +33,8 @@ import {
   Animated,
   StatusBar,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import RenderHTML from "react-native-render-html";
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

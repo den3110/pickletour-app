@@ -1,12 +1,12 @@
 import React from "react";
 import {
   View,
-  Text,
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
   StyleSheet,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 
 export default function RadarSortModal({

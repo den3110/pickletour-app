@@ -13,10 +13,10 @@ import {
   Pressable,
   StyleSheet,
   Switch,
-  Text,
   useColorScheme,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import {
   BottomSheetBackdrop,
   BottomSheetFlatList,

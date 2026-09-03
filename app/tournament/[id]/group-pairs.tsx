@@ -4,11 +4,11 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Text,
   View,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import {

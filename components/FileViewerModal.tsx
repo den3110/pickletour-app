@@ -3,13 +3,13 @@ import React, { useState, useCallback, useEffect, memo } from "react";
 import {
   Modal,
   View,
-  Text,
   Pressable,
   StyleSheet,
   ActivityIndicator,
   Platform,
   StatusBar,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

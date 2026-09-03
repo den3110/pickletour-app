@@ -12,7 +12,6 @@ import {
   Modal,
   Platform,
   StyleSheet,
-  Text,
   View,
   useColorScheme,
   useWindowDimensions,
@@ -21,6 +20,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Ripple from "react-native-material-ripple";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";

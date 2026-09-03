@@ -1,5 +1,8 @@
-import { useRouter } from "expo-router";
-import { Pressable, Text } from "react-native";
+import {
+  useRouter } from "expo-router";
+import { Pressable,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 
 function BackText() {
   const router = useRouter();

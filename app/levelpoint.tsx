@@ -2,8 +2,12 @@
 import AuthGuard from "@/components/auth/AuthGuard";
 import {
   useGetLatestAssessmentQuery,
-} from "@/slices/assessmentsApiSlice";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+  } from "@/slices/assessmentsApiSlice";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,12 +16,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useSelector } from "react-redux";
 
 /* ===== DUPR LOGIC ===== */

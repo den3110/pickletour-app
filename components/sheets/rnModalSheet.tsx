@@ -23,13 +23,13 @@ import {
   View,
   ScrollView,
   FlatList,
-  TextInput,
   Pressable,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   useColorScheme,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
 
 export type BottomSheetModalRef = {
   present: () => void;

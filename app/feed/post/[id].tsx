@@ -1,11 +1,17 @@
 // app/feed/post/[id].tsx — Chi tiết bài viết + comments + reply
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router,
+  useLocalSearchParams,
+  useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer,
+  VideoView } from "expo-video";
 import ImageView from "react-native-image-viewing";
-import React, { useState } from "react";
+import React,
+  { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import {
@@ -18,10 +24,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSelector } from "react-redux";

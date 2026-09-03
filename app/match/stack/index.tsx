@@ -2,15 +2,15 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import {
   View,
-  Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
   Modal,
   Alert,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router } from "expo-router";
 import { useTheme, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";

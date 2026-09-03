@@ -9,7 +9,6 @@ import React, {
 import {
   Modal,
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -18,6 +17,7 @@ import {
   StatusBar as RNStatusBar,
   Keyboard,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";

@@ -2,14 +2,14 @@
 import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
   RefreshControl,
   Image,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";

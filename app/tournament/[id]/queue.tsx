@@ -1,6 +1,11 @@
 // Màn hình HÀNG ĐỢI SÂN (mobile) — mỗi sân: trận đang đánh + trận kế tiếp.
 import React, { useMemo } from "react";
-import { ScrollView, Text, View, RefreshControl } from "react-native";
+import {
+  ScrollView,
+  View,
+  RefreshControl,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import {

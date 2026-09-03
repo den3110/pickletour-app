@@ -2,8 +2,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -11,6 +9,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useCreateEvaluationMutation } from "@/slices/evaluationsApiSlice";

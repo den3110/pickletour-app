@@ -12,11 +12,11 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   useColorScheme,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import * as SecureStore from "expo-secure-store";
 import { Redirect } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";

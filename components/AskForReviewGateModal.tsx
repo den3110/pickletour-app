@@ -3,7 +3,6 @@ import React from "react";
 import {
   Modal,
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   TouchableWithoutFeedback,
@@ -11,6 +10,7 @@ import {
   Platform,
   useColorScheme,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import * as StoreReview from "expo-store-review";
 
 const PRIMARY = "#2563EB";

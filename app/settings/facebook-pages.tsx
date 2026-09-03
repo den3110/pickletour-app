@@ -2,7 +2,6 @@
 import React, { useCallback, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -10,8 +9,10 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
-  useColorScheme, // 🔹 Import hook
+  useColorScheme,
+  // 🔹 Import hook,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";

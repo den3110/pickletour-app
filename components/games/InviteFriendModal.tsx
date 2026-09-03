@@ -1,6 +1,10 @@
 // Shared invite modal cho Poker/Phỏm/Sâm.
-import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import React,
+  { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   Alert,
   FlatList,
@@ -8,10 +12,10 @@ import {
   Modal,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 

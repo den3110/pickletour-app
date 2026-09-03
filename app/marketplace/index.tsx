@@ -2,8 +2,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
-  Text,
-  TextInput,
   Pressable,
   TouchableOpacity,
   FlatList,
@@ -13,6 +11,8 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";

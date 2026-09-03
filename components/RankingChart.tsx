@@ -9,7 +9,6 @@ import React, {
 } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import {
   InteractionManager,
   Platform,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import Svg, {
   Path,
   Line,

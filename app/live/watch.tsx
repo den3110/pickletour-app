@@ -2,23 +2,31 @@
 // modal landscape hay bị đen hình/chỉ có tiếng). Đây là MỘT TRANG expo-router
 // thật sự: WebView/VideoView render ổn định, khoá landscape khi vào, trả
 // orientation khi thoát, controls overlay tự ẩn.
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router,
+  useLocalSearchParams } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
-import { useVideoPlayer, VideoView } from "expo-video";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVideoPlayer,
+  VideoView } from "expo-video";
+import React,
+  { useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 

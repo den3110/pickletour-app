@@ -1,16 +1,19 @@
 // Hero.jsx — cập nhật ImageViewing theo theme (bg & text)
 
-import { useGetHeroContentQuery } from "@/slices/cmsApiSlice";
+import {
+  useGetHeroContentQuery } from "@/slices/cmsApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React,
+  { useMemo,
+  useState } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   useColorScheme,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Image as ExpoImage } from "expo-image";
 import { useSelector } from "react-redux";
 import ImageViewing from "react-native-image-viewing";

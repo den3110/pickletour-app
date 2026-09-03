@@ -2,12 +2,12 @@
 import React, { useMemo, useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   Alert,
   StyleSheet,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import dayjs from "dayjs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Section, EmptyState } from "./ui"; // giữ nguyên Section/EmptyState

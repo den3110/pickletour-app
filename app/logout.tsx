@@ -1,6 +1,10 @@
 // app/logout.jsx
 import React, { useEffect, useRef } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+} from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import { Stack, router } from "expo-router";
 import { useDispatch } from "react-redux";
 

@@ -4,10 +4,10 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,

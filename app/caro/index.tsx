@@ -1,7 +1,11 @@
 // Caro lobby — list rooms + create.
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Stack,
+  router } from "expo-router";
+import React,
+  { useEffect,
+  useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,10 +16,10 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
