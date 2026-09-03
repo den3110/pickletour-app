@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
@@ -629,7 +630,7 @@ export default function CreateUserMatchScreen() {
       if (matchType === "double") addP(playerB2, "B", 2);
 
       const payload = {
-        title: "Trận đấu tự do",
+        title: t("Trận đấu tự do"),
         note,
         sportType: "pickleball",
         scheduledAt: matchDate.toISOString(),
@@ -671,7 +672,7 @@ export default function CreateUserMatchScreen() {
       />
       <Stack.Screen
         options={{
-          headerTitle: "Tạo trận đấu",
+          headerTitle: t("Tạo trận đấu"),
           headerTitleAlign: "center",
           headerStyle: { backgroundColor: colors.card },
           headerTitleStyle: { color: colors.text, fontSize: FONT_SIZE_TITLE },

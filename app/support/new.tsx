@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -237,7 +238,7 @@ export default function SupportNewScreen() {
     >
       <Stack.Screen
         options={{
-          title: "Tạo case hỗ trợ",
+          title: t("Tạo case hỗ trợ"),
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
           headerShadowVisible: false,

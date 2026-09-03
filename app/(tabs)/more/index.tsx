@@ -19,14 +19,14 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
-import { useLang, setLang } from "@/utils/i18n";
+import { t, useLang, setLang } from "@/utils/i18n";
 import { useFriendCountsQuery } from "@/slices/friendsApiSlice";
 import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 
 const MORE_ITEMS = [
   {
     key: "marketplace",
-    title: "Chợ Mua bán",
+    title: t("Chợ Mua bán"),
     description: "Mua bán, trao đổi giày, vợt, quần áo pickleball.",
     icon: "storefront-outline" as const,
     route: "/marketplace",
@@ -34,7 +34,7 @@ const MORE_ITEMS = [
   },
   {
     key: "play",
-    title: "Tìm bạn đánh",
+    title: t("Tìm bạn đánh"),
     description: "Đăng kèo giao lưu, tìm người chơi cùng trình gần bạn.",
     icon: "tennisball-outline" as const,
     route: "/play",
@@ -50,7 +50,7 @@ const MORE_ITEMS = [
   },
   {
     key: "messages",
-    title: "Nhắn tin",
+    title: t("Nhắn tin"),
     description: "Trò chuyện với người khác và nhắn cho BTC giải đấu.",
     icon: "chatbubbles-outline" as const,
     route: "/messages",
@@ -58,7 +58,7 @@ const MORE_ITEMS = [
   },
   {
     key: "friends",
-    title: "Bạn bè",
+    title: t("Bạn bè"),
     description: "Xem danh sách bạn bè và duyệt lời mời kết bạn.",
     icon: "people-outline" as const,
     route: "/friends",
@@ -66,7 +66,7 @@ const MORE_ITEMS = [
   },
   {
     key: "coaches",
-    title: "Huấn luyện viên",
+    title: t("Huấn luyện viên"),
     description: "Danh sách HLV chính thức, sắp xếp theo điểm trình.",
     icon: "school-outline" as const,
     route: "/coaches",
@@ -74,7 +74,7 @@ const MORE_ITEMS = [
   },
   {
     key: "my_tournament",
-    title: "Giải của tôi",
+    title: t("Giải của tôi"),
     description: "Theo dõi các giải đã tham gia, lịch đấu và kết quả cá nhân.",
     icon: "trophy-outline" as const,
     route: "/more/my_tournament",
@@ -82,7 +82,7 @@ const MORE_ITEMS = [
   },
   {
     key: "chat",
-    title: "Trợ lý Pikora",
+    title: t("Trợ lý Pikora"),
     description: "Mở trợ lý AI để hỏi nhanh, tìm luồng và thao tác ngay trong app.",
     icon: "sparkles-outline" as const,
     route: "/more/chat",
@@ -90,7 +90,7 @@ const MORE_ITEMS = [
   },
   {
     key: "profile",
-    title: "Hồ sơ",
+    title: t("Hồ sơ"),
     description: "Cập nhật hồ sơ, định danh và toàn bộ thông tin tài khoản.",
     icon: "person-circle-outline" as const,
     route: "/more/profile",

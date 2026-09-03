@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/coaches/index.tsx — Danh sách Huấn luyện viên (mobile).
 import {
   Ionicons } from "@expo/vector-icons";
@@ -245,7 +246,7 @@ export default function CoachesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Huấn luyện viên" }} />
+      <Stack.Screen options={{ title: t("Huấn luyện viên") }} />
 
       {/* CTA đăng ký làm HLV — chỉ hiện khi user chưa là coach */}
       {viewer && !isCoach && (

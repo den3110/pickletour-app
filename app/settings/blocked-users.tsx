@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/settings/blocked-users.tsx
 // Danh sách user đã chặn — cho phép user bỏ chặn.
 // Apple Guideline 1.2 yêu cầu block phải reversible và người dùng biết mình đã chặn ai.
@@ -50,7 +51,7 @@ export default function BlockedUsersScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Người đã chặn" }} />
+      <Stack.Screen options={{ title: t("Người đã chặn") }} />
       {isFetching && !items.length ? (
         <View style={styles.centered}>
           <ActivityIndicator />

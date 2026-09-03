@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Xiangqi lobby
 import {
   Ionicons } from "@expo/vector-icons";
@@ -69,7 +70,7 @@ export default function XiangqiLobbyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Cờ Tướng · Lobby" }} />
+      <Stack.Screen options={{ title: t("Cờ Tướng · Lobby") }} />
       <View style={styles.header}>
         <Text style={styles.title}>🀄 Bàn Cờ Tướng</Text>
         {me && (

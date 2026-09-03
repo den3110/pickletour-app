@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 /* eslint-disable react/prop-types */
 // app/tournament/[id]/index.jsx
 import React, {
@@ -622,7 +623,7 @@ export default function TournamentOverviewScreen() {
     <BottomSheetModalProvider>
       <Stack.Screen
         options={{
-          title: "Tổng quan giải đấu",
+          title: t("Tổng quan giải đấu"),
           headerStyle: { backgroundColor: T.card },
           headerTitleStyle: { color: T.text },
           headerShadowVisible: false,

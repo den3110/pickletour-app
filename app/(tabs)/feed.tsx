@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/feed/index.tsx — Bảng tin (list + composer + reactions + link chi tiết)
 import {
   Ionicons } from "@expo/vector-icons";
@@ -1780,7 +1781,7 @@ export default function FeedScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <Stack.Screen options={{ title: "Bảng tin" }} />
+      <Stack.Screen options={{ title: t("Bảng tin") }} />
       <FlatList
         data={items}
         keyExtractor={(i: any) => i._id}

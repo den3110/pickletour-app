@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/(auth)/register.jsx
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
@@ -497,7 +498,7 @@ export default function RegisterScreen() {
   ) : (
     <>
       <Stack.Screen
-        options={{ title: "Đăng ký", headerTitleAlign: "center" }}
+        options={{ title: t("Đăng ký"), headerTitleAlign: "center" }}
       />
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}

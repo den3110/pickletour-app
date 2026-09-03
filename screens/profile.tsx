@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/(tabs)/profile/index.jsx
 // ✨ NEW LAYOUT v4 - ULTRA PERFORMANCE:
 // - NO HEIGHT ANIMATION (Zero Layout Thrashing)
@@ -9,11 +10,17 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { Image as ExpoImage, Image } from "expo-image";
+import {
+  Image as ExpoImage,
+  Image } from "expo-image";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -24,14 +31,14 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   useColorScheme,
   View,
   Switch,
   DeviceEventEmitter,
   Dimensions,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -704,7 +711,7 @@ export default function ProfileScreen({ isBack = false }) {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          title: "Bạn có chắc muốn đăng xuất?",
+          title: t("Bạn có chắc muốn đăng xuất?"),
           options: ["Huỷ", "Đăng xuất"],
           destructiveButtonIndex: 1,
           cancelButtonIndex: 0,

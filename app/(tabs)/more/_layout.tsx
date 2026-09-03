@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import { useTheme } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import React from "react";
@@ -9,7 +10,7 @@ export default function MoreLayout() {
     <Stack
       screenOptions={{
         headerTitleAlign: "center",
-        headerBackTitle: "Quay lại",
+        headerBackTitle: t("Quay lại"),
         headerStyle: {
           backgroundColor: theme.colors.card,
         },
@@ -21,7 +22,7 @@ export default function MoreLayout() {
     >
       <Stack.Screen
         name="index"
-        options={{ headerShown: false, title: "Quay lại" }}
+        options={{ headerShown: false, title: t("Quay lại") }}
       />
       <Stack.Screen name="chat" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />

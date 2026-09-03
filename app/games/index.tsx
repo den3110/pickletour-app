@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Games hub — 3 icon: Poker (đã có), Sâm (sắp ra mắt), Phỏm (sắp ra mắt).
 import {
   Ionicons,
@@ -37,7 +38,7 @@ const GAMES: GameTile[] = [
   },
   {
     id: "sam",
-    title: "Sâm",
+    title: t("Sâm"),
     subtitle: "Sâm Lốc · 4 người · 10 lá",
     iconLib: "MaterialCommunityIcons",
     icon: "cards-outline",
@@ -47,7 +48,7 @@ const GAMES: GameTile[] = [
   },
   {
     id: "phom",
-    title: "Phỏm",
+    title: t("Phỏm"),
     subtitle: "Tá lả · 4 người · hạ phỏm/ù",
     iconLib: "MaterialCommunityIcons",
     icon: "cards-club",
@@ -67,7 +68,7 @@ const GAMES: GameTile[] = [
   },
   {
     id: "xiangqi",
-    title: "Cờ Tướng",
+    title: t("Cờ Tướng"),
     subtitle: "Xiangqi · 2 người · bắt Tướng",
     iconLib: "MaterialCommunityIcons",
     icon: "chess-knight",
@@ -77,7 +78,7 @@ const GAMES: GameTile[] = [
   },
   {
     id: "chess",
-    title: "Cờ Vua",
+    title: t("Cờ Vua"),
     subtitle: "Chess · 2 người · chiếu bí",
     iconLib: "MaterialCommunityIcons",
     icon: "chess-king",
@@ -93,7 +94,7 @@ export default function GamesHubScreen() {
       <Stack.Screen
         options={{
           title: "Games",
-          headerBackTitle: "Trang chủ",
+          headerBackTitle: t("Trang chủ"),
         }}
       />
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>

@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/screens/TournamentRegistrationScreen.tsx
 import {
   Stack,
@@ -3099,7 +3100,7 @@ export default function TournamentRegistrationScreen() {
       <Stack.Screen
         options={{
           headerShown: searchOpen ? false : true,
-          title: "Đăng ký giải đấu",
+          title: t("Đăng ký giải đấu"),
           // headerLeft: () => (
           //   <TouchableOpacity
           //     onPress={() => router.back()}

@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 /* eslint-disable react/prop-types, react/display-name */
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import {
@@ -1733,17 +1734,17 @@ export default function PublicProfileScreen() {
     const config =
       {
         matches: {
-          title: "Thống kê trận đấu",
+          title: t("Thống kê trận đấu"),
           icon: "tennis",
           gradient: ["#6366F1", "#8B5CF6"],
         },
         wins: {
-          title: "Thống kê chiến thắng",
+          title: t("Thống kê chiến thắng"),
           icon: "trophy",
           gradient: ["#F59E0B", "#EF4444"],
         },
         rating: {
-          title: "Biểu đồ điểm trình",
+          title: t("Biểu đồ điểm trình"),
           icon: "trending-up",
           gradient: ["#10B981", "#059669"],
         },

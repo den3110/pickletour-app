@@ -1,22 +1,26 @@
 // app/screens/RankingListScreen.jsx
-import { router, useRouter } from "expo-router";
+import {
+  router,
+  useRouter } from "expo-router";
 import { useOpenDmMutation } from "@/slices/messagesApiSlice";
 import {
   useAcceptFriendMutation,
   useFriendStatusQuery,
   useRemoveFriendMutation,
   useSendFriendRequestMutation,
-} from "@/slices/friendsApiSlice";
-import React, {
+  } from "@/slices/friendsApiSlice";
+import React,
+  {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   memo,
-} from "react";
+  } from "react";
 import {
-  ActivityIndicator, // ✅ Đã thêm
+  ActivityIndicator,
+  // ✅ Đã thêm
   Animated,
   Easing,
   FlatList,
@@ -24,8 +28,6 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
   Platform,
@@ -35,6 +37,8 @@ import {
   InteractionManager,
   SafeAreaView as RNSafeAreaView,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {

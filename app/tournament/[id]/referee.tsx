@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/(app)/tournament/[id]/referee.jsx
 import React, {
   useEffect,
@@ -1258,7 +1259,7 @@ export default function RefereeCenterScreen() {
       <>
         <Stack.Screen
           options={{
-            title: "Trọng tài",
+            title: t("Trọng tài"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: T.cardBg },
             headerTitleStyle: { color: T.text },
@@ -1276,7 +1277,7 @@ export default function RefereeCenterScreen() {
       <>
         <Stack.Screen
           options={{
-            title: "Trọng tài",
+            title: t("Trọng tài"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: T.cardBg },
             headerTitleStyle: { color: T.text },

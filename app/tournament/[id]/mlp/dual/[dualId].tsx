@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // MLP dual detail — score sub-matches + DreamBreaker + check-in.
 import {
   Ionicons } from "@expo/vector-icons";
@@ -166,7 +167,7 @@ export default function MlpDualDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "MLP · Chi tiết dual" }} />
+      <Stack.Screen options={{ title: t("MLP · Chi tiết dual") }} />
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
         {/* Team header */}
         <View style={styles.teamsRow}>

@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -52,7 +53,7 @@ export default function NotFound() {
     <>
       <Stack.Screen
         options={{
-          title: "Không tìm thấy",
+          title: t("Không tìm thấy"),
           headerTitleAlign: "center",
           headerShadowVisible: false,
         }}

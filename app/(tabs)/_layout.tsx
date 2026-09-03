@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import { router, Tabs, usePathname } from "expo-router";
 import React from "react";
 import { DeviceEventEmitter, Platform } from "react-native";
@@ -172,7 +173,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Trang chủ",
+          title: t("Trang chủ"),
           tabBarIcon: ({ color, size, focused }) => (
             <HomeTabIcon
               color={color}
@@ -194,7 +195,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Bảng tin",
+          title: t("Bảng tin"),
           tabBarIcon: makeIcon("newspaper.fill", "newspaper-variant"),
         }}
       />
@@ -209,7 +210,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Giải đấu",
+          title: t("Giải đấu"),
           tabBarIcon: makeIcon("trophy.fill", "trophy"),
         }}
       />
@@ -224,7 +225,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Xếp hạng",
+          title: t("Xếp hạng"),
           tabBarIcon: makeIcon("chart.bar.fill", "chart-bar"),
         }}
       />
@@ -239,7 +240,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Thông báo",
+          title: t("Thông báo"),
           tabBarIcon: makeIcon("bell.fill", "bell"),
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
@@ -255,7 +256,7 @@ export default function TabLayout() {
           },
         })}
         options={{
-          title: "Khác",
+          title: t("Khác"),
           tabBarIcon: makeIcon("ellipsis.circle.fill", "dots-horizontal-circle"),
         }}
       />

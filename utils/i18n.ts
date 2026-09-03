@@ -2,6 +2,7 @@
 // Không cần refactor sang key: bọc chuỗi bằng <Text> tự dịch hoặc t("<tiếng Việt>").
 // Chuỗi không có trong từ điển sẽ fallback về tiếng Việt (an toàn).
 import { useSyncExternalStore } from "react";
+import { Alert } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
 import EN from "./i18n-en.json";
@@ -14,7 +15,56 @@ let current: Lang = "vi";
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+// Dịch toàn bộ Alert (title/message/nút) mà không phải sửa từng lời gọi.
+let _alertPatched = false;
+export function patchAlert() {
+  if (_alertPatched) return;
+  _alertPatched = true;
+  const orig = Alert.alert.bind(Alert);
+  (Alert as any).alert = (
+    title?: any,
+    message?: any,
+    buttons?: any,
+    options?: any,
+  ) => {
+    const tt = typeof title === "string" ? translate(title) : title;
+    const tm = typeof message === "string" ? translate(message) : message;
+    const tb = Array.isArray(buttons)
+      ? buttons.map((b: any) =>
+          b && typeof b.text === "string"
+            ? { ...b, text: translate(b.text) }
+            : b,
+        )
+      : buttons;
+    return orig(tt, tm, tb, options);
+  };
+}
+
+// Dịch toàn bộ Toast (text1/text2) mà không phải sửa từng lời gọi.
+let _toastPatched = false;
+export function patchToast() {
+  if (_toastPatched) return;
+  try {
+    // require động để tránh lỗi nếu lib chưa sẵn
+    const ToastMod = require("react-native-toast-message");
+    const Toast = ToastMod?.default || ToastMod;
+    if (!Toast || typeof Toast.show !== "function") return;
+    _toastPatched = true;
+    const origShow = Toast.show.bind(Toast);
+    Toast.show = (opts: any = {}) =>
+      origShow({
+        ...opts,
+        text1: typeof opts.text1 === "string" ? translate(opts.text1) : opts.text1,
+        text2: typeof opts.text2 === "string" ? translate(opts.text2) : opts.text2,
+      });
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function initLang() {
+  patchAlert();
+  patchToast();
   try {
     const v = await SecureStore.getItemAsync(STORAGE_KEY);
     if (v === "en" || v === "vi") {

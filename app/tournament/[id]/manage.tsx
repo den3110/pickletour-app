@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/(app)/admin/tournament/[id]/ManageScreen.jsx
 import React, {
   useEffect,
@@ -3331,7 +3332,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
       <>
         <Stack.Screen
           options={{
-            title: "Quản lý giải",
+            title: t("Quản lý giải"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
             headerTintColor: colors.text,
@@ -3347,7 +3348,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
       <>
         <Stack.Screen
           options={{
-            title: "Quản lý giải",
+            title: t("Quản lý giải"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
             headerTintColor: colors.text,

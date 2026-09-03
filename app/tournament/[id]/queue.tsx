@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Màn hình HÀNG ĐỢI SÂN (mobile) — mỗi sân: trận đang đánh + trận kế tiếp.
 import React, { useMemo } from "react";
 import {
@@ -104,7 +105,7 @@ export default function TournamentCourtQueueMobile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.background }}>
-      <Stack.Screen options={{ title: "Hàng đợi sân" }} />
+      <Stack.Screen options={{ title: t("Hàng đợi sân") }} />
       <ScrollView
         contentContainerStyle={{ padding: 12, gap: 12 }}
         refreshControl={

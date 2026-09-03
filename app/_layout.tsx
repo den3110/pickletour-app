@@ -21,8 +21,8 @@ import {
   Alert,
   TextInput,
   TouchableOpacity,
-  Text,
 } from "react-native";
+import { Text } from "@/components/ui/i18nText";
 import "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SplashScreen from "expo-splash-screen";
@@ -55,7 +55,7 @@ import { useLazyGetProfileQuery } from "@/slices/usersApiSlice";
 import Constants from "expo-constants";
 import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
-import { initLang } from "@/utils/i18n";
+import { t, initLang } from "@/utils/i18n";
 import * as SecureStore from "expo-secure-store";
 import {
   increaseLaunchCountAndGet,
@@ -2039,7 +2039,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="register"
                               options={{
-                                title: "Đăng ký",
+                                title: t("Đăng ký"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2047,7 +2047,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="forgot-password"
                               options={{
-                                title: "Quên mật khẩu",
+                                title: t("Quên mật khẩu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2055,7 +2055,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="levelpoint"
                               options={{
-                                title: "Chấm trình",
+                                title: t("Chấm trình"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2063,7 +2063,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/checkin"
                               options={{
-                                title: "Check-in giải đấu",
+                                title: t("Check-in giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2071,21 +2071,21 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/register"
                               options={{
-                                title: "Đăng ký giải đấu",
+                                title: t("Đăng ký giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
 
                             <Stack.Screen
                               options={{
-                                title: "Duyệt định danh",
+                                title: t("Duyệt định danh"),
                               }}
                               name="user/[id]/kyc"
                             />
 
                             <Stack.Screen
                               options={{
-                                title: "Chấm trình",
+                                title: t("Chấm trình"),
                               }}
                               name="user/[id]/grade"
                             />
@@ -2093,7 +2093,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/draw"
                               options={{
-                                title: "Bốc thăm giải đấu",
+                                title: t("Bốc thăm giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2101,7 +2101,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/bracket"
                               options={{
-                                title: "Sơ đồ giải đấu",
+                                title: t("Sơ đồ giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2109,7 +2109,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/home"
                               options={{
-                                title: "Tổng quan giải đấu",
+                                title: t("Tổng quan giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2117,7 +2117,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="tournament/[id]/index"
                               options={{
-                                title: "Giải đấu",
+                                title: t("Giải đấu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2242,7 +2242,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="guide/index"
                               options={{
-                                title: "Hướng dẫn",
+                                title: t("Hướng dẫn"),
                                 headerTitleAlign: "center",
                                 headerTintColor: navTheme.colors.primary,
                                 headerTitleStyle: {
@@ -2255,7 +2255,7 @@ function RootLayout() {
                             <Stack.Screen
                               name="reset-password"
                               options={{
-                                title: "Đặt lại mật khẩu",
+                                title: t("Đặt lại mật khẩu"),
                                 headerTitleAlign: "center",
                               }}
                             />
@@ -2264,7 +2264,7 @@ function RootLayout() {
                               name="404"
                               options={{
                                 headerTitleAlign: "center",
-                                headerBackTitle: "Quay lại",
+                                headerBackTitle: t("Quay lại"),
                                 headerTintColor: navTheme.colors.primary,
                                 headerTitleStyle: {
                                   color: navTheme.colors.text,
@@ -2277,7 +2277,7 @@ function RootLayout() {
                               name="403"
                               options={{
                                 headerTitleAlign: "center",
-                                headerBackTitle: "Quay lại",
+                                headerBackTitle: t("Quay lại"),
                                 headerTintColor: navTheme.colors.primary,
                                 headerTitleStyle: {
                                   color: navTheme.colors.text,

@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/feed/post/[id].tsx — Chi tiết bài viết + comments + reply
 import {
   Ionicons } from "@expo/vector-icons";
@@ -868,7 +869,7 @@ export default function FeedPostDetail() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Chi tiết bài viết" }} />
+      <Stack.Screen options={{ title: t("Chi tiết bài viết") }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

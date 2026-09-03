@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/user/[id]/grade.jsx
 import React, { useState } from "react";
 import {
@@ -108,7 +109,7 @@ export default function GradeUserScreen() {
       <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <Stack.Screen
           options={{
-            title: "Chấm trình",
+            title: t("Chấm trình"),
             headerStyle: { backgroundColor: colors.card },
             headerTintColor: colors.text,
             headerShadowVisible: false,

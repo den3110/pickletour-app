@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Chess lobby
 import {
   Ionicons } from "@expo/vector-icons";
@@ -69,7 +70,7 @@ export default function ChessLobbyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Cờ Vua · Lobby" }} />
+      <Stack.Screen options={{ title: t("Cờ Vua · Lobby") }} />
       <View style={styles.header}>
         <Text style={styles.title}>♟️ Bàn Cờ Vua</Text>
         {me && (

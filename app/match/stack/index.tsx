@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/matches/stack.jsx
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import {
@@ -398,7 +399,7 @@ export default function MatchesStackScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Trận đấu",
+          title: t("Trận đấu"),
           headerTitleAlign: "center",
           // headerLeft: () => (
           //   <TouchableOpacity

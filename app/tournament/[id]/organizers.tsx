@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Sửa Ban tổ chức (mobile): chức vụ + ẩn/hiện từng thành viên (creator + đồng quản lý).
 import React, { useMemo, useState, useEffect } from "react";
 import {
@@ -69,7 +70,7 @@ export default function OrganizersEditMobile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.background }}>
-      <Stack.Screen options={{ title: "Ban tổ chức" }} />
+      <Stack.Screen options={{ title: t("Ban tổ chức") }} />
       <ScrollView contentContainerStyle={{ padding: 12, gap: 10 }}>
         <Text style={{ color: C.text, opacity: 0.6, fontSize: 13 }}>
           Sửa chức vụ (để trống = mặc định) và bật/tắt hiển thị từng người.

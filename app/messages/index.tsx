@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/messages/index.tsx — Danh sách cuộc trò chuyện.
 import {
   Ionicons } from "@expo/vector-icons";
@@ -114,7 +115,7 @@ export default function MessagesListScreen() {
   if (!me) {
     return (
       <SafeAreaView style={styles.container}>
-        <Stack.Screen options={{ title: "Nhắn tin" }} />
+        <Stack.Screen options={{ title: t("Nhắn tin") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
           <Text style={{ marginBottom: 12, color: "#334155" }}>
             Đăng nhập để xem tin nhắn.
@@ -132,7 +133,7 @@ export default function MessagesListScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Nhắn tin" }} />
+      <Stack.Screen options={{ title: t("Nhắn tin") }} />
       <FlatList
         data={items}
         keyExtractor={(i: any) => String(i._id)}

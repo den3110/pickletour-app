@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/contact/index.jsx  (hoặc src/screens/ContactScreen.jsx)
 import {
   useGetContactContentQuery } from "@/slices/cmsApiSlice";
@@ -121,7 +122,7 @@ export default function ContactScreen() {
   return (
     <>
       <Stack.Screen
-        options={{ title: "Liên hệ", headerTitleAlign: "center" }}
+        options={{ title: t("Liên hệ"), headerTitleAlign: "center" }}
       />
       <ScrollView
         contentContainerStyle={[styles.scroll, { backgroundColor: bg }]}

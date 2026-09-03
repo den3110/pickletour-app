@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Hero.jsx — cập nhật ImageViewing theo theme (bg & text)
 
 import {
@@ -22,7 +23,7 @@ import { useTheme } from "@react-navigation/native";
 import { resolveAuxiliaryTabPath } from "@/utils/nativeTabs";
 
 const FALLBACK = {
-  title: "Kết nối cộng đồng & quản lý giải đấu thể thao",
+  title: t("Kết nối cộng đồng & quản lý giải đấu thể thao"),
   lead: "PickleTour giúp bạn đăng ký, tổ chức, theo dõi điểm trình và cập nhật bảng xếp hạng cho mọi môn thể thao – ngay trên điện thoại.",
   imageAlt: "PickleTour — Kết nối cộng đồng & quản lý giải đấu",
 };

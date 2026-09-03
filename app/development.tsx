@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React from "react";
 import {
   View,
@@ -28,9 +29,9 @@ export default function DevelopmentScreen() {
       >
         <Stack.Screen
           options={{
-            title: "Đang phát triển",
+            title: t("Đang phát triển"),
             headerShown: true,
-            headerBackTitle: "Quay lại",
+            headerBackTitle: t("Quay lại"),
           }}
         />
 

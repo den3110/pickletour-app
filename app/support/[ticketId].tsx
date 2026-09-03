@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -367,7 +368,7 @@ export default function SupportThreadScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen
         options={{
-          title: "Chi tiết hỗ trợ",
+          title: t("Chi tiết hỗ trợ"),
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
           headerShadowVisible: false,

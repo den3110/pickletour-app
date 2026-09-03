@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Quản lý cặp trong bảng SAU bốc thăm (mobile) — thêm cặp / chuyển bảng.
 import React, { useMemo, useState } from "react";
 import {
@@ -111,7 +112,7 @@ export default function GroupPairsMobile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.background }}>
-      <Stack.Screen options={{ title: "Thêm / Chuyển cặp" }} />
+      <Stack.Screen options={{ title: t("Thêm / Chuyển cặp") }} />
       <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }}>
         {groupBrackets.length === 0 ? (
           <Text style={{ color: C.text, padding: 20, textAlign: "center" }}>

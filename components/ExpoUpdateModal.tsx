@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 /**
  * Expo Update Modal - VIP UI với progress bar
  */
@@ -28,25 +29,25 @@ const ExpoUpdateModal: React.FC<Props> = ({ visible, status, onClose }) => {
       showProgress: false,
     },
     checking: {
-      title: "Kiểm tra cập nhật",
+      title: t("Kiểm tra cập nhật"),
       text: "Đang kiểm tra phiên bản mới...",
       showSpinner: true,
       showProgress: false,
     },
     downloading: {
-      title: "Đang cập nhật",
+      title: t("Đang cập nhật"),
       text: "Đang tải bản cập nhật mới...",
       showSpinner: true,
       showProgress: true,
     },
     done: {
-      title: "✅ Hoàn tất",
+      title: t("✅ Hoàn tất"),
       text: "Ứng dụng sẽ khởi động lại...",
       showSpinner: false,
       showProgress: false,
     },
     error: {
-      title: "❌ Lỗi",
+      title: t("❌ Lỗi"),
       text: "Không thể cập nhật. Thử lại sau.",
       showSpinner: false,
       showProgress: false,

@@ -1,7 +1,13 @@
 // app/(app)/tournaments/DashboardScreen.jsx
-import { useGetTournamentsQuery } from "@/slices/tournamentsApiSlice";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useGetTournamentsQuery } from "@/slices/tournamentsApiSlice";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import React,
+  { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   Animated,
   FlatList,
@@ -9,13 +15,13 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   useColorScheme,
   View,
   Modal,
   SafeAreaView as RNSafeAreaView,
 } from "react-native";
+import { TextInput } from "@/components/ui/i18nTextInput";
+import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";

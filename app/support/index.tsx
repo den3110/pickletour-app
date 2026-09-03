@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -108,7 +109,7 @@ export default function SupportInboxScreen() {
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <Stack.Screen
         options={{
-          title: "Hỗ trợ",
+          title: t("Hỗ trợ"),
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
           headerShadowVisible: false,

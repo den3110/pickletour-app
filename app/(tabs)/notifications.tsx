@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/notifications/index.tsx — Trung tâm thông báo
 import {
   Ionicons } from "@expo/vector-icons";
@@ -145,7 +146,7 @@ export default function NotificationsScreen() {
   if (!me) {
     return (
       <SafeAreaView style={styles.container}>
-        <Stack.Screen options={{ title: "Thông báo" }} />
+        <Stack.Screen options={{ title: t("Thông báo") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
           <Text style={{ color: "#334155", marginBottom: 12 }}>
             Đăng nhập để xem thông báo.
@@ -177,7 +178,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <Stack.Screen
         options={{
-          title: "Thông báo",
+          title: t("Thông báo"),
           headerRight: () =>
             unreadInList > 0 ? (
               <Pressable

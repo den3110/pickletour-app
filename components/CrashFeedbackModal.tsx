@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import {
   Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -183,7 +184,7 @@ export default function CrashFeedbackModal() {
       ].join("\n");
 
       await createTicket({
-        title: "Báo lỗi app bị văng",
+        title: t("Báo lỗi app bị văng"),
         text,
         attachments,
       }).unwrap();

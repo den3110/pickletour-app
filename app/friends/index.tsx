@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/friends/index.tsx — Trang Bạn bè (3 tab)
 import {
   Ionicons } from "@expo/vector-icons";
@@ -143,7 +144,7 @@ export default function FriendsScreen() {
   if (!me) {
     return (
       <SafeAreaView style={styles.container}>
-        <Stack.Screen options={{ title: "Bạn bè" }} />
+        <Stack.Screen options={{ title: t("Bạn bè") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
           <Text style={{ marginBottom: 12, color: "#334155" }}>
             Đăng nhập để xem bạn bè.
@@ -195,7 +196,7 @@ export default function FriendsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Bạn bè" }} />
+      <Stack.Screen options={{ title: t("Bạn bè") }} />
       <View style={styles.tabBar}>
         <Tab id="friends" label="Bạn bè" badge={counts?.friends} />
         <Tab

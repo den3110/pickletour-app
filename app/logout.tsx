@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/logout.jsx
 import React, { useEffect, useRef } from "react";
 import {
@@ -49,7 +50,7 @@ export default function LogoutScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Đăng xuất",
+          title: t("Đăng xuất"),
           headerTitleAlign: "center",
           gestureEnabled: false,
           headerShown: false,

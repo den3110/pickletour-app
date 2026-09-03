@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -265,7 +266,7 @@ export default function KycCheckScreen() {
       <>
         <Stack.Screen
           options={{
-            title: "Duyệt định danh",
+            title: t("Duyệt định danh"),
             headerStyle: { backgroundColor: colors.card },
             headerTintColor: colors.text,
           }}
@@ -289,7 +290,7 @@ export default function KycCheckScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Duyệt định danh",
+          title: t("Duyệt định danh"),
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

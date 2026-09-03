@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // src/screens/settings/FacebookLiveSettingsScreen.jsx
 import React, { useCallback, useState } from "react";
 import {
@@ -271,7 +272,7 @@ const FacebookLiveSettingsScreen = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
-          title: "Thiết lập page LIVE",
+          title: t("Thiết lập page LIVE"),
           headerTitleAlign: "center",
           headerStyle: { backgroundColor: theme.headerBg }, // 🔹 Header bg
           headerTintColor: theme.headerTint, // 🔹 Header text/icon color

@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // Phỏm lobby — list rooms + create.
 import {
   Ionicons } from "@expo/vector-icons";
@@ -77,7 +78,7 @@ export default function PhomLobbyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Phỏm · Lobby" }} />
+      <Stack.Screen options={{ title: t("Phỏm · Lobby") }} />
 
       <View style={styles.header}>
         <Text style={styles.title}>🃏 Bàn Phỏm (Tá lả)</Text>

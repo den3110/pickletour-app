@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/head2head/index.jsx
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
@@ -1085,9 +1086,9 @@ export default function Head2HeadScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Đối đầu",
+          title: t("Đối đầu"),
           headerTitleStyle: { fontWeight: "800" },
-          headerBackTitle: "Quay lại",
+          headerBackTitle: t("Quay lại"),
         }}
       />
 

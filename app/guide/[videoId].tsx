@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 // app/guides/[videoId].jsx
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -85,7 +86,7 @@ export default function GuideVideoScreen() {
       <>
         <Stack.Screen
           options={{
-            title: "Video hướng dẫn",
+            title: t("Video hướng dẫn"),
           }}
         />
         <View style={[styles.center, { backgroundColor: bg }]}>

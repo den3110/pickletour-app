@@ -1,3 +1,4 @@
+import { t } from "@/utils/i18n";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -53,8 +54,8 @@ export default function NotFound() {
       <Stack.Screen
         options={{
           headerTitleAlign: "center",
-          headerBackTitle: "Quay lại",
-          headerTitle: "Không tìm thấy",
+          headerBackTitle: t("Quay lại"),
+          headerTitle: t("Không tìm thấy"),
           // headerTintColor: navTheme.colors.primary,
           // headerTitleStyle: {
           //   color: navTheme.colors.text,
