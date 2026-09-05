@@ -12,6 +12,7 @@ import React,
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
@@ -160,7 +161,10 @@ export default function EventLiveScreen() {
   const eventName = data?.eventName || "Giải đấu trực tiếp";
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
@@ -334,7 +338,7 @@ export default function EventLiveScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

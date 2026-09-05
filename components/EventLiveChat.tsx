@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { EmitterSubscription } from "react-native";
 import { useSelector } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import {
@@ -111,11 +112,23 @@ export default function EventLiveChat() {
     }
   }, [comments.length]);
 
+  // Scroll to end when keyboard appears
+  useEffect(() => {
+    const sub: EmitterSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 150);
+      },
+    );
+    return () => sub.remove();
+  }, []);
+
   const doSend = useCallback(async () => {
     const text = input.trim();
     if (!text || sending) return;
     setSending(true);
-    Keyboard.dismiss();
 
     try {
       if (socket?.connected) {
@@ -188,6 +201,8 @@ export default function EventLiveChat() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       />
 
       {/* Input */}
