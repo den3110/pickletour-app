@@ -18,6 +18,23 @@ export const eventLiveApiSlice = apiSlice.injectEndpoints({
         body: body || {},
       }),
     }),
+    // Live comments
+    getEventLiveComments: builder.query({
+      query: ({ before, limit = 30 } = {}) => {
+        const p = new URLSearchParams();
+        if (limit) p.set("limit", String(limit));
+        if (before) p.set("before", before);
+        return { url: `/api/event-live/comments?${p.toString()}` };
+      },
+      keepUnusedDataFor: 10,
+    }),
+    postEventLiveComment: builder.mutation({
+      query: (body) => ({
+        url: `/api/event-live/comments`,
+        method: "POST",
+        body,
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -26,4 +43,6 @@ export const {
   useGetEventLiveQuery,
   useGetEventLiveConfigQuery,
   useTrackEventLiveViewMutation,
+  useGetEventLiveCommentsQuery,
+  usePostEventLiveCommentMutation,
 } = eventLiveApiSlice;

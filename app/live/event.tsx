@@ -30,6 +30,7 @@ import {
   useGetEventLiveQuery,
   useTrackEventLiveViewMutation,
 } from "@/slices/eventLiveApiSlice";
+import EventLiveChat from "@/components/EventLiveChat";
 
 // Origin THẬT để YouTube cho phép nhúng (baseUrl=youtube.com khiến YT coi như
 // tự-nhúng-vào-chính-mình -> lỗi 152 cho MỌI video). Dùng pickletour.vn.
@@ -110,7 +111,7 @@ export default function EventLiveScreen() {
       refetchOnMountOrArgChange: true,
     });
 
-  const [tab, setTab] = useState<"live" | "replay">("live");
+  const [tab, setTab] = useState<"live" | "replay" | "chat">("live");
   const [current, setCurrent] = useState<Feed | null>(null);
   const [trackView] = useTrackEventLiveViewMutation();
   // Ghi nhận lượt dùng (1 lần khi mở màn) — cho thống kê web/app.
@@ -272,56 +273,67 @@ export default function EventLiveScreen() {
           active={tab === "replay"}
           onPress={() => setTab("replay")}
         />
+        <TabBtn
+          label="💬 Chat"
+          active={tab === "chat"}
+          onPress={() => setTab("chat")}
+        />
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 24 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isFetching}
-            onRefresh={refetch}
-            tintColor="#fff"
-          />
-        }
-      >
-        {isError ? (
-          <EmptyState
-            icon="cloud-offline-outline"
-            text="Không tải được dữ liệu. Kéo xuống để thử lại."
-          />
-        ) : tab === "live" ? (
-          live.length === 0 ? (
-            <EmptyState
-              icon="videocam-off-outline"
-              text="Hiện chưa có sân nào phát trực tiếp. Hãy quay lại sau nhé!"
+      {tab === "chat" ? (
+        <View style={{ flex: 1, paddingHorizontal: 8, paddingBottom: insets.bottom }}>
+          <EventLiveChat />
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={refetch}
+              tintColor="#fff"
             />
+          }
+        >
+          {isError ? (
+            <EmptyState
+              icon="cloud-offline-outline"
+              text="Không tải được dữ liệu. Kéo xuống để thử lại."
+            />
+          ) : tab === "live" ? (
+            live.length === 0 ? (
+              <EmptyState
+                icon="videocam-off-outline"
+                text="Hiện chưa có sân nào phát trực tiếp. Hãy quay lại sau nhé!"
+              />
+            ) : (
+              live.map((court) => (
+                <CourtCard
+                  key={`l-${court.courtKey ?? court.courtLabel}`}
+                  court={court}
+                  feeds={court.angles || []}
+                  currentId={current?.videoId}
+                  onPick={setCurrent}
+                />
+              ))
+            )
+          ) : replays.length === 0 ? (
+            <EmptyState icon="film-outline" text="Chưa có video xem lại." />
           ) : (
-            live.map((court) => (
-              <CourtCard
-                key={`l-${court.courtKey ?? court.courtLabel}`}
+            replays.map((court) => (
+              <ReplayGroup
+                key={`r-${court.courtKey ?? court.courtLabel}`}
                 court={court}
-                feeds={court.angles || []}
-                currentId={current?.videoId}
-                onPick={setCurrent}
+                videos={court.videos || []}
+                onPick={(f) => {
+                  setCurrent(f);
+                }}
               />
             ))
-          )
-        ) : replays.length === 0 ? (
-          <EmptyState icon="film-outline" text="Chưa có video xem lại." />
-        ) : (
-          replays.map((court) => (
-            <ReplayGroup
-              key={`r-${court.courtKey ?? court.courtLabel}`}
-              court={court}
-              videos={court.videos || []}
-              onPick={(f) => {
-                setCurrent(f);
-              }}
-            />
-          ))
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
