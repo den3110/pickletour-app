@@ -12,6 +12,7 @@ import React,
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -158,6 +159,17 @@ export default function EventLiveScreen() {
     if (!live.length && replays.length) setTab("replay");
   }, [live.length, replays.length]);
 
+  const [kbVisible, setKbVisible] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const s1 = Keyboard.addListener(showEvt, () => setKbVisible(true));
+    const s2 = Keyboard.addListener(hideEvt, () => setKbVisible(false));
+    return () => { s1.remove(); s2.remove(); };
+  }, []);
+
+  const hidePlayer = tab === "chat" && kbVisible;
+
   const eventName = data?.eventName || "Giải đấu trực tiếp";
 
   return (
@@ -193,66 +205,66 @@ export default function EventLiveScreen() {
         </Pressable>
       </View>
 
-      {/* Player */}
-      <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
-        {current && current.embeddable === false ? (
-          // Kênh tắt nhúng (vd FPT Bóng Đá) -> không phát trong app được.
-          <View style={styles.noEmbed}>
-            <Ionicons name="logo-youtube" size={40} color="#ff2d2d" />
-            <Text style={styles.noEmbedTitle}>
-              Luồng này chỉ xem được trên YouTube
-            </Text>
-            <Text style={styles.noEmbedSub} numberOfLines={2}>
-              Kênh nguồn không cho phép nhúng video.
-            </Text>
-            <Pressable
-              onPress={() => openYouTube(current.videoId)}
-              style={styles.noEmbedBtn}
-            >
-              <Ionicons name="play" size={16} color="#0a0e1a" />
-              <Text style={styles.noEmbedBtnText}>Mở trên YouTube</Text>
-            </Pressable>
-          </View>
-        ) : current ? (
-          <>
-            <WebView
-              key={`${current.videoId}-${muted ? "m" : "s"}`}
-              style={{ width: playerW, height: playerH, backgroundColor: "#000" }}
-              source={{
-                html: buildEmbedHtml(current.videoId, muted),
-                baseUrl: EMBED_ORIGIN,
-              }}
-              originWhitelist={["*"]}
-              javaScriptEnabled
-              domStorageEnabled
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              allowsFullscreenVideo
-              androidLayerType="hardware"
-              scrollEnabled={false}
-              bounces={false}
-            />
-            {/* Overlay che thanh tiêu đề/kênh YouTube ở góc trên */}
-            <View pointerEvents="none" style={styles.playerTopMask} />
-            {muted ? (
-              <Pressable onPress={() => setMuted(false)} style={styles.unmuteBtn}>
-                <Ionicons name="volume-high" size={16} color="#fff" />
-                <Text style={styles.unmuteText}>Bật tiếng</Text>
+      {/* Player — ẩn khi keyboard hiện ở tab chat để nhường chỗ */}
+      {!hidePlayer && (
+        <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
+          {current && current.embeddable === false ? (
+            <View style={styles.noEmbed}>
+              <Ionicons name="logo-youtube" size={40} color="#ff2d2d" />
+              <Text style={styles.noEmbedTitle}>
+                Luồng này chỉ xem được trên YouTube
+              </Text>
+              <Text style={styles.noEmbedSub} numberOfLines={2}>
+                Kênh nguồn không cho phép nhúng video.
+              </Text>
+              <Pressable
+                onPress={() => openYouTube(current.videoId)}
+                style={styles.noEmbedBtn}
+              >
+                <Ionicons name="play" size={16} color="#0a0e1a" />
+                <Text style={styles.noEmbedBtnText}>Mở trên YouTube</Text>
               </Pressable>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.playerEmpty}>
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={{ color: SUB }}>Chưa có video để phát</Text>
-            )}
-          </View>
-        )}
-      </View>
+            </View>
+          ) : current ? (
+            <>
+              <WebView
+                key={`${current.videoId}-${muted ? "m" : "s"}`}
+                style={{ width: playerW, height: playerH, backgroundColor: "#000" }}
+                source={{
+                  html: buildEmbedHtml(current.videoId, muted),
+                  baseUrl: EMBED_ORIGIN,
+                }}
+                originWhitelist={["*"]}
+                javaScriptEnabled
+                domStorageEnabled
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                allowsFullscreenVideo
+                androidLayerType="hardware"
+                scrollEnabled={false}
+                bounces={false}
+              />
+              <View pointerEvents="none" style={styles.playerTopMask} />
+              {muted ? (
+                <Pressable onPress={() => setMuted(false)} style={styles.unmuteBtn}>
+                  <Ionicons name="volume-high" size={16} color="#fff" />
+                  <Text style={styles.unmuteText}>Bật tiếng</Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.playerEmpty}>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={{ color: SUB }}>Chưa có video để phát</Text>
+              )}
+            </View>
+          )}
+        </View>
+      )}
 
-      {current ? (
+      {!hidePlayer && current ? (
         <View style={styles.nowRow}>
           <View
             style={[styles.anglePill, { backgroundColor: angleColor(current.angle) }]}
