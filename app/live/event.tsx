@@ -285,7 +285,7 @@ export default function EventLiveScreen() {
       </View>
 
       {tab === "chat" ? (
-        <View style={{ flex: 1, paddingHorizontal: 8, paddingBottom: insets.bottom }}>
+        <View style={{ flex: 1, paddingHorizontal: 8 }}>
           <EventLiveChat />
         </View>
       ) : (
