@@ -96,6 +96,14 @@ const MORE_ITEMS = [
     route: "/more/profile",
     accent: "#8B5CF6",
   },
+  {
+    key: "notif-settings",
+    title: t("Cài đặt thông báo"),
+    description: "Bật/tắt push, tin nhắn, bảng tin và quản lý giải đang theo dõi.",
+    icon: "notifications-outline" as const,
+    route: "/settings/notifications",
+    accent: "#f59e0b",
+  },
 ];
 
 function MoreGlassSurface({

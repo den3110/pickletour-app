@@ -2303,6 +2303,35 @@ export default function PublicProfileScreen() {
           >
             <FriendActions userId={String(id)} />
             <OpenMessageButton userId={String(id)} />
+            {!isSelf ? (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/head2head",
+                    params: {
+                      opponentId: String(id),
+                      opponentName: base?.nickname || base?.name || "",
+                      opponentAvatar: base?.avatar || "",
+                    },
+                  })
+                }
+                activeOpacity={0.85}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: "#f59e0b",
+                }}
+              >
+                <MaterialCommunityIcons name="sword-cross" size={18} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>
+                  Đối đầu
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             <UserActionsMenu
               userId={String(id)}
               userName={base?.nickname || base?.name}

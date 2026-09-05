@@ -1648,9 +1648,11 @@ export default function FeedScreen() {
   const dispatch = useDispatch();
   const socket = useSocket();
   const [cursor, setCursor] = useState<string | null>(null);
+  const [feedTab, setFeedTab] = useState<"all" | "following">("all");
   const { data, isFetching, refetch } = useListFeedQuery({
     cursor,
     limit: 10,
+    following: feedTab === "following",
   });
   const items = data?.items || [];
   const hasMore = Boolean(data?.hasMore);
@@ -1786,11 +1788,44 @@ export default function FeedScreen() {
         data={items}
         keyExtractor={(i: any) => i._id}
         ListHeaderComponent={
-          me ? (
-            <Composer onPosted={handleRefresh} />
-          ) : (
-            <GuestBanner />
-          )
+          <>
+            {me ? <Composer onPosted={handleRefresh} /> : <GuestBanner />}
+            {me ? (
+              <View style={styles.feedTabs}>
+                {(
+                  [
+                    { key: "all", label: "Tất cả" },
+                    { key: "following", label: "Đang theo dõi" },
+                  ] as const
+                ).map((t) => {
+                  const active = feedTab === t.key;
+                  return (
+                    <TouchableOpacity
+                      key={t.key}
+                      onPress={() => {
+                        if (feedTab === t.key) return;
+                        setCursor(null);
+                        setFeedTab(t.key);
+                      }}
+                      style={[
+                        styles.feedTabBtn,
+                        active && styles.feedTabBtnActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.feedTabText,
+                          active && styles.feedTabTextActive,
+                        ]}
+                      >
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+          </>
         }
         renderItem={renderItem}
         refreshControl={
@@ -1822,7 +1857,9 @@ export default function FeedScreen() {
         ListEmptyComponent={
           !isFetching ? (
             <Text style={styles.empty}>
-              Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ 👋
+              {feedTab === "following"
+                ? "Chưa có bài viết từ giải bạn theo dõi. Hãy theo dõi giải để xem tin ở đây 🔔"
+                : "Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ 👋"}
             </Text>
           ) : (
             <View style={{ padding: 24 }}>
@@ -1979,6 +2016,21 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, marginBottom: 12, color: "#334155" },
   empty: { padding: 24, textAlign: "center", color: "#64748B" },
+  feedTabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  feedTabBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(148,163,184,0.15)",
+  },
+  feedTabBtnActive: { backgroundColor: "#4dd0e1" },
+  feedTabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+  feedTabTextActive: { color: "#0a0e1a" },
   composer: {
     backgroundColor: "#fff",
     padding: 12,

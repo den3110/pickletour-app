@@ -4,11 +4,12 @@ import { apiSlice } from "./apiSlice";
 export const feedApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     listFeed: builder.query({
-      query: ({ cursor, tag, limit = 10 } = {}) => {
+      query: ({ cursor, tag, limit = 10, following } = {}) => {
         const p = new URLSearchParams();
         if (cursor) p.set("cursor", String(cursor));
         if (tag) p.set("tag", String(tag).toLowerCase());
         if (limit) p.set("limit", String(limit));
+        if (following) p.set("following", "1");
         const qs = p.toString();
         return { url: `/api/feed${qs ? `?${qs}` : ""}`, method: "GET" };
       },

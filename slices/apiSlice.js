@@ -344,6 +344,8 @@ export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery,
   tagTypes: [
+    "Reviews",
+    "Subscriptions",
     "Chat",
     "ChatMessages",
     "Friend",

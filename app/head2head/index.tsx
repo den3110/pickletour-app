@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { TextInput } from "@/components/ui/i18nTextInput";
 import { Text } from "@/components/ui/i18nText";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -970,8 +970,22 @@ export default function Head2HeadScreen() {
     // nếu sau này đổi sang FlatList thì dùng:
     // scrollRef.current?.scrollToOffset?.({ offset: 0, animated: true });
   };
+  const params = useLocalSearchParams();
   const [player1, setPlayer1] = useState(currentUser || null);
-  const [player2, setPlayer2] = useState(null);
+  const [player2, setPlayer2] = useState(
+    params?.opponentId
+      ? {
+          _id: String(params.opponentId),
+          name: params?.opponentName ? String(params.opponentName) : undefined,
+          nickname: params?.opponentName
+            ? String(params.opponentName)
+            : undefined,
+          avatar: params?.opponentAvatar
+            ? String(params.opponentAvatar)
+            : undefined,
+        }
+      : null
+  );
 
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [selectingSide, setSelectingSide] = useState(null); // "left" | "right"

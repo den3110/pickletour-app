@@ -39,6 +39,12 @@ import {
   useListTournamentBracketsQuery,
   useGetRegistrationsQuery,
 } from "@/slices/tournamentsApiSlice";
+import {
+  useListMySubscriptionsQuery,
+  useSubscribeTopicMutation,
+  useUnsubscribeTopicMutation,
+} from "@/slices/subscriptionApiSlice";
+import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   getMatchCourtStationName,
@@ -615,6 +621,40 @@ export default function TournamentOverviewScreen() {
     [router, id]
   );
 
+  // ── Theo dõi giải (subscription) + tổng hợp đánh giá ──
+  const { data: mySubs } = useListMySubscriptionsQuery(undefined, { skip: !me });
+  const [subscribeTopic] = useSubscribeTopicMutation();
+  const [unsubscribeTopic] = useUnsubscribeTopicMutation();
+  const isFollowing = useMemo(
+    () =>
+      Array.isArray(mySubs) &&
+      mySubs.some(
+        (s) =>
+          s.topicType === "tournament" && String(s.topicId) === String(id)
+      ),
+    [mySubs, id]
+  );
+  const toggleFollow = useCallback(async () => {
+    if (!me) {
+      router.push("/login");
+      return;
+    }
+    try {
+      if (isFollowing) {
+        await unsubscribeTopic({ topicType: "tournament", topicId: id }).unwrap();
+      } else {
+        await subscribeTopic({ topicType: "tournament", topicId: id }).unwrap();
+      }
+    } catch (_) {
+      /* best effort */
+    }
+  }, [me, isFollowing, id, router, subscribeTopic, unsubscribeTopic]);
+
+  const { data: reviewSummary } = useGetReviewSummaryQuery(
+    { targetType: "tournament", targetId: id },
+    { skip: !id }
+  );
+
   const col2 = width >= 900;
 
   if (loading && !tournament) return <OverviewSkeleton T={T} insets={insets} />;
@@ -831,6 +871,47 @@ export default function TournamentOverviewScreen() {
                   <Ionicons name="chatbubbles" size={18} color="#fff" />
                 </View>
                 <Text style={S.shortcutText}>Nhóm Zalo</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => go("/tournament/[id]/reviews")}
+                style={({ pressed }) => [
+                  S.shortcut,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <View style={[S.shortcutIcon, { backgroundColor: "#F59E0B" }]}>
+                  <Ionicons name="star" size={18} color="#fff" />
+                </View>
+                <Text style={S.shortcutText}>
+                  {reviewSummary?.summary?.count
+                    ? `Đánh giá ${reviewSummary.summary.avg?.toFixed(1)}★`
+                    : "Đánh giá"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={toggleFollow}
+                style={({ pressed }) => [
+                  S.shortcut,
+                  { opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <View
+                  style={[
+                    S.shortcutIcon,
+                    { backgroundColor: isFollowing ? "#22c55e" : "#6366f1" },
+                  ]}
+                >
+                  <Ionicons
+                    name={isFollowing ? "notifications" : "notifications-outline"}
+                    size={18}
+                    color="#fff"
+                  />
+                </View>
+                <Text style={S.shortcutText}>
+                  {isFollowing ? "Đang theo dõi" : "Theo dõi"}
+                </Text>
               </Pressable>
             </View>
           </LinearGradient>
