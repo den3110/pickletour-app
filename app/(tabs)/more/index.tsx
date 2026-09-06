@@ -97,6 +97,22 @@ const MORE_ITEMS = [
     accent: "#8B5CF6",
   },
   {
+    key: "courts",
+    title: t("Đặt sân"),
+    description: "Tìm sân gần bạn, xem giờ trống, đặt sân và thanh toán qua QR.",
+    icon: "calendar-outline" as const,
+    route: "/courts",
+    accent: "#22c55e",
+  },
+  {
+    key: "my-bookings",
+    title: t("Lịch đặt sân của tôi"),
+    description: "Xem lượt đặt, gửi bill chuyển khoản và vé QR vào sân.",
+    icon: "ticket-outline" as const,
+    route: "/courts/my-bookings",
+    accent: "#f59e0b",
+  },
+  {
     key: "notif-settings",
     title: t("Cài đặt thông báo"),
     description: "Bật/tắt push, tin nhắn, bảng tin và quản lý giải đang theo dõi.",

@@ -346,6 +346,8 @@ export const apiSlice = createApi({
   tagTypes: [
     "Reviews",
     "Subscriptions",
+    "Venue",
+    "Booking",
     "Chat",
     "ChatMessages",
     "Friend",
