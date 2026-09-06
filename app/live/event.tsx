@@ -26,6 +26,7 @@ import {
 import { Text } from "@/components/ui/i18nText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+import { useVideoPlayer, VideoView } from "expo-video";
 
 import analytics from "@/utils/analytics";
 import {
@@ -65,6 +66,42 @@ function buildEmbedHtml(videoId: string, muted: boolean) {
 </div></body></html>`;
 }
 
+// Player HLS/URL thủ công (expo-video) — cho luồng thêm từ link .m3u8/mp4.
+function HlsPlayer({
+  uri,
+  muted,
+  width,
+  height,
+}: {
+  uri: string;
+  muted: boolean;
+  width: number;
+  height: number;
+}) {
+  const player = useVideoPlayer(uri || "", (p) => {
+    p.loop = false;
+    p.muted = muted;
+    p.play();
+  });
+  useEffect(() => {
+    try {
+      player.muted = muted;
+    } catch {
+      /* ignore */
+    }
+  }, [muted, player]);
+  return (
+    <VideoView
+      player={player}
+      style={{ width, height, backgroundColor: "#000" }}
+      contentFit="contain"
+      nativeControls
+      allowsFullscreen
+      allowsPictureInPicture={false}
+    />
+  );
+}
+
 const BG = "#0a0e1a";
 const CARD = "#121829";
 const BORDER = "rgba(255,255,255,0.08)";
@@ -90,6 +127,8 @@ type Feed = {
   angleLabelDisplay?: string;
   courtLabel?: string;
   embeddable?: boolean;
+  sourceType?: "youtube" | "hls" | "url";
+  hlsUrl?: string;
 };
 
 const ytWatchUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
@@ -208,7 +247,26 @@ export default function EventLiveScreen() {
       {/* Player — ẩn khi keyboard hiện ở tab chat để nhường chỗ */}
       {!hidePlayer && (
         <View style={{ width: playerW, height: playerH, backgroundColor: "#000" }}>
-          {current && current.embeddable === false ? (
+          {current &&
+          (current.hlsUrl ||
+            current.sourceType === "hls" ||
+            current.sourceType === "url") ? (
+            <>
+              <HlsPlayer
+                key={current.videoId}
+                uri={current.hlsUrl}
+                muted={muted}
+                width={playerW}
+                height={playerH}
+              />
+              {muted ? (
+                <Pressable onPress={() => setMuted(false)} style={styles.unmuteBtn}>
+                  <Ionicons name="volume-high" size={16} color="#fff" />
+                  <Text style={styles.unmuteText}>Bật tiếng</Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : current && current.embeddable === false ? (
             <View style={styles.noEmbed}>
               <Ionicons name="logo-youtube" size={40} color="#ff2d2d" />
               <Text style={styles.noEmbedTitle}>
