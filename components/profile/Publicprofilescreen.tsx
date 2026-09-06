@@ -2181,7 +2181,7 @@ export default function PublicProfileScreen() {
             <PlayerNameText
               user={base}
               name={base?.name || base?.fullName || "Người dùng"}
-              style={styles.userName}
+              style={[styles.userName, { textAlign: "center" }]}
             />
 
 

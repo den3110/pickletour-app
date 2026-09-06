@@ -38,12 +38,20 @@ function GradientName({
   const fontWeight = String(bold ? "800" : flat.fontWeight || "600");
   const fontStyle = flat.fontStyle;
   const fontFamily = flat.fontFamily;
+  // Canh theo textAlign của style (center/right/left) để khớp tên thường —
+  // trước đây hardcode flex-start khiến tên gradient lệch trái khi cần canh giữa.
+  const alignSelf =
+    flat.textAlign === "center"
+      ? "center"
+      : flat.textAlign === "right"
+        ? "flex-end"
+        : "flex-start";
   // màu đại diện hiển thị trong lúc chờ đo (không bao giờ để trống/vô hình)
   const repColor = colors[Math.floor(colors.length / 2)] || colors[0];
   const { x1, y1, x2, y2 } = angleToSvgVector(angle);
 
   return (
-    <View style={{ alignSelf: "flex-start" }}>
+    <View style={{ alignSelf }}>
       <Text
         style={[textStyle, { color: repColor, opacity: m ? 0 : 1 }, bold ? { fontWeight: "800" } : null]}
         numberOfLines={numberOfLines || 1}
