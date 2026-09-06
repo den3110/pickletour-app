@@ -41,6 +41,7 @@ export const BOOKING_STATUS: Record<string, { label: string; color: string }> = 
 };
 
 export const pal = (dark: boolean) => ({
+  dark,
   bg: dark ? "#0a0e1a" : "#f5f7fb",
   card: dark ? "#121829" : "#ffffff",
   border: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",

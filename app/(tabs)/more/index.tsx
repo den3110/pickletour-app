@@ -113,6 +113,14 @@ const MORE_ITEMS = [
     accent: "#f59e0b",
   },
   {
+    key: "owner",
+    title: t("Quản lý sân (chủ sân)"),
+    description: "Nhận đặt sân, duyệt thanh toán, quét vé QR, doanh thu. Đăng ký làm chủ sân.",
+    icon: "business-outline" as const,
+    route: "/owner",
+    accent: "#8B5CF6",
+  },
+  {
     key: "notif-settings",
     title: t("Cài đặt thông báo"),
     description: "Bật/tắt push, tin nhắn, bảng tin và quản lý giải đang theo dõi.",

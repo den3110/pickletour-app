@@ -21,6 +21,8 @@ import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { useGetVenueQuery, useGetVenueAvailabilityQuery } from "@/slices/venuesApiSlice";
 import { useCreateBookingMutation } from "@/slices/bookingsApiSlice";
+import { useLazyValidatePromoQuery } from "@/slices/venueOwnerApiSlice";
+import VenueMiniMap from "@/components/courts/VenueMiniMap";
 import { fmtVND, pal, toDateInput, addDays, WEEKDAYS_SHORT, weekdayOf } from "@/utils/courtFormat";
 
 type Slot = { start: string; end: string; price: number; booked: boolean; past: boolean };
@@ -48,6 +50,9 @@ export default function VenueDetailScreen() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
+  const [promo, setPromo] = useState("");
+  const [promoInfo, setPromoInfo] = useState<any>(null); // { discount, reason, ok }
+  const [validatePromo, { isFetching: checkingPromo }] = useLazyValidatePromoQuery();
 
   // Chọn slot: giữ dải liên tiếp trên cùng 1 sân; bấm slot đã chọn ở cuối → bỏ bớt
   const toggleSlot = useCallback((court: any, slot: Slot) => {
@@ -84,8 +89,24 @@ export default function VenueDetailScreen() {
     setName(me?.name || "");
     setPhone(me?.phone || "");
     setNote("");
+    setPromo("");
+    setPromoInfo(null);
     setConfirmOpen(true);
   };
+
+  const checkPromo = async () => {
+    const code = promo.trim().toUpperCase();
+    if (!code) { setPromoInfo(null); return; }
+    try {
+      const r: any = await validatePromo({ venueId: id, code, total }).unwrap();
+      setPromoInfo(r);
+    } catch {
+      setPromoInfo({ ok: false, discount: 0, reason: "Không kiểm tra được mã" });
+    }
+  };
+
+  const discount = promoInfo?.ok ? promoInfo.discount : 0;
+  const payable = Math.max(0, total - discount);
 
   const submit = async () => {
     if (!sel || !start || !end) return;
@@ -99,6 +120,7 @@ export default function VenueDetailScreen() {
         customerName: name,
         customerPhone: phone,
         note,
+        promoCode: promoInfo?.ok ? promo.trim().toUpperCase() : undefined,
       }).unwrap();
       setConfirmOpen(false);
       setSel(null);
@@ -166,6 +188,10 @@ export default function VenueDetailScreen() {
             </View>
           )}
         </View>
+
+        {venue.locationGeo?.lat && venue.locationGeo?.lon ? (
+          <VenueMiniMap lat={venue.locationGeo.lat} lon={venue.locationGeo.lon} name={venue.name} accent={C.accent} card={C.card} sub={C.sub} />
+        ) : null}
 
         {/* Ngày */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
@@ -248,10 +274,29 @@ export default function VenueDetailScreen() {
             <Text style={{ color: C.sub, marginBottom: 10 }}>
               {venue.name} · {sel?.courtName} · {date.split("-").reverse().join("/")} · {start} → {end}
             </Text>
-            <Text style={{ color: C.accent, fontWeight: "900", fontSize: 20, marginBottom: 12 }}>{fmtVND(total)}</Text>
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Tên người đặt" placeholderTextColor={C.sub} value={name} onChangeText={setName} />
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Số điện thoại" placeholderTextColor={C.sub} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, height: 70 }]} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.sub} multiline value={note} onChangeText={(t) => setNote(t.slice(0, 500))} />
+            {/* Mã giảm giá */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1, marginBottom: 0 }]} placeholder="Mã giảm giá" placeholderTextColor={C.sub} autoCapitalize="characters" value={promo} onChangeText={setPromo} />
+              <TouchableOpacity style={[styles.btn, { paddingHorizontal: 18, backgroundColor: C.field }]} onPress={checkPromo} disabled={checkingPromo}>
+                <Text style={{ color: C.text, fontWeight: "700" }}>{checkingPromo ? "…" : "Áp dụng"}</Text>
+              </TouchableOpacity>
+            </View>
+            {promoInfo && (
+              <Text style={{ color: promoInfo.ok ? "#22c55e" : "#ef4444", fontSize: 12, marginBottom: 8 }}>
+                {promoInfo.ok ? `Đã áp mã · giảm ${fmtVND(promoInfo.discount)}` : promoInfo.reason}
+              </Text>
+            )}
+            {/* Tổng thanh toán */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
+              <Text style={{ color: C.sub }}>Thanh toán</Text>
+              <View style={{ alignItems: "flex-end" }}>
+                {discount > 0 && <Text style={{ color: C.sub, fontSize: 13, textDecorationLine: "line-through" }}>{fmtVND(total)}</Text>}
+                <Text style={{ color: C.accent, fontWeight: "900", fontSize: 20 }}>{fmtVND(payable)}</Text>
+              </View>
+            </View>
             <Text style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>
               Sau khi đặt, bạn chuyển khoản qua QR và gửi bill để chủ sân duyệt. Đơn giữ chỗ 30 phút.
             </Text>
