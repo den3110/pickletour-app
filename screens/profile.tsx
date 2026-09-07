@@ -1,4 +1,7 @@
-import { t } from "@/utils/i18n";
+// NOTE: bên trong ProfileScreen, biến `t` bị shadow bởi `const t = useTokens()`
+// (tokens theme), nên i18n phải dùng alias `tr` để không gọi nhầm object tokens
+// như một hàm (đây là nguyên nhân crash khi bấm Đăng xuất trên iOS).
+import { t as tr } from "@/utils/i18n";
 // app/(tabs)/profile/index.jsx
 // ✨ NEW LAYOUT v4 - ULTRA PERFORMANCE:
 // - NO HEIGHT ANIMATION (Zero Layout Thrashing)
@@ -711,7 +714,7 @@ export default function ProfileScreen({ isBack = false }) {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          title: t("Bạn có chắc muốn đăng xuất?"),
+          title: tr("Bạn có chắc muốn đăng xuất?"),
           options: ["Huỷ", "Đăng xuất"],
           destructiveButtonIndex: 1,
           cancelButtonIndex: 0,
