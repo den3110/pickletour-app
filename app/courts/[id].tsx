@@ -26,6 +26,7 @@ import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { useListVenuePackagesQuery, usePurchasePackageMutation, useMyPackagesQuery } from "@/slices/packagesApiSlice";
 import { LinearGradient } from "expo-linear-gradient";
 import VenueMiniMap from "@/components/courts/VenueMiniMap";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { fmtVND, pal, toDateInput, addDays, weekdayOf } from "@/utils/courtFormat";
 import { DateStrip, SectionHeader, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
@@ -40,8 +41,10 @@ export default function VenueDetailScreen() {
   const me = useSelector((s: any) => s.auth?.userInfo);
 
   const today = toDateInput();
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(today, i)), [today]);
   const [date, setDate] = useState(today);
+  const [stripBase, setStripBase] = useState(today); // ngày đầu của dải nhanh
+  const [showPicker, setShowPicker] = useState(false);
+  const days = useMemo(() => Array.from({ length: 14 }, (_, i) => addDays(stripBase, i)), [stripBase]);
 
   const { data: venue, isLoading } = useGetVenueQuery(id, { skip: !id });
   const { data: avail, isFetching: loadingAvail } = useGetVenueAvailabilityQuery(
@@ -284,11 +287,34 @@ export default function VenueDetailScreen() {
 
         {/* Ngày */}
         <View style={{ paddingHorizontal: SP.lg }}>
-          <SectionHeader C={C} title="Chọn ngày & giờ" right={<Text style={{ color: C.sub, fontSize: 12 }}>Chạm để chọn nhiều khung liên tiếp</Text>} />
+          <SectionHeader
+            C={C}
+            title="Chọn ngày & giờ"
+            right={
+              <TouchableOpacity onPress={() => setShowPicker(true)} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.accentSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 }}>
+                <Ionicons name="calendar-outline" size={14} color={C.accent} />
+                <Text style={{ color: C.accent, fontSize: 12, fontWeight: "700" }}>Chọn ngày</Text>
+              </TouchableOpacity>
+            }
+          />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: SP.lg, paddingBottom: 4 }}>
           <DateStrip C={C} dates={days} value={date} onChange={(d) => { setDate(d); setSel(null); }} />
         </ScrollView>
+        <DateTimePickerModal
+          isVisible={showPicker}
+          mode="date"
+          date={new Date(`${date}T12:00:00`)}
+          minimumDate={new Date(`${today}T00:00:00`)}
+          onConfirm={(d) => {
+            const s = toDateInput(d);
+            setDate(s);
+            setStripBase(s < today ? today : s);
+            setSel(null);
+            setShowPicker(false);
+          }}
+          onCancel={() => setShowPicker(false)}
+        />
 
         {/* Lưới giờ trống theo sân */}
         <View style={{ padding: SP.lg, gap: SP.md }}>
