@@ -33,7 +33,8 @@ type Slot = { start: string; end: string; price: number; booked: boolean; past: 
 type Sel = { courtId: string; courtName: string; slots: Slot[] } | null;
 
 export default function VenueDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, walkin } = useLocalSearchParams<{ id: string; walkin?: string }>();
+  const asOwner = walkin === "1"; // chủ sân "Đặt hộ" khách vãng lai → đơn xác nhận ngay
   const theme = useTheme();
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -159,6 +160,7 @@ export default function VenueDetailScreen() {
         note,
         promoCode: !usePkg && promoInfo?.ok ? promo.trim().toUpperCase() : undefined,
         packagePurchaseId: usePkg?._id,
+        asOwner: asOwner || undefined,
       }).unwrap();
       setConfirmOpen(false);
       setSel(null);
@@ -371,7 +373,7 @@ export default function VenueDetailScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalWrap}>
           <View style={[styles.modal, { backgroundColor: C.card }, shadow(C.dark, 3)]}>
             <SheetHandle C={C} />
-            <Text style={[styles.title, { color: C.text, marginBottom: 6 }]}>Xác nhận đặt sân</Text>
+            <Text style={[styles.title, { color: C.text, marginBottom: 6 }]}>{asOwner ? "Đặt hộ khách (chủ sân)" : "Xác nhận đặt sân"}</Text>
             <View style={[styles.summaryBox, { backgroundColor: C.accentSoft }]}>
               <Ionicons name="calendar" size={16} color={C.accent} />
               <Text style={{ color: C.text, fontWeight: "700", flex: 1, fontSize: 13 }} numberOfLines={2}>
@@ -429,9 +431,11 @@ export default function VenueDetailScreen() {
               </View>
             </View>
             <Text style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>
-              {usePkg
+              {asOwner
+                ? "Đơn đặt hộ được xác nhận ngay, thu tiền tại quầy."
+                : usePkg
                 ? "Thanh toán bằng gói — xác nhận ngay, không cần chuyển khoản."
-                : "Sau khi đặt, bạn chuyển khoản qua QR và gửi bill để chủ sân duyệt. Đơn giữ chỗ 30 phút."}
+                : "Sau khi đặt, bạn chuyển khoản qua QR và gửi bill để chủ sân duyệt. Đơn chỉ giữ chỗ 15 phút — quá hạn sẽ tự huỷ."}
             </Text>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity style={[styles.btn, { flex: 1, borderWidth: 1, borderColor: C.border }]} onPress={() => setConfirmOpen(false)}>

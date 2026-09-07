@@ -30,7 +30,7 @@ const MGMT = [
 // "Đặt hộ" tái dùng màn đặt công khai (owner → tự confirmed)
 const openTile = (m: any, id: string) =>
   m.key === "walkin"
-    ? router.push({ pathname: "/courts/[id]", params: { id } })
+    ? router.push({ pathname: "/courts/[id]", params: { id, walkin: "1" } })
     : router.push({ pathname: `/owner/venue/[id]/${m.route}` as any, params: { id } });
 
 export default function OwnerVenueHub() {

@@ -51,7 +51,11 @@ export default function MyBookingsScreen() {
                   </View>
                   {needAction && (
                     <Text style={{ color: st.color, fontSize: 12, marginTop: 6, fontWeight: "700" }}>
-                      {b.payment?.rejectReason ? "Bill bị từ chối — gửi lại" : "Chưa thanh toán — bấm để gửi bill"}
+                      {b.payment?.rejectReason
+                        ? "Bill bị từ chối — gửi lại"
+                        : b.holdExpiresAt
+                        ? `Chưa thanh toán — giữ chỗ đến ${tLabel(b.holdExpiresAt)}`
+                        : "Chưa thanh toán — bấm để gửi bill"}
                     </Text>
                   )}
                 </View>

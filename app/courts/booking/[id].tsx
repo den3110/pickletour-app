@@ -1,5 +1,5 @@
 // app/courts/booking/[id].tsx — Chi tiết đơn: QR chuyển khoản, gửi bill, vé QR, huỷ
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   ScrollView,
@@ -44,6 +44,14 @@ export default function BookingDetailScreen() {
   const [createInvite, { isLoading: creatingInvite }] = useCreateInviteMutation();
   const [note, setNote] = useState("");
   const [localPreview, setLocalPreview] = useState("");
+  // Đếm ngược giữ chỗ (đơn pending)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!b?.holdExpiresAt || b.status !== "pending") return;
+    const t = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, [b?.holdExpiresAt, b?.status]);
+  const holdLeftMin = b?.holdExpiresAt ? Math.max(0, Math.ceil((new Date(b.holdExpiresAt).getTime() - now) / 60000)) : null;
 
   const openPlay = async () => {
     try {
@@ -196,9 +204,17 @@ export default function BookingDetailScreen() {
                 <Text style={{ color: "#ef4444", fontSize: 12 }}>Vui lòng kiểm tra và gửi lại bill.</Text>
               </View>
             )}
+            {b.status === "pending" && holdLeftMin !== null && (
+              <View style={[styles.alert, { backgroundColor: holdLeftMin <= 3 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)", flexDirection: "row", alignItems: "center", gap: 8 }]}>
+                <Ionicons name="timer-outline" size={16} color={holdLeftMin <= 3 ? C.danger : C.warning} />
+                <Text style={{ color: holdLeftMin <= 3 ? C.danger : C.warning, fontWeight: "700", fontSize: 13, flex: 1 }}>
+                  {holdLeftMin > 0 ? `Giữ chỗ đến ${tLabel(b.holdExpiresAt)} · còn ${holdLeftMin} phút` : "Hết hạn giữ chỗ — đơn sẽ tự huỷ"}
+                </Text>
+              </View>
+            )}
             {b.status === "pending" && !rejected && (
               <Text style={{ color: C.sub, fontSize: 12, marginBottom: 10 }}>
-                Chuyển khoản đúng số tiền &amp; nội dung, rồi chụp bill gửi lên. Đơn giữ chỗ trong 30 phút.
+                Chuyển khoản đúng số tiền &amp; nội dung, rồi chụp bill gửi lên trong {b.holdMinutes || 15} phút, quá hạn đơn tự huỷ.
               </Text>
             )}
 
