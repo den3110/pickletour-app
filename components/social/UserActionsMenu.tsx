@@ -2,7 +2,7 @@
 // Nút 3 chấm cho public profile — chứa các hành động: Chặn user, Bỏ chặn user.
 // Report bài viết/comment/tin nhắn xử lý ở chỗ tương ứng.
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 import { useSelector } from "react-redux";
 
@@ -12,6 +12,7 @@ import {
   useUnblockUserMutation,
 } from "@/slices/friendsApiSlice";
 import { confirmBlock } from "@/utils/contentModeration";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export function UserActionsMenu({
   userId,
@@ -20,6 +21,8 @@ export function UserActionsMenu({
   userId: string;
   userName?: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data } = useFriendStatusQuery(userId, {
     skip: !me || !userId,
@@ -80,20 +83,20 @@ export function UserActionsMenu({
       style={styles.btn}
       hitSlop={10}
     >
-      <Ionicons name="ellipsis-horizontal" size={20} color="#334155" />
+      <Ionicons name="ellipsis-horizontal" size={20} color={C.text2} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   btn: {
     width: 34,
     height: 34,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
 });

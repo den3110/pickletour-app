@@ -5,7 +5,7 @@ import {
   MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +13,7 @@ import { Pressable,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type GameTile = {
   id: string;
@@ -82,6 +83,7 @@ const GAMES: GameTile[] = [
     subtitle: "Chess · 2 người · chiếu bí",
     iconLib: "MaterialCommunityIcons",
     icon: "chess-king",
+    // màu cờ vua = màu chữ theo theme (đen ở sáng, sáng ở tối) — xử lý trong component
     color: "#0F172A",
     route: "/chess",
     isNew: true,
@@ -89,6 +91,8 @@ const GAMES: GameTile[] = [
 ];
 
 export default function GamesHubScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.container}>
       <Stack.Screen
@@ -107,7 +111,9 @@ export default function GamesHubScreen() {
           </Text>
 
           <View style={styles.grid}>
-            {GAMES.map((g) => (
+            {GAMES.map((g) => {
+              const tileColor = g.id === "chess" ? C.text : g.color;
+              return (
               <Pressable
                 key={g.id}
                 onPress={() => router.push(g.route as any)}
@@ -119,20 +125,20 @@ export default function GamesHubScreen() {
                 <View
                   style={[
                     styles.iconWrap,
-                    { backgroundColor: g.color + "1A" },
+                    { backgroundColor: tileColor + "1A" },
                   ]}
                 >
                   {g.iconLib === "Ionicons" ? (
                     <Ionicons
                       name={g.icon as any}
                       size={38}
-                      color={g.color}
+                      color={tileColor}
                     />
                   ) : (
                     <MaterialCommunityIcons
                       name={g.icon as any}
                       size={40}
-                      color={g.color}
+                      color={tileColor}
                     />
                   )}
                   {g.isNew && (
@@ -146,11 +152,12 @@ export default function GamesHubScreen() {
                   {g.subtitle}
                 </Text>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
 
           <View style={styles.infoBox}>
-            <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+            <Ionicons name="information-circle-outline" size={16} color={C.sub} />
             <Text style={styles.infoText}>
               Chip vui chơi, không đổi tiền thật. Sâm và Phỏm đang phát triển —
               nhấn để đăng ký nhận thông báo khi ra mắt.
@@ -162,17 +169,17 @@ export default function GamesHubScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   headerText: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#0F172A",
+    color: C.text,
     marginBottom: 4,
   },
   subHeaderText: {
     fontSize: 13,
-    color: "#64748B",
+    color: C.sub,
     marginBottom: 20,
   },
   grid: {
@@ -183,12 +190,12 @@ const styles = StyleSheet.create({
   },
   tile: {
     width: "31%",
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 16,
     padding: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     minHeight: 140,
   },
   iconWrap: {
@@ -206,7 +213,7 @@ const styles = StyleSheet.create({
     right: -8,
     backgroundColor: "#EF4444",
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: C.card,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -220,13 +227,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: C.text,
     marginBottom: 2,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 11,
-    color: "#64748B",
+    color: C.sub,
     textAlign: "center",
     lineHeight: 14,
   },
@@ -235,14 +242,14 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 24,
     padding: 12,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 10,
     alignItems: "flex-start",
   },
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: "#475569",
+    color: C.text3,
     lineHeight: 17,
   },
 });

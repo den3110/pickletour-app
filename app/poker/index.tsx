@@ -3,8 +3,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React,
-  { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,8 +25,11 @@ import {
   useListPokerRoomsQuery,
   useCreatePokerRoomMutation,
 } from "@/slices/pokerApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function PokerLobbyScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data, isFetching, refetch } = useListPokerRoomsQuery(undefined);
   const [createRoom, { isLoading: creating }] = useCreatePokerRoomMutation();
@@ -90,12 +92,12 @@ export default function PokerLobbyScreen() {
         ListEmptyComponent={
           !isFetching ? (
             <View style={{ padding: 40, alignItems: "center" }}>
-              <Text style={{ color: "#94A3B8", textAlign: "center" }}>
+              <Text style={{ color: C.muted, textAlign: "center" }}>
                 Chưa có bàn nào. Tạo bàn đầu tiên và mời bạn bè cùng chơi!
               </Text>
             </View>
           ) : (
-            <ActivityIndicator style={{ marginTop: 20 }} />
+            <ActivityIndicator style={{ marginTop: 20 }} color={C.accent} />
           )
         }
         renderItem={({ item }) => (
@@ -110,12 +112,12 @@ export default function PokerLobbyScreen() {
               <View
                 style={[
                   styles.stagePill,
-                  item.stage !== "waiting" && { backgroundColor: "#FEF3C7" },
+                  item.stage !== "waiting" && { backgroundColor: C.amberSoft },
                 ]}
               >
                 <Text
                   style={{
-                    color: item.stage === "waiting" ? "#64748B" : "#92400E",
+                    color: item.stage === "waiting" ? C.sub : C.amberText,
                     fontSize: 11,
                     fontWeight: "800",
                   }}
@@ -158,6 +160,7 @@ export default function PokerLobbyScreen() {
               value={name}
               onChangeText={setName}
               style={styles.input}
+              placeholderTextColor={C.muted}
               maxLength={60}
             />
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -196,9 +199,9 @@ export default function PokerLobbyScreen() {
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <Pressable
                 onPress={() => setModalOpen(false)}
-                style={[styles.btn, { backgroundColor: "#F1F5F9" }]}
+                style={[styles.btn, { backgroundColor: C.field }]}
               >
-                <Text style={{ color: "#0F172A", fontWeight: "700" }}>Huỷ</Text>
+                <Text style={{ color: C.text, fontWeight: "700" }}>Huỷ</Text>
               </Pressable>
               <Pressable
                 onPress={doCreate}
@@ -222,17 +225,17 @@ export default function PokerLobbyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  title: { flex: 1, fontSize: 18, fontWeight: "800", color: C.text },
   createBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -244,29 +247,29 @@ const styles = StyleSheet.create({
   },
   createBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     gap: 6,
   },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: C.text },
   stagePill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   cardMeta: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  metaTxt: { fontSize: 12, color: "#64748B" },
+  metaTxt: { fontSize: 12, color: C.sub },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
@@ -277,19 +280,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     marginBottom: 8,
   },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: "#0F172A" },
-  label: { fontSize: 12, color: "#64748B", marginBottom: 4 },
+  modalTitle: { fontSize: 17, fontWeight: "800", color: C.text },
+  label: { fontSize: 12, color: C.sub, marginBottom: 4 },
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    color: C.text,
   },
-  hint: { fontSize: 11, color: "#94A3B8", marginTop: 4 },
+  hint: { fontSize: 11, color: C.muted, marginTop: 4 },
   btn: {
     padding: 12,
     borderRadius: 10,

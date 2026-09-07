@@ -647,7 +647,7 @@ export default function PickleRadarScreen() {
           <View style={styles.cardHeader}>
             <ExpoImage
               source={{ uri: normalizeUrl(avatar) }}
-              style={[styles.cardAvatar, { backgroundColor: "#FFF" }]}
+              style={[styles.cardAvatar, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "#FFF" }]}
               contentFit="cover"
               cachePolicy="memory-disk"
             />

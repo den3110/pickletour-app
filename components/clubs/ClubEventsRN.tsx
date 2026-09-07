@@ -26,6 +26,7 @@ import {
 } from "@/slices/clubsApiSlice";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -42,6 +43,8 @@ function GradLightCard({
   style?: any;
   pad?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={[styles.card, style]}>
       <LinearGradient
@@ -68,6 +71,8 @@ function SmallPrimaryGradBtn({
   loading?: boolean;
   icon?: any;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -108,6 +113,8 @@ function SmallLightBtn({
   icon?: any;
   active?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -119,12 +126,12 @@ function SmallLightBtn({
         <MaterialCommunityIcons
           name={icon}
           size={14}
-          color={active ? "#1B7A46" : "#3B3F75"}
+          color={active ? C.greenText : C.text2}
           style={{ marginRight: 4 }}
         />
       )}
       <Text
-        style={[styles.smallLightText, active && { color: "#1B7A46" }]}
+        style={[styles.smallLightText, active && { color: C.greenText }]}
       >
         {loading ? "Đang xử lý…" : title}
       </Text>
@@ -143,6 +150,8 @@ function SmallDangerGhostBtn({
   loading?: boolean;
   icon?: any;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -154,7 +163,7 @@ function SmallDangerGhostBtn({
         <MaterialCommunityIcons
           name={icon}
           size={14}
-          color="#B4232D"
+          color={C.redText}
           style={{ marginRight: 4 }}
         />
       )}
@@ -170,6 +179,7 @@ const fmt = (s?: string | Date) =>
 
 /* Danh sách người tham gia sự kiện (mở/đóng, fetch khi mở) */
 function EventAttendees({ clubId, event }: { clubId: string; event: any }) {
+  const C = useThemeTokens();
   const [open, setOpen] = useState(false);
   const { data, isFetching } = useListEventAttendeesQuery(
     { id: clubId, eventId: event._id },
@@ -187,18 +197,18 @@ function EventAttendees({ clubId, event }: { clubId: string; event: any }) {
         <MaterialCommunityIcons
           name={open ? "chevron-up" : "chevron-down"}
           size={16}
-          color="#5C6285"
+          color={C.text3}
         />
-        <Text style={{ color: "#5C6285", fontWeight: "700", fontSize: 12.5 }}>
+        <Text style={{ color: C.text3, fontWeight: "700", fontSize: 12.5 }}>
           Người tham gia ({count})
         </Text>
       </TouchableOpacity>
       {open && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {isFetching ? (
-            <Text style={{ color: "#7780A1", fontSize: 12 }}>Đang tải…</Text>
+            <Text style={{ color: C.sub, fontSize: 12 }}>Đang tải…</Text>
           ) : attendees.length === 0 ? (
-            <Text style={{ color: "#7780A1", fontSize: 12 }}>Chưa có ai.</Text>
+            <Text style={{ color: C.sub, fontSize: 12 }}>Chưa có ai.</Text>
           ) : (
             attendees.map((u: any) => (
               <View
@@ -207,19 +217,19 @@ function EventAttendees({ clubId, event }: { clubId: string; event: any }) {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 5,
-                  backgroundColor: "#F3F4FF",
+                  backgroundColor: C.field,
                   borderRadius: 999,
                   paddingVertical: 3,
                   paddingHorizontal: 8,
                   borderWidth: 1,
-                  borderColor: "#E6E8F5",
+                  borderColor: C.border,
                 }}
               >
                 <ExpoImage
                   source={{ uri: normalizeUrl(u.avatar) }}
-                  style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: "#E0E7FF" }}
+                  style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: C.field }}
                 />
-                <Text style={{ color: "#3B3F75", fontSize: 12, fontWeight: "600" }}>
+                <Text style={{ color: C.text2, fontSize: 12, fontWeight: "600" }}>
                   {u.nickname || u.fullName || "Người dùng"}
                 </Text>
               </View>
@@ -239,6 +249,8 @@ export default function ClubEventsRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const clubId = club?._id;
 
   const { data, isFetching, refetch } = useListEventsQuery(
@@ -400,7 +412,7 @@ export default function ClubEventsRN({
             value={title}
             onChangeText={setTitle}
             placeholder="Tiêu đề"
-            placeholderTextColor="#7C83AB"
+            placeholderTextColor={C.sub}
             style={styles.input}
           />
 
@@ -408,7 +420,7 @@ export default function ClubEventsRN({
             value={description}
             onChangeText={setDescription}
             placeholder="Mô tả (tuỳ chọn)"
-            placeholderTextColor="#7C83AB"
+            placeholderTextColor={C.sub}
             multiline
             style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]}
           />
@@ -417,7 +429,7 @@ export default function ClubEventsRN({
             value={location}
             onChangeText={setLocation}
             placeholder="Địa điểm"
-            placeholderTextColor="#7C83AB"
+            placeholderTextColor={C.sub}
             style={styles.input}
           />
 
@@ -463,7 +475,7 @@ export default function ClubEventsRN({
             value={capacity}
             onChangeText={setCapacity}
             placeholder="Sức chứa (0 = không giới hạn)"
-            placeholderTextColor="#7C83AB"
+            placeholderTextColor={C.sub}
             keyboardType="numeric"
             style={styles.input}
           />
@@ -556,13 +568,13 @@ export default function ClubEventsRN({
 }
 
 /* ---------- Styles ---------- */
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   card: {
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 6 },
@@ -570,9 +582,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  title: { color: "#1F2557", fontWeight: "800", fontSize: 16 },
-  meta: { color: "#5C6285", marginTop: 2 },
-  desc: { color: "#3E4466", marginTop: 6 },
+  title: { color: C.text, fontWeight: "800", fontSize: 16 },
+  meta: { color: C.text3, marginTop: 2 },
+  desc: { color: C.text2, marginTop: 6 },
 
   actionsRow: {
     flexDirection: "row",
@@ -599,15 +611,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
   smallLightBtnActive: {
-    backgroundColor: "#E4F7EC",
-    borderColor: "#B5E6C9",
+    backgroundColor: C.greenSoft,
+    borderColor: C.greenSoft,
   },
-  smallLightText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
+  smallLightText: { color: C.text2, fontWeight: "800", fontSize: 13 },
 
   smallDangerBtn: {
     flexDirection: "row",
@@ -616,29 +628,29 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFE9EC",
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: "#FFD5DA",
+    borderColor: C.redSoft,
   },
-  smallDangerText: { color: "#B4232D", fontWeight: "800", fontSize: 13 },
+  smallDangerText: { color: C.redText, fontWeight: "800", fontSize: 13 },
 
   input: {
     marginTop: 10,
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E1E4F3",
-    backgroundColor: "#FFFFFF",
-    color: "#1F2557",
+    borderColor: C.border,
+    backgroundColor: C.field,
+    color: C.text,
   },
   timeBtn: {
     marginTop: 10,
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E1E4F3",
-    backgroundColor: "#FFFFFF",
+    borderColor: C.border,
+    backgroundColor: C.field,
   },
-  timeBtnLabel: { color: "#5C6285", fontSize: 12, marginBottom: 2 },
-  timeBtnValue: { color: "#1F2557", fontWeight: "700" },
+  timeBtnLabel: { color: C.text3, fontSize: 12, marginBottom: 2 },
+  timeBtnValue: { color: C.text, fontWeight: "700" },
 });

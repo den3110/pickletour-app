@@ -63,6 +63,7 @@ import {
   messagesApiSlice,
 } from "@/slices/messagesApiSlice";
 import { socket } from "@/lib/socket";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 
@@ -76,6 +77,7 @@ const _sameDay = (a: Date, b: Date) =>
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function AudioMessage({ url, durationSec, isMine }: { url: string; durationSec?: number; isMine: boolean }) {
+  const C = useThemeTokens();
   const player = useAudioPlayer(url);
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
@@ -123,10 +125,10 @@ function AudioMessage({ url, durationSec, isMine }: { url: string; durationSec?:
           flex: 1,
           height: 3,
           borderRadius: 2,
-          backgroundColor: isMine ? "rgba(255,255,255,0.5)" : "#CBD5E1",
+          backgroundColor: isMine ? "rgba(255,255,255,0.5)" : C.line,
         }}
       />
-      <Text style={{ fontSize: 12, color: isMine ? "#E5E7EB" : "#475569" }}>
+      <Text style={{ fontSize: 12, color: isMine ? "#E5E7EB" : C.text3 }}>
         {secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}` : "🎤"}
       </Text>
     </Pressable>
@@ -199,6 +201,7 @@ function fmtDateRange(startIso?: string, endIso?: string) {
 }
 
 function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean }) {
+  const C = useThemeTokens();
   if (!listing) return null;
   const img = listing.images?.[0]?.url || listing.images?.[0] || "";
   const sold = listing.status === "sold";
@@ -213,13 +216,13 @@ function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean 
         maxWidth: "100%",
         borderRadius: 12,
         overflow: "hidden",
-        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : "#fff",
+        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : C.card,
         borderWidth: 1,
-        borderColor: isMine ? "rgba(255,255,255,0.35)" : "#E2E8F0",
+        borderColor: isMine ? "rgba(255,255,255,0.35)" : C.border,
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 8 }}>
-        <View style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", backgroundColor: "#F1F5F9" }}>
+        <View style={{ width: 50, height: 50, borderRadius: 8, overflow: "hidden", backgroundColor: C.field }}>
           {img ? (
             <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} />
           ) : (
@@ -232,7 +235,7 @@ function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean 
           <Text style={{ fontSize: 10.5, fontWeight: "700", color: isMine ? "rgba(255,255,255,0.9)" : "#0066FF" }}>
             🛍️ Sản phẩm trên Chợ
           </Text>
-          <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "700", color: isMine ? "#fff" : "#0F172A" }}>
+          <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "700", color: isMine ? "#fff" : C.text }}>
             {listing.title}
           </Text>
           <Text style={{ fontSize: 13.5, fontWeight: "900", color: isMine ? "#fff" : "#0066FF" }}>
@@ -254,6 +257,7 @@ function ListingChatCardRN({ listing, isMine }: { listing: any; isMine: boolean 
 }
 
 function PlayChatCardRN({ play, isMine }: { play: any; isMine: boolean }) {
+  const C = useThemeTokens();
   if (!play) return null;
   const slotsLeft = Math.max(0, (play.slots || 0) - (play.acceptedCount || 0));
   return (
@@ -265,9 +269,9 @@ function PlayChatCardRN({ play, isMine }: { play: any; isMine: boolean }) {
         maxWidth: "100%",
         borderRadius: 12,
         overflow: "hidden",
-        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : "#fff",
+        backgroundColor: isMine ? "rgba(255,255,255,0.15)" : C.card,
         borderWidth: 1,
-        borderColor: isMine ? "rgba(255,255,255,0.35)" : "#E2E8F0",
+        borderColor: isMine ? "rgba(255,255,255,0.35)" : C.border,
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: isMine ? "rgba(255,255,255,0.2)" : "#16a34a" }}>
@@ -275,11 +279,11 @@ function PlayChatCardRN({ play, isMine }: { play: any; isMine: boolean }) {
         <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Kèo giao lưu</Text>
       </View>
       <View style={{ padding: 10 }}>
-        <Text numberOfLines={1} style={{ fontWeight: "700", fontSize: 13.5, color: isMine ? "#fff" : "#0F172A" }}>
+        <Text numberOfLines={1} style={{ fontWeight: "700", fontSize: 13.5, color: isMine ? "#fff" : C.text }}>
           {play.title || play.courtName || "Kèo pickleball"}
         </Text>
-        <Text style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : "#64748B" }}>🕒 {formatPlayTime(play.playAt)}</Text>
-        <Text numberOfLines={1} style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : "#64748B" }}>
+        <Text style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : C.sub }}>🕒 {formatPlayTime(play.playAt)}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 12, color: isMine ? "rgba(255,255,255,0.85)" : C.sub }}>
           {skillLabel(play.skillMin, play.skillMax)} · thiếu {slotsLeft}
         </Text>
         <View style={{ marginTop: 6, alignItems: "center", paddingVertical: 5, borderRadius: 8, backgroundColor: isMine ? "rgba(255,255,255,0.25)" : "#16a34a" }}>
@@ -291,12 +295,14 @@ function PlayChatCardRN({ play, isMine }: { play: any; isMine: boolean }) {
 }
 
 function TournamentBubbleCard({ tour, isMine }: { tour: any; isMine: boolean }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const dateStr = fmtDateRange(tour?.startDate, tour?.endDate);
   const regCount = Number(tour?.registrationCount || 0);
   const maxPairs = Number(tour?.maxPairs || 0);
-  const labelColor = isMine ? "#FEF3C7" : "#B45309";
-  const textColor = isMine ? "#fff" : "#0F172A";
-  const subColor = isMine ? "rgba(255,255,255,0.85)" : "#64748B";
+  const labelColor = isMine ? "#FEF3C7" : C.amberText;
+  const textColor = isMine ? "#fff" : C.text;
+  const subColor = isMine ? "rgba(255,255,255,0.85)" : C.sub;
   return (
     <Pressable
       onPress={() => router.push(`/tournament/${tour._id}` as any)}
@@ -355,7 +361,7 @@ function TournamentBubbleCard({ tour, isMine }: { tour: any; isMine: boolean }) 
       <Ionicons
         name="chevron-forward"
         size={16}
-        color={isMine ? "#DBEAFE" : "#94A3B8"}
+        color={isMine ? "#DBEAFE" : C.muted}
       />
     </Pressable>
   );
@@ -368,6 +374,8 @@ function extractErr(err: any): string {
 }
 
 export default function ChatWindow() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const headerHeight = useHeaderHeight();
   const { cid } = useLocalSearchParams<{ cid: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -848,7 +856,7 @@ export default function ChatWindow() {
                     style={{
                       fontSize: 17,
                       fontWeight: "700",
-                      color: "#0F172A",
+                      color: C.text,
                     }}
                     numberOfLines={1}
                   >
@@ -868,7 +876,7 @@ export default function ChatWindow() {
                     <Ionicons
                       name={convMuted ? "notifications-off" : "notifications-outline"}
                       size={22}
-                      color={convMuted ? "#94A3B8" : "#0F172A"}
+                      color={convMuted ? C.muted : C.text}
                     />
                   </Pressable>
                   <CallButton
@@ -898,8 +906,8 @@ export default function ChatWindow() {
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderBottomWidth: 1,
-              borderBottomColor: "#E2E8F0",
-              backgroundColor: "#F8FAFC",
+              borderBottomColor: C.border,
+              backgroundColor: C.bg,
             }}
           >
             {pinnedMessages.map((pm: any) => (
@@ -908,17 +916,17 @@ export default function ChatWindow() {
                 style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 }}
               >
                 <Ionicons name="pin" size={13} color="#F59E0B" />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#475569" }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: C.text3 }}>
                   {pm.sender?.nickname || pm.sender?.name || ""}:
                 </Text>
                 <Text
-                  style={{ fontSize: 12, color: "#64748B", flex: 1 }}
+                  style={{ fontSize: 12, color: C.sub, flex: 1 }}
                   numberOfLines={1}
                 >
                   {replySnippet(pm)}
                 </Text>
                 <Pressable onPress={() => handlePin(pm, false)} hitSlop={8}>
-                  <Ionicons name="close" size={14} color="#94A3B8" />
+                  <Ionicons name="close" size={14} color={C.muted} />
                 </Pressable>
               </View>
             ))}
@@ -975,7 +983,7 @@ export default function ChatWindow() {
                   >
                     <Text
                       style={{
-                        color: isMine ? "#E5E7EB" : "#94A3B8",
+                        color: isMine ? "#E5E7EB" : C.muted,
                         fontStyle: "italic",
                       }}
                     >
@@ -1066,7 +1074,7 @@ export default function ChatWindow() {
                       <Text
                         style={{
                           fontSize: 12,
-                          color: isMine ? "#E5E7EB" : "#475569",
+                          color: isMine ? "#E5E7EB" : C.text3,
                         }}
                         numberOfLines={1}
                       >
@@ -1117,11 +1125,11 @@ export default function ChatWindow() {
                               <Ionicons
                                 name="document-outline"
                                 size={20}
-                                color={isMine ? "#fff" : "#0F172A"}
+                                color={isMine ? "#fff" : C.text}
                               />
                               <Text
                                 style={{
-                                  color: isMine ? "#fff" : "#0F172A",
+                                  color: isMine ? "#fff" : C.text,
                                   marginLeft: 6,
                                 }}
                                 numberOfLines={1}
@@ -1139,7 +1147,7 @@ export default function ChatWindow() {
                       mentions={item.mentions}
                       style={[
                         styles.msgText,
-                        { color: isMine ? "#fff" : "#0F172A" },
+                        { color: isMine ? "#fff" : C.text },
                       ]}
                       mentionColor={isMine ? "#DBEAFE" : "#1877F2"}
                     />
@@ -1180,13 +1188,13 @@ export default function ChatWindow() {
                           paddingHorizontal: 7,
                           paddingVertical: 1,
                           borderRadius: 999,
-                          backgroundColor: g.mine ? "#DBEAFE" : "#E2E8F0",
+                          backgroundColor: g.mine ? C.primarySoft : C.border,
                           borderWidth: 1,
                           borderColor: g.mine ? "#1877F2" : "transparent",
                         }}
                       >
                         <Text style={{ fontSize: 12 }}>{g.emoji}</Text>
-                        <Text style={{ fontSize: 11, fontWeight: "800", color: "#334155" }}>
+                        <Text style={{ fontSize: 11, fontWeight: "800", color: C.text2 }}>
                           {g.count}
                         </Text>
                       </Pressable>
@@ -1227,7 +1235,7 @@ export default function ChatWindow() {
                 paddingVertical: 6,
                 borderLeftWidth: 3,
                 borderLeftColor: "#1877F2",
-                backgroundColor: "#F1F5F9",
+                backgroundColor: C.field,
                 borderRadius: 8,
                 marginBottom: 6,
               }}
@@ -1237,12 +1245,12 @@ export default function ChatWindow() {
                   Đang trả lời{" "}
                   {replyTarget.sender?.nickname || replyTarget.sender?.name || ""}
                 </Text>
-                <Text style={{ fontSize: 12, color: "#475569" }} numberOfLines={1}>
+                <Text style={{ fontSize: 12, color: C.text3 }} numberOfLines={1}>
                   {replySnippet(replyTarget)}
                 </Text>
               </View>
               <Pressable onPress={() => setReplyTarget(null)} hitSlop={8}>
-                <Ionicons name="close" size={18} color="#64748B" />
+                <Ionicons name="close" size={18} color={C.sub} />
               </Pressable>
             </View>
           )}
@@ -1306,7 +1314,7 @@ export default function ChatWindow() {
                 {linkedTournament.name}
               </Text>
               <Pressable onPress={() => setLinkedTournament(null)} hitSlop={8}>
-                <Ionicons name="close-circle" size={16} color="#64748B" />
+                <Ionicons name="close-circle" size={16} color={C.sub} />
               </Pressable>
             </View>
           )}
@@ -1318,7 +1326,7 @@ export default function ChatWindow() {
                   onPress={() => insertMention(u)}
                   style={({ pressed }) => [
                     styles.mentionItem,
-                    pressed && { backgroundColor: "#F1F5F9" },
+                    pressed && { backgroundColor: C.field },
                   ]}
                 >
                   <AuthorAvatar user={u} size={28} />
@@ -1357,7 +1365,7 @@ export default function ChatWindow() {
                     backgroundColor: "#DC2626",
                   }}
                 />
-                <Text style={{ color: "#0F172A", fontWeight: "700" }}>
+                <Text style={{ color: C.text, fontWeight: "700" }}>
                   Đang ghi âm · {Math.floor(recSecs / 60)}:
                   {String(recSecs % 60).padStart(2, "0")}
                 </Text>
@@ -1386,7 +1394,7 @@ export default function ChatWindow() {
                 value={text}
                 onChangeText={onChangeText}
                 multiline
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
               />
               {!text.trim() && !attachments.length && !linkedTournament ? (
                 <Pressable onPress={startRecording} style={styles.sendBtn}>
@@ -1444,14 +1452,14 @@ export default function ChatWindow() {
         <Pressable
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: C.overlay,
             justifyContent: "flex-end",
           }}
           onPress={() => setActionMsg(null)}
         >
           <Pressable
             style={{
-              backgroundColor: "#fff",
+              backgroundColor: C.card,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               paddingTop: 10,
@@ -1465,7 +1473,7 @@ export default function ChatWindow() {
                 width: 40,
                 height: 5,
                 borderRadius: 99,
-                backgroundColor: "#CBD5E1",
+                backgroundColor: C.line,
                 marginBottom: 12,
               }}
             />
@@ -1501,11 +1509,11 @@ export default function ChatWindow() {
                 gap: 12,
                 paddingVertical: 14,
                 borderTopWidth: 1,
-                borderTopColor: "#F1F5F9",
+                borderTopColor: C.border,
               }}
             >
-              <Ionicons name="arrow-undo-outline" size={22} color="#0F172A" />
-              <Text style={{ fontSize: 16, color: "#0F172A" }}>Trả lời</Text>
+              <Ionicons name="arrow-undo-outline" size={22} color={C.text} />
+              <Text style={{ fontSize: 16, color: C.text }}>Trả lời</Text>
             </Pressable>
             {actionMsg && (
               <Pressable
@@ -1518,11 +1526,11 @@ export default function ChatWindow() {
                   gap: 12,
                   paddingVertical: 14,
                   borderTopWidth: 1,
-                  borderTopColor: "#F1F5F9",
+                  borderTopColor: C.border,
                 }}
               >
-                <Ionicons name="pin-outline" size={22} color="#0F172A" />
-                <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                <Ionicons name="pin-outline" size={22} color={C.text} />
+                <Text style={{ fontSize: 16, color: C.text }}>
                   {pinnedIdSet.has(String(actionMsg._id)) ? "Bỏ ghim" : "Ghim tin nhắn"}
                 </Text>
               </Pressable>
@@ -1543,7 +1551,7 @@ export default function ChatWindow() {
                     gap: 12,
                     paddingVertical: 14,
                     borderTopWidth: 1,
-                    borderTopColor: "#F1F5F9",
+                    borderTopColor: C.border,
                   }}
                 >
                   <Ionicons name="trash-outline" size={22} color="#DC2626" />
@@ -1566,6 +1574,8 @@ function ChatVideoThumb({
   url?: string | null;
   onPress: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const player = useVideoPlayer(url || "", (p) => {
     try {
       p.muted = true;
@@ -1664,6 +1674,8 @@ function ChatTournamentPickerModal({
   onClose: () => void;
   onPick: (t: any) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1697,19 +1709,19 @@ function ChatTournamentPickerModal({
       onRequestClose={onClose}
       presentationStyle="pageSheet"
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }} edges={["top", "bottom"]}>
         <View style={styles.pickerHeader}>
           <Text style={styles.pickerTitle}>Gắn giải đấu</Text>
           <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={24} color="#0F172A" />
+            <Ionicons name="close" size={24} color={C.text} />
           </Pressable>
         </View>
         <View style={styles.pickerSearchBox}>
-          <Ionicons name="search" size={18} color="#94A3B8" />
+          <Ionicons name="search" size={18} color={C.muted} />
           <TextInput
             style={styles.pickerSearchInput}
             placeholder="Tìm giải theo tên…"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             value={q}
             onChangeText={setQ}
             autoFocus
@@ -1727,7 +1739,7 @@ function ChatTournamentPickerModal({
                 onPress={() => onPick(item)}
                 style={({ pressed }) => [
                   styles.pickerRow,
-                  pressed && { backgroundColor: "#F1F5F9" },
+                  pressed && { backgroundColor: C.field },
                 ]}
               >
                 {item.image ? (
@@ -1748,7 +1760,7 @@ function ChatTournamentPickerModal({
               <Text
                 style={{
                   padding: 24,
-                  color: "#94A3B8",
+                  color: C.muted,
                   textAlign: "center",
                 }}
               >
@@ -1764,14 +1776,14 @@ function ChatTournamentPickerModal({
 
 const { width: SW } = Dimensions.get("window");
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   mentionList: {
     marginHorizontal: 8,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     overflow: "hidden",
   },
   mentionItem: {
@@ -1781,10 +1793,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
-  mentionNick: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  mentionName: { fontSize: 12, color: "#64748B" },
+  mentionNick: { fontSize: 14, fontWeight: "700", color: C.text },
+  mentionName: { fontSize: 12, color: C.sub },
   chatTournamentChip: {
     marginHorizontal: 8,
     marginBottom: 6,
@@ -1795,15 +1807,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 16,
-    backgroundColor: "#FFF7ED",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: "#FED7AA",
+    borderColor: C.dark ? "rgba(245,158,11,0.4)" : "#FED7AA",
     maxWidth: "90%",
   },
   chatTournamentText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#B45309",
+    color: C.amberText,
     flexShrink: 1,
   },
   msgTournamentCard: {
@@ -1813,9 +1825,9 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: 12,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: C.dark ? "rgba(245,158,11,0.4)" : "#FDE68A",
     // Force minWidth để card không bị co khi bubble content ngắn (VD chỉ "Ok?").
     // Bubble maxWidth = SW * 0.72 nên chọn 62% để chừa mép cho avatar + gap.
     minWidth: SW * 0.62,
@@ -1829,7 +1841,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
     flexShrink: 0,
   },
   msgTournamentImgFallback: {
@@ -1839,7 +1851,7 @@ const styles = StyleSheet.create({
   msgTournamentLabel: {
     fontSize: 10,
     fontWeight: "800",
-    color: "#B45309",
+    color: C.amberText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1852,14 +1864,14 @@ const styles = StyleSheet.create({
   tourInfoText: { fontSize: 12, flexShrink: 1, lineHeight: 16 },
   timeSeparator: {
     textAlign: "center",
-    color: "#94A3B8",
+    color: C.muted,
     fontSize: 11,
     fontWeight: "600",
     marginVertical: 12,
   },
   bubbleTime: {
     fontSize: 10,
-    color: "#94A3B8",
+    color: C.muted,
     marginTop: 2,
     marginBottom: 6,
     marginHorizontal: 8,
@@ -1867,7 +1879,7 @@ const styles = StyleSheet.create({
   msgTournamentName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: C.text,
     marginTop: 2,
     lineHeight: 18,
   },
@@ -1878,9 +1890,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  pickerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
+  pickerTitle: { fontSize: 17, fontWeight: "700", color: C.text },
   pickerSearchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -1889,12 +1901,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   pickerSearchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
     padding: 0,
   },
   pickerRow: {
@@ -1904,25 +1916,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
   pickerThumb: {
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   pickerThumbFallback: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF7ED",
+    backgroundColor: C.amberSoft,
   },
-  pickerName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  container: { flex: 1, backgroundColor: "#fff" },
+  pickerName: { fontSize: 14, fontWeight: "700", color: C.text },
+  container: { flex: 1, backgroundColor: C.card },
   systemBar: { alignItems: "center", marginVertical: 8 },
   systemText: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: C.muted,
     fontStyle: "italic",
     textAlign: "center",
     paddingHorizontal: 20,
@@ -1955,7 +1967,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   bubbleTheir: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderBottomLeftRadius: 4,
   },
   msgText: { fontSize: 15, lineHeight: 20 },
@@ -1985,8 +1997,8 @@ const styles = StyleSheet.create({
   },
   composer: {
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    backgroundColor: "#fff",
+    borderTopColor: C.border,
+    backgroundColor: C.card,
     paddingHorizontal: 8,
     paddingTop: 8,
     paddingBottom: 12,
@@ -2006,12 +2018,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 40,
     maxHeight: 120,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: "#0F172A",
+    color: C.text,
   },
   sendBtn: {
     width: 40,

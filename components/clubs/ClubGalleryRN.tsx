@@ -1,5 +1,5 @@
 // components/clubs/ClubGalleryRN.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -24,6 +24,7 @@ import {
   useAddPhotosMutation,
   useDeletePhotoMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -44,6 +45,8 @@ export default function ClubGalleryRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const clubId = club?._id;
   const isMember = !!club?._my?.isMember;
   const authUserId = useSelector((s: any) => s.auth?.userInfo?._id);
@@ -182,7 +185,7 @@ export default function ClubGalleryRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   addBtn: {
     flexDirection: "row",
     gap: 6,
@@ -201,7 +204,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 10,
-    backgroundColor: "#E0E7FF",
+    backgroundColor: C.field,
   },
   delBtn: {
     position: "absolute",

@@ -19,6 +19,7 @@ import {
   timeAgo,
   firstImage,
 } from "@/constants/market";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function MarketCard({
   item,
@@ -31,6 +32,7 @@ export default function MarketCard({
   onToggleSave?: (item: any) => void;
   canSave?: boolean;
 }) {
+  const C = useThemeTokens();
   if (!item) return null;
   const cond = CONDITION_MAP[item.condition];
   const cat = CATEGORY_MAP[item.category];
@@ -45,15 +47,15 @@ export default function MarketCard({
       onPress={() => router.push(`/marketplace/${item._id}` as any)}
       style={{
         width,
-        backgroundColor: "#fff",
+        backgroundColor: C.card,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#EAECEF",
+        borderColor: C.border,
         overflow: "hidden",
         marginBottom: 12,
       }}
     >
-      <View style={{ width: "100%", aspectRatio: 1, backgroundColor: "#F1F5F9" }}>
+      <View style={{ width: "100%", aspectRatio: 1, backgroundColor: C.field }}>
         {img ? (
           <Image
             source={{ uri: img }}
@@ -135,7 +137,7 @@ export default function MarketCard({
         <Text style={{ fontSize: 15, fontWeight: "900", color: "#0d6efd" }}>
           {priceRangeLabel(item)}
         </Text>
-        <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "600", minHeight: 34, color: "#111827" }}>
+        <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "600", minHeight: 34, color: C.text }}>
           {item.title}
         </Text>
 
@@ -155,21 +157,21 @@ export default function MarketCard({
             </View>
           )}
           {!!item.brand && (
-            <Text style={{ fontSize: 11, color: "#64748B" }}>{item.brand}</Text>
+            <Text style={{ fontSize: 11, color: C.sub }}>{item.brand}</Text>
           )}
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3, flex: 1 }}>
-            <Ionicons name="location-outline" size={12} color="#94A3B8" />
-            <Text numberOfLines={1} style={{ fontSize: 10, color: "#94A3B8", flex: 1 }}>
+            <Ionicons name="location-outline" size={12} color={C.muted} />
+            <Text numberOfLines={1} style={{ fontSize: 10, color: C.muted, flex: 1 }}>
               {item.location?.province || "—"} · {timeAgo(item.createdAt)}
             </Text>
           </View>
           {item.seller?.ratingCount > 0 && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 1 }}>
               <Ionicons name="star" size={11} color="#f59e0b" />
-              <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "700" }}>
+              <Text style={{ fontSize: 10, color: C.sub, fontWeight: "700" }}>
                 {Number(item.seller.ratingAvg).toFixed(1)}
               </Text>
             </View>

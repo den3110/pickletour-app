@@ -39,6 +39,7 @@ import {
   useXiangqiMoveMutation,
   useXiangqiResignMutation,
 } from "@/slices/xiangqiApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 // Ký tự Hán cho mỗi loại quân. Red uppercase, Black lowercase.
 const PIECE_TEXT: Record<string, string> = {
@@ -47,6 +48,8 @@ const PIECE_TEXT: Record<string, string> = {
 };
 
 export default function XiangqiRoomScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const roomId = String(id || "");
@@ -225,7 +228,7 @@ export default function XiangqiRoomScreen() {
   }, []);
 
   if (!room) {
-    return <View style={styles.loading}><Text>Đang tải…</Text></View>;
+    return <View style={styles.loading}><Text style={{ color: C.text }}>Đang tải…</Text></View>;
   }
 
   const seat0 = room.seats.find((s: any) => s.seatIndex === 0);
@@ -403,8 +406,8 @@ export default function XiangqiRoomScreen() {
             <ScrollView style={{ maxHeight: 220 }}>
               {(room.messages || []).slice(-30).map((m: any) => (
                 <View key={String(m._id || m.at)} style={{ flexDirection: "row", gap: 6, marginBottom: 4 }}>
-                  <Text style={{ fontWeight: "800", color: "#0F172A" }}>{m.name}:</Text>
-                  <Text style={{ color: "#334155", flex: 1 }}>{m.text}</Text>
+                  <Text style={{ fontWeight: "800", color: C.text }}>{m.name}:</Text>
+                  <Text style={{ color: C.text2, flex: 1 }}>{m.text}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -413,6 +416,7 @@ export default function XiangqiRoomScreen() {
                 value={chatText}
                 onChangeText={setChatText}
                 placeholder="Nhập tin…"
+                placeholderTextColor={C.muted}
                 style={styles.chatInput}
                 onSubmitEditing={doSendChat}
               />
@@ -444,6 +448,8 @@ function PlayerBar({
   remainSec?: number;
   bubble?: { text: string; at: number } | null;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const label = side === "red" ? "帥 ĐỎ" : "將 ĐEN";
   const color = side === "red" ? "#DC2626" : "#0F172A";
   if (!seat?.user) {
@@ -493,8 +499,8 @@ const BOARD_W = Math.min(SW - 20, 400);
 const CELL = Math.floor(BOARD_W / 9);
 const BOARD_H = CELL * 10;
 
-const styles = StyleSheet.create({
-  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: C.card },
   topBar: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" },
   titleBox: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: "rgba(251,191,36,0.4)" },
@@ -535,12 +541,12 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
   actionBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   winOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", zIndex: 100 },
-  winBox: { backgroundColor: "#fff", padding: 24, borderRadius: 16, borderWidth: 3, borderColor: "#FBBF24", minWidth: 280, alignItems: "center" },
-  winTitle: { fontSize: 20, fontWeight: "900", color: "#0F172A", textAlign: "center" },
-  winReason: { fontSize: 13, color: "#64748B", marginTop: 4 },
+  winBox: { backgroundColor: C.card, padding: 24, borderRadius: 16, borderWidth: 3, borderColor: "#FBBF24", minWidth: 280, alignItems: "center" },
+  winTitle: { fontSize: 20, fontWeight: "900", color: C.text, textAlign: "center" },
+  winReason: { fontSize: 13, color: C.sub, marginTop: 4 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  chatBox: { backgroundColor: "#fff", padding: 14, borderRadius: 14, width: "85%", maxWidth: 400 },
-  chatTitle: { fontSize: 15, fontWeight: "900", marginBottom: 8, color: "#0F172A" },
-  chatInput: { flex: 1, backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  chatBox: { backgroundColor: C.card, padding: 14, borderRadius: 14, width: "85%", maxWidth: 400 },
+  chatTitle: { fontSize: 15, fontWeight: "900", marginBottom: 8, color: C.text },
+  chatInput: { flex: 1, backgroundColor: C.field, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text },
   chatSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#B45309", alignItems: "center", justifyContent: "center" },
 });

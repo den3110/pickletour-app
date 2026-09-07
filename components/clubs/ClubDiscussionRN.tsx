@@ -1,5 +1,5 @@
 // components/clubs/ClubDiscussionRN.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -29,6 +29,7 @@ import {
   useCreatePostCommentMutation,
   useDeletePostCommentMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const pickUrl = (res: any) =>
   res?.url || res?.secure_url || res?.data?.url || res?.path || "";
@@ -48,6 +49,8 @@ function GradLightCard({
   style?: any;
   pad?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={[styles.card, style]}>
       <LinearGradient
@@ -63,6 +66,7 @@ function GradLightCard({
 }
 
 function Avatar({ uri, size = 40 }: { uri?: string; size?: number }) {
+  const C = useThemeTokens();
   return (
     <ExpoImage
       source={{ uri: normalizeUrl(uri) }}
@@ -70,7 +74,7 @@ function Avatar({ uri, size = 40 }: { uri?: string; size?: number }) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: "#E0E7FF",
+        backgroundColor: C.field,
       }}
       contentFit="cover"
     />
@@ -90,6 +94,8 @@ function Comments({
   canManage: boolean;
   authUserId?: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { data, isFetching } = useListPostCommentsQuery({ id: clubId, postId });
   const [createComment, { isLoading }] = useCreatePostCommentMutation();
   const [delComment] = useDeletePostCommentMutation();
@@ -144,7 +150,7 @@ function Comments({
                       <MaterialCommunityIcons
                         name="trash-can-outline"
                         size={15}
-                        color="#9AA3B2"
+                        color={C.muted}
                       />
                     </TouchableOpacity>
                   )}
@@ -162,7 +168,7 @@ function Comments({
             value={text}
             onChangeText={setText}
             placeholder="Viết bình luận…"
-            placeholderTextColor="#9AA3B2"
+            placeholderTextColor={C.muted}
           />
           <TouchableOpacity
             style={styles.sendBtn}
@@ -190,6 +196,8 @@ function PostItem({
   canManage: boolean;
   authUserId?: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [react] = useReactPostMutation();
   const [delPost] = useDeletePostMutation();
   const [updatePost] = useUpdatePostMutation();
@@ -259,7 +267,7 @@ function PostItem({
             </Text>
             {post.pinned && (
               <View style={styles.pinBadge}>
-                <MaterialCommunityIcons name="pin" size={10} color="#B7791F" />
+                <MaterialCommunityIcons name="pin" size={10} color={C.amberText} />
                 <Text style={styles.pinBadgeText}>Ghim</Text>
               </View>
             )}
@@ -274,7 +282,7 @@ function PostItem({
             <MaterialCommunityIcons
               name={post.pinned ? "pin-off" : "pin"}
               size={17}
-              color={post.pinned ? "#B7791F" : "#9AA3B2"}
+              color={post.pinned ? C.amberText : C.muted}
             />
           </TouchableOpacity>
         )}
@@ -286,7 +294,7 @@ function PostItem({
             }}
             style={{ marginRight: 6 }}
           >
-            <MaterialCommunityIcons name="pencil" size={17} color="#9AA3B2" />
+            <MaterialCommunityIcons name="pencil" size={17} color={C.muted} />
           </TouchableOpacity>
         )}
         {canDelete && (
@@ -294,7 +302,7 @@ function PostItem({
             <MaterialCommunityIcons
               name="trash-can-outline"
               size={18}
-              color="#9AA3B2"
+              color={C.muted}
             />
           </TouchableOpacity>
         )}
@@ -347,7 +355,7 @@ function PostItem({
           <MaterialCommunityIcons
             name={post.myReaction ? "heart" : "heart-outline"}
             size={18}
-            color={post.myReaction ? "#F2544B" : "#5C6285"}
+            color={post.myReaction ? "#F2544B" : C.text3}
           />
           <Text
             style={[
@@ -365,7 +373,7 @@ function PostItem({
           <MaterialCommunityIcons
             name="comment-outline"
             size={17}
-            color="#5C6285"
+            color={C.text3}
           />
           <Text style={styles.actionText}>{post.commentCount || 0}</Text>
         </TouchableOpacity>
@@ -391,6 +399,8 @@ export default function ClubDiscussionRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const clubId = club?._id;
   const isMember = !!club?._my?.isMember;
   const authUserId = useSelector((s: any) => s.auth?.userInfo?._id);
@@ -462,7 +472,7 @@ export default function ClubDiscussionRN({
             onChangeText={setContent}
             multiline
             placeholder="Chia sẻ điều gì đó với câu lạc bộ…"
-            placeholderTextColor="#8A90B2"
+            placeholderTextColor={C.muted}
           />
           {!!imageUrl && (
             <View style={{ marginTop: 10 }}>
@@ -501,7 +511,7 @@ export default function ClubDiscussionRN({
               onPress={pickImage}
               disabled={uploadingImg}
             >
-              <MaterialCommunityIcons name="image-outline" size={16} color="#3B3F75" />
+              <MaterialCommunityIcons name="image-outline" size={16} color={C.text2} />
               <Text style={styles.lightBtnText}>
                 {uploadingImg ? "Đang tải…" : "Ảnh"}
               </Text>
@@ -534,13 +544,13 @@ export default function ClubDiscussionRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   card: {
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 6 },
@@ -551,15 +561,15 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
-    backgroundColor: "#F8F9FF",
-    color: "#1F2557",
+    borderColor: C.border,
+    backgroundColor: C.field,
+    color: C.text,
   },
   previewImg: {
     width: "100%",
     height: 200,
     borderRadius: 12,
-    backgroundColor: "#EEF1FF",
+    backgroundColor: C.field,
   },
   removeImgBtn: {
     position: "absolute",
@@ -588,16 +598,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  lightBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
+  lightBtnText: { color: C.text2, fontWeight: "800", fontSize: 13 },
 
-  dim: { color: "#7780A1", fontSize: 13 },
+  dim: { color: C.sub, fontSize: 13 },
 
   postHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  postAuthor: { color: "#1F2557", fontWeight: "800", fontSize: 14.5 },
+  postAuthor: { color: C.text, fontWeight: "800", fontSize: 14.5 },
   pinBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -605,14 +615,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 999,
-    backgroundColor: "#FFF7E6",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: "#FCE2A6",
+    borderColor: C.amberSoft,
   },
-  pinBadgeText: { color: "#B7791F", fontSize: 10, fontWeight: "800" },
-  postTime: { color: "#7780A1", fontSize: 11.5, marginTop: 1 },
+  pinBadgeText: { color: C.amberText, fontSize: 10, fontWeight: "800" },
+  postTime: { color: C.sub, fontSize: 11.5, marginTop: 1 },
   postContent: {
-    color: "#3E4466",
+    color: C.text2,
     fontSize: 14.5,
     lineHeight: 21,
     marginTop: 10,
@@ -622,7 +632,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     marginTop: 10,
-    backgroundColor: "#EEF1FF",
+    backgroundColor: C.field,
   },
   postActions: {
     flexDirection: "row",
@@ -631,37 +641,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
-  actionText: { color: "#5C6285", fontWeight: "700", fontSize: 13 },
+  actionText: { color: C.text3, fontWeight: "700", fontSize: 13 },
 
   commentsWrap: {
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#EEF1F8",
+    borderTopColor: C.border,
     paddingTop: 12,
     gap: 10,
   },
   commentRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   commentBubble: {
     flex: 1,
-    backgroundColor: "#F5F6FF",
+    backgroundColor: C.field,
     borderRadius: 12,
     paddingHorizontal: 11,
     paddingVertical: 8,
   },
   commentHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  commentName: { color: "#2D3561", fontWeight: "700", fontSize: 12.5 },
-  commentTime: { color: "#9AA3B2", fontSize: 10.5 },
-  commentText: { color: "#4A5270", fontSize: 13, marginTop: 2 },
+  commentName: { color: C.text, fontWeight: "700", fontSize: 12.5 },
+  commentTime: { color: C.muted, fontSize: 10.5 },
+  commentText: { color: C.text2, fontSize: 13, marginTop: 2 },
   commentInputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   commentInput: {
     flex: 1,
     height: 40,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     borderRadius: 999,
     paddingHorizontal: 14,
-    backgroundColor: "#F8F9FF",
-    color: "#1F2557",
+    backgroundColor: C.field,
+    color: C.text,
   },
   sendBtn: {
     width: 40,

@@ -56,6 +56,7 @@ import {
   useStartSamHandMutation,
   useXinSamMutation,
 } from "@/slices/samApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
@@ -67,6 +68,8 @@ const SEAT_LAYOUT = [
 ];
 
 export default function SamRoomScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const roomId = String(id || "");
@@ -647,6 +650,7 @@ export default function SamRoomScreen() {
                 value={chatText}
                 onChangeText={setChatText}
                 placeholder="Nhập tin…"
+                placeholderTextColor={C.muted}
                 style={styles.chatInput}
                 onSubmitEditing={doSendChat}
               />
@@ -674,6 +678,8 @@ function ActionBtn({
   onPress?: () => void;
   disabled?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable
       onPress={onPress}
@@ -690,7 +696,7 @@ function ActionBtn({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   loading: {
     flex: 1,
     justifyContent: "center",
@@ -940,7 +946,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   chatBox: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     padding: 14,
     borderRadius: 14,
     width: "70%",
@@ -950,7 +956,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     marginBottom: 8,
-    color: "#0F172A",
+    color: C.text,
   },
   chatMsg: {
     flexDirection: "row",
@@ -958,14 +964,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     flexWrap: "wrap",
   },
-  chatMsgName: { fontWeight: "800", color: "#0F172A" },
-  chatMsgText: { color: "#334155", flex: 1 },
+  chatMsgName: { fontWeight: "800", color: C.text },
+  chatMsgText: { color: C.text2, flex: 1 },
   chatInput: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    color: C.text,
   },
   chatSendBtn: {
     width: 44,

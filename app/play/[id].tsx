@@ -24,22 +24,25 @@ import {
   useDeleteInviteMutation,
 } from "@/slices/playApiSlice";
 import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const GREEN = "#16a34a";
 
 function Avatar({ uri, name, size = 36 }: { uri?: string; name?: string; size?: number }) {
+  const C = useThemeTokens();
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: "#E2E8F0", overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: C.border, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
       {uri ? (
         <Image source={{ uri }} style={{ width: "100%", height: "100%" }} />
       ) : (
-        <Text style={{ fontWeight: "700", color: "#64748B" }}>{(name || "?").charAt(0)}</Text>
+        <Text style={{ fontWeight: "700", color: C.sub }}>{(name || "?").charAt(0)}</Text>
       )}
     </View>
   );
 }
 
 export default function PlayDetailScreen() {
+  const C = useThemeTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data: it, isLoading, refetch } = useGetInviteQuery(id);
@@ -79,14 +82,14 @@ export default function PlayDetailScreen() {
 
   if (isLoading)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
         <ActivityIndicator style={{ marginTop: 60 }} color={GREEN} />
       </SafeAreaView>
     );
   if (!it)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
-        <Text>Không tìm thấy kèo.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: C.text }}>Không tìm thấy kèo.</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
           <Text style={{ color: GREEN }}>Quay lại</Text>
         </TouchableOpacity>
@@ -121,59 +124,59 @@ export default function PlayDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 17, fontWeight: "800", marginLeft: 4 }}>Chi tiết kèo</Text>
+        <Text style={{ fontSize: 17, fontWeight: "800", marginLeft: 4, color: C.text }}>Chi tiết kèo</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40, gap: 12 }}>
         {/* Card */}
-        <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16 }}>
+        <View style={{ backgroundColor: C.card, borderRadius: 16, padding: 16 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <Avatar uri={it.host?.avatar} name={it.host?.name} size={46} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: "800", fontSize: 15 }}>{it.host?.nickname || it.host?.name}</Text>
-              <Text style={{ color: "#64748B", fontSize: 12 }}>Chủ kèo</Text>
+              <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{it.host?.nickname || it.host?.name}</Text>
+              <Text style={{ color: C.sub, fontSize: 12 }}>Chủ kèo</Text>
             </View>
             <View style={{ backgroundColor: st.color, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>{st.label}</Text>
             </View>
           </View>
 
-          <Text style={{ fontWeight: "900", fontSize: 20, color: "#0F172A" }}>
+          <Text style={{ fontWeight: "900", fontSize: 20, color: C.text }}>
             {it.title || it.courtName || "Kèo giao lưu pickleball"}
           </Text>
 
           <View style={{ gap: 8, marginTop: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="time-outline" size={18} color="#64748B" />
-              <Text style={{ fontWeight: "700" }}>{formatPlayTime(it.playAt)} · {it.durationMin} phút</Text>
+              <Ionicons name="time-outline" size={18} color={C.sub} />
+              <Text style={{ fontWeight: "700", color: C.text }}>{formatPlayTime(it.playAt)} · {it.durationMin} phút</Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="location-outline" size={18} color="#64748B" />
-              <Text style={{ flex: 1 }}>{[it.courtName, it.district, it.province].filter(Boolean).join(", ") || "—"}</Text>
+              <Ionicons name="location-outline" size={18} color={C.sub} />
+              <Text style={{ flex: 1, color: C.text }}>{[it.courtName, it.district, it.province].filter(Boolean).join(", ") || "—"}</Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <View style={{ borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 12, color: "#334155" }}>{skillLabel(it.skillMin, it.skillMax)}</Text>
+              <View style={{ borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 12, color: C.text2 }}>{skillLabel(it.skillMin, it.skillMax)}</Text>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="people-outline" size={16} color="#64748B" />
-                <Text style={{ fontSize: 13, color: "#334155", fontWeight: "600" }}>{it.acceptedCount}/{it.slots} · thiếu {it.slotsLeft}</Text>
+                <Ionicons name="people-outline" size={16} color={C.sub} />
+                <Text style={{ fontSize: 13, color: C.text2, fontWeight: "600" }}>{it.acceptedCount}/{it.slots} · thiếu {it.slotsLeft}</Text>
               </View>
             </View>
             {!!it.contactPhone && (
               <TouchableOpacity onPress={() => Linking.openURL(`tel:${it.contactPhone}`)} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Ionicons name="call-outline" size={18} color="#64748B" />
+                <Ionicons name="call-outline" size={18} color={C.sub} />
                 <Text style={{ color: GREEN, fontWeight: "700" }}>{it.contactPhone}</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {!!it.note && <Text style={{ marginTop: 12, color: "#475569", lineHeight: 21 }}>{it.note}</Text>}
+          {!!it.note && <Text style={{ marginTop: 12, color: C.text3, lineHeight: 21 }}>{it.note}</Text>}
 
           {/* Actions */}
           <View style={{ marginTop: 16 }}>
@@ -190,51 +193,51 @@ export default function PlayDetailScreen() {
             ) : it.myStatus === "accepted" ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <Text style={{ color: GREEN, fontWeight: "800", flex: 1 }}>✅ Bạn đã tham gia</Text>
-                <TouchableOpacity onPress={onLeave}><Text style={{ color: "#94A3B8", fontWeight: "600" }}>Rời kèo</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onLeave}><Text style={{ color: C.muted, fontWeight: "600" }}>Rời kèo</Text></TouchableOpacity>
               </View>
             ) : it.myStatus === "pending" ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Text style={{ color: "#92400e", fontWeight: "700", flex: 1 }}>Đang chờ chủ kèo duyệt</Text>
-                <TouchableOpacity onPress={onLeave}><Text style={{ color: "#94A3B8", fontWeight: "600" }}>Huỷ</Text></TouchableOpacity>
+                <Text style={{ color: C.amberText, fontWeight: "700", flex: 1 }}>Đang chờ chủ kèo duyệt</Text>
+                <TouchableOpacity onPress={onLeave}><Text style={{ color: C.muted, fontWeight: "600" }}>Huỷ</Text></TouchableOpacity>
               </View>
             ) : it.status === "open" ? (
               <View style={{ gap: 8 }}>
-                <TextInput value={note} onChangeText={setNote} placeholder="Lời nhắn cho chủ kèo (tuỳ chọn)" placeholderTextColor="#94A3B8" style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }} />
+                <TextInput value={note} onChangeText={setNote} placeholder="Lời nhắn cho chủ kèo (tuỳ chọn)" placeholderTextColor={C.muted} style={{ borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: C.text }} />
                 <TouchableOpacity onPress={onJoin} disabled={joining} style={{ backgroundColor: GREEN, borderRadius: 12, paddingVertical: 13, alignItems: "center" }}>
                   <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Xin tham gia</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={{ color: "#94A3B8", fontWeight: "600" }}>Kèo đã đóng / đủ người</Text>
+              <Text style={{ color: C.muted, fontWeight: "600" }}>Kèo đã đóng / đủ người</Text>
             )}
           </View>
 
           <TouchableOpacity
             onPress={handleShareToFeed}
             disabled={sharing}
-            style={{ marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, paddingVertical: 11 }}
+            style={{ marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 11 }}
           >
-            <Ionicons name="megaphone-outline" size={18} color="#334155" />
-            <Text style={{ color: "#334155", fontWeight: "700" }}>{sharing ? "Đang chia sẻ…" : "Chia sẻ kèo lên bảng tin"}</Text>
+            <Ionicons name="megaphone-outline" size={18} color={C.text2} />
+            <Text style={{ color: C.text2, fontWeight: "700" }}>{sharing ? "Đang chia sẻ…" : "Chia sẻ kèo lên bảng tin"}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Host: pending */}
         {it.isHost && pending.length > 0 && (
-          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#FDE68A" }}>
-            <Text style={{ fontWeight: "800", marginBottom: 8 }}>Yêu cầu chờ duyệt ({pending.length})</Text>
+          <View style={{ backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#FDE68A" }}>
+            <Text style={{ fontWeight: "800", marginBottom: 8, color: C.text }}>Yêu cầu chờ duyệt ({pending.length})</Text>
             {pending.map((p: any) => (
               <View key={String(p.user?._id || p.user)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }}>
                 <Avatar uri={p.user?.avatar} name={p.user?.name} />
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontWeight: "600" }} numberOfLines={1}>{p.user?.nickname || p.user?.name}</Text>
-                  {!!p.note && <Text style={{ fontSize: 12.5, color: "#64748B" }} numberOfLines={1}>“{p.note}”</Text>}
+                  <Text style={{ fontWeight: "600", color: C.text }} numberOfLines={1}>{p.user?.nickname || p.user?.name}</Text>
+                  {!!p.note && <Text style={{ fontSize: 12.5, color: C.sub }} numberOfLines={1}>“{p.note}”</Text>}
                 </View>
                 <TouchableOpacity onPress={() => respond(p.user._id, "accept")} style={{ backgroundColor: GREEN, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 }}>
                   <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Nhận</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => respond(p.user._id, "decline")} style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 }}>
-                  <Text style={{ color: "#334155", fontWeight: "700", fontSize: 13 }}>Từ chối</Text>
+                <TouchableOpacity onPress={() => respond(p.user._id, "decline")} style={{ backgroundColor: C.field, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 }}>
+                  <Text style={{ color: C.text2, fontWeight: "700", fontSize: 13 }}>Từ chối</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -242,23 +245,23 @@ export default function PlayDetailScreen() {
         )}
 
         {/* Accepted */}
-        <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16 }}>
-          <Text style={{ fontWeight: "800", marginBottom: 8 }}>Người tham gia ({accepted.length}/{it.slots})</Text>
+        <View style={{ backgroundColor: C.card, borderRadius: 16, padding: 16 }}>
+          <Text style={{ fontWeight: "800", marginBottom: 8, color: C.text }}>Người tham gia ({accepted.length}/{it.slots})</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 }}>
             <Avatar uri={it.host?.avatar} name={it.host?.name} />
-            <Text style={{ fontWeight: "600", flex: 1 }}>{it.host?.nickname || it.host?.name}</Text>
+            <Text style={{ fontWeight: "600", flex: 1, color: C.text }}>{it.host?.nickname || it.host?.name}</Text>
             <Text style={{ fontSize: 12, color: GREEN, fontWeight: "700" }}>Chủ kèo</Text>
           </View>
           {accepted.map((p: any) => (
             <View key={String(p.user?._id || p.user)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 }}>
               <Avatar uri={p.user?.avatar} name={p.user?.name} />
-              <Text style={{ fontWeight: "600", flex: 1 }} numberOfLines={1}>{p.user?.nickname || p.user?.name}</Text>
+              <Text style={{ fontWeight: "600", flex: 1, color: C.text }} numberOfLines={1}>{p.user?.nickname || p.user?.name}</Text>
               {it.isHost && (
-                <TouchableOpacity onPress={() => respond(p.user._id, "decline")}><Text style={{ color: "#94A3B8", fontSize: 12 }}>Bỏ</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => respond(p.user._id, "decline")}><Text style={{ color: C.muted, fontSize: 12 }}>Bỏ</Text></TouchableOpacity>
               )}
             </View>
           ))}
-          {accepted.length === 0 && <Text style={{ color: "#94A3B8", fontSize: 13 }}>Chưa có ai được nhận.</Text>}
+          {accepted.length === 0 && <Text style={{ color: C.muted, fontSize: 13 }}>Chưa có ai được nhận.</Text>}
         </View>
       </ScrollView>
       {shareModal}

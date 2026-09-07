@@ -36,6 +36,7 @@ import {
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
 import { useGetTournamentQuery } from "@/slices/tournamentsApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "#F59E0B",
@@ -66,6 +67,8 @@ const PRESET_COLORS = [
 ];
 
 export default function MlpTeamsScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data: tour } = useGetTournamentQuery(String(id));
@@ -119,7 +122,7 @@ export default function MlpTeamsScreen() {
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
           ListEmptyComponent={
             <View style={{ padding: 32, alignItems: "center" }}>
-              <Text style={{ color: "#64748B" }}>
+              <Text style={{ color: C.sub }}>
                 Chưa có team nào. Bấm "Tạo team" để tạo team đầu tiên.
               </Text>
             </View>
@@ -220,7 +223,7 @@ export default function MlpTeamsScreen() {
                   <Ionicons
                     name="chevron-forward"
                     size={20}
-                    color="#94A3B8"
+                    color={C.muted}
                   />
                 </View>
 
@@ -236,7 +239,7 @@ export default function MlpTeamsScreen() {
                     >
                       <View
                         style={{
-                          backgroundColor: overCap ? "#FEE2E2" : "#DBEAFE",
+                          backgroundColor: overCap ? C.redSoft : C.primarySoft,
                           borderRadius: 6,
                           paddingHorizontal: 8,
                           paddingVertical: 3,
@@ -246,7 +249,7 @@ export default function MlpTeamsScreen() {
                           style={{
                             fontSize: 11,
                             fontWeight: "800",
-                            color: overCap ? "#B91C1C" : "#1E40AF",
+                            color: overCap ? C.redText : C.primary,
                           }}
                         >
                           Tổng đôi: {totalD.toFixed(2)}
@@ -255,7 +258,7 @@ export default function MlpTeamsScreen() {
                       </View>
                       <View
                         style={{
-                          backgroundColor: "#F1F5F9",
+                          backgroundColor: C.field,
                           borderRadius: 6,
                           paddingHorizontal: 8,
                           paddingVertical: 3,
@@ -265,7 +268,7 @@ export default function MlpTeamsScreen() {
                           style={{
                             fontSize: 11,
                             fontWeight: "700",
-                            color: "#334155",
+                            color: C.text2,
                           }}
                         >
                           Tổng đơn: {totalS.toFixed(2)}
@@ -291,8 +294,8 @@ export default function MlpTeamsScreen() {
                               alignItems: "center",
                               gap: 4,
                               backgroundColor: isFemale
-                                ? "#FCE7F3"
-                                : "#DBEAFE",
+                                ? C.purpleSoft
+                                : C.primarySoft,
                               borderRadius: 10,
                               paddingLeft: 4,
                               paddingRight: 8,
@@ -314,7 +317,7 @@ export default function MlpTeamsScreen() {
                                   width: 20,
                                   height: 20,
                                   borderRadius: 10,
-                                  backgroundColor: "#CBD5E1",
+                                  backgroundColor: C.line,
                                   alignItems: "center",
                                   justifyContent: "center",
                                 }}
@@ -323,7 +326,7 @@ export default function MlpTeamsScreen() {
                                   style={{
                                     fontSize: 10,
                                     fontWeight: "800",
-                                    color: "#0F172A",
+                                    color: C.text,
                                   }}
                                 >
                                   {(p?.nickname || p?.name || "?")[0]
@@ -335,7 +338,7 @@ export default function MlpTeamsScreen() {
                               style={{
                                 fontSize: 11,
                                 fontWeight: "700",
-                                color: "#0F172A",
+                                color: C.text,
                               }}
                               numberOfLines={1}
                             >
@@ -410,6 +413,8 @@ function TeamFormModal({
   onSaved: () => void;
   canEdit?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const isEdit = !!team;
   // Với edit — fetch team chi tiết để có players populated đầy đủ
   const { data: teamDetail } = useGetMlpTeamQuery(String(team?._id || ""), {
@@ -568,7 +573,7 @@ function TeamFormModal({
                 {isEdit ? "Chi tiết team" : "Tạo team MLP"}
               </Text>
               <Pressable onPress={onClose} hitSlop={10}>
-                <Ionicons name="close" size={22} color="#0F172A" />
+                <Ionicons name="close" size={22} color={C.text} />
               </Pressable>
             </View>
 
@@ -580,6 +585,7 @@ function TeamFormModal({
               <TextInput
                 style={[styles.input, !canEdit && { opacity: 0.6 }]}
                 placeholder="Tên team *"
+                placeholderTextColor={C.muted}
                 value={name}
                 onChangeText={setName}
                 maxLength={100}
@@ -588,6 +594,7 @@ function TeamFormModal({
               <TextInput
                 style={[styles.input, !canEdit && { opacity: 0.6 }]}
                 placeholder="Ký hiệu ngắn (VD: HN, SG)"
+                placeholderTextColor={C.muted}
                 value={shortName}
                 onChangeText={setShortName}
                 maxLength={20}
@@ -607,7 +614,7 @@ function TeamFormModal({
                         {
                           backgroundColor: c,
                           borderWidth: color === c ? 3 : 1,
-                          borderColor: color === c ? "#0F172A" : "#CBD5E1",
+                          borderColor: color === c ? C.text : C.line,
                         },
                       ]}
                     />
@@ -624,6 +631,7 @@ function TeamFormModal({
                   <TextInput
                     style={styles.input}
                     placeholder="Tìm VĐV theo tên / nickname / SĐT…"
+                    placeholderTextColor={C.muted}
                     value={q}
                     onChangeText={setQ}
                     autoCorrect={false}
@@ -675,7 +683,7 @@ function TeamFormModal({
                               {sd > 0 && (
                                 <View
                                   style={{
-                                    backgroundColor: "#DBEAFE",
+                                    backgroundColor: C.primarySoft,
                                     paddingHorizontal: 5,
                                     paddingVertical: 1,
                                     borderRadius: 3,
@@ -683,7 +691,7 @@ function TeamFormModal({
                                 >
                                   <Text
                                     style={{
-                                      color: "#1E40AF",
+                                      color: C.primary,
                                       fontSize: 9,
                                       fontWeight: "800",
                                     }}
@@ -695,7 +703,7 @@ function TeamFormModal({
                               {ss > 0 && (
                                 <View
                                   style={{
-                                    backgroundColor: "#F1F5F9",
+                                    backgroundColor: C.field,
                                     paddingHorizontal: 5,
                                     paddingVertical: 1,
                                     borderRadius: 3,
@@ -703,7 +711,7 @@ function TeamFormModal({
                                 >
                                   <Text
                                     style={{
-                                      color: "#334155",
+                                      color: C.text2,
                                       fontSize: 9,
                                       fontWeight: "700",
                                     }}
@@ -761,7 +769,7 @@ function TeamFormModal({
                               {sd > 0 && (
                                 <View
                                   style={{
-                                    backgroundColor: "#DBEAFE",
+                                    backgroundColor: C.primarySoft,
                                     paddingHorizontal: 5,
                                     paddingVertical: 1,
                                     borderRadius: 3,
@@ -769,7 +777,7 @@ function TeamFormModal({
                                 >
                                   <Text
                                     style={{
-                                      color: "#1E40AF",
+                                      color: C.primary,
                                       fontSize: 10,
                                       fontWeight: "800",
                                     }}
@@ -781,7 +789,7 @@ function TeamFormModal({
                               {ss > 0 && (
                                 <View
                                   style={{
-                                    backgroundColor: "#F1F5F9",
+                                    backgroundColor: C.field,
                                     paddingHorizontal: 5,
                                     paddingVertical: 1,
                                     borderRadius: 3,
@@ -789,7 +797,7 @@ function TeamFormModal({
                                 >
                                   <Text
                                     style={{
-                                      color: "#334155",
+                                      color: C.text2,
                                       fontSize: 10,
                                       fontWeight: "700",
                                     }}
@@ -831,7 +839,7 @@ function TeamFormModal({
                   >
                     <View
                       style={{
-                        backgroundColor: overCap ? "#FEE2E2" : "#DBEAFE",
+                        backgroundColor: overCap ? C.redSoft : C.primarySoft,
                         paddingHorizontal: 8,
                         paddingVertical: 3,
                         borderRadius: 6,
@@ -839,7 +847,7 @@ function TeamFormModal({
                     >
                       <Text
                         style={{
-                          color: overCap ? "#B91C1C" : "#1E40AF",
+                          color: overCap ? C.redText : C.primary,
                           fontSize: 11,
                           fontWeight: "800",
                         }}
@@ -850,7 +858,7 @@ function TeamFormModal({
                     </View>
                     <View
                       style={{
-                        backgroundColor: "#F1F5F9",
+                        backgroundColor: C.field,
                         paddingHorizontal: 8,
                         paddingVertical: 3,
                         borderRadius: 6,
@@ -858,7 +866,7 @@ function TeamFormModal({
                     >
                       <Text
                         style={{
-                          color: "#334155",
+                          color: C.text2,
                           fontSize: 11,
                           fontWeight: "700",
                         }}
@@ -873,7 +881,7 @@ function TeamFormModal({
                     style={{
                       marginTop: 8,
                       padding: 8,
-                      backgroundColor: "#FEE2E2",
+                      backgroundColor: C.redSoft,
                       borderRadius: 6,
                       borderWidth: 1,
                       borderColor: "#FCA5A5",
@@ -881,7 +889,7 @@ function TeamFormModal({
                   >
                     <Text
                       style={{
-                        color: "#991B1B",
+                        color: C.redText,
                         fontSize: 12,
                         fontWeight: "700",
                       }}
@@ -905,7 +913,7 @@ function TeamFormModal({
                 {isEdit && (
                   <Pressable
                     onPress={handleDelete}
-                    style={[styles.actionBtn, { backgroundColor: "#FEE2E2" }]}
+                    style={[styles.actionBtn, { backgroundColor: C.redSoft }]}
                   >
                     <Ionicons name="trash" size={16} color="#DC2626" />
                     <Text
@@ -943,6 +951,7 @@ function TeamFormModal({
 }
 
 function UserAvatar({ user, size = 30 }: { user: any; size?: number }) {
+  const C = useThemeTokens();
   const uri = user?.avatar ? normalizeUrl(user.avatar) : "";
   const initial =
     String(user?.nickname || user?.name || "?")
@@ -959,7 +968,7 @@ function UserAvatar({ user, size = 30 }: { user: any; size?: number }) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: "#E2E8F0",
+          backgroundColor: C.border,
         }}
       />
     );
@@ -970,29 +979,29 @@ function UserAvatar({ user, size = 30 }: { user: any; size?: number }) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: "#DBEAFE",
+        backgroundColor: C.primarySoft,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Text style={{ color: "#1E40AF", fontWeight: "800", fontSize: 12 }}>
+      <Text style={{ color: C.primary, fontWeight: "800", fontSize: 12 }}>
         {initial}
       </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: "#0F172A" },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: C.text },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1004,12 +1013,12 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
   },
   card: {
     flexDirection: "row",
@@ -1017,7 +1026,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     marginBottom: 8,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
   },
   cardMine: { borderWidth: 2, borderColor: "#10B981" },
@@ -1037,8 +1046,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logoText: { color: "#fff", fontWeight: "900", fontSize: 20 },
-  name: { flex: 1, fontSize: 15, fontWeight: "700", color: "#0F172A" },
-  sub: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  name: { flex: 1, fontSize: 15, fontWeight: "700", color: C.text },
+  sub: { fontSize: 12, color: C.sub, marginTop: 2 },
   statusPill: {
     alignSelf: "flex-start",
     paddingHorizontal: 8,
@@ -1049,7 +1058,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "#475569",
+    color: C.text3,
     fontWeight: "800",
     marginBottom: 4,
     textTransform: "uppercase",
@@ -1064,15 +1073,15 @@ const styles = StyleSheet.create({
   searchBox: {
     marginTop: 6,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     borderRadius: 8,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     maxHeight: 220,
   },
   searchEmpty: {
     padding: 12,
     textAlign: "center",
-    color: "#94A3B8",
+    color: C.muted,
     fontSize: 12,
   },
   searchRow: {
@@ -1081,17 +1090,17 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
-  searchName: { fontSize: 13, color: "#0F172A", fontWeight: "700" },
-  searchSub: { fontSize: 10, color: "#94A3B8" },
+  searchName: { fontSize: 13, color: C.text, fontWeight: "700" },
+  searchSub: { fontSize: 10, color: C.muted },
   rosterEmpty: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: C.muted,
     fontStyle: "italic",
     padding: 12,
     textAlign: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: C.bg,
     borderRadius: 8,
   },
   rosterRow: {
@@ -1100,9 +1109,9 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: C.bg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   rosterIdx: {
     width: 22,
@@ -1110,25 +1119,25 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#0066FF",
   },
-  rosterName: { fontSize: 13, color: "#0F172A", fontWeight: "700" },
-  rosterSub: { fontSize: 10, color: "#94A3B8" },
+  rosterName: { fontSize: 13, color: C.text, fontWeight: "700" },
+  rosterSub: { fontSize: 10, color: C.muted },
   warn: {
     marginTop: 6,
     padding: 6,
-    color: "#B45309",
+    color: C.amberText,
     fontSize: 11,
     fontWeight: "700",
     textAlign: "center",
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
     borderRadius: 6,
   },
   mdBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   mdSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "88%",
@@ -1139,15 +1148,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  mdTitle: { fontSize: 16, fontWeight: "900", color: "#0F172A" },
+  mdTitle: { fontSize: 16, fontWeight: "900", color: C.text },
   mdFooter: {
     flexDirection: "row",
     gap: 8,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: C.border,
   },
   actionBtn: {
     flexDirection: "row",

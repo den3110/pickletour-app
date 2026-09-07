@@ -1,5 +1,5 @@
 // components/clubs/ClubSessionsRN.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -25,6 +25,7 @@ import {
   useListSessionAttendanceQuery,
   useSessionStatsQuery,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -33,6 +34,8 @@ const getApiErrMsg = (e: any) =>
 const fmt = (s: any) => dayjs(s).format("HH:mm, DD/MM/YYYY");
 
 function Attendees({ clubId, session }: { clubId: string; session: any }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [open, setOpen] = useState(false);
   const { data, isFetching } = useListSessionAttendanceQuery(
     { id: clubId, sessionId: session._id },
@@ -44,18 +47,18 @@ function Attendees({ clubId, session }: { clubId: string; session: any }) {
   return (
     <View style={{ marginTop: 8 }}>
       <TouchableOpacity onPress={() => setOpen((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <MaterialCommunityIcons name={open ? "chevron-up" : "chevron-down"} size={16} color="#5C6285" />
-        <Text style={{ color: "#5C6285", fontWeight: "700", fontSize: 12.5 }}>Người tham gia ({count})</Text>
+        <MaterialCommunityIcons name={open ? "chevron-up" : "chevron-down"} size={16} color={C.text3} />
+        <Text style={{ color: C.text3, fontWeight: "700", fontSize: 12.5 }}>Người tham gia ({count})</Text>
       </TouchableOpacity>
       {open && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {isFetching ? (
-            <Text style={{ color: "#7780A1", fontSize: 12 }}>Đang tải…</Text>
+            <Text style={{ color: C.sub, fontSize: 12 }}>Đang tải…</Text>
           ) : (
             people.map((u: any) => (
               <View key={u._id} style={styles.attChip}>
-                <ExpoImage source={{ uri: normalizeUrl(u.avatar) }} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: "#E0E7FF" }} />
-                <Text style={{ color: "#3B3F75", fontSize: 12, fontWeight: "600" }}>{u.nickname || u.fullName || "Người dùng"}</Text>
+                <ExpoImage source={{ uri: normalizeUrl(u.avatar) }} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: C.field }} />
+                <Text style={{ color: C.text2, fontSize: 12, fontWeight: "600" }}>{u.nickname || u.fullName || "Người dùng"}</Text>
               </View>
             ))
           )}
@@ -72,6 +75,8 @@ export default function ClubSessionsRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const id = club?._id;
   const [view, setView] = useState<"list" | "stats">("list");
 
@@ -155,14 +160,14 @@ export default function ClubSessionsRN({
 
       {view === "stats" ? (
         <>
-          <Text style={{ color: "#7780A1", fontSize: 12, marginBottom: 8 }}>Tổng số buổi: {stats?.totalSessions || 0}</Text>
+          <Text style={{ color: C.sub, fontSize: 12, marginBottom: 8 }}>Tổng số buổi: {stats?.totalSessions || 0}</Text>
           {(stats?.items || []).length === 0 ? (
             <EmptyState label="Chưa có dữ liệu chuyên cần" icon="calendar-check" />
           ) : (
             <View style={styles.card}>
               {(stats?.items || []).map((it: any, i: number) => (
-                <View key={it.user._id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: "#EEF1F8" }]}>
-                  <Text style={[styles.rank, i < 3 && { color: "#B7791F" }]}>{i + 1}</Text>
+                <View key={it.user._id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
+                  <Text style={[styles.rank, i < 3 && { color: C.amberText }]}>{i + 1}</Text>
                   <ExpoImage source={{ uri: normalizeUrl(it.user.avatar) }} style={styles.avatar} />
                   <Text style={styles.name} numberOfLines={1}>{it.user.nickname || it.user.fullName || "Người dùng"}</Text>
                   <Text style={styles.count}>{it.count} buổi</Text>
@@ -184,14 +189,14 @@ export default function ClubSessionsRN({
               ) : (
                 <View>
                   <Text style={styles.label}>Tên buổi</Text>
-                  <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholderTextColor="#8A90B2" />
+                  <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholderTextColor={C.muted} />
                   <Text style={styles.label}>Thời gian</Text>
                   <TouchableOpacity style={styles.input} onPress={() => setShowDate(true)}>
-                    <Text style={{ color: "#1F2557", paddingVertical: 2 }}>{fmt(startAt)}</Text>
+                    <Text style={{ color: C.text, paddingVertical: 2 }}>{fmt(startAt)}</Text>
                   </TouchableOpacity>
                   <DateTimePickerModal isVisible={showDate} mode="datetime" date={startAt} onConfirm={(d) => { setStartAt(d); setShowDate(false); }} onCancel={() => setShowDate(false)} is24Hour minuteInterval={5} />
                   <Text style={styles.label}>Địa điểm</Text>
-                  <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Sân…" placeholderTextColor="#8A90B2" />
+                  <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Sân…" placeholderTextColor={C.muted} />
                   {!editId && (
                     <>
                       <Text style={styles.label}>Lặp lại hàng tuần (số tuần)</Text>
@@ -199,7 +204,7 @@ export default function ClubSessionsRN({
                     </>
                   )}
                   <Text style={styles.label}>Ghi chú</Text>
-                  <TextInput style={[styles.input, { minHeight: 50, textAlignVertical: "top" }]} value={note} onChangeText={setNote} multiline placeholderTextColor="#8A90B2" />
+                  <TextInput style={[styles.input, { minHeight: 50, textAlignVertical: "top" }]} value={note} onChangeText={setNote} multiline placeholderTextColor={C.muted} />
                   <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
                     <TouchableOpacity style={styles.primaryBtn} onPress={submit} disabled={creating || updating}>
                       <LinearGradient colors={["#667eea", "#764ba2"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
@@ -230,20 +235,20 @@ export default function ClubSessionsRN({
                     {canManage && (
                       <View style={{ flexDirection: "row" }}>
                         <TouchableOpacity onPress={() => startEdit(s)} style={{ padding: 4 }}>
-                          <MaterialCommunityIcons name="pencil" size={17} color="#9AA3B2" />
+                          <MaterialCommunityIcons name="pencil" size={17} color={C.muted} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => remove(s)} style={{ padding: 4 }}>
-                          <MaterialCommunityIcons name="trash-can-outline" size={17} color="#B4232D" />
+                          <MaterialCommunityIcons name="trash-can-outline" size={17} color={C.redText} />
                         </TouchableOpacity>
                       </View>
                     )}
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                     <TouchableOpacity style={[styles.checkinBtn, s.myCheckedIn && styles.checkinBtnActive]} onPress={() => doCheckin(s)}>
-                      <MaterialCommunityIcons name="check" size={14} color={s.myCheckedIn ? "#fff" : "#1B7A46"} />
+                      <MaterialCommunityIcons name="check" size={14} color={s.myCheckedIn ? "#fff" : C.greenText} />
                       <Text style={[styles.checkinText, s.myCheckedIn && { color: "#fff" }]}>{s.myCheckedIn ? "Đã điểm danh" : "Điểm danh"}</Text>
                     </TouchableOpacity>
-                    <Text style={{ color: "#7780A1", fontSize: 12 }}>{s.attendeeCount || 0} người tham gia</Text>
+                    <Text style={{ color: C.sub, fontSize: 12 }}>{s.attendeeCount || 0} người tham gia</Text>
                   </View>
                   <Attendees clubId={id} session={s} />
                 </View>
@@ -256,35 +261,35 @@ export default function ClubSessionsRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   viewToggle: { flexDirection: "row", gap: 8, marginBottom: 10 },
-  viewBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: "#F3F4FF", borderWidth: 1, borderColor: "#E6E8F5" },
+  viewBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: C.field, borderWidth: 1, borderColor: C.border },
   viewBtnActive: { backgroundColor: "#667eea", borderColor: "#667eea" },
-  viewBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13.5 },
+  viewBtnText: { color: C.text2, fontWeight: "800", fontSize: 13.5 },
 
-  card: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E6E8F5", borderRadius: 14, padding: 12, marginBottom: 10 },
-  label: { color: "#5C6285", fontSize: 12.5, fontWeight: "600", marginTop: 10, marginBottom: 5 },
-  input: { padding: 11, borderRadius: 12, borderWidth: 1, borderColor: "#E6E8F5", backgroundColor: "#F8F9FF", color: "#1F2557" },
+  card: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 12, marginBottom: 10 },
+  label: { color: C.text3, fontSize: 12.5, fontWeight: "600", marginTop: 10, marginBottom: 5 },
+  input: { padding: 11, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.field, color: C.text },
 
   addBtn: { flexDirection: "row", gap: 6, alignSelf: "flex-start", height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   primaryBtn: { height: 40, paddingHorizontal: 20, borderRadius: 999, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  lightBtn: { height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: "#F3F4FF", borderWidth: 1, borderColor: "#E6E8F5" },
-  lightBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 14 },
+  lightBtn: { height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: C.field, borderWidth: 1, borderColor: C.border },
+  lightBtnText: { color: C.text2, fontWeight: "800", fontSize: 14 },
 
-  sTitle: { color: "#1F2557", fontWeight: "800", fontSize: 15.5 },
-  sMeta: { color: "#5C6285", fontSize: 13, marginTop: 3 },
-  sNote: { color: "#3E4466", fontSize: 13, marginTop: 6 },
-  checkinBtn: { flexDirection: "row", gap: 5, alignItems: "center", height: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "#E4F7EC", borderWidth: 1, borderColor: "#B5E6C9" },
+  sTitle: { color: C.text, fontWeight: "800", fontSize: 15.5 },
+  sMeta: { color: C.text3, fontSize: 13, marginTop: 3 },
+  sNote: { color: C.text2, fontSize: 13, marginTop: 6 },
+  checkinBtn: { flexDirection: "row", gap: 5, alignItems: "center", height: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: C.greenSoft, borderWidth: 1, borderColor: C.greenSoft },
   checkinBtnActive: { backgroundColor: "#3BA55D", borderColor: "#3BA55D" },
-  checkinText: { color: "#1B7A46", fontWeight: "800", fontSize: 12.5 },
+  checkinText: { color: C.greenText, fontWeight: "800", fontSize: 12.5 },
 
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
-  rank: { width: 22, textAlign: "center", fontWeight: "800", color: "#7780A1" },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#E0E7FF" },
-  name: { flex: 1, color: "#1F2557", fontWeight: "600", fontSize: 14 },
-  count: { color: "#3E4466", fontWeight: "700", fontSize: 13.5 },
+  rank: { width: 22, textAlign: "center", fontWeight: "800", color: C.sub },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.field },
+  name: { flex: 1, color: C.text, fontWeight: "600", fontSize: 14 },
+  count: { color: C.text2, fontWeight: "700", fontSize: 13.5 },
 
-  attChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F3F4FF", borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8, borderWidth: 1, borderColor: "#E6E8F5" },
+  attChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.field, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8, borderWidth: 1, borderColor: C.border },
 });

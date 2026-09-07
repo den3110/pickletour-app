@@ -16,11 +16,10 @@ import { PLAY_STATUS,
 import * as ImageManipulator from "expo-image-manipulator";
 import { useVideoPlayer,
   VideoView } from "expo-video";
-import React,
-  { useState,
+import React, { useState,
   useCallback,
   useEffect,
-  useRef } from "react";
+  useRef, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -69,6 +68,7 @@ import { MentionText } from "@/components/feed/MentionText";
 import { AspectImage } from "@/components/feed/AspectImage";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import PlayerNameText from "@/components/PlayerNameText";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const REACTION_EMOJI: Record<string, string> = {
   like: "👍",
@@ -128,6 +128,8 @@ function fmtTourDate(startIso?: string, endIso?: string) {
 }
 
 function TourFeedCard({ tour }: { tour: any }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const dateStr = fmtTourDate(tour?.startDate, tour?.endDate);
   const reg = Number(tour?.registrationCount || 0);
   const maxPairs = Number(tour?.maxPairs || 0);
@@ -150,7 +152,7 @@ function TourFeedCard({ tour }: { tour: any }) {
         </Text>
         {tour.location ? (
           <View style={styles.tourInfoRow}>
-            <Ionicons name="location-outline" size={12} color="#94A3B8" />
+            <Ionicons name="location-outline" size={12} color={C.muted} />
             <Text style={styles.tourInfoText} numberOfLines={1}>
               {tour.location}
             </Text>
@@ -158,20 +160,20 @@ function TourFeedCard({ tour }: { tour: any }) {
         ) : null}
         {dateStr ? (
           <View style={styles.tourInfoRow}>
-            <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
+            <Ionicons name="calendar-outline" size={12} color={C.muted} />
             <Text style={styles.tourInfoText}>{dateStr}</Text>
           </View>
         ) : null}
         {(reg > 0 || maxPairs > 0) && (
           <View style={styles.tourInfoRow}>
-            <Ionicons name="people-outline" size={12} color="#94A3B8" />
+            <Ionicons name="people-outline" size={12} color={C.muted} />
             <Text style={styles.tourInfoText}>
               {reg} cặp{maxPairs > 0 ? ` / ${maxPairs}` : ""} đã đăng ký
             </Text>
           </View>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      <Ionicons name="chevron-forward" size={18} color={C.muted} />
     </Pressable>
   );
 }
@@ -185,6 +187,7 @@ function ScoreBadges({
   double?: number | null;
   size?: "sm" | "md";
 }) {
+  const C = useThemeTokens();
   const s = Number(single || 0);
   const d = Number(double || 0);
   if (!s && !d) return null;
@@ -195,13 +198,13 @@ function ScoreBadges({
   return (
     <View style={scoreStyles.wrap}>
       {s > 0 && (
-        <View style={[sizeStyle, { backgroundColor: "#DBEAFE" }]}>
-          <Text style={[txtStyle, { color: "#1D4ED8" }]}>Đơn {fmt(s)}</Text>
+        <View style={[sizeStyle, { backgroundColor: C.primarySoft }]}>
+          <Text style={[txtStyle, { color: C.dark ? "#93c5fd" : "#1D4ED8" }]}>Đơn {fmt(s)}</Text>
         </View>
       )}
       {d > 0 && (
-        <View style={[sizeStyle, { backgroundColor: "#FCE7F3" }]}>
-          <Text style={[txtStyle, { color: "#BE185D" }]}>Đôi {fmt(d)}</Text>
+        <View style={[sizeStyle, { backgroundColor: C.purpleSoft }]}>
+          <Text style={[txtStyle, { color: C.dark ? "#f9a8d4" : "#BE185D" }]}>Đôi {fmt(d)}</Text>
         </View>
       )}
     </View>
@@ -230,10 +233,11 @@ const scoreStyles = StyleSheet.create({
 });
 
 function GuestBanner() {
+  const C = useThemeTokens();
   return (
     <View
       style={{
-        backgroundColor: "#fff",
+        backgroundColor: C.card,
         borderRadius: 12,
         padding: 16,
         marginHorizontal: 12,
@@ -245,10 +249,10 @@ function GuestBanner() {
     >
       <Ionicons name="log-in-outline" size={22} color="#0066FF" />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#0F172A" }}>
+        <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
           Đăng nhập để đăng bài, bình luận, thả cảm xúc
         </Text>
-        <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+        <Text style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
           Bạn vẫn có thể xem bảng tin mà không cần đăng nhập.
         </Text>
       </View>
@@ -283,6 +287,8 @@ function requireLogin(me: any): boolean {
 }
 
 function Composer({ onPosted }: { onPosted: () => void }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -469,7 +475,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           style={styles.input}
           multiline
           placeholder={`${authorName(me)} ơi, chia sẻ gì hôm nay? (gõ @ để nhắc bạn)`}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={C.muted}
           value={content}
           onChangeText={onChangeContent}
         />
@@ -484,7 +490,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
               onPress={() => insertMention(u)}
               style={({ pressed }) => [
                 styles.mentionItem,
-                pressed && { backgroundColor: "#F1F5F9" },
+                pressed && { backgroundColor: C.field },
               ]}
             >
               <AuthorAvatar user={u} size={32} />
@@ -520,7 +526,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
             onPress={() => setLinkedTournament(null)}
             hitSlop={8}
           >
-            <Ionicons name="close-circle" size={16} color="#64748B" />
+            <Ionicons name="close-circle" size={16} color={C.sub} />
           </Pressable>
         </View>
       )}
@@ -585,8 +591,8 @@ function Composer({ onPosted }: { onPosted: () => void }) {
             padding: 12,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: "#E2E8F0",
-            backgroundColor: "#F8FAFC",
+            borderColor: C.border,
+            backgroundColor: C.bg,
           }}
         >
           <View
@@ -597,25 +603,25 @@ function Composer({ onPosted }: { onPosted: () => void }) {
               marginBottom: 8,
             }}
           >
-            <Text style={{ fontWeight: "800", color: "#0F172A" }}>📊 Bình chọn</Text>
+            <Text style={{ fontWeight: "800", color: C.text }}>📊 Bình chọn</Text>
             <Pressable onPress={() => setPollDraft(null)} hitSlop={8}>
-              <Ionicons name="close" size={18} color="#64748B" />
+              <Ionicons name="close" size={18} color={C.sub} />
             </Pressable>
           </View>
           <TextInput
             placeholder="Câu hỏi (VD: Ai vô địch?)"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             value={pollDraft.question}
             onChangeText={(t) => setPollDraft((p: any) => ({ ...p, question: t }))}
             style={{
               borderWidth: 1,
-              borderColor: "#E2E8F0",
+              borderColor: C.border,
               borderRadius: 8,
               paddingHorizontal: 10,
               paddingVertical: 8,
               marginBottom: 8,
-              color: "#0F172A",
-              backgroundColor: "#fff",
+              color: C.text,
+              backgroundColor: C.card,
             }}
           />
           {pollDraft.options.map((opt: string, i: number) => (
@@ -625,7 +631,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
             >
               <TextInput
                 placeholder={`Lựa chọn ${i + 1}`}
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 value={opt}
                 onChangeText={(t) =>
                   setPollDraft((p: any) => {
@@ -637,12 +643,12 @@ function Composer({ onPosted }: { onPosted: () => void }) {
                 style={{
                   flex: 1,
                   borderWidth: 1,
-                  borderColor: "#E2E8F0",
+                  borderColor: C.border,
                   borderRadius: 8,
                   paddingHorizontal: 10,
                   paddingVertical: 8,
-                  color: "#0F172A",
-                  backgroundColor: "#fff",
+                  color: C.text,
+                  backgroundColor: C.card,
                 }}
               />
               {pollDraft.options.length > 2 && (
@@ -655,7 +661,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
                   }
                   hitSlop={8}
                 >
-                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                  <Ionicons name="close-circle" size={20} color={C.muted} />
                 </Pressable>
               )}
             </View>
@@ -679,14 +685,14 @@ function Composer({ onPosted }: { onPosted: () => void }) {
                 paddingHorizontal: 10,
                 paddingVertical: 5,
                 borderRadius: 999,
-                backgroundColor: pollDraft.multi ? "#0066FF" : "#E2E8F0",
+                backgroundColor: pollDraft.multi ? "#0066FF" : C.border,
               }}
             >
               <Text
                 style={{
                   fontSize: 12,
                   fontWeight: "700",
-                  color: pollDraft.multi ? "#fff" : "#334155",
+                  color: pollDraft.multi ? "#fff" : C.text2,
                 }}
               >
                 Chọn nhiều: {pollDraft.multi ? "Bật" : "Tắt"}
@@ -768,6 +774,8 @@ function TournamentPickerModal({
   onClose: () => void;
   onPick: (t: any) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -801,31 +809,31 @@ function TournamentPickerModal({
       onRequestClose={onClose}
       presentationStyle="pageSheet"
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }} edges={["top", "bottom"]}>
         <View style={styles.pickerHeader}>
           <Text style={styles.pickerTitle}>Gắn giải đấu</Text>
           <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={24} color="#0F172A" />
+            <Ionicons name="close" size={24} color={C.text} />
           </Pressable>
         </View>
         <View style={styles.pickerSearchBox}>
-          <Ionicons name="search" size={18} color="#94A3B8" />
+          <Ionicons name="search" size={18} color={C.muted} />
           <TextInput
             style={styles.pickerSearchInput}
             placeholder="Tìm giải theo tên…"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             value={q}
             onChangeText={setQ}
             autoFocus
           />
           {q.length > 0 && (
             <Pressable onPress={() => setQ("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#CBD5E1" />
+              <Ionicons name="close-circle" size={18} color={C.line} />
             </Pressable>
           )}
         </View>
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 20 }} />
+          <ActivityIndicator style={{ marginTop: 20 }} color={C.primary} />
         ) : (
           <FlatList
             data={items}
@@ -836,7 +844,7 @@ function TournamentPickerModal({
                 onPress={() => onPick(item)}
                 style={({ pressed }) => [
                   styles.pickerRow,
-                  pressed && { backgroundColor: "#F1F5F9" },
+                  pressed && { backgroundColor: C.field },
                 ]}
               >
                 {item.image ? (
@@ -865,7 +873,7 @@ function TournamentPickerModal({
               <Text
                 style={{
                   padding: 24,
-                  color: "#94A3B8",
+                  color: C.muted,
                   textAlign: "center",
                 }}
               >
@@ -1015,6 +1023,7 @@ const WEB_BASE_URL =
   process.env.EXPO_PUBLIC_WEB_BASE_URL || "https://pickletour.vn";
 
 function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void }) {
+  const C = useThemeTokens();
   const total = poll.totalVotes || 0;
   const closed = poll.closesAt && new Date(poll.closesAt) < new Date();
   return (
@@ -1024,12 +1033,12 @@ function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void
         padding: 12,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
-        backgroundColor: "#F8FAFC",
+        borderColor: C.border,
+        backgroundColor: C.bg,
       }}
     >
       {!!poll.question && (
-        <Text style={{ fontWeight: "800", marginBottom: 8, color: "#0F172A" }}>
+        <Text style={{ fontWeight: "800", marginBottom: 8, color: C.text }}>
           {poll.question}
         </Text>
       )}
@@ -1043,9 +1052,9 @@ function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void
               marginBottom: 6,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: o.voted ? "#0066FF" : "#E2E8F0",
+              borderColor: o.voted ? "#0066FF" : C.border,
               overflow: "hidden",
-              backgroundColor: "#fff",
+              backgroundColor: C.card,
             }}
           >
             <View
@@ -1055,7 +1064,7 @@ function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void
                 top: 0,
                 bottom: 0,
                 width: `${pct}%`,
-                backgroundColor: o.voted ? "#DBEAFE" : "#EEF2F7",
+                backgroundColor: o.voted ? C.primarySoft : C.field,
               }}
             />
             <View
@@ -1066,18 +1075,18 @@ function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void
                 paddingVertical: 8,
               }}
             >
-              <Text style={{ fontWeight: o.voted ? "800" : "500", color: "#0F172A" }}>
+              <Text style={{ fontWeight: o.voted ? "800" : "500", color: C.text }}>
                 {o.voted ? "✓ " : ""}
                 {o.text}
               </Text>
-              <Text style={{ fontWeight: "700", color: "#334155" }}>
+              <Text style={{ fontWeight: "700", color: C.text2 }}>
                 {pct}% · {o.votes}
               </Text>
             </View>
           </Pressable>
         );
       })}
-      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+      <Text style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
         {total} lượt bình chọn{closed ? " · đã đóng" : ""}
         {poll.multi ? " · chọn nhiều" : ""}
       </Text>
@@ -1086,6 +1095,7 @@ function PollBlockRN({ poll, onVote }: { poll: any; onVote: (id: string) => void
 }
 
 function SharedMatchCardRN({ sm }: { sm: any }) {
+  const C = useThemeTokens();
   const winA = sm.winner === "A";
   const winB = sm.winner === "B";
   return (
@@ -1095,7 +1105,7 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
         marginTop: 10,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
+        borderColor: C.border,
         overflow: "hidden",
       }}
     >
@@ -1128,7 +1138,7 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
           style={{
             flex: 1,
             fontWeight: winA ? "800" : "500",
-            color: winA ? "#15803D" : "#0F172A",
+            color: winA ? C.greenText : C.text,
           }}
         >
           {sm.teamA || "Đội A"}
@@ -1138,16 +1148,16 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
             paddingHorizontal: 12,
             paddingVertical: 4,
             borderRadius: 10,
-            backgroundColor: "#E2E8F0",
+            backgroundColor: C.border,
             alignItems: "center",
             minWidth: 74,
           }}
         >
-          <Text style={{ fontWeight: "900", fontSize: 18, color: "#0F172A" }}>
+          <Text style={{ fontWeight: "900", fontSize: 18, color: C.text }}>
             {sm.scoreA} – {sm.scoreB}
           </Text>
           {(sm.setsA || sm.setsB) ? (
-            <Text style={{ fontSize: 11, color: "#64748B" }}>
+            <Text style={{ fontSize: 11, color: C.sub }}>
               Sets {sm.setsA}–{sm.setsB}
             </Text>
           ) : null}
@@ -1157,7 +1167,7 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
             flex: 1,
             textAlign: "right",
             fontWeight: winB ? "800" : "500",
-            color: winB ? "#15803D" : "#0F172A",
+            color: winB ? C.greenText : C.text,
           }}
         >
           {sm.teamB || "Đội B"}
@@ -1168,6 +1178,7 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
 }
 
 function SharedListingCardRN({ sl }: { sl: any }) {
+  const C = useThemeTokens();
   const cond = CONDITION_MAP[sl.condition];
   const sold = sl.status === "sold";
   const cta = sold
@@ -1186,12 +1197,12 @@ function SharedListingCardRN({ sl }: { sl: any }) {
         marginTop: 10,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
+        borderColor: C.border,
         overflow: "hidden",
         flexDirection: "row",
       }}
     >
-      <View style={{ width: 104, height: 104, backgroundColor: "#F1F5F9" }}>
+      <View style={{ width: 104, height: 104, backgroundColor: C.field }}>
         {sl.image ? (
           <Image
             source={{ uri: sl.image }}
@@ -1210,7 +1221,7 @@ function SharedListingCardRN({ sl }: { sl: any }) {
             Sản phẩm trên Chợ
           </Text>
         </View>
-        <Text numberOfLines={2} style={{ fontWeight: "700", fontSize: 14, color: "#111827" }}>
+        <Text numberOfLines={2} style={{ fontWeight: "700", fontSize: 14, color: C.text }}>
           {sl.title || "Sản phẩm"}
         </Text>
         <Text style={{ color: "#0066FF", fontWeight: "900", fontSize: 16 }}>
@@ -1225,7 +1236,7 @@ function SharedListingCardRN({ sl }: { sl: any }) {
             gap: 8,
           }}
         >
-          <Text numberOfLines={1} style={{ color: "#64748B", fontSize: 11, flex: 1 }}>
+          <Text numberOfLines={1} style={{ color: C.sub, fontSize: 11, flex: 1 }}>
             {[cond?.label, sl.province].filter(Boolean).join(" · ")}
           </Text>
           <View
@@ -1233,10 +1244,10 @@ function SharedListingCardRN({ sl }: { sl: any }) {
               paddingHorizontal: 12,
               paddingVertical: 5,
               borderRadius: 999,
-              backgroundColor: sold ? "#E2E8F0" : "#0066FF",
+              backgroundColor: sold ? C.border : "#0066FF",
             }}
           >
-            <Text style={{ color: sold ? "#94A3B8" : "#fff", fontWeight: "700", fontSize: 12 }}>
+            <Text style={{ color: sold ? C.muted : "#fff", fontWeight: "700", fontSize: 12 }}>
               {cta}
             </Text>
           </View>
@@ -1247,12 +1258,13 @@ function SharedListingCardRN({ sl }: { sl: any }) {
 }
 
 function SharedPlayCardRN({ sp }: { sp: any }) {
+  const C = useThemeTokens();
   const st = PLAY_STATUS[sp.status] || PLAY_STATUS.open;
   const slotsLeft = Math.max(0, (sp.slots || 0) - (sp.acceptedCount || 0));
   return (
     <Pressable
       onPress={() => sp.playId && router.push(`/play/${sp.playId}` as any)}
-      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" }}
+      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#16a34a" }}>
         <Text>🏓</Text>
@@ -1262,13 +1274,13 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
         </View>
       </View>
       <View style={{ padding: 12 }}>
-        <Text style={{ fontWeight: "800", fontSize: 15, color: "#0F172A" }}>{sp.title || sp.courtName || "Kèo pickleball"}</Text>
-        <Text style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>🕒 {formatPlayTime(sp.playAt)}</Text>
-        <Text style={{ fontSize: 13, color: "#64748B" }}>📍 {[sp.courtName, sp.province].filter(Boolean).join(", ") || "—"}</Text>
+        <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{sp.title || sp.courtName || "Kèo pickleball"}</Text>
+        <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>🕒 {formatPlayTime(sp.playAt)}</Text>
+        <Text style={{ fontSize: 13, color: C.sub }}>📍 {[sp.courtName, sp.province].filter(Boolean).join(", ") || "—"}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
-          <Text style={{ fontSize: 12.5, color: "#64748B", flex: 1 }}>{skillLabel(sp.skillMin, sp.skillMax)} · thiếu {slotsLeft} người</Text>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: sp.status === "open" ? "#16a34a" : "#E2E8F0" }}>
-            <Text style={{ color: sp.status === "open" ? "#fff" : "#94A3B8", fontWeight: "700", fontSize: 12.5 }}>{sp.status === "open" ? "Tham gia" : "Xem kèo"}</Text>
+          <Text style={{ fontSize: 12.5, color: C.sub, flex: 1 }}>{skillLabel(sp.skillMin, sp.skillMax)} · thiếu {slotsLeft} người</Text>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: sp.status === "open" ? "#16a34a" : C.border }}>
+            <Text style={{ color: sp.status === "open" ? "#fff" : C.muted, fontWeight: "700", fontSize: 12.5 }}>{sp.status === "open" ? "Tham gia" : "Xem kèo"}</Text>
           </View>
         </View>
       </View>
@@ -1278,6 +1290,7 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
 
 // Card sự kiện xé vé / social được chia sẻ (rủ mọi người tham gia)
 function SharedEventCardRN({ se }: { se: any }) {
+  const C = useThemeTokens();
   const start = se.startAt ? new Date(se.startAt) : null;
   const when = start
     ? start.toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })
@@ -1290,7 +1303,7 @@ function SharedEventCardRN({ se }: { se: any }) {
   return (
     <Pressable
       onPress={() => se.eventId && router.push(`/events/${se.eventId}` as any)}
-      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" }}
+      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}
     >
       {!!se.coverImage && <Image source={{ uri: se.coverImage }} style={{ width: "100%", height: 140 }} resizeMode="cover" />}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#e11d48" }}>
@@ -1301,13 +1314,13 @@ function SharedEventCardRN({ se }: { se: any }) {
         </View>
       </View>
       <View style={{ padding: 12 }}>
-        <Text style={{ fontWeight: "800", fontSize: 15, color: "#0F172A" }}>{se.title || "Sự kiện"}</Text>
-        {!!when && <Text style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>🕒 {when}</Text>}
-        <Text style={{ fontSize: 13, color: "#64748B" }} numberOfLines={1}>📍 {[se.venueName, se.address].filter(Boolean).join(" · ") || "—"}{se.courts ? ` · ${se.courts}` : ""}</Text>
+        <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{se.title || "Sự kiện"}</Text>
+        {!!when && <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>🕒 {when}</Text>}
+        <Text style={{ fontSize: 13, color: C.sub }} numberOfLines={1}>📍 {[se.venueName, se.address].filter(Boolean).join(" · ") || "—"}{se.courts ? ` · ${se.courts}` : ""}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
-          <Text style={{ fontSize: 12.5, color: "#64748B", flex: 1 }} numberOfLines={1}>{skill}{gender[se.genderPolicy] ? ` · ${gender[se.genderPolicy]}` : ""} · {se.registered || 0}/{se.capacity || 0} suất · {price}</Text>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: !ended && left > 0 ? "#e11d48" : "#E2E8F0" }}>
-            <Text style={{ color: !ended && left > 0 ? "#fff" : "#94A3B8", fontWeight: "700", fontSize: 12.5 }}>{!ended && left > 0 ? "Tham gia" : "Xem"}</Text>
+          <Text style={{ fontSize: 12.5, color: C.sub, flex: 1 }} numberOfLines={1}>{skill}{gender[se.genderPolicy] ? ` · ${gender[se.genderPolicy]}` : ""} · {se.registered || 0}/{se.capacity || 0} suất · {price}</Text>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: !ended && left > 0 ? "#e11d48" : C.border }}>
+            <Text style={{ color: !ended && left > 0 ? "#fff" : C.muted, fontWeight: "700", fontSize: 12.5 }}>{!ended && left > 0 ? "Tham gia" : "Xem"}</Text>
           </View>
         </View>
       </View>
@@ -1316,6 +1329,8 @@ function SharedEventCardRN({ se }: { se: any }) {
 }
 
 function PostCard({ post, me }: { post: any; me: any }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
   const [deletePost] = useDeleteFeedPostMutation();
@@ -1486,7 +1501,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
           <Text style={styles.postTime}>{fmtTime(post.createdAt)}</Text>
         </Pressable>
         <Pressable onPress={handleMenu} hitSlop={12}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#64748B" />
+          <Ionicons name="ellipsis-horizontal" size={20} color={C.sub} />
         </Pressable>
       </View>
 
@@ -1494,21 +1509,21 @@ function PostCard({ post, me }: { post: any; me: any }) {
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          style={{ flex: 1, backgroundColor: C.overlay, justifyContent: "flex-end" }}
         >
           <Pressable style={{ flex: 1 }} onPress={() => setEditOpen(false)} />
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
-            <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 10 }}>Sửa bài viết</Text>
+          <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
+            <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 10, color: C.text }}>Sửa bài viết</Text>
             <TextInput
               value={editText}
               onChangeText={setEditText}
               multiline
               placeholder="Nội dung bài viết…"
-              placeholderTextColor="#94A3B8"
-              style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, padding: 12, fontSize: 15, minHeight: 100, textAlignVertical: "top" }}
+              placeholderTextColor={C.muted}
+              style={{ borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 100, textAlignVertical: "top", color: C.text }}
             />
             {(post.sharedListing || post.sharedPlay || post.sharedMatch || post.sharedEvent) && (
-              <Text style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 6 }}>
+              <Text style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>
                 * Phần đính kèm (sản phẩm/kèo/trận/sự kiện) được giữ nguyên.
               </Text>
             )}
@@ -1597,11 +1612,11 @@ function PostCard({ post, me }: { post: any; me: any }) {
           onPress={() => router.push(`/feed/post/${post._id}`)}
           style={styles.actionBtn}
         >
-          <Ionicons name="chatbubble-outline" size={18} color="#64748B" />
+          <Ionicons name="chatbubble-outline" size={18} color={C.sub} />
           <Text style={styles.actionLabel}>Bình luận</Text>
         </Pressable>
         <Pressable onPress={handleShare} style={styles.actionBtn}>
-          <Ionicons name="share-social-outline" size={18} color="#64748B" />
+          <Ionicons name="share-social-outline" size={18} color={C.sub} />
           <Text style={styles.actionLabel}>Chia sẻ</Text>
         </Pressable>
         <Pressable onPress={toggleSave} style={styles.actionBtn}>
@@ -1675,7 +1690,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
             </Pressable>
           ))}
           <Pressable onPress={() => setPickerOpen(false)} style={styles.reactionPick}>
-            <Ionicons name="close" size={22} color="#64748B" />
+            <Ionicons name="close" size={22} color={C.sub} />
           </Pressable>
         </View>
       )}
@@ -1684,6 +1699,8 @@ function PostCard({ post, me }: { post: any; me: any }) {
 }
 
 export default function FeedScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const dispatch = useDispatch();
   const socket = useSocket();
@@ -1872,6 +1889,7 @@ export default function FeedScreen() {
           <RefreshControl
             refreshing={isFetching && !cursor}
             onRefresh={handleRefresh}
+            tintColor={C.sub}
           />
         }
         onEndReached={loadMore}
@@ -1879,13 +1897,13 @@ export default function FeedScreen() {
         ListFooterComponent={
           isFetching && cursor ? (
             <View style={{ padding: 16 }}>
-              <ActivityIndicator />
+              <ActivityIndicator color={C.primary} />
             </View>
           ) : !hasMore && items.length > 0 ? (
             <Text
               style={{
                 textAlign: "center",
-                color: "#94A3B8",
+                color: C.muted,
                 padding: 16,
                 fontSize: 12,
               }}
@@ -1903,7 +1921,7 @@ export default function FeedScreen() {
             </Text>
           ) : (
             <View style={{ padding: 24 }}>
-              <ActivityIndicator />
+              <ActivityIndicator color={C.primary} />
             </View>
           )
         }
@@ -1913,13 +1931,13 @@ export default function FeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   mentionList: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     overflow: "hidden",
   },
   mentionItem: {
@@ -1929,15 +1947,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
   mentionNameRow: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
   },
-  mentionNick: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  mentionName: { fontSize: 12, color: "#64748B" },
+  mentionNick: { fontSize: 14, fontWeight: "700", color: C.text },
+  mentionName: { fontSize: 12, color: C.sub },
   tournamentChip: {
     marginTop: 10,
     alignSelf: "flex-start",
@@ -1947,15 +1965,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 16,
-    backgroundColor: "#FFF7ED",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: "#FED7AA",
+    borderColor: C.dark ? "rgba(245,158,11,0.35)" : "#FED7AA",
     maxWidth: "100%",
   },
   tournamentChipText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#B45309",
+    color: C.amberText,
     flexShrink: 1,
   },
   tourInfoRow: {
@@ -1964,7 +1982,7 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 3,
   },
-  tourInfoText: { fontSize: 11, color: "#64748B", flexShrink: 1 },
+  tourInfoText: { fontSize: 11, color: C.sub, flexShrink: 1 },
   linkedTournamentCard: {
     marginTop: 10,
     flexDirection: "row",
@@ -1972,15 +1990,15 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: 12,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: C.dark ? "rgba(245,158,11,0.35)" : "#FDE68A",
   },
   linkedTournamentImg: {
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
   },
   linkedTournamentFallback: {
     alignItems: "center",
@@ -1989,14 +2007,14 @@ const styles = StyleSheet.create({
   linkedTournamentLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#B45309",
+    color: C.amberText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   linkedTournamentName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: C.text,
     marginTop: 2,
   },
   pickerHeader: {
@@ -2006,9 +2024,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  pickerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
+  pickerTitle: { fontSize: 17, fontWeight: "700", color: C.text },
   pickerSearchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -2017,12 +2035,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   pickerSearchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
     padding: 0,
   },
   pickerRow: {
@@ -2032,30 +2050,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
   pickerThumb: {
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   pickerThumbFallback: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF7ED",
+    backgroundColor: C.amberSoft,
   },
-  pickerName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  pickerMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  pickerName: { fontSize: 14, fontWeight: "700", color: C.text },
+  pickerMeta: { fontSize: 12, color: C.sub, marginTop: 2 },
+  container: { flex: 1, backgroundColor: C.bg },
   emptyLogin: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
   },
-  emptyTitle: { fontSize: 16, marginBottom: 12, color: "#334155" },
-  empty: { padding: 24, textAlign: "center", color: "#64748B" },
+  emptyTitle: { fontSize: 16, marginBottom: 12, color: C.text2 },
+  empty: { padding: 24, textAlign: "center", color: C.sub },
   feedTabs: {
     flexDirection: "row",
     gap: 8,
@@ -2069,10 +2087,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(148,163,184,0.15)",
   },
   feedTabBtnActive: { backgroundColor: "#4dd0e1" },
-  feedTabText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+  feedTabText: { fontSize: 13, fontWeight: "700", color: C.sub },
   feedTabTextActive: { color: "#0a0e1a" },
   composer: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     padding: 12,
     marginHorizontal: 12,
     marginTop: 12,
@@ -2098,7 +2116,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     maxHeight: 160,
     fontSize: 15,
-    color: "#0F172A",
+    color: C.text,
     padding: 0,
     paddingTop: 10,
   },
@@ -2108,7 +2126,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: C.border,
     position: "relative",
   },
   mediaPreviewImg: { width: "100%", height: "100%" },
@@ -2130,7 +2148,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: C.border,
   },
   iconBtn: { flexDirection: "row", alignItems: "center", gap: 6, padding: 6 },
   iconBtnLabel: { color: "#0066FF", fontWeight: "600" },
@@ -2142,7 +2160,7 @@ const styles = StyleSheet.create({
   },
   postBtnText: { color: "#fff", fontWeight: "700" },
   postCard: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     marginHorizontal: 12,
     marginBottom: 12,
     borderRadius: 12,
@@ -2153,18 +2171,18 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   postHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  postAuthor: { fontWeight: "700", color: "#0F172A" },
+  postAuthor: { fontWeight: "700", color: C.text },
   pinnedBadge: { color: "#F59E0B" },
-  postTime: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  postTime: { fontSize: 12, color: C.sub, marginTop: 2 },
   postContent: {
     marginTop: 10,
     fontSize: 15,
     lineHeight: 22,
-    color: "#0F172A",
+    color: C.text,
   },
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   tagChip: {
-    backgroundColor: "#EEF4FF",
+    backgroundColor: C.primarySoft,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -2177,9 +2195,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
-  statText: { fontSize: 12, color: "#64748B" },
+  statText: { fontSize: 12, color: C.sub },
   actionRow: {
     flexDirection: "row",
     marginTop: 4,
@@ -2192,12 +2210,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  actionLabel: { color: "#64748B", fontSize: 14 },
+  actionLabel: { color: C.sub, fontSize: 14 },
   previewComments: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: C.border,
     gap: 8,
   },
   previewCommentRow: {
@@ -2207,19 +2225,19 @@ const styles = StyleSheet.create({
   },
   previewBubble: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  previewAuthor: { fontWeight: "700", color: "#0F172A", fontSize: 12 },
-  previewContent: { color: "#0F172A", fontSize: 13, marginTop: 1 },
-  previewMore: { color: "#475569", fontSize: 12, fontWeight: "600" },
+  previewAuthor: { fontWeight: "700", color: C.text, fontSize: 12 },
+  previewContent: { color: C.text, fontSize: 13, marginTop: 1 },
+  previewMore: { color: C.text3, fontSize: 12, fontWeight: "600" },
   reactionPicker: {
     position: "absolute",
     left: 12,
     bottom: 40,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 24,
     paddingHorizontal: 8,
     paddingVertical: 6,

@@ -3,8 +3,7 @@
 // rejected + nút "Bổ sung thành tích".
 import {
   Ionicons } from "@expo/vector-icons";
-import React,
-  { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +20,7 @@ import {
   useDeleteCoachAchievementMutation,
   useListCoachAchievementsQuery,
 } from "@/slices/coachesApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const LEVEL_LABEL: Record<string, string> = {
   national: "Quốc gia",
@@ -36,29 +36,28 @@ const LEVEL_COLOR: Record<string, string> = {
   club: "#10B981",
   other: "#94A3B8",
 };
-const STATUS_META: Record<
-  string,
-  { color: string; bg: string; label: string; icon: string }
-> = {
+const mkStatusMeta = (
+  C: ThemeTokens
+): Record<string, { color: string; bg: string; label: string; icon: string }> => ({
   approved: {
-    color: "#065F46",
-    bg: "#D1FAE5",
+    color: C.greenText,
+    bg: C.greenSoft,
     label: "Đã duyệt",
     icon: "checkmark-circle",
   },
   pending: {
-    color: "#92400E",
-    bg: "#FEF3C7",
+    color: C.amberText,
+    bg: C.amberSoft,
     label: "Chờ duyệt",
     icon: "time-outline",
   },
   rejected: {
-    color: "#991B1B",
-    bg: "#FEE2E2",
+    color: C.redText,
+    bg: C.redSoft,
     label: "Từ chối",
     icon: "close-circle-outline",
   },
-};
+});
 
 export function CoachAchievementsMobile({
   userId,
@@ -71,6 +70,9 @@ export function CoachAchievementsMobile({
   isCoach: boolean;
   isAdminViewer: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
+  const STATUS_META = useMemo(() => mkStatusMeta(C), [C]);
   const [addOpen, setAddOpen] = useState(false);
   const { data, isLoading, refetch } = useListCoachAchievementsQuery(userId, {
     skip: !userId,
@@ -227,6 +229,8 @@ function AddAchievementModal({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
   const [level, setLevel] = useState("other");
@@ -273,7 +277,7 @@ function AddAchievementModal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Bổ sung thành tích</Text>
             <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#64748B" />
+              <Ionicons name="close" size={22} color={C.sub} />
             </Pressable>
           </View>
 
@@ -294,7 +298,7 @@ function AddAchievementModal({
                 value={title}
                 onChangeText={setTitle}
                 placeholder="VD: Vô địch giải mở rộng miền Bắc 2025"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={styles.input}
                 maxLength={200}
               />
@@ -308,7 +312,7 @@ function AddAchievementModal({
                   onChangeText={setYear}
                   keyboardType="number-pad"
                   placeholder="2024"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                   style={styles.input}
                 />
               </View>
@@ -344,7 +348,7 @@ function AddAchievementModal({
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Vai trò của bạn, số học viên, giải/nội dung cụ thể..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
                 multiline
                 maxLength={1000}
@@ -372,15 +376,15 @@ function AddAchievementModal({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   card: {
     marginHorizontal: 12,
     marginTop: 12,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   headerRow: {
     flexDirection: "row",
@@ -388,7 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
-  title: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  title: { fontSize: 15, fontWeight: "800", color: C.text },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -403,20 +407,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: C.dark ? "rgba(0,102,255,0.35)" : "#BFDBFE",
   },
-  emptyText: { color: "#1E40AF", fontSize: 12, textAlign: "center" },
+  emptyText: { color: C.dark ? "#93C5FD" : "#1E40AF", fontSize: 12, textAlign: "center" },
   item: {
     padding: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    borderColor: C.border,
+    backgroundColor: C.bg,
   },
   itemHeadRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  itemTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  itemTitle: { fontSize: 14, fontWeight: "700", color: C.text },
   chipsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -429,10 +433,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#fff",
+    borderColor: C.line,
+    backgroundColor: C.card,
   },
-  yearChipText: { fontSize: 11, color: "#334155", fontWeight: "700" },
+  yearChipText: { fontSize: 11, color: C.text2, fontWeight: "700" },
   levelChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -449,20 +453,20 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusChipText: { fontSize: 10, fontWeight: "700" },
-  itemDesc: { fontSize: 12, color: "#475569", marginTop: 6 },
+  itemDesc: { fontSize: 12, color: C.text3, marginTop: 6 },
   adminNoteText: {
     fontSize: 11,
-    color: "#B91C1C",
+    color: C.redText,
     fontStyle: "italic",
     marginTop: 4,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 24,
@@ -471,7 +475,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     borderRadius: 999,
     alignSelf: "center",
     marginTop: 8,
@@ -484,25 +488,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 6,
   },
-  modalTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  modalTitle: { fontSize: 16, fontWeight: "800", color: C.text },
   infoBox: {
     padding: 10,
     borderRadius: 8,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: C.dark ? "rgba(0,102,255,0.35)" : "#BFDBFE",
   },
-  infoText: { color: "#1E40AF", fontSize: 12, lineHeight: 17 },
-  label: { fontSize: 12, fontWeight: "700", color: "#334155", marginBottom: 4 },
+  infoText: { color: C.dark ? "#93C5FD" : "#1E40AF", fontSize: 12, lineHeight: 17 },
+  label: { fontSize: 12, fontWeight: "700", color: C.text2, marginBottom: 4 },
   input: {
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: C.line,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#0F172A",
-    backgroundColor: "#fff",
+    color: C.text,
+    backgroundColor: C.card,
   },
   levelPicker: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   levelPickerItem: {
@@ -510,11 +514,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#fff",
+    borderColor: C.line,
+    backgroundColor: C.card,
   },
   levelPickerItemActive: { backgroundColor: "#0066FF", borderColor: "#0066FF" },
-  levelPickerText: { fontSize: 11, color: "#334155", fontWeight: "600" },
+  levelPickerText: { fontSize: 11, color: C.text2, fontWeight: "600" },
   levelPickerTextActive: { color: "#fff" },
   submitBtn: {
     marginTop: 8,

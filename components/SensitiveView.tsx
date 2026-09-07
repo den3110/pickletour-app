@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as ScreenCapture from "expo-screen-capture";
 import { BlurView } from "expo-blur";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type Props = {
   children: React.ReactNode;
@@ -29,6 +30,8 @@ export default function SensitiveView({
   showWatermark = true,
   watermarkText = "CONFIDENTIAL",
 }: Props) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [justScreenshot, setJustScreenshot] = useState(false);
   const [inBackground, setInBackground] = useState(false);
   const timeRef = useRef<NodeJS.Timeout | null>(null);
@@ -142,7 +145,7 @@ export default function SensitiveView({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   container: { flex: 1 },
   watermarkWrap: {
     ...StyleSheet.absoluteFillObject,
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
   watermarkBlock: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#fff",
+    backgroundColor: "#fff", // watermark block: luôn trắng (mờ 0.08) ở cả 2 theme
     borderRadius: 10,
   },
   // watermarkText: { color: "rgba(255,255,255,0.35)", fontSize: 18, fontWeight: "700", letterSpacing: 1 },

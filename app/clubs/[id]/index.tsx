@@ -37,6 +37,7 @@ import ClubMatchesRN from "@/components/clubs/ClubMatchesRN";
 import JoinRequestsSheetRN from "@/components/clubs/JoinRequestsSheetRN";
 import ClubCreateModal from "@/components/clubs/ClubCreateModal";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const { width: W } = Dimensions.get("window");
 const TABS = ["news", "discussion", "events", "polls", "gallery", "sessions", "matches", "finance"] as const;
@@ -90,6 +91,7 @@ function GradientCard({
 }
 
 export default function ClubDetailPageRN() {
+  const C = useThemeTokens();
   const params = useLocalSearchParams<{ id?: string; tab?: string }>();
   const id = String(params?.id || "");
   const initialTab = (params?.tab || "").toLowerCase();
@@ -154,7 +156,7 @@ export default function ClubDetailPageRN() {
   // Loading
   if (isLoading) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         {/* Lottie BG while loading */}
         {SHOULD_RENDER_NATIVE_LOTTIE ? (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -169,8 +171,8 @@ export default function ClubDetailPageRN() {
         ) : null}
 
         <View style={styles.centered}>
-          <ActivityIndicator />
-          <Text style={{ marginTop: 8, color: "#666" }}>Đang tải CLB…</Text>
+          <ActivityIndicator color={C.accent} />
+          <Text style={{ marginTop: 8, color: C.sub }}>Đang tải CLB…</Text>
         </View>
       </SafeAreaView>
     );
@@ -178,7 +180,7 @@ export default function ClubDetailPageRN() {
 
   if (!club?._id) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         {/* Lottie BG */}
         {SHOULD_RENDER_NATIVE_LOTTIE ? (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -242,8 +244,8 @@ export default function ClubDetailPageRN() {
   ) : null;
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar barStyle={C.dark ? "light-content" : "dark-content"} />
 
       <View style={{ flex: 1 }}>
         {/* ===== LOTTIE BACKGROUND (toàn trang) ===== */}
@@ -434,8 +436,8 @@ export default function ClubDetailPageRN() {
         ref={joinSheetRef}
         index={0}
         snapPoints={["50%", "80%"]}
-        backgroundStyle={{ backgroundColor: "#fff" }}
-        handleIndicatorStyle={{ backgroundColor: "#ccc" }}
+        backgroundStyle={{ backgroundColor: C.card }}
+        handleIndicatorStyle={{ backgroundColor: C.line }}
       >
         <JoinRequestsSheetRN clubId={club._id} onClose={closeJR} />
       </BottomSheetModal>

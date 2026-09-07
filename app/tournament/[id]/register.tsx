@@ -3185,7 +3185,7 @@ export default function TournamentRegistrationScreen() {
                     <View
                       key={r._id}
                       style={{
-                        backgroundColor: "#fff",
+                        backgroundColor: C.cardBg,
                         borderRadius: 10,
                         padding: 12,
                         marginBottom: 8,
@@ -3267,7 +3267,7 @@ export default function TournamentRegistrationScreen() {
                                   width: 38,
                                   height: 38,
                                   borderRadius: 19,
-                                  backgroundColor: "#F1F5F9",
+                                  backgroundColor: C.chipBg,
                                   borderWidth: 1,
                                   borderColor: "#F59E0B",
                                 }}
@@ -3291,7 +3291,7 @@ export default function TournamentRegistrationScreen() {
                                   numberOfLines={1}
                                   style={{
                                     fontWeight: "700",
-                                    color: "#0F172A",
+                                    color: C.textPrimary,
                                     fontSize: 14,
                                   }}
                                 />
@@ -3313,7 +3313,7 @@ export default function TournamentRegistrationScreen() {
                               >
                                 <Text
                                   style={{
-                                    color: "#64748B",
+                                    color: C.textSecondary,
                                     fontSize: 11,
                                     fontFamily:
                                       Platform.OS === "ios"
@@ -3356,12 +3356,12 @@ export default function TournamentRegistrationScreen() {
                             marginTop: 10,
                             paddingTop: 8,
                             borderTopWidth: 1,
-                            borderTopColor: "#FEF3C7",
+                            borderTopColor: C.warningBg,
                             borderStyle: "dashed",
                           }}
                         >
                           <Text
-                            style={{ fontSize: 11, color: "#64748B" }}
+                            style={{ fontSize: 11, color: C.textSecondary }}
                           >
                             Tổng:
                           </Text>
@@ -3376,7 +3376,7 @@ export default function TournamentRegistrationScreen() {
                           </Text>
                           {cap > 0 && (
                             <Text
-                              style={{ fontSize: 11, color: "#64748B" }}
+                              style={{ fontSize: 11, color: C.textSecondary }}
                             >
                               / {cap}
                             </Text>
@@ -3971,6 +3971,7 @@ function RegistrationHistoryModal({
   loading: boolean;
   C: any;
 }) {
+  const historyStyles = useMemo(() => mkHistoryStyles(C), [C]);
   const items = Array.isArray(data?.items) ? data.items : [];
   return (
     <Modal
@@ -4150,7 +4151,7 @@ function RegistrationHistoryModal({
                             <Text
                               style={{
                                 fontWeight: "800",
-                                color: "#0F172A",
+                                color: C.textPrimary,
                                 fontSize: 14,
                               }}
                             >
@@ -4198,19 +4199,19 @@ function RegistrationHistoryModal({
   );
 }
 
-const historyStyles = StyleSheet.create({
+const mkHistoryStyles = (C: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   counterChip: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.chipBg,
     borderRadius: 999,
   },
-  counterText: { fontSize: 12, color: "#334155", fontWeight: "600" },
+  counterText: { fontSize: 12, color: C.textPrimary, fontWeight: "600" },
   card: {
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    backgroundColor: "#fff",
+    backgroundColor: C.cardBg,
   },
   iconCircle: {
     width: 34,
@@ -4224,13 +4225,13 @@ const historyStyles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.chipBg,
   },
-  regChipText: { fontSize: 11, fontWeight: "700", color: "#334155" },
-  timeText: { fontSize: 11, color: "#64748B" },
-  regPlayers: { fontSize: 13, color: "#475569", marginTop: 4 },
-  actorText: { fontSize: 11, color: "#64748B", marginTop: 2 },
-  detailText: { fontSize: 13, color: "#334155" },
+  regChipText: { fontSize: 11, fontWeight: "700", color: C.textPrimary },
+  timeText: { fontSize: 11, color: C.textSecondary },
+  regPlayers: { fontSize: 13, color: C.textSecondary, marginTop: 4 },
+  actorText: { fontSize: 11, color: C.textSecondary, marginTop: 2 },
+  detailText: { fontSize: 13, color: C.textPrimary },
 });
 
 const styles = StyleSheet.create({

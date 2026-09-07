@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import MarketCard from "@/components/market/MarketCard";
 import { useMyMarketListingsQuery } from "@/slices/marketApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 const TABS = [
@@ -25,6 +26,7 @@ const TABS = [
 ];
 
 export default function MyListingsScreen() {
+  const C = useThemeTokens();
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState("");
   const { data, isLoading, refetch } = useMyMarketListingsQuery(tab || undefined);
@@ -38,18 +40,18 @@ export default function MyListingsScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4, flex: 1 }}>📦 Tin của tôi</Text>
+        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4, flex: 1, color: C.text }}>📦 Tin của tôi</Text>
         <TouchableOpacity onPress={() => router.push("/marketplace/new" as any)} hitSlop={8}>
           <Ionicons name="add-circle" size={26} color={BLUE} />
         </TouchableOpacity>
       </View>
 
-      <View style={{ backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+      <View style={{ backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}>
           {TABS.map((t) => {
             const active = tab === t.key;
@@ -57,9 +59,9 @@ export default function MyListingsScreen() {
               <TouchableOpacity
                 key={t.key || "all"}
                 onPress={() => setTab(t.key)}
-                style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? BLUE : "#F1F5F9" }}
+                style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? BLUE : C.field }}
               >
-                <Text style={{ fontWeight: "700", color: active ? "#fff" : "#334155" }}>{t.label}</Text>
+                <Text style={{ fontWeight: "700", color: active ? "#fff" : C.text2 }}>{t.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -79,7 +81,7 @@ export default function MyListingsScreen() {
           ListEmptyComponent={
             <View style={{ alignItems: "center", marginTop: 60 }}>
               <Text style={{ fontSize: 44 }}>📦</Text>
-              <Text style={{ color: "#64748B", marginTop: 8, fontWeight: "600" }}>Chưa có tin nào ở mục này</Text>
+              <Text style={{ color: C.sub, marginTop: 8, fontWeight: "600" }}>Chưa có tin nào ở mục này</Text>
               <TouchableOpacity
                 onPress={() => router.push("/marketplace/new" as any)}
                 style={{ marginTop: 16, backgroundColor: BLUE, paddingHorizontal: 22, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" }}

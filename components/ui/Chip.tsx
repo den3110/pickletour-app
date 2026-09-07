@@ -1,7 +1,7 @@
 // components/ui/Chip.tsx
 import {
   normalizeUrl } from "@/utils/normalizeUri";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Image } from "expo-image";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 interface ChipProps {
   label: string;
@@ -23,6 +24,8 @@ interface ChipProps {
 }
 
 export function Chip({ label, selected, onPress, style }: ChipProps) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -36,22 +39,23 @@ export function Chip({ label, selected, onPress, style }: ChipProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#667eea",
-    backgroundColor: "transparent",
+    borderColor: C.border,
+    backgroundColor: C.field,
   },
   chipSelected: {
     backgroundColor: "#667eea",
+    borderColor: "#667eea",
   },
   chipText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#667eea",
+    color: C.text2,
   },
   chipTextSelected: {
     color: "#fff",
@@ -67,12 +71,14 @@ interface CardProps {
 }
 
 export function Card({ children, style }: CardProps) {
+  const C = useThemeTokens();
+  const cardStyles = useMemo(() => mk_cardStyles(C), [C]);
   return <View style={[cardStyles.card, style]}>{children}</View>;
 }
 
-const cardStyles = StyleSheet.create({
+const mk_cardStyles = (C: ThemeTokens) => StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 16,
     padding: 16,
     shadowColor: "#000",
@@ -94,13 +100,14 @@ interface AvatarProps {
 }
 
 export function Avatar({ source, size = 40, style }: AvatarProps) {
+  const C = useThemeTokens();
   const uri = source?.uri ? normalizeUrl(source.uri) : undefined;
 
   return (
     <Image
       source={uri ? { uri } : require("../../assets/images/icon.png")}
       style={[
-        avatarStyles.avatar,
+        { backgroundColor: C.line },
         { width: size, height: size, borderRadius: size / 2 },
         style,
       ]}
@@ -108,12 +115,6 @@ export function Avatar({ source, size = 40, style }: AvatarProps) {
     />
   );
 }
-
-const avatarStyles = StyleSheet.create({
-  avatar: {
-    backgroundColor: "#e0e0e0",
-  },
-});
 
 // ===================================
 // Modal Component
@@ -126,6 +127,8 @@ interface ModalProps {
 }
 
 export function Modal({ visible, onClose, children }: ModalProps) {
+  const C = useThemeTokens();
+  const modalStyles = useMemo(() => mk_modalStyles(C), [C]);
   return (
     <RNModal
       visible={visible}
@@ -146,10 +149,10 @@ export function Modal({ visible, onClose, children }: ModalProps) {
   );
 }
 
-const modalStyles = StyleSheet.create({
+const mk_modalStyles = (C: ThemeTokens) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: C.overlay,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -158,7 +161,7 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   content: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 20,
     padding: 24,
     maxHeight: "90%",

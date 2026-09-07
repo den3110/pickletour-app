@@ -4,8 +4,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React,
-  { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +27,7 @@ import {
   useMarkNotifReadMutation,
 } from "@/slices/notificationCenterApiSlice";
 import { socket } from "@/lib/socket";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const ICONS: Record<string, any> = {
   FEED_COMMENT_NEW: "chatbubble-outline",
@@ -73,6 +73,8 @@ function NotifRow({
   onPress: () => void;
   onDelete: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const icon = ICONS[n.type] || "notifications-outline";
   const color = COLORS[n.type] || "#0066FF";
   return (
@@ -87,7 +89,7 @@ function NotifRow({
       style={({ pressed }) => [
         styles.row,
         !n.isRead && styles.rowUnread,
-        pressed && { backgroundColor: "#F1F5F9" },
+        pressed && { backgroundColor: C.field },
       ]}
     >
       <View style={[styles.iconWrap, { backgroundColor: `${color}18` }]}>
@@ -117,6 +119,8 @@ function NotifRow({
 }
 
 export default function NotificationsScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const dispatch = useDispatch();
   const { data, isFetching, refetch } = useListNotifsQuery(
@@ -149,7 +153,7 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: t("Thông báo") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
-          <Text style={{ color: "#334155", marginBottom: 12 }}>
+          <Text style={{ color: C.text2, marginBottom: 12 }}>
             Đăng nhập để xem thông báo.
           </Text>
           <Pressable
@@ -213,7 +217,7 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           !isFetching ? (
             <View style={styles.empty}>
-              <Ionicons name="notifications-outline" size={48} color="#94A3B8" />
+              <Ionicons name="notifications-outline" size={48} color={C.muted} />
               <Text style={styles.emptyText}>Chưa có thông báo nào.</Text>
             </View>
           ) : (
@@ -225,16 +229,16 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.card },
   row: {
     flexDirection: "row",
     padding: 12,
     gap: 12,
     alignItems: "flex-start",
   },
-  rowUnread: { backgroundColor: "#F0F7FF" },
-  sep: { height: 1, backgroundColor: "#F1F5F9", marginLeft: 60 },
+  rowUnread: { backgroundColor: C.unreadBg },
+  sep: { height: 1, backgroundColor: C.field, marginLeft: 60 },
   iconWrap: {
     width: 40,
     height: 40,
@@ -242,9 +246,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { color: "#0F172A", fontWeight: "600", fontSize: 14, flex: 1 },
-  body: { color: "#334155", fontSize: 13, marginTop: 2 },
-  time: { color: "#94A3B8", fontSize: 11, marginTop: 4 },
+  title: { color: C.text, fontWeight: "600", fontSize: 14, flex: 1 },
+  body: { color: C.text2, fontSize: 13, marginTop: 2 },
+  time: { color: C.muted, fontSize: 11, marginTop: 4 },
   unreadDot: {
     width: 8,
     height: 8,
@@ -252,7 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
   },
   empty: { padding: 40, alignItems: "center", gap: 8 },
-  emptyText: { color: "#64748B" },
+  emptyText: { color: C.sub },
   loginBtn: {
     backgroundColor: "#0066FF",
     paddingHorizontal: 20,

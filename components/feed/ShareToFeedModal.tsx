@@ -23,6 +23,7 @@ import { router } from "expo-router";
 import { Text } from "@/components/ui/i18nText";
 import { TextInput } from "@/components/ui/i18nTextInput";
 import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 export type ShareToFeedOptions = {
   /** Nội dung mặc định điền sẵn trong ô soạn */
@@ -56,6 +57,7 @@ export function ShareToFeedModal({
   onDone,
   successAlert = true,
 }: Props) {
+  const C = useThemeTokens();
   const [content, setContent] = useState(defaultContent || "");
   const [createFeedPost, { isLoading }] = useCreateFeedPostMutation();
 
@@ -85,12 +87,12 @@ export function ShareToFeedModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, backgroundColor: "rgba(2,6,23,0.55)", justifyContent: "flex-end" }}
+        style={{ flex: 1, backgroundColor: C.overlay, justifyContent: "flex-end" }}
       >
         <Pressable style={{ flex: 1 }} onPress={isLoading ? undefined : onClose} />
         <View
           style={{
-            backgroundColor: "#fff",
+            backgroundColor: C.card,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             paddingHorizontal: 18,
@@ -98,14 +100,14 @@ export function ShareToFeedModal({
             paddingBottom: Platform.OS === "ios" ? 30 : 18,
           }}
         >
-          <View style={{ alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E2E8F0", marginBottom: 12 }} />
+          <View style={{ alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 12 }} />
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: C.primarySoft, alignItems: "center", justifyContent: "center", marginRight: 10 }}>
               <Ionicons name="share-social" size={18} color="#0066FF" />
             </View>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: "900", color: "#0F172A" }}>{title}</Text>
+            <Text style={{ flex: 1, fontSize: 17, fontWeight: "900", color: C.text }}>{title}</Text>
             <TouchableOpacity onPress={onClose} disabled={isLoading} hitSlop={10}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={C.sub} />
             </TouchableOpacity>
           </View>
 
@@ -115,11 +117,11 @@ export function ShareToFeedModal({
             multiline
             autoFocus
             placeholder="Viết gì đó để rủ mọi người…"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             style={{
               borderWidth: 1,
-              borderColor: "#E2E8F0",
-              backgroundColor: "#F8FAFC",
+              borderColor: C.border,
+              backgroundColor: C.bg,
               borderRadius: 14,
               padding: 12,
               fontSize: 15,
@@ -127,21 +129,21 @@ export function ShareToFeedModal({
               minHeight: 110,
               maxHeight: 220,
               textAlignVertical: "top",
-              color: "#0F172A",
+              color: C.text,
             }}
           />
           <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, gap: 8 }}>
             {!!attachmentLabel && (
-              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 }}>
-                <Ionicons name="attach" size={15} color="#64748B" />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: "#475569", fontWeight: "600" }}>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.field, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 }}>
+                <Ionicons name="attach" size={15} color={C.sub} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: C.text3, fontWeight: "600" }}>
                   {attachmentLabel}
                 </Text>
               </View>
             )}
-            <Text style={{ fontSize: 11.5, color: "#94A3B8" }}>{content.length}/{MAX}</Text>
+            <Text style={{ fontSize: 11.5, color: C.muted }}>{content.length}/{MAX}</Text>
           </View>
-          <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 6 }}>
+          <Text style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
             Bạn có thể sửa nội dung trước khi đăng. Phần đính kèm sẽ hiển thị kèm bài viết.
           </Text>
 
@@ -149,9 +151,9 @@ export function ShareToFeedModal({
             <TouchableOpacity
               onPress={onClose}
               disabled={isLoading}
-              style={{ flex: 1, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" }}
+              style={{ flex: 1, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: C.field }}
             >
-              <Text style={{ color: "#334155", fontWeight: "800", fontSize: 15 }}>Huỷ</Text>
+              <Text style={{ color: C.text2, fontWeight: "800", fontSize: 15 }}>Huỷ</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={submit}

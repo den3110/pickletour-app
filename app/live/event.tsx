@@ -34,6 +34,7 @@ import {
   useTrackEventLiveViewMutation,
 } from "@/slices/eventLiveApiSlice";
 import EventLiveChat from "@/components/EventLiveChat";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 // Origin THẬT để YouTube cho phép nhúng (baseUrl=youtube.com khiến YT coi như
 // tự-nhúng-vào-chính-mình -> lỗi 152 cho MỌI video). Dùng pickletour.vn.
@@ -102,9 +103,7 @@ function HlsPlayer({
   );
 }
 
-const BG = "#0a0e1a";
-const CARD = "#121829";
-const BORDER = "rgba(255,255,255,0.08)";
+// Màu cố định cho vùng player (nền đen) — phần còn lại theo theme (C.*)
 const TXT = "#f8fafc";
 const SUB = "#94a3b8";
 const RED = "#dc2626";
@@ -141,6 +140,8 @@ type Court = {
 };
 
 export default function EventLiveScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const playerW = width;
@@ -217,12 +218,12 @@ export default function EventLiveScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
+      <StatusBar style={C.statusBar} />
 
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color={TXT} />
+          <Ionicons name="chevron-back" size={24} color={C.text} />
         </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.hTitle} numberOfLines={1}>
@@ -240,7 +241,7 @@ export default function EventLiveScreen() {
           </View>
         </View>
         <Pressable onPress={() => refetch()} hitSlop={12} style={styles.iconBtn}>
-          <Ionicons name="refresh" size={20} color={SUB} />
+          <Ionicons name="refresh" size={20} color={C.sub} />
         </Pressable>
       </View>
 
@@ -366,7 +367,7 @@ export default function EventLiveScreen() {
             <RefreshControl
               refreshing={isFetching}
               onRefresh={refetch}
-              tintColor="#fff"
+              tintColor={C.text}
             />
           }
         >
@@ -423,6 +424,8 @@ function TabBtn({
   badge?: number;
   onPress: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable onPress={onPress} style={[styles.tabBtn, active && styles.tabBtnActive]}>
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
@@ -446,6 +449,8 @@ function CourtCard({
   currentId?: string;
   onPick: (f: Feed) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
@@ -482,7 +487,7 @@ function CourtCard({
                 color={f.embeddable === false ? "#ff2d2d" : on ? "#0a0e1a" : c}
               />
               <Text
-                style={[styles.angleText, { color: on ? "#0a0e1a" : "#e2e8f0" }]}
+                style={[styles.angleText, { color: on ? "#0a0e1a" : C.text2 }]}
                 numberOfLines={1}
               >
                 {f.angleLabelDisplay || f.angleLabel || "Toàn cảnh"}
@@ -504,10 +509,12 @@ function ReplayGroup({
   videos: Feed[];
   onPick: (f: Feed) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
-        <Ionicons name="albums-outline" size={16} color={SUB} />
+        <Ionicons name="albums-outline" size={16} color={C.sub} />
         <Text style={styles.cardTitle}>{court.courtLabel}</Text>
       </View>
       {videos.map((f) => (
@@ -517,7 +524,7 @@ function ReplayGroup({
               <Image source={{ uri: f.thumbnail }} style={styles.thumb} />
             ) : (
               <View style={[styles.thumb, styles.thumbEmpty]}>
-                <Ionicons name="film-outline" size={20} color={SUB} />
+                <Ionicons name="film-outline" size={20} color={C.sub} />
               </View>
             )}
             <View style={styles.playOverlay}>
@@ -544,16 +551,18 @@ function ReplayGroup({
 }
 
 function EmptyState({ icon, text }: { icon: any; text: string }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.empty}>
-      <Ionicons name={icon} size={40} color={SUB} />
+      <Ionicons name={icon} size={40} color={C.sub} />
       <Text style={styles.emptyText}>{text}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -562,9 +571,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   iconBtn: { padding: 4 },
-  hTitle: { color: TXT, fontSize: 16, fontWeight: "800" },
+  hTitle: { color: C.text, fontSize: 16, fontWeight: "800" },
   hMetaRow: { marginTop: 2 },
-  hMeta: { color: SUB, fontSize: 12 },
+  hMeta: { color: C.sub, fontSize: 12 },
   liveDotRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   liveDot: {
     width: 8,
@@ -625,17 +634,17 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: CARD,
+    backgroundColor: C.card,
   },
   anglePill: { width: 10, height: 10, borderRadius: 5 },
-  nowText: { color: TXT, fontSize: 13, fontWeight: "600", flex: 1 },
+  nowText: { color: C.text, fontSize: 13, fontWeight: "600", flex: 1 },
   tabs: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
+    borderBottomColor: C.border,
   },
   tabBtn: {
     flexDirection: "row",
@@ -644,12 +653,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: CARD,
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: C.border,
   },
   tabBtnActive: { backgroundColor: RED, borderColor: RED },
-  tabText: { color: SUB, fontWeight: "700", fontSize: 13 },
+  tabText: { color: C.sub, fontWeight: "700", fontSize: 13 },
   tabTextActive: { color: "#fff" },
   tabBadge: {
     minWidth: 18,
@@ -662,15 +671,15 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   card: {
-    backgroundColor: CARD,
+    backgroundColor: C.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: C.border,
     padding: 12,
     marginBottom: 12,
   },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  cardTitle: { color: TXT, fontSize: 15, fontWeight: "800", flex: 1 },
+  cardTitle: { color: C.text, fontSize: 15, fontWeight: "800", flex: 1 },
   miniLive: { flexDirection: "row", alignItems: "center", gap: 5 },
   miniLiveText: { color: "#ff6b6b", fontSize: 11, fontWeight: "800" },
   angleWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -699,10 +708,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  replayTitle: { color: TXT, fontSize: 13, fontWeight: "600" },
+  replayTitle: { color: C.text, fontSize: 13, fontWeight: "600" },
   replayMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   dotSm: { width: 7, height: 7, borderRadius: 4 },
-  replaySub: { color: SUB, fontSize: 12, flex: 1 },
+  replaySub: { color: C.sub, fontSize: 12, flex: 1 },
   empty: { alignItems: "center", justifyContent: "center", paddingVertical: 64, gap: 12 },
-  emptyText: { color: SUB, fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
+  emptyText: { color: C.sub, fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
 });

@@ -1,7 +1,7 @@
 // components/social/FriendActions.tsx
 import {
   Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { ActivityIndicator,
   Alert,
   Pressable,
@@ -19,6 +19,7 @@ import {
   useSendFriendRequestMutation,
   useUnblockUserMutation,
 } from "@/slices/friendsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export function FriendActions({
   userId,
@@ -27,6 +28,8 @@ export function FriendActions({
   userId: string;
   compact?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data, isFetching } = useFriendStatusQuery(userId, {
     skip: !me || !userId,
@@ -91,7 +94,7 @@ export function FriendActions({
   };
 
   if (isFetching && !data) {
-    return <ActivityIndicator size="small" />;
+    return <ActivityIndicator size="small" color={C.sub} />;
   }
 
   if (status === "none" || status === "declined") {
@@ -113,7 +116,7 @@ export function FriendActions({
         disabled={removing}
         style={[styles.btn, styles.btnOutline, compact && styles.btnCompact]}
       >
-        <Ionicons name="hourglass-outline" size={16} color="#64748B" />
+        <Ionicons name="hourglass-outline" size={16} color={C.sub} />
         {!compact && <Text style={styles.btnOutlineText}>Huỷ lời mời</Text>}
       </Pressable>
     );
@@ -179,7 +182,7 @@ export function FriendActions({
   return null;
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   btn: {
     flexDirection: "row",
     alignItems: "center",
@@ -197,9 +200,9 @@ const styles = StyleSheet.create({
   btnPrimary: { backgroundColor: "#0066FF" },
   btnPrimaryText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   btnOutline: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
-  btnOutlineText: { color: "#334155", fontWeight: "600", fontSize: 13 },
+  btnOutlineText: { color: C.text2, fontWeight: "600", fontSize: 13 },
 });

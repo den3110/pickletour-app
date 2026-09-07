@@ -1,13 +1,14 @@
 // Shared game room list item — hiển thị avatars user đang trong bàn.
 import {
   Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { Image,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export function RoomListItem({
   room,
@@ -24,6 +25,8 @@ export function RoomListItem({
   stagePillLabel?: string;
   stagePillActive?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const seatUsers: any[] = Array.isArray(room?.seatUsers) ? room.seatUsers : [];
   const emptySlots = Math.max(0, (room?.maxSeats || 0) - seatUsers.length);
   return (
@@ -41,7 +44,7 @@ export function RoomListItem({
           >
             <Text
               style={{
-                color: stagePillActive ? accentColor : "#64748B",
+                color: stagePillActive ? accentColor : C.sub,
                 fontSize: 11,
                 fontWeight: "800",
               }}
@@ -76,7 +79,7 @@ export function RoomListItem({
               <Ionicons
                 name="person-outline"
                 size={14}
-                color="rgba(15,23,42,0.35)"
+                color={C.muted}
               />
             </View>
           ),
@@ -95,9 +98,9 @@ export function RoomListItem({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -108,12 +111,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: C.text },
   stagePill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   cardMeta: {
     flexDirection: "row",
@@ -133,7 +136,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: C.card,
   },
   avatarPlaceholder: {
     backgroundColor: "#475569",
@@ -149,15 +152,15 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: C.card,
     alignItems: "center",
     justifyContent: "center",
   },
   namesLabel: {
     marginLeft: 12,
-    color: "#475569",
+    color: C.text3,
     fontSize: 11,
     fontWeight: "600",
     flex: 1,

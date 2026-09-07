@@ -38,8 +38,11 @@ import {
   useSitCaroRoomMutation,
   useStartCaroHandMutation,
 } from "@/slices/caroApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function CaroRoomScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const roomId = String(id || "");
@@ -196,7 +199,7 @@ export default function CaroRoomScreen() {
   if (!room) {
     return (
       <View style={styles.loading}>
-        <Text style={{ color: "#0F172A" }}>Đang tải bàn…</Text>
+        <Text style={{ color: C.text }}>Đang tải bàn…</Text>
       </View>
     );
   }
@@ -400,10 +403,10 @@ export default function CaroRoomScreen() {
                   key={String(m._id || m.at)}
                   style={{ flexDirection: "row", gap: 6, marginBottom: 4 }}
                 >
-                  <Text style={{ fontWeight: "800", color: "#0F172A" }}>
+                  <Text style={{ fontWeight: "800", color: C.text }}>
                     {m.name}:
                   </Text>
-                  <Text style={{ color: "#334155", flex: 1 }}>{m.text}</Text>
+                  <Text style={{ color: C.text2, flex: 1 }}>{m.text}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -412,6 +415,7 @@ export default function CaroRoomScreen() {
                 value={chatText}
                 onChangeText={setChatText}
                 placeholder="Nhập tin…"
+                placeholderTextColor={C.muted}
                 style={styles.chatInput}
                 onSubmitEditing={doSendChat}
               />
@@ -441,6 +445,8 @@ function PlayerBox({
   onSit: () => void;
   bubble?: { text: string; at: number } | null;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const u = seat?.user;
   if (!u) {
     return (
@@ -479,12 +485,12 @@ function PlayerBox({
 const { width: SW } = Dimensions.get("window");
 const CELL = Math.floor((SW - 40) / 15);
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
   },
   topBar: {
     flexDirection: "row",
@@ -612,7 +618,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   winBox: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     padding: 24,
     borderRadius: 16,
     borderWidth: 3,
@@ -623,7 +629,7 @@ const styles = StyleSheet.create({
   winTitle: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
     textAlign: "center",
   },
   modalBackdrop: {
@@ -633,7 +639,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   chatBox: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     padding: 14,
     borderRadius: 14,
     width: "85%",
@@ -643,14 +649,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     marginBottom: 8,
-    color: "#0F172A",
+    color: C.text,
   },
   chatInput: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    color: C.text,
   },
   chatSendBtn: {
     width: 44,

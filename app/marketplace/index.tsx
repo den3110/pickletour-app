@@ -23,10 +23,12 @@ import {
   useListMarketQuery,
   useToggleSaveMarketMutation,
 } from "@/slices/marketApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 
 export default function MarketplaceScreen() {
+  const C = useThemeTokens();
   const { width } = useWindowDimensions();
   const { seller: sellerFilter } = useLocalSearchParams<{ seller?: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -76,32 +78,32 @@ export default function MarketplaceScreen() {
   const activeFilters = (condition ? 1 : 0) + (type ? 1 : 0);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
       {/* Header */}
       <View
         style={{
           paddingHorizontal: 14,
           paddingBottom: 10,
-          backgroundColor: "#fff",
+          backgroundColor: C.card,
           borderBottomWidth: 1,
-          borderBottomColor: "#EEF0F3",
+          borderBottomColor: C.border,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color="#111827" />
+            <Ionicons name="chevron-back" size={26} color={C.text} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 20, fontWeight: "900", flex: 1, color: "#111827" }}>
+          <Text style={{ fontSize: 20, fontWeight: "900", flex: 1, color: C.text }}>
             🛍️ Chợ Mua bán
           </Text>
           <TouchableOpacity onPress={() => router.push("/marketplace/offers" as any)} hitSlop={8}>
-            <Ionicons name="pricetag-outline" size={22} color="#334155" />
+            <Ionicons name="pricetag-outline" size={22} color={C.text2} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/marketplace/saved" as any)} hitSlop={8}>
-            <Ionicons name="bookmark-outline" size={22} color="#334155" />
+            <Ionicons name="bookmark-outline" size={22} color={C.text2} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/marketplace/mine" as any)} hitSlop={8}>
-            <Ionicons name="cube-outline" size={22} color="#334155" />
+            <Ionicons name="cube-outline" size={22} color={C.text2} />
           </TouchableOpacity>
         </View>
 
@@ -110,14 +112,14 @@ export default function MarketplaceScreen() {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: "#F1F5F9",
+            backgroundColor: C.field,
             borderRadius: 12,
             paddingHorizontal: 12,
             marginTop: 10,
             height: 42,
           }}
         >
-          <Ionicons name="search" size={18} color="#94A3B8" />
+          <Ionicons name="search" size={18} color={C.muted} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
@@ -127,8 +129,8 @@ export default function MarketplaceScreen() {
             }}
             returnKeyType="search"
             placeholder="Tìm giày, vợt, áo…"
-            placeholderTextColor="#94A3B8"
-            style={{ flex: 1, marginLeft: 8, fontSize: 15, color: "#111827" }}
+            placeholderTextColor={C.muted}
+            style={{ flex: 1, marginLeft: 8, fontSize: 15, color: C.text }}
           />
           {searchText ? (
             <TouchableOpacity
@@ -138,7 +140,7 @@ export default function MarketplaceScreen() {
                 setPage(1);
               }}
             >
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              <Ionicons name="close-circle" size={18} color={C.muted} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -163,10 +165,10 @@ export default function MarketplaceScreen() {
                   paddingHorizontal: 12,
                   paddingVertical: 7,
                   borderRadius: 999,
-                  backgroundColor: active ? BLUE : "#F1F5F9",
+                  backgroundColor: active ? BLUE : C.field,
                 }}
               >
-                <Text style={{ fontSize: 13, fontWeight: "700", color: active ? "#fff" : "#334155" }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: active ? "#fff" : C.text2 }}>
                   {c.emoji} {c.label}
                 </Text>
               </TouchableOpacity>
@@ -176,7 +178,7 @@ export default function MarketplaceScreen() {
 
         {/* Sort + filter row */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-          <Text style={{ fontSize: 13, color: "#64748B" }}>
+          <Text style={{ fontSize: 13, color: C.sub }}>
             {data?.total != null ? `${data.total} tin đăng` : "Đang tải…"}
           </Text>
           <TouchableOpacity
@@ -231,7 +233,7 @@ export default function MarketplaceScreen() {
           ListEmptyComponent={
             <View style={{ alignItems: "center", marginTop: 60 }}>
               <Text style={{ fontSize: 44 }}>🛍️</Text>
-              <Text style={{ color: "#64748B", marginTop: 8, fontWeight: "600" }}>
+              <Text style={{ color: C.sub, marginTop: 8, fontWeight: "600" }}>
                 Chưa có tin đăng phù hợp
               </Text>
             </View>
@@ -266,11 +268,11 @@ export default function MarketplaceScreen() {
 
       {/* Filter modal */}
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setFilterOpen(false)} />
-        <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
-          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 14 }}>Bộ lọc</Text>
+        <Pressable style={{ flex: 1, backgroundColor: C.overlay }} onPress={() => setFilterOpen(false)} />
+        <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
+          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 14, color: C.text }}>Bộ lọc</Text>
 
-          <Text style={{ fontWeight: "700", marginBottom: 8 }}>Hình thức</Text>
+          <Text style={{ fontWeight: "700", marginBottom: 8, color: C.text }}>Hình thức</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
             {TYPES.map((t) => {
               const active = type === t.key;
@@ -282,10 +284,10 @@ export default function MarketplaceScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: 999,
-                    backgroundColor: active ? BLUE : "#F1F5F9",
+                    backgroundColor: active ? BLUE : C.field,
                   }}
                 >
-                  <Text style={{ fontWeight: "600", color: active ? "#fff" : "#334155" }}>
+                  <Text style={{ fontWeight: "600", color: active ? "#fff" : C.text2 }}>
                     {t.emoji} {t.label}
                   </Text>
                 </TouchableOpacity>
@@ -293,7 +295,7 @@ export default function MarketplaceScreen() {
             })}
           </View>
 
-          <Text style={{ fontWeight: "700", marginBottom: 8 }}>Tình trạng</Text>
+          <Text style={{ fontWeight: "700", marginBottom: 8, color: C.text }}>Tình trạng</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
             {CONDITIONS.map((c) => {
               const active = condition === c.key;
@@ -305,16 +307,16 @@ export default function MarketplaceScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: 999,
-                    backgroundColor: active ? BLUE : "#F1F5F9",
+                    backgroundColor: active ? BLUE : C.field,
                   }}
                 >
-                  <Text style={{ fontWeight: "600", color: active ? "#fff" : "#334155" }}>{c.label}</Text>
+                  <Text style={{ fontWeight: "600", color: active ? "#fff" : C.text2 }}>{c.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={{ fontWeight: "700", marginBottom: 8 }}>Sắp xếp</Text>
+          <Text style={{ fontWeight: "700", marginBottom: 8, color: C.text }}>Sắp xếp</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
             {SORTS.map((s) => {
               const active = sort === s.key;
@@ -326,10 +328,10 @@ export default function MarketplaceScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: 999,
-                    backgroundColor: active ? BLUE : "#F1F5F9",
+                    backgroundColor: active ? BLUE : C.field,
                   }}
                 >
-                  <Text style={{ fontWeight: "600", color: active ? "#fff" : "#334155" }}>{s.label}</Text>
+                  <Text style={{ fontWeight: "600", color: active ? "#fff" : C.text2 }}>{s.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -342,9 +344,9 @@ export default function MarketplaceScreen() {
                 setType("");
                 setSort("newest");
               }}
-              style={{ flex: 1, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" }}
+              style={{ flex: 1, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.field }}
             >
-              <Text style={{ fontWeight: "700", color: "#334155" }}>Xoá lọc</Text>
+              <Text style={{ fontWeight: "700", color: C.text2 }}>Xoá lọc</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {

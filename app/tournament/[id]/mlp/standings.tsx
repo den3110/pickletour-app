@@ -17,6 +17,7 @@ import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useListMlpStandingsQuery } from "@/slices/mlpApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type Row = {
   _id: string;
@@ -42,6 +43,8 @@ function Table({
   items: Row[];
   topPerPool?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <FlatList
       data={items}
@@ -49,7 +52,7 @@ function Table({
       contentContainerStyle={{ paddingBottom: 20 }}
       ListEmptyComponent={
         <View style={{ padding: 32, alignItems: "center" }}>
-          <Text style={{ color: "#64748B" }}>Chưa có dữ liệu BXH.</Text>
+          <Text style={{ color: C.sub }}>Chưa có dữ liệu BXH.</Text>
         </View>
       }
       renderItem={({ item: r, index }) => {
@@ -59,8 +62,8 @@ function Table({
           <View
             style={[
               styles.row,
-              isTop && { backgroundColor: "#F0FDF4" },
-              !isTop && isRankOne && { backgroundColor: "#FFFBEB" },
+              isTop && { backgroundColor: C.greenSoft },
+              !isTop && isRankOne && { backgroundColor: C.amberSoft },
             ]}
           >
             <Text style={[styles.c, { width: 32, fontWeight: "800" }]}>
@@ -69,13 +72,13 @@ function Table({
             </Text>
             <View style={{ flex: 1 }}>
               <Text
-                style={{ fontSize: 14, fontWeight: "700", color: "#0F172A" }}
+                style={{ fontSize: 14, fontWeight: "700", color: C.text }}
                 numberOfLines={1}
               >
                 {r.name}
               </Text>
               <Text
-                style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}
+                style={{ fontSize: 11, color: C.sub, marginTop: 2 }}
               >
                 Đã đấu {r.played} · Slot {r.slotsFor}-{r.slotsAgainst}
               </Text>
@@ -95,7 +98,7 @@ function Table({
                       ? "#10B981"
                       : (r.slotDiff ?? 0) < 0
                         ? "#EF4444"
-                        : "#64748B",
+                        : C.sub,
                 },
               ]}
             >
@@ -113,7 +116,7 @@ function Table({
                       ? "#10B981"
                       : (r.pointDiff ?? 0) < 0
                         ? "#EF4444"
-                        : "#64748B",
+                        : C.sub,
                 },
               ]}
             >
@@ -129,6 +132,8 @@ function Table({
 }
 
 export default function MlpStandingsScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isFetching } = useListMlpStandingsQuery(String(id), {
     skip: !id,
@@ -204,6 +209,8 @@ function TabBtn({
   label: string;
   onPress: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable
       onPress={onPress}
@@ -216,51 +223,51 @@ function TabBtn({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  h: { fontSize: 12, color: "#64748B", fontWeight: "700" },
+  h: { fontSize: 12, color: C.sub, fontWeight: "700" },
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    backgroundColor: "#fff",
+    borderBottomColor: C.border,
+    backgroundColor: C.card,
     gap: 4,
   },
-  c: { fontSize: 13, color: "#0F172A" },
+  c: { fontSize: 13, color: C.text },
   numCol: { width: 40, textAlign: "center" },
   footer: {
     padding: 12,
     fontSize: 11,
-    color: "#94A3B8",
+    color: C.muted,
     fontStyle: "italic",
   },
   tabsRow: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 6,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
   tabBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   tabBtnActive: { backgroundColor: "#0066FF" },
-  tabBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
+  tabBtnText: { color: C.text2, fontWeight: "700", fontSize: 12 },
   tabBtnTextActive: { color: "#fff" },
 });

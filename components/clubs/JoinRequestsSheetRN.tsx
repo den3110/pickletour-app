@@ -14,6 +14,7 @@ import {
 } from "@/slices/clubsApiSlice";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function JoinRequestsSheetRN({
   clubId,
@@ -22,6 +23,7 @@ export default function JoinRequestsSheetRN({
   clubId: string;
   onClose: () => void;
 }) {
+  const C = useThemeTokens();
   const { data, isFetching, refetch } = useListJoinRequestsQuery(
     { id: clubId, params: { status: "pending" } },
     { skip: !clubId }
@@ -31,12 +33,12 @@ export default function JoinRequestsSheetRN({
 
   return (
     <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-      <Text style={{ color: "#d5e8ff", fontWeight: "800", fontSize: 16 }}>
+      <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>
         Yêu cầu gia nhập
       </Text>
       {isFetching && (
         <View style={{ paddingVertical: 12 }}>
-          <ActivityIndicator />
+          <ActivityIndicator color={C.accent} />
         </View>
       )}
       {(data?.items || []).map((r: any) => (

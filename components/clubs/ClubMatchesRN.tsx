@@ -1,5 +1,5 @@
 // components/clubs/ClubMatchesRN.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -23,6 +23,7 @@ import {
   useDeleteMatchMutation,
   useClubLeaderboardQuery,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -32,6 +33,8 @@ const teamNames = (t: any[]) =>
   (t || []).map((u: any) => u?.nickname || u?.fullName || "?").join(" & ") || "?";
 
 function RecordForm({ id, onDone }: { id: string; onDone: () => void }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { data: mem } = useListMembersQuery({ id });
   const members = mem?.items || [];
   const [createMatch, { isLoading }] = useCreateMatchMutation();
@@ -101,11 +104,11 @@ function RecordForm({ id, onDone }: { id: string; onDone: () => void }) {
         );
       })}
       <View style={styles.scoreRow}>
-        <TextInput style={styles.scoreInput} value={sa} onChangeText={(t) => setSa(t.replace(/[^\d]/g, ""))} keyboardType="numeric" placeholder="0" placeholderTextColor="#8A90B2" />
-        <Text style={{ color: "#5C6285", fontWeight: "800" }}>-</Text>
-        <TextInput style={styles.scoreInput} value={sb} onChangeText={(t) => setSb(t.replace(/[^\d]/g, ""))} keyboardType="numeric" placeholder="0" placeholderTextColor="#8A90B2" />
+        <TextInput style={styles.scoreInput} value={sa} onChangeText={(t) => setSa(t.replace(/[^\d]/g, ""))} keyboardType="numeric" placeholder="0" placeholderTextColor={C.muted} />
+        <Text style={{ color: C.text3, fontWeight: "800" }}>-</Text>
+        <TextInput style={styles.scoreInput} value={sb} onChangeText={(t) => setSb(t.replace(/[^\d]/g, ""))} keyboardType="numeric" placeholder="0" placeholderTextColor={C.muted} />
       </View>
-      <TextInput style={[styles.input, { marginTop: 8 }]} value={note} onChangeText={setNote} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor="#8A90B2" />
+      <TextInput style={[styles.input, { marginTop: 8 }]} value={note} onChangeText={setNote} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.muted} />
       <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
         <TouchableOpacity style={styles.primaryBtn} onPress={submit} disabled={isLoading}>
           <LinearGradient colors={["#667eea", "#764ba2"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} pointerEvents="none" />
@@ -126,6 +129,8 @@ export default function ClubMatchesRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const id = club?._id;
   const isMember = !!club?._my?.isMember;
   const authUserId = useSelector((s: any) => s.auth?.userInfo?._id);
@@ -157,14 +162,14 @@ export default function ClubMatchesRN({
 
       {view === "board" ? (
         <>
-          <Text style={{ color: "#7780A1", fontSize: 12, marginBottom: 8 }}>Tổng số trận: {lb?.totalMatches || 0} · 3 điểm/thắng</Text>
+          <Text style={{ color: C.sub, fontSize: 12, marginBottom: 8 }}>Tổng số trận: {lb?.totalMatches || 0} · 3 điểm/thắng</Text>
           {board.length === 0 ? (
             <EmptyState label="Chưa có dữ liệu xếp hạng" icon="trophy-outline" />
           ) : (
             <View style={styles.card}>
               {board.map((it: any, i: number) => (
-                <View key={it.user._id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: "#EEF1F8" }]}>
-                  <Text style={[styles.rank, i < 3 && { color: "#B7791F" }]}>{i + 1}</Text>
+                <View key={it.user._id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}>
+                  <Text style={[styles.rank, i < 3 && { color: C.amberText }]}>{i + 1}</Text>
                   <ExpoImage source={{ uri: normalizeUrl(it.user.avatar) }} style={styles.avatar} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name} numberOfLines={1}>{it.user.nickname || it.user.fullName || "Người dùng"}</Text>
@@ -196,19 +201,19 @@ export default function ClubMatchesRN({
               return (
                 <View key={m._id} style={styles.card}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[styles.mTeam, { textAlign: "right" }, aWin && { fontWeight: "800", color: "#1F2557" }]} numberOfLines={1}>{teamNames(m.teamA)}</Text>
+                    <Text style={[styles.mTeam, { textAlign: "right" }, aWin && { fontWeight: "800", color: C.text }]} numberOfLines={1}>{teamNames(m.teamA)}</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <Text style={[styles.mScore, { color: aWin ? "#1B7A46" : "#7780A1" }]}>{m.scoreA}</Text>
-                      <Text style={{ color: "#9AA3B2" }}>-</Text>
-                      <Text style={[styles.mScore, { color: !aWin ? "#B4232D" : "#7780A1" }]}>{m.scoreB}</Text>
+                      <Text style={[styles.mScore, { color: aWin ? C.greenText : C.sub }]}>{m.scoreA}</Text>
+                      <Text style={{ color: C.muted }}>-</Text>
+                      <Text style={[styles.mScore, { color: !aWin ? C.redText : C.sub }]}>{m.scoreB}</Text>
                     </View>
-                    <Text style={[styles.mTeam, !aWin && { fontWeight: "800", color: "#1F2557" }]} numberOfLines={1}>{teamNames(m.teamB)}</Text>
+                    <Text style={[styles.mTeam, !aWin && { fontWeight: "800", color: C.text }]} numberOfLines={1}>{teamNames(m.teamB)}</Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                    <Text style={{ color: "#7780A1", fontSize: 11.5 }}>{dayjs(m.playedAt).format("DD/MM/YYYY")}{m.note ? ` · ${m.note}` : ""}</Text>
+                    <Text style={{ color: C.sub, fontSize: 11.5 }}>{dayjs(m.playedAt).format("DD/MM/YYYY")}{m.note ? ` · ${m.note}` : ""}</Text>
                     {canDel && (
                       <TouchableOpacity onPress={() => removeMatch(m)}>
-                        <MaterialCommunityIcons name="trash-can-outline" size={16} color="#B4232D" />
+                        <MaterialCommunityIcons name="trash-can-outline" size={16} color={C.redText} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -222,41 +227,41 @@ export default function ClubMatchesRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   viewToggle: { flexDirection: "row", gap: 8, marginBottom: 10 },
-  viewBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: "#F3F4FF", borderWidth: 1, borderColor: "#E6E8F5" },
+  viewBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: C.field, borderWidth: 1, borderColor: C.border },
   viewBtnActive: { backgroundColor: "#667eea", borderColor: "#667eea" },
-  viewBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13.5 },
+  viewBtnText: { color: C.text2, fontWeight: "800", fontSize: 13.5 },
 
-  card: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E6E8F5", borderRadius: 14, padding: 12, marginBottom: 10 },
-  hint: { color: "#7780A1", fontSize: 12, marginBottom: 6 },
-  input: { padding: 11, borderRadius: 12, borderWidth: 1, borderColor: "#E6E8F5", backgroundColor: "#F8F9FF", color: "#1F2557" },
+  card: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 12, marginBottom: 10 },
+  hint: { color: C.sub, fontSize: 12, marginBottom: 6 },
+  input: { padding: 11, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.field, color: C.text },
 
   pickRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
-  pickAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#E0E7FF" },
-  pickName: { flex: 1, color: "#1F2557", fontSize: 13.5, fontWeight: "600" },
-  sideBtn: { width: 32, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F3F4FF", borderWidth: 1, borderColor: "#E6E8F5" },
+  pickAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.field },
+  pickName: { flex: 1, color: C.text, fontSize: 13.5, fontWeight: "600" },
+  sideBtn: { width: 32, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: C.field, borderWidth: 1, borderColor: C.border },
   sideBtnA: { backgroundColor: "#3BA55D", borderColor: "#3BA55D" },
   sideBtnB: { backgroundColor: "#E05353", borderColor: "#E05353" },
-  sideBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
+  sideBtnText: { color: C.text2, fontWeight: "800", fontSize: 13 },
 
   scoreRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10 },
-  scoreInput: { width: 70, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E6E8F5", backgroundColor: "#F8F9FF", color: "#1F2557", textAlign: "center", fontWeight: "800" },
+  scoreInput: { width: 70, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.field, color: C.text, textAlign: "center", fontWeight: "800" },
 
   addBtn: { flexDirection: "row", gap: 6, alignSelf: "flex-start", height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
   primaryBtn: { height: 40, paddingHorizontal: 20, borderRadius: 999, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  lightBtn: { height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: "#F3F4FF", borderWidth: 1, borderColor: "#E6E8F5" },
-  lightBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 14 },
+  lightBtn: { height: 40, paddingHorizontal: 18, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: C.field, borderWidth: 1, borderColor: C.border },
+  lightBtnText: { color: C.text2, fontWeight: "800", fontSize: 14 },
 
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
-  rank: { width: 22, textAlign: "center", fontWeight: "800", color: "#7780A1" },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#E0E7FF" },
-  name: { color: "#1F2557", fontWeight: "600", fontSize: 14 },
-  sub: { color: "#7780A1", fontSize: 11.5 },
-  pts: { color: "#4E56A6", fontWeight: "800", fontSize: 14 },
+  rank: { width: 22, textAlign: "center", fontWeight: "800", color: C.sub },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.field },
+  name: { color: C.text, fontWeight: "600", fontSize: 14 },
+  sub: { color: C.sub, fontSize: 11.5 },
+  pts: { color: C.dark ? "#8B96F0" : "#4E56A6", fontWeight: "800", fontSize: 14 },
 
-  mTeam: { flex: 1, color: "#5C6285", fontSize: 13 },
+  mTeam: { flex: 1, color: C.text3, fontSize: 13 },
   mScore: { fontWeight: "800", fontSize: 16 },
 });

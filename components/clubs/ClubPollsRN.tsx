@@ -19,6 +19,7 @@ import {
   useClosePollMutation,
   useDeletePollMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -35,6 +36,8 @@ function GradLightCard({
   style?: any;
   pad?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={[styles.card, style]}>
       <LinearGradient
@@ -58,6 +61,8 @@ function SmallPrimaryGradBtn({
   onPress?: () => void;
   loading?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -86,6 +91,8 @@ function SmallLightBtn({
   onPress?: () => void;
   loading?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -109,6 +116,8 @@ function SmallDangerGhostBtn({
   onPress?: () => void;
   loading?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -135,6 +144,8 @@ function PollItem({
   canManage: boolean;
   onRefetch: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [vote, { isLoading: voting }] = useVotePollMutation();
   const [closePoll, { isLoading: closing }] = useClosePollMutation();
   const [deletePoll] = useDeletePollMutation();
@@ -249,13 +260,13 @@ function PollItem({
                       : "radiobox-blank"
                 }
                 size={18}
-                color={picked ? "#667eea" : "#9AA3B2"}
+                color={picked ? "#667eea" : C.muted}
                 style={{ marginRight: 6 }}
               />
               <Text
                 style={[
                   styles.optionText,
-                  isMyVote && { fontWeight: "800", color: "#2D3561" },
+                  isMyVote && { fontWeight: "800", color: C.text },
                 ]}
               >
                 {opt.text}
@@ -310,6 +321,8 @@ export default function ClubPollsRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const clubId = club?._id;
 
   const { data, isLoading, isFetching, refetch } = useListPollsQuery(
@@ -364,7 +377,7 @@ export default function ClubPollsRN({
             value={title}
             onChangeText={setTitle}
             placeholder="Tiêu đề khảo sát"
-            placeholderTextColor="#8A90B2"
+            placeholderTextColor={C.muted}
             style={styles.input}
           />
 
@@ -374,7 +387,7 @@ export default function ClubPollsRN({
               value={v}
               onChangeText={(t) => changeOpt(i, t)}
               placeholder={`Lựa chọn #${i + 1}`}
-              placeholderTextColor="#8A90B2"
+              placeholderTextColor={C.muted}
               style={[styles.input, { marginTop: 8 }]}
             />
           ))}
@@ -387,7 +400,7 @@ export default function ClubPollsRN({
             <MaterialCommunityIcons
               name={multiple ? "checkbox-marked" : "checkbox-blank-outline"}
               size={20}
-              color={multiple ? "#667eea" : "#9AA3B2"}
+              color={multiple ? "#667eea" : C.muted}
             />
             <Text style={styles.checkLabel}>Cho phép chọn nhiều phương án</Text>
           </TouchableOpacity>
@@ -422,13 +435,13 @@ export default function ClubPollsRN({
 }
 
 /* ---------- Styles ---------- */
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   card: {
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 6 },
@@ -436,17 +449,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  title: { color: "#1F2557", fontWeight: "800", fontSize: 16 },
-  subMeta: { color: "#7780A1", marginTop: 4, fontSize: 12 },
+  title: { color: C.text, fontWeight: "800", fontSize: 16 },
+  subMeta: { color: C.sub, marginTop: 4, fontSize: 12 },
 
   input: {
     marginTop: 10,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
-    backgroundColor: "#F8F9FF",
-    color: "#1F2557",
+    borderColor: C.border,
+    backgroundColor: C.field,
+    color: C.text,
   },
 
   checkRow: {
@@ -455,7 +468,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
-  checkLabel: { color: "#4A5270", fontWeight: "600" },
+  checkLabel: { color: C.text2, fontWeight: "600" },
 
   actionsRow: {
     flexDirection: "row",
@@ -469,28 +482,28 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
-    backgroundColor: "#F8F9FF",
+    borderColor: C.border,
+    backgroundColor: C.field,
   },
   optionPicked: {
     borderColor: "#667eea",
-    backgroundColor: "#EEF1FF",
+    backgroundColor: C.field,
   },
   optionHead: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  optionText: { color: "#3E4466", fontWeight: "600", flex: 1 },
-  countText: { color: "#5C6285", marginTop: 4, fontSize: 12 },
+  optionText: { color: C.text2, fontWeight: "600", flex: 1 },
+  countText: { color: C.text3, marginTop: 4, fontSize: 12 },
 
-  votedHint: { color: "#7780A1", fontSize: 12, marginTop: 8 },
+  votedHint: { color: C.sub, fontSize: 12, marginTop: 8 },
 
   tag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#EEF1FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#D6DCFB",
+    borderColor: C.border,
   },
-  tagText: { color: "#4E56A6", fontSize: 11, fontWeight: "700" },
+  tagText: { color: C.dark ? "#8B96F0" : "#4E56A6", fontSize: 11, fontWeight: "700" },
 
   adminRow: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
 
@@ -510,11 +523,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  smallLightText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
+  smallLightText: { color: C.text2, fontWeight: "800", fontSize: 13 },
 
   smallDangerBtn: {
     height: 36,
@@ -522,14 +535,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFE9EC",
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: "#FFD5DA",
+    borderColor: C.redSoft,
   },
-  smallDangerText: { color: "#B4232D", fontWeight: "800", fontSize: 13 },
+  smallDangerText: { color: C.redText, fontWeight: "800", fontSize: 13 },
 
   closedText: {
-    color: "#6E728B",
+    color: C.sub,
     fontSize: 12,
     marginTop: 8,
     fontWeight: "700",

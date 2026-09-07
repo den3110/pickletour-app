@@ -18,6 +18,7 @@ import { TextInput } from "@/components/ui/i18nTextInput";
 import { Text } from "@/components/ui/i18nText";
 
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export function InviteFriendModal({
   visible,
@@ -32,6 +33,8 @@ export function InviteFriendModal({
   loading?: boolean;
   color?: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<any[]>([]);
   const [triggerSearch, { data, isFetching }] = useLazySearchUserQuery();
@@ -100,6 +103,7 @@ export function InviteFriendModal({
             value={q}
             onChangeText={setQ}
             style={styles.input}
+            placeholderTextColor={C.muted}
             autoFocus
           />
           {selected.length > 0 && (
@@ -122,7 +126,7 @@ export function InviteFriendModal({
             keyExtractor={(u: any) => String(u._id)}
             style={{ maxHeight: 260 }}
             ListEmptyComponent={
-              <Text style={{ color: "#94A3B8", padding: 16, textAlign: "center" }}>
+              <Text style={{ color: C.muted, padding: 16, textAlign: "center" }}>
                 {isFetching
                   ? "Đang tìm…"
                   : q.trim()
@@ -135,11 +139,11 @@ export function InviteFriendModal({
                 {item.avatar ? (
                   <Image source={{ uri: item.avatar }} style={styles.avatar} />
                 ) : (
-                  <View style={[styles.avatar, { backgroundColor: "#CBD5E1" }]}>
+                  <View style={[styles.avatar, { backgroundColor: C.line }]}>
                     <Text
                       style={{
                         fontWeight: "800",
-                        color: "#0F172A",
+                        color: C.text,
                         textAlign: "center",
                         lineHeight: 32,
                       }}
@@ -162,7 +166,7 @@ export function InviteFriendModal({
           />
           <View style={styles.actions}>
             <Pressable style={styles.cancelBtn} onPress={onClose}>
-              <Text style={{ color: "#0F172A", fontWeight: "700" }}>Huỷ</Text>
+              <Text style={{ color: C.text, fontWeight: "700" }}>Huỷ</Text>
             </Pressable>
             <Pressable
               style={[
@@ -184,15 +188,15 @@ export function InviteFriendModal({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: C.overlay,
     justifyContent: "center",
     alignItems: "center",
   },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 14,
     width: "88%",
@@ -201,16 +205,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
+    color: C.text,
     marginBottom: 10,
   },
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
     marginBottom: 8,
+    color: C.text,
   },
   selectedRow: {
     flexDirection: "row",
@@ -230,15 +235,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
   },
-  rowName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  rowSub: { fontSize: 11, color: "#64748B" },
+  rowName: { fontSize: 14, fontWeight: "700", color: C.text },
+  rowSub: { fontSize: 11, color: C.sub },
   actions: {
     flexDirection: "row",
     gap: 8,
@@ -248,7 +253,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     alignItems: "center",
   },
   sendBtn: {

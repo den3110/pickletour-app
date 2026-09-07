@@ -34,8 +34,11 @@ import {
   useAssignMlpLineupMutation,
 } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function MlpDualDetailScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { dualId } = useLocalSearchParams<{ dualId: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const socket = useSocket();
@@ -407,6 +410,8 @@ function SubMatchLineupModal({
   teamB: any;
   onSubmit: (side: "A" | "B", playerIds: string[]) => Promise<void>;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const sub = target?.sub;
   const side = target?.side || "A";
   const team = side === "A" ? teamA : teamB;
@@ -458,7 +463,7 @@ function SubMatchLineupModal({
               🏸 Lineup — {sub?.slotKey}
             </Text>
             <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#0F172A" />
+              <Ionicons name="close" size={22} color={C.text} />
             </Pressable>
           </View>
           <Text style={styles.mdHint}>
@@ -583,6 +588,8 @@ function CurrentPlayerCard({
   rotate: number;
   lineupSize: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const rotationIdx = lineupSize
     ? Math.floor(Math.max(0, currentScore) / Math.max(1, rotate)) % lineupSize
     : 0;
@@ -645,6 +652,8 @@ function StartDreamBreakerModal({
   rotate: number;
   onSubmit: (lineupA: string[], lineupB: string[]) => Promise<void>;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const rosterA = Array.isArray(teamA?.players) ? teamA.players : [];
   const rosterB = Array.isArray(teamB?.players) ? teamB.players : [];
   const [lineupA, setLineupA] = useState<string[]>([]);
@@ -690,7 +699,7 @@ function StartDreamBreakerModal({
           <View style={styles.mdHeader}>
             <Text style={styles.mdTitle}>🏆 Start DreamBreaker</Text>
             <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#0F172A" />
+              <Ionicons name="close" size={22} color={C.text} />
             </Pressable>
           </View>
           <Text style={styles.mdHint}>
@@ -748,6 +757,8 @@ function LineupPicker({
   onToggle: (id: string) => void;
   color: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View>
       <Text style={[styles.mdSectionLabel, { color }]}>
@@ -828,9 +839,11 @@ function TeamCard({
   checkedIn: boolean;
   onCheckIn: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View
-      style={[styles.teamCard, winner && { backgroundColor: "#F0FDF4", borderColor: "#10B981" }]}
+      style={[styles.teamCard, winner && { backgroundColor: C.greenSoft, borderColor: "#10B981" }]}
     >
       <Text style={styles.teamName} numberOfLines={2}>
         {team?.name || "-"}
@@ -882,6 +895,8 @@ function SubMatchCard({
   teamB: any;
   onOpenLineup: (side: "A" | "B") => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [sa, setSa] = useState(String(sub.result?.scoreA ?? 0));
   const [sb, setSb] = useState(String(sub.result?.scoreB ?? 0));
   const [status, setStatus] = useState(sub.result?.status || "scheduled");
@@ -930,7 +945,7 @@ function SubMatchCard({
             </Pressable>
           )}
         </View>
-        <Text style={{ marginHorizontal: 8, color: "#94A3B8" }}>vs</Text>
+        <Text style={{ marginHorizontal: 8, color: C.muted }}>vs</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.subTeamName} numberOfLines={1}>
             {teamB?.name || "Team B"}
@@ -960,7 +975,7 @@ function SubMatchCard({
               keyboardType="number-pad"
               style={styles.scoreInput}
             />
-            <Text style={{ fontSize: 20, color: "#94A3B8" }}>—</Text>
+            <Text style={{ fontSize: 20, color: C.muted }}>—</Text>
             <TextInput
               value={sb}
               onChangeText={setSb}
@@ -1013,10 +1028,11 @@ function SubMatchCard({
 }
 
 function PlayerNames({ list }: { list: any[] }) {
+  const C = useThemeTokens();
   if (!list?.length)
-    return <Text style={{ color: "#94A3B8", fontSize: 12 }}>Chưa gán</Text>;
+    return <Text style={{ color: C.muted, fontSize: 12 }}>Chưa gán</Text>;
   return (
-    <Text style={{ flex: 1, fontSize: 12, color: "#0F172A" }} numberOfLines={2}>
+    <Text style={{ flex: 1, fontSize: 12, color: C.text }} numberOfLines={2}>
       {list.map((p: any) => p.nickname || p.name).join(" & ")}
     </Text>
   );
@@ -1033,6 +1049,8 @@ function StatusChip({
   cur: string;
   on: (v: string) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const active = cur === v;
   return (
     <Pressable
@@ -1046,8 +1064,8 @@ function StatusChip({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   teamsRow: {
     flexDirection: "row",
     alignItems: "stretch",
@@ -1056,17 +1074,17 @@ const styles = StyleSheet.create({
   },
   teamCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     alignItems: "center",
     gap: 6,
   },
-  teamName: { fontSize: 14, fontWeight: "800", color: "#0F172A", textAlign: "center" },
-  teamScore: { fontSize: 36, fontWeight: "900", color: "#0F172A" },
-  vs: { alignSelf: "center", fontWeight: "800", color: "#64748B" },
+  teamName: { fontSize: 14, fontWeight: "800", color: C.text, textAlign: "center" },
+  teamScore: { fontSize: 36, fontWeight: "900", color: C.text },
+  vs: { alignSelf: "center", fontWeight: "800", color: C.sub },
   checkInBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1074,41 +1092,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
   },
   checkInText: { fontSize: 11, color: "#0066FF", fontWeight: "700" },
   status: {
     textAlign: "center",
     fontSize: 13,
-    color: "#64748B",
+    color: C.sub,
     marginBottom: 16,
     fontStyle: "italic",
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#0F172A",
+    color: C.text,
     marginBottom: 8,
   },
   subCard: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   subHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   subKey: {
     fontSize: 14,
     fontWeight: "800",
     color: "#0066FF",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  subMeta: { flex: 1, fontSize: 11, color: "#64748B" },
+  subMeta: { flex: 1, fontSize: 11, color: C.sub },
   subPlayers: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1118,7 +1136,7 @@ const styles = StyleSheet.create({
   subTeamName: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#64748B",
+    color: C.sub,
     textTransform: "uppercase",
     letterSpacing: 0.3,
     marginBottom: 2,
@@ -1132,9 +1150,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
     borderWidth: 1,
-    borderColor: "#DBEAFE",
+    borderColor: C.primarySoft,
   },
   subLineupBtnText: {
     fontSize: 11,
@@ -1148,11 +1166,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     marginTop: 4,
   },
-  subScoreROTxt: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
-  subScoreROStatus: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+  subScoreROTxt: { fontSize: 18, fontWeight: "900", color: C.text },
+  subScoreROStatus: { fontSize: 12, color: C.sub, fontWeight: "600" },
   scoreRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1162,20 +1180,20 @@ const styles = StyleSheet.create({
   scoreInput: {
     width: 60,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: C.line,
     borderRadius: 6,
     padding: 8,
     fontSize: 20,
     fontWeight: "800",
     textAlign: "center",
-    color: "#0F172A",
+    color: C.text,
   },
   statusPicker: { flexDirection: "row", gap: 4, marginLeft: "auto" },
   chip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
   },
   saveBtn: {
     flexDirection: "row",
@@ -1189,15 +1207,15 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   dbBox: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
     borderRadius: 12,
     padding: 16,
     marginTop: 12,
     borderWidth: 1,
     borderColor: "#F59E0B",
   },
-  dbTitle: { fontSize: 16, fontWeight: "900", color: "#92400E", textAlign: "center" },
-  dbSub: { fontSize: 12, color: "#78350F", textAlign: "center", marginTop: 6 },
+  dbTitle: { fontSize: 16, fontWeight: "900", color: C.amberText, textAlign: "center" },
+  dbSub: { fontSize: 12, color: C.amberText, textAlign: "center", marginTop: 6 },
   dbScore: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1205,8 +1223,8 @@ const styles = StyleSheet.create({
     gap: 16,
     marginVertical: 12,
   },
-  dbBigScore: { fontSize: 48, fontWeight: "900", color: "#92400E" },
-  dbSep: { fontSize: 24, color: "#B45309" },
+  dbBigScore: { fontSize: 48, fontWeight: "900", color: C.amberText },
+  dbSep: { fontSize: 24, color: C.amberText },
   dbBtnsRow: {
     flexDirection: "row",
     gap: 8,
@@ -1224,7 +1242,7 @@ const styles = StyleSheet.create({
   dbWinner: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#065F46",
+    color: C.greenText,
     textAlign: "center",
     marginTop: 10,
   },
@@ -1248,7 +1266,7 @@ const styles = StyleSheet.create({
   },
   dbPlayerCard: {
     flex: 1,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: C.amberSoft,
     borderRadius: 8,
     padding: 8,
     borderWidth: 1,
@@ -1256,18 +1274,18 @@ const styles = StyleSheet.create({
   },
   dbPlayerTeam: {
     fontSize: 10,
-    color: "#B45309",
+    color: C.amberText,
     fontWeight: "700",
     marginBottom: 2,
   },
   dbPlayerName: {
     fontSize: 15,
-    color: "#78350F",
+    color: C.amberText,
     fontWeight: "800",
   },
   dbPlayerRotate: {
     fontSize: 10,
-    color: "#92400E",
+    color: C.amberText,
     marginTop: 3,
   },
   dbPlayerHead: {
@@ -1301,11 +1319,11 @@ const styles = StyleSheet.create({
   },
   mdBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   mdSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "85%",
@@ -1316,16 +1334,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
   mdTitle: {
     fontSize: 16,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
   },
   mdHint: {
     fontSize: 12,
-    color: "#64748B",
+    color: C.sub,
     paddingHorizontal: 16,
     paddingTop: 8,
     lineHeight: 18,
@@ -1337,7 +1355,7 @@ const styles = StyleSheet.create({
   },
   mdEmpty: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: C.muted,
     fontStyle: "italic",
     padding: 12,
   },
@@ -1357,19 +1375,19 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#CBD5E1",
+    borderColor: C.line,
     alignItems: "center",
     justifyContent: "center",
   },
   mdRosterName: {
     flex: 1,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
     fontWeight: "600",
   },
   mdRosterMeta: {
     fontSize: 14,
-    color: "#64748B",
+    color: C.sub,
     marginLeft: 6,
   },
   mdSubmit: {

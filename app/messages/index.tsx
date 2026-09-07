@@ -4,7 +4,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,6 +20,7 @@ import { useSelector } from "react-redux";
 
 import { useListConversationsQuery } from "@/slices/messagesApiSlice";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 
@@ -35,6 +36,8 @@ const fmtTime = (iso?: string | Date | null) => {
 };
 
 function ConversationRow({ conv, me }: { conv: any; me: any }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const other = conv.otherParticipants?.[0] || null;
   const title =
     conv.type === "tournament"
@@ -57,7 +60,7 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
       onPress={() => router.push(`/messages/${conv._id}`)}
       style={({ pressed }) => [
         styles.row,
-        pressed && { backgroundColor: "#F1F5F9" },
+        pressed && { backgroundColor: C.field },
       ]}
     >
       {conv.type === "tournament" ? (
@@ -99,7 +102,7 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
           <Text
             style={[
               styles.preview,
-              conv.unread > 0 && { color: "#0F172A", fontWeight: "600" },
+              conv.unread > 0 && { color: C.text, fontWeight: "600" },
             ]}
             numberOfLines={1}
           >
@@ -118,6 +121,8 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
 }
 
 export default function MessagesListScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data, isFetching, refetch } = useListConversationsQuery({});
   const items = data?.items || [];
@@ -127,7 +132,7 @@ export default function MessagesListScreen() {
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: t("Nhắn tin") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
-          <Text style={{ marginBottom: 12, color: "#334155" }}>
+          <Text style={{ marginBottom: 12, color: C.text2 }}>
             Đăng nhập để xem tin nhắn.
           </Text>
           <Pressable
@@ -155,7 +160,7 @@ export default function MessagesListScreen() {
         ListEmptyComponent={
           !isFetching ? (
             <View style={styles.empty}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#94A3B8" />
+              <Ionicons name="chatbubbles-outline" size={48} color={C.muted} />
               <Text style={styles.emptyText}>Chưa có tin nhắn nào.</Text>
               <Text style={[styles.emptyText, { fontSize: 12 }]}>
                 Bắt đầu bằng cách vào trang cá nhân của người khác hoặc mở giải
@@ -173,15 +178,15 @@ export default function MessagesListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.card },
   row: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
     gap: 12,
   },
-  sep: { height: 1, backgroundColor: "#F1F5F9", marginLeft: 68 },
+  sep: { height: 1, backgroundColor: C.field, marginLeft: 68 },
   avatar: {
     width: 48,
     height: 48,
@@ -196,9 +201,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { color: "#0F172A", fontSize: 15, flex: 1, marginRight: 8 },
-  time: { color: "#94A3B8", fontSize: 12 },
-  preview: { color: "#64748B", fontSize: 13, flex: 1 },
+  title: { color: C.text, fontSize: 15, flex: 1, marginRight: 8 },
+  time: { color: C.muted, fontSize: 12 },
+  preview: { color: C.sub, fontSize: 13, flex: 1 },
   unreadDot: {
     minWidth: 22,
     height: 22,
@@ -215,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  emptyText: { color: "#64748B", textAlign: "center" },
+  emptyText: { color: C.sub, textAlign: "center" },
   loginBtn: {
     backgroundColor: "#0066FF",
     paddingHorizontal: 20,

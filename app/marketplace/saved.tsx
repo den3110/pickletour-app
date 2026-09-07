@@ -16,10 +16,12 @@ import {
   useSavedMarketListingsQuery,
   useToggleSaveMarketMutation,
 } from "@/slices/marketApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 
 export default function SavedScreen() {
+  const C = useThemeTokens();
   const { width } = useWindowDimensions();
   const { data, isLoading, refetch } = useSavedMarketListingsQuery(1);
   const [toggleSave] = useToggleSaveMarketMutation();
@@ -40,12 +42,12 @@ export default function SavedScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4 }}>🔖 Tin đã lưu</Text>
+        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4, color: C.text }}>🔖 Tin đã lưu</Text>
       </View>
 
       {isLoading ? (
@@ -63,7 +65,7 @@ export default function SavedScreen() {
           ListEmptyComponent={
             <View style={{ alignItems: "center", marginTop: 60 }}>
               <Text style={{ fontSize: 44 }}>🔖</Text>
-              <Text style={{ color: "#64748B", marginTop: 8, fontWeight: "600" }}>Bạn chưa lưu tin nào</Text>
+              <Text style={{ color: C.sub, marginTop: 8, fontWeight: "600" }}>Bạn chưa lưu tin nào</Text>
               <TouchableOpacity
                 onPress={() => router.push("/marketplace" as any)}
                 style={{ marginTop: 16, backgroundColor: BLUE, paddingHorizontal: 22, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" }}

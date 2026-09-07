@@ -6,7 +6,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,8 +23,11 @@ import {
   useListBlockedQuery,
   useUnblockUserMutation,
 } from "@/slices/friendsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function BlockedUsersScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { data, isFetching, refetch } = useListBlockedQuery(undefined);
   const [unblock, { isLoading: unblocking }] = useUnblockUserMutation();
   const items = data?.items || [];
@@ -58,7 +61,7 @@ export default function BlockedUsersScreen() {
         </View>
       ) : items.length === 0 ? (
         <View style={styles.centered}>
-          <Ionicons name="shield-checkmark-outline" size={40} color="#94A3B8" />
+          <Ionicons name="shield-checkmark-outline" size={40} color={C.muted} />
           <Text style={styles.emptyTitle}>Bạn chưa chặn ai</Text>
           <Text style={styles.emptyDesc}>
             Khi chặn 1 user, tên họ sẽ xuất hiện ở đây.
@@ -112,8 +115,8 @@ export default function BlockedUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   centered: {
     flex: 1,
     alignItems: "center",
@@ -121,18 +124,18 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
   },
-  emptyTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-  emptyDesc: { color: "#64748B", textAlign: "center" },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: C.text },
+  emptyDesc: { color: C.sub, textAlign: "center" },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   userInfo: {
     flex: 1,
@@ -140,14 +143,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#E2E8F0" },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.border },
   avatarFallback: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#64748B",
   },
-  name: { fontWeight: "700", color: "#0F172A" },
-  sub: { color: "#64748B", fontSize: 12 },
+  name: { fontWeight: "700", color: C.text },
+  sub: { color: C.sub, fontSize: 12 },
   unblockBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,

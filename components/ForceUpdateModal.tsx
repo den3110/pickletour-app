@@ -1,5 +1,5 @@
 // src/components/ForceUpdateModal.jsx
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useMemo } from "react";
 import {
   Modal,
   View,
@@ -13,8 +13,11 @@ import {
 import { Text } from "@/components/ui/i18nText";
 import { useSelector, useDispatch } from "react-redux";
 import { forceClose } from "@/slices/versionUiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function ForceUpdateModal() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const dispatch = useDispatch();
   const data1= useSelector(s=> s.version)
   const open = useSelector((s) => s.version?.open);
@@ -94,23 +97,23 @@ export default function ForceUpdateModal() {
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "#00000088",
+    backgroundColor: C.overlay,
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
   card: {
     width: "100%",
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 16,
     padding: 18,
   },
-  title: { fontSize: 18, fontWeight: "800", color: "#111827", marginBottom: 8 },
-  desc: { color: "#111827" },
-  meta: { color: "#6b7280", fontSize: 12, marginTop: 6 },
+  title: { fontSize: 18, fontWeight: "800", color: C.text, marginBottom: 8 },
+  desc: { color: C.text },
+  meta: { color: C.sub, fontSize: 12, marginTop: 6 },
   btn: {
     marginTop: 14,
     backgroundColor: "#2563eb",

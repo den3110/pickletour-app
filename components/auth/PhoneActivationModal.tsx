@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Modal,
   View,
@@ -15,6 +15,7 @@ import {
   useVerifyPhoneActivationOtpMutation,
 } from "@/slices/usersApiSlice";
 import { setCredentials, logout } from "@/slices/authSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 // Modal kích hoạt/đổi SĐT bằng OTP Zalo. force=true => không cho đóng (bắt buộc).
 export default function PhoneActivationModal({
@@ -28,6 +29,8 @@ export default function PhoneActivationModal({
   onClose?: () => void;
   onSuccess?: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const dispatch = useDispatch();
   const userInfo: any = useSelector((s: any) => s.auth?.userInfo);
   const [requestOtp, { isLoading: sending }] = useRequestPhoneOtpMutation();
@@ -101,7 +104,7 @@ export default function PhoneActivationModal({
                   value={newPhone}
                   onChangeText={(v) => setNewPhone(v.replace(/[^\d]/g, ""))}
                   placeholder="0987654321"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                   keyboardType="number-pad"
                   maxLength={11}
                 />
@@ -134,7 +137,7 @@ export default function PhoneActivationModal({
                 value={otp}
                 onChangeText={(v) => setOtp(v.replace(/\D/g, ""))}
                 placeholder="••••••"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 keyboardType="number-pad"
                 maxLength={6}
                 autoFocus
@@ -172,19 +175,19 @@ export default function PhoneActivationModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: 20 },
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 20 },
-  title: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginBottom: 8 },
-  warn: { backgroundColor: "#FEF3C7", color: "#92400E", padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 14 },
-  body: { fontSize: 14, color: "#334155", marginBottom: 10 },
-  bold: { fontWeight: "700", color: "#0F172A" },
-  input: { borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: "#0F172A", marginBottom: 10 },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: C.overlay, justifyContent: "center", padding: 20 },
+  card: { backgroundColor: C.card, borderRadius: 16, padding: 20 },
+  title: { fontSize: 18, fontWeight: "800", color: C.text, marginBottom: 8 },
+  warn: { backgroundColor: C.amberSoft, color: C.amberText, padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 14 },
+  body: { fontSize: 14, color: C.text2, marginBottom: 10 },
+  bold: { fontWeight: "700", color: C.text },
+  input: { borderWidth: 1, borderColor: C.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: C.text, marginBottom: 10 },
   link: { color: "#0066FF", fontWeight: "600", fontSize: 13, marginBottom: 10 },
   row: { flexDirection: "row", justifyContent: "space-between" },
   btnPrimary: { backgroundColor: "#0066FF", borderRadius: 10, paddingVertical: 13, alignItems: "center", marginTop: 6 },
   btnPrimaryText: { color: "#fff", fontWeight: "700", fontSize: 15 },
   btnDisabled: { opacity: 0.5 },
   logout: { alignItems: "center", marginTop: 14 },
-  logoutText: { color: "#64748B", fontWeight: "600" },
+  logoutText: { color: C.sub, fontWeight: "600" },
 });

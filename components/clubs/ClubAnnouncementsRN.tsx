@@ -18,6 +18,7 @@ import {
   useUpdateAnnouncementMutation,
   useDeleteAnnouncementMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -34,6 +35,8 @@ function GradLightCard({
   style?: any;
   pad?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={[styles.card, style]}>
       <LinearGradient
@@ -55,6 +58,8 @@ export default function ClubAnnouncementsRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const clubId = club?._id;
   const { data, isFetching, refetch } = useListAnnouncementsQuery(
     { id: clubId },
@@ -158,7 +163,7 @@ export default function ClubAnnouncementsRN({
             value={title}
             onChangeText={setTitle}
             placeholder="VD: Thông báo tuần này…"
-            placeholderTextColor="#9AA3B2"
+            placeholderTextColor={C.muted}
             style={styles.input}
           />
           <Text style={[styles.label, { marginTop: 10 }]}>Nội dung</Text>
@@ -167,7 +172,7 @@ export default function ClubAnnouncementsRN({
             onChangeText={setContent}
             multiline
             placeholder="Chi tiết…"
-            placeholderTextColor="#9AA3B2"
+            placeholderTextColor={C.muted}
             style={[styles.input, { minHeight: 88, textAlignVertical: "top" }]}
           />
 
@@ -180,7 +185,7 @@ export default function ClubAnnouncementsRN({
             <MaterialCommunityIcons
               name={pinned ? "checkbox-marked" : "checkbox-blank-outline"}
               size={20}
-              color={pinned ? "#667eea" : "#9AA3B2"}
+              color={pinned ? "#667eea" : C.muted}
             />
             <Text style={styles.checkLabel}>Ghim lên đầu</Text>
           </TouchableOpacity>
@@ -216,7 +221,7 @@ export default function ClubAnnouncementsRN({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {p.pinned && (
               <View style={styles.pinBadge}>
-                <MaterialCommunityIcons name="pin" size={12} color="#B4232D" />
+                <MaterialCommunityIcons name="pin" size={12} color={C.redText} />
                 <Text style={styles.pinBadgeText}>Ghim</Text>
               </View>
             )}
@@ -240,7 +245,7 @@ export default function ClubAnnouncementsRN({
                 <MaterialCommunityIcons
                   name={p.pinned ? "pin-off" : "pin"}
                   size={16}
-                  color="#3B3F75"
+                  color={C.text2}
                 />
                 <Text style={styles.iconBtnText}>
                   {p.pinned ? "Bỏ ghim" : "Ghim"}
@@ -253,7 +258,7 @@ export default function ClubAnnouncementsRN({
                 <MaterialCommunityIcons
                   name="pencil"
                   size={16}
-                  color="#3B3F75"
+                  color={C.text2}
                 />
                 <Text style={styles.iconBtnText}>Sửa</Text>
               </TouchableOpacity>
@@ -264,9 +269,9 @@ export default function ClubAnnouncementsRN({
                 <MaterialCommunityIcons
                   name="trash-can-outline"
                   size={16}
-                  color="#B4232D"
+                  color={C.redText}
                 />
-                <Text style={[styles.iconBtnText, { color: "#B4232D" }]}>
+                <Text style={[styles.iconBtnText, { color: C.redText }]}>
                   Xoá
                 </Text>
               </TouchableOpacity>
@@ -282,14 +287,14 @@ export default function ClubAnnouncementsRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   // Card sáng
   card: {
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 6 },
@@ -298,12 +303,12 @@ const styles = StyleSheet.create({
   },
 
   // Label/input sáng
-  label: { color: "#5C6285", marginBottom: 6, fontWeight: "600" },
+  label: { color: C.text3, marginBottom: 6, fontWeight: "600" },
   input: {
-    color: "#1F2340",
-    backgroundColor: "#FFFFFF",
+    color: C.text,
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -315,7 +320,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
-  checkLabel: { color: "#4A5270", fontWeight: "600" },
+  checkLabel: { color: C.text2, fontWeight: "600" },
 
   // Button primary (gradient tím)
   btnPrimary: {
@@ -334,16 +339,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  btnLightText: { color: "#3B3F75", fontWeight: "800", fontSize: 14 },
+  btnLightText: { color: C.text2, fontWeight: "800", fontSize: 14 },
 
   // Items
-  itemTitle: { color: "#2D3561", fontWeight: "800", fontSize: 16 },
-  itemBody: { color: "#4A5270", marginTop: 6, lineHeight: 20 },
-  itemTime: { color: "#7780A1", marginTop: 8, fontSize: 12 },
+  itemTitle: { color: C.text, fontWeight: "800", fontSize: 16 },
+  itemBody: { color: C.text2, marginTop: 6, lineHeight: 20 },
+  itemTime: { color: C.sub, marginTop: 8, fontSize: 12 },
 
   pinBadge: {
     flexDirection: "row",
@@ -352,11 +357,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#FFE9EC",
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: "#FFD5DA",
+    borderColor: C.redSoft,
   },
-  pinBadgeText: { color: "#B4232D", fontSize: 11, fontWeight: "800" },
+  pinBadgeText: { color: C.redText, fontSize: 11, fontWeight: "800" },
 
   adminRow: {
     flexDirection: "row",
@@ -371,10 +376,10 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  iconBtnDanger: { backgroundColor: "#FFE9EC", borderColor: "#FFD5DA" },
-  iconBtnText: { color: "#3B3F75", fontWeight: "700", fontSize: 13 },
+  iconBtnDanger: { backgroundColor: C.redSoft, borderColor: C.redSoft },
+  iconBtnText: { color: C.text2, fontWeight: "700", fontSize: 13 },
 });

@@ -35,6 +35,7 @@ import {
 } from "@/slices/coachesApiSlice";
 import { useOpenDmMutation } from "@/slices/messagesApiSlice";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const authorName = (u: any) => u?.nickname || u?.name || "Huấn luyện viên";
 
@@ -47,6 +48,8 @@ function ScoreChip({
   value?: number;
   color: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View
       style={[
@@ -69,6 +72,8 @@ function CoachCard({
   coach: any;
   onMessage: (id: string) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const hasPhone = !!coach.phone;
   const openProfile = () => router.push(`/profile/${coach._id}` as any);
   const call = () => {
@@ -124,13 +129,13 @@ function CoachCard({
         <View style={styles.metaCol}>
           {coach.province ? (
             <View style={styles.metaRow}>
-              <Ionicons name="location-outline" size={14} color="#64748B" />
+              <Ionicons name="location-outline" size={14} color={C.sub} />
               <Text style={styles.metaText}>{coach.province}</Text>
             </View>
           ) : null}
           {coach.coachProfile?.experienceYears > 0 ? (
             <View style={styles.metaRow}>
-              <Ionicons name="ribbon-outline" size={14} color="#64748B" />
+              <Ionicons name="ribbon-outline" size={14} color={C.sub} />
               <Text style={styles.metaText}>
                 {coach.coachProfile.experienceYears} năm kinh nghiệm
               </Text>
@@ -166,7 +171,7 @@ function CoachCard({
             <Ionicons
               name="call-outline"
               size={18}
-              color={hasPhone ? "#10B981" : "#CBD5E1"}
+              color={hasPhone ? "#10B981" : C.line}
             />
           </Pressable>
         </View>
@@ -176,6 +181,8 @@ function CoachCard({
 }
 
 export default function CoachesScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const viewer = useSelector((s: any) => s.auth?.userInfo);
   const isCoach = !!viewer?.isCoach;
   const [q, setQ] = useState("");
@@ -254,7 +261,7 @@ export default function CoachesScreen() {
           {myApp?.status === "pending" ? (
             <View style={styles.applyStatusRow}>
               <View style={styles.applyStatusChip}>
-                <Ionicons name="hourglass-outline" size={14} color="#B45309" />
+                <Ionicons name="hourglass-outline" size={14} color={C.amberText} />
                 <Text style={styles.applyStatusText}>Đơn đang chờ duyệt</Text>
               </View>
               <Pressable onPress={cancelApp} hitSlop={8}>
@@ -264,10 +271,10 @@ export default function CoachesScreen() {
           ) : myApp?.status === "rejected" ? (
             <Pressable
               onPress={() => setApplyOpen(true)}
-              style={[styles.applyBtn, { backgroundColor: "#FEE2E2" }]}
+              style={[styles.applyBtn, { backgroundColor: C.redSoft }]}
             >
-              <Ionicons name="alert-circle" size={16} color="#B91C1C" />
-              <Text style={[styles.applyBtnText, { color: "#B91C1C" }]}>
+              <Ionicons name="alert-circle" size={16} color={C.redText} />
+              <Text style={[styles.applyBtnText, { color: C.redText }]}>
                 Đơn bị từ chối — Đăng ký lại
               </Text>
             </Pressable>
@@ -286,12 +293,12 @@ export default function CoachesScreen() {
       {/* Search + filter */}
       <View style={styles.filterBar}>
         <View style={styles.searchWrap}>
-          <Ionicons name="search-outline" size={16} color="#64748B" />
+          <Ionicons name="search-outline" size={16} color={C.sub} />
           <TextInput
             value={q}
             onChangeText={setQ}
             placeholder="Tìm theo tên / biệt danh"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             style={styles.searchInput}
           />
         </View>
@@ -299,11 +306,11 @@ export default function CoachesScreen() {
           onPress={() => setProvinceOpen(true)}
           style={styles.provinceBtn}
         >
-          <Ionicons name="location-outline" size={14} color="#334155" />
+          <Ionicons name="location-outline" size={14} color={C.text2} />
           <Text style={styles.provinceBtnText} numberOfLines={1}>
             {province || "Tất cả tỉnh"}
           </Text>
-          <Ionicons name="chevron-down" size={14} color="#334155" />
+          <Ionicons name="chevron-down" size={14} color={C.text2} />
         </Pressable>
       </View>
 
@@ -322,7 +329,7 @@ export default function CoachesScreen() {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.empty}>
-              <Ionicons name="people-outline" size={40} color="#94A3B8" />
+              <Ionicons name="people-outline" size={40} color={C.muted} />
               <Text style={styles.emptyText}>Chưa có HLV phù hợp.</Text>
             </View>
           ) : (
@@ -428,6 +435,8 @@ function CoachApplicationModal({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [headline, setHeadline] = useState("");
   const [experienceYears, setExperienceYears] = useState("");
   const [specialtyText, setSpecialtyText] = useState("");
@@ -503,7 +512,7 @@ function CoachApplicationModal({
           <View style={styles.applyModalHeader}>
             <Text style={styles.modalTitle}>Đăng ký làm HLV</Text>
             <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#64748B" />
+              <Ionicons name="close" size={22} color={C.sub} />
             </Pressable>
           </View>
           <ScrollView
@@ -523,7 +532,7 @@ function CoachApplicationModal({
                 value={headline}
                 onChangeText={setHeadline}
                 placeholder="VD: HLV Pickleball 8 năm kinh nghiệm..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={styles.applyInput}
                 maxLength={200}
               />
@@ -536,7 +545,7 @@ function CoachApplicationModal({
                   value={experienceYears}
                   onChangeText={setExperienceYears}
                   keyboardType="number-pad"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                   style={styles.applyInput}
                 />
               </View>
@@ -546,7 +555,7 @@ function CoachApplicationModal({
                   value={phone}
                   onChangeText={setPhone}
                   keyboardType="phone-pad"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                   style={styles.applyInput}
                 />
               </View>
@@ -560,7 +569,7 @@ function CoachApplicationModal({
                 value={specialtyText}
                 onChangeText={setSpecialtyText}
                 placeholder="VD: Kỹ thuật đôi, Chấm trình 3.0-4.0"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={styles.applyInput}
               />
             </View>
@@ -571,7 +580,7 @@ function CoachApplicationModal({
                 value={bio}
                 onChangeText={setBio}
                 placeholder="Bio tuỳ chọn..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={[styles.applyInput, { minHeight: 80, textAlignVertical: "top" }]}
                 multiline
               />
@@ -591,7 +600,7 @@ function CoachApplicationModal({
                       value={a.title}
                       onChangeText={(v) => updateAch(idx, { title: v })}
                       placeholder="Tên thành tích"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={C.muted}
                       style={[styles.applyInput, { flex: 1 }]}
                     />
                     {achievements.length > 1 && (
@@ -610,7 +619,7 @@ function CoachApplicationModal({
                       onChangeText={(v) => updateAch(idx, { year: v })}
                       keyboardType="number-pad"
                       placeholder="Năm"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={C.muted}
                       style={[styles.applyInput, { width: 90 }]}
                     />
                     <View style={styles.levelPickerWrap}>
@@ -639,7 +648,7 @@ function CoachApplicationModal({
                     value={a.description}
                     onChangeText={(v) => updateAch(idx, { description: v })}
                     placeholder="Mô tả (tuỳ chọn)"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={C.muted}
                     style={[styles.applyInput, { marginTop: 6, minHeight: 40 }]}
                     multiline
                   />
@@ -653,7 +662,7 @@ function CoachApplicationModal({
                 value={note}
                 onChangeText={setNote}
                 placeholder="Tuỳ chọn..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={C.muted}
                 style={[styles.applyInput, { minHeight: 60, textAlignVertical: "top" }]}
                 multiline
               />
@@ -680,13 +689,13 @@ function CoachApplicationModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   applyBar: {
     padding: 10,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
   applyBtn: {
     flexDirection: "row",
@@ -709,12 +718,12 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: C.dark ? "rgba(245,158,11,0.4)" : "#FDE68A",
   },
-  applyStatusText: { color: "#92400E", fontSize: 12, fontWeight: "700" },
+  applyStatusText: { color: C.amberText, fontSize: 12, fontWeight: "700" },
   applyCancelText: { color: "#DC2626", fontWeight: "700", fontSize: 13 },
   applyModalHeader: {
     flexDirection: "row",
@@ -726,21 +735,21 @@ const styles = StyleSheet.create({
   applyInfoBox: {
     padding: 10,
     borderRadius: 8,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: C.dark ? "rgba(0,102,255,0.35)" : "#BFDBFE",
   },
-  applyInfoText: { color: "#1E40AF", fontSize: 12, lineHeight: 18 },
-  applyLabel: { fontSize: 12, fontWeight: "700", color: "#334155", marginBottom: 4 },
+  applyInfoText: { color: C.dark ? "#93C5FD" : "#1E40AF", fontSize: 12, lineHeight: 18 },
+  applyLabel: { fontSize: 12, fontWeight: "700", color: C.text2, marginBottom: 4 },
   applyInput: {
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: C.line,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#0F172A",
-    backgroundColor: "#fff",
+    color: C.text,
+    backgroundColor: C.card,
   },
   achHeaderRow: {
     flexDirection: "row",
@@ -753,9 +762,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     marginBottom: 8,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: C.bg,
   },
   achHeadRow: { flexDirection: "row", alignItems: "center" },
   levelPickerWrap: { flexDirection: "row", flexWrap: "wrap", gap: 4, flex: 1 },
@@ -764,11 +773,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#fff",
+    borderColor: C.line,
+    backgroundColor: C.card,
   },
   levelChipActive: { backgroundColor: "#0066FF", borderColor: "#0066FF" },
-  levelChipText: { fontSize: 11, color: "#334155", fontWeight: "600" },
+  levelChipText: { fontSize: 11, color: C.text2, fontWeight: "600" },
   levelChipTextActive: { color: "#fff" },
   submitBtn: {
     marginTop: 8,
@@ -782,9 +791,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
     alignItems: "center",
   },
   searchWrap: {
@@ -792,12 +801,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     paddingHorizontal: 10,
     borderRadius: 999,
     height: 36,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#0F172A", paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, paddingVertical: 0 },
   provinceBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -805,16 +814,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 36,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     maxWidth: 160,
   },
-  provinceBtnText: { fontSize: 12, color: "#334155", fontWeight: "600" },
+  provinceBtnText: { fontSize: 12, color: C.text2, fontWeight: "600" },
   card: {
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   cardHero: {
     height: 60,
@@ -825,13 +834,13 @@ const styles = StyleSheet.create({
     marginTop: -30,
     marginBottom: 4,
     borderWidth: 3,
-    borderColor: "#fff",
+    borderColor: C.card,
     borderRadius: 999,
     alignSelf: "flex-start",
   },
-  name: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
-  nickname: { fontSize: 12, color: "#64748B", marginTop: 1 },
-  headline: { fontSize: 13, color: "#475569", marginTop: 2 },
+  name: { fontSize: 16, fontWeight: "800", color: C.text },
+  nickname: { fontSize: 12, color: C.sub, marginTop: 1 },
+  headline: { fontSize: 13, color: C.text3, marginTop: 2 },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -862,13 +871,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#F8FAFC",
+    borderColor: C.line,
+    backgroundColor: C.bg,
   },
-  specialtyText: { fontSize: 11, color: "#334155", fontWeight: "600" },
+  specialtyText: { fontSize: 11, color: C.text2, fontWeight: "600" },
   metaCol: { gap: 4, marginTop: 6 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  metaText: { fontSize: 12, color: "#64748B" },
+  metaText: { fontSize: 12, color: C.sub },
   actionRow: {
     flexDirection: "row",
     gap: 8,
@@ -896,17 +905,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   callBtnDisabled: {
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
   empty: { padding: 48, alignItems: "center", gap: 6 },
-  emptyText: { color: "#64748B", fontWeight: "600" },
+  emptyText: { color: C.sub, fontWeight: "600" },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
@@ -917,7 +926,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     borderRadius: 999,
     alignSelf: "center",
     marginBottom: 8,
@@ -925,7 +934,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
+    color: C.text,
     paddingVertical: 8,
   },
   modalRow: {
@@ -934,8 +943,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   modalRowActive: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: C.primarySoft,
   },
-  modalRowText: { color: "#334155", fontSize: 14 },
+  modalRowText: { color: C.text2, fontSize: 14 },
   modalRowTextActive: { color: "#0066FF", fontWeight: "700" },
 });

@@ -4,8 +4,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React,
-  { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -26,6 +25,7 @@ import {
   useListFriendRequestsQuery,
   useListFriendsQuery,
 } from "@/slices/friendsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 const fmtDate = (iso?: string) =>
@@ -40,6 +40,8 @@ function UserRow({
   meta?: string;
   right?: React.ReactNode;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable
       onPress={() => user?._id && router.push(`/profile/${user._id}`)}
@@ -56,6 +58,8 @@ function UserRow({
 }
 
 function FriendsList() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { data, isFetching, refetch } = useListFriendsQuery({});
   const items = data?.items || [];
   return (
@@ -81,7 +85,7 @@ function FriendsList() {
       ListEmptyComponent={
         !isFetching ? (
           <View style={styles.empty}>
-            <Ionicons name="people-outline" size={48} color="#94A3B8" />
+            <Ionicons name="people-outline" size={48} color={C.muted} />
             <Text style={styles.emptyText}>Chưa có bạn nào.</Text>
             <Text style={styles.emptySub}>
               Gửi lời mời từ Bảng xếp hạng hoặc trang cá nhân.
@@ -96,6 +100,8 @@ function FriendsList() {
 }
 
 function RequestsList({ direction }: { direction: "incoming" | "outgoing" }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { data, isFetching, refetch } = useListFriendRequestsQuery(direction);
   const items = data?.items || [];
   return (
@@ -135,6 +141,8 @@ function RequestsList({ direction }: { direction: "incoming" | "outgoing" }) {
 }
 
 export default function FriendsScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const [tab, setTab] = useState<"friends" | "incoming" | "outgoing">(
     "friends"
@@ -146,7 +154,7 @@ export default function FriendsScreen() {
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: t("Bạn bè") }} />
         <View style={{ padding: 24, alignItems: "center" }}>
-          <Text style={{ marginBottom: 12, color: "#334155" }}>
+          <Text style={{ marginBottom: 12, color: C.text2 }}>
             Đăng nhập để xem bạn bè.
           </Text>
           <Pressable
@@ -214,15 +222,15 @@ export default function FriendsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.card },
   tabBar: {
     flexDirection: "row",
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
     gap: 6,
   },
   tabBtn: {
@@ -232,10 +240,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
-  tabBtnActive: { backgroundColor: "#DBEAFE" },
-  tabText: { color: "#64748B", fontWeight: "600", fontSize: 13 },
+  tabBtnActive: { backgroundColor: C.primarySoft },
+  tabText: { color: C.sub, fontWeight: "600", fontSize: 13 },
   tabTextActive: { color: "#0066FF" },
   badge: {
     backgroundColor: "#94A3B8",
@@ -253,7 +261,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
   },
-  sep: { height: 1, backgroundColor: "#F1F5F9", marginLeft: 68 },
+  sep: { height: 1, backgroundColor: C.field, marginLeft: 68 },
   avatar: {
     width: 44,
     height: 44,
@@ -263,11 +271,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarLetter: { color: "#fff", fontWeight: "700" },
-  name: { color: "#0F172A", fontWeight: "600" },
-  meta: { color: "#64748B", fontSize: 12, marginTop: 2 },
+  name: { color: C.text, fontWeight: "600" },
+  meta: { color: C.sub, fontSize: 12, marginTop: 2 },
   empty: { padding: 32, alignItems: "center", gap: 4 },
-  emptyText: { color: "#334155", fontWeight: "600" },
-  emptySub: { color: "#64748B", fontSize: 12, textAlign: "center" },
+  emptyText: { color: C.text2, fontWeight: "600" },
+  emptySub: { color: C.sub, fontSize: 12, textAlign: "center" },
   loginBtn: {
     backgroundColor: "#0066FF",
     paddingHorizontal: 20,

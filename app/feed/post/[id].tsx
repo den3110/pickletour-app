@@ -11,8 +11,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { useVideoPlayer,
   VideoView } from "expo-video";
 import ImageView from "react-native-image-viewing";
-import React,
-  { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import {
@@ -57,6 +56,7 @@ import { AspectImage } from "@/components/feed/AspectImage";
 import { ReactorsModal } from "@/components/feed/ReactorsModal";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import { useLazySearchUserQuery } from "@/slices/usersApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const authorName = (u?: any) => u?.nickname || u?.name || "Người dùng";
 function extractErr(err: any): string {
@@ -277,6 +277,8 @@ function CommentItem({
   justRepliedTo?: string | null;
   requireLoginGuard: () => boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [reactComment] = useReactFeedCommentMutation();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const myReaction: string | null = comment.myReaction || null;
@@ -501,6 +503,8 @@ function CommentItem({
 }
 
 export default function FeedPostDetail() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const headerHeight = useHeaderHeight();
@@ -860,9 +864,9 @@ export default function FeedPostDetail() {
   if (isFetching || !post) {
     return (
       <View
-        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg }}
       >
-        <ActivityIndicator />
+        <ActivityIndicator color={C.primary} />
       </View>
     );
   }
@@ -908,7 +912,7 @@ export default function FeedPostDetail() {
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={20}
-                    color="#64748B"
+                    color={C.sub}
                   />
                 </Pressable>
               )}
@@ -1056,7 +1060,7 @@ export default function FeedPostDetail() {
             />
           ))}
           {comments?.items?.length === 0 && (
-            <Text style={{ color: "#64748B", padding: 12 }}>
+            <Text style={{ color: C.sub, padding: 12 }}>
               Chưa có bình luận. Hãy là người đầu tiên!
             </Text>
           )}
@@ -1065,11 +1069,11 @@ export default function FeedPostDetail() {
         <View style={styles.commentBar}>
           {replyTarget && (
             <View style={styles.replyIndicator}>
-              <Text style={{ color: "#64748B", fontSize: 12 }}>
+              <Text style={{ color: C.sub, fontSize: 12 }}>
                 Đang trả lời một bình luận
               </Text>
               <Pressable onPress={() => setReplyTarget(null)}>
-                <Ionicons name="close" size={18} color="#64748B" />
+                <Ionicons name="close" size={18} color={C.sub} />
               </Pressable>
             </View>
           )}
@@ -1082,7 +1086,7 @@ export default function FeedPostDetail() {
                   onPress={() => insertMention(u)}
                   style={({ pressed }) => [
                     styles.mentionItem,
-                    pressed && { backgroundColor: "#F1F5F9" },
+                    pressed && { backgroundColor: C.field },
                   ]}
                 >
                   <AuthorAvatar user={u} size={32} />
@@ -1179,6 +1183,7 @@ export default function FeedPostDetail() {
               value={text}
               onChangeText={onChangeText}
               multiline
+              placeholderTextColor={C.muted}
             />
             <Pressable
               onPress={submit}
@@ -1209,10 +1214,10 @@ export default function FeedPostDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   postCard: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -1235,30 +1240,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarLetter: { color: "#fff", fontWeight: "700" },
-  postAuthor: { fontWeight: "700", color: "#0F172A" },
-  postTime: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  postAuthor: { fontWeight: "700", color: C.text },
+  postTime: { fontSize: 12, color: C.sub, marginTop: 2 },
   postContent: {
     marginTop: 10,
     fontSize: 15,
     lineHeight: 22,
-    color: "#0F172A",
+    color: C.text,
   },
   sectionTitle: {
     fontWeight: "700",
     fontSize: 15,
-    color: "#0F172A",
+    color: C.text,
     marginTop: 8,
     marginBottom: 12,
   },
   commentRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   commentBubble: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  commentAuthor: { fontWeight: "700", color: "#0F172A", fontSize: 13 },
-  commentText: { color: "#0F172A", marginTop: 2 },
+  commentAuthor: { fontWeight: "700", color: C.text, fontSize: 13 },
+  commentText: { color: C.text, marginTop: 2 },
   commentMeta: {
     flexDirection: "row",
     gap: 12,
@@ -1266,11 +1271,11 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     alignItems: "center",
   },
-  commentMetaText: { fontSize: 12, color: "#64748B" },
+  commentMetaText: { fontSize: 12, color: C.sub },
   commentBar: {
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    backgroundColor: "#fff",
+    borderTopColor: C.border,
+    backgroundColor: C.card,
     paddingHorizontal: 12,
     paddingTop: 10,
     // SafeAreaView edges=["bottom"] đã trừ home indicator, thêm 12 để thoáng.
@@ -1282,19 +1287,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 6,
     marginBottom: 4,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
   },
   commentInput: {
     flex: 1,
     minHeight: 36,
     maxHeight: 120,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
   },
   sendBtn: {
     marginLeft: 8,
@@ -1307,7 +1312,7 @@ const styles = StyleSheet.create({
   },
   reactionPicker: {
     flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 24,
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -1326,10 +1331,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 8,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 10,
   },
-  postStatsText: { fontSize: 13, color: "#475569", fontWeight: "500" },
+  postStatsText: { fontSize: 13, color: C.text3, fontWeight: "500" },
   attachBtn: {
     marginRight: 4,
     width: 36,
@@ -1364,10 +1369,10 @@ const styles = StyleSheet.create({
   },
   mentionList: {
     marginBottom: 6,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     maxHeight: 240,
     overflow: "hidden",
   },
@@ -1381,10 +1386,10 @@ const styles = StyleSheet.create({
   mentionNick: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: C.text,
   },
   mentionName: {
     fontSize: 11,
-    color: "#64748B",
+    color: C.sub,
   },
 });

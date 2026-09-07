@@ -1916,7 +1916,6 @@ const calendarTheme = {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
   },
   scrollView: {
     flex: 1,
@@ -2037,7 +2036,6 @@ const styles = StyleSheet.create({
 
   // Calendar Card
   calendarCard: {
-    backgroundColor: "#FFF",
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 16,
@@ -2107,7 +2105,6 @@ const styles = StyleSheet.create({
 
   // Enhanced Match Card
   enhancedMatchCard: {
-    backgroundColor: "#FFF",
     borderRadius: 16,
     marginBottom: 16,
     overflow: "hidden",
@@ -2208,7 +2205,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: "#F9FAFB",
     borderWidth: 1,
   },
   teamRowHighlight: {
@@ -2336,7 +2332,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#FFF",
     padding: 14,
     borderRadius: 12,
     marginBottom: 10,
@@ -2582,7 +2577,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   skeletonCard: {
-    backgroundColor: "#FFF",
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
@@ -2617,7 +2611,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
-    backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,

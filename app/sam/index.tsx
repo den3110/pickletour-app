@@ -4,9 +4,8 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
   router } from "expo-router";
-import React,
-  { useEffect,
-  useState } from "react";
+import React, { useEffect,
+  useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,8 +29,11 @@ import {
 } from "@/slices/samApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { RoomListItem } from "@/components/games/RoomListItem";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 export default function SamLobbyScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data, isFetching, refetch } = useListSamRoomsQuery(undefined);
   const [createRoom, { isLoading: creating }] = useCreateSamRoomMutation();
@@ -94,7 +96,7 @@ export default function SamLobbyScreen() {
       </View>
 
       <View style={styles.notice}>
-        <Ionicons name="information-circle-outline" size={14} color="#5B21B6" />
+        <Ionicons name="information-circle-outline" size={14} color={C.dark ? "#c4b5fd" : "#5B21B6"} />
         <Text style={styles.noticeText}>
           Gameplay Sâm đang phát triển. Tạm thời có thể tạo bàn, ngồi, chat,
           mời bạn. Đánh combo sẽ ra ở bản kế.
@@ -111,12 +113,12 @@ export default function SamLobbyScreen() {
         ListEmptyComponent={
           !isFetching ? (
             <View style={{ padding: 40, alignItems: "center" }}>
-              <Text style={{ color: "#94A3B8", textAlign: "center" }}>
+              <Text style={{ color: C.muted, textAlign: "center" }}>
                 Chưa có bàn nào. Tạo bàn đầu tiên và mời bạn bè cùng chơi!
               </Text>
             </View>
           ) : (
-            <ActivityIndicator style={{ marginTop: 20 }} />
+            <ActivityIndicator style={{ marginTop: 20 }} color={C.accent} />
           )
         }
         renderItem={({ item }) => (
@@ -156,6 +158,7 @@ export default function SamLobbyScreen() {
               <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>Tạo bàn Sâm Lốc</Text>
               <TextInput
+                placeholderTextColor={C.muted}
                 placeholder="Tên bàn (tùy chọn)"
                 value={name}
                 onChangeText={setName}
@@ -189,9 +192,9 @@ export default function SamLobbyScreen() {
               <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
                 <Pressable
                   onPress={() => setModalOpen(false)}
-                  style={[styles.btn, { backgroundColor: "#F1F5F9" }]}
+                  style={[styles.btn, { backgroundColor: C.field }]}
                 >
-                  <Text style={{ color: "#0F172A", fontWeight: "700" }}>
+                  <Text style={{ color: C.text, fontWeight: "700" }}>
                     Huỷ
                   </Text>
                 </Pressable>
@@ -217,17 +220,17 @@ export default function SamLobbyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  title: { flex: 1, fontSize: 18, fontWeight: "800", color: C.text },
   createBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -242,36 +245,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     padding: 10,
-    backgroundColor: "#EDE9FE",
+    backgroundColor: C.purpleSoft,
     borderBottomWidth: 1,
-    borderBottomColor: "#DDD6FE",
+    borderBottomColor: C.dark ? "rgba(124,58,237,0.35)" : "#DDD6FE",
     alignItems: "flex-start",
   },
-  noticeText: { flex: 1, fontSize: 11, color: "#5B21B6", lineHeight: 15 },
+  noticeText: { flex: 1, fontSize: 11, color: C.dark ? "#c4b5fd" : "#5B21B6", lineHeight: 15 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     gap: 6,
   },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  roomName: { flex: 1, fontSize: 15, fontWeight: "800", color: C.text },
   stagePill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   cardMeta: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  metaTxt: { fontSize: 12, color: "#64748B" },
+  metaTxt: { fontSize: 12, color: C.sub },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
@@ -282,19 +285,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     marginBottom: 8,
   },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: "#0F172A" },
-  label: { fontSize: 12, color: "#64748B", marginBottom: 4 },
+  modalTitle: { fontSize: 17, fontWeight: "800", color: C.text },
+  label: { fontSize: 12, color: C.sub, marginBottom: 4 },
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    color: C.text,
   },
-  hint: { fontSize: 11, color: "#94A3B8", marginTop: 4 },
+  hint: { fontSize: 11, color: C.muted, marginTop: 4 },
   btn: {
     padding: 12,
     borderRadius: 10,

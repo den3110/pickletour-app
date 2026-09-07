@@ -1,5 +1,5 @@
 // components/market/ListingForm.tsx — form đăng / sửa tin Chợ (mobile)
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Pressable,
@@ -25,48 +25,58 @@ import {
   useCreateMarketListingMutation,
   useUpdateMarketListingMutation,
 } from "@/slices/marketApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 
-const Label = ({ children }: { children: React.ReactNode }) => (
-  <Text style={{ fontWeight: "700", marginBottom: 6, marginTop: 14, color: "#111827" }}>{children}</Text>
-);
-const inputStyle = {
-  borderWidth: 1,
-  borderColor: "#E2E8F0",
-  borderRadius: 12,
-  paddingHorizontal: 14,
-  paddingVertical: 12,
-  fontSize: 15,
-  color: "#111827",
-  backgroundColor: "#fff",
-} as const;
+const Label = ({ children }: { children: React.ReactNode }) => {
+  const C = useThemeTokens();
+  return (
+    <Text style={{ fontWeight: "700", marginBottom: 6, marginTop: 14, color: C.text }}>{children}</Text>
+  );
+};
+const mkInputStyle = (C: ThemeTokens) =>
+  ({
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: C.text,
+    backgroundColor: C.card,
+  }) as const;
 
-const Chips = ({ options, value, onPick }: any) => (
-  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-    {options.map((o: any) => {
-      const active = value === o.key;
-      return (
-        <TouchableOpacity
-          key={o.key}
-          onPress={() => onPick(o.key)}
-          style={{
-            paddingHorizontal: 14,
-            paddingVertical: 9,
-            borderRadius: 999,
-            backgroundColor: active ? BLUE : "#F1F5F9",
-          }}
-        >
-          <Text style={{ fontWeight: "700", color: active ? "#fff" : "#334155" }}>
-            {o.emoji ? `${o.emoji} ` : ""}{o.label}
-          </Text>
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-);
+const Chips = ({ options, value, onPick }: any) => {
+  const C = useThemeTokens();
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      {options.map((o: any) => {
+        const active = value === o.key;
+        return (
+          <TouchableOpacity
+            key={o.key}
+            onPress={() => onPick(o.key)}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 9,
+              borderRadius: 999,
+              backgroundColor: active ? BLUE : C.field,
+            }}
+          >
+            <Text style={{ fontWeight: "700", color: active ? "#fff" : C.text2 }}>
+              {o.emoji ? `${o.emoji} ` : ""}{o.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
 export default function ListingForm({ existingId }: { existingId?: string }) {
+  const C = useThemeTokens();
+  const inputStyle = useMemo(() => mkInputStyle(C), [C]);
   const isEdit = !!existingId;
   const { data: canPost, isLoading: canPostLoading } = useMarketCanPostQuery(undefined, { skip: isEdit });
   const { data: existing } = useGetMarketListingQuery(existingId, { skip: !isEdit });
@@ -243,7 +253,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
 
   if (!isEdit && canPostLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
         <ActivityIndicator style={{ marginTop: 60 }} color={BLUE} />
       </SafeAreaView>
     );
@@ -251,18 +261,18 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
 
   if (!isEdit && canPost && !canPost.canPost) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }} edges={["top"]}>
         <View style={{ flexDirection: "row", alignItems: "center", padding: 12 }}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color="#111827" />
+            <Ionicons name="chevron-back" size={26} color={C.text} />
           </TouchableOpacity>
         </View>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 30 }}>
           <Ionicons name="shield-checkmark-outline" size={64} color="#F59E0B" />
-          <Text style={{ fontSize: 20, fontWeight: "800", marginTop: 12, textAlign: "center" }}>
+          <Text style={{ fontSize: 20, fontWeight: "800", marginTop: 12, textAlign: "center", color: C.text }}>
             Cần xác minh danh tính
           </Text>
-          <Text style={{ color: "#64748B", marginTop: 8, textAlign: "center", lineHeight: 22 }}>
+          <Text style={{ color: C.sub, marginTop: 8, textAlign: "center", lineHeight: 22 }}>
             {canPost.reason || "Bạn cần xác minh CCCD/KYC trước khi đăng tin mua bán để đảm bảo an toàn giao dịch."}
           </Text>
           <TouchableOpacity
@@ -277,12 +287,12 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4 }}>{isEdit ? "Sửa tin" : "Đăng tin mới"}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4, color: C.text }}>{isEdit ? "Sửa tin" : "Đăng tin mới"}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
@@ -308,9 +318,9 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
           {images.length < 12 && (
             <TouchableOpacity
               onPress={pickImages}
-              style={{ width: 92, height: 92, borderWidth: 2, borderColor: "#CBD5E1", borderStyle: "dashed", borderRadius: 10, alignItems: "center", justifyContent: "center" }}
+              style={{ width: 92, height: 92, borderWidth: 2, borderColor: C.line, borderStyle: "dashed", borderRadius: 10, alignItems: "center", justifyContent: "center" }}
             >
-              {uploading ? <ActivityIndicator color={BLUE} /> : <Ionicons name="camera-outline" size={26} color="#94A3B8" />}
+              {uploading ? <ActivityIndicator color={BLUE} /> : <Ionicons name="camera-outline" size={26} color={C.muted} />}
             </TouchableOpacity>
           )}
         </View>
@@ -319,7 +329,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         <Chips options={TYPES} value={type} onPick={setType} />
 
         <Label>Tiêu đề *</Label>
-        <TextInput value={title} onChangeText={setTitle} placeholder="VD: Giày Nike Vapor Pro size 42, mới 95%" placeholderTextColor="#94A3B8" maxLength={140} style={inputStyle} />
+        <TextInput value={title} onChangeText={setTitle} placeholder="VD: Giày Nike Vapor Pro size 42, mới 95%" placeholderTextColor={C.muted} maxLength={140} style={inputStyle} />
 
         <Label>Danh mục</Label>
         <Chips options={CATEGORIES} value={category} onPick={setCategory} />
@@ -331,27 +341,27 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         {type === "sell" && (
           <>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
-              <Text style={{ fontWeight: "700", color: "#111827" }}>Nhiều phân loại (size/màu — mỗi loại 1 giá)</Text>
+              <Text style={{ fontWeight: "700", color: C.text }}>Nhiều phân loại (size/màu — mỗi loại 1 giá)</Text>
               <Switch value={hasVariants} onValueChange={setHasVariants} />
             </View>
             {hasVariants && (
-              <View style={{ marginTop: 10, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12 }}>
-                <Text style={{ fontSize: 13, fontWeight: "600", marginBottom: 6, color: "#475569" }}>Tên nhóm phân loại</Text>
+              <View style={{ marginTop: 10, padding: 12, borderWidth: 1, borderColor: C.border, borderRadius: 12 }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", marginBottom: 6, color: C.text3 }}>Tên nhóm phân loại</Text>
                 <TextInput
                   value={variantLabel}
                   onChangeText={setVariantLabel}
                   placeholder="VD: Size, Màu sắc"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                   style={{ ...inputStyle, marginBottom: 10 }}
                 />
                 {variants.map((v, i) => (
-                  <View key={i} style={{ marginBottom: 10, padding: 8, borderRadius: 10, backgroundColor: "#F8FAFC" }}>
+                  <View key={i} style={{ marginBottom: 10, padding: 8, borderRadius: 10, backgroundColor: C.bg }}>
                     <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                       <TextInput
                         value={v.name}
                         onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, name: t } : x)))}
                         placeholder="Tên loại (40, Đen-M)"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={C.muted}
                         style={{ ...inputStyle, flex: 1 }}
                       />
                       <TextInput
@@ -359,7 +369,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
                         onChangeText={(t) => setVariants((arr) => arr.map((x, idx) => (idx === i ? { ...x, price: t.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".") } : x)))}
                         keyboardType="number-pad"
                         placeholder="Giá"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={C.muted}
                         style={{ ...inputStyle, width: 100 }}
                       />
                       <TouchableOpacity onPress={() => setVariants((arr) => arr.filter((_, idx) => idx !== i))} hitSlop={6}>
@@ -380,8 +390,8 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
                         </View>
                       ))}
                       {(((v as any).images || []).length < 8) && (
-                        <TouchableOpacity onPress={() => pickVariantImages(i)} style={{ width: 48, height: 48, borderWidth: 1, borderColor: "#CBD5E1", borderStyle: "dashed", borderRadius: 8, alignItems: "center", justifyContent: "center" }}>
-                          <Ionicons name="camera-outline" size={18} color="#94A3B8" />
+                        <TouchableOpacity onPress={() => pickVariantImages(i)} style={{ width: 48, height: 48, borderWidth: 1, borderColor: C.line, borderStyle: "dashed", borderRadius: 8, alignItems: "center", justifyContent: "center" }}>
+                          <Ionicons name="camera-outline" size={18} color={C.muted} />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -403,11 +413,11 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
               onChangeText={(v) => setPrice(v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, "."))}
               keyboardType="number-pad"
               placeholder="0 = thương lượng"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={C.muted}
               style={inputStyle}
             />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-              <Text style={{ color: "#334155" }}>Có thể thương lượng</Text>
+              <Text style={{ color: C.text2 }}>Có thể thương lượng</Text>
               <Switch value={negotiable} onValueChange={setNegotiable} />
             </View>
           </>
@@ -416,21 +426,21 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         {type === "trade" && (
           <>
             <Label>Muốn đổi lấy gì?</Label>
-            <TextInput value={tradeFor} onChangeText={setTradeFor} placeholder="VD: Vợt Joola Perseus, hoặc bù tiền" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={tradeFor} onChangeText={setTradeFor} placeholder="VD: Vợt Joola Perseus, hoặc bù tiền" placeholderTextColor={C.muted} style={inputStyle} />
           </>
         )}
 
         <Label>Thương hiệu</Label>
-        <TextInput value={brand} onChangeText={setBrand} placeholder="Nike, Joola…" placeholderTextColor="#94A3B8" style={inputStyle} />
+        <TextInput value={brand} onChangeText={setBrand} placeholder="Nike, Joola…" placeholderTextColor={C.muted} style={inputStyle} />
 
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Label>Size / Thông số</Label>
-            <TextInput value={size} onChangeText={setSize} placeholder="42, L, 8.0oz…" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={size} onChangeText={setSize} placeholder="42, L, 8.0oz…" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
           <View style={{ flex: 1 }}>
             <Label>Màu sắc</Label>
-            <TextInput value={color} onChangeText={setColor} placeholder="Đen…" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={color} onChangeText={setColor} placeholder="Đen…" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
         </View>
 
@@ -439,7 +449,7 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
           value={description}
           onChangeText={setDescription}
           placeholder="Tình trạng, lý do bán, thời gian sử dụng, bảo hành…"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={C.muted}
           multiline
           style={{ ...inputStyle, minHeight: 100, textAlignVertical: "top" }}
         />
@@ -447,26 +457,26 @@ export default function ListingForm({ existingId }: { existingId?: string }) {
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Label>Tỉnh/Thành</Label>
-            <TextInput value={province} onChangeText={setProvince} placeholder="Hà Nội" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={province} onChangeText={setProvince} placeholder="Hà Nội" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
           <View style={{ flex: 1 }}>
             <Label>Quận/Huyện</Label>
-            <TextInput value={district} onChangeText={setDistrict} placeholder="Cầu Giấy" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={district} onChangeText={setDistrict} placeholder="Cầu Giấy" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
         </View>
 
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Label>Số điện thoại</Label>
-            <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xx" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xx" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
           <View style={{ flex: 1 }}>
             <Label>Zalo</Label>
-            <TextInput value={zalo} onChangeText={setZalo} placeholder="SĐT/link Zalo" placeholderTextColor="#94A3B8" style={inputStyle} />
+            <TextInput value={zalo} onChangeText={setZalo} placeholder="SĐT/link Zalo" placeholderTextColor={C.muted} style={inputStyle} />
           </View>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-          <Text style={{ color: "#334155" }}>Hiển thị SĐT công khai</Text>
+          <Text style={{ color: C.text2 }}>Hiển thị SĐT công khai</Text>
           <Switch value={showPhone} onValueChange={setShowPhone} />
         </View>
 

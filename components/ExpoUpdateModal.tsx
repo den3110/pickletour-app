@@ -3,7 +3,7 @@ import { t } from "@/utils/i18n";
  * Expo Update Modal - VIP UI với progress bar
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Modal,
   View,
@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 interface Props {
   visible: boolean;
@@ -21,6 +22,8 @@ interface Props {
 }
 
 const ExpoUpdateModal: React.FC<Props> = ({ visible, status, onClose }) => {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const statusConfig = {
     idle: {
       title: "",
@@ -103,16 +106,16 @@ const ExpoUpdateModal: React.FC<Props> = ({ visible, status, onClose }) => {
 
 const { width } = Dimensions.get("window");
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: C.overlay,
     justifyContent: "center",
     alignItems: "center",
   },
   container: {
     width: width * 0.85,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 20,
     padding: 28,
     alignItems: "center",
@@ -128,13 +131,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#1a1a1a",
+    color: C.text,
     marginBottom: 8,
     textAlign: "center",
   },
   text: {
     fontSize: 15,
-    color: "#666",
+    color: C.sub,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -144,7 +147,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: "#e5e7eb",
+    backgroundColor: C.border,
     borderRadius: 3,
     overflow: "hidden",
   },

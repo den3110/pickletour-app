@@ -1,5 +1,5 @@
 // components/clubs/ClubJoinButtonRN.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -13,6 +13,7 @@ import {
   useCancelJoinMutation,
   useLeaveClubMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 function PrimaryButton({
   title,
@@ -23,6 +24,8 @@ function PrimaryButton({
   onPress?: () => void;
   disabled?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -53,6 +56,8 @@ function SecondaryButton({
   onPress?: () => void;
   disabled?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -76,6 +81,8 @@ function DangerGhostButton({
   onPress?: () => void;
   disabled?: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -97,6 +104,8 @@ export default function ClubJoinButtonRN({
   clubId: string;
   state: "member" | "pending" | "not_member";
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [requestJoin, { isLoading: joining }] = useRequestJoinMutation();
   const [cancelJoin, { isLoading: canceling }] = useCancelJoinMutation();
   const [leaveClub, { isLoading: leaving }] = useLeaveClubMutation();
@@ -148,7 +157,7 @@ export default function ClubJoinButtonRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   row: { flexDirection: "row", gap: 8 },
   btnBase: {
     height: 42,
@@ -171,20 +180,20 @@ const styles = StyleSheet.create({
 
   // Secondary: nền sáng, có viền nhạt
   btnSecondary: {
-    backgroundColor: "#F6F7FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
 
   // Danger ghost: nền trắng mờ, viền nhạt tông đỏ
   btnDangerGhost: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#F5C2C2",
+    borderColor: C.redSoft,
   },
 
   btnText: { fontWeight: "800", fontSize: 15 },
   btnTextLight: { color: "#FFFFFF" },
-  btnTextDark: { color: "#3D4470" },
-  btnTextDanger: { color: "#B91C1C" },
+  btnTextDark: { color: C.text2 },
+  btnTextDanger: { color: C.redText },
 });

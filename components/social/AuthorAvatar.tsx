@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Image,
   StyleSheet,
   View,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type Author =
   | { avatar?: string | null; nickname?: string; name?: string }
@@ -20,6 +21,8 @@ export function AuthorAvatar({
   user: Author;
   size?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const url = typeof user?.avatar === "string" ? user.avatar.trim() : "";
   const style = {
     width: size,
@@ -39,8 +42,8 @@ export function AuthorAvatar({
   );
 }
 
-const styles = StyleSheet.create({
-  img: { backgroundColor: "#E2E8F0" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  img: { backgroundColor: C.border },
   fallback: {
     backgroundColor: "#0066FF",
     alignItems: "center",

@@ -43,16 +43,18 @@ import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 import { useBoostListingMutation } from "@/slices/marketApiSlice";
 import StarRatingRN from "@/components/market/StarRatingRN";
 import SellerReviewsRN from "@/components/market/SellerReviewsRN";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 
 function OffersManager({ listingId }: { listingId: string }) {
+  const C = useThemeTokens();
   const { data, isLoading, refetch } = useListMarketOffersQuery(listingId);
   const [respond, { isLoading: responding }] = useRespondMarketOfferMutation();
   if (isLoading) return <ActivityIndicator style={{ marginTop: 8 }} color={BLUE} />;
   const offers = data?.items || [];
   if (!offers.length)
-    return <Text style={{ color: "#64748B", marginTop: 6 }}>Chưa có đề nghị nào.</Text>;
+    return <Text style={{ color: C.sub, marginTop: 6 }}>Chưa có đề nghị nào.</Text>;
   const act = async (offerId: string, action: string) => {
     try {
       await respond({ offerId, action }).unwrap();
@@ -72,21 +74,21 @@ function OffersManager({ listingId }: { listingId: string }) {
             gap: 10,
             padding: 10,
             borderWidth: 1,
-            borderColor: "#EAECEF",
+            borderColor: C.border,
             borderRadius: 12,
           }}
         >
           <Image
             source={{ uri: o.buyer?.avatar || undefined }}
-            style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#E2E8F0" }}
+            style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: C.border }}
           />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: "700" }}>
+            <Text style={{ fontWeight: "700", color: C.text }}>
               {o.buyer?.nickname || o.buyer?.name}{" "}
               <Text style={{ color: BLUE, fontWeight: "900" }}>· {formatPrice(o.amount, "sell")}</Text>
-              {!!o.variantName && <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}> ({o.variantName})</Text>}
+              {!!o.variantName && <Text style={{ color: C.sub, fontSize: 12, fontWeight: "600" }}> ({o.variantName})</Text>}
             </Text>
-            {!!o.message && <Text style={{ color: "#64748B", fontSize: 13 }}>“{o.message}”</Text>}
+            {!!o.message && <Text style={{ color: C.sub, fontSize: 13 }}>“{o.message}”</Text>}
           </View>
           {o.status === "pending" ? (
             <View style={{ flexDirection: "row", gap: 6 }}>
@@ -100,13 +102,13 @@ function OffersManager({ listingId }: { listingId: string }) {
               <TouchableOpacity
                 disabled={responding}
                 onPress={() => act(o._id, "reject")}
-                style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 }}
+                style={{ backgroundColor: C.field, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 }}
               >
-                <Text style={{ color: "#334155", fontWeight: "700", fontSize: 13 }}>Từ chối</Text>
+                <Text style={{ color: C.text2, fontWeight: "700", fontSize: 13 }}>Từ chối</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={{ fontSize: 12, fontWeight: "700", color: o.status === "accepted" ? "#16a34a" : "#94A3B8" }}>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: o.status === "accepted" ? "#16a34a" : C.muted }}>
               {o.status === "accepted" ? "Đã nhận" : o.status === "rejected" ? "Từ chối" : "Đã huỷ"}
             </Text>
           )}
@@ -117,6 +119,7 @@ function OffersManager({ listingId }: { listingId: string }) {
 }
 
 export default function MarketDetailScreen() {
+  const C = useThemeTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
   const me = useSelector((s: any) => s.auth?.userInfo);
@@ -147,14 +150,14 @@ export default function MarketDetailScreen() {
 
   if (isLoading)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
         <ActivityIndicator style={{ marginTop: 60 }} color={BLUE} />
       </SafeAreaView>
     );
   if (!item)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
-        <Text>Không tìm thấy tin đăng.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.card, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: C.text }}>Không tìm thấy tin đăng.</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
           <Text style={{ color: BLUE }}>Quay lại</Text>
         </TouchableOpacity>
@@ -260,7 +263,7 @@ export default function MarketDetailScreen() {
     (item.contact?.showPhone && item.contact?.phone) || item.contact?.zalo;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
       {/* Header bar */}
       <View
         style={{
@@ -268,23 +271,23 @@ export default function MarketDetailScreen() {
           alignItems: "center",
           paddingHorizontal: 12,
           paddingBottom: 8,
-          backgroundColor: "#fff",
+          backgroundColor: C.card,
           borderBottomWidth: 1,
-          borderBottomColor: "#EEF0F3",
+          borderBottomColor: C.border,
         }}
       >
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, fontSize: 17, fontWeight: "800", marginLeft: 4 }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontSize: 17, fontWeight: "800", marginLeft: 4, color: C.text }} numberOfLines={1}>
           Chi tiết
         </Text>
         <TouchableOpacity onPress={handleShareToFeed} hitSlop={8} disabled={sharing} style={{ marginRight: 14 }}>
-          <Ionicons name="megaphone-outline" size={23} color={sharing ? "#94A3B8" : "#334155"} />
+          <Ionicons name="megaphone-outline" size={23} color={sharing ? C.muted : C.text2} />
         </TouchableOpacity>
         {!item.isOwner && (
           <TouchableOpacity onPress={onSave} hitSlop={8}>
-            <Ionicons name={item.saved ? "heart" : "heart-outline"} size={24} color={item.saved ? "#e11d48" : "#334155"} />
+            <Ionicons name={item.saved ? "heart" : "heart-outline"} size={24} color={item.saved ? "#e11d48" : C.text2} />
           </TouchableOpacity>
         )}
       </View>
@@ -325,24 +328,24 @@ export default function MarketDetailScreen() {
         )}
 
         {/* Info card */}
-        <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
+        <View style={{ backgroundColor: C.card, margin: 12, borderRadius: 16, padding: 16 }}>
           {type && item.type !== "sell" && (
             <View style={{ alignSelf: "flex-start", backgroundColor: type.color, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginBottom: 8 }}>
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>{type.emoji} {type.label}</Text>
             </View>
           )}
-          <Text style={{ fontSize: 19, fontWeight: "800", color: "#111827", lineHeight: 26 }}>{item.title}</Text>
+          <Text style={{ fontSize: 19, fontWeight: "800", color: C.text, lineHeight: 26 }}>{item.title}</Text>
           <Text style={{ fontSize: 26, fontWeight: "900", color: BLUE, marginTop: 6 }}>
             {selVariant ? formatPrice(selVariant.price, item.type) : priceRangeLabel(item)}
             {item.negotiable && item.type === "sell" && item.price > 0 && !item.hasVariants && (
-              <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>  · Thương lượng</Text>
+              <Text style={{ fontSize: 13, color: C.sub, fontWeight: "600" }}>  · Thương lượng</Text>
             )}
           </Text>
 
           {/* Bộ chọn phân loại */}
           {item.hasVariants && item.variants?.length > 0 && (
             <View style={{ marginTop: 10 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", marginBottom: 6, color: "#334155" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", marginBottom: 6, color: C.text2 }}>
                 {item.variantLabel || "Phân loại"}{selVariant ? `: ${selVariant.name}` : ""}
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -352,9 +355,9 @@ export default function MarketDetailScreen() {
                     <TouchableOpacity
                       key={i}
                       onPress={() => { setSelVariant(active ? null : v); setActiveImg(0); }}
-                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? BLUE : "#CBD5E1", backgroundColor: active ? "#EFF6FF" : "#fff" }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? BLUE : C.line, backgroundColor: active ? C.primarySoft : C.card }}
                     >
-                      <Text style={{ fontWeight: "700", color: active ? BLUE : "#334155", fontSize: 13 }}>
+                      <Text style={{ fontWeight: "700", color: active ? BLUE : C.text2, fontSize: 13 }}>
                         {v.name} · {formatPrice(v.price, item.type)}
                       </Text>
                     </TouchableOpacity>
@@ -364,41 +367,41 @@ export default function MarketDetailScreen() {
             </View>
           )}
           {item.type === "trade" && !!item.tradeFor && (
-            <Text style={{ marginTop: 4, color: "#64748B" }}>Muốn đổi: <Text style={{ fontWeight: "700", color: "#111827" }}>{item.tradeFor}</Text></Text>
+            <Text style={{ marginTop: 4, color: C.sub }}>Muốn đổi: <Text style={{ fontWeight: "700", color: C.text }}>{item.tradeFor}</Text></Text>
           )}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Ionicons name="location-outline" size={16} color="#94A3B8" />
-              <Text style={{ color: "#64748B", fontSize: 13 }}>
+              <Ionicons name="location-outline" size={16} color={C.muted} />
+              <Text style={{ color: C.sub, fontSize: 13 }}>
                 {item.location?.province || "—"}{item.location?.district ? `, ${item.location.district}` : ""}
               </Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Ionicons name="eye-outline" size={16} color="#94A3B8" />
-              <Text style={{ color: "#64748B", fontSize: 13 }}>{item.views || 0} lượt xem</Text>
+              <Ionicons name="eye-outline" size={16} color={C.muted} />
+              <Text style={{ color: C.sub, fontSize: 13 }}>{item.views || 0} lượt xem</Text>
             </View>
-            <Text style={{ color: "#64748B", fontSize: 13 }}>· {timeAgo(item.createdAt)}</Text>
+            <Text style={{ color: C.sub, fontSize: 13 }}>· {timeAgo(item.createdAt)}</Text>
           </View>
         </View>
 
         {/* Seller */}
         {item.seller && (
-          <View style={{ backgroundColor: "#fff", marginHorizontal: 12, borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={{ uri: item.seller.avatar || undefined }} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: "#E2E8F0" }} />
+          <View style={{ backgroundColor: C.card, marginHorizontal: 12, borderRadius: 16, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Image source={{ uri: item.seller.avatar || undefined }} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: C.border }} />
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Text style={{ fontWeight: "800", fontSize: 15 }}>{item.seller.nickname || item.seller.name}</Text>
+                <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{item.seller.nickname || item.seller.name}</Text>
                 {item.seller.verified && <Ionicons name="checkmark-circle" size={16} color="#2563eb" />}
               </View>
               {item.seller.ratingCount > 0 ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                   <StarRatingRN value={item.seller.ratingAvg} size={14} />
-                  <Text style={{ color: "#64748B", fontSize: 12 }}>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>
                     {item.seller.ratingAvg?.toFixed(1)} · {item.seller.ratingCount} đánh giá
                   </Text>
                 </View>
               ) : (
-                <Text style={{ color: "#64748B", fontSize: 12 }}>
+                <Text style={{ color: C.sub, fontSize: 12 }}>
                   {item.seller.verified ? "Đã xác minh danh tính" : "Chưa có đánh giá"}
                 </Text>
               )}
@@ -411,7 +414,7 @@ export default function MarketDetailScreen() {
 
         {/* Owner: boost + offers */}
         {item.isOwner && (
-          <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
+          <View style={{ backgroundColor: C.card, margin: 12, borderRadius: 16, padding: 16 }}>
             {["available", "reserved"].includes(item.status) && (
               <TouchableOpacity
                 onPress={onBoost}
@@ -424,23 +427,23 @@ export default function MarketDetailScreen() {
                 </Text>
               </TouchableOpacity>
             )}
-            <Text style={{ fontWeight: "800", fontSize: 15 }}>🏷️ Đề nghị mua ({item.offerCount || 0})</Text>
+            <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>🏷️ Đề nghị mua ({item.offerCount || 0})</Text>
             <OffersManager listingId={item._id} />
           </View>
         )}
 
         {/* Description + specs */}
-        <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
-          <Text style={{ fontWeight: "800", fontSize: 15, marginBottom: 8 }}>Mô tả</Text>
-          <Text style={{ color: "#374151", lineHeight: 22 }}>
+        <View style={{ backgroundColor: C.card, margin: 12, borderRadius: 16, padding: 16 }}>
+          <Text style={{ fontWeight: "800", fontSize: 15, marginBottom: 8, color: C.text }}>Mô tả</Text>
+          <Text style={{ color: C.text2, lineHeight: 22 }}>
             {item.description || "Người bán chưa thêm mô tả."}
           </Text>
           {specs.length > 0 && (
-            <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: "#EEF0F3", paddingTop: 10, gap: 8 }}>
+            <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10, gap: 8 }}>
               {specs.map((s) => (
                 <View key={s.label} style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ color: "#64748B" }}>{s.label}</Text>
-                  <Text style={{ fontWeight: "600" }}>{s.value}</Text>
+                  <Text style={{ color: C.sub }}>{s.label}</Text>
+                  <Text style={{ fontWeight: "600", color: C.text }}>{s.value}</Text>
                 </View>
               ))}
             </View>
@@ -448,8 +451,8 @@ export default function MarketDetailScreen() {
           {item.tags?.length > 0 && (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
               {item.tags.map((t: string) => (
-                <View key={t} style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ color: "#64748B", fontSize: 12 }}>#{t}</Text>
+                <View key={t} style={{ borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>#{t}</Text>
                 </View>
               ))}
             </View>
@@ -458,8 +461,8 @@ export default function MarketDetailScreen() {
 
         {/* Đánh giá người bán */}
         {item.seller && (
-          <View style={{ backgroundColor: "#fff", margin: 12, borderRadius: 16, padding: 16 }}>
-            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 10 }}>Đánh giá người bán</Text>
+          <View style={{ backgroundColor: C.card, margin: 12, borderRadius: 16, padding: 16 }}>
+            <Text style={{ fontWeight: "800", fontSize: 16, marginBottom: 10, color: C.text }}>Đánh giá người bán</Text>
             <SellerReviewsRN sellerId={item.seller._id} listingId={item._id} me={me} />
           </View>
         )}
@@ -476,19 +479,19 @@ export default function MarketDetailScreen() {
           gap: 10,
           padding: 12,
           paddingBottom: 26,
-          backgroundColor: "#fff",
+          backgroundColor: C.card,
           borderTopWidth: 1,
-          borderTopColor: "#EEF0F3",
+          borderTopColor: C.border,
         }}
       >
         {item.isOwner ? (
           <>
             <TouchableOpacity
               onPress={() => setStatusOpen(true)}
-              style={{ flex: 1, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9", flexDirection: "row", gap: 6 }}
+              style={{ flex: 1, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.field, flexDirection: "row", gap: 6 }}
             >
-              <Ionicons name="swap-horizontal" size={18} color="#334155" />
-              <Text style={{ fontWeight: "700", color: "#334155" }}>{status?.label}</Text>
+              <Ionicons name="swap-horizontal" size={18} color={C.text2} />
+              <Text style={{ fontWeight: "700", color: C.text2 }}>{status?.label}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push(`/marketplace/edit/${item._id}` as any)}
@@ -499,7 +502,7 @@ export default function MarketDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onDelete}
-              style={{ width: 48, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#FEF2F2" }}
+              style={{ width: 48, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.redSoft }}
             >
               <Ionicons name="trash-outline" size={20} color="#dc2626" />
             </TouchableOpacity>
@@ -513,9 +516,9 @@ export default function MarketDetailScreen() {
                   if (phone) Linking.openURL(`tel:${phone}`);
                   else if (item.contact?.zalo) Linking.openURL(`https://zalo.me/${item.contact.zalo}`);
                 }}
-                style={{ width: 52, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" }}
+                style={{ width: 52, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.field }}
               >
-                <Ionicons name="call-outline" size={20} color="#334155" />
+                <Ionicons name="call-outline" size={20} color={C.text2} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
@@ -534,7 +537,7 @@ export default function MarketDetailScreen() {
                 borderRadius: 12,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: ["available", "reserved"].includes(item.status) ? BLUE : "#CBD5E1",
+                backgroundColor: ["available", "reserved"].includes(item.status) ? BLUE : C.line,
                 flexDirection: "row",
                 gap: 8,
               }}
@@ -552,16 +555,16 @@ export default function MarketDetailScreen() {
       <Modal visible={offerOpen} transparent animationType="slide" onRequestClose={() => setOfferOpen(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          style={{ flex: 1, backgroundColor: C.overlay, justifyContent: "flex-end" }}
         >
           <Pressable style={{ flex: 1 }} onPress={() => setOfferOpen(false)} />
-        <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
-          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 6 }}>Gửi đề nghị mua</Text>
-          <Text style={{ color: "#64748B", marginBottom: 14 }}>
+        <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
+          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 6, color: C.text }}>Gửi đề nghị mua</Text>
+          <Text style={{ color: C.sub, marginBottom: 14 }}>
             {selVariant ? (
-              <>Phân loại <Text style={{ fontWeight: "700", color: "#111827" }}>{selVariant.name}</Text> · Giá đăng: <Text style={{ fontWeight: "700", color: "#111827" }}>{formatPrice(selVariant.price, item.type)}</Text></>
+              <>Phân loại <Text style={{ fontWeight: "700", color: C.text }}>{selVariant.name}</Text> · Giá đăng: <Text style={{ fontWeight: "700", color: C.text }}>{formatPrice(selVariant.price, item.type)}</Text></>
             ) : (
-              <>Giá đang đăng: <Text style={{ fontWeight: "700", color: "#111827" }}>{priceRangeLabel(item)}</Text></>
+              <>Giá đang đăng: <Text style={{ fontWeight: "700", color: C.text }}>{priceRangeLabel(item)}</Text></>
             )}
           </Text>
           <TextInput
@@ -569,16 +572,16 @@ export default function MarketDetailScreen() {
             onChangeText={(v) => setAmount(v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, "."))}
             keyboardType="number-pad"
             placeholder="Giá bạn đề nghị (₫)"
-            placeholderTextColor="#94A3B8"
-            style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12 }}
+            placeholderTextColor={C.muted}
+            style={{ borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12, color: C.text }}
           />
           <TextInput
             value={message}
             onChangeText={setMessage}
             placeholder="Lời nhắn (tuỳ chọn)"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={C.muted}
             multiline
-            style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, padding: 14, fontSize: 15, minHeight: 70, textAlignVertical: "top", marginBottom: 16 }}
+            style={{ borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, fontSize: 15, minHeight: 70, textAlignVertical: "top", marginBottom: 16, color: C.text }}
           />
           <TouchableOpacity
             onPress={submitOffer}
@@ -593,17 +596,17 @@ export default function MarketDetailScreen() {
 
       {/* Status modal */}
       <Modal visible={statusOpen} transparent animationType="slide" onRequestClose={() => setStatusOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setStatusOpen(false)} />
-        <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
-          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 14 }}>Cập nhật trạng thái</Text>
+        <Pressable style={{ flex: 1, backgroundColor: C.overlay }} onPress={() => setStatusOpen(false)} />
+        <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 }}>
+          <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 14, color: C.text }}>Cập nhật trạng thái</Text>
           {STATUSES.map((s) => (
             <TouchableOpacity
               key={s.key}
               onPress={() => changeStatus(s.key)}
-              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border }}
             >
               <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-              <Text style={{ fontSize: 16, fontWeight: item.status === s.key ? "800" : "500", color: "#111827" }}>{s.label}</Text>
+              <Text style={{ fontSize: 16, fontWeight: item.status === s.key ? "800" : "500", color: C.text }}>{s.label}</Text>
               {item.status === s.key && <Ionicons name="checkmark" size={18} color={BLUE} style={{ marginLeft: "auto" }} />}
             </TouchableOpacity>
           ))}

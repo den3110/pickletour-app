@@ -1,5 +1,5 @@
 // components/clubs/ClubFinanceRN.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   TouchableOpacity,
@@ -27,6 +27,7 @@ import {
   usePayDuesMutation,
   useUnpayDuesMutation,
 } from "@/slices/clubsApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const getApiErrMsg = (e: any) =>
   e?.data?.message ||
@@ -45,6 +46,8 @@ const METHODS: { k: string; l: string }[] = [
 const methodLabel = (m: string) => METHODS.find((x) => x.k === m)?.l || m;
 
 function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -80,6 +83,8 @@ function duesStep(date: Date, period: string, dir: number) {
 }
 
 function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const id = club?._id;
   const { data: cfg } = useGetDuesConfigQuery({ id }, { skip: !id });
   const period = cfg?.period || "monthly";
@@ -118,11 +123,11 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
   const Nav = (
     <View style={styles.navRow}>
       <TouchableOpacity onPress={() => setCursor((c) => duesStep(c, period, -1))} style={styles.navBtn}>
-        <MaterialCommunityIcons name="chevron-left" size={22} color="#3B3F75" />
+        <MaterialCommunityIcons name="chevron-left" size={22} color={C.text2} />
       </TouchableOpacity>
       <Text style={styles.navLabel}>{duesPeriodLabel(cursor, period)}</Text>
       <TouchableOpacity onPress={() => setCursor((c) => duesStep(c, period, 1))} style={styles.navBtn}>
-        <MaterialCommunityIcons name="chevron-right" size={22} color="#3B3F75" />
+        <MaterialCommunityIcons name="chevron-right" size={22} color={C.text2} />
       </TouchableOpacity>
     </View>
   );
@@ -133,7 +138,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
     return (
       <View>
         <View style={styles.card}>
-          <Text style={{ color: "#5C6285", fontSize: 13.5 }}>
+          <Text style={{ color: C.text3, fontSize: 13.5 }}>
             {cfg?.active
               ? `Phí hội viên: ${fmtVnd(cfg.amount)} / ${(PERIOD_OPTS.find((p) => p.k === cfg.period)?.l || "").replace("Theo ", "")}`
               : "CLB chưa thu phí hội viên."}
@@ -143,7 +148,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
           <>
             {Nav}
             <View style={[styles.card, { alignItems: "center" }]}>
-              <Text style={{ fontWeight: "700", color: myPaid ? "#1B7A46" : "#B4232D" }}>
+              <Text style={{ fontWeight: "700", color: myPaid ? C.greenText : C.redText }}>
                 {myPaid ? `✓ Đã đóng phí ${duesPeriodLabel(cursor, period)}` : `Chưa đóng phí ${duesPeriodLabel(cursor, period)}`}
               </Text>
             </View>
@@ -158,7 +163,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
       {/* Config */}
       <View style={styles.card}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ color: "#5C6285", fontSize: 13.5, flex: 1 }}>
+          <Text style={{ color: C.text3, fontSize: 13.5, flex: 1 }}>
             {cfg?.active
               ? `Phí: ${fmtVnd(cfg.amount)} / ${(PERIOD_OPTS.find((p) => p.k === cfg.period)?.l || "").replace("Theo ", "")}`
               : "Chưa bật thu phí hội viên"}
@@ -176,7 +181,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
               onChangeText={(t) => setAmount(t.replace(/[^\d]/g, ""))}
               keyboardType="numeric"
               placeholder="VD: 100000"
-              placeholderTextColor="#8A90B2"
+              placeholderTextColor={C.muted}
             />
             <Text style={styles.label}>Chu kỳ</Text>
             <View style={styles.chipsWrap}>
@@ -186,7 +191,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
                   style={[styles.catChip, cfgPeriod === p.k && styles.catChipActive]}
                   onPress={() => setCfgPeriod(p.k)}
                 >
-                  <Text style={[styles.catChipText, cfgPeriod === p.k && { color: "#3B3F75" }]}>{p.l}</Text>
+                  <Text style={[styles.catChipText, cfgPeriod === p.k && { color: C.text2 }]}>{p.l}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -197,9 +202,9 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
               <MaterialCommunityIcons
                 name={active ? "checkbox-marked" : "checkbox-blank-outline"}
                 size={20}
-                color={active ? "#667eea" : "#9AA3B2"}
+                color={active ? "#667eea" : C.muted}
               />
-              <Text style={{ color: "#4A5270" }}>Bật thu phí hội viên</Text>
+              <Text style={{ color: C.text2 }}>Bật thu phí hội viên</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.primaryBtn, { marginTop: 12, alignSelf: "flex-start" }]} onPress={saveCfg}>
               <LinearGradient
@@ -222,8 +227,8 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
           {Nav}
           {s && (
             <View style={styles.statsRow}>
-              <StatCard label="Đã đóng" value={`${s.paidCount}/${s.memberCount}`} color="#1B7A46" />
-              <StatCard label="Còn nợ" value={`${s.unpaidCount}`} color="#B4232D" />
+              <StatCard label="Đã đóng" value={`${s.paidCount}/${s.memberCount}`} color={C.greenText} />
+              <StatCard label="Còn nợ" value={`${s.unpaidCount}`} color={C.redText} />
             </View>
           )}
           {!isLoading && (
@@ -231,7 +236,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
               {items.map((it: any, i: number) => (
                 <View
                   key={it.user._id}
-                  style={[styles.duesRow, i > 0 && { borderTopWidth: 1, borderTopColor: "#EEF1F8" }]}
+                  style={[styles.duesRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}
                 >
                   <Text style={styles.duesName} numberOfLines={1}>
                     {it.user.nickname || it.user.fullName || "Người dùng"}
@@ -256,7 +261,7 @@ function DuesView({ club, canManage }: { club: any; canManage: boolean }) {
                 </View>
               ))}
               {items.length === 0 && (
-                <Text style={{ color: "#7780A1", fontSize: 13 }}>Chưa có thành viên.</Text>
+                <Text style={{ color: C.sub, fontSize: 13 }}>Chưa có thành viên.</Text>
               )}
             </View>
           )}
@@ -273,6 +278,8 @@ function FinanceBookRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const id = club?._id;
   const isMember = !!club?._my?.isMember;
   const [filterType, setFilterType] = useState("");
@@ -376,12 +383,12 @@ function FinanceBookRN({
         <StatCard
           label="Số dư quỹ"
           value={fmtVnd(sum?.balance)}
-          color={Number(sum?.balance) < 0 ? "#B4232D" : "#1F2557"}
+          color={Number(sum?.balance) < 0 ? C.redText : C.text}
         />
       </View>
       <View style={styles.statsRow}>
-        <StatCard label="Tổng thu" value={fmtVnd(sum?.totalIncome)} color="#1B7A46" />
-        <StatCard label="Tổng chi" value={fmtVnd(sum?.totalExpense)} color="#B4232D" />
+        <StatCard label="Tổng thu" value={fmtVnd(sum?.totalIncome)} color={C.greenText} />
+        <StatCard label="Tổng chi" value={fmtVnd(sum?.totalExpense)} color={C.redText} />
       </View>
 
       {/* Filter + thêm */}
@@ -448,12 +455,12 @@ function FinanceBookRN({
             onChangeText={(t) => setAmount(t.replace(/[^\d]/g, ""))}
             keyboardType="numeric"
             placeholder="VD: 200000"
-            placeholderTextColor="#8A90B2"
+            placeholderTextColor={C.muted}
           />
 
           <Text style={styles.label}>Ngày</Text>
           <TouchableOpacity style={styles.input} onPress={() => setShowDate(true)}>
-            <Text style={{ color: "#1F2557", paddingVertical: 2 }}>
+            <Text style={{ color: C.text, paddingVertical: 2 }}>
               {dayjs(occurredAt).format("DD/MM/YYYY")}
             </Text>
           </TouchableOpacity>
@@ -474,7 +481,7 @@ function FinanceBookRN({
             value={category}
             onChangeText={setCategory}
             placeholder="Chọn hoặc nhập…"
-            placeholderTextColor="#8A90B2"
+            placeholderTextColor={C.muted}
           />
           <View style={styles.chipsWrap}>
             {cats.map((c) => (
@@ -483,7 +490,7 @@ function FinanceBookRN({
                 style={[styles.catChip, category === c && styles.catChipActive]}
                 onPress={() => setCategory(c)}
               >
-                <Text style={[styles.catChipText, category === c && { color: "#3B3F75" }]}>{c}</Text>
+                <Text style={[styles.catChipText, category === c && { color: C.text2 }]}>{c}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -496,7 +503,7 @@ function FinanceBookRN({
                 style={[styles.catChip, method === m.k && styles.catChipActive]}
                 onPress={() => setMethod(m.k)}
               >
-                <Text style={[styles.catChipText, method === m.k && { color: "#3B3F75" }]}>{m.l}</Text>
+                <Text style={[styles.catChipText, method === m.k && { color: C.text2 }]}>{m.l}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -508,7 +515,7 @@ function FinanceBookRN({
             onChangeText={setDescription}
             multiline
             placeholder="Ghi chú…"
-            placeholderTextColor="#8A90B2"
+            placeholderTextColor={C.muted}
           />
 
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
@@ -539,13 +546,13 @@ function FinanceBookRN({
             return (
               <View
                 key={t._id}
-                style={[styles.txRow, i > 0 && { borderTopWidth: 1, borderTopColor: "#EEF1F8" }]}
+                style={[styles.txRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}
               >
-                <View style={[styles.txIcon, { backgroundColor: inc ? "#E4F7EC" : "#FFE9EC" }]}>
+                <View style={[styles.txIcon, { backgroundColor: inc ? C.greenSoft : C.redSoft }]}>
                   <MaterialCommunityIcons
                     name={inc ? "arrow-up" : "arrow-down"}
                     size={16}
-                    color={inc ? "#1B7A46" : "#B4232D"}
+                    color={inc ? C.greenText : C.redText}
                   />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -558,17 +565,17 @@ function FinanceBookRN({
                     {t.description ? ` · ${t.description}` : ""}
                   </Text>
                 </View>
-                <Text style={[styles.txAmount, { color: inc ? "#1B7A46" : "#B4232D" }]}>
+                <Text style={[styles.txAmount, { color: inc ? C.greenText : C.redText }]}>
                   {inc ? "+" : "−"}
                   {fmtVnd(t.amount)}
                 </Text>
                 {canManage && (
                   <View style={{ flexDirection: "row" }}>
                     <TouchableOpacity onPress={() => startEdit(t)} style={{ padding: 4 }}>
-                      <MaterialCommunityIcons name="pencil" size={16} color="#9AA3B2" />
+                      <MaterialCommunityIcons name="pencil" size={16} color={C.muted} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => remove(t)} style={{ padding: 4 }}>
-                      <MaterialCommunityIcons name="trash-can-outline" size={16} color="#B4232D" />
+                      <MaterialCommunityIcons name="trash-can-outline" size={16} color={C.redText} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -588,7 +595,7 @@ function FinanceBookRN({
               <View key={i} style={{ marginTop: 8 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={styles.reportCat}>
-                    <Text style={{ color: inc ? "#1B7A46" : "#B4232D", fontWeight: "700" }}>
+                    <Text style={{ color: inc ? C.greenText : C.redText, fontWeight: "700" }}>
                       {inc ? "Thu" : "Chi"}
                     </Text>{" "}
                     · {c.category}
@@ -621,6 +628,8 @@ export default function ClubFinanceRN({
   club: any;
   canManage: boolean;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [view, setView] = useState<"book" | "dues">("book");
   const isMember = !!club?._my?.isMember;
   if (!isMember) {
@@ -653,7 +662,7 @@ export default function ClubFinanceRN({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
   viewToggle: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginTop: 8, marginBottom: 4 },
   viewBtn: {
@@ -661,12 +670,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
   viewBtnActive: { backgroundColor: "#667eea", borderColor: "#667eea" },
-  viewBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13.5 },
+  viewBtnText: { color: C.text2, fontWeight: "800", fontSize: 13.5 },
 
   navRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginBottom: 8 },
   navBtn: {
@@ -675,58 +684,58 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  navLabel: { color: "#1F2557", fontWeight: "700", fontSize: 14.5, minWidth: 130, textAlign: "center" },
+  navLabel: { color: C.text, fontWeight: "700", fontSize: 14.5, minWidth: 130, textAlign: "center" },
 
   duesRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11 },
-  duesName: { flex: 1, color: "#1F2557", fontWeight: "600", fontSize: 14 },
+  duesName: { flex: 1, color: C.text, fontWeight: "600", fontSize: 14 },
   paidBtn: {
     paddingHorizontal: 14,
     height: 34,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E4F7EC",
+    backgroundColor: C.greenSoft,
     borderWidth: 1,
-    borderColor: "#B5E6C9",
+    borderColor: C.greenSoft,
   },
-  paidBtnText: { color: "#1B7A46", fontWeight: "800", fontSize: 12.5 },
+  paidBtnText: { color: C.greenText, fontWeight: "800", fontSize: 12.5 },
   markBtn: {
     paddingHorizontal: 14,
     height: 34,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  markBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 12.5 },
+  markBtnText: { color: C.text2, fontWeight: "800", fontSize: 12.5 },
   statCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     borderRadius: 14,
     padding: 12,
   },
-  statLabel: { color: "#7780A1", fontSize: 12 },
-  statValue: { color: "#1F2557", fontSize: 18, fontWeight: "800", marginTop: 4 },
+  statLabel: { color: C.sub, fontSize: 12 },
+  statValue: { color: C.text, fontSize: 18, fontWeight: "800", marginTop: 4 },
 
   toolbar: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 4, marginBottom: 10, flexWrap: "wrap" },
   filterChip: {
     paddingHorizontal: 13,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
   filterChipActive: { backgroundColor: "#667eea", borderColor: "#667eea" },
-  filterChipText: { color: "#3B3F75", fontWeight: "700", fontSize: 13 },
+  filterChipText: { color: C.text2, fontWeight: "700", fontSize: 13 },
   addBtn: {
     flexDirection: "row",
     gap: 5,
@@ -740,9 +749,9 @@ const styles = StyleSheet.create({
   addBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
     borderRadius: 14,
     padding: 12,
     marginBottom: 10,
@@ -753,32 +762,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  typeBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 13 },
+  typeBtnText: { color: C.text2, fontWeight: "800", fontSize: 13 },
 
-  label: { color: "#5C6285", fontSize: 12.5, fontWeight: "600", marginTop: 10, marginBottom: 5 },
+  label: { color: C.text3, fontSize: 12.5, fontWeight: "600", marginTop: 10, marginBottom: 5 },
   input: {
     padding: 11,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
-    backgroundColor: "#F8F9FF",
-    color: "#1F2557",
+    borderColor: C.border,
+    backgroundColor: C.field,
+    color: C.text,
   },
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   catChip: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  catChipActive: { backgroundColor: "#EEF1FF", borderColor: "#667eea" },
-  catChipText: { color: "#5C6285", fontSize: 12, fontWeight: "600" },
+  catChipActive: { backgroundColor: C.field, borderColor: "#667eea" },
+  catChipText: { color: C.text3, fontSize: 12, fontWeight: "600" },
 
   primaryBtn: {
     height: 40,
@@ -795,25 +804,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4FF",
+    backgroundColor: C.field,
     borderWidth: 1,
-    borderColor: "#E6E8F5",
+    borderColor: C.border,
   },
-  lightBtnText: { color: "#3B3F75", fontWeight: "800", fontSize: 14 },
+  lightBtnText: { color: C.text2, fontWeight: "800", fontSize: 14 },
 
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11 },
   txIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  txCat: { color: "#1F2557", fontWeight: "700", fontSize: 14 },
-  txMeta: { color: "#7780A1", fontSize: 11.5, marginTop: 1 },
+  txCat: { color: C.text, fontWeight: "700", fontSize: 14 },
+  txMeta: { color: C.sub, fontSize: 11.5, marginTop: 1 },
   txAmount: { fontWeight: "800", fontSize: 14 },
 
-  reportTitle: { color: "#1F2557", fontWeight: "800", fontSize: 15 },
-  reportCat: { color: "#5C6285", fontSize: 12.5 },
-  reportSum: { color: "#3E4466", fontSize: 12.5, fontWeight: "700" },
+  reportTitle: { color: C.text, fontWeight: "800", fontSize: 15 },
+  reportCat: { color: C.text3, fontSize: 12.5 },
+  reportSum: { color: C.text2, fontSize: 12.5, fontWeight: "700" },
   barTrack: {
     height: 7,
     borderRadius: 999,
-    backgroundColor: "#EEF1F8",
+    backgroundColor: C.field,
     overflow: "hidden",
     marginTop: 3,
   },

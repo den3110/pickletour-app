@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useVoteFeedPollMutation } from "@/slices/feedApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 function fmtTourDate(startIso?: string, endIso?: string) {
   if (!startIso) return "";
@@ -31,6 +32,7 @@ function fmtTourDate(startIso?: string, endIso?: string) {
 }
 
 export function LinkedTournamentCard({ tour }: { tour: any }) {
+  const C = useThemeTokens();
   const dateStr = fmtTourDate(tour?.startDate, tour?.endDate);
   const reg = Number(tour?.registrationCount || 0);
   const maxPairs = Number(tour?.maxPairs || 0);
@@ -44,15 +46,15 @@ export function LinkedTournamentCard({ tour }: { tour: any }) {
         gap: 10,
         padding: 10,
         borderRadius: 12,
-        backgroundColor: "#FFFBEB",
+        backgroundColor: C.amberSoft,
         borderWidth: 1,
-        borderColor: "#FDE68A",
+        borderColor: C.dark ? "rgba(245,158,11,0.35)" : "#FDE68A",
       }}
     >
       {tour.image ? (
         <Image
           source={{ uri: tour.image }}
-          style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: "#FEF3C7" }}
+          style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: C.amberSoft }}
         />
       ) : (
         <View
@@ -60,7 +62,7 @@ export function LinkedTournamentCard({ tour }: { tour: any }) {
             width: 44,
             height: 44,
             borderRadius: 8,
-            backgroundColor: "#FEF3C7",
+            backgroundColor: C.amberSoft,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -73,7 +75,7 @@ export function LinkedTournamentCard({ tour }: { tour: any }) {
           style={{
             fontSize: 11,
             fontWeight: "700",
-            color: "#B45309",
+            color: C.amberText,
             textTransform: "uppercase",
             letterSpacing: 0.5,
           }}
@@ -81,7 +83,7 @@ export function LinkedTournamentCard({ tour }: { tour: any }) {
           Giải đấu
         </Text>
         <Text
-          style={{ fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 2 }}
+          style={{ fontSize: 14, fontWeight: "700", color: C.text, marginTop: 2 }}
           numberOfLines={2}
         >
           {tour.name}
@@ -97,18 +99,19 @@ export function LinkedTournamentCard({ tour }: { tour: any }) {
           />
         )}
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      <Ionicons name="chevron-forward" size={18} color={C.muted} />
     </Pressable>
   );
 }
 
 function InfoRow({ icon, text }: { icon: any; text: string }) {
+  const C = useThemeTokens();
   return (
     <View
       style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}
     >
-      <Ionicons name={icon} size={12} color="#94A3B8" />
-      <Text style={{ fontSize: 11, color: "#64748B", flexShrink: 1 }} numberOfLines={1}>
+      <Ionicons name={icon} size={12} color={C.muted} />
+      <Text style={{ fontSize: 11, color: C.sub, flexShrink: 1 }} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -116,6 +119,7 @@ function InfoRow({ icon, text }: { icon: any; text: string }) {
 }
 
 export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: string }) {
+  const C = useThemeTokens();
   const [poll, setPoll] = useState<any>(pollProp || null);
   useEffect(() => setPoll(pollProp || null), [pollProp]);
   const [votePoll] = useVoteFeedPollMutation();
@@ -143,12 +147,12 @@ export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: strin
         padding: 12,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
-        backgroundColor: "#F8FAFC",
+        borderColor: C.border,
+        backgroundColor: C.bg,
       }}
     >
       {!!poll.question && (
-        <Text style={{ fontWeight: "800", marginBottom: 8, color: "#0F172A" }}>
+        <Text style={{ fontWeight: "800", marginBottom: 8, color: C.text }}>
           {poll.question}
         </Text>
       )}
@@ -162,9 +166,9 @@ export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: strin
               marginBottom: 6,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: o.voted ? "#0066FF" : "#E2E8F0",
+              borderColor: o.voted ? "#0066FF" : C.border,
               overflow: "hidden",
-              backgroundColor: "#fff",
+              backgroundColor: C.card,
             }}
           >
             <View
@@ -174,7 +178,7 @@ export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: strin
                 top: 0,
                 bottom: 0,
                 width: `${pct}%`,
-                backgroundColor: o.voted ? "#DBEAFE" : "#EEF2F7",
+                backgroundColor: o.voted ? C.primarySoft : C.field,
               }}
             />
             <View
@@ -185,18 +189,18 @@ export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: strin
                 paddingVertical: 8,
               }}
             >
-              <Text style={{ fontWeight: o.voted ? "800" : "500", color: "#0F172A" }}>
+              <Text style={{ fontWeight: o.voted ? "800" : "500", color: C.text }}>
                 {o.voted ? "✓ " : ""}
                 {o.text}
               </Text>
-              <Text style={{ fontWeight: "700", color: "#334155" }}>
+              <Text style={{ fontWeight: "700", color: C.text2 }}>
                 {pct}% · {o.votes}
               </Text>
             </View>
           </Pressable>
         );
       })}
-      <Text style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+      <Text style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
         {total} lượt bình chọn{closed ? " · đã đóng" : ""}
         {poll.multi ? " · chọn nhiều" : ""}
       </Text>
@@ -205,6 +209,7 @@ export function PollBlock({ poll: pollProp, postId }: { poll: any; postId: strin
 }
 
 export function SharedMatchCard({ sm }: { sm: any }) {
+  const C = useThemeTokens();
   if (!sm) return null;
   const winA = sm.winner === "A";
   const winB = sm.winner === "B";
@@ -215,7 +220,7 @@ export function SharedMatchCard({ sm }: { sm: any }) {
         marginTop: 10,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
+        borderColor: C.border,
         overflow: "hidden",
       }}
     >
@@ -244,7 +249,7 @@ export function SharedMatchCard({ sm }: { sm: any }) {
           gap: 8,
         }}
       >
-        <Text style={{ flex: 1, fontWeight: winA ? "800" : "500", color: winA ? "#15803D" : "#0F172A" }}>
+        <Text style={{ flex: 1, fontWeight: winA ? "800" : "500", color: winA ? C.greenText : C.text }}>
           {sm.teamA || "Đội A"}
         </Text>
         <View
@@ -252,16 +257,16 @@ export function SharedMatchCard({ sm }: { sm: any }) {
             paddingHorizontal: 12,
             paddingVertical: 4,
             borderRadius: 10,
-            backgroundColor: "#E2E8F0",
+            backgroundColor: C.border,
             alignItems: "center",
             minWidth: 74,
           }}
         >
-          <Text style={{ fontWeight: "900", fontSize: 18, color: "#0F172A" }}>
+          <Text style={{ fontWeight: "900", fontSize: 18, color: C.text }}>
             {sm.scoreA} – {sm.scoreB}
           </Text>
           {sm.setsA || sm.setsB ? (
-            <Text style={{ fontSize: 11, color: "#64748B" }}>
+            <Text style={{ fontSize: 11, color: C.sub }}>
               Sets {sm.setsA}–{sm.setsB}
             </Text>
           ) : null}
@@ -271,7 +276,7 @@ export function SharedMatchCard({ sm }: { sm: any }) {
             flex: 1,
             textAlign: "right",
             fontWeight: winB ? "800" : "500",
-            color: winB ? "#15803D" : "#0F172A",
+            color: winB ? C.greenText : C.text,
           }}
         >
           {sm.teamB || "Đội B"}

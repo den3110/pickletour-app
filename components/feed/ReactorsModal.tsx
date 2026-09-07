@@ -17,6 +17,7 @@ import {
   useLazyListPostReactorsQuery,
   useLazyListCommentReactorsQuery,
 } from "@/slices/feedApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const EMOJI: Record<string, string> = {
   like: "👍",
@@ -47,6 +48,8 @@ export function ReactorsModal({
   postId?: string | null;
   commentId?: string | null;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [triggerPost, postRes] = useLazyListPostReactorsQuery();
   const [triggerComment, commentRes] = useLazyListCommentReactorsQuery();
   const [activeTab, setActiveTab] = useState<string>("all");
@@ -88,7 +91,7 @@ export function ReactorsModal({
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Cảm xúc</Text>
             <Pressable onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color="#0F172A" />
+              <Ionicons name="close" size={22} color={C.text} />
             </Pressable>
           </View>
 
@@ -132,7 +135,7 @@ export function ReactorsModal({
           </View>
 
           {isLoading ? (
-            <ActivityIndicator style={{ marginVertical: 24 }} />
+            <ActivityIndicator style={{ marginVertical: 24 }} color={C.primary} />
           ) : (
             <FlatList
               data={filtered}
@@ -145,7 +148,7 @@ export function ReactorsModal({
               )}
               ListEmptyComponent={
                 <View style={{ padding: 24, alignItems: "center" }}>
-                  <Text style={{ color: "#94A3B8" }}>
+                  <Text style={{ color: C.muted }}>
                     Chưa có ai thả cảm xúc
                   </Text>
                 </View>
@@ -190,10 +193,10 @@ export function ReactorsModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: C.overlay },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 12,
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     marginBottom: 8,
   },
   header: {
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 8,
   },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
+  headerTitle: { fontSize: 17, fontWeight: "700", color: C.text },
   tabsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -223,7 +226,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: C.border,
   },
   tabChip: {
     flexDirection: "row",
@@ -232,10 +235,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
-  tabChipActive: { backgroundColor: "#DBEAFE" },
-  tabChipText: { fontSize: 13, color: "#334155", fontWeight: "500" },
+  tabChipActive: { backgroundColor: C.primarySoft },
+  tabChipText: { fontSize: 13, color: C.text2, fontWeight: "500" },
   tabChipTextActive: { color: "#0066FF", fontWeight: "700" },
   row: {
     flexDirection: "row",
@@ -251,13 +254,13 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
   },
-  name: { fontSize: 15, fontWeight: "600", color: "#0F172A" },
-  reactionLabel: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  divider: { height: 1, backgroundColor: "#F1F5F9", marginLeft: 68 },
+  name: { fontSize: 15, fontWeight: "600", color: C.text },
+  reactionLabel: { fontSize: 12, color: C.sub, marginTop: 2 },
+  divider: { height: 1, backgroundColor: C.field, marginLeft: 68 },
 });

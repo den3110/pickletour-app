@@ -17,6 +17,7 @@ import {
   useMyMarketOffersQuery,
   useCancelMarketOfferMutation,
 } from "@/slices/marketApiSlice";
+import { useThemeTokens } from "@/hooks/useThemeTokens";
 
 const BLUE = "#0d6efd";
 const STATUS: Record<string, { label: string; color: string }> = {
@@ -27,6 +28,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function MyOffersScreen() {
+  const C = useThemeTokens();
   const { data, isLoading, refetch } = useMyMarketOffersQuery();
   const [cancelOffer] = useCancelMarketOfferMutation();
   const items = data?.items || [];
@@ -54,12 +56,12 @@ export default function MyOffersScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#EEF0F3" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4 }}>🏷️ Đề nghị của tôi</Text>
+        <Text style={{ fontSize: 18, fontWeight: "900", marginLeft: 4, color: C.text }}>🏷️ Đề nghị của tôi</Text>
       </View>
 
       {isLoading ? (
@@ -74,10 +76,10 @@ export default function MyOffersScreen() {
             const st = STATUS[o.status] || STATUS.pending;
             const img = firstImage(l);
             return (
-              <View style={{ flexDirection: "row", gap: 10, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#EAECEF", padding: 10, alignItems: "center" }}>
+              <View style={{ flexDirection: "row", gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 10, alignItems: "center" }}>
                 <TouchableOpacity
                   onPress={() => l._id && router.push(`/marketplace/${l._id}` as any)}
-                  style={{ width: 66, height: 66, borderRadius: 10, overflow: "hidden", backgroundColor: "#F1F5F9" }}
+                  style={{ width: 66, height: 66, borderRadius: 10, overflow: "hidden", backgroundColor: C.field }}
                 >
                   {img ? (
                     <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} />
@@ -88,13 +90,13 @@ export default function MyOffersScreen() {
                   )}
                 </TouchableOpacity>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text numberOfLines={1} style={{ fontWeight: "700", color: "#111827" }} onPress={() => l._id && router.push(`/marketplace/${l._id}` as any)}>
+                  <Text numberOfLines={1} style={{ fontWeight: "700", color: C.text }} onPress={() => l._id && router.push(`/marketplace/${l._id}` as any)}>
                     {l.title || "Sản phẩm"}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#64748B" }}>Giá đăng: {formatPrice(l.price, "sell")}</Text>
+                  <Text style={{ fontSize: 12, color: C.sub }}>Giá đăng: {formatPrice(l.price, "sell")}</Text>
                   <Text style={{ fontSize: 13.5, fontWeight: "800", color: BLUE }}>Bạn đề nghị: {formatPrice(o.amount, "sell")}</Text>
                   {!!o.message && (
-                    <Text numberOfLines={1} style={{ fontSize: 12, color: "#94A3B8", fontStyle: "italic" }}>“{o.message}”</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>“{o.message}”</Text>
                   )}
                 </View>
                 <View style={{ alignItems: "flex-end", gap: 6 }}>
@@ -103,7 +105,7 @@ export default function MyOffersScreen() {
                   </View>
                   {o.status === "pending" && (
                     <TouchableOpacity onPress={() => onCancel(o._id)}>
-                      <Text style={{ color: "#94A3B8", fontSize: 12, fontWeight: "600" }}>Huỷ</Text>
+                      <Text style={{ color: C.muted, fontSize: 12, fontWeight: "600" }}>Huỷ</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -113,7 +115,7 @@ export default function MyOffersScreen() {
           ListEmptyComponent={
             <View style={{ alignItems: "center", marginTop: 60 }}>
               <Text style={{ fontSize: 44 }}>🏷️</Text>
-              <Text style={{ color: "#64748B", marginTop: 8, fontWeight: "600" }}>Bạn chưa gửi đề nghị nào</Text>
+              <Text style={{ color: C.sub, marginTop: 8, fontWeight: "600" }}>Bạn chưa gửi đề nghị nào</Text>
               <TouchableOpacity onPress={() => router.push("/marketplace" as any)} style={{ marginTop: 16, backgroundColor: BLUE, paddingHorizontal: 22, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" }}>
                 <Text style={{ color: "#fff", fontWeight: "800" }}>Khám phá Chợ</Text>
               </TouchableOpacity>

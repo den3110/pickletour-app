@@ -44,6 +44,7 @@ import {
   formatKnockoutRoundLabelByMatchCount,
   formatKnockoutRoundLabelByTeamCount,
 } from "@/utils/tournamentRoundLabels";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 /* ───────────────────── Utils ───────────────────── */
 const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString() : "—");
@@ -118,6 +119,15 @@ const CHIP = {
   neutral: { bg: "#f4f4f5", fg: "#52525b", bd: "#e4e4e7" },
 } as const;
 type ChipVariant = keyof typeof CHIP;
+/** Biến thể chip cho nền tối (tint mờ + chữ sáng) */
+const CHIP_DARK: Record<ChipVariant, { bg: string; fg: string; bd: string }> = {
+  primary: { bg: "rgba(25,118,210,0.2)", fg: "#90caf9", bd: "rgba(25,118,210,0.45)" },
+  success: { bg: "rgba(46,125,50,0.2)", fg: "#a5d6a7", bd: "rgba(46,125,50,0.45)" },
+  info: { bg: "rgba(0,151,167,0.2)", fg: "#80deea", bd: "rgba(0,151,167,0.45)" },
+  warning: { bg: "rgba(245,124,0,0.2)", fg: "#ffcc80", bd: "rgba(245,124,0,0.45)" },
+  danger: { bg: "rgba(183,28,28,0.25)", fg: "#ef9a9a", bd: "rgba(183,28,28,0.5)" },
+  neutral: { bg: "rgba(255,255,255,0.06)", fg: "#cbd5e1", bd: "rgba(255,255,255,0.12)" },
+};
 const ChipRN = ({
   label,
   variant = "neutral",
@@ -125,7 +135,9 @@ const ChipRN = ({
   label: string;
   variant?: ChipVariant;
 }) => {
-  const c = CHIP[variant] || CHIP.neutral;
+  const C = useThemeTokens();
+  const chips = C.dark ? CHIP_DARK : CHIP;
+  const c = chips[variant] || chips.neutral;
   return (
     <View
       style={{
@@ -195,20 +207,24 @@ const PrimaryBtn = ({
   disabled?: boolean;
   full?: boolean;
   color?: string;
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.9}
-    style={[
-      styles.btn,
-      { backgroundColor: disabled ? "#9aa0a6" : color },
-      full && { alignSelf: "stretch" },
-    ]}
-  >
-    <Text style={styles.btnText}>{title}</Text>
-  </TouchableOpacity>
-);
+}) => {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.9}
+      style={[
+        styles.btn,
+        { backgroundColor: disabled ? "#9aa0a6" : color },
+        full && { alignSelf: "stretch" },
+      ]}
+    >
+      <Text style={styles.btnText}>{title}</Text>
+    </TouchableOpacity>
+  );
+};
 
 const OutlineBtn = ({
   title,
@@ -218,15 +234,19 @@ const OutlineBtn = ({
   title: string;
   onPress?: () => void;
   full?: boolean;
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.85}
-    style={[styles.btn, styles.btnOutline, full && { alignSelf: "stretch" }]}
-  >
-    <Text style={styles.btnOutlineText}>{title}</Text>
-  </TouchableOpacity>
-);
+}) => {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[styles.btn, styles.btnOutline, full && { alignSelf: "stretch" }]}
+    >
+      <Text style={styles.btnOutlineText}>{title}</Text>
+    </TouchableOpacity>
+  );
+};
 
 /* ───────────────────── Modal Select ───────────────────── */
 function ModalSelect({
@@ -244,6 +264,8 @@ function ModalSelect({
   getValue?: (x: any) => string;
   onChange?: (v: string) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [open, setOpen] = useState(false);
   const curLabel =
     getLabel(options.find((o) => String(getValue(o)) === String(value))) ||
@@ -280,7 +302,7 @@ function ModalSelect({
                   }}
                   style={styles.sheetItem}
                 >
-                  <Text style={{ fontWeight: "600" }}>{getLabel(opt)}</Text>
+                  <Text style={{ fontWeight: "600", color: C.text }}>{getLabel(opt)}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -306,6 +328,8 @@ function GroupSeatingBoard({
   eventType: "single" | "double";
   lastHighlight: any;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const seats = useMemo(() => {
     const map = new Map<string, any>();
     (groupsMeta || []).forEach((g, idx) => {
@@ -344,7 +368,7 @@ function GroupSeatingBoard({
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
       {seats.map((g) => (
         <View key={g.code} style={[styles.card, { width: "100%" }]}>
-          <Text style={{ fontWeight: "800", marginBottom: 6 }}>
+          <Text style={{ fontWeight: "800", marginBottom: 6, color: C.text }}>
             Bảng {g.code}
           </Text>
           <View style={{ gap: 6 }}>
@@ -362,14 +386,14 @@ function GroupSeatingBoard({
                     {
                       backgroundColor: val
                         ? isHit
-                          ? "#f0fff4"
-                          : "#f8fbff"
-                        : "#fafafa",
+                          ? C.greenSoft
+                          : C.primarySoft
+                        : C.cardAlt,
                     },
                     isHit && { borderColor: "#a5d6a7" },
                   ]}
                 >
-                  <Text style={{ fontSize: 12 }}>
+                  <Text style={{ fontSize: 12, color: C.text }}>
                     <Text style={{ fontWeight: "700" }}>Slot {idx + 1}:</Text>{" "}
                     {val || "—"}
                   </Text>
@@ -422,6 +446,8 @@ function RoundRobinPreview({
   doubleRound: boolean;
   eventType: "single" | "double";
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={{ gap: 10 }}>
       {groupsMeta.map((g) => {
@@ -448,23 +474,23 @@ function RoundRobinPreview({
         return (
           <View key={String(g.code)} style={[styles.card, { gap: 8 }]}>
             <View style={styles.rowBetween}>
-              <Text style={{ fontWeight: "800" }}>
+              <Text style={{ fontWeight: "800", color: C.text }}>
                 Lịch thi đấu — Bảng {g.code}{" "}
                 {doubleRound ? "(2 lượt)" : "(1 lượt)"}
               </Text>
               <ChipRN label={`Tổng: ${totalMatches} trận`} />
             </View>
             {!teamNames.length ? (
-              <Text style={{ color: "#666" }}>Chưa có đội.</Text>
+              <Text style={{ color: C.sub }}>Chưa có đội.</Text>
             ) : (
               schedule.map((roundPairs, idx) => (
                 <View key={idx} style={{ marginBottom: 6 }}>
-                  <Text style={{ fontWeight: "700", marginBottom: 4 }}>
+                  <Text style={{ fontWeight: "700", marginBottom: 4, color: C.text }}>
                     Vòng {idx + 1}
                   </Text>
                   <View style={{ gap: 2 }}>
                     {roundPairs.map((p, i2) => (
-                      <Text key={i2} style={{ fontSize: 13 }}>
+                      <Text key={i2} style={{ fontSize: 13, color: C.text }}>
                         • {p.A} vs {p.B}
                       </Text>
                     ))}
@@ -682,7 +708,7 @@ const Ticker = ({
   }, [finalText, pool, duration, onDone]);
   return (
     <Text
-      style={{ fontSize: 28, fontWeight: "900", textAlign: "center" }}
+      style={{ fontSize: 28, fontWeight: "900", textAlign: "center", color: "#fff" }}
       numberOfLines={1}
     >
       {text}
@@ -711,6 +737,8 @@ const CountdownSplash = ({
     }, 750);
     return () => clearInterval(tick);
   }, [seconds, onDone]);
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <View style={styles.overlayBackdrop}>
       <Text style={[styles.countdownText]}>{n > 0 ? n : "BẮT ĐẦU!"}</Text>
@@ -733,6 +761,8 @@ function RevealOverlay({
   onClose?: () => void;
   autoCloseMs?: number;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => onClose?.(), autoCloseMs);
@@ -770,7 +800,7 @@ function RevealOverlay({
             <View style={{ gap: 8 }}>
               <Ticker finalText={data.AName} pool={pool} duration={900} />
               <Text
-                style={{ textAlign: "center", fontSize: 26, fontWeight: "900" }}
+                style={{ textAlign: "center", fontSize: 26, fontWeight: "900", color: "#fff" }}
               >
                 VS
               </Text>
@@ -784,6 +814,7 @@ function RevealOverlay({
             marginTop: 10,
             fontSize: 12,
             textAlign: "center",
+            color: "#fff",
           }}
         >
           Nhấn để đóng
@@ -809,6 +840,8 @@ function BottomSheet({
   heightPct?: number; // 0..1
   title?: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const sheetHeight = Math.max(320, Math.round(SCREEN_HEIGHT * heightPct));
   const translateY = React.useRef(new Animated.Value(sheetHeight)).current;
   const [visible, setVisible] = React.useState(open);
@@ -912,6 +945,8 @@ function GroupMatchesSheet({
   selBracketId: string;
   eventType: "single" | "double";
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [doubleRound, setDoubleRound] = useState(false);
   const [generateGroupMatches, { isLoading: genLoading }] =
     useGenerateGroupMatchesMutation();
@@ -926,9 +961,9 @@ function GroupMatchesSheet({
       <View
         style={[styles.rowBetween, { marginBottom: 10, paddingHorizontal: 2 }]}
       >
-        <Text style={{ fontWeight: "700" }}>Tự động (vòng tròn)</Text>
+        <Text style={{ fontWeight: "700", color: C.text }}>Tự động (vòng tròn)</Text>
         <View style={styles.rowWrap}>
-          <Text style={{ marginRight: 6 }}>Đánh 2 lượt</Text>
+          <Text style={{ marginRight: 6, color: C.text }}>Đánh 2 lượt</Text>
           <Switch value={doubleRound} onValueChange={setDoubleRound} />
         </View>
       </View>
@@ -969,6 +1004,8 @@ function GroupMatchesSheet({
 
 /* ───────────────────── MAIN ───────────────────── */
 export default function DrawScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const {
     id,
     bracketId: qsBracketId,
@@ -1576,7 +1613,7 @@ export default function DrawScreen() {
   if (lt || lb || ls || lRegs || lMatches) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={C.accent} />
       </View>
     );
   }
@@ -1630,9 +1667,9 @@ export default function DrawScreen() {
 
       <View style={[styles.card, { gap: 10 }]}>
         <View style={styles.infoBox}>
-          <Text>
+          <Text style={{ color: C.text }}>
             Chỉ admin mới thấy trang này. Thể loại giải:{" "}
-            <Text style={{ fontWeight: "900" }}>
+            <Text style={{ fontWeight: "900", color: C.text }}>
               {String(tournament?.eventType || "").toUpperCase()}
             </Text>
           </Text>
@@ -1668,7 +1705,7 @@ export default function DrawScreen() {
 
         {selBracketId && drawType === "knockout" && (
           <View style={styles.rowBetween}>
-            <Text>Lấy đội thắng ở vòng trước</Text>
+            <Text style={{ color: C.text }}>Lấy đội thắng ở vòng trước</Text>
             <Switch value={usePrevWinners} onValueChange={setUsePrevWinners} />
           </View>
         )}
@@ -1698,18 +1735,18 @@ export default function DrawScreen() {
 
         {/* FX toggles */}
         <View style={styles.rowBetween}>
-          <Text>Hiệu ứng</Text>
+          <Text style={{ color: C.text }}>Hiệu ứng</Text>
           <Switch value={fxEnabled} onValueChange={setFxEnabled} />
         </View>
       </View>
 
       {/* Reveal Board */}
       <View style={[styles.card, { gap: 10 }]}>
-        <Text style={{ fontWeight: "800" }}>Kết quả bốc (reveal)</Text>
+        <Text style={{ fontWeight: "800", color: C.text }}>Kết quả bốc (reveal)</Text>
 
         {!selBracketId ? (
           <View style={styles.infoBox}>
-            <Text>Hãy chọn một Bracket để bắt đầu.</Text>
+            <Text style={{ color: C.text }}>Hãy chọn một Bracket để bắt đầu.</Text>
           </View>
         ) : drawType === "group" ? (
           hasGroups ? (
@@ -1721,7 +1758,7 @@ export default function DrawScreen() {
               lastHighlight={lastHighlight}
             />
           ) : (
-            <Text style={{ color: "#666" }}>
+            <Text style={{ color: C.sub }}>
               Chưa có thông tin bảng/slot để hiển thị.
             </Text>
           )
@@ -1730,9 +1767,9 @@ export default function DrawScreen() {
             {roundsForKO.map((round: any, idx: number) => (
               <View
                 key={`${idx}-${round.title}`}
-                style={[styles.card, { backgroundColor: "#fafafa" }]}
+                style={[styles.card, { backgroundColor: C.cardAlt }]}
               >
-                <Text style={{ fontWeight: "800", marginBottom: 6 }}>
+                <Text style={{ fontWeight: "800", marginBottom: 6, color: C.text }}>
                   {round.title}
                 </Text>
                 {round.seeds.map((sd: any, i: number) => (
@@ -1756,7 +1793,7 @@ export default function DrawScreen() {
 
       {/* Quick links & group actions */}
       <View style={[styles.card, { gap: 8 }]}>
-        <Text style={{ fontWeight: "800" }}>Liên kết nhanh</Text>
+        <Text style={{ fontWeight: "800", color: C.text }}>Liên kết nhanh</Text>
         <OutlineBtn
           title="Xem sơ đồ giải"
           onPress={() => {
@@ -1801,19 +1838,19 @@ export default function DrawScreen() {
             style={{
               marginTop: 10,
               borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: "#e0e0e0",
+              borderTopColor: C.border,
               paddingTop: 8,
             }}
           >
-            <Text style={{ fontWeight: "800" }}>Kế hoạch (planned)</Text>
+            <Text style={{ fontWeight: "800", color: C.text }}>Kế hoạch (planned)</Text>
             {(planned as any)?.planned?.groupSizes && (
-              <Text>
+              <Text style={{ color: C.text }}>
                 Group sizes:{" "}
                 {JSON.stringify((planned as any).planned.groupSizes)}
               </Text>
             )}
             {Number.isFinite((planned as any)?.planned?.byes) && (
-              <Text>Byes: {(planned as any).planned.byes}</Text>
+              <Text style={{ color: C.text }}>Byes: {(planned as any).planned.byes}</Text>
             )}
           </View>
         )}
@@ -1823,17 +1860,17 @@ export default function DrawScreen() {
             style={{
               marginTop: 10,
               borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: "#e0e0e0",
+              borderTopColor: C.border,
               paddingTop: 8,
             }}
           >
-            <Text style={{ fontWeight: "800", marginBottom: 4 }}>Log</Text>
+            <Text style={{ fontWeight: "800", marginBottom: 4, color: C.text }}>Log</Text>
             <View style={{ maxHeight: 220 }}>
               {log
                 .slice(-80)
                 .reverse()
                 .map((row, i) => (
-                  <Text key={i} style={{ fontSize: 12 }}>
+                  <Text key={i} style={{ fontSize: 12, color: C.text }}>
                     • {row.type} @ {new Date(row.t).toLocaleTimeString()}
                   </Text>
                 ))}
@@ -1869,15 +1906,15 @@ export default function DrawScreen() {
 }
 
 /* ───────────────────── styles ───────────────────── */
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12, backgroundColor: "#fafafa" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 18, fontWeight: "800" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { padding: 16, gap: 12, backgroundColor: C.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
+  title: { fontSize: 18, fontWeight: "800", color: C.text },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e6e8ef",
+    borderColor: C.border,
     padding: 12,
   },
   rowWrap: {
@@ -1908,17 +1945,17 @@ const styles = StyleSheet.create({
   btnOutlineText: { color: "#1976d2", fontWeight: "800" },
 
   errorBox: {
-    backgroundColor: "#ffebee",
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: "#ffcdd2",
+    borderColor: C.dark ? "rgba(239,68,68,0.45)" : "#ffcdd2",
     padding: 10,
     borderRadius: 12,
   },
-  errorText: { color: "#b71c1c" },
+  errorText: { color: C.redText },
   infoBox: {
-    backgroundColor: "#e3f2fd",
+    backgroundColor: C.primarySoft,
     borderWidth: 1,
-    borderColor: "#bbdefb",
+    borderColor: C.dark ? "rgba(0,102,255,0.4)" : "#bbdefb",
     padding: 10,
     borderRadius: 12,
   },
@@ -1926,38 +1963,38 @@ const styles = StyleSheet.create({
   selectBox: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: C.border,
     padding: 10,
   },
-  selectLabel: { fontSize: 12, color: "#666" },
-  selectValue: { fontSize: 15, fontWeight: "700" },
+  selectLabel: { fontSize: 12, color: C.sub },
+  selectValue: { fontSize: 15, fontWeight: "700", color: C.text },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: C.overlay,
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 16,
     padding: 14,
     width: "88%",
     maxWidth: 520,
     gap: 10,
   },
-  sheetTitle: { fontWeight: "800", fontSize: 16 },
+  sheetTitle: { fontWeight: "800", fontSize: 16, color: C.text },
   sheetItem: {
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
+    borderBottomColor: C.border,
   },
 
   slotItem: {
     padding: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: C.border,
   },
 
   seedRow: {
@@ -1966,15 +2003,15 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eceff1",
+    borderBottomColor: C.border,
   },
   seedNo: {
     width: 22,
     textAlign: "right",
     fontWeight: "700",
-    color: "#455a64",
+    color: C.text3,
   },
-  teamLine: { fontSize: 13, lineHeight: 18, color: "#111" },
+  teamLine: { fontSize: 13, lineHeight: 18, color: C.text },
 
   overlayBackdrop: {
     position: "absolute",
@@ -2012,12 +2049,12 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: C.overlay,
     justifyContent: "flex-end",
   },
   bsBackdropTouchable: { flex: 1 },
   bsContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     paddingHorizontal: 12,
@@ -2028,11 +2065,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 999,
-    backgroundColor: "#D1D5DB",
+    backgroundColor: C.line,
   },
   bsTitle: {
     fontSize: 16,
     fontWeight: "800",
+    color: C.text,
     paddingHorizontal: 4,
     paddingBottom: 8,
   },

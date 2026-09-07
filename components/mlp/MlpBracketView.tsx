@@ -19,6 +19,7 @@ import {
   useListMlpTeamsQuery,
 } from "@/slices/mlpApiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type MlpBracketViewProps = {
   tourId: string;
@@ -26,6 +27,8 @@ type MlpBracketViewProps = {
 };
 
 export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const {
     data: dualsResp,
     isLoading: dLoading,
@@ -135,7 +138,7 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
       {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.mlpBadge}>
-          <Ionicons name="shield-checkmark" size={14} color="#B45309" />
+          <Ionicons name="shield-checkmark" size={14} color={C.amberText} />
           <Text style={styles.mlpBadgeText}>MLP Format</Text>
         </View>
         <Text style={styles.summaryTxt} numberOfLines={1}>
@@ -178,8 +181,8 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
                     key={String(row._id)}
                     style={[
                       styles.stRow,
-                      isTop && { backgroundColor: "#F0FDF4" },
-                      idx === 0 && !isTop && { backgroundColor: "#FEF3C7" },
+                      isTop && { backgroundColor: C.greenSoft },
+                      idx === 0 && !isTop && { backgroundColor: C.amberSoft },
                     ]}
                   >
                     <Text style={styles.stRank}>
@@ -241,9 +244,9 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
                 key={String(row?.team?._id || idx)}
                 style={[
                   styles.stRow,
-                  idx === 0 && { backgroundColor: "#FEF3C7" },
-                  idx === 1 && { backgroundColor: "#F1F5F9" },
-                  idx === 2 && { backgroundColor: "#FEE2E2" },
+                  idx === 0 && { backgroundColor: C.amberSoft },
+                  idx === 1 && { backgroundColor: C.field },
+                  idx === 2 && { backgroundColor: C.redSoft },
                 ]}
               >
                 <Text style={styles.stRank}>
@@ -265,7 +268,7 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
       {!useGroupStage && (
         dualsByRound.length === 0 ? (
           <View style={[styles.card, { padding: 20, alignItems: "center" }]}>
-            <Text style={{ color: "#64748B", textAlign: "center" }}>
+            <Text style={{ color: C.sub, textAlign: "center" }}>
               Chưa có dual match nào — BTC sinh vòng bảng từ trang MLP Duals.
             </Text>
             <Pressable style={styles.ctaBtn} onPress={goToDuals}>
@@ -290,7 +293,7 @@ export default function MlpBracketView({ tourId, tour }: MlpBracketViewProps) {
         (!poolsStandings || poolsStandings.length === 0) &&
         koRounds.length === 0 && (
           <View style={[styles.card, { padding: 20, alignItems: "center" }]}>
-            <Text style={{ color: "#64748B", textAlign: "center" }}>
+            <Text style={{ color: C.sub, textAlign: "center" }}>
               Chưa có bảng nào — BTC bốc thăm chia bảng và sinh dual từ trang
               web quản trị.
             </Text>
@@ -315,6 +318,8 @@ function NavChip({
   onPress: () => void;
   color: string;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable
       onPress={onPress}
@@ -333,6 +338,8 @@ function DualCard({
   dual: any;
   onOpen: (d: any) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const status = String(dual?.status || "").toLowerCase();
   const finished = status === "finished";
   const tieBreak = status === "tie_break";
@@ -344,8 +351,8 @@ function DualCard({
   const StatusPill = () => {
     if (finished) {
       return (
-        <View style={[styles.statusPill, { backgroundColor: "#DCFCE7" }]}>
-          <Text style={[styles.statusPillText, { color: "#166534" }]}>
+        <View style={[styles.statusPill, { backgroundColor: C.greenSoft }]}>
+          <Text style={[styles.statusPillText, { color: C.greenText }]}>
             Đã kết thúc
           </Text>
         </View>
@@ -353,8 +360,8 @@ function DualCard({
     }
     if (tieBreak) {
       return (
-        <View style={[styles.statusPill, { backgroundColor: "#FEF3C7" }]}>
-          <Text style={[styles.statusPillText, { color: "#92400E" }]}>
+        <View style={[styles.statusPill, { backgroundColor: C.amberSoft }]}>
+          <Text style={[styles.statusPillText, { color: C.amberText }]}>
             🏆 DreamBreaker
           </Text>
         </View>
@@ -362,16 +369,16 @@ function DualCard({
     }
     if (live) {
       return (
-        <View style={[styles.statusPill, { backgroundColor: "#DBEAFE" }]}>
-          <Text style={[styles.statusPillText, { color: "#1E40AF" }]}>
+        <View style={[styles.statusPill, { backgroundColor: C.primarySoft }]}>
+          <Text style={[styles.statusPillText, { color: C.primary }]}>
             Đang diễn ra
           </Text>
         </View>
       );
     }
     return (
-      <View style={[styles.statusPill, { backgroundColor: "#F1F5F9" }]}>
-        <Text style={[styles.statusPillText, { color: "#475569" }]}>
+      <View style={[styles.statusPill, { backgroundColor: C.field }]}>
+        <Text style={[styles.statusPillText, { color: C.text3 }]}>
           Chưa bắt đầu
         </Text>
       </View>
@@ -383,15 +390,15 @@ function DualCard({
       <View style={styles.dualHead}>
         <StatusPill />
         {dual?.poolKey ? (
-          <View style={[styles.statusPill, { backgroundColor: "#E0E7FF" }]}>
-            <Text style={[styles.statusPillText, { color: "#3730A3" }]}>
+          <View style={[styles.statusPill, { backgroundColor: C.purpleSoft }]}>
+            <Text style={[styles.statusPillText, { color: C.dark ? "#c4b5fd" : "#3730A3" }]}>
               Bảng {dual.poolKey}
             </Text>
           </View>
         ) : null}
         {dual?.phase === "knockout" ? (
-          <View style={[styles.statusPill, { backgroundColor: "#FCE7F3" }]}>
-            <Text style={[styles.statusPillText, { color: "#9F1239" }]}>
+          <View style={[styles.statusPill, { backgroundColor: C.purpleSoft }]}>
+            <Text style={[styles.statusPillText, { color: C.redText }]}>
               KO R{dual.knockoutRound || 1}
             </Text>
           </View>
@@ -431,8 +438,8 @@ function DualCard({
                 key={String(s._id)}
                 style={[
                   styles.subChip,
-                  w === "A" && { backgroundColor: "#DBEAFE" },
-                  w === "B" && { backgroundColor: "#FEE2E2" },
+                  w === "A" && { backgroundColor: C.primarySoft },
+                  w === "B" && { backgroundColor: C.redSoft },
                 ]}
               >
                 <Text style={styles.subChipKey}>{s.slotKey}</Text>
@@ -448,7 +455,7 @@ function DualCard({
       {/* DreamBreaker score if any */}
       {dual?.dreamBreaker?.triggered && (
         <View style={styles.dbFooter}>
-          <Ionicons name="trophy" size={12} color="#B45309" />
+          <Ionicons name="trophy" size={12} color={C.amberText} />
           <Text style={styles.dbFooterText}>
             DB: {dual.dreamBreaker.scoreA || 0} — {dual.dreamBreaker.scoreB || 0}
             {dual.dreamBreaker.winner
@@ -486,24 +493,26 @@ function TeamRow({
   isWinner: boolean;
   placeholder?: string | null;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   if (!team && placeholder) {
     return (
       <View
         style={[
           styles.teamRow,
-          { backgroundColor: "#FEF3C7", borderColor: "#F59E0B", borderWidth: 1, borderStyle: "dashed" as any },
+          { backgroundColor: C.amberSoft, borderColor: "#F59E0B", borderWidth: 1, borderStyle: "dashed" as any },
         ]}
       >
         <View style={[styles.teamAvatar, { backgroundColor: "#F59E0B" }]}>
           <Text style={{ color: "#fff", fontWeight: "900" }}>?</Text>
         </View>
         <Text
-          style={[styles.teamName, { fontStyle: "italic", color: "#92400E" }]}
+          style={[styles.teamName, { fontStyle: "italic", color: C.amberText }]}
           numberOfLines={1}
         >
           {placeholder}
         </Text>
-        <Text style={[styles.teamScore, { color: "#92400E" }]}>–</Text>
+        <Text style={[styles.teamScore, { color: C.amberText }]}>–</Text>
       </View>
     );
   }
@@ -522,13 +531,13 @@ function TeamRow({
         )}
       </View>
       <Text
-        style={[styles.teamName, isWinner && { color: "#065F46" }]}
+        style={[styles.teamName, isWinner && { color: C.greenText }]}
         numberOfLines={1}
       >
         {team?.name || "—"}
       </Text>
       <Text
-        style={[styles.teamScore, isWinner && { color: "#065F46" }]}
+        style={[styles.teamScore, isWinner && { color: C.greenText }]}
       >
         {score ?? 0}
       </Text>
@@ -539,8 +548,8 @@ function TeamRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   content: { padding: 12, paddingBottom: 40 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerRow: {
@@ -553,15 +562,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: C.amberSoft,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#FCD34D",
   },
-  mlpBadgeText: { color: "#B45309", fontWeight: "800", fontSize: 11 },
-  summaryTxt: { color: "#64748B", fontSize: 12 },
+  mlpBadgeText: { color: C.amberText, fontWeight: "800", fontSize: 11 },
+  summaryTxt: { color: C.sub, fontSize: 12 },
   navRow: {
     flexDirection: "row",
     gap: 8,
@@ -576,7 +585,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
   },
   navChipText: { fontSize: 13, fontWeight: "800" },
   section: { marginBottom: 14 },
@@ -586,13 +595,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "900", color: "#0F172A" },
+  sectionTitle: { fontSize: 14, fontWeight: "900", color: C.text },
   sectionMore: { fontSize: 11, color: "#0066FF", fontWeight: "700" },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     overflow: "hidden",
   },
   stRow: {
@@ -605,15 +614,15 @@ const styles = StyleSheet.create({
     width: 34,
     fontSize: 16,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
     textAlign: "center",
   },
-  stName: { flex: 1, fontSize: 13, color: "#0F172A", fontWeight: "700" },
-  stStat: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+  stName: { flex: 1, fontSize: 13, color: C.text, fontWeight: "700" },
+  stStat: { fontSize: 12, color: C.sub, fontWeight: "600" },
   roundTitle: {
     fontSize: 13,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
     marginBottom: 8,
     paddingHorizontal: 4,
   },
@@ -629,11 +638,11 @@ const styles = StyleSheet.create({
   },
   ctaBtnText: { color: "#fff", fontWeight: "800", fontSize: 12 },
   dualCard: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     marginBottom: 8,
   },
   dualHead: {
@@ -648,36 +657,36 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusPillText: { fontSize: 10, fontWeight: "800" },
-  dualDate: { fontSize: 10, color: "#94A3B8" },
+  dualDate: { fontSize: 10, color: C.muted },
   dualBody: { gap: 4 },
   dualVs: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 2,
   },
-  dualVsText: { fontSize: 10, color: "#94A3B8", fontWeight: "700" },
+  dualVsText: { fontSize: 10, color: C.muted, fontWeight: "700" },
   teamRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: C.bg,
   },
-  teamRowWinner: { backgroundColor: "#F0FDF4" },
+  teamRowWinner: { backgroundColor: C.greenSoft },
   teamAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#E0E7FF",
+    backgroundColor: C.purpleSoft,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
   teamAvatarImg: { width: "100%", height: "100%" },
-  teamAvatarInitial: { color: "#4338CA", fontWeight: "900", fontSize: 14 },
-  teamName: { flex: 1, fontSize: 13, color: "#0F172A", fontWeight: "700" },
-  teamScore: { fontSize: 20, color: "#0F172A", fontWeight: "900" },
+  teamAvatarInitial: { color: C.dark ? "#c4b5fd" : "#4338CA", fontWeight: "900", fontSize: 14 },
+  teamName: { flex: 1, fontSize: 13, color: C.text, fontWeight: "700" },
+  teamScore: { fontSize: 20, color: C.text, fontWeight: "900" },
   subRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -691,10 +700,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
-  subChipKey: { fontSize: 10, color: "#0F172A", fontWeight: "900" },
-  subChipScore: { fontSize: 10, color: "#334155", fontWeight: "700" },
+  subChipKey: { fontSize: 10, color: C.text, fontWeight: "900" },
+  subChipScore: { fontSize: 10, color: C.text2, fontWeight: "700" },
   dbFooter: {
     marginTop: 10,
     flexDirection: "row",
@@ -702,16 +711,16 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
     borderColor: "#FCD34D",
   },
-  dbFooterText: { fontSize: 11, color: "#92400E", fontWeight: "700" },
+  dbFooterText: { fontSize: 11, color: C.amberText, fontWeight: "700" },
   poolBox: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: C.border,
     padding: 10,
     marginBottom: 10,
     gap: 6,
@@ -725,6 +734,6 @@ const styles = StyleSheet.create({
   poolTitle: {
     fontSize: 15,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
   },
 });

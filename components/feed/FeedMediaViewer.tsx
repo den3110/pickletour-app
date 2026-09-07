@@ -2,7 +2,7 @@
 // Full-screen viewer kiểu Facebook: swipe ngang, tap để ẩn/hiện overlay,
 // bar dưới hiện reaction + số cảm xúc + comments, tap "Bình luận" mở bottom
 // sheet CommentThread ngay trong viewer.
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,7 @@ import {
   useReactFeedPostMutation,
 } from "@/slices/feedApiSlice";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 type Media = {
   type: "image" | "video";
@@ -160,6 +161,8 @@ function CommentsSheet({
   postId: string;
   me: any;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [text, setText] = useState("");
   const { data, isFetching } = useListFeedCommentsQuery(
@@ -223,16 +226,16 @@ function CommentsSheet({
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Bình luận</Text>
               <Pressable onPress={onClose} hitSlop={12}>
-                <Ionicons name="close" size={22} color="#0F172A" />
+                <Ionicons name="close" size={22} color={C.text} />
               </Pressable>
             </View>
             <ScrollView
               style={{ flex: 1 }}
               contentContainerStyle={{ padding: 12, paddingBottom: 20 }}
             >
-              {isFetching && !data && <ActivityIndicator />}
+              {isFetching && !data && <ActivityIndicator color={C.primary} />}
               {(data?.items || []).length === 0 && !isFetching && (
-                <Text style={{ color: "#64748B", textAlign: "center" }}>
+                <Text style={{ color: C.sub, textAlign: "center" }}>
                   Chưa có bình luận. Hãy là người đầu tiên!
                 </Text>
               )}
@@ -250,11 +253,11 @@ function CommentsSheet({
             <View style={styles.sheetInputRow}>
               {replyTarget && (
                 <View style={styles.replyIndicator}>
-                  <Text style={{ color: "#64748B", fontSize: 12 }}>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>
                     Đang trả lời một bình luận
                   </Text>
                   <Pressable onPress={() => setReplyTarget(null)}>
-                    <Ionicons name="close" size={16} color="#64748B" />
+                    <Ionicons name="close" size={16} color={C.sub} />
                   </Pressable>
                 </View>
               )}
@@ -269,7 +272,7 @@ function CommentsSheet({
                   value={text}
                   onChangeText={setText}
                   multiline
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={C.muted}
                 />
                 <Pressable
                   onPress={submit}
@@ -303,6 +306,8 @@ function SheetCommentItem({
   onReply: () => void;
   onDelete: (cid: string) => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const [showReplies, setShowReplies] = useState(false);
   const { data: replies } = useListFeedCommentsQuery(
     showReplies ? { postId, parent: comment._id } : (undefined as any),
@@ -379,6 +384,8 @@ export function FeedMediaViewer({
   post: any;
   me: any;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { width, height } = Dimensions.get("window");
   const [index, setIndex] = useState(initialIndex);
   const [showOverlay, setShowOverlay] = useState(true);
@@ -628,7 +635,7 @@ export function FeedMediaViewer({
   );
 }
 
-const styles = StyleSheet.create({
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   // backgroundColor để "transparent" — backdrop đen được vẽ bằng Animated.View
   // riêng để có thể fade khi kéo xuống.
   viewerRoot: { flex: 1, backgroundColor: "transparent" },
@@ -731,7 +738,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheetContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "85%",
@@ -744,7 +751,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: C.line,
     marginTop: 8,
   },
   sheetHeader: {
@@ -754,18 +761,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
-  sheetTitle: { fontWeight: "700", fontSize: 16, color: "#0F172A" },
+  sheetTitle: { fontWeight: "700", fontSize: 16, color: C.text },
   sheetInputRow: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: C.border,
     paddingHorizontal: 12,
     paddingTop: 10,
     // chừa khoảng an toàn dưới (Home Indicator) — SafeAreaView bottom đã trừ
     // safe-inset nhưng để chắc chắn không sát mép, thêm 12pt.
     paddingBottom: 12,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
   },
   replyIndicator: {
     flexDirection: "row",
@@ -773,19 +780,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 6,
     marginBottom: 4,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 8,
   },
   sheetInput: {
     flex: 1,
     minHeight: 36,
     maxHeight: 120,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#0F172A",
+    color: C.text,
   },
   sheetSend: {
     width: 40,
@@ -796,13 +803,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   commentBubble: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  commentAuthor: { fontWeight: "700", color: "#0F172A", fontSize: 13 },
-  commentText: { color: "#0F172A", marginTop: 2 },
+  commentAuthor: { fontWeight: "700", color: C.text, fontSize: 13 },
+  commentText: { color: C.text, marginTop: 2 },
   commentMeta: {
     flexDirection: "row",
     gap: 12,
@@ -810,5 +817,5 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     alignItems: "center",
   },
-  commentMetaText: { fontSize: 12, color: "#64748B" },
+  commentMetaText: { fontSize: 12, color: C.sub },
 });

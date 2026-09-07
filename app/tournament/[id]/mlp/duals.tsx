@@ -19,6 +19,7 @@ import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useListMlpDualsQuery } from "@/slices/mlpApiSlice";
+import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
 
 const STATUS: Record<string, { label: string; color: string }> = {
   scheduled: { label: "Chưa đấu", color: "#94A3B8" },
@@ -28,6 +29,8 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function MlpDualsScreen() {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isFetching } = useListMlpDualsQuery(
     { tourId: String(id) },
@@ -117,7 +120,7 @@ export default function MlpDualsScreen() {
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
           ListEmptyComponent={
             <View style={{ padding: 32, alignItems: "center" }}>
-              <Text style={{ color: "#64748B" }}>
+              <Text style={{ color: C.sub }}>
                 Chưa có dual match nào.
               </Text>
             </View>
@@ -212,6 +215,8 @@ function NavBtn({
   label: string;
   onPress: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable onPress={onPress} style={styles.navBtn}>
       <Ionicons name={icon} size={18} color="#0066FF" />
@@ -229,6 +234,8 @@ function TabBtn({
   label: string;
   onPress: () => void;
 }) {
+  const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   return (
     <Pressable
       onPress={onPress}
@@ -241,15 +248,15 @@ function TabBtn({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+const mk_styles = (C: ThemeTokens) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   nav: {
     flexDirection: "row",
     padding: 12,
     gap: 8,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
   navBtn: {
     flex: 1,
@@ -259,18 +266,18 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 10,
     borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   navBtnText: { color: "#0066FF", fontWeight: "700", fontSize: 13 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     gap: 8,
   },
   cardHeader: { flexDirection: "row", alignItems: "center" },
-  round: { flex: 1, fontSize: 12, color: "#64748B", fontWeight: "600" },
+  round: { flex: 1, fontSize: 12, color: C.sub, fontWeight: "600" },
   status: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -281,11 +288,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  team: { flex: 1, fontSize: 15, fontWeight: "700", color: "#0F172A" },
+  team: { flex: 1, fontSize: 15, fontWeight: "700", color: C.text },
   score: {
     fontSize: 24,
     fontWeight: "900",
-    color: "#0F172A",
+    color: C.text,
     minWidth: 80,
     textAlign: "center",
   },
@@ -295,22 +302,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginTop: 4,
   },
-  meta: { fontSize: 12, color: "#64748B" },
+  meta: { fontSize: 12, color: C.sub },
   tabsRow: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 6,
-    backgroundColor: "#fff",
+    backgroundColor: C.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: C.border,
   },
   tabBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: C.field,
   },
   tabBtnActive: { backgroundColor: "#0066FF" },
-  tabBtnText: { color: "#334155", fontWeight: "700", fontSize: 12 },
+  tabBtnText: { color: C.text2, fontWeight: "700", fontSize: 12 },
   tabBtnTextActive: { color: "#fff" },
 });
