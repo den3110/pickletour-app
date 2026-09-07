@@ -5,11 +5,11 @@ import qrcode from "qrcode-generator";
 
 export const ticketQrPayload = (token: string) => `ptbk:${token}`;
 
-export default function TicketQrRN({ token, size = 220 }: { token?: string; size?: number }) {
+export default function TicketQrRN({ token, size = 220, prefix = "ptbk:" }: { token?: string; size?: number; prefix?: string }) {
   const d = useMemo(() => {
     if (!token) return "";
     const qr = qrcode(0, "M");
-    qr.addData(ticketQrPayload(token));
+    qr.addData(`${prefix}${token}`);
     qr.make();
     const n = qr.getModuleCount();
     const cell = size / (n + 8);
@@ -23,7 +23,7 @@ export default function TicketQrRN({ token, size = 220 }: { token?: string; size
       }
     }
     return path;
-  }, [token, size]);
+  }, [token, size, prefix]);
 
   if (!d) return null;
   return (

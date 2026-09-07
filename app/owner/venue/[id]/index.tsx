@@ -22,6 +22,7 @@ import { Hero, Tile, SectionHeader, Card, Chip, Empty, PrimaryButton, GhostButto
 const MGMT = [
   { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin", tint: "#22c1d6", perm: "bookings.manage" },
   { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products", tint: "#f59e0b", perm: "pos.sell" },
+  { key: "events", label: "Sự kiện", icon: "ticket-outline", route: "events", tint: "#e11d48", perm: "events.manage" },
   { key: "packages", label: "Gói / thẻ", icon: "card-outline", route: "packages", tint: "#8b5cf6", perm: "packages.manage" },
   { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring", tint: "#0ea5e9", perm: "recurring.manage" },
   { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks", tint: "#64748b", perm: "blocks.manage" },

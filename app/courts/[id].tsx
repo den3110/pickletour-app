@@ -22,6 +22,7 @@ import { useSelector } from "react-redux";
 import { useGetVenueQuery, useGetVenueAvailabilityQuery } from "@/slices/venuesApiSlice";
 import { useCreateBookingMutation } from "@/slices/bookingsApiSlice";
 import { useOpenVenueChatMutation } from "@/slices/messagesApiSlice";
+import { useListPublicEventsQuery } from "@/slices/eventsApiSlice";
 import { useLazyValidatePromoQuery } from "@/slices/venueOwnerApiSlice";
 import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { useListVenuePackagesQuery, usePurchasePackageMutation, useMyPackagesQuery } from "@/slices/packagesApiSlice";
@@ -68,6 +69,7 @@ export default function VenueDetailScreen() {
   const { data: venuePackages } = useListVenuePackagesQuery(id, { skip: !id });
   const { data: myPkgs } = useMyPackagesQuery(undefined, { skip: !me });
   const [purchasePackage, { isLoading: purchasing }] = usePurchasePackageMutation();
+  const { data: venueEvents } = useListPublicEventsQuery(id, { skip: !id });
   const [openVenueChat, { isLoading: openingChat }] = useOpenVenueChatMutation();
   const openChat = async () => {
     if (!me) return Alert.alert("Cần đăng nhập", "Đăng nhập để nhắn tin với quản lý sân.", [{ text: "Để sau" }, { text: "Đăng nhập", onPress: () => router.push("/login") }]);
@@ -280,6 +282,24 @@ export default function VenueDetailScreen() {
           <Text style={{ color: C.text, fontWeight: "700", flex: 1 }}>Nhắn tin với quản lý sân</Text>
           {openingChat ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="chevron-forward" size={16} color={C.muted} />}
         </TouchableOpacity>
+
+        {/* Sự kiện xé vé / social */}
+        {Array.isArray(venueEvents) && venueEvents.length > 0 && (
+          <View style={{ paddingHorizontal: SP.lg }}>
+            <SectionHeader C={C} title="Sự kiện sắp diễn ra" style={{ marginTop: SP.lg }} />
+            {venueEvents.map((ev: any) => (
+              <TouchableOpacity key={ev._id} activeOpacity={0.9} onPress={() => router.push({ pathname: "/events/[id]", params: { id: String(ev._id) } })} style={[styles.eventRow, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]}>
+                <View style={[styles.eventIcon, { backgroundColor: "rgba(225,29,72,0.14)" }]}><Ionicons name="ticket" size={18} color="#e11d48" /></View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: C.text, fontWeight: "800" }} numberOfLines={1}>{ev.title}</Text>
+                  <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 2 }} numberOfLines={1}>{new Date(ev.startAt).toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })} · {ev.registered || 0}/{ev.capacity} suất</Text>
+                </View>
+                <Text style={{ color: C.accent, fontWeight: "800", fontSize: 13 }}>{ev.price > 0 ? fmtVND(ev.price) : "Free"}</Text>
+                <Ionicons name="chevron-forward" size={16} color={C.muted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Gói giờ / thẻ tháng */}
         {Array.isArray(venuePackages) && venuePackages.length > 0 && (
@@ -527,6 +547,8 @@ const styles = StyleSheet.create({
   ratingPill: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.16)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, marginTop: 8 },
   infoCard: { marginHorizontal: SP.lg, marginTop: -18, borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, padding: SP.lg, gap: 4 },
   reviewBtn: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: SP.lg, marginTop: SP.md, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth },
+  eventRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
+  eventIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   pkgCard: { width: 176, borderRadius: R.lg, padding: 14, overflow: "hidden" },
   pkgBuy: { marginTop: 10, paddingVertical: 8, borderRadius: 10, alignItems: "center" },
   pkgOpt: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 6 },

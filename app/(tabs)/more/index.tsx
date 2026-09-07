@@ -121,6 +121,14 @@ const MORE_ITEMS = [
     accent: "#10B981",
   },
   {
+    key: "my-events",
+    title: t("Sự kiện của tôi"),
+    description: "Vé sự kiện đánh social / giao lưu đã đăng ký.",
+    icon: "sparkles-outline" as const,
+    route: "/events/my",
+    accent: "#e11d48",
+  },
+  {
     key: "owner",
     title: t("Quản lý sân (chủ sân)"),
     description: "Nhận đặt sân, duyệt thanh toán, quét vé QR, doanh thu. Đăng ký làm chủ sân.",
