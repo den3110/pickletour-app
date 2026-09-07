@@ -1,5 +1,6 @@
 // Mã giảm giá
 import React, { useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, ActivityIndicator } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,17 +43,17 @@ export default function PromosScreen() {
         keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 10 }}>Tạo mã mới</Text>
-          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="MÃ (vd: SALE10)" placeholderTextColor={C.sub} autoCapitalize="characters" />
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="MÃ (vd: SALE10)" placeholderTextColor={C.sub} autoCapitalize="characters" />
           <View style={{ flexDirection: "row", gap: 8, marginVertical: 10 }}>
             <TouchableOpacity style={[styles.seg, { backgroundColor: type === "percent" ? C.accent : C.field }]} onPress={() => setType("percent")}><Text style={{ color: type === "percent" ? C.onAccent : C.text, fontWeight: "700" }}>Giảm %</Text></TouchableOpacity>
             <TouchableOpacity style={[styles.seg, { backgroundColor: type === "amount" ? C.accent : C.field }]} onPress={() => setType("amount")}><Text style={{ color: type === "amount" ? C.onAccent : C.text, fontWeight: "700" }}>Giảm tiền</Text></TouchableOpacity>
           </View>
-          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={value} onChangeText={setValue} keyboardType="numeric" placeholder={type === "percent" ? "Phần trăm (0-100)" : "Số tiền (đ)"} placeholderTextColor={C.sub} />
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={value} onChangeText={setValue} keyboardType="numeric" placeholder={type === "percent" ? "Phần trăm (0-100)" : "Số tiền (đ)"} placeholderTextColor={C.sub} />
           <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={minTotal} onChangeText={setMinTotal} keyboardType="numeric" placeholder="Đơn tối thiểu" placeholderTextColor={C.sub} />
-            {type === "percent" && <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={maxDiscount} onChangeText={setMaxDiscount} keyboardType="numeric" placeholder="Giảm tối đa" placeholderTextColor={C.sub} />}
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={minTotal} onChangeText={setMinTotal} keyboardType="numeric" placeholder="Đơn tối thiểu" placeholderTextColor={C.sub} />
+            {type === "percent" && <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={maxDiscount} onChangeText={setMaxDiscount} keyboardType="numeric" placeholder="Giảm tối đa" placeholderTextColor={C.sub} />}
           </View>
-          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginTop: 10 }]} value={usageLimit} onChangeText={setUsageLimit} keyboardType="numeric" placeholder="Giới hạn lượt dùng (0 = không giới hạn)" placeholderTextColor={C.sub} />
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginTop: 10 }]} value={usageLimit} onChangeText={setUsageLimit} keyboardType="numeric" placeholder="Giới hạn lượt dùng (0 = không giới hạn)" placeholderTextColor={C.sub} />
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}>
             <Text style={{ color: C.onAccent, fontWeight: "800" }}>{creating ? "Đang tạo…" : "Tạo mã"}</Text>
           </TouchableOpacity>

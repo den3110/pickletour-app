@@ -1,5 +1,6 @@
 // Cài đặt cụm sân: thông tin, ảnh, giờ mở cửa, ngân hàng, chính sách huỷ + quản lý sân con
 import React, { useEffect, useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -170,9 +171,9 @@ export default function VenueEditScreen() {
               <Switch value={!h.closed} onValueChange={(v) => { const oh = [...form.openHours]; oh[i] = { ...oh[i], closed: !v }; set("openHours", oh); }} trackColor={{ true: C.accent, false: "#94a3b8" }} thumbColor="#fff" />
               {h.closed ? <Text style={{ color: C.sub, flex: 1, marginLeft: 8 }}>Đóng cửa</Text> : (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, marginLeft: 8 }}>
-                  <TextInput style={[styles.timeInput, { backgroundColor: C.field, color: C.text }]} value={h.open} onChangeText={(t) => { const oh = [...form.openHours]; oh[i] = { ...oh[i], open: t }; set("openHours", oh); }} />
+                  <PtInput style={[styles.timeInput, { backgroundColor: C.field, color: C.text }]} value={h.open} onChangeText={(t) => { const oh = [...form.openHours]; oh[i] = { ...oh[i], open: t }; set("openHours", oh); }} />
                   <Text style={{ color: C.sub }}>–</Text>
-                  <TextInput style={[styles.timeInput, { backgroundColor: C.field, color: C.text }]} value={h.close} onChangeText={(t) => { const oh = [...form.openHours]; oh[i] = { ...oh[i], close: t }; set("openHours", oh); }} />
+                  <PtInput style={[styles.timeInput, { backgroundColor: C.field, color: C.text }]} value={h.close} onChangeText={(t) => { const oh = [...form.openHours]; oh[i] = { ...oh[i], close: t }; set("openHours", oh); }} />
                 </View>
               )}
             </View>
@@ -280,7 +281,7 @@ function CourtsManager({ C, venueId, courts }: any) {
             {rules.map((r, i) => (
               <View key={i} style={[styles.rule, { borderColor: C.border }]}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <TextInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.label} onChangeText={(t) => { const rr = [...rules]; rr[i].label = t; setRules(rr); }} placeholder="Nhãn" placeholderTextColor={C.sub} />
+                  <PtInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.label} onChangeText={(t) => { const rr = [...rules]; rr[i].label = t; setRules(rr); }} placeholder="Nhãn" placeholderTextColor={C.sub} />
                   <TouchableOpacity onPress={() => setRules(rules.filter((_, j) => j !== i))} style={{ padding: 6 }}><Ionicons name="trash-outline" size={18} color="#ef4444" /></TouchableOpacity>
                 </View>
                 <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
@@ -290,9 +291,9 @@ function CourtsManager({ C, venueId, courts }: any) {
                   })}
                 </View>
                 <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
-                  <TextInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.start} onChangeText={(t) => { const rr = [...rules]; rr[i].start = t; setRules(rr); }} placeholder="18:00" placeholderTextColor={C.sub} />
-                  <TextInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.end} onChangeText={(t) => { const rr = [...rules]; rr[i].end = t; setRules(rr); }} placeholder="22:00" placeholderTextColor={C.sub} />
-                  <TextInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1.4 }]} value={String(r.pricePerHour)} onChangeText={(t) => { const rr = [...rules]; rr[i].pricePerHour = Number(t) || 0; setRules(rr); }} placeholder="Giá/giờ" placeholderTextColor={C.sub} keyboardType="numeric" />
+                  <PtInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.start} onChangeText={(t) => { const rr = [...rules]; rr[i].start = t; setRules(rr); }} placeholder="18:00" placeholderTextColor={C.sub} />
+                  <PtInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={r.end} onChangeText={(t) => { const rr = [...rules]; rr[i].end = t; setRules(rr); }} placeholder="22:00" placeholderTextColor={C.sub} />
+                  <PtInput style={[styles.ruleInput, { backgroundColor: C.field, color: C.text, flex: 1.4 }]} value={String(r.pricePerHour)} onChangeText={(t) => { const rr = [...rules]; rr[i].pricePerHour = Number(t) || 0; setRules(rr); }} placeholder="Giá/giờ" placeholderTextColor={C.sub} keyboardType="numeric" />
                 </View>
               </View>
             ))}
@@ -312,7 +313,7 @@ function Field({ C, label, v, set, kb, multiline, flex }: any) {
   return (
     <View style={{ marginBottom: 10, flex: flex ? 1 : undefined }}>
       <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} keyboardType={kb} multiline={multiline} placeholderTextColor={C.sub} />
+      <PtInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} keyboardType={kb} multiline={multiline} placeholderTextColor={C.sub} />
     </View>
   );
 }

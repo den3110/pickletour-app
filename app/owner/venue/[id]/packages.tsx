@@ -1,5 +1,6 @@
 // Gói giờ / thẻ tháng (chủ sân) + kích hoạt lượt mua
 import React, { useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -87,15 +88,15 @@ export default function OwnerPackagesScreen() {
               <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Tạo gói</Text>
               <TouchableOpacity onPress={() => setOpen(false)}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
             </View>
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên gói (vd: Gói 10 giờ)" placeholderTextColor={C.sub} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên gói (vd: Gói 10 giờ)" placeholderTextColor={C.sub} />
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
               <TouchableOpacity style={[styles.seg, { backgroundColor: type === "credits" ? C.accent : C.field }]} onPress={() => setType("credits")}><Text style={{ color: type === "credits" ? C.onAccent : C.text, fontWeight: "700" }}>Gói giờ</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.seg, { backgroundColor: type === "period" ? C.accent : C.field }]} onPress={() => setType("period")}><Text style={{ color: type === "period" ? C.onAccent : C.text, fontWeight: "700" }}>Thẻ tháng</Text></TouchableOpacity>
             </View>
-            {type === "credits" && <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={hours} onChangeText={setHours} keyboardType="numeric" placeholder="Số giờ" placeholderTextColor={C.sub} />}
+            {type === "credits" && <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={hours} onChangeText={setHours} keyboardType="numeric" placeholder="Số giờ" placeholderTextColor={C.sub} />}
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={validDays} onChangeText={setValidDays} keyboardType="numeric" placeholder="Hạn (ngày)" placeholderTextColor={C.sub} />
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá (đ)" placeholderTextColor={C.sub} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={validDays} onChangeText={setValidDays} keyboardType="numeric" placeholder="Hạn (ngày)" placeholderTextColor={C.sub} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá (đ)" placeholderTextColor={C.sub} />
             </View>
             <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Tạo gói</Text></TouchableOpacity>
           </View>

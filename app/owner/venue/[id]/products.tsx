@@ -1,5 +1,6 @@
 // POS — bán hàng & tồn kho
 import React, { useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -185,17 +186,17 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
             <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>{editing?.new ? "Thêm sản phẩm" : "Sửa sản phẩm"}</Text>
             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
           </View>
-          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên (vd: Nước suối)" placeholderTextColor={C.sub} />
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên (vd: Nước suối)" placeholderTextColor={C.sub} />
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={category} onChangeText={setCategory} placeholder="Loại (nước/bóng/thuê)" placeholderTextColor={C.sub} />
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={unit} onChangeText={setUnit} placeholder="Đơn vị" placeholderTextColor={C.sub} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={category} onChangeText={setCategory} placeholder="Loại (nước/bóng/thuê)" placeholderTextColor={C.sub} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={unit} onChangeText={setUnit} placeholder="Đơn vị" placeholderTextColor={C.sub} />
           </View>
-          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá (đ)" placeholderTextColor={C.sub} />
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá (đ)" placeholderTextColor={C.sub} />
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 8 }}>
             <Text style={{ color: C.text }}>Quản lý tồn kho</Text>
             <Switch value={trackStock} onValueChange={setTrackStock} trackColor={{ true: C.accent, false: "#94a3b8" }} thumbColor="#fff" />
           </View>
-          {trackStock && <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={stock} onChangeText={setStock} keyboardType="numeric" placeholder="Tồn kho hiện tại" placeholderTextColor={C.sub} />}
+          {trackStock && <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={stock} onChangeText={setStock} keyboardType="numeric" placeholder="Tồn kho hiện tại" placeholderTextColor={C.sub} />}
           <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
             {!editing?.new && <TouchableOpacity style={[styles.mBtn, { borderWidth: 1, borderColor: "#ef4444" }]} onPress={() => { remove({ venueId, productId: editing._id }); onClose(); }}><Text style={{ color: "#ef4444", fontWeight: "700" }}>Xoá</Text></TouchableOpacity>}
             <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu</Text></TouchableOpacity>

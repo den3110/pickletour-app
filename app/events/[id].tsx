@@ -81,6 +81,7 @@ export default function EventDetailScreen() {
         {/* Yêu cầu tham gia */}
         <Card C={C} style={{ marginTop: SP.md }}>
           <Row C={C} icon="people-outline" label="Số suất" value={`${st.registered || 0}/${ev.capacity} (còn ${Math.max(0, ev.capacity - (st.registered || 0))})`} />
+          {ev.courts?.length ? <Row C={C} icon="tennisball-outline" label="Sân" value={ev.courts.map((c: any) => c.name).join(", ")} /> : null}
           <Row C={C} icon="male-female-outline" label="Giới tính" value={GENDER_LABEL[ev.genderPolicy] || "Mọi giới tính"} />
           {(ev.skillMin > 0 || ev.skillMax > 0) && <Row C={C} icon="trophy-outline" label="Điểm trình" value={`${ev.skillMin || 0}${ev.skillMax > 0 ? ` – ${ev.skillMax}` : "+"}`} />}
           <Row C={C} icon="location-outline" label="Địa điểm" value={[ev.venue?.address, ev.venue?.province].filter(Boolean).join(", ") || ev.venue?.name} onPress={() => router.push({ pathname: "/courts/[id]", params: { id: String(ev.venue?._id) } })} />

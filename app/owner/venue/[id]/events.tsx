@@ -1,5 +1,6 @@
 // app/owner/venue/[id]/events.tsx — Chủ sân: quản lý sự kiện xé vé / social
 import React, { useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Text } from "@/components/ui/i18nText";
@@ -61,6 +62,7 @@ export default function OwnerEventsScreen() {
                     </View>
                     <View style={{ flexDirection: "row", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                       <Chip C={C} color={C.accent} label={ev.price > 0 ? fmtVND(ev.price) : "Miễn phí"} small />
+                      {ev.courts?.length ? <Chip C={C} color={C.info} label={ev.courts.map((c: any) => c.name).join(", ")} small /> : null}
                       <Chip C={C} color={C.success} label={`Thu ${fmtVND(st.revenue || 0)}`} small />
                       {st.checkedIn > 0 && <Chip C={C} color={C.info} label={`${st.checkedIn} check-in`} small />}
                       {(st.byGender?.male || st.byGender?.female) ? <Chip C={C} color={C.muted} label={`${st.byGender.male || 0}N/${st.byGender.female || 0}Nữ`} small /> : null}
@@ -94,12 +96,16 @@ function EventEditor({ C, venueId, courts, editor, onClose }: any) {
   const [maleQuota, setMaleQuota] = useState(String(editor.maleQuota || 0));
   const [femaleQuota, setFemaleQuota] = useState(String(editor.femaleQuota || 0));
   const [online, setOnline] = useState(editor.paymentMode ? editor.paymentMode === "online" : true);
+  const [courtIds, setCourtIds] = useState<string[]>(Array.isArray(editor.courts) ? editor.courts.map((c: any) => String(c?._id || c)) : []);
+  const toggleCourt = (cid: string) => setCourtIds((p) => (p.includes(cid) ? p.filter((x) => x !== cid) : [...p, cid]));
 
   const save = async () => {
     if (!title.trim()) return Alert.alert("Nhập tên sự kiện");
     if (end <= start) return Alert.alert("Thời gian", "Giờ kết thúc phải sau giờ bắt đầu.");
+    if (courts.length > 0 && courtIds.length === 0) return Alert.alert("Chọn sân", "Chọn ít nhất 1 sân tổ chức sự kiện.");
     const body: any = {
       title: title.trim(), description: desc.trim(),
+      courts: courtIds,
       startAt: start.toISOString(), endAt: end.toISOString(),
       capacity: Number(capacity) || 1, price: Number(price) || 0,
       skillType: "double", skillMin: Number(skillMin) || 0, skillMax: Number(skillMax) || 0,
@@ -127,6 +133,20 @@ function EventEditor({ C, venueId, courts, editor, onClose }: any) {
           <View style={{ flexDirection: "row", gap: 10 }}>
             <DateBtn C={C} label="Bắt đầu" value={start} onPress={() => setPicker("start")} />
             <DateBtn C={C} label="Kết thúc" value={end} onPress={() => setPicker("end")} />
+          </View>
+          <Text style={{ color: C.sub, fontSize: 13, marginTop: 4, marginBottom: 6 }}>Sân tổ chức (chọn 1 hoặc nhiều sân — các sân này sẽ được giữ trong giờ sự kiện)</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            {courts.length === 0 ? (
+              <Text style={{ color: C.muted, fontSize: 12.5 }}>Cụm sân chưa có sân con — thêm ở Cài đặt sân.</Text>
+            ) : courts.map((c: any) => {
+              const on = courtIds.includes(String(c._id));
+              return (
+                <TouchableOpacity key={c._id} onPress={() => toggleCourt(String(c._id))} style={[styles.chip, { backgroundColor: on ? C.accent : C.field, flexDirection: "row", alignItems: "center", gap: 5 }]}>
+                  {on ? <Ionicons name="checkmark-circle" size={14} color={C.onAccent} /> : null}
+                  <Text style={{ color: on ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{c.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <F C={C} label="Số suất" v={capacity} set={setCapacity} kb="numeric" flex />
@@ -190,7 +210,7 @@ function F({ C, label, v, set, ph, kb, multiline, flex }: any) {
   return (
     <View style={{ marginBottom: 8, flex: flex ? 1 : undefined }}>
       <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.muted} keyboardType={kb} multiline={multiline} />
+      <PtInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.muted} keyboardType={kb} multiline={multiline} />
     </View>
   );
 }

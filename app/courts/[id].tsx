@@ -1,5 +1,6 @@
 // app/courts/[id].tsx — Chi tiết cụm sân + chọn giờ trống + đặt sân
 import React, { useMemo, useState, useCallback } from "react";
+import PtInput from "@/components/ui/PtInput";
 import {
   View,
   ScrollView,
@@ -292,7 +293,7 @@ export default function VenueDetailScreen() {
                 <View style={[styles.eventIcon, { backgroundColor: "rgba(225,29,72,0.14)" }]}><Ionicons name="ticket" size={18} color="#e11d48" /></View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ color: C.text, fontWeight: "800" }} numberOfLines={1}>{ev.title}</Text>
-                  <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 2 }} numberOfLines={1}>{new Date(ev.startAt).toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })} · {ev.registered || 0}/{ev.capacity} suất</Text>
+                  <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 2 }} numberOfLines={1}>{new Date(ev.startAt).toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })} · {ev.registered || 0}/{ev.capacity} suất{ev.courts?.length ? ` · ${ev.courts.map((c: any) => c.name).join(", ")}` : ""}</Text>
                 </View>
                 <Text style={{ color: C.accent, fontWeight: "800", fontSize: 13 }}>{ev.price > 0 ? fmtVND(ev.price) : "Free"}</Text>
                 <Ionicons name="chevron-forward" size={16} color={C.muted} />
@@ -445,9 +446,9 @@ export default function VenueDetailScreen() {
                 <Text style={{ color: C.sub, fontWeight: "600" }}>{date.split("-").reverse().join("/")} · {start} → {end}</Text>
               </Text>
             </View>
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Tên người đặt" placeholderTextColor={C.sub} value={name} onChangeText={setName} />
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Số điện thoại" placeholderTextColor={C.sub} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, height: 70 }]} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.sub} multiline value={note} onChangeText={(t) => setNote(t.slice(0, 500))} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Tên người đặt" placeholderTextColor={C.sub} value={name} onChangeText={setName} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Số điện thoại" placeholderTextColor={C.sub} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, height: 70 }]} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.sub} multiline value={note} onChangeText={(t) => setNote(t.slice(0, 500))} />
             {/* Thanh toán bằng gói */}
             {eligiblePkgs.length > 0 && (
               <View style={{ marginBottom: 10 }}>
@@ -468,7 +469,7 @@ export default function VenueDetailScreen() {
             {!usePkg && (
             <>
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1, marginBottom: 0 }]} placeholder="Mã giảm giá" placeholderTextColor={C.sub} autoCapitalize="characters" value={promo} onChangeText={setPromo} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1, marginBottom: 0 }]} placeholder="Mã giảm giá" placeholderTextColor={C.sub} autoCapitalize="characters" value={promo} onChangeText={setPromo} />
               <TouchableOpacity style={[styles.btn, { paddingHorizontal: 18, backgroundColor: C.field }]} onPress={checkPromo} disabled={checkingPromo}>
                 <Text style={{ color: C.text, fontWeight: "700" }}>{checkingPromo ? "…" : "Áp dụng"}</Text>
               </TouchableOpacity>

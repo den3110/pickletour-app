@@ -1,5 +1,6 @@
 // app/owner/venue/[id]/recurring.tsx — Lịch cố định cho CLB/khách quen (nhiều thứ/tuần, theo tháng, tự set giá)
 import React, { useMemo, useState } from "react";
+import PtInput from "@/components/ui/PtInput";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, ActivityIndicator, Modal } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -120,7 +121,7 @@ export default function RecurringScreen() {
             </View>
 
             <Label C={C}>Bắt đầu từ</Label>
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateFrom} onChangeText={setDateFrom} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateFrom} onChangeText={setDateFrom} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
 
             <Label C={C}>Kéo dài</Label>
             <View style={styles.seg}>
@@ -131,9 +132,9 @@ export default function RecurringScreen() {
               ))}
             </View>
             {rangeMode === "dateTo" ? (
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateTo} onChangeText={setDateTo} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateTo} onChangeText={setDateTo} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
             ) : (
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={rangeVal} onChangeText={setRangeVal} keyboardType="numeric" placeholder={rangeMode === "weeks" ? "Số tuần (vd 8)" : "Số tháng (vd 2)"} placeholderTextColor={C.muted} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={rangeVal} onChangeText={setRangeVal} keyboardType="numeric" placeholder={rangeMode === "weeks" ? "Số tuần (vd 8)" : "Số tháng (vd 2)"} placeholderTextColor={C.muted} />
             )}
 
             <Label C={C}>Cách tính giá</Label>
@@ -146,12 +147,12 @@ export default function RecurringScreen() {
             </View>
             {priceMode === "total" && (
               <>
-                <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={packageTotal} onChangeText={setPackageTotal} keyboardType="numeric" placeholder="Tổng giá cả kỳ (đ) — vd 10000000" placeholderTextColor={C.muted} />
+                <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={packageTotal} onChangeText={setPackageTotal} keyboardType="numeric" placeholder="Tổng giá cả kỳ (đ) — vd 10000000" placeholderTextColor={C.muted} />
                 <Text style={{ color: C.sub, fontSize: 12, marginBottom: 8 }}>Tổng tiền cho toàn bộ lịch (VD gói tháng của CLB). Hệ thống chia đều cho các buổi để tính doanh thu.</Text>
               </>
             )}
             {priceMode === "custom" && (
-              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá 1 buổi (đ) — vd 300000" placeholderTextColor={C.muted} />
+              <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá 1 buổi (đ) — vd 300000" placeholderTextColor={C.muted} />
             )}
 
             <View style={styles.paidRow}>
@@ -292,7 +293,7 @@ function EditSeriesModal({ C, venueId, g, onClose }: any) {
             ))}
           </View>
           {priceMode !== "keep" && (
-            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder={priceMode === "total" ? "Tổng giá cho các buổi sắp tới (đ)" : "Giá 1 buổi (đ)"} placeholderTextColor={C.muted} />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder={priceMode === "total" ? "Tổng giá cho các buổi sắp tới (đ)" : "Giá 1 buổi (đ)"} placeholderTextColor={C.muted} />
           )}
 
           <View style={styles.paidRow}>
@@ -324,7 +325,7 @@ function Field({ C, label, v, set, ph, kb }: any) {
   return (
     <View style={{ marginBottom: 8, flex: 1 }}>
       <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6, marginTop: 4 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.muted} keyboardType={kb} />
+      <PtInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.muted} keyboardType={kb} />
     </View>
   );
 }
