@@ -113,6 +113,14 @@ const MORE_ITEMS = [
     accent: "#f59e0b",
   },
   {
+    key: "my-packages",
+    title: t("Gói sân của tôi"),
+    description: "Gói giờ / thẻ tháng đã mua tại các sân.",
+    icon: "card-outline" as const,
+    route: "/courts/my-packages",
+    accent: "#10B981",
+  },
+  {
     key: "owner",
     title: t("Quản lý sân (chủ sân)"),
     description: "Nhận đặt sân, duyệt thanh toán, quét vé QR, doanh thu. Đăng ký làm chủ sân.",

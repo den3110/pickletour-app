@@ -22,6 +22,7 @@ import {
   useSubmitPaymentProofMutation,
   useUpdateBookingStatusMutation,
 } from "@/slices/bookingsApiSlice";
+import { useCreateInviteMutation } from "@/slices/playApiSlice";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import TicketQrRN from "@/components/courts/TicketQrRN";
@@ -39,8 +40,30 @@ export default function BookingDetailScreen() {
   const [upload, { isLoading: uploading }] = useUploadImageToFolderMutation();
   const [submitProof, { isLoading: submitting }] = useSubmitPaymentProofMutation();
   const [updateStatus, { isLoading: cancelling }] = useUpdateBookingStatusMutation();
+  const [createInvite, { isLoading: creatingInvite }] = useCreateInviteMutation();
   const [note, setNote] = useState("");
   const [localPreview, setLocalPreview] = useState("");
+
+  const openPlay = async () => {
+    try {
+      const inv: any = await createInvite({
+        title: `Tìm người chơi tại ${b?.venue?.name || "sân"}`,
+        province: b?.venue?.province || "",
+        courtName: `${b?.venue?.name || ""}${b?.court?.name ? ` · ${b.court.name}` : ""}`,
+        playAt: b?.startAt,
+        durationMin: b?.durationMin || 60,
+        slots: 2,
+        venue: b?.venue?._id,
+        booking: b?._id,
+      }).unwrap();
+      Alert.alert("Đã mở kèo", "Kèo tìm người chơi đã được đăng.", [
+        { text: "Xem kèo", onPress: () => router.push({ pathname: "/play/[id]", params: { id: String(inv?._id || inv?.id) } }) },
+        { text: "OK" },
+      ]);
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Không mở được kèo.");
+    }
+  };
 
   const st = BOOKING_STATUS[b?.status] || BOOKING_STATUS.pending;
   const needPay = ["pending", "awaiting_approval"].includes(b?.status);
@@ -221,6 +244,10 @@ export default function BookingDetailScreen() {
             <Text style={{ color: C.sub, fontSize: 12, marginTop: 10, textAlign: "center" }}>
               {b.ticket?.checkedInAt ? "Vé đã được sử dụng." : "Đưa mã QR này cho chủ sân quét khi đến sân."}
             </Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: "#6366f1", alignSelf: "stretch", marginTop: 14, opacity: creatingInvite ? 0.6 : 1 }]} disabled={creatingInvite} onPress={openPlay}>
+              <Ionicons name="people" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "800" }}>Mở kèo tìm người chơi</Text>
+            </TouchableOpacity>
           </View>
         )}
 

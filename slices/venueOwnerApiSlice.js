@@ -72,6 +72,61 @@ export const venueOwnerApiSlice = apiSlice.injectEndpoints({
       query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/recurring`, method: "POST", body }),
       invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }],
     }),
+    // POS — sản phẩm
+    listProducts: builder.query({
+      query: (venueId) => ({ url: `/api/venues/${venueId}/products?all=1` }),
+      providesTags: (r, e, venueId) => [{ type: "Venue", id: `PROD-${venueId}` }],
+    }),
+    createProduct: builder.mutation({
+      query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/products`, method: "POST", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
+    updateProduct: builder.mutation({
+      query: ({ venueId, productId, ...body }) => ({ url: `/api/venues/${venueId}/products/${productId}`, method: "PATCH", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
+    deleteProduct: builder.mutation({
+      query: ({ venueId, productId }) => ({ url: `/api/venues/${venueId}/products/${productId}`, method: "DELETE" }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
+    listSales: builder.query({
+      query: ({ venueId, date }) => ({ url: `/api/venues/${venueId}/sales${date ? `?date=${date}` : ""}` }),
+      providesTags: (r, e, a) => [{ type: "Venue", id: `SALES-${a.venueId}` }],
+    }),
+    createSale: builder.mutation({
+      query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/sales`, method: "POST", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `SALES-${a.venueId}` }, { type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
+    // Gói giờ / thẻ tháng (chủ sân)
+    listPackagesOwner: builder.query({
+      query: (venueId) => ({ url: `/api/venues/${venueId}/packages?all=1` }),
+      providesTags: (r, e, venueId) => [{ type: "Venue", id: `PKG-${venueId}` }],
+    }),
+    createPackage: builder.mutation({
+      query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/packages`, method: "POST", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PKG-${a.venueId}` }],
+    }),
+    updatePackage: builder.mutation({
+      query: ({ venueId, packageId, ...body }) => ({ url: `/api/venues/${venueId}/packages/${packageId}`, method: "PATCH", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PKG-${a.venueId}` }],
+    }),
+    deletePackage: builder.mutation({
+      query: ({ venueId, packageId }) => ({ url: `/api/venues/${venueId}/packages/${packageId}`, method: "DELETE" }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PKG-${a.venueId}` }],
+    }),
+    listVenuePurchases: builder.query({
+      query: ({ venueId, status }) => ({ url: `/api/venues/${venueId}/package-purchases${status ? `?status=${status}` : ""}` }),
+      providesTags: (r, e, a) => [{ type: "Venue", id: `PUR-${a.venueId}` }],
+    }),
+    activatePurchase: builder.mutation({
+      query: ({ venueId, purchaseId }) => ({ url: `/api/venues/${venueId}/package-purchases/${purchaseId}/activate`, method: "PATCH" }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `PUR-${a.venueId}` }],
+    }),
+    // Phân tích
+    getAnalytics: builder.query({
+      query: ({ venueId, from, to }) => ({ url: `/api/venues/${venueId}/analytics?from=${from}&to=${to}` }),
+      providesTags: (r, e, a) => [{ type: "Venue", id: `ANALYTICS-${a.venueId}` }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -92,4 +147,17 @@ export const {
   useDeletePromoMutation,
   useLazyValidatePromoQuery,
   useCreateRecurringMutation,
+  useListProductsQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+  useDeleteProductMutation,
+  useListSalesQuery,
+  useCreateSaleMutation,
+  useListPackagesOwnerQuery,
+  useCreatePackageMutation,
+  useUpdatePackageMutation,
+  useDeletePackageMutation,
+  useListVenuePurchasesQuery,
+  useActivatePurchaseMutation,
+  useGetAnalyticsQuery,
 } = venueOwnerApiSlice;

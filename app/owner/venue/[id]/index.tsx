@@ -17,9 +17,12 @@ import { fmtVND, pal, tLabel, toDateInput, addDays, dtLabel, BOOKING_STATUS } fr
 
 const MGMT = [
   { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin" },
+  { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products" },
+  { key: "packages", label: "Gói/thẻ", icon: "card-outline", route: "packages" },
   { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring" },
   { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks" },
   { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos" },
+  { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics" },
   { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue" },
   { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit" },
 ];
