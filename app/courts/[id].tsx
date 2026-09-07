@@ -26,7 +26,7 @@ import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { useListVenuePackagesQuery, usePurchasePackageMutation, useMyPackagesQuery } from "@/slices/packagesApiSlice";
 import { LinearGradient } from "expo-linear-gradient";
 import VenueMiniMap from "@/components/courts/VenueMiniMap";
-import { fmtVND, pal, toDateInput, addDays } from "@/utils/courtFormat";
+import { fmtVND, pal, toDateInput, addDays, weekdayOf } from "@/utils/courtFormat";
 import { DateStrip, SectionHeader, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
 type Slot = { start: string; end: string; price: number; booked: boolean; past: boolean };
