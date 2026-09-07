@@ -39,7 +39,9 @@ export default function RecurringScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Đặt định kỳ" }} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>Sân</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>

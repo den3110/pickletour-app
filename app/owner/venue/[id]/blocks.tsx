@@ -39,7 +39,9 @@ export default function BlocksScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Khoá sân / bảo trì" }} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 10 }}>Thêm khoá</Text>
           <Row C={C} label="Ngày (YYYY-MM-DD)"><TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={date} onChangeText={setDate} placeholderTextColor={C.sub} /></Row>

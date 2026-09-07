@@ -1,6 +1,6 @@
 // app/owner/venue/[id]/staff.tsx — Quản lý nhân viên & phân quyền cụm sân
 import React, { useMemo, useState, useEffect } from "react";
-import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, TextInput, Image, ActivityIndicator, FlatList } from "react-native";
+import { View, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, TextInput, Image, ActivityIndicator, FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -162,7 +162,7 @@ function StaffEditor({ C, venueId, editor, roles, groups, onClose }: any) {
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalWrap}>
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.modal, { backgroundColor: C.card }, shadow(C.dark, 3)]}>
           <SheetHandle C={C} />
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -245,7 +245,7 @@ function StaffEditor({ C, venueId, editor, roles, groups, onClose }: any) {
             )}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

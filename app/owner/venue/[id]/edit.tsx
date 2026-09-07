@@ -1,6 +1,6 @@
 // Cài đặt cụm sân: thông tin, ảnh, giờ mở cửa, ngân hàng, chính sách huỷ + quản lý sân con
 import React, { useEffect, useMemo, useState } from "react";
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Switch, Modal, ActivityIndicator } from "react-native";
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -204,8 +204,8 @@ function CourtsManager({ C, venueId, courts }: any) {
       </TouchableOpacity>
 
       <Modal visible={!!editing} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={styles.modalWrap}>
-          <ScrollView style={[styles.modal, { backgroundColor: C.card }]} contentContainerStyle={{ paddingBottom: 20 }}>
+        <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView style={[styles.modal, { backgroundColor: C.card }]} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>{editing?.new ? "Thêm sân" : "Sửa sân"}</Text>
               <TouchableOpacity onPress={() => setEditing(null)}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
@@ -235,7 +235,7 @@ function CourtsManager({ C, venueId, courts }: any) {
             <TouchableOpacity onPress={addRule} style={{ paddingVertical: 8 }}><Text style={{ color: C.accent, fontWeight: "700" }}>+ Thêm khung giá</Text></TouchableOpacity>
             <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, marginTop: 8 }]} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu sân</Text></TouchableOpacity>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Card>
   );

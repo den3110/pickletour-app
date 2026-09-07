@@ -1,6 +1,6 @@
 // Gói giờ / thẻ tháng (chủ sân) + kích hoạt lượt mua
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator } from "react-native";
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -81,7 +81,7 @@ export default function OwnerPackagesScreen() {
       </ScrollView>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={styles.modalWrap}>
+        <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={[styles.modal, { backgroundColor: C.card }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Tạo gói</Text>
@@ -99,7 +99,7 @@ export default function OwnerPackagesScreen() {
             </View>
             <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Tạo gói</Text></TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

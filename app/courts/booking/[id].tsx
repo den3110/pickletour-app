@@ -152,6 +152,8 @@ export default function BookingDetailScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: `#${b.code}` }} />
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: SP.lg, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
       >

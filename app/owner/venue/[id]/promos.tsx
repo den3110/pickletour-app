@@ -37,7 +37,9 @@ export default function PromosScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Mã giảm giá" }} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 10 }}>Tạo mã mới</Text>
           <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="MÃ (vd: SALE10)" placeholderTextColor={C.sub} autoCapitalize="characters" />

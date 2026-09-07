@@ -52,7 +52,9 @@ export default function VenueReviewsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Đánh giá sân" }} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {isLoading ? <ActivityIndicator color="#f59e0b" style={{ marginTop: 30 }} /> : (
           <>
             <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, alignItems: "center" }]}>

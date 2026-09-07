@@ -1,6 +1,6 @@
 // POS — bán hàng & tồn kho
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator } from "react-native";
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -179,8 +179,8 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
 
   return (
     <Modal visible={!!editing} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalWrap}>
-        <View style={[styles.modal, { backgroundColor: C.card }]}>
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView style={[styles.modal, { backgroundColor: C.card }]} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>{editing?.new ? "Thêm sản phẩm" : "Sửa sản phẩm"}</Text>
             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
@@ -200,8 +200,8 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
             {!editing?.new && <TouchableOpacity style={[styles.mBtn, { borderWidth: 1, borderColor: "#ef4444" }]} onPress={() => { remove({ venueId, productId: editing._id }); onClose(); }}><Text style={{ color: "#ef4444", fontWeight: "700" }}>Xoá</Text></TouchableOpacity>}
             <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu</Text></TouchableOpacity>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   cart: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingBottom: 28, borderTopWidth: 1 },
   payBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
-  modal: { padding: 20, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: 36 },
+  modal: { padding: 20, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: 36, maxHeight: "88%" },
   input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 10 },
   mBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
 });
