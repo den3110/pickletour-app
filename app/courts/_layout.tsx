@@ -13,7 +13,6 @@ export default function CourtsLayout() {
         headerTitleStyle: { fontWeight: "800", fontSize: 17 },
         headerShadowVisible: false,
         headerBackTitle: "Quay lại",
-        headerBackTitleVisible: false,
         contentStyle: { backgroundColor: C.bg },
       }}
     />
