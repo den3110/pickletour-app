@@ -670,13 +670,15 @@ export default function ChatWindow() {
   }, [cid, cidStr, dispatch, markRead]);
 
   const items = msgs?.items || [];
-  const isGroup = conv?.type === "club" || conv?.type === "tournament";
+  const isGroup = conv?.type === "club" || conv?.type === "tournament" || conv?.type === "venue";
   const title = useMemo(() => {
     if (!conv) return "Nhắn tin";
     if (conv.type === "tournament")
       return `BTC · ${conv.tournament?.name || "Giải đấu"}`;
     if (conv.type === "club")
       return `CLB · ${conv.club?.name || "Câu lạc bộ"}`;
+    if (conv.type === "venue")
+      return `Sân · ${conv.venue?.name || "Cụm sân"}`;
     const other = conv.otherParticipants?.[0];
     return authorName(other);
   }, [conv]);

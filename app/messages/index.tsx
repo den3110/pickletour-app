@@ -41,6 +41,8 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
       ? `BTC · ${conv.tournament?.name || "Giải đấu"}`
       : conv.type === "club"
       ? `CLB · ${conv.club?.name || "Câu lạc bộ"}`
+      : conv.type === "venue"
+      ? `Sân · ${conv.venue?.name || "Cụm sân"}`
       : authorName(other);
   const avatarLetter = title[0]?.toUpperCase() || "?";
   const preview =
@@ -69,6 +71,14 @@ function ConversationRow({ conv, me }: { conv: any; me: any }) {
           <Image source={{ uri: conv.club.logoUrl }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: "#16a34a" }]}>
+            <Text style={styles.avatarLetter}>{avatarLetter}</Text>
+          </View>
+        )
+      ) : conv.type === "venue" ? (
+        conv.venue?.images?.[0] ? (
+          <Image source={{ uri: conv.venue.images[0] }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: "#22c1d6" }]}>
             <Text style={styles.avatarLetter}>{avatarLetter}</Text>
           </View>
         )

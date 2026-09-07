@@ -21,6 +21,7 @@ import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { useGetVenueQuery, useGetVenueAvailabilityQuery } from "@/slices/venuesApiSlice";
 import { useCreateBookingMutation } from "@/slices/bookingsApiSlice";
+import { useOpenVenueChatMutation } from "@/slices/messagesApiSlice";
 import { useLazyValidatePromoQuery } from "@/slices/venueOwnerApiSlice";
 import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { useListVenuePackagesQuery, usePurchasePackageMutation, useMyPackagesQuery } from "@/slices/packagesApiSlice";
@@ -67,6 +68,16 @@ export default function VenueDetailScreen() {
   const { data: venuePackages } = useListVenuePackagesQuery(id, { skip: !id });
   const { data: myPkgs } = useMyPackagesQuery(undefined, { skip: !me });
   const [purchasePackage, { isLoading: purchasing }] = usePurchasePackageMutation();
+  const [openVenueChat, { isLoading: openingChat }] = useOpenVenueChatMutation();
+  const openChat = async () => {
+    if (!me) return Alert.alert("Cần đăng nhập", "Đăng nhập để nhắn tin với quản lý sân.", [{ text: "Để sau" }, { text: "Đăng nhập", onPress: () => router.push("/login") }]);
+    try {
+      const conv: any = await openVenueChat(id).unwrap();
+      router.push(`/messages/${conv._id}`);
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Không mở được cuộc trò chuyện.");
+    }
+  };
   const [pkgBank, setPkgBank] = useState<any>(null); // { bank, packageName } sau khi mua
 
   // Chọn slot: giữ dải liên tiếp trên cùng 1 sân; bấm slot đã chọn ở cuối → bỏ bớt
@@ -261,6 +272,13 @@ export default function VenueDetailScreen() {
             {reviewSum?.summary?.count ? `${reviewSum.summary.avg?.toFixed(1)}★ · ${reviewSum.summary.count} đánh giá` : "Xem & viết đánh giá"}
           </Text>
           <Ionicons name="chevron-forward" size={16} color={C.muted} />
+        </TouchableOpacity>
+
+        {/* Nhắn tin với quản lý sân */}
+        <TouchableOpacity activeOpacity={0.85} style={[styles.reviewBtn, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]} disabled={openingChat} onPress={openChat}>
+          <View style={[styles.rowIcon, { backgroundColor: C.accentSoft }]}><Ionicons name="chatbubbles" size={14} color={C.accent} /></View>
+          <Text style={{ color: C.text, fontWeight: "700", flex: 1 }}>Nhắn tin với quản lý sân</Text>
+          {openingChat ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="chevron-forward" size={16} color={C.muted} />}
         </TouchableOpacity>
 
         {/* Gói giờ / thẻ tháng */}
