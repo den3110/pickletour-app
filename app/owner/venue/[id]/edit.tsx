@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Switch, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -39,12 +40,29 @@ export default function VenueEditScreen() {
         bankAccountNumber: venue.bankAccountNumber || "",
         bankAccountName: venue.bankAccountName || "",
         cancelHours: String(venue.cancelPolicy?.hoursBefore || 0),
+        locationGeo: venue.locationGeo?.lat != null ? { ...venue.locationGeo } : null,
         openHours: (venue.openHours && venue.openHours.length === 7) ? venue.openHours.map((h: any) => ({ ...h })) : Array.from({ length: 7 }, () => ({ closed: false, open: "06:00", close: "22:00" })),
       });
     }
   }, [venue]); // eslint-disable-line
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const [locating, setLocating] = useState(false);
+
+  const useCurrentLocation = async () => {
+    try {
+      setLocating(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") { Alert.alert("Cần quyền vị trí", "Cho phép vị trí để ghim sân lên bản đồ."); return; }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      set("locationGeo", { lat: loc.coords.latitude, lon: loc.coords.longitude, displayName: form?.address || "" });
+      Alert.alert("Đã lấy vị trí", "Toạ độ hiện tại đã được gán. Nhớ bấm Lưu.");
+    } catch {
+      Alert.alert("Lỗi", "Không lấy được vị trí hiện tại.");
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const addImage = async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
@@ -76,6 +94,7 @@ export default function VenueEditScreen() {
         bankAccountNumber: form.bankAccountNumber.trim(),
         bankAccountName: form.bankAccountName.trim(),
         cancelPolicy: { hoursBefore: Number(form.cancelHours) || 0 },
+        ...(form.locationGeo?.lat != null ? { locationGeo: form.locationGeo } : {}),
         openHours: form.openHours,
       }).unwrap();
       Alert.alert("Đã lưu", "Cập nhật cụm sân thành công.");
@@ -113,6 +132,24 @@ export default function VenueEditScreen() {
           <Field C={C} label="Địa chỉ" v={form.address} set={(t: string) => set("address", t)} />
           <Field C={C} label="Tỉnh/Thành" v={form.province} set={(t: string) => set("province", t)} />
           <Field C={C} label="Mô tả" v={form.description} set={(t: string) => set("description", t)} multiline />
+
+          {/* Vị trí trên bản đồ */}
+          <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>Vị trí trên bản đồ</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              {form.locationGeo?.lat != null ? (
+                <Text style={{ color: C.success, fontSize: 13, fontWeight: "600" }}>
+                  ✓ Đã ghim ({Number(form.locationGeo.lat).toFixed(5)}, {Number(form.locationGeo.lon).toFixed(5)})
+                </Text>
+              ) : (
+                <Text style={{ color: C.warning, fontSize: 12.5 }}>Chưa có toạ độ — sân sẽ không hiện trên bản đồ. Lưu địa chỉ để tự định vị, hoặc bấm nút bên cạnh khi đang ở sân.</Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={useCurrentLocation} disabled={locating} style={[styles.locBtn, { backgroundColor: C.accentSoft }]}>
+              {locating ? <ActivityIndicator color={C.accent} size="small" /> : <Ionicons name="locate" size={16} color={C.accent} />}
+              <Text style={{ color: C.accent, fontWeight: "700", fontSize: 12.5 }}>Vị trí hiện tại</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
 
         <Card C={C} title="Đặt sân & thanh toán">
@@ -260,6 +297,7 @@ const styles = StyleSheet.create({
   hourRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   timeInput: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, width: 68, textAlign: "center" },
   save: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginBottom: 16 },
+  locBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
   courtRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
   addCourt: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderStyle: "dashed", borderRadius: 10, paddingVertical: 10, marginTop: 6 },
   modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
