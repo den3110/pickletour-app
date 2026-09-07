@@ -144,11 +144,12 @@ export default function VenueDetailScreen() {
 
   const submit = async () => {
     if (!sel || !start || !end) return;
+    const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? date : toDateInput();
     try {
       const b: any = await createBooking({
         venueId: id,
         courtId: sel.courtId,
-        date,
+        date: safeDate,
         start,
         end,
         customerName: name,

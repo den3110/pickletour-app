@@ -9,21 +9,20 @@ export const dLabel = (iso: any) =>
   iso ? new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", ...tz }) : "";
 export const dtLabel = (iso: any) => (iso ? `${dLabel(iso)} ${tLabel(iso)}` : "");
 
-/** YYYY-MM-DD theo giờ VN. */
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isDateStr = (s: any) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+
+/** YYYY-MM-DD theo giờ VN (UTC+7) — tính bằng số học, KHÔNG dùng Intl
+ *  (Intl.formatToParts với timeZone không ổn định trên một số bản Hermes). */
 export function toDateInput(d: Date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  const m: Record<string, string> = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return `${m.year}-${m.month}-${m.day}`;
+  const vn = new Date(d.getTime() + 7 * 3600 * 1000);
+  return `${vn.getUTCFullYear()}-${pad2(vn.getUTCMonth() + 1)}-${pad2(vn.getUTCDate())}`;
 }
 export function addDays(dateStr: string, n: number) {
-  const [y, m, d] = dateStr.split("-").map(Number);
+  const base = isDateStr(dateStr) ? dateStr : toDateInput();
+  const [y, m, d] = base.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d) + n * 86400000);
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
 }
 export const WEEKDAYS_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 export function weekdayOf(dateStr: string) {
