@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { normalizeNotifUrl } from "@/utils/notifRoute";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -168,7 +169,9 @@ export default function NotificationsScreen() {
         await markRead(n._id).unwrap();
       } catch {}
     }
-    if (n.url) router.push(n.url as any);
+    const target = normalizeNotifUrl(n.url);
+    if (target) router.push(target as any);
+    else if (n.url) router.push(n.url as any);
   };
 
   const items = data?.items || [];

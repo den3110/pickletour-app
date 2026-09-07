@@ -42,6 +42,7 @@ import { PikoraHost } from "@/components/chatbot/PikoraHost";
 import { PikoraProvider } from "@/components/chatbot/PikoraProvider";
 import { GlassAppearanceProvider } from "@/context/GlassAppearanceContext";
 import { resolvePikoraNavigationTarget } from "@/components/chatbot/pikoraNavigation";
+import { normalizeNotifUrl } from "@/utils/notifRoute";
 import { useExpoPushToken } from "@/hooks/useExpoPushToken";
 import { loadExpoNotifications } from "@/lib/expoNotifications";
 import ForceUpdateModal from "@/components/ForceUpdateModal";
@@ -1548,6 +1549,9 @@ function RootLayout() {
     const data: any = n?.request?.content?.data ?? {};
     const rawUrl = String(data?.url || "").trim();
     if (rawUrl) {
+      // Map URL kiểu web (đặt sân/cụm sân) → route mobile để không bị 404
+      const mapped = normalizeNotifUrl(rawUrl);
+      if (mapped && mapped !== rawUrl) return mapped;
       const resolved = resolvePikoraNavigationTarget(rawUrl);
       if (resolved.internalPath) {
         return resolved.internalPath;

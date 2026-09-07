@@ -1,12 +1,17 @@
-// Đặt định kỳ hàng tuần cho khách quen
+// app/owner/venue/[id]/recurring.tsx — Lịch cố định cho CLB/khách quen (nhiều thứ/tuần, theo tháng, tự set giá)
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useGetVenueQuery } from "@/slices/venuesApiSlice";
-import { useCreateRecurringMutation } from "@/slices/venueOwnerApiSlice";
-import { pal, toDateInput, WEEKDAYS_SHORT } from "@/utils/courtFormat";
+import { useCreateRecurringMutation, useListRecurringQuery, useCancelRecurringMutation } from "@/slices/venueOwnerApiSlice";
+import { pal, fmtVND, toDateInput, addDays, WEEKDAYS_SHORT } from "@/utils/courtFormat";
+import { Card, Chip, SectionHeader, Empty, PrimaryButton, shadow, R, SP } from "@/components/courts/ui";
+
+const tHHMM = (iso: string) => new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
+const dDMY = (iso: string) => new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "Asia/Bangkok" });
 
 export default function RecurringScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,89 +19,213 @@ export default function RecurringScreen() {
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
   const { data: venue } = useGetVenueQuery(id, { skip: !id });
   const [create, { isLoading }] = useCreateRecurringMutation();
+  const [cancel] = useCancelRecurringMutation();
+  const { data: groups, isLoading: loadingGroups } = useListRecurringQuery(id, { skip: !id });
   const courts = venue?.courts || [];
 
   const [courtId, setCourtId] = useState<string | null>(null);
-  const [weekday, setWeekday] = useState(1);
-  const [start, setStart] = useState("18:00");
-  const [end, setEnd] = useState("20:00");
+  const [dow, setDow] = useState<number[]>([1]); // thứ 2 mặc định
+  const [start, setStart] = useState("17:00");
+  const [end, setEnd] = useState("19:00");
   const [dateFrom, setDateFrom] = useState(toDateInput());
-  const [weeks, setWeeks] = useState("4");
+  const [rangeMode, setRangeMode] = useState<"weeks" | "months" | "dateTo">("months");
+  const [rangeVal, setRangeVal] = useState("2"); // 2 tháng
+  const [dateTo, setDateTo] = useState(addDays(toDateInput(), 60));
+  const [priceMode, setPriceMode] = useState<"auto" | "custom">("custom");
+  const [price, setPrice] = useState("");
+  const [markPaid, setMarkPaid] = useState(true);
+  const [payMethod, setPayMethod] = useState<"cash" | "transfer">("cash");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [result, setResult] = useState<any>(null);
 
+  const toggleDow = (d: number) => setDow((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort()));
+
   const submit = async () => {
     if (!courtId) return Alert.alert("Chọn sân");
+    if (!dow.length) return Alert.alert("Chọn thứ", "Chọn ít nhất 1 thứ trong tuần.");
+    if (priceMode === "custom" && !(Number(price) > 0)) return Alert.alert("Nhập giá", "Nhập giá mỗi buổi khi tự set giá.");
+    const body: any = {
+      venueId: id, courtId, daysOfWeek: dow, start, end, dateFrom,
+      priceMode, pricePerSession: Number(price) || 0, markPaid, paymentMethod: payMethod,
+      customerName: name.trim(), customerPhone: phone.trim(),
+    };
+    if (rangeMode === "weeks") body.weeks = Number(rangeVal) || 4;
+    else if (rangeMode === "months") body.months = Number(rangeVal) || 1;
+    else body.dateTo = dateTo;
     try {
-      const r: any = await create({ venueId: id, courtId, weekday, start, end, dateFrom, weeks: Number(weeks) || 4, customerName: name.trim(), customerPhone: phone.trim() }).unwrap();
+      const r: any = await create(body).unwrap();
       setResult(r);
     } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Không tạo được.");
+      Alert.alert("Lỗi", e?.data?.message || "Không tạo được lịch.");
     }
   };
 
+  const doCancel = (g: any) =>
+    Alert.alert("Huỷ lịch cố định", `Huỷ ${g.upcoming} buổi sắp tới của "${g.customerName || "lịch này"}"?`, [
+      { text: "Không" },
+      { text: "Huỷ buổi sắp tới", style: "destructive", onPress: () => cancel({ venueId: id, group: g.group }).unwrap().catch((e: any) => Alert.alert("Lỗi", e?.data?.message || "Thất bại")) },
+    ]);
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ title: "Đặt định kỳ" }} />
-      <ScrollView
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>Sân</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            {courts.map((c: any) => (
-              <TouchableOpacity key={c._id} onPress={() => setCourtId(c._id)} style={[styles.chip, { backgroundColor: courtId === c._id ? C.accent : C.field }]}>
-                <Text style={{ color: courtId === c._id ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{c.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>Thứ trong tuần</Text>
-          <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
-            {WEEKDAYS_SHORT.map((w, i) => (
-              <TouchableOpacity key={i} onPress={() => setWeekday(i)} style={[styles.wd, { backgroundColor: weekday === i ? C.accent : C.field }]}>
-                <Text style={{ color: weekday === i ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{w}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <F C={C} label="Từ giờ" v={start} set={setStart} ph="HH:MM" />
-            <F C={C} label="Đến giờ" v={end} set={setEnd} ph="HH:MM" />
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <F C={C} label="Bắt đầu từ" v={dateFrom} set={setDateFrom} ph="YYYY-MM-DD" />
-            <F C={C} label="Số tuần" v={weeks} set={setWeeks} kb="numeric" />
-          </View>
-          <F C={C} label="Tên khách" v={name} set={setName} ph="Khách quen" full />
-          <F C={C} label="SĐT" v={phone} set={setPhone} kb="phone-pad" full />
-          <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: isLoading ? 0.6 : 1 }]} disabled={isLoading} onPress={submit}>
-            <Text style={{ color: C.onAccent, fontWeight: "800" }}>{isLoading ? "Đang tạo…" : "Tạo lịch định kỳ"}</Text>
-          </TouchableOpacity>
-        </View>
+      <Stack.Screen options={{ title: "Lịch cố định" }} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
+        <ScrollView contentContainerStyle={{ padding: SP.lg, paddingBottom: 48 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+          <Card C={C}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={[styles.icon, { backgroundColor: C.accentSoft }]}><Ionicons name="repeat" size={18} color={C.accent} /></View>
+              <Text style={{ color: C.text, fontWeight: "800", fontSize: 15, flex: 1 }}>Tạo lịch cố định cho CLB / khách quen</Text>
+            </View>
 
-        {result && (
-          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-            <Text style={{ color: "#22c55e", fontWeight: "800", marginBottom: 6 }}>Đã tạo {result.createdCount} lượt</Text>
-            {result.created?.map((c: any) => <Text key={c.id} style={{ color: C.text, fontSize: 13 }}>✓ {c.date.split("-").reverse().join("/")} · #{c.code}</Text>)}
-            {result.skippedCount > 0 && <Text style={{ color: "#f59e0b", marginTop: 8, fontWeight: "700" }}>Bỏ qua {result.skippedCount} tuần:</Text>}
-            {result.skipped?.map((s: any, i: number) => <Text key={i} style={{ color: C.sub, fontSize: 13 }}>• {s.date.split("-").reverse().join("/")} — {s.reason}</Text>)}
-          </View>
-        )}
-      </ScrollView>
+            <Label C={C}>Sân</Label>
+            <View style={styles.wrap}>
+              {courts.map((c: any) => (
+                <TouchableOpacity key={c._id} onPress={() => setCourtId(c._id)} style={[styles.chip, { backgroundColor: courtId === c._id ? C.accent : C.field }]}>
+                  <Text style={{ color: courtId === c._id ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Label C={C}>Các thứ trong tuần</Label>
+            <View style={styles.wrap}>
+              {WEEKDAYS_SHORT.map((w, i) => {
+                const on = dow.includes(i);
+                return (
+                  <TouchableOpacity key={i} onPress={() => toggleDow(i)} style={[styles.wd, { backgroundColor: on ? C.accent : C.field }]}>
+                    <Text style={{ color: on ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{w}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Field C={C} label="Từ giờ" v={start} set={setStart} ph="17:00" />
+              <Field C={C} label="Đến giờ" v={end} set={setEnd} ph="19:00" />
+            </View>
+
+            <Label C={C}>Bắt đầu từ</Label>
+            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateFrom} onChangeText={setDateFrom} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+
+            <Label C={C}>Kéo dài</Label>
+            <View style={styles.seg}>
+              {([["weeks", "Số tuần"], ["months", "Số tháng"], ["dateTo", "Đến ngày"]] as const).map(([k, lbl]) => (
+                <TouchableOpacity key={k} onPress={() => setRangeMode(k)} style={[styles.segItem, { backgroundColor: rangeMode === k ? C.accent : C.field }]}>
+                  <Text style={{ color: rangeMode === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12.5 }}>{lbl}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {rangeMode === "dateTo" ? (
+              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={dateTo} onChangeText={setDateTo} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+            ) : (
+              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={rangeVal} onChangeText={setRangeVal} keyboardType="numeric" placeholder={rangeMode === "weeks" ? "Số tuần (vd 8)" : "Số tháng (vd 2)"} placeholderTextColor={C.muted} />
+            )}
+
+            <Label C={C}>Giá mỗi buổi</Label>
+            <View style={styles.seg}>
+              {([["custom", "Tự set giá"], ["auto", "Theo bảng giá"]] as const).map(([k, lbl]) => (
+                <TouchableOpacity key={k} onPress={() => setPriceMode(k)} style={[styles.segItem, { backgroundColor: priceMode === k ? C.accent : C.field }]}>
+                  <Text style={{ color: priceMode === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12.5 }}>{lbl}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {priceMode === "custom" && (
+              <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá 1 buổi (đ) — vd 300000" placeholderTextColor={C.muted} />
+            )}
+
+            <View style={styles.paidRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontWeight: "700" }}>Đã thu tiền</Text>
+                <Text style={{ color: C.sub, fontSize: 12 }}>Tính vào doanh thu ngay (CLB trả trước)</Text>
+              </View>
+              <Switch value={markPaid} onValueChange={setMarkPaid} trackColor={{ true: C.accent, false: "#94a3b8" }} thumbColor="#fff" />
+            </View>
+            {markPaid && (
+              <View style={[styles.seg, { marginTop: 0 }]}>
+                {([["cash", "Tiền mặt"], ["transfer", "Chuyển khoản"]] as const).map(([k, lbl]) => (
+                  <TouchableOpacity key={k} onPress={() => setPayMethod(k)} style={[styles.segItem, { backgroundColor: payMethod === k ? C.accent : C.field }]}>
+                    <Text style={{ color: payMethod === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12.5 }}>{lbl}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <Field C={C} label="Tên CLB / khách" v={name} set={setName} ph="VD: CLB Pickleball ABC" />
+            <Field C={C} label="Số điện thoại" v={phone} set={setPhone} kb="phone-pad" ph="SĐT liên hệ" />
+
+            <PrimaryButton C={C} icon="calendar" label={isLoading ? "Đang tạo…" : "Tạo lịch cố định"} disabled={isLoading} onPress={submit} style={{ marginTop: 8 }} />
+          </Card>
+
+          {result && (
+            <Card C={C} style={{ marginTop: SP.md, borderColor: C.success, borderWidth: 1 }}>
+              <Text style={{ color: C.success, fontWeight: "800", marginBottom: 6 }}>✓ Đã tạo {result.createdCount} buổi</Text>
+              <View style={{ flexDirection: "row", gap: 16, marginBottom: 6, flexWrap: "wrap" }}>
+                <Text style={{ color: C.sub, fontSize: 13 }}>Tổng giá trị: <Text style={{ color: C.text, fontWeight: "800" }}>{fmtVND(result.grossTotal)}</Text></Text>
+                {result.paidRevenue > 0 && <Text style={{ color: C.sub, fontSize: 13 }}>Đã thu: <Text style={{ color: C.success, fontWeight: "800" }}>{fmtVND(result.paidRevenue)}</Text></Text>}
+              </View>
+              {result.skippedCount > 0 && (
+                <Text style={{ color: C.warning, fontSize: 12.5 }}>Bỏ qua {result.skippedCount} buổi (trùng lịch / khoá / đã qua).</Text>
+              )}
+            </Card>
+          )}
+
+          {/* Danh sách lịch cố định hiện có */}
+          <SectionHeader C={C} title="Lịch cố định đang chạy" />
+          {loadingGroups ? (
+            <ActivityIndicator color={C.accent} />
+          ) : !groups?.length ? (
+            <Card C={C} pad={0}><Empty C={C} icon="repeat-outline" title="Chưa có lịch cố định" subtitle="Tạo lịch cho CLB thuê sân dài hạn ở trên." /></Card>
+          ) : (
+            groups.map((g: any) => (
+              <Card key={g.group} C={C} style={{ marginBottom: SP.md }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ color: C.text, fontWeight: "800" }} numberOfLines={1}>{g.customerName || "Lịch cố định"}</Text>
+                    <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 2 }}>
+                      {g.courtName} · {tHHMM(g.sampleStart)}–{tHHMM(g.sampleEnd)} · {(g.weekdays || []).map((d: number) => WEEKDAYS_SHORT[d]).join(", ")}
+                    </Text>
+                    <Text style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>{dDMY(g.firstStart)} → {dDMY(g.lastStart)}</Text>
+                  </View>
+                  {g.upcoming > 0 && (
+                    <TouchableOpacity onPress={() => doCancel(g)} style={[styles.cancelBtn, { backgroundColor: "rgba(239,68,68,0.12)" }]}>
+                      <Ionicons name="trash-outline" size={14} color={C.danger} /><Text style={{ color: C.danger, fontSize: 12, fontWeight: "700" }}>Huỷ</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                  <Chip C={C} color={C.accent} label={`${g.total} buổi`} small />
+                  {g.upcoming > 0 && <Chip C={C} color={C.info} label={`${g.upcoming} sắp tới`} small />}
+                  {g.cancelled > 0 && <Chip C={C} color={C.muted} label={`${g.cancelled} đã huỷ`} small />}
+                  <Chip C={C} color={C.success} label={`Thu ${fmtVND(g.paidRevenue)}`} small />
+                </View>
+              </Card>
+            ))
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
-function F({ C, label, v, set, ph, kb, full }: any) {
+
+function Label({ C, children }: any) {
+  return <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6, marginTop: 4 }}>{children}</Text>;
+}
+function Field({ C, label, v, set, ph, kb }: any) {
   return (
-    <View style={{ marginBottom: 10, flex: full ? undefined : 1 }}>
-      <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.sub} keyboardType={kb} />
+    <View style={{ marginBottom: 8, flex: 1 }}>
+      <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6, marginTop: 4 }}>{label}</Text>
+      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.muted} keyboardType={kb} />
     </View>
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 16 },
+  icon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
-  wd: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: "center" },
-  btn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 6 },
+  wd: { width: 42, paddingVertical: 9, borderRadius: 10, alignItems: "center" },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 4 },
+  seg: { flexDirection: "row", gap: 8, marginBottom: 10, marginTop: 2 },
+  segItem: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
+  paidRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 10 },
+  cancelBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
 });

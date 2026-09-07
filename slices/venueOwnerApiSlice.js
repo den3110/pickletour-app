@@ -67,10 +67,18 @@ export const venueOwnerApiSlice = apiSlice.injectEndpoints({
         url: `/api/venues/${venueId}/promos/validate?code=${encodeURIComponent(code)}&total=${total}`,
       }),
     }),
-    // Đặt định kỳ
+    // Đặt định kỳ / lịch cố định
+    listRecurring: builder.query({
+      query: (venueId) => ({ url: `/api/venues/${venueId}/recurring` }),
+      providesTags: (r, e, venueId) => [{ type: "Venue", id: `RECUR-${venueId}` }],
+    }),
     createRecurring: builder.mutation({
       query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/recurring`, method: "POST", body }),
-      invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }],
+      invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }, { type: "Venue", id: `RECUR-${arg.venueId}` }],
+    }),
+    cancelRecurring: builder.mutation({
+      query: ({ venueId, group, scope }) => ({ url: `/api/venues/${venueId}/recurring/${group}${scope ? `?scope=${scope}` : ""}`, method: "DELETE" }),
+      invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }, { type: "Venue", id: `RECUR-${arg.venueId}` }],
     }),
     // POS — sản phẩm
     listProducts: builder.query({
@@ -146,7 +154,9 @@ export const {
   useUpdatePromoMutation,
   useDeletePromoMutation,
   useLazyValidatePromoQuery,
+  useListRecurringQuery,
   useCreateRecurringMutation,
+  useCancelRecurringMutation,
   useListProductsQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
