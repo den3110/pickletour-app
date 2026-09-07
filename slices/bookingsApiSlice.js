@@ -84,6 +84,37 @@ export const bookingsApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }],
     }),
+    // Sân mở ghép (open play)
+    listOpenPlay: builder.query({
+      query: ({ province = "" } = {}) => ({
+        url: `/api/bookings/open-play${province ? `?province=${encodeURIComponent(province)}` : ""}`,
+      }),
+      providesTags: [{ type: "Booking", id: "OPENPLAY" }],
+    }),
+    joinOpenPlay: builder.mutation({
+      query: (id) => ({ url: `/api/bookings/${id}/open-play/join`, method: "POST" }),
+      invalidatesTags: (r, e, id) => [
+        { type: "Booking", id: "OPENPLAY" },
+        { type: "Booking", id },
+      ],
+    }),
+    leaveOpenPlay: builder.mutation({
+      query: (id) => ({ url: `/api/bookings/${id}/open-play/leave`, method: "POST" }),
+      invalidatesTags: (r, e, id) => [
+        { type: "Booking", id: "OPENPLAY" },
+        { type: "Booking", id },
+      ],
+    }),
+    // Báo cáo khách bỏ hẹn (chủ sân)
+    getNoShowReport: builder.query({
+      query: ({ venueId, from = "", to = "" }) => {
+        const p = new URLSearchParams();
+        if (from) p.set("from", from);
+        if (to) p.set("to", to);
+        const qs = p.toString();
+        return { url: `/api/venues/${venueId}/no-show-report${qs ? `?${qs}` : ""}` };
+      },
+    }),
   }),
   overrideExisting: false,
 });
@@ -99,4 +130,8 @@ export const {
   useRejectBookingMutation,
   useCheckInBookingMutation,
   useGetVenueRevenueQuery,
+  useListOpenPlayQuery,
+  useJoinOpenPlayMutation,
+  useLeaveOpenPlayMutation,
+  useGetNoShowReportQuery,
 } = bookingsApiSlice;

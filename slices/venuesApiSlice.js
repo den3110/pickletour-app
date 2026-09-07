@@ -30,6 +30,22 @@ export const venuesApiSlice = apiSlice.injectEndpoints({
       query: () => ({ url: `/api/venues/mine` }),
       providesTags: [{ type: "Venue", id: "MINE" }],
     }),
+    // Sân yêu thích
+    listFavoriteVenues: builder.query({
+      query: () => ({ url: `/api/venues/favorites/mine` }),
+      providesTags: [{ type: "Venue", id: "FAVORITES" }],
+    }),
+    toggleFavoriteVenue: builder.mutation({
+      query: (id) => ({ url: `/api/venues/${id}/favorite`, method: "POST" }),
+      invalidatesTags: (r, e, id) => [
+        { type: "Venue", id: "FAVORITES" },
+        { type: "Venue", id },
+      ],
+    }),
+    // Thời tiết sân (ngoài trời)
+    getVenueWeather: builder.query({
+      query: (id) => ({ url: `/api/venues/${id}/weather` }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -39,4 +55,7 @@ export const {
   useGetVenueQuery,
   useGetVenueAvailabilityQuery,
   useListMyVenuesQuery,
+  useListFavoriteVenuesQuery,
+  useToggleFavoriteVenueMutation,
+  useGetVenueWeatherQuery,
 } = venuesApiSlice;

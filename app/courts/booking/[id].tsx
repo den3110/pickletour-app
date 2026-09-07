@@ -317,6 +317,39 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
+        {/* Sân mở ghép: người đã tham gia */}
+        {b?.openPlay?.enabled && (
+          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 2)]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <View style={[styles.secIcon, { backgroundColor: "rgba(34,193,214,0.16)" }]}><Ionicons name="people" size={16} color={C.accent} /></View>
+              <Text style={[styles.section, { color: C.text }]}>Sân mở ghép</Text>
+              <Text style={{ color: C.sub, fontWeight: "700", fontSize: 13, marginLeft: "auto" }}>
+                {(b.openPlay.players || []).filter((p: any) => p.status === "going").length + 1}/{b.openPlay.capacity} người
+              </Text>
+            </View>
+            {b.openPlay.pricePerPerson > 0 && (
+              <Text style={{ color: C.sub, fontSize: 13, marginBottom: 8 }}>Giá mỗi người: <Text style={{ color: C.text, fontWeight: "800" }}>{fmtVND(b.openPlay.pricePerPerson)}</Text></Text>
+            )}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.accentSoft, alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="star" size={14} color={C.accent} />
+              </View>
+              <Text style={{ color: C.text, fontWeight: "700", fontSize: 13.5 }}>{b.user?.nickname || b.user?.name || b.customerName || "Chủ kèo"} <Text style={{ color: C.sub, fontWeight: "600" }}>· chủ kèo</Text></Text>
+            </View>
+            {(b.openPlay.players || []).filter((p: any) => p.status === "going").map((p: any, i: number) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.field, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="person" size={14} color={C.sub} />
+                </View>
+                <Text style={{ color: C.text, fontSize: 13.5 }} numberOfLines={1}>{p.name || "Người chơi"}{p.skillPoint != null ? <Text style={{ color: C.sub }}> · trình {p.skillPoint}</Text> : null}</Text>
+              </View>
+            ))}
+            {(b.openPlay.players || []).filter((p: any) => p.status === "going").length === 0 && (
+              <Text style={{ color: C.sub, fontSize: 13 }}>Chưa có ai ghép. Chia sẻ để rủ thêm người nhé!</Text>
+            )}
+          </View>
+        )}
+
         {b.status === "cancelled" && (
           <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, flexDirection: "row", alignItems: "center", gap: 12 }]}>
             <View style={[styles.secIcon, { backgroundColor: C.field }]}><Ionicons name="close-circle" size={18} color={C.muted} /></View>

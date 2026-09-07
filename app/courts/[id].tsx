@@ -1,5 +1,5 @@
 // app/courts/[id].tsx — Chi tiết cụm sân + chọn giờ trống + đặt sân
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import PtInput from "@/components/ui/PtInput";
 import {
   View,
@@ -20,7 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
-import { useGetVenueQuery, useGetVenueAvailabilityQuery } from "@/slices/venuesApiSlice";
+import { useGetVenueQuery, useGetVenueAvailabilityQuery, useToggleFavoriteVenueMutation, useListFavoriteVenuesQuery, useGetVenueWeatherQuery } from "@/slices/venuesApiSlice";
+import { weatherLabel } from "@/utils/courtFormat";
 import { useCreateBookingMutation } from "@/slices/bookingsApiSlice";
 import { useOpenVenueChatMutation } from "@/slices/messagesApiSlice";
 import { useListPublicEventsQuery } from "@/slices/eventsApiSlice";
@@ -37,15 +38,16 @@ type Slot = { start: string; end: string; price: number; booked: boolean; past: 
 type Sel = { courtId: string; courtName: string; slots: Slot[] } | null;
 
 export default function VenueDetailScreen() {
-  const { id, walkin } = useLocalSearchParams<{ id: string; walkin?: string }>();
+  const { id, walkin, date: dateParam } = useLocalSearchParams<{ id: string; walkin?: string; date?: string }>();
   const asOwner = walkin === "1"; // chủ sân "Đặt hộ" khách vãng lai → đơn xác nhận ngay
   const theme = useTheme();
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
   const me = useSelector((s: any) => s.auth?.userInfo);
 
   const today = toDateInput();
-  const [date, setDate] = useState(today);
-  const [stripBase, setStripBase] = useState(today); // ngày đầu của dải nhanh
+  const initDate = /^\d{4}-\d{2}-\d{2}$/.test(String(dateParam || "")) && String(dateParam) >= today ? String(dateParam) : today;
+  const [date, setDate] = useState(initDate);
+  const [stripBase, setStripBase] = useState(initDate); // ngày đầu của dải nhanh
   const [showPicker, setShowPicker] = useState(false);
   const days = useMemo(() => Array.from({ length: 14 }, (_, i) => addDays(stripBase, i)), [stripBase]);
 
@@ -56,8 +58,33 @@ export default function VenueDetailScreen() {
   );
   const [createBooking, { isLoading: booking }] = useCreateBookingMutation();
 
+  // Sân yêu thích
+  const { data: favVenues } = useListFavoriteVenuesQuery(undefined, { skip: !me });
+  const [toggleFav] = useToggleFavoriteVenueMutation();
+  const [fav, setFav] = useState(false);
+  useEffect(() => {
+    if (Array.isArray(favVenues)) setFav(favVenues.some((v: any) => String(v._id) === String(id)));
+  }, [favVenues, id]);
+  const onToggleFav = useCallback(async () => {
+    if (!me) return router.push("/login" as any);
+    setFav((p) => !p);
+    try {
+      const r: any = await toggleFav(id).unwrap();
+      if (typeof r?.favorited === "boolean") setFav(r.favorited);
+    } catch {
+      setFav((p) => !p);
+    }
+  }, [me, id, toggleFav]);
+
+  // Thời tiết sân (ngoài trời)
+  const { data: weather } = useGetVenueWeatherQuery(id, { skip: !id });
+
   const [sel, setSel] = useState<Sel>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Mở ghép (open play) khi đặt
+  const [opEnabled, setOpEnabled] = useState(false);
+  const [opCap, setOpCap] = useState("4");
+  const [opPrice, setOpPrice] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
@@ -178,6 +205,14 @@ export default function VenueDetailScreen() {
         promoCode: !usePkg && promoInfo?.ok ? promo.trim().toUpperCase() : undefined,
         packagePurchaseId: usePkg?._id,
         asOwner: asOwner || undefined,
+        openPlay:
+          !asOwner && opEnabled
+            ? {
+                enabled: true,
+                capacity: Math.max(2, Number(opCap) || 4),
+                pricePerPerson: Math.max(0, Number(opPrice) || 0),
+              }
+            : undefined,
       }).unwrap();
       setConfirmOpen(false);
       setSel(null);
@@ -212,6 +247,14 @@ export default function VenueDetailScreen() {
             </LinearGradient>
           )}
           <LinearGradient colors={["rgba(2,6,23,0)", "rgba(2,6,23,0.82)"]} style={styles.coverShade} />
+          <TouchableOpacity
+            onPress={onToggleFav}
+            activeOpacity={0.85}
+            hitSlop={8}
+            style={styles.favBtn}
+          >
+            <Ionicons name={fav ? "heart" : "heart-outline"} size={22} color={fav ? "#e11d48" : "#fff"} />
+          </TouchableOpacity>
           <View style={styles.coverBottom}>
             <Text style={styles.coverTitle} numberOfLines={2}>{venue.name}</Text>
             {reviewSum?.summary?.count ? (
@@ -223,6 +266,19 @@ export default function VenueDetailScreen() {
           </View>
         </View>
         <View style={[styles.infoCard, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 2)]}>
+          {weather?.available && weather?.current ? (
+            <View style={[styles.weatherRow, { backgroundColor: C.accentSoft, borderColor: C.border }]}>
+              <Ionicons name={weatherLabel(weather.current.code).icon as any} size={20} color={C.accent} />
+              <Text style={{ color: C.text, fontWeight: "800", fontSize: 14 }}>
+                {Math.round(weather.current.temp)}°C · {weatherLabel(weather.current.code).label}
+              </Text>
+              {Array.isArray(weather.hours) && weather.hours[0]?.rainProb != null ? (
+                <Text style={{ color: C.sub, fontSize: 12, marginLeft: "auto" }}>
+                  Mưa {weather.hours[0].rainProb}%
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <TouchableOpacity
             style={styles.row}
             onPress={() => {
@@ -481,6 +537,31 @@ export default function VenueDetailScreen() {
             )}
             </>
             )}
+            {/* Mở ghép cho người khác vào đánh chung */}
+            {!asOwner && (
+              <View style={{ marginBottom: 10, borderWidth: 1, borderColor: opEnabled ? C.accent : C.border, borderRadius: 12, padding: 10 }}>
+                <TouchableOpacity onPress={() => setOpEnabled((p) => !p)} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name={opEnabled ? "checkmark-circle" : "ellipse-outline"} size={20} color={opEnabled ? C.accent : C.sub} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.text, fontWeight: "800", fontSize: 14 }}>Mở ghép sân này</Text>
+                    <Text style={{ color: C.sub, fontSize: 12 }}>Cho người lạ vào đánh chung, chia tiền theo đầu người.</Text>
+                  </View>
+                </TouchableOpacity>
+                {opEnabled && (
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.sub, fontSize: 12, marginBottom: 4 }}>Số người tối đa</Text>
+                      <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginBottom: 0 }]} keyboardType="number-pad" value={opCap} onChangeText={(t) => setOpCap(t.replace(/[^\d]/g, ""))} placeholder="4" placeholderTextColor={C.sub} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.sub, fontSize: 12, marginBottom: 4 }}>Giá / người (đ)</Text>
+                      <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginBottom: 0 }]} keyboardType="number-pad" value={opPrice} onChangeText={(t) => setOpPrice(t.replace(/[^\d]/g, ""))} placeholder="0" placeholderTextColor={C.sub} />
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Tổng thanh toán */}
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
               <Text style={{ color: C.sub }}>Thanh toán</Text>
@@ -544,6 +625,8 @@ const styles = StyleSheet.create({
   cover: { width: "100%", height: 240 },
   coverShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 150 },
   coverBottom: { position: "absolute", left: SP.lg, right: SP.lg, bottom: 30 },
+  favBtn: { position: "absolute", top: 12, right: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(2,6,23,0.45)", alignItems: "center", justifyContent: "center" },
+  weatherRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
   coverTitle: { color: "#fff", fontWeight: "900", fontSize: 24, letterSpacing: -0.5, lineHeight: 30 },
   ratingPill: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.16)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, marginTop: 8 },
   infoCard: { marginHorizontal: SP.lg, marginTop: -18, borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, padding: SP.lg, gap: 4 },

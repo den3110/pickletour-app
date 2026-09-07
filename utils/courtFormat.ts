@@ -61,3 +61,18 @@ export const pal = (dark: boolean) => ({
   heroGrad: ["#0f172a", "#134e5e"] as [string, string],
   heroGradAlt: ["#0f172a", "#1e3a8a"] as [string, string],
 });
+
+// Nhãn + icon thời tiết theo WMO weather_code (open-meteo). Trả { icon (Ionicons), label }.
+export function weatherLabel(code?: number): { icon: string; label: string } {
+  const c = Number(code);
+  if (c === 0) return { icon: "sunny", label: "Trời quang" };
+  if (c === 1 || c === 2) return { icon: "partly-sunny", label: "Ít mây" };
+  if (c === 3) return { icon: "cloudy", label: "Nhiều mây" };
+  if (c === 45 || c === 48) return { icon: "cloud", label: "Sương mù" };
+  if (c >= 51 && c <= 57) return { icon: "rainy", label: "Mưa phùn" };
+  if (c >= 61 && c <= 67) return { icon: "rainy", label: "Mưa" };
+  if (c >= 71 && c <= 77) return { icon: "snow", label: "Tuyết" };
+  if (c >= 80 && c <= 82) return { icon: "rainy", label: "Mưa rào" };
+  if (c >= 95) return { icon: "thunderstorm", label: "Giông bão" };
+  return { icon: "partly-sunny", label: "—" };
+}

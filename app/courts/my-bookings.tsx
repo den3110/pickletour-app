@@ -1,13 +1,46 @@
 // app/courts/my-bookings.tsx — Lịch đặt sân của tôi
 import React, { useMemo } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Linking } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { useListMyBookingsQuery } from "@/slices/bookingsApiSlice";
-import { fmtVND, pal, dLabel, tLabel, BOOKING_STATUS } from "@/utils/courtFormat";
+import { fmtVND, pal, dLabel, tLabel, toDateInput, addDays, BOOKING_STATUS } from "@/utils/courtFormat";
+
+// Thêm lượt đặt vào Google Calendar (mở app/web lịch, không cần quyền native)
+function addToCalendar(b: any) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const g = (d: string) => {
+    const x = new Date(d);
+    return `${x.getUTCFullYear()}${pad(x.getUTCMonth() + 1)}${pad(x.getUTCDate())}T${pad(x.getUTCHours())}${pad(x.getUTCMinutes())}00Z`;
+  };
+  const title = `Đặt sân ${b.venue?.name || ""}${b.court?.name ? ` - ${b.court.name}` : ""}`.trim();
+  const details = `Mã đặt ${b.code || ""}. Mở app PickleTour để xem chi tiết.`;
+  const loc = [b.venue?.name, b.venue?.address].filter(Boolean).join(", ");
+  const url =
+    `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${g(b.startAt)}/${g(b.endAt)}` +
+    `&details=${encodeURIComponent(details)}` +
+    `&location=${encodeURIComponent(loc)}`;
+  Linking.openURL(url).catch(() => {});
+}
+
+// Đặt lại: mở lại cụm sân, chọn ngày cùng thứ tuần sau
+function rebook(b: any) {
+  const venueId = b.venue?._id || b.venue;
+  if (!venueId) return;
+  let nextDate = "";
+  try {
+    const d = new Date(b.startAt);
+    d.setDate(d.getDate() + 7);
+    nextDate = toDateInput(d);
+    if (nextDate < toDateInput()) nextDate = toDateInput();
+  } catch {}
+  router.push({ pathname: "/courts/[id]", params: { id: String(venueId), ...(nextDate ? { date: nextDate } : {}) } });
+}
 import { Chip, Empty, PrimaryButton, shadow, R, SP } from "@/components/courts/ui";
 
 export default function MyBookingsScreen() {
@@ -58,6 +91,16 @@ export default function MyBookingsScreen() {
                         : "Chưa thanh toán — bấm để gửi bill"}
                     </Text>
                   )}
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity onPress={() => rebook(b)} hitSlop={6} style={[styles.miniBtn, { borderColor: C.border }]}>
+                      <Ionicons name="repeat" size={14} color={C.accent} />
+                      <Text style={{ color: C.text, fontWeight: "700", fontSize: 12 }}>Đặt lại</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => addToCalendar(b)} hitSlop={6} style={[styles.miniBtn, { borderColor: C.border }]}>
+                      <Ionicons name="calendar-outline" size={14} color={C.accent} />
+                      <Text style={{ color: C.text, fontWeight: "700", fontSize: 12 }}>Thêm vào lịch</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={{ justifyContent: "center", paddingRight: 10 }}><Ionicons name="chevron-forward" size={18} color={C.muted} /></View>
               </TouchableOpacity>
@@ -72,4 +115,5 @@ export default function MyBookingsScreen() {
 const styles = StyleSheet.create({
   card: { flexDirection: "row", borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden", marginBottom: SP.md },
   dateBox: { width: 90, alignItems: "center", justifyContent: "center", padding: 10 },
+  miniBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
 });

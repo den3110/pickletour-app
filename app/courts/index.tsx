@@ -92,6 +92,9 @@ export default function CourtsBrowseScreen() {
               <TouchableOpacity onPress={() => setMode(mode === "list" ? "map" : "list")} hitSlop={6} style={[styles.hdrBtn, { backgroundColor: C.accentSoft }]}>
                 <Ionicons name={mode === "list" ? "map-outline" : "list-outline"} size={18} color={C.accent} />
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push("/courts/favorites")} hitSlop={6} style={[styles.hdrBtn, { backgroundColor: C.accentSoft }]}>
+                <Ionicons name="heart-outline" size={18} color={C.accent} />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push("/courts/my-bookings")} hitSlop={6} style={[styles.hdrBtn, { backgroundColor: C.accentSoft }]}>
                 <Ionicons name="ticket-outline" size={18} color={C.accent} />
               </TouchableOpacity>
@@ -107,6 +110,27 @@ export default function CourtsBrowseScreen() {
           <Text style={{ color: near ? C.onAccent : C.sub, fontSize: 12, fontWeight: "800" }}>Gần tôi</Text>
         </TouchableOpacity>
       </View>
+
+      {mode !== "map" && (
+        <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: SP.lg, marginBottom: 4 }}>
+          <TouchableOpacity
+            onPress={() => router.push("/courts/open-play")}
+            activeOpacity={0.85}
+            style={[styles.quickAction, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]}
+          >
+            <Ionicons name="people" size={17} color={C.accent} />
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 13 }}>Sân mở ghép</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/courts/favorites")}
+            activeOpacity={0.85}
+            style={[styles.quickAction, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]}
+          >
+            <Ionicons name="heart" size={17} color="#e11d48" />
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 13 }}>Sân yêu thích</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {mode === "map" ? (
         <View style={{ flex: 1 }}>
@@ -130,6 +154,7 @@ export default function CourtsBrowseScreen() {
 
 const styles = StyleSheet.create({
   hdrBtn: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  quickAction: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 11, borderRadius: 14, borderWidth: 1 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: SP.lg, marginTop: SP.md, paddingHorizontal: 14, height: 48, borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth },
   searchInput: { flex: 1, fontSize: 15 },
   nearBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999 },

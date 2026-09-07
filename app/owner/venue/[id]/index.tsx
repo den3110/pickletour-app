@@ -28,6 +28,7 @@ const MGMT = [
   { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks", tint: "#64748b", perm: "blocks.manage" },
   { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos", tint: "#ec4899", perm: "promos.manage" },
   { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics", tint: "#10b981", perm: "analytics.view" },
+  { key: "no-show", label: "Khách bỏ hẹn", icon: "alert-circle-outline", route: "no-show", tint: "#ef4444", perm: "analytics.view" },
   { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue", tint: "#22c55e", perm: "revenue.view" },
   { key: "staff", label: "Nhân viên", icon: "people-outline", route: "staff", tint: "#6366f1", perm: "staff.manage" },
   { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit", tint: "#94a3b8", perm: "venue.edit" },
