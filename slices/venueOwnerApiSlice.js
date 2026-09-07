@@ -77,7 +77,17 @@ export const venueOwnerApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }, { type: "Venue", id: `RECUR-${arg.venueId}` }],
     }),
     cancelRecurring: builder.mutation({
-      query: ({ venueId, group, scope }) => ({ url: `/api/venues/${venueId}/recurring/${group}${scope ? `?scope=${scope}` : ""}`, method: "DELETE" }),
+      query: ({ venueId, group, scope, hard }) => {
+        const p = new URLSearchParams();
+        if (scope) p.set("scope", scope);
+        if (hard) p.set("hard", "1");
+        const qs = p.toString();
+        return { url: `/api/venues/${venueId}/recurring/${group}${qs ? `?${qs}` : ""}`, method: "DELETE" };
+      },
+      invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }, { type: "Venue", id: `RECUR-${arg.venueId}` }],
+    }),
+    updateRecurring: builder.mutation({
+      query: ({ venueId, group, ...body }) => ({ url: `/api/venues/${venueId}/recurring/${group}`, method: "PATCH", body }),
       invalidatesTags: (r, e, arg) => [{ type: "Booking", id: `VENUE-${arg.venueId}` }, { type: "Venue", id: `RECUR-${arg.venueId}` }],
     }),
     // POS — sản phẩm
@@ -157,6 +167,7 @@ export const {
   useListRecurringQuery,
   useCreateRecurringMutation,
   useCancelRecurringMutation,
+  useUpdateRecurringMutation,
   useListProductsQuery,
   useCreateProductMutation,
   useUpdateProductMutation,

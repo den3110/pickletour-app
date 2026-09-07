@@ -1,14 +1,14 @@
 // app/owner/venue/[id]/recurring.tsx — Lịch cố định cho CLB/khách quen (nhiều thứ/tuần, theo tháng, tự set giá)
 import React, { useMemo, useState } from "react";
-import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { View, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, ActivityIndicator, Modal } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useGetVenueQuery } from "@/slices/venuesApiSlice";
-import { useCreateRecurringMutation, useListRecurringQuery, useCancelRecurringMutation } from "@/slices/venueOwnerApiSlice";
+import { useCreateRecurringMutation, useListRecurringQuery, useCancelRecurringMutation, useUpdateRecurringMutation } from "@/slices/venueOwnerApiSlice";
 import { pal, fmtVND, toDateInput, addDays, WEEKDAYS_SHORT } from "@/utils/courtFormat";
-import { Card, Chip, SectionHeader, Empty, PrimaryButton, shadow, R, SP } from "@/components/courts/ui";
+import { Card, Chip, SectionHeader, Empty, PrimaryButton, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
 const tHHMM = (iso: string) => new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
 const dDMY = (iso: string) => new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "Asia/Bangkok" });
@@ -21,6 +21,7 @@ export default function RecurringScreen() {
   const [create, { isLoading }] = useCreateRecurringMutation();
   const [cancel] = useCancelRecurringMutation();
   const { data: groups, isLoading: loadingGroups } = useListRecurringQuery(id, { skip: !id });
+  const [editGroup, setEditGroup] = useState<any>(null);
   const courts = venue?.courts || [];
 
   const [courtId, setCourtId] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export default function RecurringScreen() {
   const [packageTotal, setPackageTotal] = useState("");
   const [markPaid, setMarkPaid] = useState(true);
   const [payMethod, setPayMethod] = useState<"cash" | "transfer">("cash");
+  const [autoRenew, setAutoRenew] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [result, setResult] = useState<any>(null);
@@ -50,7 +52,7 @@ export default function RecurringScreen() {
     const body: any = {
       venueId: id, courtId, daysOfWeek: dow, start, end, dateFrom,
       priceMode, pricePerSession: Number(price) || 0, totalPackagePrice: Number(packageTotal) || 0,
-      markPaid, paymentMethod: payMethod,
+      markPaid, paymentMethod: payMethod, autoRenew,
       customerName: name.trim(), customerPhone: phone.trim(),
     };
     if (rangeMode === "weeks") body.weeks = Number(rangeVal) || 4;
@@ -64,10 +66,20 @@ export default function RecurringScreen() {
     }
   };
 
+  const runCancel = (g: any, opts: any, okMsg: string) =>
+    cancel({ venueId: id, group: g.group, ...opts }).unwrap()
+      .then(() => Alert.alert("Đã xong", okMsg))
+      .catch((e: any) => Alert.alert("Lỗi", e?.data?.message || "Thất bại"));
+
   const doCancel = (g: any) =>
-    Alert.alert("Huỷ lịch cố định", `Huỷ ${g.upcoming} buổi sắp tới của "${g.customerName || "lịch này"}"?`, [
-      { text: "Không" },
-      { text: "Huỷ buổi sắp tới", style: "destructive", onPress: () => cancel({ venueId: id, group: g.group }).unwrap().catch((e: any) => Alert.alert("Lỗi", e?.data?.message || "Thất bại")) },
+    Alert.alert("Xoá / huỷ lịch cố định", `"${g.customerName || "Lịch này"}" — ${g.upcoming} buổi sắp tới, ${g.total} buổi tổng.`, [
+      { text: "Đóng", style: "cancel" },
+      { text: "Huỷ buổi sắp tới", onPress: () => runCancel(g, {}, "Đã huỷ các buổi sắp tới.") },
+      { text: "Xoá hẳn cả lịch", style: "destructive", onPress: () =>
+        Alert.alert("Xoá hẳn?", "Xoá toàn bộ buổi của lịch này khỏi hệ thống (không khôi phục được). Dùng khi cài nhầm.", [
+          { text: "Không" },
+          { text: "Xoá hẳn", style: "destructive", onPress: () => runCancel(g, { scope: "all", hard: true }, "Đã xoá hẳn cả lịch.") },
+        ]) },
     ]);
 
   return (
@@ -162,6 +174,14 @@ export default function RecurringScreen() {
             <Field C={C} label="Tên CLB / khách" v={name} set={setName} ph="VD: CLB Pickleball ABC" />
             <Field C={C} label="Số điện thoại" v={phone} set={setPhone} kb="phone-pad" ph="SĐT liên hệ" />
 
+            <View style={styles.paidRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontWeight: "700" }}>Tự động gia hạn hàng tháng</Text>
+                <Text style={{ color: C.sub, fontSize: 12 }}>Hệ thống tự tạo tiếp lịch khi sắp hết, đến khi bạn bấm "Kết thúc".</Text>
+              </View>
+              <Switch value={autoRenew} onValueChange={setAutoRenew} trackColor={{ true: C.accent, false: "#94a3b8" }} thumbColor="#fff" />
+            </View>
+
             <PrimaryButton C={C} icon="calendar" label={isLoading ? "Đang tạo…" : "Tạo lịch cố định"} disabled={isLoading} onPress={submit} style={{ marginTop: 8 }} />
           </Card>
 
@@ -195,24 +215,105 @@ export default function RecurringScreen() {
                     </Text>
                     <Text style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>{dDMY(g.firstStart)} → {dDMY(g.lastStart)}</Text>
                   </View>
-                  {g.upcoming > 0 && (
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    {g.upcoming > 0 && (
+                      <TouchableOpacity onPress={() => setEditGroup(g)} style={[styles.cancelBtn, { backgroundColor: C.accentSoft }]}>
+                        <Ionicons name="create-outline" size={14} color={C.accent} /><Text style={{ color: C.accent, fontSize: 12, fontWeight: "700" }}>Sửa</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity onPress={() => doCancel(g)} style={[styles.cancelBtn, { backgroundColor: "rgba(239,68,68,0.12)" }]}>
-                      <Ionicons name="trash-outline" size={14} color={C.danger} /><Text style={{ color: C.danger, fontSize: 12, fontWeight: "700" }}>Huỷ</Text>
+                      <Ionicons name="trash-outline" size={14} color={C.danger} /><Text style={{ color: C.danger, fontSize: 12, fontWeight: "700" }}>Xoá</Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
                 <View style={{ flexDirection: "row", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                   <Chip C={C} color={C.accent} label={`${g.total} buổi`} small />
                   {g.upcoming > 0 && <Chip C={C} color={C.info} label={`${g.upcoming} sắp tới`} small />}
                   {g.cancelled > 0 && <Chip C={C} color={C.muted} label={`${g.cancelled} đã huỷ`} small />}
                   <Chip C={C} color={C.success} label={`Thu ${fmtVND(g.paidRevenue)}`} small />
+                  {g.autoRenew ? <Chip C={C} color={C.gold} label={`🔁 Tự gia hạn ${g.renewEveryMonths || 1} tháng`} small /> : null}
+                  {g.planStatus === "ended" ? <Chip C={C} color={C.muted} label="Đã kết thúc" small /> : null}
                 </View>
               </Card>
             ))
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {editGroup && <EditSeriesModal C={C} venueId={id} g={editGroup} onClose={() => setEditGroup(null)} />}
     </View>
+  );
+}
+
+function EditSeriesModal({ C, venueId, g, onClose }: any) {
+  const [update, { isLoading }] = useUpdateRecurringMutation();
+  const [cancel] = useCancelRecurringMutation();
+  const [name, setName] = useState(g.customerName || "");
+  const [phone, setPhone] = useState(g.customerPhone || "");
+  const [note, setNote] = useState(g.note || "");
+  const [priceMode, setPriceMode] = useState<"keep" | "custom" | "total">("keep");
+  const [price, setPrice] = useState("");
+  const [autoRenew, setAutoRenew] = useState(!!g.autoRenew);
+  const [renewMonths, setRenewMonths] = useState(String(g.renewEveryMonths || 1));
+
+  const save = async () => {
+    const body: any = { venueId, group: g.group, customerName: name.trim(), customerPhone: phone.trim(), note: note.trim(), autoRenew, renewEveryMonths: Number(renewMonths) || 1 };
+    if (priceMode === "custom") { if (!(Number(price) > 0)) return Alert.alert("Nhập giá", "Nhập giá mỗi buổi."); body.priceMode = "custom"; body.pricePerSession = Number(price); }
+    else if (priceMode === "total") { if (!(Number(price) > 0)) return Alert.alert("Nhập giá", "Nhập tổng giá trọn gói."); body.priceMode = "total"; body.totalPackagePrice = Number(price); }
+    try { await update(body).unwrap(); Alert.alert("Đã lưu", "Cập nhật lịch cố định thành công."); onClose(); }
+    catch (e: any) { Alert.alert("Lỗi", e?.data?.message || "Lưu thất bại."); }
+  };
+
+  const endPlan = () =>
+    Alert.alert("Kết thúc lịch cố định?", "Ngừng tự gia hạn. Các buổi đã tạo vẫn giữ nguyên (muốn xoá thì dùng nút Xoá).", [
+      { text: "Không" },
+      { text: "Kết thúc", style: "destructive", onPress: () => update({ venueId, group: g.group, endPlan: true }).unwrap().then(() => { Alert.alert("Đã kết thúc", "Lịch sẽ không tự gia hạn nữa."); onClose(); }).catch((e: any) => Alert.alert("Lỗi", e?.data?.message || "Thất bại")) },
+    ]);
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView style={[styles.modalSheet, { backgroundColor: C.card }]} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+          <SheetHandle C={C} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <Text style={{ color: C.text, fontWeight: "900", fontSize: 17 }}>Sửa lịch cố định</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
+          </View>
+          <Field C={C} label="Tên CLB / khách" v={name} set={setName} />
+          <Field C={C} label="Số điện thoại" v={phone} set={setPhone} kb="phone-pad" />
+          <Field C={C} label="Ghi chú" v={note} set={setNote} />
+
+          <Label C={C}>Đổi giá các buổi sắp tới</Label>
+          <View style={styles.seg}>
+            {([["keep", "Giữ nguyên"], ["total", "Trọn gói"], ["custom", "Theo buổi"]] as const).map(([k, lbl]) => (
+              <TouchableOpacity key={k} onPress={() => setPriceMode(k)} style={[styles.segItem, { backgroundColor: priceMode === k ? C.accent : C.field }]}>
+                <Text style={{ color: priceMode === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{lbl}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {priceMode !== "keep" && (
+            <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder={priceMode === "total" ? "Tổng giá cho các buổi sắp tới (đ)" : "Giá 1 buổi (đ)"} placeholderTextColor={C.muted} />
+          )}
+
+          <View style={styles.paidRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontWeight: "700" }}>Tự động gia hạn</Text>
+              <Text style={{ color: C.sub, fontSize: 12 }}>Tự tạo tiếp lịch khi sắp hết</Text>
+            </View>
+            <Switch value={autoRenew} onValueChange={setAutoRenew} trackColor={{ true: C.accent, false: "#94a3b8" }} thumbColor="#fff" />
+          </View>
+          {autoRenew && (
+            <Field C={C} label="Chu kỳ gia hạn (tháng)" v={renewMonths} set={setRenewMonths} kb="numeric" />
+          )}
+
+          <PrimaryButton C={C} icon="checkmark" label={isLoading ? "Đang lưu…" : "Lưu thay đổi"} disabled={isLoading} onPress={save} style={{ marginTop: 12 }} />
+          <TouchableOpacity onPress={endPlan} style={{ alignSelf: "center", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, padding: 8 }}>
+            <Ionicons name="stop-circle-outline" size={16} color={C.danger} />
+            <Text style={{ color: C.danger, fontWeight: "700" }}>Kết thúc lịch cố định</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -237,4 +338,6 @@ const styles = StyleSheet.create({
   segItem: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
   paidRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 10 },
   cancelBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
+  modalSheet: { padding: SP.lg, borderTopLeftRadius: R.xl, borderTopRightRadius: R.xl, maxHeight: "90%" },
 });
