@@ -26,6 +26,7 @@ import { useCreateInviteMutation } from "@/slices/playApiSlice";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import TicketQrRN from "@/components/courts/TicketQrRN";
+import { BankLogo } from "@/components/courts/BankPicker";
 import { fmtVND, pal, dLabel, tLabel, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
 import { Hero, Chip, shadow, R, SP } from "@/components/courts/ui";
 
@@ -237,7 +238,10 @@ export default function BookingDetailScreen() {
               </View>
               {!!bank.bankAccountNumber && (
                 <TouchableOpacity onPress={() => copy(bank.bankAccountNumber, "Số tài khoản")} style={[styles.bankRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border }]}>
-                  <Text style={{ color: C.sub, fontSize: 12.5 }}>{bank.bankShortName || "STK"}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {bank.bankCode ? <BankLogo code={bank.bankCode} size={22} /> : null}
+                    <Text style={{ color: C.sub, fontSize: 12.5 }}>{bank.bankShortName || "STK"}</Text>
+                  </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{bank.bankAccountNumber}</Text>
                     <Ionicons name="copy-outline" size={15} color={C.accent} />

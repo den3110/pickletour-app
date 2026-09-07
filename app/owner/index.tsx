@@ -20,7 +20,8 @@ export default function OwnerHomeScreen() {
   const owner = isOwnerRole(me);
 
   const { data: req } = useGetMyOwnerRequestQuery(undefined, { skip: !me || owner });
-  const { data, isLoading, isFetching, refetch } = useMyVenuesOverviewQuery(undefined, { skip: !owner });
+  const { data, isLoading, isFetching, refetch } = useMyVenuesOverviewQuery(undefined, { skip: !me });
+  const hasVenues = (data?.venues || []).length > 0;
 
   if (!me) {
     return (
@@ -31,7 +32,7 @@ export default function OwnerHomeScreen() {
     );
   }
 
-  if (!owner) {
+  if (!owner && !hasVenues) {
     const pending = req?.request?.status === "pending";
     const rejected = req?.request?.status === "rejected";
     return (
@@ -101,10 +102,12 @@ export default function OwnerHomeScreen() {
             <Text style={{ color: "rgba(255,255,255,0.72)", fontSize: 13, marginTop: 2 }}>Đã thu từ {totals.todayCount} lượt đặt</Text>
             <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
               <PrimaryButton C={C} icon="qr-code" label="Quét vé QR" style={{ flex: 1, paddingVertical: 12 }} onPress={() => router.push("/owner/scan")} />
-              <TouchableOpacity activeOpacity={0.85} style={styles.heroGhost} onPress={() => router.push("/owner/venue/new")}>
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "800" }}>Tạo cụm sân</Text>
-              </TouchableOpacity>
+              {owner && (
+                <TouchableOpacity activeOpacity={0.85} style={styles.heroGhost} onPress={() => router.push("/owner/venue/new")}>
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={{ color: "#fff", fontWeight: "800" }}>Tạo cụm sân</Text>
+                </TouchableOpacity>
+              )}
             </View>
             {totals.awaiting > 0 && (
               <View style={styles.pendingPill}>

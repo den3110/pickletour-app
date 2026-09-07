@@ -13,19 +13,22 @@ import {
   useCheckInBookingMutation,
   useUpdateBookingStatusMutation,
 } from "@/slices/bookingsApiSlice";
+import { useGetMyVenueAccessQuery } from "@/slices/venueStaffApiSlice";
 import { fmtVND, pal, tLabel, toDateInput, addDays, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
 import { Hero, Tile, SectionHeader, DateStrip, Card, Chip, Empty, PrimaryButton, GhostButton, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
+// perm = quyền cần để thấy tile (null = luôn hiện cho ai vào được hub)
 const MGMT = [
-  { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin", tint: "#22c1d6" },
-  { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products", tint: "#f59e0b" },
-  { key: "packages", label: "Gói / thẻ", icon: "card-outline", route: "packages", tint: "#8b5cf6" },
-  { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring", tint: "#0ea5e9" },
-  { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks", tint: "#64748b" },
-  { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos", tint: "#ec4899" },
-  { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics", tint: "#10b981" },
-  { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue", tint: "#22c55e" },
-  { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit", tint: "#94a3b8" },
+  { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin", tint: "#22c1d6", perm: "bookings.manage" },
+  { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products", tint: "#f59e0b", perm: "pos.sell" },
+  { key: "packages", label: "Gói / thẻ", icon: "card-outline", route: "packages", tint: "#8b5cf6", perm: "packages.manage" },
+  { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring", tint: "#0ea5e9", perm: "recurring.manage" },
+  { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks", tint: "#64748b", perm: "blocks.manage" },
+  { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos", tint: "#ec4899", perm: "promos.manage" },
+  { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics", tint: "#10b981", perm: "analytics.view" },
+  { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue", tint: "#22c55e", perm: "revenue.view" },
+  { key: "staff", label: "Nhân viên", icon: "people-outline", route: "staff", tint: "#6366f1", perm: "staff.manage" },
+  { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit", tint: "#94a3b8", perm: "venue.edit" },
 ];
 // "Đặt hộ" tái dùng màn đặt công khai (owner → tự confirmed)
 const openTile = (m: any, id: string) =>
@@ -41,7 +44,13 @@ export default function OwnerVenueHub() {
   const [bill, setBill] = useState<any>(null);
 
   const { data: venue } = useGetVenueQuery(id, { skip: !id });
-  const { data, isLoading, isFetching, refetch } = useListVenueBookingsQuery({ venueId: id, date });
+  const { data: access } = useGetMyVenueAccessQuery(id, { skip: !id });
+  const canManage = !!access?.canManage;
+  const myPerms: string[] = access?.permissions || [];
+  const can = (p?: string) => canManage || !p || myPerms.includes(p);
+  const tiles = useMemo(() => MGMT.filter((m) => can(m.perm)), [access]); // eslint-disable-line
+  const canViewBookings = can("bookings.view");
+  const { data, isLoading, isFetching, refetch } = useListVenueBookingsQuery({ venueId: id, date }, { skip: !id || !canViewBookings });
   const [approve, { isLoading: approving }] = useApproveBookingMutation();
   const [reject, { isLoading: rejecting }] = useRejectBookingMutation();
   const [checkIn] = useCheckInBookingMutation();
@@ -100,14 +109,20 @@ export default function OwnerVenueHub() {
         </Hero>
 
         {/* Menu */}
-        <SectionHeader C={C} title="Quản lý" />
-        <View style={styles.grid}>
-          {MGMT.map((m) => (
-            <Tile key={m.key} C={C} icon={m.icon} label={m.label} tint={m.tint} onPress={() => openTile(m, id)} />
-          ))}
-        </View>
+        {tiles.length > 0 && (
+          <>
+            <SectionHeader C={C} title="Quản lý" right={access?.roleLabel && !canManage ? <Chip C={C} color={C.accent} label={access.roleLabel} small /> : null} />
+            <View style={styles.grid}>
+              {tiles.map((m) => (
+                <Tile key={m.key} C={C} icon={m.icon} label={m.label} tint={m.tint} onPress={() => openTile(m, id)} />
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Lịch đặt */}
+        {canViewBookings && (
+        <>
         <SectionHeader
           C={C}
           title="Lịch đặt"
@@ -167,6 +182,8 @@ export default function OwnerVenueHub() {
             })
           )}
         </View>
+        </>
+        )}
       </ScrollView>
 
       {/* Modal duyệt bill */}

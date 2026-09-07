@@ -347,6 +347,8 @@ export const apiSlice = createApi({
     "Reviews",
     "Subscriptions",
     "Venue",
+    "VenueStaff",
+    "VenueAccess",
     "Booking",
     "CourtOwnerRequest",
     "MyPackages",

@@ -11,6 +11,7 @@ import { useUpdateVenueMutation, useAddCourtMutation, useUpdateCourtMutation, us
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import { fmtVND, pal, WEEKDAYS_SHORT } from "@/utils/courtFormat";
+import BankPicker from "@/components/courts/BankPicker";
 
 export default function VenueEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function VenueEditScreen() {
         slotMinutes: String(venue.slotMinutes || 60),
         defaultPricePerHour: String(venue.defaultPricePerHour || 0),
         bankShortName: venue.bankShortName || "",
+        bankCode: venue.bankCode || "",
         bankAccountNumber: venue.bankAccountNumber || "",
         bankAccountName: venue.bankAccountName || "",
         cancelHours: String(venue.cancelPolicy?.hoursBefore || 0),
@@ -70,6 +72,7 @@ export default function VenueEditScreen() {
         slotMinutes: Number(form.slotMinutes) || 60,
         defaultPricePerHour: Number(form.defaultPricePerHour) || 0,
         bankShortName: form.bankShortName.trim(),
+        bankCode: form.bankCode || "",
         bankAccountNumber: form.bankAccountNumber.trim(),
         bankAccountName: form.bankAccountName.trim(),
         cancelPolicy: { hoursBefore: Number(form.cancelHours) || 0 },
@@ -117,7 +120,7 @@ export default function VenueEditScreen() {
             <Field C={C} label="Bước đặt (phút)" v={form.slotMinutes} set={(t: string) => set("slotMinutes", t)} kb="numeric" flex />
             <Field C={C} label="Giá mặc định/giờ" v={form.defaultPricePerHour} set={(t: string) => set("defaultPricePerHour", t)} kb="numeric" flex />
           </View>
-          <Field C={C} label="Ngân hàng (mã, vd MB, VCB)" v={form.bankShortName} set={(t: string) => set("bankShortName", t)} />
+          <BankPicker C={C} code={form.bankCode} onSelect={(b) => { set("bankCode", b.code); set("bankShortName", b.name); }} />
           <Field C={C} label="Số tài khoản" v={form.bankAccountNumber} set={(t: string) => set("bankAccountNumber", t)} kb="numeric" />
           <Field C={C} label="Tên chủ tài khoản" v={form.bankAccountName} set={(t: string) => set("bankAccountName", t)} />
           <Field C={C} label="Cho tự huỷ trước (giờ) — 0 = luôn cho huỷ" v={form.cancelHours} set={(t: string) => set("cancelHours", t)} kb="numeric" />

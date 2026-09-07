@@ -5,18 +5,24 @@ import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import {
   useListProductsQuery, useCreateProductMutation, useUpdateProductMutation, useDeleteProductMutation,
   useCreateSaleMutation, useListSalesQuery,
 } from "@/slices/venueOwnerApiSlice";
+import { useGetVenueQuery } from "@/slices/venuesApiSlice";
 import { fmtVND, pal, toDateInput } from "@/utils/courtFormat";
+import { saleReceiptHtml, salesReportHtml } from "@/utils/receiptHtml";
 
 export default function ProductsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
+  const { data: venue } = useGetVenueQuery(id, { skip: !id });
   const { data: products, isLoading } = useListProductsQuery(id, { skip: !id });
-  const { data: sales } = useListSalesQuery({ venueId: id, date: toDateInput() }, { skip: !id });
+  const today = toDateInput();
+  const { data: sales } = useListSalesQuery({ venueId: id, date: today }, { skip: !id });
   const [createProduct, { isLoading: creating }] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
   const [deleteProduct] = useDeleteProductMutation();
@@ -32,11 +38,29 @@ export default function ProductsScreen() {
   const add = (pid: string) => setCart((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
   const sub = (pid: string) => setCart((c) => { const n = (c[pid] || 0) - 1; const cc = { ...c }; if (n <= 0) delete cc[pid]; else cc[pid] = n; return cc; });
 
+  const venueInfo = { name: venue?.name, address: venue?.address, province: venue?.province, phone: venue?.phone };
+
+  const printReceipt = async (sale: any) => {
+    try { await Print.printAsync({ html: saleReceiptHtml(venueInfo, sale) }); }
+    catch (e: any) { if (!/cancel/i.test(String(e?.message))) Alert.alert("Lỗi in", e?.message || "Không in được."); }
+  };
+  const sharePdf = async (html: string, name: string) => {
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: name, UTI: "com.adobe.pdf" });
+      else Alert.alert("Đã tạo PDF", uri);
+    } catch (e: any) { Alert.alert("Lỗi PDF", e?.message || "Không tạo được PDF."); }
+  };
+
   const checkout = async (method: "cash" | "transfer") => {
     try {
-      await createSale({ venueId: id, items: cartItems.map((p: any) => ({ productId: p._id, qty: cart[p._id] })), paymentMethod: method }).unwrap();
+      const sale: any = await createSale({ venueId: id, items: cartItems.map((p: any) => ({ productId: p._id, qty: cart[p._id] })), paymentMethod: method }).unwrap();
       setCart({});
-      Alert.alert("Đã bán", `Thu ${fmtVND(cartTotal)} (${method === "cash" ? "tiền mặt" : "chuyển khoản"})`);
+      Alert.alert("Đã bán", `Thu ${fmtVND(sale?.total ?? cartTotal)} (${method === "cash" ? "tiền mặt" : "chuyển khoản"})`, [
+        { text: "In hoá đơn", onPress: () => printReceipt(sale) },
+        { text: "Lưu PDF", onPress: () => sharePdf(saleReceiptHtml(venueInfo, sale), `HoaDon-${sale?.code || ""}`) },
+        { text: "Xong", style: "cancel" },
+      ]);
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || "Bán hàng thất bại");
     }
@@ -48,7 +72,17 @@ export default function ProductsScreen() {
         <TouchableOpacity onPress={() => setEditing({ new: true })} hitSlop={8}><Ionicons name="add-circle" size={24} color={C.accent} /></TouchableOpacity>
       ) }} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: cartItems.length ? 130 : 40 }}>
-        {sales ? <Text style={{ color: C.sub, marginBottom: 10 }}>Hôm nay: {sales.count} đơn · thu {fmtVND(sales.total)}</Text> : null}
+        {sales ? (
+          <View style={[styles.todayBar, { backgroundColor: C.card, borderColor: C.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.sub, fontSize: 12 }}>Hôm nay</Text>
+              <Text style={{ color: C.text, fontWeight: "800" }}>{sales.count} đơn · <Text style={{ color: C.success }}>{fmtVND(sales.total)}</Text></Text>
+            </View>
+            <TouchableOpacity onPress={() => sharePdf(salesReportHtml(venueInfo, today, sales.items || [], sales.total || 0), `BaoCao-${today}`)} style={[styles.reportBtn, { backgroundColor: C.accentSoft }]}>
+              <Ionicons name="document-text-outline" size={15} color={C.accent} /><Text style={{ color: C.accent, fontWeight: "700", fontSize: 12.5 }}>Báo cáo PDF</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {isLoading ? <ActivityIndicator color={C.accent} /> : list.length === 0 ? (
           <Text style={{ color: C.sub, textAlign: "center", marginTop: 20 }}>Chưa có sản phẩm. Bấm + để thêm.</Text>
         ) : list.map((p: any) => {
@@ -78,6 +112,25 @@ export default function ProductsScreen() {
             </View>
           );
         })}
+
+        {/* Lịch sử bán hôm nay */}
+        {sales?.items?.length ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={{ color: C.sub, fontWeight: "800", fontSize: 12, letterSpacing: 0.6, marginBottom: 8 }}>ĐƠN HÔM NAY</Text>
+            {sales.items.map((s: any) => (
+              <View key={s._id} style={[styles.saleRow, { backgroundColor: C.card, borderColor: C.border }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: C.text, fontWeight: "700" }} numberOfLines={1}>{s.code} · {fmtVND(s.total)}</Text>
+                  <Text style={{ color: C.sub, fontSize: 12 }} numberOfLines={1}>
+                    {(s.items || []).reduce((a: number, b: any) => a + b.qty, 0)} món · {s.paymentMethod === "transfer" ? "CK" : "Tiền mặt"} · {new Date(s.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => printReceipt(s)} style={[styles.miniBtn, { backgroundColor: C.accentSoft }]}><Ionicons name="print-outline" size={16} color={C.accent} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => sharePdf(saleReceiptHtml(venueInfo, s), `HoaDon-${s.code}`)} style={[styles.miniBtn, { backgroundColor: C.field }]}><Ionicons name="share-outline" size={16} color={C.sub} /></TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Giỏ bán */}
@@ -154,6 +207,10 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
 }
 
 const styles = StyleSheet.create({
+  todayBar: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12, marginBottom: 12 },
+  reportBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  saleRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, marginBottom: 8 },
+  miniBtn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
   addBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   qtyBox: { flexDirection: "row", alignItems: "center", gap: 4 },
