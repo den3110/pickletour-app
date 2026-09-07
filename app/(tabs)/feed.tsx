@@ -1276,6 +1276,45 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
   );
 }
 
+// Card sự kiện xé vé / social được chia sẻ (rủ mọi người tham gia)
+function SharedEventCardRN({ se }: { se: any }) {
+  const start = se.startAt ? new Date(se.startAt) : null;
+  const when = start
+    ? start.toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })
+    : "";
+  const ended = se.endAt ? new Date(se.endAt).getTime() < Date.now() : false;
+  const left = Math.max(0, (se.capacity || 0) - (se.registered || 0));
+  const price = se.price > 0 ? `${Number(se.price).toLocaleString("vi-VN")}đ` : "Miễn phí";
+  const skill = se.skillMin || se.skillMax ? `Trình ${se.skillMin || 0}${se.skillMax ? `–${se.skillMax}` : "+"}` : "Mọi trình";
+  const gender: any = { male: "Chỉ nam", female: "Chỉ nữ", balanced: "Cân bằng nam/nữ" };
+  return (
+    <Pressable
+      onPress={() => se.eventId && router.push(`/events/${se.eventId}` as any)}
+      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" }}
+    >
+      {!!se.coverImage && <Image source={{ uri: se.coverImage }} style={{ width: "100%", height: 140 }} resizeMode="cover" />}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#e11d48" }}>
+        <Text>🎟️</Text>
+        <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>Sự kiện xé vé · Đánh social</Text>
+        <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{ended ? "Đã diễn ra" : left > 0 ? `Còn ${left} suất` : "Hết suất"}</Text>
+        </View>
+      </View>
+      <View style={{ padding: 12 }}>
+        <Text style={{ fontWeight: "800", fontSize: 15, color: "#0F172A" }}>{se.title || "Sự kiện"}</Text>
+        {!!when && <Text style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>🕒 {when}</Text>}
+        <Text style={{ fontSize: 13, color: "#64748B" }} numberOfLines={1}>📍 {[se.venueName, se.address].filter(Boolean).join(" · ") || "—"}{se.courts ? ` · ${se.courts}` : ""}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
+          <Text style={{ fontSize: 12.5, color: "#64748B", flex: 1 }} numberOfLines={1}>{skill}{gender[se.genderPolicy] ? ` · ${gender[se.genderPolicy]}` : ""} · {se.registered || 0}/{se.capacity || 0} suất · {price}</Text>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: !ended && left > 0 ? "#e11d48" : "#E2E8F0" }}>
+            <Text style={{ color: !ended && left > 0 ? "#fff" : "#94A3B8", fontWeight: "700", fontSize: 12.5 }}>{!ended && left > 0 ? "Tham gia" : "Xem"}</Text>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function PostCard({ post, me }: { post: any; me: any }) {
   const [react] = useReactFeedPostMutation();
   const [sharePostMut] = useShareFeedPostMutation();
@@ -1468,9 +1507,9 @@ function PostCard({ post, me }: { post: any; me: any }) {
               placeholderTextColor="#94A3B8"
               style={{ borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 12, padding: 12, fontSize: 15, minHeight: 100, textAlignVertical: "top" }}
             />
-            {(post.sharedListing || post.sharedPlay || post.sharedMatch) && (
+            {(post.sharedListing || post.sharedPlay || post.sharedMatch || post.sharedEvent) && (
               <Text style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 6 }}>
-                * Phần đính kèm (sản phẩm/kèo/trận) được giữ nguyên.
+                * Phần đính kèm (sản phẩm/kèo/trận/sự kiện) được giữ nguyên.
               </Text>
             )}
             <TouchableOpacity
@@ -1513,6 +1552,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
       {post.sharedMatch && <SharedMatchCardRN sm={post.sharedMatch} />}
       {post.sharedListing && <SharedListingCardRN sl={post.sharedListing} />}
       {post.sharedPlay && <SharedPlayCardRN sp={post.sharedPlay} />}
+      {post.sharedEvent && <SharedEventCardRN se={post.sharedEvent} />}
       {poll && <PollBlockRN poll={poll} onVote={doVote} />}
       {post.media?.length > 0 && (
         <PostMedia

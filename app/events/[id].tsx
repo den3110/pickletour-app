@@ -9,6 +9,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { useGetEventQuery, useRegisterEventMutation, useSubmitEventProofMutation, useCancelMyEventRegMutation } from "@/slices/eventsApiSlice";
+import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import TicketQrRN from "@/components/courts/TicketQrRN";
@@ -28,7 +29,23 @@ export default function EventDetailScreen() {
   const [upload, { isLoading: uploading }] = useUploadImageToFolderMutation();
   const [submitProof, { isLoading: submitting }] = useSubmitEventProofMutation();
   const [cancelReg] = useCancelMyEventRegMutation();
+  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
   const [localPreview, setLocalPreview] = useState("");
+
+  // Bất kỳ ai cũng chia sẻ được sự kiện lên Bảng tin để rủ người tham gia
+  const shareToFeed = async () => {
+    if (!me) return Alert.alert("Cần đăng nhập", "Đăng nhập để chia sẻ lên bảng tin.", [{ text: "Để sau" }, { text: "Đăng nhập", onPress: () => router.push("/login") }]);
+    if (!ev) return;
+    try {
+      await createFeedPost({
+        content: `🎟️ Rủ anh em đánh social: ${ev.title}${ev.venue?.name ? ` tại ${ev.venue.name}` : ""}. Vào đăng ký nhé!`,
+        sharedEvent: { eventId: ev._id },
+      }).unwrap();
+      Alert.alert("Đã chia sẻ", "Sự kiện đã được đăng lên bảng tin.", [{ text: "Xem bảng tin", onPress: () => router.push("/feed" as any) }, { text: "OK" }]);
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại.");
+    }
+  };
 
   if (isLoading || !ev) {
     return <View style={{ flex: 1, backgroundColor: C.bg }}><Stack.Screen options={{ title: "Sự kiện" }} /><ActivityIndicator color={C.accent} style={{ marginTop: 40 }} /></View>;
@@ -77,6 +94,20 @@ export default function EventDetailScreen() {
             <Chip C={C} color="#fde68a" label={ev.price > 0 ? fmtVND(ev.price) : "Miễn phí"} small />
           </View>
         </Hero>
+
+        {/* Chia sẻ lên bảng tin — ai cũng rủ được */}
+        {!cancelled && (
+          <TouchableOpacity activeOpacity={0.85} disabled={sharing} onPress={shareToFeed} style={[styles.shareBtn, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]}>
+            <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: "rgba(225,29,72,0.14)", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="share-social" size={15} color="#e11d48" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontWeight: "800" }}>Chia sẻ lên bảng tin</Text>
+              <Text style={{ color: C.sub, fontSize: 12 }}>Rủ mọi người cùng tham gia sự kiện này</Text>
+            </View>
+            {sharing ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="chevron-forward" size={16} color={C.muted} />}
+          </TouchableOpacity>
+        )}
 
         {/* Yêu cầu tham gia */}
         <Card C={C} style={{ marginTop: SP.md }}>
@@ -153,6 +184,7 @@ function Row({ C, icon, label, value, onPress }: any) {
 }
 const styles = StyleSheet.create({
   qrFrame: { padding: 10, borderRadius: R.md, backgroundColor: "#fff" },
+  shareBtn: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: SP.md, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth },
   bankBox: { borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth, marginTop: 10, overflow: "hidden" },
   bankRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10 },
   proof: { width: "100%", height: 200, borderRadius: R.sm, marginTop: 8, backgroundColor: "#000" },
