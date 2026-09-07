@@ -169,6 +169,14 @@ export const userApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
     // ... login, register đang có
+    // Tra kênh khả dụng để đặt lại mật khẩu (email / zalo) theo identifier
+    resolveResetOptions: builder.mutation({
+      query: (body) => ({
+        url: `${USERS_URL}/forgot-password/options`,
+        method: "POST",
+        body,
+      }),
+    }),
     forgotPassword: builder.mutation({
       query: (body) => ({
         url: `${USERS_URL}/forgot-password`,
@@ -308,6 +316,7 @@ export const {
   useLazySearchUserQuery,
   useSearchUserQuery,
   useDeleteMeMutation,
+  useResolveResetOptionsMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useVerifyResetOtpMutation,

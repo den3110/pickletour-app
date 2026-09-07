@@ -130,11 +130,18 @@ export default function ResetPasswordOtpScreen() {
   const masked = String(getParam("masked", ""));
   const channel = String(getParam("channel", ""));
   const initialPhone = String(getParam("phone", "")).trim();
+  const identifier = String(getParam("identifier", "")).trim();
+  const useIdentifier = !!identifier;
   const isZalo = channel === "zalo";
-  // Tham số định danh dùng chung cho verify/resend/reset (email hoặc Zalo/SĐT)
-  const authArgs = isZalo
-    ? { channel: "zalo", phone: initialPhone }
-    : { email: initialEmail, platform: "app" };
+  // Tham số định danh dùng chung cho verify/reset. Ưu tiên identifier (app mới):
+  // BE tự resolve user theo identifier + OTP, không cần biết email/SĐT thật.
+  const authArgs = useIdentifier
+    ? { identifier }
+    : isZalo
+      ? { channel: "zalo", phone: initialPhone }
+      : { email: initialEmail, platform: "app" };
+  // Gửi lại OTP: nhánh identifier cần kèm channel để BE biết gửi qua email hay zalo.
+  const resendArgs = useIdentifier ? { identifier, channel } : authArgs;
   const initialTTL = Number(getParam("expiresIn", 600)) || 600;
 
   const [forgotPassword, { isLoading: isResending }] =
@@ -229,7 +236,7 @@ export default function ResetPasswordOtpScreen() {
 
   const handleResend = useCallback(async () => {
     if (
-      !initialEmail ||
+      (!useIdentifier && !initialEmail && !initialPhone) ||
       resendCooldown > 0 ||
       isResending ||
       resendBusyRef.current
@@ -238,7 +245,7 @@ export default function ResetPasswordOtpScreen() {
     try {
       setResendBusySafe(true);
       const res = await forgotPassword({
-        ...authArgs,
+        ...resendArgs,
       }).unwrap();
 
       const ttl = typeof res?.expiresIn === "number" ? res.expiresIn : 600;
@@ -248,7 +255,9 @@ export default function ResetPasswordOtpScreen() {
       setOtp("");
       RNAlert.alert(
         "Đã gửi lại OTP",
-        `Kiểm tra email ${masked || initialEmail}.`
+        channel === "zalo"
+          ? `Kiểm tra Zalo ${masked || initialPhone}.`
+          : `Kiểm tra email ${masked || initialEmail}.`
       );
       // replay anim sau khi gửi lại
       requestAnimationFrame(() => {
