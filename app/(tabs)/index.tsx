@@ -38,6 +38,7 @@ import ImageViewing from "react-native-image-viewing";
 import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
 import EventLiveBanner from "@/components/home/EventLiveBanner";
+import CourtBookingBanner from "@/components/home/CourtBookingBanner";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
@@ -82,6 +83,16 @@ const FALLBACK = {
 
 /* ---------- Features Data ---------- */
 const FEATURES = [
+  {
+    id: 21,
+    icon: "tennisball",
+    iconLib: "Ionicons",
+    title: t("Đặt sân"),
+    color: "#22c1d6",
+    link: "/courts",
+    isNew: true,
+    isHot: true, // ô nổi bật (nền gradient) — tính năng mới ra mắt
+  },
   {
     id: 1,
     icon: "calendar",
@@ -708,11 +719,21 @@ function AthleteIsland() {
   );
 }
 
-/* ---------- Feature Item (Interactive) ---------- */
+/* ---------- Feature Item (luxury tile) ---------- */
+// Làm tối/sáng mã màu hex (amt âm = tối hơn)
+function shadeHex(hex, amt) {
+  const h = String(hex || "#22c1d6").replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  const ch = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
+  const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
 function FeatureItem({ item, theme }) {
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const scaleVal = useRef(new Animated.Value(1)).current;
+  const hot = !!item.isHot;
 
   const handlePress = () => {
     if (!item.link) return;
@@ -726,80 +747,18 @@ function FeatureItem({ item, theme }) {
   };
 
   const onPressIn = () =>
-    Animated.spring(scaleVal, { toValue: 0.9, useNativeDriver: true }).start();
+    Animated.spring(scaleVal, { toValue: 0.92, useNativeDriver: true }).start();
   const onPressOut = () =>
     Animated.spring(scaleVal, {
       toValue: 1,
-      friction: 3,
-      tension: 40,
+      friction: 4,
+      tension: 60,
       useNativeDriver: true,
     }).start();
 
-  const renderIcon = () => {
-    const iconProps = { name: item.icon, size: 26, color: item.color };
-    const Lib =
-      { Ionicons, MaterialIcons, FontAwesome, FontAwesome5 }[item.iconLib] ||
-      Ionicons;
-    return <Lib {...iconProps} />;
-  };
-
-  const NewBadge = () =>
-    item.isNew ? (
-      <View style={styles.newBadge} pointerEvents="none">
-        <Text style={styles.newBadgeText}>Mới</Text>
-      </View>
-    ) : null;
-
-  if (IOS_26_LIQUID_GLASS_ENABLED) {
-    return (
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handlePress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={{ width: "22%", marginBottom: 16 }}
-      >
-        <Animated.View
-          style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
-        >
-          <View style={styles.featureIconWrap}>
-            <AppleLiquidGlassView
-              fallback="view"
-              glassEffectStyle="regular"
-              glassTintColor={
-                isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.22)"
-              }
-              isInteractive
-              style={[
-                styles.featureIconContainer,
-                {
-                  backgroundColor: isDark ? "#1F2229" : "#FFF",
-                  shadowColor: item.color,
-                },
-                styles.featureIconContainerCalm,
-              ]}
-            >
-              <View
-                style={[
-                  styles.featureIconBg,
-                  { backgroundColor: item.color + "15" },
-                ]}
-              >
-                {renderIcon()}
-              </View>
-            </AppleLiquidGlassView>
-            <NewBadge />
-          </View>
-          <Text
-            style={[styles.featureTitle, { color: text }]}
-            numberOfLines={2}
-          >
-            {item.title}
-          </Text>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  }
+  const Lib =
+    { Ionicons, MaterialIcons, FontAwesome, FontAwesome5 }[item.iconLib] ||
+    Ionicons;
 
   return (
     <TouchableOpacity
@@ -807,74 +766,113 @@ function FeatureItem({ item, theme }) {
       onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={{ width: "22%", marginBottom: 16 }}
+      style={styles.featureCol}
     >
       <Animated.View
-        style={{ alignItems: "center", transform: [{ scale: scaleVal }] }}
+        style={[
+          styles.featureTile,
+          {
+            backgroundColor: isDark ? "#151a26" : "#ffffff",
+            borderColor: hot
+              ? item.color
+              : isDark
+              ? "rgba(255,255,255,0.07)"
+              : "rgba(15,23,42,0.06)",
+            shadowColor: item.color,
+            transform: [{ scale: scaleVal }],
+          },
+          hot && styles.featureTileHot,
+        ]}
       >
-        <View style={styles.featureIconWrap}>
-          <AppleLiquidGlassView
-            fallback="view"
-            intensity={isDark ? 68 : 55}
-            tint={isDark ? "dark" : "light"}
-            glassTintColor={
-              isDark ? "rgba(31, 34, 41, 0.36)" : "rgba(255, 255, 255, 0.2)"
-            }
-            isInteractive
-            style={[
-              styles.featureIconContainer,
-              {
-                backgroundColor: isDark ? "#1F2229" : "#FFF",
-                shadowColor: item.color,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.featureIconBg,
-                { backgroundColor: item.color + "15" },
-              ]}
-            >
-              {renderIcon()}
-            </View>
-          </AppleLiquidGlassView>
-          <NewBadge />
-        </View>
-        <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
+        {hot ? (
+          <LinearGradient
+            colors={[shadeHex(item.color, -0.55), item.color]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        ) : null}
+        <LinearGradient
+          colors={
+            hot
+              ? ["rgba(255,255,255,0.28)", "rgba(255,255,255,0.10)"]
+              : [item.color + (isDark ? "33" : "26"), item.color + (isDark ? "14" : "0d")]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.featureIconOrb}
+        >
+          <Lib name={item.icon} size={24} color={hot ? "#fff" : item.color} />
+        </LinearGradient>
+        <Text
+          style={[
+            styles.featureTitle,
+            { color: hot ? "#fff" : text },
+          ]}
+          numberOfLines={2}
+        >
           {item.title}
         </Text>
+        {item.isNew ? (
+          <View
+            style={[
+              styles.newBadge,
+              hot && { backgroundColor: "#f5b301", borderColor: "rgba(255,255,255,0.9)" },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.newBadgeText, hot && { color: "#06111f" }]}>
+              {hot ? "HOT" : "Mới"}
+            </Text>
+          </View>
+        ) : null}
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
 /* ---------- Features Grid ---------- */
-/* ---------- Features Grid ---------- */
 function FeaturesGrid() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const sub = isDark ? "#94a3b8" : "#64748b";
 
-  // --- FIX LOGIC CĂN HÀNG ---
+  // Hàng cuối thiếu bao nhiêu ô để đủ 4 cột → chèn ô rỗng, giữ lưới thẳng hàng
   const NUM_COLUMNS = 4;
-  // Tính xem hàng cuối còn thiếu bao nhiêu item để đủ 4
   const remainder = FEATURES.length % NUM_COLUMNS;
   const emptySlots = remainder === 0 ? 0 : NUM_COLUMNS - remainder;
-  // --------------------------
 
   return (
     <View style={styles.featuresContainer}>
-      <Text style={[styles.sectionTitle, { color: text }]}>
-        Tính năng PickleTour
-      </Text>
+      <View style={styles.sectionHead}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={styles.sectionAccent} />
+            <Text style={[styles.sectionTitle, { color: text }]}>
+              Tính năng PickleTour
+            </Text>
+          </View>
+          <Text style={[styles.sectionSub, { color: sub }]}>
+            Mọi thứ cho người chơi pickleball — trong một app
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.sectionCount,
+            { backgroundColor: isDark ? "rgba(34,193,214,0.16)" : "rgba(34,193,214,0.12)" },
+          ]}
+        >
+          <Ionicons name="grid-outline" size={12} color="#22c1d6" />
+          <Text style={styles.sectionCountText}>{FEATURES.length}</Text>
+        </View>
+      </View>
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />
         ))}
-
-        {/* Render các View rỗng có cùng chiều rộng (22%) để đẩy item về bên trái */}
         {Array.from({ length: emptySlots }).map((_, index) => (
-          <View key={`empty-${index}`} style={{ width: "22%" }} />
+          <View key={`empty-${index}`} style={styles.featureCol} />
         ))}
       </View>
     </View>
@@ -1758,7 +1756,9 @@ export default function HomeScreen() {
 
           <View style={{ height: 16 }} />
           <EventLiveBanner />
+          <CourtBookingBanner />
 
+          <View style={{ height: 8 }} />
           <FeaturesGrid />
 
           <View style={{ height: 24 }} />
@@ -1994,16 +1994,60 @@ const styles = StyleSheet.create({
   loginButtonText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 
   featuresContainer: { paddingHorizontal: 16 },
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 14,
+  },
+  sectionAccent: { width: 4, height: 18, borderRadius: 2, backgroundColor: "#22c1d6" },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 16,
-    letterSpacing: 0,
+    fontWeight: "900",
+    letterSpacing: -0.4,
   },
+  sectionSub: { fontSize: 12.5, marginTop: 4, marginLeft: 12 },
+  sectionCount: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginTop: 2,
+  },
+  sectionCountText: { color: "#22c1d6", fontWeight: "800", fontSize: 12 },
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+  featureCol: { width: "23.2%", marginBottom: 10 },
+  featureTile: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    overflow: "hidden",
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  featureTileHot: {
+    borderWidth: 1,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  featureIconOrb: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
 
   /* 💎 GLASS-MORPHISM FEATURE ITEM */
@@ -2048,8 +2092,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   featureTitle: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 11.5,
+    fontWeight: "700",
     textAlign: "center",
     lineHeight: 14,
     height: 28,
@@ -2061,8 +2105,8 @@ const styles = StyleSheet.create({
   },
   newBadge: {
     position: "absolute",
-    top: -4,
-    right: -8,
+    top: 6,
+    right: 6,
     backgroundColor: "#EF4444",
     borderRadius: 999,
     paddingHorizontal: 6,
