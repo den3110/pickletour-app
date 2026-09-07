@@ -199,20 +199,35 @@ function CourtsManager({ C, venueId, courts }: any) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [rules, setRules] = useState<any[]>([]);
+  const [count, setCount] = useState("1"); // số sân tạo cùng lúc (chỉ khi thêm mới)
+  const [startNumber, setStartNumber] = useState("1");
 
   const openEdit = (c: any) => {
     setEditing(c || { new: true });
     setName(c?.name || "");
     setPrice(String(c?.defaultPricePerHour || 0));
     setRules(c?.priceRules ? c.priceRules.map((r: any) => ({ ...r })) : []);
+    setCount("1");
+    setStartNumber("1");
+  };
+
+  const nCourts = Math.min(30, Math.max(1, Number(count) || 1));
+  const previewNames = () => {
+    const base = name.trim() || "Sân";
+    const s = Number(startNumber) || 1;
+    return Array.from({ length: nCourts }, (_, i) => `${base} ${s + i}`).join(", ");
   };
 
   const save = async () => {
     if (!name.trim()) return Alert.alert("Nhập tên sân");
-    const body = { name: name.trim(), defaultPricePerHour: Number(price) || 0, priceRules: rules };
+    const body: any = { name: name.trim(), defaultPricePerHour: Number(price) || 0, priceRules: rules };
     try {
-      if (editing.new) await addCourt({ venueId, ...body }).unwrap();
-      else await updateCourt({ venueId, courtId: editing._id, ...body }).unwrap();
+      if (editing.new) {
+        if (nCourts > 1) { body.count = nCourts; body.startNumber = Number(startNumber) || 1; }
+        await addCourt({ venueId, ...body }).unwrap();
+      } else {
+        await updateCourt({ venueId, courtId: editing._id, ...body }).unwrap();
+      }
       setEditing(null);
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || "Lưu thất bại.");
@@ -247,9 +262,21 @@ function CourtsManager({ C, venueId, courts }: any) {
               <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>{editing?.new ? "Thêm sân" : "Sửa sân"}</Text>
               <TouchableOpacity onPress={() => setEditing(null)}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
             </View>
-            <Field C={C} label="Tên sân" v={name} set={setName} />
+            <Field C={C} label={editing?.new && nCourts > 1 ? "Tên gốc (sẽ đánh số)" : "Tên sân"} v={name} set={setName} />
+            {editing?.new && (
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Field C={C} label="Số sân tạo cùng lúc" v={count} set={setCount} kb="numeric" flex />
+                {nCourts > 1 && <Field C={C} label="Bắt đầu từ số" v={startNumber} set={setStartNumber} kb="numeric" flex />}
+              </View>
+            )}
+            {editing?.new && nCourts > 1 && (
+              <View style={{ backgroundColor: C.accentSoft, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+                <Text style={{ color: C.sub, fontSize: 12 }}>Sẽ tạo {nCourts} sân cùng giá & khung giờ:</Text>
+                <Text style={{ color: C.accent, fontSize: 12.5, fontWeight: "700", marginTop: 2 }} numberOfLines={2}>{previewNames()}</Text>
+              </View>
+            )}
             <Field C={C} label="Giá mặc định/giờ" v={price} set={setPrice} kb="numeric" />
-            <Text style={{ color: C.sub, fontSize: 13, marginTop: 6, marginBottom: 8 }}>Khung giá đặc biệt (giờ vàng / cuối tuần)</Text>
+            <Text style={{ color: C.sub, fontSize: 13, marginTop: 6, marginBottom: 8 }}>Khung giá đặc biệt (giờ vàng / cuối tuần){editing?.new && nCourts > 1 ? " — áp cho tất cả sân" : ""}</Text>
             {rules.map((r, i) => (
               <View key={i} style={[styles.rule, { borderColor: C.border }]}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -270,7 +297,7 @@ function CourtsManager({ C, venueId, courts }: any) {
               </View>
             ))}
             <TouchableOpacity onPress={addRule} style={{ paddingVertical: 8 }}><Text style={{ color: C.accent, fontWeight: "700" }}>+ Thêm khung giá</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, marginTop: 8 }]} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu sân</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, marginTop: 8, opacity: adding ? 0.6 : 1 }]} disabled={adding} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>{adding ? "Đang lưu…" : editing?.new && nCourts > 1 ? `Tạo ${nCourts} sân` : "Lưu sân"}</Text></TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
