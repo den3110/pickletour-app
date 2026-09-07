@@ -31,8 +31,9 @@ export default function RecurringScreen() {
   const [rangeMode, setRangeMode] = useState<"weeks" | "months" | "dateTo">("months");
   const [rangeVal, setRangeVal] = useState("2"); // 2 tháng
   const [dateTo, setDateTo] = useState(addDays(toDateInput(), 60));
-  const [priceMode, setPriceMode] = useState<"auto" | "custom">("custom");
+  const [priceMode, setPriceMode] = useState<"auto" | "custom" | "total">("total");
   const [price, setPrice] = useState("");
+  const [packageTotal, setPackageTotal] = useState("");
   const [markPaid, setMarkPaid] = useState(true);
   const [payMethod, setPayMethod] = useState<"cash" | "transfer">("cash");
   const [name, setName] = useState("");
@@ -45,9 +46,11 @@ export default function RecurringScreen() {
     if (!courtId) return Alert.alert("Chọn sân");
     if (!dow.length) return Alert.alert("Chọn thứ", "Chọn ít nhất 1 thứ trong tuần.");
     if (priceMode === "custom" && !(Number(price) > 0)) return Alert.alert("Nhập giá", "Nhập giá mỗi buổi khi tự set giá.");
+    if (priceMode === "total" && !(Number(packageTotal) > 0)) return Alert.alert("Nhập giá", "Nhập tổng giá trọn gói cả kỳ.");
     const body: any = {
       venueId: id, courtId, daysOfWeek: dow, start, end, dateFrom,
-      priceMode, pricePerSession: Number(price) || 0, markPaid, paymentMethod: payMethod,
+      priceMode, pricePerSession: Number(price) || 0, totalPackagePrice: Number(packageTotal) || 0,
+      markPaid, paymentMethod: payMethod,
       customerName: name.trim(), customerPhone: phone.trim(),
     };
     if (rangeMode === "weeks") body.weeks = Number(rangeVal) || 4;
@@ -121,14 +124,20 @@ export default function RecurringScreen() {
               <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={rangeVal} onChangeText={setRangeVal} keyboardType="numeric" placeholder={rangeMode === "weeks" ? "Số tuần (vd 8)" : "Số tháng (vd 2)"} placeholderTextColor={C.muted} />
             )}
 
-            <Label C={C}>Giá mỗi buổi</Label>
+            <Label C={C}>Cách tính giá</Label>
             <View style={styles.seg}>
-              {([["custom", "Tự set giá"], ["auto", "Theo bảng giá"]] as const).map(([k, lbl]) => (
+              {([["total", "Trọn gói cả kỳ"], ["custom", "Theo buổi"], ["auto", "Bảng giá"]] as const).map(([k, lbl]) => (
                 <TouchableOpacity key={k} onPress={() => setPriceMode(k)} style={[styles.segItem, { backgroundColor: priceMode === k ? C.accent : C.field }]}>
-                  <Text style={{ color: priceMode === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12.5 }}>{lbl}</Text>
+                  <Text style={{ color: priceMode === k ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{lbl}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            {priceMode === "total" && (
+              <>
+                <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={packageTotal} onChangeText={setPackageTotal} keyboardType="numeric" placeholder="Tổng giá cả kỳ (đ) — vd 10000000" placeholderTextColor={C.muted} />
+                <Text style={{ color: C.sub, fontSize: 12, marginBottom: 8 }}>Tổng tiền cho toàn bộ lịch (VD gói tháng của CLB). Hệ thống chia đều cho các buổi để tính doanh thu.</Text>
+              </>
+            )}
             {priceMode === "custom" && (
               <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá 1 buổi (đ) — vd 300000" placeholderTextColor={C.muted} />
             )}
