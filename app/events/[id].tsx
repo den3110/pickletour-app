@@ -9,7 +9,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 import { useGetEventQuery, useRegisterEventMutation, useSubmitEventProofMutation, useCancelMyEventRegMutation } from "@/slices/eventsApiSlice";
-import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import TicketQrRN from "@/components/courts/TicketQrRN";
@@ -29,22 +29,21 @@ export default function EventDetailScreen() {
   const [upload, { isLoading: uploading }] = useUploadImageToFolderMutation();
   const [submitProof, { isLoading: submitting }] = useSubmitEventProofMutation();
   const [cancelReg] = useCancelMyEventRegMutation();
-  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
+  const { openShare, shareModal, shareOpen: sharing } = useShareToFeed();
   const [localPreview, setLocalPreview] = useState("");
 
-  // Bất kỳ ai cũng chia sẻ được sự kiện lên Bảng tin để rủ người tham gia
-  const shareToFeed = async () => {
+  // Bất kỳ ai cũng chia sẻ được sự kiện lên Bảng tin để rủ người tham gia.
+  // Mở popup soạn nội dung (điền sẵn, user sửa được) rồi mới đăng.
+  const shareToFeed = () => {
     if (!me) return Alert.alert("Cần đăng nhập", "Đăng nhập để chia sẻ lên bảng tin.", [{ text: "Để sau" }, { text: "Đăng nhập", onPress: () => router.push("/login") }]);
     if (!ev) return;
-    try {
-      await createFeedPost({
-        content: `🎟️ Rủ anh em đánh social: ${ev.title}${ev.venue?.name ? ` tại ${ev.venue.name}` : ""}. Vào đăng ký nhé!`,
-        sharedEvent: { eventId: ev._id },
-      }).unwrap();
-      Alert.alert("Đã chia sẻ", "Sự kiện đã được đăng lên bảng tin.", [{ text: "Xem bảng tin", onPress: () => router.push("/feed" as any) }, { text: "OK" }]);
-    } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại.");
-    }
+    const when = ev.startAt ? ` — ${dtLabel(ev.startAt)}` : "";
+    openShare({
+      title: "Chia sẻ sự kiện",
+      defaultContent: `🎟️ Rủ anh em đánh social: ${ev.title}${ev.venue?.name ? ` tại ${ev.venue.name}` : ""}${when}. Vào đăng ký nhé!`,
+      payload: { sharedEvent: { eventId: ev._id } },
+      attachmentLabel: `Sự kiện: ${ev.title}`,
+    });
   };
 
   if (isLoading || !ev) {
@@ -167,6 +166,7 @@ export default function EventDetailScreen() {
           </Card>
         )}
       </ScrollView>
+      {shareModal}
     </View>
   );
 }

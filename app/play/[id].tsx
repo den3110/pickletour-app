@@ -23,7 +23,7 @@ import {
   useLeaveInviteMutation,
   useDeleteInviteMutation,
 } from "@/slices/playApiSlice";
-import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 
 const GREEN = "#16a34a";
 
@@ -47,14 +47,19 @@ export default function PlayDetailScreen() {
   const [respondJoin] = useRespondJoinMutation();
   const [leaveInvite] = useLeaveInviteMutation();
   const [deleteInvite] = useDeleteInviteMutation();
-  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
+  const { openShare, shareModal, shareOpen: sharing } = useShareToFeed();
   const [note, setNote] = useState("");
 
-  const handleShareToFeed = async () => {
+  // Mở popup soạn nội dung (điền sẵn, sửa được) rồi mới đăng lên bảng tin
+  const handleShareToFeed = () => {
     if (!me) return router.push("/login" as any);
-    try {
-      await createFeedPost({
-        content: `🏓 Kèo giao lưu: ${it.title || it.courtName || "pickleball"}`,
+    const name = it.title || it.courtName || "pickleball";
+    const when = it.playAt ? ` — ${formatPlayTime(it.playAt)}` : "";
+    openShare({
+      title: "Chia sẻ kèo",
+      defaultContent: `🏓 Kèo giao lưu: ${name}${when}. Ai rảnh vào ghép kèo nhé!`,
+      attachmentLabel: `Kèo: ${name}`,
+      payload: {
         sharedPlay: {
           playId: it._id,
           title: it.title || it.courtName || "",
@@ -68,11 +73,8 @@ export default function PlayDetailScreen() {
           hostName: it.host?.nickname || it.host?.name || "",
           status: it.status,
         },
-      }).unwrap();
-      Alert.alert("Thành công", "Đã chia sẻ kèo lên bảng tin");
-    } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại");
-    }
+      },
+    });
   };
 
   if (isLoading)
@@ -259,6 +261,7 @@ export default function PlayDetailScreen() {
           {accepted.length === 0 && <Text style={{ color: "#94A3B8", fontSize: 13 }}>Chưa có ai được nhận.</Text>}
         </View>
       </ScrollView>
+      {shareModal}
     </SafeAreaView>
   );
 }

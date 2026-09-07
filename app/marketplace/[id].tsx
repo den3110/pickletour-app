@@ -39,7 +39,7 @@ import {
   useListMarketOffersQuery,
   useRespondMarketOfferMutation,
 } from "@/slices/marketApiSlice";
-import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 import { useBoostListingMutation } from "@/slices/marketApiSlice";
 import StarRatingRN from "@/components/market/StarRatingRN";
 import SellerReviewsRN from "@/components/market/SellerReviewsRN";
@@ -125,7 +125,7 @@ export default function MarketDetailScreen() {
   const [createOffer, { isLoading: offering }] = useCreateMarketOfferMutation();
   const [updateStatus] = useUpdateMarketStatusMutation();
   const [deleteListing] = useDeleteMarketListingMutation();
-  const [createFeedPost, { isLoading: sharing }] = useCreateFeedPostMutation();
+  const { openShare, shareModal, shareOpen: sharing } = useShareToFeed();
   const [boostListing, { isLoading: boosting }] = useBoostListingMutation();
 
   const onBoost = async () => {
@@ -222,11 +222,16 @@ export default function MarketDetailScreen() {
     ]);
   };
 
-  const handleShareToFeed = async () => {
+  // Mở popup soạn nội dung (điền sẵn, sửa được) rồi mới đăng lên bảng tin
+  const handleShareToFeed = () => {
     if (!me) return router.push("/login" as any);
-    try {
-      await createFeedPost({
-        content: `Mình đang bán trên Chợ: ${item.title}`,
+    const isMine = me && item.seller && String(item.seller._id || item.seller) === String(me._id);
+    const lead = item.type === "giveaway" ? "Tặng miễn phí trên Chợ" : item.type === "trade" ? "Trao đổi trên Chợ" : isMine ? "Mình đang bán trên Chợ" : "Săn được món này trên Chợ";
+    openShare({
+      title: "Chia sẻ sản phẩm",
+      defaultContent: `🛒 ${lead}: ${item.title}. Ai cần thì inbox nhé!`,
+      attachmentLabel: `Sản phẩm: ${item.title}`,
+      payload: {
         sharedListing: {
           listingId: item._id,
           title: item.title,
@@ -239,11 +244,8 @@ export default function MarketDetailScreen() {
           status: item.status,
           province: item.location?.province || "",
         },
-      }).unwrap();
-      Alert.alert("Thành công", "Đã chia sẻ sản phẩm lên bảng tin");
-    } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Chia sẻ thất bại");
-    }
+      },
+    });
   };
 
   const specs = [
@@ -607,6 +609,7 @@ export default function MarketDetailScreen() {
           ))}
         </View>
       </Modal>
+      {shareModal}
     </SafeAreaView>
   );
 }

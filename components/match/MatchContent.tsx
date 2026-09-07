@@ -30,7 +30,7 @@ import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAdminPatchMatchMutation } from "@/slices/matchesApiSlice";
-import { useCreateFeedPostMutation } from "@/slices/feedApiSlice";
+import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 import AdminMatchTools from "@/components/match/AdminMatchTools";
 import PublicProfileDialog from "../PublicProfileDialog";
 import RefereeJudgePanel from "./RefereeScorePanel.native";
@@ -3622,14 +3622,24 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
     [shownGameScores],
   );
 
-  const [createFeedPost] = useCreateFeedPostMutation();
-  const handleShareResult = async () => {
+  const { openShare, shareModal } = useShareToFeed();
+  // Mở popup soạn nội dung (điền sẵn, sửa được) rồi mới đăng kết quả lên bảng tin
+  const handleShareResult = () => {
     const last = lastGameScore(shownGameScores) || { a: 0, b: 0 };
     const nameA = visibleTeamLabel(teamAName) || "Đội A";
     const nameB = visibleTeamLabel(teamBName) || "Đội B";
-    try {
-      await createFeedPost({
-        content: `Kết quả trận đấu: ${nameA} vs ${nameB}`,
+    const tourName = (tour as any)?.name || "";
+    const scoreTxt =
+      setsA + setsB > 1 ? `${setsA}-${setsB} (set)` : `${Number(last.a) || 0}-${Number(last.b) || 0}`;
+    const winTxt =
+      merged?.winner === "A" ? ` 🏆 ${nameA} thắng!` : merged?.winner === "B" ? ` 🏆 ${nameB} thắng!` : "";
+    openShare({
+      title: "Chia sẻ kết quả",
+      defaultContent: `🏓 Kết quả trận đấu${tourName ? ` ${tourName}` : ""}: ${nameA} vs ${nameB} — ${scoreTxt}.${winTxt}`,
+      attachmentLabel: `Trận: ${nameA} vs ${nameB}`,
+      successAlert: false,
+      onDone: () => Toast.show({ type: "success", text1: "Đã chia sẻ kết quả lên bảng tin" }),
+      payload: {
         sharedMatch: {
           matchId: merged?._id || null,
           tournamentId: tournamentId || null,
@@ -3647,15 +3657,8 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
               : "",
           status,
         },
-      } as any).unwrap();
-      Toast.show({ type: "success", text1: "Đã chia sẻ kết quả lên bảng tin" });
-    } catch (e: any) {
-      Toast.show({
-        type: "error",
-        text1: "Chia sẻ thất bại",
-        text2: e?.data?.message || e?.message,
-      });
-    }
+      },
+    });
   };
 
   const [createLive, { isLoading: creatingLive }] =
@@ -4316,6 +4319,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           onClose={() => {}}
         />
       )}
+      {shareModal}
     </>
   );
 }
