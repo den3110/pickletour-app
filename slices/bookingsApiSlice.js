@@ -22,9 +22,11 @@ export const bookingsApiSlice = apiSlice.injectEndpoints({
       providesTags: (r, e, id) => [{ type: "Booking", id }],
     }),
     listVenueBookings: builder.query({
-      query: ({ venueId, date = "", status = "" }) => {
+      query: ({ venueId, date = "", from = "", to = "", status = "" }) => {
         const p = new URLSearchParams();
         if (date) p.set("date", date);
+        if (from) p.set("from", from);
+        if (to) p.set("to", to);
         if (status) p.set("status", status);
         const qs = p.toString();
         return { url: `/api/venues/${venueId}/bookings${qs ? `?${qs}` : ""}` };

@@ -13,9 +13,10 @@ import {
   useCheckInBookingMutation,
   useUpdateBookingStatusMutation,
 } from "@/slices/bookingsApiSlice";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { useGetMyVenueAccessQuery } from "@/slices/venueStaffApiSlice";
-import { fmtVND, pal, tLabel, toDateInput, addDays, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
-import { Hero, Tile, SectionHeader, DateStrip, Card, Chip, Empty, PrimaryButton, GhostButton, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
+import { fmtVND, pal, tLabel, toDateInput, addDays, dLabel, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
+import { Hero, Tile, SectionHeader, Card, Chip, Empty, PrimaryButton, GhostButton, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
 // perm = quyền cần để thấy tile (null = luôn hiện cho ai vào được hub)
 const MGMT = [
@@ -40,7 +41,10 @@ export default function OwnerVenueHub() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
-  const [date, setDate] = useState(toDateInput());
+  const today = toDateInput();
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [picker, setPicker] = useState<null | "from" | "to">(null);
   const [bill, setBill] = useState<any>(null);
 
   const { data: venue } = useGetVenueQuery(id, { skip: !id });
@@ -50,17 +54,24 @@ export default function OwnerVenueHub() {
   const can = (p?: string) => canManage || !p || myPerms.includes(p);
   const tiles = useMemo(() => MGMT.filter((m) => can(m.perm)), [access]); // eslint-disable-line
   const canViewBookings = can("bookings.view");
-  const { data, isLoading, isFetching, refetch } = useListVenueBookingsQuery({ venueId: id, date }, { skip: !id || !canViewBookings });
+  // Hero luôn hiển thị số liệu HÔM NAY; danh sách lịch đặt lọc theo khoảng from→to
+  const { data: todayData } = useListVenueBookingsQuery({ venueId: id, date: today }, { skip: !id || !canViewBookings });
+  const { data, isLoading, isFetching, refetch } = useListVenueBookingsQuery({ venueId: id, from, to }, { skip: !id || !canViewBookings });
   const [approve, { isLoading: approving }] = useApproveBookingMutation();
   const [reject, { isLoading: rejecting }] = useRejectBookingMutation();
   const [checkIn] = useCheckInBookingMutation();
   const [updateStatus] = useUpdateBookingStatusMutation();
 
+  const todayItems: any[] = todayData || [];
+  const active = todayItems.filter((b) => b.status !== "cancelled");
+  const revenue = todayItems.filter((b) => b.payment?.status === "Paid").reduce((s, b) => s + (Number(b.totalPrice) || 0), 0);
+  const awaiting = todayItems.filter((b) => b.status === "awaiting_approval").length;
+
   const items: any[] = data || [];
-  const active = items.filter((b) => b.status !== "cancelled");
-  const revenue = items.filter((b) => b.payment?.status === "Paid").reduce((s, b) => s + (Number(b.totalPrice) || 0), 0);
-  const awaiting = items.filter((b) => b.status === "awaiting_approval").length;
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(toDateInput(), i)), []);
+  const multiDay = from !== to;
+  const rangeAwaiting = items.filter((b) => b.status === "awaiting_approval").length;
+  const rangeRevenue = items.filter((b) => b.payment?.status === "Paid").reduce((s, b) => s + (Number(b.totalPrice) || 0), 0);
+  const setPreset = (f: string, t: string) => { setFrom(f); setTo(t); };
 
   const run = async (fn: () => Promise<any>) => {
     try { await fn(); } catch (e: any) { Alert.alert("Lỗi", e?.data?.message || "Thao tác thất bại"); }
@@ -126,17 +137,53 @@ export default function OwnerVenueHub() {
         <SectionHeader
           C={C}
           title="Lịch đặt"
-          right={awaiting > 0 ? <Chip C={C} color={C.warning} label={`${awaiting} bill chờ duyệt`} small /> : null}
+          right={rangeAwaiting > 0 ? <Chip C={C} color={C.warning} label={`${rangeAwaiting} bill chờ duyệt`} small /> : null}
         />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -SP.lg }} contentContainerStyle={{ paddingHorizontal: SP.lg }}>
-          <DateStrip C={C} dates={days} value={date} onChange={setDate} />
+        {/* Bộ lọc khoảng ngày */}
+        <View style={styles.rangeRow}>
+          <TouchableOpacity style={[styles.dateBtn, { backgroundColor: C.card, borderColor: C.border }]} onPress={() => setPicker("from")}>
+            <Ionicons name="calendar-outline" size={15} color={C.accent} />
+            <View>
+              <Text style={{ color: C.muted, fontSize: 10 }}>Từ ngày</Text>
+              <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>{from.split("-").reverse().join("/")}</Text>
+            </View>
+          </TouchableOpacity>
+          <Ionicons name="arrow-forward" size={16} color={C.muted} />
+          <TouchableOpacity style={[styles.dateBtn, { backgroundColor: C.card, borderColor: C.border }]} onPress={() => setPicker("to")}>
+            <Ionicons name="calendar-outline" size={15} color={C.accent} />
+            <View>
+              <Text style={{ color: C.muted, fontSize: 10 }}>Đến ngày</Text>
+              <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>{to.split("-").reverse().join("/")}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -SP.lg }} contentContainerStyle={{ paddingHorizontal: SP.lg, gap: 8, paddingVertical: 2 }}>
+          {[
+            { k: "today", lbl: "Hôm nay", f: today, t: today },
+            { k: "7d", lbl: "7 ngày tới", f: today, t: addDays(today, 6) },
+            { k: "30d", lbl: "30 ngày tới", f: today, t: addDays(today, 29) },
+            { k: "past7", lbl: "7 ngày qua", f: addDays(today, -6), t: today },
+          ].map((p) => {
+            const on = from === p.f && to === p.t;
+            return (
+              <TouchableOpacity key={p.k} onPress={() => setPreset(p.f, p.t)} style={[styles.presetChip, { backgroundColor: on ? C.accent : C.field }]}>
+                <Text style={{ color: on ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{p.lbl}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
+        {multiDay && (
+          <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+            <Text style={{ color: C.sub, fontSize: 12.5 }}>{items.length} lượt</Text>
+            <Text style={{ color: C.sub, fontSize: 12.5 }}>Đã thu: <Text style={{ color: C.success, fontWeight: "700" }}>{fmtVND(rangeRevenue)}</Text></Text>
+          </View>
+        )}
 
         <View style={{ marginTop: SP.md }}>
           {isLoading ? (
             <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
           ) : items.length === 0 ? (
-            <Card C={C} pad={0}><Empty C={C} title="Chưa có lượt đặt" subtitle="Ngày này chưa có khách đặt sân." /></Card>
+            <Card C={C} pad={0}><Empty C={C} title="Chưa có lượt đặt" subtitle="Khoảng thời gian này chưa có khách đặt sân." /></Card>
           ) : (
             items.map((b) => {
               const st = BOOKING_STATUS[b.status] || BOOKING_STATUS.pending;
@@ -147,6 +194,7 @@ export default function OwnerVenueHub() {
                 <Card key={b._id} C={C} pad={0} style={[{ marginBottom: SP.md, overflow: "hidden" }, awaitingBill && { borderColor: C.info, borderWidth: 1 }]}>
                   <View style={{ flexDirection: "row" }}>
                     <View style={[styles.timeCol, { backgroundColor: `${st.color}18` }]}>
+                      {multiDay && <Text style={{ color: st.color, fontWeight: "800", fontSize: 11, marginBottom: 1 }}>{dLabel(b.startAt)}</Text>}
                       <Text style={{ color: st.color, fontWeight: "900", fontSize: 16 }}>{tLabel(b.startAt)}</Text>
                       <Text style={{ color: st.color, fontSize: 11, opacity: 0.85 }}>→ {tLabel(b.endAt)}</Text>
                     </View>
@@ -225,6 +273,20 @@ export default function OwnerVenueHub() {
           </View>
         </View>
       </Modal>
+
+      {/* Chọn ngày (từ / đến) — xem lịch đặt bất kỳ khoảng thời gian */}
+      <DateTimePickerModal
+        isVisible={!!picker}
+        mode="date"
+        date={new Date(`${(picker === "to" ? to : from)}T12:00:00`)}
+        onConfirm={(d) => {
+          const s = toDateInput(d);
+          if (picker === "from") { setFrom(s); if (s > to) setTo(s); }
+          else if (picker === "to") { setTo(s); if (s < from) setFrom(s); }
+          setPicker(null);
+        }}
+        onCancel={() => setPicker(null)}
+      />
     </View>
   );
 }
@@ -256,6 +318,9 @@ const styles = StyleSheet.create({
   heroStats: { flexDirection: "row", alignItems: "center", marginTop: 18, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.22)" },
   heroDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: "rgba(255,255,255,0.22)" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  rangeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  dateBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  presetChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   timeCol: { width: 82, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
   act: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10 },
