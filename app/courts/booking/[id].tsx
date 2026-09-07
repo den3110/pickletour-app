@@ -27,6 +27,7 @@ import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
 import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 import TicketQrRN from "@/components/courts/TicketQrRN";
 import { fmtVND, pal, dLabel, tLabel, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
+import { Hero, Chip, shadow, R, SP } from "@/components/courts/ui";
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -142,33 +143,53 @@ export default function BookingDetailScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: `#${b.code}` }} />
       <ScrollView
-        contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: SP.lg, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
       >
         {/* Tóm tắt */}
-        <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <Hero C={C} colors={b.status === "confirmed" ? (["#0f172a", "#14532d"] as [string, string]) : b.status === "cancelled" ? (["#1f2937", "#374151"] as [string, string]) : C.heroGrad} style={{ marginBottom: SP.md }}>
           <View style={styles.rowBetween}>
-            <Text style={[styles.title, { color: C.text }]} numberOfLines={1}>{b.venue?.name}</Text>
-            <View style={[styles.chip, { backgroundColor: `${st.color}26` }]}>
-              <Text style={{ color: st.color, fontWeight: "800", fontSize: 12 }}>{st.label}</Text>
+            <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "700", letterSpacing: 0.8 }}>#{b.code}</Text>
+            <View style={{ backgroundColor: "rgba(255,255,255,0.16)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: st.color }} />
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>{st.label}</Text>
             </View>
           </View>
-          <Text style={{ color: C.sub, marginTop: 4 }}>{b.court?.name} · {b.venue?.address || b.venue?.province || ""}</Text>
-          <Text style={{ color: C.text, fontWeight: "700", marginTop: 6 }}>
-            {dLabel(b.startAt)} · {tLabel(b.startAt)} → {tLabel(b.endAt)}
-          </Text>
-          <Text style={{ color: C.accent, fontWeight: "900", fontSize: 20, marginTop: 4 }}>{fmtVND(b.totalPrice)}</Text>
+          <Text style={styles.title} numberOfLines={2}>{b.venue?.name}</Text>
+          <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 2 }} numberOfLines={1}>{b.court?.name} · {b.venue?.address || b.venue?.province || ""}</Text>
+          <View style={styles.heroRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroLabel}>Thời gian</Text>
+              <Text style={styles.heroVal}>{dLabel(b.startAt)}</Text>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13, marginTop: 1 }}>{tLabel(b.startAt)} → {tLabel(b.endAt)}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.heroLabel}>Tổng tiền</Text>
+              <Text style={[styles.heroVal, { fontSize: 22 }]}>{fmtVND(b.totalPrice)}</Text>
+              <Text style={{ color: b.payment?.status === "Paid" ? "#86efac" : "#fde68a", fontSize: 12, fontWeight: "700", marginTop: 1 }}>
+                {b.payment?.status === "Paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+              </Text>
+            </View>
+          </View>
           {b.ticket?.checkedInAt && (
-            <Text style={{ color: "#22c55e", fontWeight: "700", marginTop: 6 }}>✓ Đã check-in {dtLabel(b.ticket.checkedInAt)}</Text>
+            <View style={styles.checkedPill}>
+              <Ionicons name="checkmark-circle" size={15} color="#86efac" />
+              <Text style={{ color: "#86efac", fontWeight: "700", fontSize: 12.5 }}>Đã check-in {dtLabel(b.ticket.checkedInAt)}</Text>
+            </View>
           )}
-        </View>
+        </Hero>
 
         {/* Thanh toán + bill */}
         {needPay && (
-          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-            <Text style={[styles.section, { color: C.text }]}>
-              {b.status === "awaiting_approval" ? "Bill đã gửi — chờ chủ sân duyệt" : "Thanh toán qua QR"}
-            </Text>
+          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <View style={[styles.secIcon, { backgroundColor: b.status === "awaiting_approval" ? "rgba(56,189,248,0.16)" : C.accentSoft }]}>
+                <Ionicons name={b.status === "awaiting_approval" ? "hourglass" : "qr-code"} size={16} color={b.status === "awaiting_approval" ? C.info : C.accent} />
+              </View>
+              <Text style={[styles.section, { color: C.text }]}>
+                {b.status === "awaiting_approval" ? "Bill đã gửi — chờ chủ sân duyệt" : "Thanh toán qua QR"}
+              </Text>
+            </View>
             {rejected && (
               <View style={[styles.alert, { backgroundColor: "rgba(239,68,68,0.12)" }]}>
                 <Text style={{ color: "#ef4444", fontWeight: "700" }}>Bill bị từ chối: {b.payment.rejectReason}</Text>
@@ -182,28 +203,44 @@ export default function BookingDetailScreen() {
             )}
 
             {bank.qrUrl ? (
-              <View style={{ alignItems: "center", marginVertical: 6 }}>
-                <Image source={{ uri: bank.qrUrl }} style={styles.qr} resizeMode="contain" />
+              <View style={{ alignItems: "center", marginVertical: 8 }}>
+                <View style={[styles.qrFrame, shadow(C.dark, 2)]}>
+                  <Image source={{ uri: bank.qrUrl }} style={styles.qr} resizeMode="contain" />
+                </View>
+                <Text style={{ color: C.muted, fontSize: 11.5, marginTop: 8 }}>Quét bằng app ngân hàng — số tiền & nội dung đã điền sẵn</Text>
               </View>
             ) : (
-              <Text style={{ color: "#f59e0b", marginBottom: 8 }}>Sân chưa cấu hình tài khoản nhận tiền — liên hệ chủ sân.</Text>
+              <View style={[styles.alert, { backgroundColor: "rgba(245,158,11,0.12)" }]}>
+                <Text style={{ color: "#f59e0b", fontWeight: "700" }}>Sân chưa cấu hình tài khoản nhận tiền — liên hệ chủ sân.</Text>
+              </View>
             )}
-            <View style={[styles.bankBox, { backgroundColor: C.field }]}>
-              <Text style={{ color: C.sub, fontSize: 12 }}>Số tiền</Text>
-              <Text style={{ color: C.accent, fontWeight: "900", fontSize: 22 }}>{fmtVND(bank.amount || b.totalPrice)}</Text>
+            <View style={[styles.bankBox, { backgroundColor: C.cardAlt, borderColor: C.border }]}>
+              <View style={styles.bankRow}>
+                <Text style={{ color: C.sub, fontSize: 12.5 }}>Số tiền</Text>
+                <Text style={{ color: C.accent, fontWeight: "900", fontSize: 20, letterSpacing: -0.3 }}>{fmtVND(bank.amount || b.totalPrice)}</Text>
+              </View>
               {!!bank.bankAccountNumber && (
-                <TouchableOpacity onPress={() => copy(bank.bankAccountNumber, "Số tài khoản")} style={styles.rowBetween}>
-                  <Text style={{ color: C.text, marginTop: 6 }}>
-                    {bank.bankShortName} · <Text style={{ fontWeight: "800" }}>{bank.bankAccountNumber}</Text>
-                  </Text>
-                  <Ionicons name="copy-outline" size={16} color={C.sub} />
+                <TouchableOpacity onPress={() => copy(bank.bankAccountNumber, "Số tài khoản")} style={[styles.bankRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border }]}>
+                  <Text style={{ color: C.sub, fontSize: 12.5 }}>{bank.bankShortName || "STK"}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ color: C.text, fontWeight: "800", fontSize: 15 }}>{bank.bankAccountNumber}</Text>
+                    <Ionicons name="copy-outline" size={15} color={C.accent} />
+                  </View>
                 </TouchableOpacity>
               )}
-              {!!bank.bankAccountName && <Text style={{ color: C.sub, fontSize: 13 }}>{bank.bankAccountName}</Text>}
+              {!!bank.bankAccountName && (
+                <View style={[styles.bankRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border }]}>
+                  <Text style={{ color: C.sub, fontSize: 12.5 }}>Chủ TK</Text>
+                  <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>{bank.bankAccountName}</Text>
+                </View>
+              )}
               {!!bank.memo && (
-                <TouchableOpacity onPress={() => copy(bank.memo, "Nội dung chuyển khoản")} style={styles.rowBetween}>
-                  <Text style={{ color: C.text, marginTop: 4 }}>Nội dung: <Text style={{ fontWeight: "800" }}>{bank.memo}</Text></Text>
-                  <Ionicons name="copy-outline" size={16} color={C.sub} />
+                <TouchableOpacity onPress={() => copy(bank.memo, "Nội dung chuyển khoản")} style={[styles.bankRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border }]}>
+                  <Text style={{ color: C.sub, fontSize: 12.5 }}>Nội dung</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ color: C.text, fontWeight: "800", fontSize: 13 }}>{bank.memo}</Text>
+                    <Ionicons name="copy-outline" size={15} color={C.accent} />
+                  </View>
                 </TouchableOpacity>
               )}
             </View>
@@ -224,13 +261,13 @@ export default function BookingDetailScreen() {
               onChangeText={(t) => setNote(t.slice(0, 300))}
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity style={[styles.btn, { flex: 1, backgroundColor: C.accent, opacity: busy ? 0.6 : 1 }]} disabled={busy} onPress={pickFromCamera}>
-                <Ionicons name="camera" size={18} color="#0a0e1a" />
-                <Text style={styles.btnText}>{busy ? "Đang gửi…" : "Chụp bill"}</Text>
+              <TouchableOpacity activeOpacity={0.85} style={[styles.btn, { flex: 1.3, backgroundColor: C.accent, opacity: busy ? 0.6 : 1 }, shadow(C.dark, 2)]} disabled={busy} onPress={pickFromCamera}>
+                <Ionicons name="camera" size={18} color={C.onAccent} />
+                <Text style={[styles.btnText, { color: C.onAccent }]}>{busy ? "Đang gửi…" : "Chụp bill"}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btn, { flex: 1, borderWidth: 1, borderColor: C.accent, opacity: busy ? 0.6 : 1 }]} disabled={busy} onPress={pickFromLibrary}>
-                <Ionicons name="images" size={18} color={C.accent} />
-                <Text style={[styles.btnText, { color: C.accent }]}>Chọn ảnh</Text>
+              <TouchableOpacity activeOpacity={0.85} style={[styles.btn, { flex: 1, borderWidth: 1, borderColor: C.border, opacity: busy ? 0.6 : 1 }]} disabled={busy} onPress={pickFromLibrary}>
+                <Ionicons name="images-outline" size={18} color={C.text} />
+                <Text style={[styles.btnText, { color: C.text }]}>Chọn ảnh</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -238,31 +275,43 @@ export default function BookingDetailScreen() {
 
         {/* Vé QR */}
         {b.status === "confirmed" && (
-          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, alignItems: "center" }]}>
-            <Text style={[styles.section, { color: C.text }]}>Vé vào sân</Text>
-            <TicketQrRN token={b.ticket?.token} size={230} />
-            <Text style={{ color: C.sub, fontSize: 12, marginTop: 10, textAlign: "center" }}>
+          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, alignItems: "center" }, shadow(C.dark, 2)]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", marginBottom: 12 }}>
+              <View style={[styles.secIcon, { backgroundColor: "rgba(34,197,94,0.16)" }]}><Ionicons name="ticket" size={16} color={C.success} /></View>
+              <Text style={[styles.section, { color: C.text }]}>Vé vào sân</Text>
+              <Chip C={C} color={C.success} label="Hợp lệ" small style={{ marginLeft: "auto" }} />
+            </View>
+            <View style={[styles.qrFrame, shadow(C.dark, 2)]}>
+              <TicketQrRN token={b.ticket?.token} size={220} />
+            </View>
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 16, marginTop: 12, letterSpacing: 1 }}>#{b.code}</Text>
+            <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 4, textAlign: "center", lineHeight: 18 }}>
               {b.ticket?.checkedInAt ? "Vé đã được sử dụng." : "Đưa mã QR này cho chủ sân quét khi đến sân."}
             </Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: "#6366f1", alignSelf: "stretch", marginTop: 14, opacity: creatingInvite ? 0.6 : 1 }]} disabled={creatingInvite} onPress={openPlay}>
+            <TouchableOpacity activeOpacity={0.85} style={[styles.btn, { backgroundColor: "#6366f1", alignSelf: "stretch", marginTop: 16, opacity: creatingInvite ? 0.6 : 1 }, shadow(C.dark, 2)]} disabled={creatingInvite} onPress={openPlay}>
               <Ionicons name="people" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontWeight: "800" }}>Mở kèo tìm người chơi</Text>
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Mở kèo tìm người chơi</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {b.status === "cancelled" && (
-          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-            <Text style={{ color: C.sub }}>Đã huỷ{b.cancelReason ? ` · ${b.cancelReason}` : ""}.</Text>
-            <TouchableOpacity onPress={() => router.replace({ pathname: "/courts/[id]", params: { id: String(b.venue?._id) } })} style={{ marginTop: 8 }}>
-              <Text style={{ color: C.accent, fontWeight: "700" }}>Đặt lại sân này →</Text>
+          <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, flexDirection: "row", alignItems: "center", gap: 12 }]}>
+            <View style={[styles.secIcon, { backgroundColor: C.field }]}><Ionicons name="close-circle" size={18} color={C.muted} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontWeight: "700" }}>Lượt đặt đã huỷ</Text>
+              {!!b.cancelReason && <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 2 }}>{b.cancelReason}</Text>}
+            </View>
+            <TouchableOpacity onPress={() => router.replace({ pathname: "/courts/[id]", params: { id: String(b.venue?._id) } })}>
+              <Text style={{ color: C.accent, fontWeight: "800", fontSize: 13 }}>Đặt lại →</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {canCancel && (
-          <TouchableOpacity onPress={cancel} disabled={cancelling} style={{ alignSelf: "center", marginTop: 6, padding: 10 }}>
-            <Text style={{ color: "#ef4444", fontWeight: "700" }}>Huỷ lượt đặt</Text>
+          <TouchableOpacity onPress={cancel} disabled={cancelling} style={{ alignSelf: "center", marginTop: 8, paddingVertical: 10, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="trash-outline" size={15} color={C.danger} />
+            <Text style={{ color: C.danger, fontWeight: "700" }}>Huỷ lượt đặt</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -271,16 +320,22 @@ export default function BookingDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  title: { fontSize: 17, fontWeight: "900", flex: 1, marginRight: 8 },
-  section: { fontSize: 15, fontWeight: "800", marginBottom: 8 },
+  card: { borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, padding: SP.lg, marginBottom: SP.md },
+  title: { color: "#fff", fontSize: 21, fontWeight: "900", letterSpacing: -0.4, marginTop: 10 },
+  heroRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.22)" },
+  heroLabel: { color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 3 },
+  heroVal: { color: "#fff", fontWeight: "900", fontSize: 16, letterSpacing: -0.3 },
+  checkedPill: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", backgroundColor: "rgba(34,197,94,0.18)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, marginTop: 12 },
+  section: { fontSize: 15, fontWeight: "800" },
+  secIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  alert: { padding: 10, borderRadius: 10, marginBottom: 10 },
-  qr: { width: 210, height: 210, borderRadius: 12, backgroundColor: "#fff" },
-  bankBox: { borderRadius: 12, padding: 12, marginVertical: 10 },
-  proof: { width: "100%", height: 220, borderRadius: 10, marginBottom: 8, backgroundColor: "#000" },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10 },
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12 },
-  btnText: { color: "#0a0e1a", fontWeight: "800" },
+  alert: { padding: 12, borderRadius: R.sm, marginBottom: 10 },
+  qrFrame: { padding: 10, borderRadius: R.md, backgroundColor: "#fff" },
+  qr: { width: 200, height: 200, borderRadius: 8, backgroundColor: "#fff" },
+  bankBox: { borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth, marginVertical: 10, overflow: "hidden" },
+  bankRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 10 },
+  proof: { width: "100%", height: 220, borderRadius: R.sm, marginBottom: 8, backgroundColor: "#000" },
+  input: { borderRadius: R.sm, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, marginBottom: 10 },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 13, borderRadius: R.md },
+  btnText: { fontWeight: "800", fontSize: 15 },
 });

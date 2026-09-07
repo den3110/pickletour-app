@@ -39,13 +39,13 @@ export default function RecurringScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Đặt định kỳ" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>Sân</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             {courts.map((c: any) => (
               <TouchableOpacity key={c._id} onPress={() => setCourtId(c._id)} style={[styles.chip, { backgroundColor: courtId === c._id ? C.accent : C.field }]}>
-                <Text style={{ color: courtId === c._id ? "#0a0e1a" : C.text, fontWeight: "700", fontSize: 12 }}>{c.name}</Text>
+                <Text style={{ color: courtId === c._id ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{c.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -53,7 +53,7 @@ export default function RecurringScreen() {
           <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
             {WEEKDAYS_SHORT.map((w, i) => (
               <TouchableOpacity key={i} onPress={() => setWeekday(i)} style={[styles.wd, { backgroundColor: weekday === i ? C.accent : C.field }]}>
-                <Text style={{ color: weekday === i ? "#0a0e1a" : C.text, fontWeight: "700", fontSize: 12 }}>{w}</Text>
+                <Text style={{ color: weekday === i ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{w}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -68,7 +68,7 @@ export default function RecurringScreen() {
           <F C={C} label="Tên khách" v={name} set={setName} ph="Khách quen" full />
           <F C={C} label="SĐT" v={phone} set={setPhone} kb="phone-pad" full />
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: isLoading ? 0.6 : 1 }]} disabled={isLoading} onPress={submit}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{isLoading ? "Đang tạo…" : "Tạo lịch định kỳ"}</Text>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>{isLoading ? "Đang tạo…" : "Tạo lịch định kỳ"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -88,13 +88,13 @@ function F({ C, label, v, set, ph, kb, full }: any) {
   return (
     <View style={{ marginBottom: 10, flex: full ? undefined : 1 }}>
       <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.sub} keyboardType={kb} />
+      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }} value={v} onChangeText={set} placeholder={ph} placeholderTextColor={C.sub} keyboardType={kb} />
     </View>
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 16 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   wd: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: "center" },
-  btn: { paddingVertical: 13, borderRadius: 12, alignItems: "center", marginTop: 6 },
+  btn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 6 },
 });

@@ -41,11 +41,23 @@ export const BOOKING_STATUS: Record<string, { label: string; color: string }> = 
 
 export const pal = (dark: boolean) => ({
   dark,
-  bg: dark ? "#0a0e1a" : "#f5f7fb",
-  card: dark ? "#121829" : "#ffffff",
-  border: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+  bg: dark ? "#0b1020" : "#f4f6fb",
+  card: dark ? "#141b2d" : "#ffffff",
+  cardAlt: dark ? "#1a2238" : "#f8fafc",
+  border: dark ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.06)",
   text: dark ? "#f8fafc" : "#0f172a",
   sub: dark ? "#94a3b8" : "#64748b",
+  muted: dark ? "#64748b" : "#94a3b8",
   field: dark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
-  accent: "#4dd0e1",
+  accent: "#22c1d6",
+  accentSoft: dark ? "rgba(34,193,214,0.16)" : "rgba(34,193,214,0.12)",
+  gold: "#f5b301",
+  success: "#22c55e",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  info: "#38bdf8",
+  onAccent: "#06111f",
+  // gradient hero dùng chung (navy → teal sâu) — đẹp ở cả sáng/tối
+  heroGrad: ["#0f172a", "#134e5e"] as [string, string],
+  heroGradAlt: ["#0f172a", "#1e3a8a"] as [string, string],
 });

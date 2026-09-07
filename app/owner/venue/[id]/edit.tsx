@@ -88,7 +88,7 @@ export default function VenueEditScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Cài đặt sân" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
         {/* Ảnh */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 14 }}>
           {form.images.map((u: string, i: number) => (
@@ -140,7 +140,7 @@ export default function VenueEditScreen() {
         </Card>
 
         <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, opacity: saving ? 0.6 : 1 }]} disabled={saving} onPress={save}>
-          <Text style={{ color: "#0a0e1a", fontWeight: "800", fontSize: 15 }}>{saving ? "Đang lưu…" : "Lưu cài đặt"}</Text>
+          <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 15 }}>{saving ? "Đang lưu…" : "Lưu cài đặt"}</Text>
         </TouchableOpacity>
 
         <CourtsManager C={C} venueId={id} courts={venue?.courts || []} />
@@ -219,7 +219,7 @@ function CourtsManager({ C, venueId, courts }: any) {
                 <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                   {WEEKDAYS_SHORT.map((w, wi) => {
                     const on = r.daysOfWeek?.includes(wi);
-                    return <TouchableOpacity key={wi} onPress={() => { const rr = [...rules]; const set0 = new Set(rr[i].daysOfWeek || []); on ? set0.delete(wi) : set0.add(wi); rr[i].daysOfWeek = [...set0]; setRules(rr); }} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: on ? C.accent : C.field }}><Text style={{ color: on ? "#0a0e1a" : C.text, fontSize: 11 }}>{w}</Text></TouchableOpacity>;
+                    return <TouchableOpacity key={wi} onPress={() => { const rr = [...rules]; const set0 = new Set(rr[i].daysOfWeek || []); on ? set0.delete(wi) : set0.add(wi); rr[i].daysOfWeek = [...set0]; setRules(rr); }} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: on ? C.accent : C.field }}><Text style={{ color: on ? C.onAccent : C.text, fontSize: 11 }}>{w}</Text></TouchableOpacity>;
                   })}
                 </View>
                 <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
@@ -230,7 +230,7 @@ function CourtsManager({ C, venueId, courts }: any) {
               </View>
             ))}
             <TouchableOpacity onPress={addRule} style={{ paddingVertical: 8 }}><Text style={{ color: C.accent, fontWeight: "700" }}>+ Thêm khung giá</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, marginTop: 8 }]} onPress={save}><Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Lưu sân</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.save, { backgroundColor: C.accent, marginTop: 8 }]} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu sân</Text></TouchableOpacity>
           </ScrollView>
         </View>
       </Modal>
@@ -245,21 +245,21 @@ function Field({ C, label, v, set, kb, multiline, flex }: any) {
   return (
     <View style={{ marginBottom: 10, flex: flex ? 1 : undefined }}>
       <Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} keyboardType={kb} multiline={multiline} placeholderTextColor={C.sub} />
+      <TextInput style={{ backgroundColor: C.field, color: C.text, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, height: multiline ? 76 : undefined, textAlignVertical: multiline ? "top" : "center" }} value={v} onChangeText={set} keyboardType={kb} multiline={multiline} placeholderTextColor={C.sub} />
     </View>
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 14 },
   img: { width: 100, height: 72, borderRadius: 10 },
   imgDel: { position: "absolute", top: 4, right: 4, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 999, padding: 3 },
   imgAdd: { width: 100, height: 72, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
   hourRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   timeInput: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, width: 68, textAlign: "center" },
-  save: { paddingVertical: 14, borderRadius: 12, alignItems: "center", marginBottom: 16 },
+  save: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginBottom: 16 },
   courtRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
   addCourt: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderStyle: "dashed", borderRadius: 10, paddingVertical: 10, marginTop: 6 },
-  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
   modal: { padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90%" },
   rule: { borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 8 },
   ruleInput: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13 },

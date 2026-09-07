@@ -1,4 +1,4 @@
-// app/owner/venue/[id]/index.tsx — Bảng điều khiển cụm sân: lịch đặt trong ngày + thao tác
+// app/owner/venue/[id]/index.tsx — Bảng điều khiển cụm sân: hero + menu + lịch đặt trong ngày
 import React, { useMemo, useState } from "react";
 import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Modal, Alert, Linking } from "react-native";
 import { Text } from "@/components/ui/i18nText";
@@ -14,17 +14,18 @@ import {
   useUpdateBookingStatusMutation,
 } from "@/slices/bookingsApiSlice";
 import { fmtVND, pal, tLabel, toDateInput, addDays, dtLabel, BOOKING_STATUS } from "@/utils/courtFormat";
+import { Hero, Tile, SectionHeader, DateStrip, Card, Chip, Empty, PrimaryButton, GhostButton, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
 const MGMT = [
-  { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin" },
-  { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products" },
-  { key: "packages", label: "Gói/thẻ", icon: "card-outline", route: "packages" },
-  { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring" },
-  { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks" },
-  { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos" },
-  { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics" },
-  { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue" },
-  { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit" },
+  { key: "walkin", label: "Đặt hộ", icon: "person-add-outline", route: "walkin", tint: "#22c1d6" },
+  { key: "products", label: "Bán hàng", icon: "cart-outline", route: "products", tint: "#f59e0b" },
+  { key: "packages", label: "Gói / thẻ", icon: "card-outline", route: "packages", tint: "#8b5cf6" },
+  { key: "recurring", label: "Định kỳ", icon: "repeat-outline", route: "recurring", tint: "#0ea5e9" },
+  { key: "blocks", label: "Khoá sân", icon: "lock-closed-outline", route: "blocks", tint: "#64748b" },
+  { key: "promos", label: "Mã giảm", icon: "pricetag-outline", route: "promos", tint: "#ec4899" },
+  { key: "analytics", label: "Phân tích", icon: "pie-chart-outline", route: "analytics", tint: "#10b981" },
+  { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue", tint: "#22c55e" },
+  { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit", tint: "#94a3b8" },
 ];
 // "Đặt hộ" tái dùng màn đặt công khai (owner → tự confirmed)
 const openTile = (m: any, id: string) =>
@@ -47,14 +48,14 @@ export default function OwnerVenueHub() {
   const [updateStatus] = useUpdateBookingStatusMutation();
 
   const items: any[] = data || [];
+  const active = items.filter((b) => b.status !== "cancelled");
   const revenue = items.filter((b) => b.payment?.status === "Paid").reduce((s, b) => s + (Number(b.totalPrice) || 0), 0);
   const awaiting = items.filter((b) => b.status === "awaiting_approval").length;
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(toDateInput(), i)), []);
 
   const run = async (fn: () => Promise<any>) => {
     try { await fn(); } catch (e: any) { Alert.alert("Lỗi", e?.data?.message || "Thao tác thất bại"); }
   };
-
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(toDateInput(), i)), []);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -62,134 +63,144 @@ export default function OwnerVenueHub() {
         options={{
           title: venue?.name || "Cụm sân",
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push("/owner/scan")} hitSlop={8}>
-              <Ionicons name="qr-code-outline" size={22} color={C.accent} />
+            <TouchableOpacity onPress={() => router.push("/owner/scan")} hitSlop={8} style={[styles.hdrBtn, { backgroundColor: C.accentSoft }]}>
+              <Ionicons name="qr-code-outline" size={18} color={C.accent} />
             </TouchableOpacity>
           ),
         }}
       />
       <ScrollView
-        contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: SP.lg, paddingBottom: 48 }}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
       >
-        {/* Menu quản lý */}
+        {/* Hero */}
+        <Hero C={C}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            {venue?.images?.[0] ? (
+              <Image source={{ uri: venue.images[0] }} style={styles.heroImg} />
+            ) : (
+              <View style={[styles.heroImg, { backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" }]}>
+                <Ionicons name="tennisball" size={26} color="#fff" />
+              </View>
+            )}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.heroTitle} numberOfLines={1}>{venue?.name || "Cụm sân"}</Text>
+              <Text style={styles.heroSub} numberOfLines={1}>
+                {[venue?.address, venue?.province].filter(Boolean).join(", ") || "Chưa có địa chỉ"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.heroStats}>
+            <HeroStat label="Lượt hôm nay" value={String(active.length)} />
+            <View style={styles.heroDivider} />
+            <HeroStat label="Đã thu" value={fmtVND(revenue)} />
+            <View style={styles.heroDivider} />
+            <HeroStat label="Chờ duyệt" value={String(awaiting)} highlight={awaiting > 0} />
+          </View>
+        </Hero>
+
+        {/* Menu */}
+        <SectionHeader C={C} title="Quản lý" />
         <View style={styles.grid}>
           {MGMT.map((m) => (
-            <TouchableOpacity
-              key={m.key}
-              style={[styles.tile, { backgroundColor: C.card, borderColor: C.border }]}
-              onPress={() => openTile(m, id)}
-            >
-              <Ionicons name={m.icon as any} size={22} color={C.accent} />
-              <Text style={{ color: C.text, fontSize: 12, fontWeight: "700", marginTop: 4 }}>{m.label}</Text>
-            </TouchableOpacity>
+            <Tile key={m.key} C={C} icon={m.icon} label={m.label} tint={m.tint} onPress={() => openTile(m, id)} />
           ))}
         </View>
 
-        {/* Chọn ngày */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }} contentContainerStyle={{ gap: 8 }}>
-          {days.map((d) => {
-            const on = d === date;
-            const [, m, dd] = d.split("-");
-            return (
-              <TouchableOpacity key={d} onPress={() => setDate(d)} style={[styles.day, { backgroundColor: on ? C.accent : C.card, borderColor: on ? C.accent : C.border }]}>
-                <Text style={{ color: on ? "#0a0e1a" : C.text, fontWeight: "800" }}>{dd}/{m}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        {/* Lịch đặt */}
+        <SectionHeader
+          C={C}
+          title="Lịch đặt"
+          right={awaiting > 0 ? <Chip C={C} color={C.warning} label={`${awaiting} bill chờ duyệt`} small /> : null}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -SP.lg }} contentContainerStyle={{ paddingHorizontal: SP.lg }}>
+          <DateStrip C={C} dates={days} value={date} onChange={setDate} />
         </ScrollView>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12, marginBottom: 6 }}>
-          <Text style={{ color: C.sub }}>{items.filter((b) => b.status !== "cancelled").length} lượt · thu {fmtVND(revenue)}</Text>
-          {awaiting > 0 && <Text style={{ color: "#f59e0b", fontWeight: "700" }}>{awaiting} bill chờ duyệt</Text>}
-        </View>
-
-        {isLoading ? (
-          <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
-        ) : items.length === 0 ? (
-          <Text style={{ color: C.sub, textAlign: "center", marginTop: 24 }}>Chưa có lượt đặt trong ngày.</Text>
-        ) : (
-          items.map((b) => {
-            const st = BOOKING_STATUS[b.status] || BOOKING_STATUS.pending;
-            const paid = b.payment?.status === "Paid";
-            const checkedIn = !!b.ticket?.checkedInAt;
-            return (
-              <View key={b._id} style={[styles.card, { backgroundColor: C.card, borderColor: b.status === "awaiting_approval" ? "#38bdf8" : C.border }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <Text style={{ color: C.text, fontWeight: "800" }}>{tLabel(b.startAt)}–{tLabel(b.endAt)} · {b.court?.name}</Text>
-                  <View style={[styles.badge, { backgroundColor: `${st.color}26` }]}>
-                    <Text style={{ color: st.color, fontWeight: "700", fontSize: 11 }}>{st.label}</Text>
+        <View style={{ marginTop: SP.md }}>
+          {isLoading ? (
+            <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
+          ) : items.length === 0 ? (
+            <Card C={C} pad={0}><Empty C={C} title="Chưa có lượt đặt" subtitle="Ngày này chưa có khách đặt sân." /></Card>
+          ) : (
+            items.map((b) => {
+              const st = BOOKING_STATUS[b.status] || BOOKING_STATUS.pending;
+              const paid = b.payment?.status === "Paid";
+              const checkedIn = !!b.ticket?.checkedInAt;
+              const awaitingBill = b.status === "awaiting_approval";
+              return (
+                <Card key={b._id} C={C} pad={0} style={[{ marginBottom: SP.md, overflow: "hidden" }, awaitingBill && { borderColor: C.info, borderWidth: 1 }]}>
+                  <View style={{ flexDirection: "row" }}>
+                    <View style={[styles.timeCol, { backgroundColor: `${st.color}18` }]}>
+                      <Text style={{ color: st.color, fontWeight: "900", fontSize: 16 }}>{tLabel(b.startAt)}</Text>
+                      <Text style={{ color: st.color, fontSize: 11, opacity: 0.85 }}>→ {tLabel(b.endAt)}</Text>
+                    </View>
+                    <View style={{ flex: 1, padding: 12, minWidth: 0 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <Text style={{ color: C.text, fontWeight: "800", flex: 1 }} numberOfLines={1}>
+                          {b.customerName || b.user?.name || "Khách"}
+                        </Text>
+                        <Chip C={C} color={st.color} label={st.label} small />
+                      </View>
+                      <Text style={{ color: C.sub, fontSize: 12.5, marginTop: 3 }} numberOfLines={1}>
+                        {b.court?.name}{b.customerPhone || b.user?.phone ? ` · ${b.customerPhone || b.user?.phone}` : ""} · <Text style={{ color: C.text, fontWeight: "700" }}>{fmtVND(b.totalPrice)}</Text>
+                      </Text>
+                      {checkedIn && <Text style={{ color: C.success, fontSize: 12, marginTop: 3, fontWeight: "700" }}>✓ Check-in {dtLabel(b.ticket.checkedInAt)}</Text>}
+                      <View style={styles.actions}>
+                        {b.payment?.proofUrl && (
+                          <ActBtn C={C} icon="receipt-outline" label={awaitingBill ? "Duyệt bill" : "Xem bill"} primary={awaitingBill} color={C.info} onPress={() => setBill(b)} />
+                        )}
+                        {b.status === "confirmed" && !checkedIn && (
+                          <ActBtn C={C} icon="checkmark-done" label="Check-in" primary color={C.success} onPress={() => run(() => checkIn({ token: b.ticket?.token, venueId: id }).unwrap())} />
+                        )}
+                        {!paid && b.status !== "cancelled" && (
+                          <ActBtn C={C} icon="cash-outline" label="Đã thu" color={C.success} onPress={() => run(() => approve({ id: b._id, venueId: id }).unwrap())} />
+                        )}
+                        {["pending", "awaiting_approval", "confirmed"].includes(b.status) && (
+                          <ActBtn C={C} icon="close" label="Huỷ" color={C.muted} onPress={() => Alert.alert("Huỷ lượt đặt", `#${b.code}?`, [{ text: "Không" }, { text: "Huỷ đơn", style: "destructive", onPress: () => run(() => updateStatus({ id: b._id, status: "cancelled", venueId: id }).unwrap()) }])} />
+                        )}
+                      </View>
+                    </View>
                   </View>
-                </View>
-                <Text style={{ color: C.sub, marginTop: 4 }}>
-                  {b.customerName || b.user?.name || "Khách"}{b.customerPhone || b.user?.phone ? ` · ${b.customerPhone || b.user?.phone}` : ""} · <Text style={{ color: C.text, fontWeight: "700" }}>{fmtVND(b.totalPrice)}</Text>
-                </Text>
-                {checkedIn && <Text style={{ color: "#22c55e", fontSize: 12, marginTop: 2 }}>✓ Check-in {dtLabel(b.ticket.checkedInAt)}</Text>}
-
-                <View style={styles.actions}>
-                  {b.payment?.proofUrl && (
-                    <TouchableOpacity style={[styles.actBtn, { backgroundColor: b.status === "awaiting_approval" ? "#38bdf8" : C.field }]} onPress={() => setBill(b)}>
-                      <Ionicons name="receipt-outline" size={15} color={b.status === "awaiting_approval" ? "#0a0e1a" : C.text} />
-                      <Text style={{ color: b.status === "awaiting_approval" ? "#0a0e1a" : C.text, fontWeight: "700", fontSize: 12 }}>{b.status === "awaiting_approval" ? "Duyệt bill" : "Xem bill"}</Text>
-                    </TouchableOpacity>
-                  )}
-                  {b.status === "confirmed" && !checkedIn && (
-                    <TouchableOpacity style={[styles.actBtn, { backgroundColor: "#22c55e" }]} onPress={() => run(() => checkIn({ token: b.ticket?.token, venueId: id }).unwrap())}>
-                      <Ionicons name="checkmark-done" size={15} color="#0a0e1a" />
-                      <Text style={{ color: "#0a0e1a", fontWeight: "700", fontSize: 12 }}>Check-in</Text>
-                    </TouchableOpacity>
-                  )}
-                  {!paid && b.status !== "cancelled" && (
-                    <TouchableOpacity style={[styles.actBtn, { borderWidth: 1, borderColor: "#22c55e" }]} onPress={() => run(() => approve({ id: b._id, venueId: id }).unwrap())}>
-                      <Text style={{ color: "#22c55e", fontWeight: "700", fontSize: 12 }}>Đã thu tiền</Text>
-                    </TouchableOpacity>
-                  )}
-                  {["pending", "awaiting_approval", "confirmed"].includes(b.status) && (
-                    <TouchableOpacity style={[styles.actBtn, { borderWidth: 1, borderColor: C.border }]} onPress={() => Alert.alert("Huỷ lượt đặt", `#${b.code}?`, [{ text: "Không" }, { text: "Huỷ đơn", style: "destructive", onPress: () => run(() => updateStatus({ id: b._id, status: "cancelled", venueId: id }).unwrap()) }])}>
-                      <Text style={{ color: C.sub, fontWeight: "700", fontSize: 12 }}>Huỷ</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          })
-        )}
+                </Card>
+              );
+            })
+          )}
+        </View>
       </ScrollView>
 
       {/* Modal duyệt bill */}
       <Modal visible={!!bill} transparent animationType="slide" onRequestClose={() => setBill(null)}>
         <View style={styles.modalWrap}>
-          <View style={[styles.modal, { backgroundColor: C.card }]}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Bill · #{bill?.code}</Text>
-              <TouchableOpacity onPress={() => setBill(null)}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
+          <View style={[styles.modal, { backgroundColor: C.card }, shadow(C.dark, 3)]}>
+            <SheetHandle C={C} />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <Text style={{ color: C.text, fontWeight: "900", fontSize: 18 }}>Bill chuyển khoản</Text>
+              <TouchableOpacity onPress={() => setBill(null)} style={[styles.hdrBtn, { backgroundColor: C.field }]}><Ionicons name="close" size={18} color={C.sub} /></TouchableOpacity>
             </View>
             {bill && (
               <>
-                <Text style={{ color: C.sub, marginBottom: 8 }}>
-                  {bill.customerName || bill.user?.name} · {tLabel(bill.startAt)}–{tLabel(bill.endAt)} · {fmtVND(bill.totalPrice)}
+                <Text style={{ color: C.sub, marginBottom: 12 }}>
+                  #{bill.code} · {bill.customerName || bill.user?.name} · {tLabel(bill.startAt)}–{tLabel(bill.endAt)} · <Text style={{ color: C.text, fontWeight: "800" }}>{fmtVND(bill.totalPrice)}</Text>
                 </Text>
                 {bill.payment?.proofUrl ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(bill.payment.proofUrl)}>
-                    <Image source={{ uri: bill.payment.proofUrl }} style={styles.billImg} resizeMode="contain" />
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => Linking.openURL(bill.payment.proofUrl)}>
+                    <Image source={{ uri: bill.payment.proofUrl }} style={[styles.billImg, { borderColor: C.border }]} resizeMode="contain" />
                   </TouchableOpacity>
                 ) : null}
                 {bill.status === "awaiting_approval" && (
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-                    <TouchableOpacity
-                      style={[styles.mBtn, { borderWidth: 1, borderColor: "#ef4444" }]}
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                    <GhostButton
+                      C={C}
+                      color={C.danger}
+                      label="Từ chối"
                       disabled={rejecting}
-                      onPress={() => Alert.prompt ? Alert.prompt("Từ chối bill", "Lý do:", (reason) => run(async () => { await reject({ id: bill._id, reason: reason || "", venueId: id }).unwrap(); setBill(null); })) : run(async () => { await reject({ id: bill._id, reason: "", venueId: id }).unwrap(); setBill(null); })}
-                    >
-                      <Text style={{ color: "#ef4444", fontWeight: "800" }}>Từ chối</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.mBtn, { backgroundColor: "#22c55e" }]}
-                      disabled={approving}
-                      onPress={() => run(async () => { await approve({ id: bill._id, venueId: id }).unwrap(); setBill(null); })}
-                    >
-                      <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Duyệt — đã nhận tiền</Text>
-                    </TouchableOpacity>
+                      style={{ flex: 1, borderColor: C.danger }}
+                      onPress={() => (Alert as any).prompt
+                        ? (Alert as any).prompt("Từ chối bill", "Lý do:", (reason: string) => run(async () => { await reject({ id: bill._id, reason: reason || "", venueId: id }).unwrap(); setBill(null); }))
+                        : run(async () => { await reject({ id: bill._id, reason: "", venueId: id }).unwrap(); setBill(null); })}
+                    />
+                    <PrimaryButton C={C} color={C.success} icon="checkmark-circle" label="Duyệt — đã nhận tiền" disabled={approving} style={{ flex: 1.4 }} onPress={() => run(async () => { await approve({ id: bill._id, venueId: id }).unwrap(); setBill(null); })} />
                   </View>
                 )}
               </>
@@ -201,16 +212,37 @@ export default function OwnerVenueHub() {
   );
 }
 
+function HeroStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <Text style={{ color: highlight ? "#fde68a" : "#fff", fontWeight: "900", fontSize: 17, letterSpacing: -0.3 }} numberOfLines={1}>{value}</Text>
+      <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 2 }}>{label}</Text>
+    </View>
+  );
+}
+
+function ActBtn({ C, icon, label, onPress, primary, color }: any) {
+  const c = color || C.accent;
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.act, primary ? { backgroundColor: c } : { backgroundColor: `${c}1a` }]}>
+      <Ionicons name={icon} size={14} color={primary ? "#06111f" : c} />
+      <Text style={{ color: primary ? "#06111f" : c, fontWeight: "700", fontSize: 12 }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tile: { width: "31.5%", aspectRatio: 1.35, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  day: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  card: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
-  actBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
-  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
-  modal: { padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34, maxHeight: "88%" },
-  billImg: { width: "100%", height: 340, borderRadius: 10, backgroundColor: "#000" },
-  mBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+  hdrBtn: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  heroImg: { width: 58, height: 58, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.35)" },
+  heroTitle: { color: "#fff", fontWeight: "900", fontSize: 19, letterSpacing: -0.3 },
+  heroSub: { color: "rgba(255,255,255,0.72)", fontSize: 12.5, marginTop: 3 },
+  heroStats: { flexDirection: "row", alignItems: "center", marginTop: 18, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.22)" },
+  heroDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: "rgba(255,255,255,0.22)" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  timeCol: { width: 82, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  act: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10 },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
+  modal: { padding: SP.xl, borderTopLeftRadius: R.xl, borderTopRightRadius: R.xl, paddingBottom: 36, maxHeight: "88%" },
+  billImg: { width: "100%", height: 340, borderRadius: R.md, backgroundColor: "#000", borderWidth: StyleSheet.hairlineWidth },
 });

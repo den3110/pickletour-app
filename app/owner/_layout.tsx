@@ -1,17 +1,20 @@
 import { Stack } from "expo-router";
 import { useTheme } from "@react-navigation/native";
+import { pal } from "@/utils/courtFormat";
 
 export default function OwnerLayout() {
   const theme = useTheme();
-  const dark = !!theme.dark;
+  const C = pal(!!theme.dark);
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: dark ? "#121829" : "#ffffff" },
-        headerTintColor: dark ? "#f8fafc" : "#0f172a",
+        headerStyle: { backgroundColor: C.bg },
+        headerTintColor: C.text,
+        headerTitleStyle: { fontWeight: "800", fontSize: 17 },
         headerShadowVisible: false,
         headerBackTitle: "Quay lại",
-        contentStyle: { backgroundColor: dark ? "#0a0e1a" : "#f5f7fb" },
+        headerBackTitleVisible: false,
+        contentStyle: { backgroundColor: C.bg },
       }}
     />
   );

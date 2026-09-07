@@ -54,7 +54,7 @@ export default function OwnerScanScreen() {
             Cần quyền camera để quét vé QR
           </Text>
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, marginTop: 16 }]} onPress={() => requestPermission()}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Cho phép camera</Text>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>Cho phép camera</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -100,7 +100,7 @@ export default function OwnerScanScreen() {
             </>
           )}
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, marginTop: 24 }]} onPress={reset}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Quét vé tiếp theo</Text>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>Quét vé tiếp theo</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -123,10 +123,10 @@ function BookingInfo({ b, C }: any) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
-  btn: { paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12 },
+  btn: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   frame: { width: 240, height: 240, borderRadius: 24, borderWidth: 3, borderColor: "rgba(255,255,255,0.9)" },
   hint: { color: "#fff", marginTop: 20, fontSize: 15, fontWeight: "600", textShadowColor: "#000", textShadowRadius: 4 },
   resultWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  info: { marginTop: 18, padding: 16, borderRadius: 14, borderWidth: 1, width: "100%" },
+  info: { marginTop: 18, padding: 16, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, width: "100%" },
 });

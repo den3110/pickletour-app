@@ -52,7 +52,7 @@ export default function VenueReviewsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Đánh giá sân" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {isLoading ? <ActivityIndicator color="#f59e0b" style={{ marginTop: 30 }} /> : (
           <>
             <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, alignItems: "center" }]}>
@@ -73,7 +73,7 @@ export default function VenueReviewsScreen() {
                 <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Chia sẻ trải nghiệm về sân…" placeholderTextColor={C.sub} value={comment} onChangeText={(t) => setComment(t.slice(0, 1000))} multiline />
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
                   {mine && <TouchableOpacity style={[styles.btn, { borderWidth: 1, borderColor: C.border }]} onPress={() => setEditing(false)}><Text style={{ color: C.sub, fontWeight: "700" }}>Huỷ</Text></TouchableOpacity>}
-                  <TouchableOpacity style={[styles.btn, { backgroundColor: "#f59e0b", flex: 1, opacity: saving ? 0.6 : 1 }]} disabled={saving} onPress={submit}><Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{saving ? "Đang gửi…" : "Gửi đánh giá"}</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.btn, { backgroundColor: "#f59e0b", flex: 1, opacity: saving ? 0.6 : 1 }]} disabled={saving} onPress={submit}><Text style={{ color: C.onAccent, fontWeight: "800" }}>{saving ? "Đang gửi…" : "Gửi đánh giá"}</Text></TouchableOpacity>
                 </View>
               </View>
             ) : (
@@ -118,9 +118,9 @@ export default function VenueReviewsScreen() {
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
-  input: { borderRadius: 10, padding: 10, minHeight: 80, textAlignVertical: "top", fontSize: 14 },
-  btn: { paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 12 },
+  input: { borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: "top", fontSize: 14 },
+  btn: { paddingVertical: 13, borderRadius: 14, alignItems: "center" },
   avatar: { width: 36, height: 36, borderRadius: 18 },
   chip: { backgroundColor: "rgba(34,197,94,0.15)", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
 });

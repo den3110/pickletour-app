@@ -39,7 +39,7 @@ export default function BlocksScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Khoá sân / bảo trì" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 10 }}>Thêm khoá</Text>
           <Row C={C} label="Ngày (YYYY-MM-DD)"><TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={date} onChangeText={setDate} placeholderTextColor={C.sub} /></Row>
@@ -54,11 +54,11 @@ export default function BlocksScreen() {
           </View>
           <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={reason} onChangeText={setReason} placeholder="Lý do (vd: bảo trì mặt sân)" placeholderTextColor={C.sub} />
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{creating ? "Đang lưu…" : "Khoá khung giờ"}</Text>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>{creating ? "Đang lưu…" : "Khoá khung giờ"}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={{ color: C.sub, fontWeight: "800", fontSize: 12, marginBottom: 8 }}>ĐANG KHOÁ</Text>
+        <Text style={{ color: C.sub, fontWeight: "800", fontSize: 11.5, letterSpacing: 0.8, marginBottom: 8 }}>ĐANG KHOÁ</Text>
         {isLoading ? <ActivityIndicator color={C.accent} /> : (blocks || []).length === 0 ? (
           <Text style={{ color: C.sub }}>Không có khoá nào sắp tới.</Text>
         ) : (
@@ -83,11 +83,11 @@ function Row({ C, label, children, flex }: any) {
   return <View style={{ marginBottom: 10, flex: flex ? 1 : undefined }}><Text style={{ color: C.sub, fontSize: 13, marginBottom: 6 }}>{label}</Text>{children}</View>;
 }
 function Chip({ C, on, label, onPress }: any) {
-  return <TouchableOpacity onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: on ? C.accent : C.field }}><Text style={{ color: on ? "#0a0e1a" : C.text, fontWeight: "700", fontSize: 12 }}>{label}</Text></TouchableOpacity>;
+  return <TouchableOpacity onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: on ? C.accent : C.field }}><Text style={{ color: on ? C.onAccent : C.text, fontWeight: "700", fontSize: 12 }}>{label}</Text></TouchableOpacity>;
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  btn: { paddingVertical: 13, borderRadius: 12, alignItems: "center", marginTop: 12 },
-  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 16 },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  btn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 12 },
+  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
 });

@@ -37,13 +37,13 @@ export default function PromosScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Mã giảm giá" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 10 }}>Tạo mã mới</Text>
           <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={code} onChangeText={(t) => setCode(t.toUpperCase())} placeholder="MÃ (vd: SALE10)" placeholderTextColor={C.sub} autoCapitalize="characters" />
           <View style={{ flexDirection: "row", gap: 8, marginVertical: 10 }}>
-            <TouchableOpacity style={[styles.seg, { backgroundColor: type === "percent" ? C.accent : C.field }]} onPress={() => setType("percent")}><Text style={{ color: type === "percent" ? "#0a0e1a" : C.text, fontWeight: "700" }}>Giảm %</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.seg, { backgroundColor: type === "amount" ? C.accent : C.field }]} onPress={() => setType("amount")}><Text style={{ color: type === "amount" ? "#0a0e1a" : C.text, fontWeight: "700" }}>Giảm tiền</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.seg, { backgroundColor: type === "percent" ? C.accent : C.field }]} onPress={() => setType("percent")}><Text style={{ color: type === "percent" ? C.onAccent : C.text, fontWeight: "700" }}>Giảm %</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.seg, { backgroundColor: type === "amount" ? C.accent : C.field }]} onPress={() => setType("amount")}><Text style={{ color: type === "amount" ? C.onAccent : C.text, fontWeight: "700" }}>Giảm tiền</Text></TouchableOpacity>
           </View>
           <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={value} onChangeText={setValue} keyboardType="numeric" placeholder={type === "percent" ? "Phần trăm (0-100)" : "Số tiền (đ)"} placeholderTextColor={C.sub} />
           <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
@@ -52,7 +52,7 @@ export default function PromosScreen() {
           </View>
           <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginTop: 10 }]} value={usageLimit} onChangeText={setUsageLimit} keyboardType="numeric" placeholder="Giới hạn lượt dùng (0 = không giới hạn)" placeholderTextColor={C.sub} />
           <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{creating ? "Đang tạo…" : "Tạo mã"}</Text>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>{creating ? "Đang tạo…" : "Tạo mã"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -77,9 +77,9 @@ export default function PromosScreen() {
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  seg: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
-  btn: { paddingVertical: 13, borderRadius: 12, alignItems: "center", marginTop: 12 },
-  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 16 },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  seg: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
+  btn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 12 },
+  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
 });

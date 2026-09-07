@@ -44,10 +44,10 @@ export default function OwnerPackagesScreen() {
       <Stack.Screen options={{ title: "Gói giờ / thẻ tháng", headerRight: () => (
         <TouchableOpacity onPress={() => setOpen(true)} hitSlop={8}><Ionicons name="add-circle" size={24} color={C.accent} /></TouchableOpacity>
       ) }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {pending.length > 0 && (
           <>
-            <Text style={{ color: "#f59e0b", fontWeight: "800", fontSize: 12, marginBottom: 8 }}>CHỜ KÍCH HOẠT ({pending.length})</Text>
+            <Text style={{ color: "#f59e0b", fontWeight: "800", fontSize: 11.5, letterSpacing: 0.8, marginBottom: 8 }}>CHỜ KÍCH HOẠT ({pending.length})</Text>
             {pending.map((p: any) => (
               <View key={p._id} style={[styles.item, { backgroundColor: C.card, borderColor: "#f59e0b" }]}>
                 <View style={{ flex: 1 }}>
@@ -55,7 +55,7 @@ export default function OwnerPackagesScreen() {
                   <Text style={{ color: C.sub, fontSize: 12 }}>{fmtVND(p.price)}{p.user?.phone ? ` · ${p.user.phone}` : ""} · {dtLabel(p.createdAt)}</Text>
                 </View>
                 <TouchableOpacity style={[styles.actBtn, { backgroundColor: "#22c55e" }]} onPress={() => Alert.alert("Kích hoạt gói", "Xác nhận đã nhận tiền?", [{ text: "Không" }, { text: "Kích hoạt", onPress: () => activate({ venueId: id, purchaseId: p._id }) }])}>
-                  <Text style={{ color: "#0a0e1a", fontWeight: "800", fontSize: 12 }}>Kích hoạt</Text>
+                  <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 12 }}>Kích hoạt</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -63,7 +63,7 @@ export default function OwnerPackagesScreen() {
           </>
         )}
 
-        <Text style={{ color: C.sub, fontWeight: "800", fontSize: 12, marginBottom: 8 }}>GÓI ĐANG BÁN</Text>
+        <Text style={{ color: C.sub, fontWeight: "800", fontSize: 11.5, letterSpacing: 0.8, marginBottom: 8 }}>GÓI ĐANG BÁN</Text>
         {isLoading ? <ActivityIndicator color={C.accent} /> : (packages || []).length === 0 ? (
           <Text style={{ color: C.sub }}>Chưa có gói nào. Bấm + để tạo.</Text>
         ) : (packages || []).map((p: any) => (
@@ -89,15 +89,15 @@ export default function OwnerPackagesScreen() {
             </View>
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên gói (vd: Gói 10 giờ)" placeholderTextColor={C.sub} />
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-              <TouchableOpacity style={[styles.seg, { backgroundColor: type === "credits" ? C.accent : C.field }]} onPress={() => setType("credits")}><Text style={{ color: type === "credits" ? "#0a0e1a" : C.text, fontWeight: "700" }}>Gói giờ</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.seg, { backgroundColor: type === "period" ? C.accent : C.field }]} onPress={() => setType("period")}><Text style={{ color: type === "period" ? "#0a0e1a" : C.text, fontWeight: "700" }}>Thẻ tháng</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.seg, { backgroundColor: type === "credits" ? C.accent : C.field }]} onPress={() => setType("credits")}><Text style={{ color: type === "credits" ? C.onAccent : C.text, fontWeight: "700" }}>Gói giờ</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.seg, { backgroundColor: type === "period" ? C.accent : C.field }]} onPress={() => setType("period")}><Text style={{ color: type === "period" ? C.onAccent : C.text, fontWeight: "700" }}>Thẻ tháng</Text></TouchableOpacity>
             </View>
             {type === "credits" && <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={hours} onChangeText={setHours} keyboardType="numeric" placeholder="Số giờ" placeholderTextColor={C.sub} />}
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={validDays} onChangeText={setValidDays} keyboardType="numeric" placeholder="Hạn (ngày)" placeholderTextColor={C.sub} />
               <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="Giá (đ)" placeholderTextColor={C.sub} />
             </View>
-            <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}><Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Tạo gói</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={submit}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Tạo gói</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -105,11 +105,11 @@ export default function OwnerPackagesScreen() {
   );
 }
 const styles = StyleSheet.create({
-  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  item: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
   actBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
-  modal: { padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginBottom: 10 },
-  seg: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
-  mBtn: { paddingVertical: 13, borderRadius: 12, alignItems: "center", marginTop: 6 },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
+  modal: { padding: 20, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: 36 },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 10 },
+  seg: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
+  mBtn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 6 },
 });

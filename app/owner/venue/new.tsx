@@ -41,7 +41,7 @@ export default function NewVenueScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Tạo cụm sân" }} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <View style={[styles.hint, { backgroundColor: "rgba(77,208,225,0.1)" }]}>
+        <View style={[styles.hint, { backgroundColor: C.accentSoft }]}>
           <Ionicons name="information-circle" size={18} color={C.accent} />
           <Text style={{ color: C.text, flex: 1, fontSize: 13, lineHeight: 19 }}>Tạo nhanh rồi bổ sung sân con, giá, giờ mở cửa và tài khoản nhận tiền ở bước sau.</Text>
         </View>
@@ -50,7 +50,7 @@ export default function NewVenueScreen() {
         {F("Địa chỉ", address, setAddress, "Số nhà, đường, phường…")}
         {F("Số điện thoại", phone, setPhone, "SĐT liên hệ", "phone-pad")}
         <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, opacity: isLoading ? 0.6 : 1 }]} disabled={isLoading} onPress={submit}>
-          <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{isLoading ? "Đang tạo…" : "Tạo cụm sân"}</Text>
+          <Text style={{ color: C.onAccent, fontWeight: "800" }}>{isLoading ? "Đang tạo…" : "Tạo cụm sân"}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -58,6 +58,6 @@ export default function NewVenueScreen() {
 }
 const styles = StyleSheet.create({
   hint: { flexDirection: "row", gap: 8, padding: 12, borderRadius: 12, marginBottom: 16 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
-  btn: { paddingVertical: 14, borderRadius: 12, alignItems: "center", marginTop: 6 },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  btn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", marginTop: 6 },
 });

@@ -30,7 +30,7 @@ export default function MyPackagesScreen() {
         <FlatList
           data={items}
           keyExtractor={(p) => String(p._id)}
-          contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
           ListEmptyComponent={<Text style={{ color: C.sub, textAlign: "center", marginTop: 40 }}>Bạn chưa mua gói nào.</Text>}
           renderItem={({ item: p }) => {
@@ -59,6 +59,6 @@ export default function MyPackagesScreen() {
   );
 }
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16, marginBottom: 12 },
   chip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 });

@@ -29,11 +29,11 @@ export default function RevenueScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: "Doanh thu" }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
           {RANGES.map((r) => (
             <TouchableOpacity key={r.key} onPress={() => setRange(r.key)} style={[styles.seg, { backgroundColor: range === r.key ? C.accent : C.card, borderColor: range === r.key ? C.accent : C.border }]}>
-              <Text style={{ color: range === r.key ? "#0a0e1a" : C.text, fontWeight: "700" }}>{r.label}</Text>
+              <Text style={{ color: range === r.key ? C.onAccent : C.text, fontWeight: "700" }}>{r.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -50,7 +50,7 @@ export default function RevenueScreen() {
               <Small C={C} label="Huỷ" value={String(t.cancelledCount || 0)} />
             </View>
 
-            <Text style={{ color: C.sub, fontWeight: "800", fontSize: 12, marginBottom: 8 }}>THEO SÂN</Text>
+            <Text style={{ color: C.sub, fontWeight: "800", fontSize: 11.5, letterSpacing: 0.8, marginBottom: 8 }}>THEO SÂN</Text>
             {(data?.byCourt || []).length === 0 ? <Text style={{ color: C.sub }}>Chưa có dữ liệu.</Text> : (data?.byCourt || []).map((c: any) => (
               <View key={c.courtId} style={[styles.row, { backgroundColor: C.card, borderColor: C.border }]}>
                 <Text style={{ color: C.text, fontWeight: "700", flex: 1 }}>{c.courtName}</Text>
@@ -59,7 +59,7 @@ export default function RevenueScreen() {
               </View>
             ))}
 
-            <Text style={{ color: C.sub, fontWeight: "800", fontSize: 12, marginTop: 16, marginBottom: 8 }}>THEO NGÀY</Text>
+            <Text style={{ color: C.sub, fontWeight: "800", fontSize: 11.5, letterSpacing: 0.8, marginTop: 16, marginBottom: 8 }}>THEO NGÀY</Text>
             {(data?.byDay || []).map((d: any) => (
               <View key={d.date} style={[styles.row, { backgroundColor: C.card, borderColor: C.border }]}>
                 <Text style={{ color: C.text, flex: 1 }}>{d.date.split("-").reverse().join("/")}</Text>
@@ -80,8 +80,8 @@ function Small({ C, label, value }: any) {
   return <View style={[styles.small, { backgroundColor: C.card, borderColor: C.border }]}><Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>{value}</Text><Text style={{ color: C.sub, fontSize: 11 }}>{label}</Text></View>;
 }
 const styles = StyleSheet.create({
-  seg: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: "center" },
-  big: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 14 },
-  small: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: "center" },
-  row: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, padding: 12, marginBottom: 8 },
+  seg: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, alignItems: "center" },
+  big: { flex: 1, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 16 },
+  small: { flex: 1, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, alignItems: "center" },
+  row: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 8 },
 });

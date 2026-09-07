@@ -24,8 +24,10 @@ import { useCreateBookingMutation } from "@/slices/bookingsApiSlice";
 import { useLazyValidatePromoQuery } from "@/slices/venueOwnerApiSlice";
 import { useGetReviewSummaryQuery } from "@/slices/reviewApiSlice";
 import { useListVenuePackagesQuery, usePurchasePackageMutation, useMyPackagesQuery } from "@/slices/packagesApiSlice";
+import { LinearGradient } from "expo-linear-gradient";
 import VenueMiniMap from "@/components/courts/VenueMiniMap";
-import { fmtVND, pal, toDateInput, addDays, WEEKDAYS_SHORT, weekdayOf } from "@/utils/courtFormat";
+import { fmtVND, pal, toDateInput, addDays } from "@/utils/courtFormat";
+import { DateStrip, SectionHeader, SheetHandle, shadow, R, SP } from "@/components/courts/ui";
 
 type Slot = { start: string; end: string; price: number; booked: boolean; past: boolean };
 type Sel = { courtId: string; courtName: string; slots: Slot[] } | null;
@@ -181,11 +183,27 @@ export default function VenueDetailScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: venue.name || "Sân" }} />
       <ScrollView contentContainerStyle={{ paddingBottom: sel ? 120 : 30 }}>
-        {venue.images?.[0] ? (
-          <Image source={{ uri: venue.images[0] }} style={styles.cover} />
-        ) : null}
-        <View style={{ padding: 14 }}>
-          <Text style={[styles.title, { color: C.text }]}>{venue.name}</Text>
+        {/* Cover + tên sân phủ gradient */}
+        <View>
+          {venue.images?.[0] ? (
+            <Image source={{ uri: venue.images[0] }} style={styles.cover} />
+          ) : (
+            <LinearGradient colors={C.heroGrad} style={[styles.cover, { alignItems: "center", justifyContent: "center" }]}>
+              <Ionicons name="tennisball" size={54} color="rgba(255,255,255,0.5)" />
+            </LinearGradient>
+          )}
+          <LinearGradient colors={["rgba(2,6,23,0)", "rgba(2,6,23,0.82)"]} style={styles.coverShade} />
+          <View style={styles.coverBottom}>
+            <Text style={styles.coverTitle} numberOfLines={2}>{venue.name}</Text>
+            {reviewSum?.summary?.count ? (
+              <View style={styles.ratingPill}>
+                <Ionicons name="star" size={12} color="#f5b301" />
+                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{reviewSum.summary.avg?.toFixed(1)} · {reviewSum.summary.count} đánh giá</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <View style={[styles.infoCard, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 2)]}>
           <TouchableOpacity
             style={styles.row}
             onPress={() => {
@@ -193,32 +211,34 @@ export default function VenueDetailScreen() {
               if (q) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
             }}
           >
-            <Ionicons name="location-outline" size={15} color={C.sub} />
-            <Text style={[styles.sub, { color: C.sub, textDecorationLine: "underline" }]}>
+            <View style={[styles.rowIcon, { backgroundColor: C.accentSoft }]}><Ionicons name="location" size={14} color={C.accent} /></View>
+            <Text style={[styles.sub, { color: C.text }]}>
               {[venue.address, venue.province].filter(Boolean).join(", ") || "—"}
             </Text>
+            <Ionicons name="open-outline" size={14} color={C.muted} />
           </TouchableOpacity>
           {!!venue.phone && (
             <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${venue.phone}`)}>
-              <Ionicons name="call-outline" size={15} color={C.sub} />
-              <Text style={[styles.sub, { color: C.accent }]}>{venue.phone}</Text>
+              <View style={[styles.rowIcon, { backgroundColor: C.accentSoft }]}><Ionicons name="call" size={14} color={C.accent} /></View>
+              <Text style={[styles.sub, { color: C.accent, fontWeight: "700" }]}>{venue.phone}</Text>
             </TouchableOpacity>
           )}
           <View style={styles.row}>
-            <Ionicons name="time-outline" size={15} color={C.sub} />
-            <Text style={[styles.sub, { color: C.sub }]}>
+            <View style={[styles.rowIcon, { backgroundColor: C.accentSoft }]}><Ionicons name="time" size={14} color={C.accent} /></View>
+            <Text style={[styles.sub, { color: C.text }]}>
               {hoursToday?.closed ? "Đóng cửa" : `${hoursToday?.open || "--"} – ${hoursToday?.close || "--"}`}
               {venue.slotMinutes ? ` · bước ${venue.slotMinutes}'` : ""}
             </Text>
           </View>
           {!!venue.description && (
-            <Text style={[styles.desc, { color: C.text }]}>{venue.description}</Text>
+            <Text style={[styles.desc, { color: C.sub }]}>{venue.description}</Text>
           )}
           {Array.isArray(venue.amenities) && venue.amenities.length > 0 && (
             <View style={styles.chips}>
               {venue.amenities.map((a: string) => (
                 <View key={a} style={[styles.chip, { backgroundColor: C.field }]}>
-                  <Text style={{ color: C.sub, fontSize: 12 }}>{a}</Text>
+                  <Ionicons name="checkmark-circle" size={12} color={C.success} />
+                  <Text style={{ color: C.text, fontSize: 12, fontWeight: "600" }}>{a}</Text>
                 </View>
               ))}
             </View>
@@ -230,102 +250,118 @@ export default function VenueDetailScreen() {
         ) : null}
 
         {/* Đánh giá */}
-        <TouchableOpacity style={[styles.reviewBtn, { borderColor: C.border }]} onPress={() => router.push({ pathname: "/courts/reviews/[id]", params: { id } })}>
-          <Ionicons name="star" size={16} color="#f59e0b" />
+        <TouchableOpacity activeOpacity={0.85} style={[styles.reviewBtn, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 1)]} onPress={() => router.push({ pathname: "/courts/reviews/[id]", params: { id } })}>
+          <View style={[styles.rowIcon, { backgroundColor: "rgba(245,179,1,0.16)" }]}><Ionicons name="star" size={14} color="#f5b301" /></View>
           <Text style={{ color: C.text, fontWeight: "700", flex: 1 }}>
-            {reviewSum?.summary?.count ? `Đánh giá ${reviewSum.summary.avg?.toFixed(1)}★ · ${reviewSum.summary.count} lượt` : "Đánh giá sân"}
+            {reviewSum?.summary?.count ? `${reviewSum.summary.avg?.toFixed(1)}★ · ${reviewSum.summary.count} đánh giá` : "Xem & viết đánh giá"}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={C.sub} />
+          <Ionicons name="chevron-forward" size={16} color={C.muted} />
         </TouchableOpacity>
 
         {/* Gói giờ / thẻ tháng */}
         {Array.isArray(venuePackages) && venuePackages.length > 0 && (
-          <View style={{ paddingHorizontal: 14, marginTop: 10 }}>
-            <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>Gói giờ / thẻ tháng</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+          <View style={{ paddingHorizontal: SP.lg }}>
+            <SectionHeader C={C} title="Gói giờ / thẻ tháng" style={{ marginTop: SP.lg }} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -SP.lg }} contentContainerStyle={{ gap: 10, paddingHorizontal: SP.lg, paddingBottom: 6 }}>
               {venuePackages.map((p: any) => (
-                <View key={p._id} style={[styles.pkgCard, { backgroundColor: C.card, borderColor: C.border }]}>
-                  <Text style={{ color: C.text, fontWeight: "800" }} numberOfLines={1}>{p.name}</Text>
-                  <Text style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>{p.type === "credits" ? `${p.hours} giờ` : "Không giới hạn"} · {p.validDays} ngày</Text>
-                  <Text style={{ color: C.accent, fontWeight: "900", fontSize: 16, marginTop: 6 }}>{fmtVND(p.price)}</Text>
-                  <TouchableOpacity style={[styles.pkgBuy, { backgroundColor: C.accent, opacity: purchasing ? 0.6 : 1 }]} disabled={purchasing} onPress={() => buyPackage(p)}>
-                    <Text style={{ color: "#0a0e1a", fontWeight: "800", fontSize: 12 }}>Mua gói</Text>
+                <LinearGradient key={p._id} colors={C.heroGradAlt} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.pkgCard, shadow(C.dark, 2)]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name={p.type === "credits" ? "hourglass" : "infinite"} size={14} color="#fde68a" />
+                    <Text style={{ color: "#fff", fontWeight: "800" }} numberOfLines={1}>{p.name}</Text>
+                  </View>
+                  <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 4 }}>{p.type === "credits" ? `${p.hours} giờ chơi` : "Không giới hạn"} · {p.validDays} ngày</Text>
+                  <Text style={{ color: "#fff", fontWeight: "900", fontSize: 18, marginTop: 8, letterSpacing: -0.3 }}>{fmtVND(p.price)}</Text>
+                  <TouchableOpacity style={[styles.pkgBuy, { backgroundColor: "#fff", opacity: purchasing ? 0.6 : 1 }]} disabled={purchasing} onPress={() => buyPackage(p)}>
+                    <Text style={{ color: "#0f172a", fontWeight: "800", fontSize: 12 }}>Mua gói</Text>
                   </TouchableOpacity>
-                </View>
+                </LinearGradient>
               ))}
             </ScrollView>
           </View>
         )}
 
         {/* Ngày */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}>
-          {days.map((d) => {
-            const on = d === date;
-            const [, m, dd] = d.split("-");
-            return (
-              <TouchableOpacity
-                key={d}
-                onPress={() => { setDate(d); setSel(null); }}
-                style={[styles.day, { backgroundColor: on ? C.accent : C.card, borderColor: on ? C.accent : C.border }]}
-              >
-                <Text style={{ color: on ? "#0a0e1a" : C.sub, fontSize: 12, fontWeight: "700" }}>{WEEKDAYS_SHORT[weekdayOf(d)]}</Text>
-                <Text style={{ color: on ? "#0a0e1a" : C.text, fontSize: 16, fontWeight: "800" }}>{dd}/{m}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ paddingHorizontal: SP.lg }}>
+          <SectionHeader C={C} title="Chọn ngày & giờ" right={<Text style={{ color: C.sub, fontSize: 12 }}>Chạm để chọn nhiều khung liên tiếp</Text>} />
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: SP.lg, paddingBottom: 4 }}>
+          <DateStrip C={C} dates={days} value={date} onChange={(d) => { setDate(d); setSel(null); }} />
         </ScrollView>
 
         {/* Lưới giờ trống theo sân */}
-        <View style={{ padding: 14, gap: 14 }}>
+        <View style={{ padding: SP.lg, gap: SP.md }}>
           {loadingAvail && !avail ? (
             <ActivityIndicator color={C.accent} />
           ) : (avail?.courts || []).length === 0 ? (
-            <Text style={{ color: C.sub }}>Sân chưa mở đặt chỗ.</Text>
+            <View style={[styles.courtCard, { backgroundColor: C.card, borderColor: C.border, alignItems: "center" }]}>
+              <Ionicons name="lock-closed-outline" size={22} color={C.muted} />
+              <Text style={{ color: C.sub, marginTop: 6 }}>Sân chưa mở đặt chỗ.</Text>
+            </View>
           ) : (
-            (avail?.courts || []).map((court: any) => (
-              <View key={court._id} style={[styles.courtCard, { backgroundColor: C.card, borderColor: C.border }]}>
-                <Text style={[styles.courtName, { color: C.text }]}>{court.name}</Text>
-                {court.closed ? (
-                  <Text style={{ color: C.sub, fontSize: 13 }}>Đóng cửa ngày này</Text>
-                ) : (
-                  <View style={styles.slotWrap}>
-                    {court.slots.map((s: Slot) => {
-                      const picked = sel?.courtId === String(court._id) && sel.slots.some((x) => x.start === s.start);
-                      const disabled = s.booked || s.past;
-                      return (
-                        <TouchableOpacity
-                          key={s.start}
-                          disabled={disabled}
-                          onPress={() => toggleSlot(court, s)}
-                          style={[
-                            styles.slot,
-                            { borderColor: picked ? C.accent : C.border, backgroundColor: picked ? C.accent : disabled ? C.field : "transparent", opacity: disabled ? 0.45 : 1 },
-                          ]}
-                        >
-                          <Text style={{ color: picked ? "#0a0e1a" : C.text, fontWeight: "700", fontSize: 13 }}>{s.start}</Text>
-                          <Text style={{ color: picked ? "#0a0e1a" : C.sub, fontSize: 10 }}>
-                            {s.booked ? "Đã đặt" : s.past ? "Đã qua" : fmtVND(s.price)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+            (avail?.courts || []).map((court: any) => {
+              const isActive = sel?.courtId === String(court._id);
+              const freeCount = court.closed ? 0 : court.slots.filter((s: Slot) => !s.booked && !s.past).length;
+              return (
+                <View key={court._id} style={[styles.courtCard, { backgroundColor: C.card, borderColor: isActive ? C.accent : C.border }, shadow(C.dark, 1)]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                    <View style={[styles.courtIcon, { backgroundColor: isActive ? C.accent : C.accentSoft }]}>
+                      <Ionicons name="tennisball" size={14} color={isActive ? C.onAccent : C.accent} />
+                    </View>
+                    <Text style={[styles.courtName, { color: C.text }]}>{court.name}</Text>
+                    {!court.closed && (
+                      <Text style={{ color: freeCount ? C.success : C.muted, fontSize: 12, fontWeight: "700" }}>{freeCount ? `${freeCount} khung trống` : "Hết chỗ"}</Text>
+                    )}
                   </View>
-                )}
-              </View>
-            ))
+                  {court.closed ? (
+                    <Text style={{ color: C.sub, fontSize: 13 }}>Đóng cửa ngày này</Text>
+                  ) : (
+                    <View style={styles.slotWrap}>
+                      {court.slots.map((s: Slot) => {
+                        const picked = isActive && sel!.slots.some((x) => x.start === s.start);
+                        const disabled = s.booked || s.past;
+                        return (
+                          <TouchableOpacity
+                            key={s.start}
+                            disabled={disabled}
+                            activeOpacity={0.8}
+                            onPress={() => toggleSlot(court, s)}
+                            style={[
+                              styles.slot,
+                              picked
+                                ? { backgroundColor: C.accent, borderColor: C.accent }
+                                : disabled
+                                ? { backgroundColor: C.field, borderColor: "transparent", opacity: 0.5 }
+                                : { backgroundColor: C.cardAlt, borderColor: C.border },
+                              picked ? shadow(C.dark, 2) : null,
+                            ]}
+                          >
+                            <Text style={{ color: picked ? C.onAccent : C.text, fontWeight: "800", fontSize: 13 }}>{s.start}</Text>
+                            <Text style={{ color: picked ? C.onAccent : disabled ? C.muted : C.sub, fontSize: 10, marginTop: 2 }} numberOfLines={1}>
+                              {s.booked ? "Đã đặt" : s.past ? "Đã qua" : fmtVND(s.price)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </View>
       </ScrollView>
 
       {/* Thanh chọn */}
       {sel && start && end && (
-        <View style={[styles.bar, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text, fontWeight: "800" }}>{sel.courtName} · {start} → {end}</Text>
-            <Text style={{ color: C.accent, fontWeight: "900", fontSize: 18 }}>{fmtVND(total)}</Text>
+        <View style={[styles.bar, { backgroundColor: C.card, borderColor: C.border }, shadow(C.dark, 3)]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ color: C.sub, fontSize: 12 }} numberOfLines={1}>{sel.courtName} · {date.split("-").reverse().slice(0, 2).join("/")}</Text>
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 14, marginTop: 1 }}>{start} → {end}</Text>
+            <Text style={{ color: C.accent, fontWeight: "900", fontSize: 19, letterSpacing: -0.3 }}>{fmtVND(total)}</Text>
           </View>
-          <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent }]} onPress={openConfirm}>
-            <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Đặt sân</Text>
+          <TouchableOpacity activeOpacity={0.85} style={[styles.btn, { backgroundColor: C.accent }, shadow(C.dark, 2)]} onPress={openConfirm}>
+            <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 15 }}>Đặt sân</Text>
+            <Ionicons name="arrow-forward" size={16} color={C.onAccent} />
           </TouchableOpacity>
         </View>
       )}
@@ -333,11 +369,16 @@ export default function VenueDetailScreen() {
       {/* Xác nhận */}
       <Modal visible={confirmOpen} transparent animationType="slide" onRequestClose={() => setConfirmOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalWrap}>
-          <View style={[styles.modal, { backgroundColor: C.card }]}>
+          <View style={[styles.modal, { backgroundColor: C.card }, shadow(C.dark, 3)]}>
+            <SheetHandle C={C} />
             <Text style={[styles.title, { color: C.text, marginBottom: 6 }]}>Xác nhận đặt sân</Text>
-            <Text style={{ color: C.sub, marginBottom: 10 }}>
-              {venue.name} · {sel?.courtName} · {date.split("-").reverse().join("/")} · {start} → {end}
-            </Text>
+            <View style={[styles.summaryBox, { backgroundColor: C.accentSoft }]}>
+              <Ionicons name="calendar" size={16} color={C.accent} />
+              <Text style={{ color: C.text, fontWeight: "700", flex: 1, fontSize: 13 }} numberOfLines={2}>
+                {venue.name} · {sel?.courtName}{"\n"}
+                <Text style={{ color: C.sub, fontWeight: "600" }}>{date.split("-").reverse().join("/")} · {start} → {end}</Text>
+              </Text>
+            </View>
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Tên người đặt" placeholderTextColor={C.sub} value={name} onChangeText={setName} />
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} placeholder="Số điện thoại" placeholderTextColor={C.sub} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
             <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text, height: 70 }]} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.sub} multiline value={note} onChangeText={(t) => setNote(t.slice(0, 500))} />
@@ -396,8 +437,8 @@ export default function VenueDetailScreen() {
               <TouchableOpacity style={[styles.btn, { flex: 1, borderWidth: 1, borderColor: C.border }]} onPress={() => setConfirmOpen(false)}>
                 <Text style={{ color: C.sub, fontWeight: "700" }}>Huỷ</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btn, { flex: 1, backgroundColor: C.accent, opacity: booking ? 0.6 : 1 }]} disabled={booking} onPress={submit}>
-                <Text style={{ color: "#0a0e1a", fontWeight: "800" }}>{booking ? "Đang đặt…" : "Xác nhận"}</Text>
+              <TouchableOpacity style={[styles.btn, { flex: 1.5, backgroundColor: C.accent, opacity: booking ? 0.6 : 1 }, shadow(C.dark, 2)]} disabled={booking} onPress={submit}>
+                <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 15 }}>{booking ? "Đang đặt…" : "Xác nhận đặt"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -407,15 +448,21 @@ export default function VenueDetailScreen() {
       {/* Mua gói: QR chuyển khoản */}
       <Modal visible={!!pkgBank} transparent animationType="slide" onRequestClose={() => setPkgBank(null)}>
         <View style={styles.modalWrap}>
-          <View style={[styles.modal, { backgroundColor: C.card, alignItems: "center" }]}>
+          <View style={[styles.modal, { backgroundColor: C.card, alignItems: "center" }, shadow(C.dark, 3)]}>
+            <SheetHandle C={C} />
             <Text style={[styles.title, { color: C.text, marginBottom: 4 }]}>Mua {pkgBank?.packageName}</Text>
-            <Text style={{ color: C.sub, marginBottom: 10 }}>Chuyển khoản để chủ sân kích hoạt gói</Text>
-            {pkgBank?.bank?.qrUrl ? <Image source={{ uri: pkgBank.bank.qrUrl }} style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: "#fff" }} resizeMode="contain" /> : null}
-            <Text style={{ color: C.accent, fontWeight: "900", fontSize: 22, marginTop: 10 }}>{fmtVND(pkgBank?.price)}</Text>
-            {pkgBank?.bank?.bankAccountNumber ? <Text style={{ color: C.text, marginTop: 4 }}>{pkgBank.bank.bankShortName} · {pkgBank.bank.bankAccountNumber}</Text> : null}
-            {pkgBank?.bank?.memo ? <Text style={{ color: C.sub, marginTop: 2 }}>ND: {pkgBank.bank.memo}</Text> : null}
-            <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, marginTop: 16, alignSelf: "stretch" }]} onPress={() => { setPkgBank(null); router.push("/courts/my-packages"); }}>
-              <Text style={{ color: "#0a0e1a", fontWeight: "800", textAlign: "center" }}>Đã chuyển khoản</Text>
+            <Text style={{ color: C.sub, marginBottom: 14 }}>Chuyển khoản để chủ sân kích hoạt gói</Text>
+            {pkgBank?.bank?.qrUrl ? (
+              <View style={[styles.qrFrame, shadow(C.dark, 2)]}>
+                <Image source={{ uri: pkgBank.bank.qrUrl }} style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: "#fff" }} resizeMode="contain" />
+              </View>
+            ) : null}
+            <Text style={{ color: C.accent, fontWeight: "900", fontSize: 24, marginTop: 12, letterSpacing: -0.4 }}>{fmtVND(pkgBank?.price)}</Text>
+            {pkgBank?.bank?.bankAccountNumber ? <Text style={{ color: C.text, marginTop: 4, fontWeight: "700" }}>{pkgBank.bank.bankShortName} · {pkgBank.bank.bankAccountNumber}</Text> : null}
+            {pkgBank?.bank?.memo ? <Text style={{ color: C.sub, marginTop: 2 }}>Nội dung: <Text style={{ color: C.text, fontWeight: "700" }}>{pkgBank.bank.memo}</Text></Text> : null}
+            <TouchableOpacity style={[styles.btn, { backgroundColor: C.accent, marginTop: 18, alignSelf: "stretch" }, shadow(C.dark, 2)]} onPress={() => { setPkgBank(null); router.push("/courts/my-packages"); }}>
+              <Ionicons name="checkmark-circle" size={18} color={C.onAccent} />
+              <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 15 }}>Đã chuyển khoản</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -425,22 +472,30 @@ export default function VenueDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  cover: { width: "100%", height: 200 },
-  reviewBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 14, marginTop: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
-  pkgCard: { width: 160, borderRadius: 12, borderWidth: 1, padding: 12 },
-  pkgBuy: { marginTop: 8, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
-  pkgOpt: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 6 },
-  title: { fontSize: 20, fontWeight: "900" },
-  row: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  sub: { fontSize: 13, flexShrink: 1 },
-  desc: { fontSize: 14, lineHeight: 20, marginTop: 10 },
+  cover: { width: "100%", height: 240 },
+  coverShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 150 },
+  coverBottom: { position: "absolute", left: SP.lg, right: SP.lg, bottom: 30 },
+  coverTitle: { color: "#fff", fontWeight: "900", fontSize: 24, letterSpacing: -0.5, lineHeight: 30 },
+  ratingPill: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.16)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, marginTop: 8 },
+  infoCard: { marginHorizontal: SP.lg, marginTop: -18, borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, padding: SP.lg, gap: 4 },
+  reviewBtn: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: SP.lg, marginTop: SP.md, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, borderWidth: StyleSheet.hairlineWidth },
+  pkgCard: { width: 176, borderRadius: R.lg, padding: 14, overflow: "hidden" },
+  pkgBuy: { marginTop: 10, paddingVertical: 8, borderRadius: 10, alignItems: "center" },
+  pkgOpt: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 6 },
+  title: { fontSize: 20, fontWeight: "900", letterSpacing: -0.3 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  rowIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  sub: { fontSize: 13.5, flex: 1 },
+  desc: { fontSize: 13.5, lineHeight: 20, marginTop: 8 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  day: { width: 62, paddingVertical: 8, borderRadius: 12, borderWidth: 1, alignItems: "center" },
-  courtCard: { borderRadius: 14, borderWidth: 1, padding: 12 },
-  courtName: { fontSize: 15, fontWeight: "800", marginBottom: 8 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  courtCard: { borderRadius: R.lg, borderWidth: StyleSheet.hairlineWidth, padding: 14 },
+  courtIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginRight: 8 },
+  courtName: { fontSize: 15, fontWeight: "800", flex: 1 },
   slotWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  slot: { width: "22.5%", paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  slot: { width: "22.6%", paddingVertical: 9, borderRadius: R.sm, borderWidth: StyleSheet.hairlineWidth, alignItems: "center" },
+  summaryBox: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: R.sm, marginBottom: 12 },
+  qrFrame: { padding: 8, borderRadius: R.md, backgroundColor: "#fff" },
   bar: {
     position: "absolute",
     left: 0,
@@ -449,12 +504,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 14,
-    paddingBottom: 28,
-    borderTopWidth: 1,
+    padding: SP.lg,
+    paddingBottom: 30,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: R.xl,
+    borderTopRightRadius: R.xl,
   },
-  btn: { paddingHorizontal: 22, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
-  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
-  modal: { padding: 18, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginBottom: 10 },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 22, paddingVertical: 14, borderRadius: R.md },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
+  modal: { padding: SP.xl, borderTopLeftRadius: R.xl, borderTopRightRadius: R.xl, paddingBottom: 36 },
+  input: { borderRadius: R.sm, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 10 },
 });

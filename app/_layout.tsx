@@ -2218,6 +2218,10 @@ function RootLayout() {
                               }}
                             />
 
+                            {/* Module đặt sân: header do Stack lồng bên trong tự vẽ */}
+                            <Stack.Screen name="courts" options={{ headerShown: false }} />
+                            <Stack.Screen name="owner" options={{ headerShown: false }} />
+
                             <Stack.Screen
                               name="login"
                               options={{

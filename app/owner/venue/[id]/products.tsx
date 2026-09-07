@@ -47,7 +47,7 @@ export default function ProductsScreen() {
       <Stack.Screen options={{ title: "Bán hàng & kho", headerRight: () => (
         <TouchableOpacity onPress={() => setEditing({ new: true })} hitSlop={8}><Ionicons name="add-circle" size={24} color={C.accent} /></TouchableOpacity>
       ) }} />
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: cartItems.length ? 130 : 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: cartItems.length ? 130 : 40 }}>
         {sales ? <Text style={{ color: C.sub, marginBottom: 10 }}>Hôm nay: {sales.count} đơn · thu {fmtVND(sales.total)}</Text> : null}
         {isLoading ? <ActivityIndicator color={C.accent} /> : list.length === 0 ? (
           <Text style={{ color: C.sub, textAlign: "center", marginTop: 20 }}>Chưa có sản phẩm. Bấm + để thêm.</Text>
@@ -71,7 +71,7 @@ export default function ProductsScreen() {
                 </View>
               ) : (
                 <TouchableOpacity onPress={() => add(p._id)} style={[styles.addBtn, { backgroundColor: C.accent }]} disabled={p.trackStock && p.stock <= 0}>
-                  <Text style={{ color: "#0a0e1a", fontWeight: "700", opacity: p.trackStock && p.stock <= 0 ? 0.4 : 1 }}>Chọn</Text>
+                  <Text style={{ color: C.onAccent, fontWeight: "700", opacity: p.trackStock && p.stock <= 0 ? 0.4 : 1 }}>Chọn</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => setEditing(p)} style={{ marginLeft: 10 }}><Ionicons name="create-outline" size={20} color={C.sub} /></TouchableOpacity>
@@ -86,7 +86,7 @@ export default function ProductsScreen() {
           <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>{cartItems.length} món · {fmtVND(cartTotal)}</Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <TouchableOpacity style={[styles.payBtn, { borderWidth: 1, borderColor: C.border }]} onPress={() => setCart({})}><Text style={{ color: C.sub, fontWeight: "700" }}>Xoá</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.payBtn, { backgroundColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("cash")}><Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Thu tiền mặt</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.payBtn, { backgroundColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("cash")}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Thu tiền mặt</Text></TouchableOpacity>
             <TouchableOpacity style={[styles.payBtn, { borderWidth: 1, borderColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("transfer")}><Text style={{ color: C.accent, fontWeight: "800" }}>CK</Text></TouchableOpacity>
           </View>
         </View>
@@ -145,7 +145,7 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
           {trackStock && <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={stock} onChangeText={setStock} keyboardType="numeric" placeholder="Tồn kho hiện tại" placeholderTextColor={C.sub} />}
           <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
             {!editing?.new && <TouchableOpacity style={[styles.mBtn, { borderWidth: 1, borderColor: "#ef4444" }]} onPress={() => { remove({ venueId, productId: editing._id }); onClose(); }}><Text style={{ color: "#ef4444", fontWeight: "700" }}>Xoá</Text></TouchableOpacity>}
-            <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={save}><Text style={{ color: "#0a0e1a", fontWeight: "800" }}>Lưu</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.mBtn, { backgroundColor: C.accent, opacity: creating ? 0.6 : 1 }]} disabled={creating} onPress={save}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Lưu</Text></TouchableOpacity>
           </View>
         </View>
       </View>
@@ -154,14 +154,14 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  row: { flexDirection: "row", alignItems: "center", borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, marginBottom: 10 },
   addBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   qtyBox: { flexDirection: "row", alignItems: "center", gap: 4 },
   qtyBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "rgba(148,163,184,0.2)", alignItems: "center", justifyContent: "center" },
   cart: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingBottom: 28, borderTopWidth: 1 },
-  payBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
-  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
-  modal: { padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
-  input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginBottom: 10 },
-  mBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+  payBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
+  modalWrap: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(2,6,23,0.6)" },
+  modal: { padding: 20, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingBottom: 36 },
+  input: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 10 },
+  mBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: "center" },
 });
