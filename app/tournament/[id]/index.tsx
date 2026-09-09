@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 /* eslint-disable react/prop-types */
 // app/tournament/[id]/index.jsx
 import React, {
@@ -161,19 +162,20 @@ const isRefereeOfTournament = (tour, matches, me) => {
 /* -------------------- theme tokens -------------------- */
 function useTokens() {
   const scheme = useColorScheme() ?? "light";
-  const dark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const dark = v2 || scheme === "dark";
   return useMemo(
     () => ({
       scheme,
       dark,
-      bg: dark ? "#0b0d10" : "#f5f8fa",
-      card: dark ? "#12151a" : "#ffffff",
-      soft: dark ? "#1a1f26" : "#f1f5f9",
-      border: dark ? "#2a313a" : "#e2e8f0",
-      text: dark ? "#eef2f7" : "#0f172a",
-      sub: dark ? "#cbd5e1" : "#475569",
-      muted: dark ? "#94a3b8" : "#64748b",
-      tint: dark ? "#63b3ed" : "#2563eb",
+      bg: v2 ? "#040E20" : dark ? "#0b0d10" : "#f5f8fa",
+      card: v2 ? "#0A1B34" : dark ? "#12151a" : "#ffffff",
+      soft: v2 ? "#0E2244" : dark ? "#1a1f26" : "#f1f5f9",
+      border: v2 ? "rgba(92,180,255,0.16)" : dark ? "#2a313a" : "#e2e8f0",
+      text: v2 ? "#EAF3FF" : dark ? "#eef2f7" : "#0f172a",
+      sub: v2 ? "#C4D6EC" : dark ? "#cbd5e1" : "#475569",
+      muted: v2 ? "#8CA6C8" : dark ? "#94a3b8" : "#64748b",
+      tint: v2 ? "#12B6F3" : dark ? "#63b3ed" : "#2563eb",
 
       live: "#e65100",
       ok: dark ? "#4ade80" : "#16a34a",
@@ -192,7 +194,7 @@ function useTokens() {
         elevation: 3,
       },
     }),
-    [scheme]
+    [scheme, v2]
   );
 }
 

@@ -1,4 +1,5 @@
 // app/screens/PickleBall/match/MatchContent.native.jsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, {
   useEffect,
   useMemo,
@@ -61,19 +62,20 @@ import { formatKnockoutRoundLabelByMatchCount } from "@/utils/tournamentRoundLab
  * ===================================== */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
+  const v2 = useUiVersion() === "v2";
 
   return useMemo(() => {
-    const isDark = scheme === "dark";
+    const isDark = v2 || scheme === "dark";
     // Modern colors palette
-    const tint = isDark ? "#60a5fa" : "#2563eb"; // Blue 500/600 modernized
-    const textPrimary = isDark ? "#f8fafc" : "#1e293b"; // Slate 50/800
-    const textSecondary = isDark ? "#94a3b8" : "#64748b"; // Slate 400/500
+    const tint = v2 ? "#12B6F3" : isDark ? "#60a5fa" : "#2563eb"; // Blue 500/600 modernized
+    const textPrimary = v2 ? "#EAF3FF" : isDark ? "#f8fafc" : "#1e293b"; // Slate 50/800
+    const textSecondary = v2 ? "#8CA6C8" : isDark ? "#94a3b8" : "#64748b"; // Slate 400/500
 
-    const pageBg = isDark ? "#0f172a" : "#f8fafc"; // Slate 900 / 50
-    const cardBg = isDark ? "#1e293b" : "#ffffff";
-    const cardBorder = isDark ? "#334155" : "#e2e8f0"; // Subtle border
+    const pageBg = v2 ? "#040E20" : isDark ? "#0f172a" : "#f8fafc"; // Slate 900 / 50
+    const cardBg = v2 ? "#0A1B34" : isDark ? "#1e293b" : "#ffffff";
+    const cardBorder = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#334155" : "#e2e8f0"; // Subtle border
 
-    const softBg = isDark ? "#334155" : "#f1f5f9";
+    const softBg = v2 ? "#0E2244" : isDark ? "#334155" : "#f1f5f9";
     const softBg2 = isDark ? "#0f172a" : "#f8fafc";
     const softBorder = isDark ? "#475569" : "#cbd5e1";
 
@@ -108,6 +110,7 @@ function useThemeTokens() {
 
     return {
       scheme,
+      isDark,
       tint,
       textPrimary,
       textSecondary,
@@ -130,7 +133,7 @@ function useThemeTokens() {
         elevation: 3,
       },
     };
-  }, [scheme]);
+  }, [scheme, v2]);
 }
 
 /* =============== OVERLAY helpers (Giữ nguyên logic) =============== */
@@ -3379,7 +3382,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
   })();
   const renderServeBadgeRN = (side: "A" | "B", alignRight = false) => {
     if (!serveBadge || serveBadge.side !== side) return null;
-    const isDark = T.scheme === "dark";
+    const isDark = T.isDark;
     return (
       <View
         style={{

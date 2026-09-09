@@ -1,4 +1,5 @@
 // app/match/[id]/home.tsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useEffect, useMemo, useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,15 +29,16 @@ import {
 /* ---------- theme tokens ---------- */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
-  const dark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const dark = v2 || scheme === "dark";
   return {
     scheme,
-    bg: dark ? "#0b0d10" : "#f6f8fc",
-    cardBg: dark ? "#111214" : "#ffffff",
-    border: dark ? "#2a2f36" : "#cbd5e1",
-    text: dark ? "#e5e7eb" : "#0f172a",
-    subtext: dark ? "#cbd5e1" : "#64748b",
-    tint: dark ? "#7cc0ff" : "#0a84ff",
+    bg: v2 ? "#040E20" : dark ? "#0b0d10" : "#f6f8fc",
+    cardBg: v2 ? "#0A1B34" : dark ? "#111214" : "#ffffff",
+    border: v2 ? "rgba(92,180,255,0.16)" : dark ? "#2a2f36" : "#cbd5e1",
+    text: v2 ? "#EAF3FF" : dark ? "#e5e7eb" : "#0f172a",
+    subtext: v2 ? "#8CA6C8" : dark ? "#cbd5e1" : "#64748b",
+    tint: v2 ? "#12B6F3" : dark ? "#7cc0ff" : "#0a84ff",
     errBg: dark ? "rgba(239,68,68,0.12)" : "#fee2e2",
     errBd: dark ? "#fca5a5" : "#fecaca",
     errText: dark ? "#fecaca" : "#b91c1c",

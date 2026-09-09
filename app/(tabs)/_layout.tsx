@@ -8,6 +8,7 @@ import { useSelector } from "react-redux";
 
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useUiVersion } from "@/hooks/uiVersion";
 import { buildLoginHref } from "@/services/authSession";
 import { FacebookTabBar } from "@/components/tabbar/FacebookTabBar";
 import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
@@ -141,9 +142,10 @@ export default function TabLayout() {
   });
   const unreadCount = Number(unreadData?.count || 0);
 
+  const v2 = useUiVersion() === "v2";
   const renderTabBar = React.useCallback(
-    (props: any) => <FacebookTabBar {...props} isDark={isDark} />,
-    [isDark],
+    (props: any) => <FacebookTabBar {...props} isDark={isDark} v2={v2} />,
+    [isDark, v2],
   );
 
   return (

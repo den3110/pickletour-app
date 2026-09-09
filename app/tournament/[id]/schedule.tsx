@@ -1,4 +1,5 @@
 // app/tournament/[id]/EnhancedSchedule.jsx
+import { useUiVersion } from "@/hooks/uiVersion";
 /* eslint-disable react/prop-types */
 import {
   Ionicons,
@@ -510,22 +511,24 @@ const scheduleMatchStageChipLabel = (match, matchesOfBracket = []) => {
 
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
   return useMemo(
     () => ({
       scheme,
+      isDark,
       // Base (Tối giản hơn)
-      bg: isDark ? "#080a0e" : "#f5f8fa", // Nền tổng thể rất nhạt
-      cardBg: isDark ? "#101317" : "#ffffff", // Thẻ nền sạch
-      softBg: isDark ? "#1b1e22" : "#f0f4f7",
-      border: isDark ? "#2a2f36" : "#e2e8ec", // Viền mỏng
-      text: isDark ? "#eef1f5" : "#1e293b",
-      textSecondary: isDark ? "#cbd5e1" : "#475569",
-      muted: isDark ? "#94a3b8" : "#64748b",
-      icon: isDark ? "#d1d5db" : "#334155",
+      bg: v2 ? "#040E20" : isDark ? "#080a0e" : "#f5f8fa", // Nền tổng thể rất nhạt
+      cardBg: v2 ? "#0A1B34" : isDark ? "#101317" : "#ffffff", // Thẻ nền sạch
+      softBg: v2 ? "#0E2244" : isDark ? "#1b1e22" : "#f0f4f7",
+      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#2a2f36" : "#e2e8ec", // Viền mỏng
+      text: v2 ? "#EAF3FF" : isDark ? "#eef1f5" : "#1e293b",
+      textSecondary: v2 ? "#C4D6EC" : isDark ? "#cbd5e1" : "#475569",
+      muted: v2 ? "#8CA6C8" : isDark ? "#94a3b8" : "#64748b",
+      icon: v2 ? "#C4D6EC" : isDark ? "#d1d5db" : "#334155",
       // Primary/Accent
-      tint: isDark ? "#63b3ed" : "#1a73e8", // Xanh dương hiện đại
-      accentBg: isDark ? "rgba(99, 179, 237, 0.15)" : "#e6f0ff",
+      tint: v2 ? "#12B6F3" : isDark ? "#63b3ed" : "#1a73e8", // Xanh dương hiện đại
+      accentBg: v2 ? "rgba(18,182,243,0.16)" : isDark ? "rgba(99, 179, 237, 0.15)" : "#e6f0ff",
       // Status Colors
       live: "#e65100", // Cam cháy (Live) - Mạnh mẽ hơn
       liveSoft: isDark ? "rgba(230,81,0,0.15)" : "#fff8e6",
@@ -542,14 +545,14 @@ function useThemeTokens() {
       infoText: isDark ? "#a0c4ff" : "#1a73e8",
       tabBg: isDark ? "#1c1e22" : "#f8fafc",
       tabBd: isDark ? "#2a2f36" : "#e2e8f0",
-      tabActiveBg: isDark ? "rgba(99, 179, 237, 0.15)" : "#e6f0ff",
-      tabActiveBd: isDark ? "#63b3ed" : "#90caf9",
-      tabText: isDark ? "#d1d5db" : "#334155",
-      tabTextActive: isDark ? "#cde9ff" : "#1a73e8",
+      tabActiveBg: v2 ? "rgba(18,182,243,0.18)" : isDark ? "rgba(99, 179, 237, 0.15)" : "#e6f0ff",
+      tabActiveBd: v2 ? "#12B6F3" : isDark ? "#63b3ed" : "#90caf9",
+      tabText: v2 ? "#8CA6C8" : isDark ? "#d1d5db" : "#334155",
+      tabTextActive: v2 ? "#5CD6FF" : isDark ? "#cde9ff" : "#1a73e8",
       // Skeleton
-      skeleton: isDark ? "rgba(255,255,255,0.08)" : "#e5e7eb",
+      skeleton: v2 ? "rgba(92,180,255,0.12)" : isDark ? "rgba(255,255,255,0.08)" : "#e5e7eb",
     }),
-    [scheme]
+    [scheme, v2]
   );
 }
 
@@ -584,7 +587,7 @@ function getStageChipColors(label, T) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  const isDark = T.scheme === "dark";
+  const isDark = T.isDark;
   if (text.includes("chung ket")) {
     return {
       bg: isDark ? "rgba(251, 191, 36, 0.18)" : "#fff7cc",

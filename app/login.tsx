@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { useUiVersion } from "@/hooks/uiVersion";
 import {
   View,
   Pressable,
@@ -113,13 +114,14 @@ export default function LoginScreen() {
   }>();
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
-  const tint = isDark ? "#7cc0ff" : "#0a84ff";
-  const cardBg = isDark ? "#16181c" : "#ffffff";
-  const textPrimary = isDark ? "#fff" : "#111";
-  const textSecondary = isDark ? "#c9c9c9" : "#444";
-  const border = isDark ? "#2e2f33" : "#dfe3ea";
-  const logoBg = isDark ? "#202329" : "#f3f5f9";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
+  const tint = v2 ? "#12B6F3" : isDark ? "#7cc0ff" : "#0a84ff";
+  const cardBg = v2 ? "#0A1B34" : isDark ? "#16181c" : "#ffffff";
+  const textPrimary = v2 ? "#EAF3FF" : isDark ? "#fff" : "#111";
+  const textSecondary = v2 ? "#8CA6C8" : isDark ? "#c9c9c9" : "#444";
+  const border = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#2e2f33" : "#dfe3ea";
+  const logoBg = v2 ? "#0E2244" : isDark ? "#202329" : "#f3f5f9";
 
   const dispatch = useDispatch();
   const userInfo = useSelector((s) => s.auth?.userInfo);

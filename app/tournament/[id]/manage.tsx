@@ -1,4 +1,6 @@
-import { t } from "@/utils/i18n";
+// NOTE: nhiều component trong file shadow `t` bằng getThemeTokens (tokens theme),
+// nên i18n phải dùng alias `tr` để không gọi nhầm object tokens như một hàm.
+import { t as tr } from "@/utils/i18n";
 // app/(app)/admin/tournament/[id]/ManageScreen.jsx
 import React, {
   useEffect,
@@ -3332,7 +3334,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
       <>
         <Stack.Screen
           options={{
-            title: t("Quản lý giải"),
+            title: tr("Quản lý giải"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
             headerTintColor: colors.text,
@@ -3348,7 +3350,7 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
       <>
         <Stack.Screen
           options={{
-            title: t("Quản lý giải"),
+            title: tr("Quản lý giải"),
             headerTitleAlign: "center",
             headerStyle: { backgroundColor: manageHeaderBackground(colors, dark) },
             headerTintColor: colors.text,

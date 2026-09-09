@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types */
+import { useUiVersion } from "@/hooks/uiVersion";
 // AdminMatchTools.tsx
 // Bộ công cụ quản trị trận nâng cao trên mobile — parity với web MatchContent:
 //   • Chỉnh đội A/B (chọn registration / BYE / đội thắng từ trận khác / swap)
@@ -52,18 +53,19 @@ import {
 /* ================= theme (mirror MatchContent tokens) ================= */
 function useTokens() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
   return useMemo(
     () => ({
       isDark,
-      tint: isDark ? "#60a5fa" : "#2563eb",
-      textPrimary: isDark ? "#f8fafc" : "#1e293b",
-      textSecondary: isDark ? "#94a3b8" : "#64748b",
-      pageBg: isDark ? "#0f172a" : "#f8fafc",
-      cardBg: isDark ? "#1e293b" : "#ffffff",
-      cardBorder: isDark ? "#334155" : "#e2e8f0",
-      softBg: isDark ? "#334155" : "#f1f5f9",
-      inputBg: isDark ? "#0f172a" : "#fff",
+      tint: v2 ? "#12B6F3" : isDark ? "#60a5fa" : "#2563eb",
+      textPrimary: v2 ? "#EAF3FF" : isDark ? "#f8fafc" : "#1e293b",
+      textSecondary: v2 ? "#8CA6C8" : isDark ? "#94a3b8" : "#64748b",
+      pageBg: v2 ? "#040E20" : isDark ? "#0f172a" : "#f8fafc",
+      cardBg: v2 ? "#0A1B34" : isDark ? "#1e293b" : "#ffffff",
+      cardBorder: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#334155" : "#e2e8f0",
+      softBg: v2 ? "#0E2244" : isDark ? "#334155" : "#f1f5f9",
+      inputBg: v2 ? "rgba(255,255,255,0.06)" : isDark ? "#0f172a" : "#fff",
       success: isDark ? "#4ade80" : "#166534",
       successBg: isDark ? "rgba(34,197,94,0.15)" : "#dcfce7",
       warn: isDark ? "#fbbf24" : "#b45309",

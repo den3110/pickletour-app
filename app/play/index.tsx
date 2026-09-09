@@ -17,7 +17,7 @@ import { useSelector } from "react-redux";
 import { PLAY_STATUS, formatPlayTime, skillLabel } from "@/constants/play";
 import {
   useListInvitesQuery,
-  useRequestJoinMutation,
+  useRequestJoinPlayMutation,
 } from "@/slices/playApiSlice";
 import { useThemeTokens } from "@/hooks/useThemeTokens";
 
@@ -121,7 +121,7 @@ export default function PlayScreen() {
   const { data, isLoading, isFetching, refetch } = useListInvitesQuery(params, {
     refetchOnMountOrArgChange: true,
   });
-  const [requestJoin] = useRequestJoinMutation();
+  const [requestJoin] = useRequestJoinPlayMutation();
   const items = data?.items || [];
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));

@@ -18,7 +18,7 @@ import { useSelector } from "react-redux";
 import { PLAY_STATUS, formatPlayTime, skillLabel } from "@/constants/play";
 import {
   useGetInviteQuery,
-  useRequestJoinMutation,
+  useRequestJoinPlayMutation,
   useRespondJoinMutation,
   useLeaveInviteMutation,
   useDeleteInviteMutation,
@@ -46,7 +46,7 @@ export default function PlayDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useSelector((s: any) => s.auth?.userInfo);
   const { data: it, isLoading, refetch } = useGetInviteQuery(id);
-  const [requestJoin, { isLoading: joining }] = useRequestJoinMutation();
+  const [requestJoin, { isLoading: joining }] = useRequestJoinPlayMutation();
   const [respondJoin] = useRespondJoinMutation();
   const [leaveInvite] = useLeaveInviteMutation();
   const [deleteInvite] = useDeleteInviteMutation();

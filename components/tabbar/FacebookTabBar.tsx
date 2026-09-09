@@ -18,6 +18,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 interface Props extends BottomTabBarProps {
   isDark: boolean;
+  v2?: boolean;
 }
 
 const HIDDEN_ROUTES = new Set([
@@ -52,6 +53,7 @@ function TabItem({
   options,
   isFocused,
   isDark,
+  v2,
   onPress,
   onLongPress,
 }: {
@@ -59,6 +61,7 @@ function TabItem({
   options: any;
   isFocused: boolean;
   isDark: boolean;
+  v2?: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -85,8 +88,10 @@ function TabItem({
     transform: [{ scale: 0.9 + pillOpacity.value * 0.15 }],
   }));
 
-  const accent = TAB_ACCENTS[route.name] || "#1877F2";
-  const inactiveColor = isDark ? "#8E8E93" : "#8A8F98";
+  const accent = v2
+    ? "#12B6F3"
+    : TAB_ACCENTS[route.name] || "#1877F2";
+  const inactiveColor = v2 ? "#6E88AC" : isDark ? "#8E8E93" : "#8A8F98";
   const iconColor = isFocused ? accent : inactiveColor;
   const labelColor = isFocused ? accent : inactiveColor;
 
@@ -165,6 +170,7 @@ export function FacebookTabBar({
   descriptors,
   navigation,
   isDark,
+  v2,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -184,7 +190,11 @@ export function FacebookTabBar({
     <View style={styles.outer} pointerEvents="box-none">
       {/* Accent top gradient line */}
       <LinearGradient
-        colors={["#1877F2", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444"]}
+        colors={
+          v2
+            ? ["#5CD6FF", "#12B6F3", "#045DA0"]
+            : ["#1877F2", "#8B5CF6", "#F59E0B", "#10B981", "#EF4444"]
+        }
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={styles.topAccent}
@@ -193,10 +203,11 @@ export function FacebookTabBar({
         style={[
           styles.wrapper,
           {
-            backgroundColor: isDark ? "#111214" : "#FFFFFF",
+            backgroundColor: v2 ? "#0A1B34" : isDark ? "#111214" : "#FFFFFF",
             paddingBottom: bottomPad,
-            shadowOpacity: isDark ? 0.35 : 0.08,
+            shadowOpacity: isDark || v2 ? 0.35 : 0.08,
           },
+          v2 && { borderTopWidth: 1, borderTopColor: "rgba(92,180,255,0.18)" },
         ]}
       >
         {visibleRoutes.map((route) => {
@@ -233,6 +244,7 @@ export function FacebookTabBar({
               options={options}
               isFocused={isFocused}
               isDark={isDark}
+              v2={v2}
               onPress={onPress}
               onLongPress={onLongPress}
             />

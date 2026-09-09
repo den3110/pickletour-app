@@ -1,4 +1,5 @@
 // app/screens/LevelPointScreen.jsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import AuthGuard from "@/components/auth/AuthGuard";
 import {
   useGetLatestAssessmentQuery,
@@ -65,17 +66,18 @@ const duprFromRaw = (raw0to10) =>
 /* ===== THEME TOKENS ===== */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
 
   return {
     isDark,
-    bg: isDark ? "#0f172a" : "#f8fafc",
-    card: isDark ? "#1e293b" : "#ffffff",
-    text: isDark ? "#f1f5f9" : "#0f172a",
-    subText: isDark ? "#94a3b8" : "#64748b",
-    border: isDark ? "#334155" : "#e2e8f0",
-    primary: "#3b82f6",
-    primaryLight: isDark ? "rgba(59, 130, 246, 0.2)" : "#eff6ff",
+    bg: v2 ? "#040E20" : isDark ? "#0f172a" : "#f8fafc",
+    card: v2 ? "#0A1B34" : isDark ? "#1e293b" : "#ffffff",
+    text: v2 ? "#EAF3FF" : isDark ? "#f1f5f9" : "#0f172a",
+    subText: v2 ? "#8CA6C8" : isDark ? "#94a3b8" : "#64748b",
+    border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#334155" : "#e2e8f0",
+    primary: v2 ? "#12B6F3" : "#3b82f6",
+    primaryLight: v2 ? "rgba(18,182,243,0.18)" : isDark ? "rgba(59, 130, 246, 0.2)" : "#eff6ff",
     success: "#10b981",
     successLight: isDark ? "rgba(16, 185, 129, 0.2)" : "#ecfdf5",
     chipBg: isDark ? "#334155" : "#e2e8f0",

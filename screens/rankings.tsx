@@ -145,22 +145,24 @@ const CustomImageComponent = (props) => (
 
 /* ================= Theme Hook ================= */
 function useThemeColors() {
-  const navTheme = useTheme();
+  const navTheme = useTheme() as any;
   const sysScheme = useColorScheme?.() || "light";
+  const v2 = navTheme?.version === "v2";
   const isDark =
-    typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark";
+    v2 || (typeof navTheme?.dark === "boolean" ? navTheme.dark : sysScheme === "dark");
 
   return useMemo(() => {
-    const bg = isDark ? "#0f1115" : "#F5F7FA";
-    const card = isDark ? "#181a20" : "#FFFFFF";
-    const text = isDark ? "#FFFFFF" : "#1A1D1E";
-    const subText = isDark ? "#848E9C" : "#6B7280";
-    const border = isDark ? "#262932" : "#E5E7EB";
-    const primary = isDark ? "#3B82F6" : "#2563EB";
-    const inputBg = isDark ? "#20232b" : "#F3F4F6";
+    const bg = v2 ? "#040E20" : isDark ? "#0f1115" : "#F5F7FA";
+    const card = v2 ? "#0A1B34" : isDark ? "#181a20" : "#FFFFFF";
+    const text = v2 ? "#EAF3FF" : isDark ? "#FFFFFF" : "#1A1D1E";
+    const subText = v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#6B7280";
+    const border = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#262932" : "#E5E7EB";
+    const primary = v2 ? "#12B6F3" : isDark ? "#3B82F6" : "#2563EB";
+    const inputBg = v2 ? "rgba(255,255,255,0.06)" : isDark ? "#20232b" : "#F3F4F6";
 
     return {
       isDark,
+      v2,
       bg,
       card,
       text,
@@ -170,7 +172,7 @@ function useThemeColors() {
       inputBg,
       shadow: isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.05)",
     };
-  }, [navTheme, isDark]);
+  }, [navTheme, isDark, v2]);
 }
 
 /* ================= Helpers ================= */

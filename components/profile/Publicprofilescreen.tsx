@@ -1298,23 +1298,24 @@ const SimpleBarChart = React.memo(
 
 /* ---------- MAIN COMPONENT ---------- */
 export default function PublicProfileScreen() {
-  const theme = useTheme();
+  const theme = useTheme() as any;
   const isDark = theme.dark;
+  const v2 = theme?.version === "v2";
 
   const colors = useMemo(
     () => ({
       isDark,
-      primary: theme.colors.primary || "#6366F1",
-      bg: isDark ? "#0f1115" : "#F5F7FA",
-      card: isDark ? "#181a20" : "#FFFFFF",
-      text: isDark ? "#FFFFFF" : "#333333",
-      subText: isDark ? "#848E9C" : "#666666",
-      border: isDark ? "#262932" : "#E0E0E0",
-      bgMuted: isDark ? "#20232b" : "#F8F9FA",
-      tabActive: "#6366F1",
-      tabInactive: isDark ? "#A0A0A0" : "#666666",
+      primary: v2 ? "#12B6F3" : theme.colors.primary || "#6366F1",
+      bg: v2 ? "#040E20" : isDark ? "#0f1115" : "#F5F7FA",
+      card: v2 ? "#0A1B34" : isDark ? "#181a20" : "#FFFFFF",
+      text: v2 ? "#EAF3FF" : isDark ? "#FFFFFF" : "#333333",
+      subText: v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#666666",
+      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#262932" : "#E0E0E0",
+      bgMuted: v2 ? "#0E2244" : isDark ? "#20232b" : "#F8F9FA",
+      tabActive: v2 ? "#12B6F3" : "#6366F1",
+      tabInactive: v2 ? "#8CA6C8" : isDark ? "#A0A0A0" : "#666666",
     }),
-    [isDark, theme.colors.primary]
+    [isDark, v2, theme.colors.primary]
   );
 
   const { id } = useLocalSearchParams();
@@ -2351,7 +2352,7 @@ export default function PublicProfileScreen() {
               }
               value={totalMatches}
               label="Tổng trận"
-              gradient={["#6366F1", "#8B5CF6"]}
+              gradient={v2 ? ["#0E63B3", "#12B6F3"] : ["#6366F1", "#8B5CF6"]}
               colors={colors}
               onPress={() => handleOpenStatsSheet("matches")}
             />
@@ -2359,7 +2360,7 @@ export default function PublicProfileScreen() {
               icon={<FontAwesome5 name="trophy" size={28} color="#FFF" />}
               value={`${wins} (${winRate}%)`}
               label="Chiến thắng"
-              gradient={["#F59E0B", "#EF4444"]}
+              gradient={v2 ? ["#0891B2", "#22D3EE"] : ["#F59E0B", "#EF4444"]}
               colors={colors}
               onPress={() => handleOpenStatsSheet("wins")}
             />
@@ -2367,7 +2368,7 @@ export default function PublicProfileScreen() {
               icon={<Ionicons name="trending-up" size={32} color="#FFF" />}
               value={`${num(latestSingle)} / ${num(latestDouble)}`}
               label="Điểm Đơn/Đôi"
-              gradient={["#10B981", "#059669"]}
+              gradient={v2 ? ["#0A4C8A", "#12B6F3"] : ["#10B981", "#059669"]}
               colors={colors}
               onPress={() => handleOpenStatsSheet("rating")}
             />

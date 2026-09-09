@@ -10,6 +10,7 @@ import {
   Alert,
   TouchableOpacity,
   Animated,
+  Easing,
   FlatList,
   Dimensions,
   DeviceEventEmitter,
@@ -40,6 +41,8 @@ import LeaderboardSection from "@/components/home/LeaderboardSection";
 import EventLiveBanner from "@/components/home/EventLiveBanner";
 import CourtBookingBanner from "@/components/home/CourtBookingBanner";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
+import { useUiVersion, V2 } from "@/hooks/uiVersion";
+import PlayerNameText from "@/components/PlayerNameText";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassEnabled } from "@/context/GlassAppearanceContext";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
@@ -55,6 +58,34 @@ import {
 const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
   ? require("@/assets/lottie/bg-3d.json")
   : null;
+
+/* ---------- V2 Modern: logo + tone màu theo logo PickleTour ---------- */
+const LOGO_V2_BADGE = require("@/assets/images/logo-v2-badge.png");
+const LOGO_V2_EMBLEM = require("@/assets/images/logo-v2-emblem.png");
+const BADGE_ASPECT = 1237 / 1088; // tỉ lệ file badge đã trim
+
+/* Bộ icon thể thao V2 (tạo bằng Stability AI, badge navy đồng nhất) — theo id FEATURES */
+const V2_ICONS: Record<number, any> = {
+  21: require("@/assets/images/v2icons/court.png"),
+  1: require("@/assets/images/v2icons/calendar.png"),
+  2: require("@/assets/images/v2icons/trophy.png"),
+  3: require("@/assets/images/v2icons/stats.png"),
+  4: require("@/assets/images/v2icons/guide.png"),
+  5: require("@/assets/images/v2icons/news.png"),
+  6: require("@/assets/images/v2icons/live.png"),
+  8: require("@/assets/images/v2icons/club.png"),
+  9: require("@/assets/images/v2icons/match.png"),
+  10: require("@/assets/images/v2icons/support.png"),
+  11: require("@/assets/images/v2icons/radar.png"),
+  12: require("@/assets/images/v2icons/h2h.png"),
+  13: require("@/assets/images/v2icons/feed.png"),
+  16: require("@/assets/images/v2icons/bell.png"),
+  14: require("@/assets/images/v2icons/messages.png"),
+  15: require("@/assets/images/v2icons/friends.png"),
+  17: require("@/assets/images/v2icons/coach.png"),
+  19: require("@/assets/images/v2icons/market.png"),
+  20: require("@/assets/images/v2icons/findplayers.png"),
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH * 0.8;
@@ -494,26 +525,132 @@ function AnimatedStatusChip() {
   );
 }
 
-/* ---------- Animated PickleTour Logo ---------- */
+/* ---------- Nền hero V2 Modern: navy + vệt cyan tốc độ chuyển động ---------- */
+function HeroV2Backdrop({ active, topInset = 0 }: { active: boolean; topInset?: number }) {
+  const streak = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+  const drift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active) {
+      streak.stopAnimation();
+      glow.stopAnimation();
+      drift.stopAnimation();
+      return undefined;
+    }
+    const streakLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(streak, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(1300),
+        Animated.timing(streak, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    const driftLoop = Animated.loop(
+      Animated.timing(drift, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })
+    );
+    streakLoop.start();
+    glowLoop.start();
+    driftLoop.start();
+    return () => {
+      streakLoop.stop();
+      glowLoop.stop();
+      driftLoop.stop();
+    };
+  }, [active, streak, glow, drift]);
+
+  const streakX = streak.interpolate({ inputRange: [0, 1], outputRange: [-SCREEN_WIDTH * 0.9, SCREEN_WIDTH * 1.3] });
+  const streakX2 = streak.interpolate({ inputRange: [0, 1], outputRange: [-SCREEN_WIDTH * 1.2, SCREEN_WIDTH * 1.05] });
+  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.14] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.72] });
+  const driftX = drift.interpolate({ inputRange: [0, 1], outputRange: [0, -140] });
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <LinearGradient
+        colors={V2.gradHero}
+        locations={[0, 0.4, 0.72, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Quầng cyan thở sau logo — căn theo notch để không lệch */}
+      <Animated.View style={[styles.v2Glow, { top: topInset - 14, opacity: glowOpacity, transform: [{ scale: glowScale }] }]} />
+      {/* Sọc tốc độ (đường sân) trôi chậm */}
+      <Animated.View style={[styles.v2SpeedLines, { transform: [{ translateX: driftX }, { rotate: "-18deg" }] }]}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <View key={i} style={[styles.v2SpeedLine, { left: i * 120, opacity: i % 2 ? 0.08 : 0.15, width: i % 3 === 0 ? 3 : 1.5 }]} />
+        ))}
+      </Animated.View>
+      {/* Vệt sáng cyan chéo lướt qua */}
+      <Animated.View style={[styles.v2Streak, { transform: [{ translateX: streakX }, { rotate: "-22deg" }] }]}>
+        <LinearGradient colors={["rgba(18,182,243,0)", "rgba(92,214,255,0.6)", "rgba(18,182,243,0)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFillObject} />
+      </Animated.View>
+      <Animated.View style={[styles.v2Streak, styles.v2StreakThin, { transform: [{ translateX: streakX2 }, { rotate: "-22deg" }] }]}>
+        <LinearGradient colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.22)", "rgba(255,255,255,0)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFillObject} />
+      </Animated.View>
+      {/* Viền cyan mảnh dưới đáy hero */}
+      <LinearGradient colors={["rgba(18,182,243,0)", V2.cyanBright, "rgba(18,182,243,0)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.v2BottomLine} />
+    </View>
+  );
+}
+
+/* ---------- Animated PickleTour Logo (V1 chữ gradient · V2 badge ảnh) ---------- */
 function AnimatedLogo() {
+  const v2 = useUiVersion() === "v2";
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 20,
-        friction: 7,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 20, friction: 7, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (!v2 || !isFocused) {
+      floatAnim.stopAnimation();
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 2400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v2, isFocused, floatAnim]);
+
+  if (v2) {
+    const badgeW = Math.min(SCREEN_WIDTH - 170, 168);
+    const badgeH = badgeW / BADGE_ASPECT;
+    const floatY = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+    return (
+      <Animated.View
+        style={{
+          alignItems: "center",
+          marginBottom: 10,
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }, { translateY: floatY }],
+        }}
+      >
+        <Image
+          source={LOGO_V2_BADGE}
+          style={{ width: badgeW, height: badgeH }}
+          contentFit="contain"
+        />
+      </Animated.View>
+    );
+  }
 
   return (
       <Animated.View
@@ -542,6 +679,8 @@ function AthleteIsland() {
 
   // 1. Lấy theme hiện tại
   const { dark } = useTheme();
+  const v2 = useUiVersion() === "v2";
+  const insets = useSafeAreaInsets();
 
   // 2. Định nghĩa màu sắc dynamic
   const themeColors = useMemo(
@@ -611,7 +750,87 @@ function AthleteIsland() {
       <View style={styles.islandContainer}>
         <AnimatedLogo />
 
-      {/* Premium Island Card with Drop Shadow */}
+      {v2 ? (
+        /* ===== V2 Modern: thẻ navy kính mờ viền cyan ===== */
+        <View style={styles.v2IslandWrapper}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={userInfo ? goProfile : () => router.push("/login")}
+            style={styles.athleteIslandTouch}
+          >
+            <LinearGradient
+              colors={V2.gradCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.v2Island}
+            >
+              <LinearGradient
+                pointerEvents="none"
+                colors={["rgba(92,214,255,0.14)", "rgba(92,214,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.v2IslandSheen}
+              />
+              {/* Avatar viền cyan gradient */}
+              <View style={styles.avatarContainer}>
+                <LinearGradient
+                  colors={V2.gradCyan}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.v2AvatarRing}
+                >
+                  <View style={styles.v2AvatarInner}>
+                    {!userInfo && SHOULD_RENDER_NATIVE_LOTTIE ? (
+                      <LottieView source={require("@/assets/lottie/humans.json")} autoPlay loop style={styles.avatar} speed={0.4} />
+                    ) : !userInfo ? (
+                      <View style={[styles.avatar, styles.avatarFallback]}>
+                        <Ionicons name="person-circle" size={62} color="#5F7BA0" />
+                      </View>
+                    ) : (
+                      <Image source={{ uri: normalizeUrl(avatarUrl) }} style={styles.avatar} contentFit="cover" transition={500} />
+                    )}
+                  </View>
+                </LinearGradient>
+              </View>
+              {/* Info */}
+              <View style={[styles.nameContainer, styles.v2NameContainer]}>
+                {userInfo ? (
+                  <PlayerNameText
+                    user={userInfo}
+                    name={userInfo?.nickname || userInfo?.nickName || name}
+                    style={[styles.athleteName, styles.v2Name]}
+                    numberOfLines={1}
+                  />
+                ) : (
+                  <Text style={[styles.athleteName, styles.v2Name]} numberOfLines={1}>
+                    Bắt đầu hành trình
+                  </Text>
+                )}
+                <View style={styles.v2RoleRow}>
+                  <View style={styles.v2RoleDot} />
+                  <Text style={styles.v2RoleText} numberOfLines={1}>
+                    {userInfo ? roleUser() : "Cùng PickleTour"}
+                  </Text>
+                </View>
+              </View>
+              {/* Rank / Login */}
+              {userInfo ? (
+                shouldHideRankBadge ? null : (
+                  <LinearGradient colors={V2.gradCyan} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.v2RankBadge}>
+                    <MaterialIcons name={rankIcon} size={14} color="#04121f" />
+                    <Text style={styles.v2RankText}>{rankDisplay}</Text>
+                  </LinearGradient>
+                )
+              ) : (
+                <View style={styles.v2LoginBadge}>
+                  <Text style={styles.v2LoginText}>Đăng nhập</Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : (
+      /* Premium Island Card with Drop Shadow */
       <View
         style={[
           styles.athleteIslandWrapper,
@@ -715,6 +934,7 @@ function AthleteIsland() {
           </AppleLiquidGlassView>
         </TouchableOpacity>
       </View>
+      )}
     </View>
   );
 }
@@ -730,8 +950,9 @@ function shadeHex(hex, amt) {
 }
 
 function FeatureItem({ item, theme }) {
+  const v2 = useUiVersion() === "v2";
   const isDark = !!theme?.dark;
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const text = v2 ? V2.ink : theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const scaleVal = useRef(new Animated.Value(1)).current;
   const hot = !!item.isHot;
 
@@ -760,6 +981,37 @@ function FeatureItem({ item, theme }) {
     { Ionicons, MaterialIcons, FontAwesome, FontAwesome5 }[item.iconLib] ||
     Ionicons;
 
+  const v2Icon = v2 ? V2_ICONS[item.id] : null;
+
+  // V2 Modern: icon badge thể thao (ảnh) — layout gọn kiểu app grid
+  if (v2Icon) {
+    return (
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={styles.featureCol}
+      >
+        <Animated.View style={[styles.featureV2, { transform: [{ scale: scaleVal }] }]}>
+          <View style={styles.featureV2IconWrap}>
+            <Image source={v2Icon} style={styles.featureV2Icon} contentFit="contain" />
+            {item.isNew ? (
+              <View style={[styles.newBadge, styles.newBadgeV2, hot && styles.newBadgeV2Hot]} pointerEvents="none">
+                <Text style={[styles.newBadgeText, hot && { color: "#04121f" }]}>
+                  {hot ? "HOT" : "Mới"}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.featureTitle, { color: text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       activeOpacity={1}
@@ -772,13 +1024,17 @@ function FeatureItem({ item, theme }) {
         style={[
           styles.featureTile,
           {
-            backgroundColor: isDark ? "#151a26" : "#ffffff",
+            backgroundColor: v2 ? "#0C2044" : isDark ? "#151a26" : "#ffffff",
             borderColor: hot
-              ? item.color
+              ? v2
+                ? V2.cyanBright
+                : item.color
+              : v2
+              ? "rgba(92,180,255,0.18)"
               : isDark
               ? "rgba(255,255,255,0.07)"
               : "rgba(15,23,42,0.06)",
-            shadowColor: item.color,
+            shadowColor: v2 && hot ? V2.cyan : item.color,
             transform: [{ scale: scaleVal }],
           },
           hot && styles.featureTileHot,
@@ -786,7 +1042,7 @@ function FeatureItem({ item, theme }) {
       >
         {hot ? (
           <LinearGradient
-            colors={[shadeHex(item.color, -0.55), item.color]}
+            colors={v2 ? ["#08213F", "#0E3A6B", "#12B6F3"] : [shadeHex(item.color, -0.55), item.color]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
@@ -796,6 +1052,8 @@ function FeatureItem({ item, theme }) {
           colors={
             hot
               ? ["rgba(255,255,255,0.28)", "rgba(255,255,255,0.10)"]
+              : v2
+              ? [item.color + "40", item.color + "1a"]
               : [item.color + (isDark ? "33" : "26"), item.color + (isDark ? "14" : "0d")]
           }
           start={{ x: 0, y: 0 }}
@@ -1638,7 +1896,8 @@ export default function HomeScreen() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const theme = useTheme();
   const isDark = !!theme?.dark;
-  const bg = isDark ? "#0f1115" : "#F5F7FA";
+  const v2 = useUiVersion() === "v2";
+  const bg = v2 ? V2.navyDeep : isDark ? "#0f1115" : "#F5F7FA";
   const heroTopBleed = Platform.OS === "ios" ? insets.top : 0;
 
   useEffect(() => {
@@ -1664,7 +1923,12 @@ export default function HomeScreen() {
                 marginLeft: -8,
               }}
             >
-              {IOS_26_LIQUID_GLASS_ENABLED ? (
+              {v2 ? (
+                <View style={styles.v2HeaderLogo}>
+                  <Image source={LOGO_V2_EMBLEM} style={styles.v2HeaderEmblem} contentFit="contain" />
+                  <Text style={styles.v2HeaderText}>PickleTour</Text>
+                </View>
+              ) : IOS_26_LIQUID_GLASS_ENABLED ? (
                 <AppleLiquidGlassView
                   fallback="view"
                   glassEffectStyle="regular"
@@ -1738,8 +2002,16 @@ export default function HomeScreen() {
           contentInsetAdjustmentBehavior="never"
           contentContainerStyle={{ paddingBottom: 100 }}
         >
-          <View style={[styles.hero3dWrap, { height: 240 + heroTopBleed }]}>
-            {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
+          <View
+            style={[
+              styles.hero3dWrap,
+              { height: (v2 ? 300 : 240) + heroTopBleed },
+              v2 && { justifyContent: "flex-start", paddingTop: heroTopBleed + 6 },
+            ]}
+          >
+            {v2 ? (
+              <HeroV2Backdrop active={isFocused} topInset={heroTopBleed} />
+            ) : SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
               <LottieView
                 ref={heroLottieRef}
                 source={BG_3D}
@@ -1781,6 +2053,118 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* ============ V2 MODERN ============ */
+  v2HeaderLogo: { flexDirection: "row", alignItems: "center", gap: 8 },
+  v2HeaderEmblem: { width: 30, height: 30 },
+  v2HeaderText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#EAF3FF",
+    letterSpacing: 0.3,
+    fontStyle: "italic",
+  },
+  v2Glow: {
+    position: "absolute",
+    alignSelf: "center",
+    top: 36,
+    width: 330,
+    height: 190,
+    borderRadius: 165,
+    backgroundColor: "rgba(18,182,243,0.28)",
+  },
+  v2SpeedLines: { position: "absolute", top: -60, bottom: -60, left: -80, right: -80 },
+  v2SpeedLine: { position: "absolute", top: 0, bottom: 0, backgroundColor: "#5CD6FF" },
+  v2Streak: { position: "absolute", top: -80, bottom: -80, width: 120, left: 0 },
+  v2StreakThin: { width: 58 },
+  v2BottomLine: { position: "absolute", left: 36, right: 36, bottom: 0, height: 1.5, opacity: 0.8 },
+  v2IslandWrapper: {
+    width: "100%",
+    shadowColor: "#0A1B34",
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  v2Island: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    gap: 14,
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(92,180,255,0.4)",
+    overflow: "hidden",
+  },
+  v2IslandSheen: { position: "absolute", left: 0, right: 0, top: 0, height: 44 },
+  v2AvatarRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  v2AvatarInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#081428",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  v2NameContainer: { minWidth: 0, justifyContent: "center" },
+  v2Name: { color: V2.ink, fontSize: 16.5, marginBottom: 1 },
+  featureV2: { alignItems: "center", paddingVertical: 4, paddingHorizontal: 2 },
+  featureV2IconWrap: { position: "relative", marginBottom: 8 },
+  featureV2Icon: {
+    width: 62,
+    height: 62,
+    shadowColor: "#12B6F3",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  newBadgeV2: { top: -6, right: -8 },
+  newBadgeV2Hot: { backgroundColor: "#CDE818", borderColor: "rgba(255,255,255,0.92)" },
+  v2RoleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 1 },
+  v2RoleDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#12B6F3" },
+  v2RoleText: {
+    fontSize: 11,
+    color: "#8CA6C8",
+    fontWeight: "700",
+    letterSpacing: 1.3,
+    textTransform: "uppercase",
+  },
+  v2RankBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    gap: 4,
+    shadowColor: "#12B6F3",
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  v2RankText: { fontSize: 12.5, fontWeight: "800", color: "#04121f", letterSpacing: 0.2 },
+  v2LoginBadge: {
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: "#12B6F3",
+    shadowColor: "#12B6F3",
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  v2LoginText: { fontSize: 13, fontWeight: "800", color: "#04121f" },
+  /* ================================== */
   homeRoot: {
     flex: 1,
   },

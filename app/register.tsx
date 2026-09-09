@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 // app/(auth)/register.jsx
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import {

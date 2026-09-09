@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   perks: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
   perk: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
   perkText: { color: "#e0fbff", fontSize: 11.5, fontWeight: "600" },
-  ctaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 16 },
+  ctaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 16 },
   cta: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 11, borderRadius: 14 },
   ctaText: { color: "#06111f", fontWeight: "900", fontSize: 14 },
   ghost: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },

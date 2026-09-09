@@ -1,4 +1,5 @@
 // app/(tabs)/user-stats.tsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -67,15 +68,18 @@ const safeArr = <T,>(arr: T[] | undefined | null, fallback: T[]): T[] =>
 
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
   return {
     isDark,
-    bg: isDark ? "#0f1115" : "#F5F7FA",
-    bgGradient: isDark
+    bg: v2 ? "#040E20" : isDark ? "#0f1115" : "#F5F7FA",
+    bgGradient: v2
+      ? ["#040E20", "#0A1B34", "#040E20"]
+      : isDark
       ? ["#0f1115", "#181a20", "#0f1115"]
       : ["#F5F7FA", "#FFFFFF", "#F5F7FA"],
-    text: isDark ? "#f8fafc" : "#0f172a",
-    subText: isDark ? "#848E9C" : "#6B7280",
+    text: v2 ? "#EAF3FF" : isDark ? "#f8fafc" : "#0f172a",
+    subText: v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#6B7280",
     cardBg: isDark ? "rgba(24,26,32,0.72)" : "rgba(255,255,255,0.74)",
     cardBorder: isDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.72)",
     cardGradient: isDark

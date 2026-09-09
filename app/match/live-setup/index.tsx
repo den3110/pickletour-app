@@ -1,4 +1,5 @@
 // app/matches/live-setup/index.tsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -124,8 +125,9 @@ function formatDateTime(value?: string) {
 // ==========================================
 export default function UserMatchLiveSetupScreen() {
   const colorScheme = useColorScheme();
+  const v2 = useUiVersion() === "v2";
   const insets = useSafeAreaInsets(); // ✅ Lấy safe area để xử lý footer
-  const isDark = colorScheme === "dark";
+  const isDark = v2 || colorScheme === "dark";
   const theme = THEME_COLORS[isDark ? "dark" : "light"];
 
   // State Form

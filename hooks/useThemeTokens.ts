@@ -9,8 +9,48 @@
 import { useMemo } from "react";
 import { useTheme } from "@react-navigation/native";
 import { pal } from "@/utils/courtFormat";
+import { V2, type UiVersion } from "@/hooks/uiVersion";
 
-export const themeTokens = (dark: boolean) => {
+/** Token cho giao diện V2 Modern (navy/cyan/volt theo logo). */
+const themeTokensV2 = () => {
+  const p = pal(true);
+  return {
+    ...p,
+    bg: V2.navyDeep,
+    card: V2.navy,
+    field: "rgba(255,255,255,0.055)",
+    cardAlt: V2.navyAlt,
+    pressed: "rgba(92,180,255,0.12)",
+    border: V2.border,
+    line: V2.line,
+    text: V2.ink,
+    text2: V2.ink2,
+    text3: V2.sub,
+    sub: V2.sub,
+    muted: V2.muted,
+    overlay: "rgba(2,8,20,0.72)",
+    primary: V2.cyan,
+    primarySoft: "rgba(18,182,243,0.16)",
+    unreadBg: "rgba(18,182,243,0.12)",
+    amberSoft: "rgba(205,232,24,0.16)",
+    amberText: V2.volt,
+    greenSoft: "rgba(34,197,94,0.16)",
+    greenText: "#4ade80",
+    redSoft: "rgba(239,68,68,0.18)",
+    redText: "#fb7185",
+    purpleSoft: "rgba(124,58,237,0.2)",
+    onPrimary: "#04121f",
+    statusBar: "light" as "light" | "dark",
+    // Token riêng V2 (không dùng ở V1)
+    brandCyan: V2.cyan,
+    brandCyanBright: V2.cyanBright,
+    volt: V2.volt,
+    isV2: true,
+  };
+};
+
+export const themeTokens = (dark: boolean, version: UiVersion = "v1") => {
+  if (version === "v2") return themeTokensV2();
   const p = pal(dark);
   return {
     ...p,
@@ -52,14 +92,21 @@ export const themeTokens = (dark: boolean) => {
     onPrimary: "#ffffff",
     /** StatusBar style */
     statusBar: (dark ? "light" : "dark") as "light" | "dark",
+    // Token riêng V2 (ở V1 map sang giá trị hợp lý để không undefined)
+    brandCyan: "#12B6F3",
+    brandCyanBright: "#5CD6FF",
+    volt: dark ? "#CDE818" : "#84a300",
+    isV2: false,
   };
 };
 
 export type ThemeTokens = ReturnType<typeof themeTokens>;
 
 export function useThemeTokens(): ThemeTokens {
-  const { dark } = useTheme();
-  return useMemo(() => themeTokens(!!dark), [dark]);
+  const th = useTheme() as any;
+  const dark = !!th?.dark;
+  const version: UiVersion = th?.version === "v2" ? "v2" : "v1";
+  return useMemo(() => themeTokens(dark, version), [dark, version]);
 }
 
 export default useThemeTokens;

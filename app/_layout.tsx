@@ -58,6 +58,7 @@ import Toast from "react-native-toast-message";
 import analytics from "@/utils/analytics";
 import { t, initLang } from "@/utils/i18n";
 import * as SecureStore from "expo-secure-store";
+import { AppV2NavTheme, PREF_UI_VERSION_KEY, type UiVersion } from "@/hooks/uiVersion";
 import {
   increaseLaunchCountAndGet,
   initInstallDateIfNeeded,
@@ -1268,14 +1269,51 @@ function RootLayout() {
     return () => sub.remove();
   }, []);
 
+  // 2b) Phiên bản giao diện V1 (hiện tại) / V2 Modern
+  const [uiVersion, setUiVersion] = React.useState<UiVersion>("v1");
+  const loadUiVersion = React.useCallback(async () => {
+    try {
+      const v = (await SecureStore.getItemAsync(PREF_UI_VERSION_KEY)) as
+        | UiVersion
+        | null;
+      // Mặc định V2 Modern; chỉ khi user chủ động chọn "v1" mới quay lại giao diện cũ.
+      setUiVersion(v === "v1" ? "v1" : "v2");
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    loadUiVersion();
+  }, [loadUiVersion]);
+  React.useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") loadUiVersion();
+    });
+    return () => sub.remove();
+  }, [loadUiVersion]);
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "uiversion:changed",
+      (mode: UiVersion) => {
+        setThemeApplying(true);
+        setUiVersion(mode === "v2" ? "v2" : "v1");
+      },
+    );
+    return () => sub.remove();
+  }, []);
+
   // 3) Resolve theme
   const resolvedScheme =
     prefTheme === "system" ? systemScheme : (prefTheme as "light" | "dark");
   const isDark = resolvedScheme === "dark";
 
+  // V2 Modern luôn dùng theme navy riêng (bỏ qua sáng/tối); V1 giữ nguyên.
   const navTheme = React.useMemo(
-    () => (isDark ? AppDarkTheme : AppLightTheme),
-    [isDark],
+    () =>
+      uiVersion === "v2"
+        ? { ...AppV2NavTheme, fonts: (isDark ? AppDarkTheme : AppLightTheme).fonts }
+        : isDark
+        ? AppDarkTheme
+        : AppLightTheme,
+    [isDark, uiVersion],
   );
   const bg = navTheme.colors.background;
 

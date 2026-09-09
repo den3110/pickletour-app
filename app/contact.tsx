@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 // app/contact/index.jsx  (hoặc src/screens/ContactScreen.jsx)
 import {
   useGetContactContentQuery } from "@/slices/cmsApiSlice";
@@ -102,16 +103,17 @@ function SocialButton({ onPress, children, bg }) {
 
 export default function ContactScreen() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
 
-  const bg = isDark ? "#0f1115" : "#ffffff";
-  const cardBg = isDark ? "#14171c" : "#ffffff";
-  const border = isDark ? "#2a2e35" : "#e7eaf0";
-  const textPrimary = isDark ? "#ffffff" : "#111111";
-  const textSecondary = isDark ? "#c9c9c9" : "#555555";
-  const muted = isDark ? "#1a1e24" : "#f6f8fb";
-  const skeleton = isDark ? "#262a31" : "rgba(0,0,0,0.08)";
-  const tint = isDark ? "#7cc0ff" : "#0a84ff";
+  const bg = v2 ? "#040E20" : isDark ? "#0f1115" : "#ffffff";
+  const cardBg = v2 ? "#0A1B34" : isDark ? "#14171c" : "#ffffff";
+  const border = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#2a2e35" : "#e7eaf0";
+  const textPrimary = v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#111111";
+  const textSecondary = v2 ? "#8CA6C8" : isDark ? "#c9c9c9" : "#555555";
+  const muted = v2 ? "#0E2244" : isDark ? "#1a1e24" : "#f6f8fb";
+  const skeleton = v2 ? "rgba(92,180,255,0.12)" : isDark ? "#262a31" : "rgba(0,0,0,0.08)";
+  const tint = v2 ? "#12B6F3" : isDark ? "#7cc0ff" : "#0a84ff";
 
   const { data, isLoading, isError } = useGetContactContentQuery();
   const info = useMemo(

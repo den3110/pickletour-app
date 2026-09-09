@@ -1,4 +1,5 @@
 // app/403.jsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useMemo } from "react";
 import {
   SafeAreaView,
@@ -42,11 +43,12 @@ function Btn({
 
 export default function Forbidden403() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
-  const bg = isDark ? "#0b0d12" : "#f7f9fc";
-  const card = isDark ? "#12151b" : "#ffffff";
-  const text = isDark ? "#ffffff" : "#111827";
-  const sub = isDark ? "#cbd5e1" : "#4b5563";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
+  const bg = v2 ? "#040E20" : isDark ? "#0b0d12" : "#f7f9fc";
+  const card = v2 ? "#0A1B34" : isDark ? "#12151b" : "#ffffff";
+  const text = v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#111827";
+  const sub = v2 ? "#8CA6C8" : isDark ? "#cbd5e1" : "#4b5563";
   const error = "#ef4444";
 
   // nhận ?from=/duong-dan-cu nếu có

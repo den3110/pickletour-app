@@ -84,6 +84,7 @@ import { DEVICE_ID_KEY } from "@/services/deviceIdentity";
 import { triggerCrashFeedbackTestCrash } from "@/services/crashFeedbackService";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { useLiquidGlassPreference } from "@/context/GlassAppearanceContext";
+import { useUiVersion, applyUiVersion } from "@/hooks/uiVersion";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
 import {
   getTournamentConsoleEnabled,
@@ -296,12 +297,33 @@ const fmtScore = (v) => {
 
 /* ---------- Theme ---------- */
 function useTokens() {
-  const navTheme = useTheme?.() || {};
+  const navTheme = (useTheme?.() || {}) as any;
   const scheme = useColorScheme?.() || "light";
+  const v2 = navTheme?.version === "v2";
   const dark =
-    typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark";
+    v2 || (typeof navTheme.dark === "boolean" ? navTheme.dark : scheme === "dark");
+  if (v2) {
+    return {
+      dark: true,
+      v2: true,
+      headerGradient: ["#040E20", "#0A1B34", "#0E2A52"],
+      bg: "#040E20",
+      surface: "#0A1B34",
+      surfaceAlt: "#0E2244",
+      text: "#EAF3FF",
+      textSecondary: "#8CA6C8",
+      textMuted: "#5F7BA0",
+      accent: "#12B6F3",
+      accentLight: "rgba(18,182,243,0.18)",
+      border: "rgba(92,180,255,0.16)",
+      success: "#22c55e",
+      warning: "#f59e0b",
+      error: "#ef4444",
+    };
+  }
   return {
     dark,
+    v2: false,
     headerGradient: dark
       ? ["#0f0f23", "#1a1a3e", "#2d1b69"]
       : ["#667eea", "#764ba2"],
@@ -787,6 +809,19 @@ export default function ProfileScreen({ isBack = false }) {
   const [tournamentConsoleEnabled, setTournamentConsoleEnabled] =
     useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
+  const uiVersion = useUiVersion();
+  const onToggleUiVersion = async (v: boolean) => {
+    setThemeBusy(true);
+    const sub = DeviceEventEmitter.addListener("theme:applied", () => {
+      setThemeBusy(false);
+      sub.remove();
+    });
+    setTimeout(() => {
+      setThemeBusy(false);
+      sub.remove();
+    }, 900);
+    await applyUiVersion(v ? "v2" : "v1");
+  };
   const { data: notifPrefs } = useGetNotificationPrefsQuery();
   const [patchNotifPrefs, { isLoading: patchingNotif }] =
     usePatchNotificationPrefsMutation();
@@ -1359,14 +1394,14 @@ export default function ProfileScreen({ isBack = false }) {
               <>
                 <View style={styles.bentoGrid}>
                   <BentoCard
-                    gradient={["#6366f1", "#8b5cf6"]}
+                    gradient={t.v2 ? ["#0E63B3", "#12B6F3"] : ["#6366f1", "#8b5cf6"]}
                     icon="award"
                     value={user.stats?.tournaments || 0}
                     label="Giải đấu"
                   />
                   {/* ✅ BỎ LIVE -> thay bằng Uy tín */}
                   <BentoCard
-                    gradient={["#f59e0b", "#f97316"]}
+                    gradient={t.v2 ? ["#0891B2", "#22D3EE"] : ["#f59e0b", "#f97316"]}
                     icon="shield"
                     value={user.stats?.reputation || 0}
                     label="Uy tín"
@@ -1375,7 +1410,7 @@ export default function ProfileScreen({ isBack = false }) {
                 </View>
                 {/* ✅ Đổi “Điểm xếp hạng” -> “điểm đôi/điểm đơn” */}
                 <BentoCardWide
-                  gradient={["#14b8a6", "#06b6d4"]}
+                  gradient={t.v2 ? ["#0A4C8A", "#12B6F3"] : ["#14b8a6", "#06b6d4"]}
                   icon="trending-up"
                   value={`${fmtScore(user.ratingDouble)}/${fmtScore(
                     user.ratingSingle,
@@ -1717,6 +1752,81 @@ export default function ProfileScreen({ isBack = false }) {
                       style={{ marginBottom: 12 }}
                     />
                   )}
+                  {/* ==== Chuyển đổi V1 ↔ V2 Modern (luxury thể thao) ==== */}
+                  <View
+                    style={[
+                      styles.switchRow,
+                      {
+                        borderBottomWidth: 1,
+                        borderBottomColor: t.border,
+                        marginBottom: 12,
+                        paddingBottom: 12,
+                      },
+                    ]}
+                  >
+                    <View style={styles.switchLeft}>
+                      <View
+                        style={[
+                          styles.switchIcon,
+                          {
+                            backgroundColor: "rgba(18,182,243,0.16)",
+                            borderWidth: 1,
+                            borderColor: "rgba(18,182,243,0.4)",
+                          },
+                        ]}
+                      >
+                        <Feather name="layers" size={16} color="#12B6F3" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <Text style={[styles.switchLabel, { color: t.text }]}>
+                            V2 Modern
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor: "#CDE818",
+                              borderRadius: 999,
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "900",
+                                color: "#0A1B34",
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              MỚI
+                            </Text>
+                          </View>
+                        </View>
+                        <Text
+                          style={[
+                            styles.switchHint,
+                            { color: t.textSecondary },
+                          ]}
+                        >
+                          {uiVersion === "v2"
+                            ? "Đang dùng giao diện thể thao cao cấp (cyan · navy). Tắt để quay về V1."
+                            : "Bật giao diện luxury thể thao mới theo logo PickleTour."}
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={uiVersion === "v2"}
+                      onValueChange={onToggleUiVersion}
+                      trackColor={{ false: t.border, true: "#12B6F3" }}
+                      thumbColor="#fff"
+                    />
+                  </View>
                   <View
                     style={[
                       styles.switchRow,

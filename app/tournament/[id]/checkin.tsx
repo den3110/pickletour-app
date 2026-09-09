@@ -1,4 +1,5 @@
 // app/tournament/[id]/checkin.tsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,17 +26,18 @@ import {
 /* ---------- Theme helpers ---------- */
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
-  const isDark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
 
-  const tint = isDark ? "#7cc0ff" : "#0a84ff";
-  const background = isDark ? "#0f1115" : "#fafafa";
-  const cardBg = isDark ? "#16181d" : "#ffffff";
-  const border = isDark ? "#2f3136" : "#e6e8ef";
-  const hairline = isDark ? "#26282d" : "#e6e8ef";
-  const inputBg = isDark ? "#1a1c21" : "#ffffff";
-  const inputBorder = isDark ? "#2a2d33" : "#e0e0e0";
-  const textPrimary = isDark ? "#ffffff" : "#111111";
-  const textMuted = isDark ? "#9aa0a6" : "#666666";
+  const tint = v2 ? "#12B6F3" : isDark ? "#7cc0ff" : "#0a84ff";
+  const background = v2 ? "#040E20" : isDark ? "#0f1115" : "#fafafa";
+  const cardBg = v2 ? "#0A1B34" : isDark ? "#16181d" : "#ffffff";
+  const border = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#2f3136" : "#e6e8ef";
+  const hairline = v2 ? "rgba(92,180,255,0.12)" : isDark ? "#26282d" : "#e6e8ef";
+  const inputBg = v2 ? "rgba(255,255,255,0.06)" : isDark ? "#1a1c21" : "#ffffff";
+  const inputBorder = v2 ? "rgba(92,180,255,0.2)" : isDark ? "#2a2d33" : "#e0e0e0";
+  const textPrimary = v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#111111";
+  const textMuted = v2 ? "#8CA6C8" : isDark ? "#9aa0a6" : "#666666";
   const btnDisabled = isDark ? "#4b5563" : "#9aa0a6";
 
   // Soft info/danger boxes (balanced for dark)

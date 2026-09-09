@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -12,7 +13,9 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function NotFound() {
-  const scheme = useColorScheme() ?? "light";
+  const scheme0 = useColorScheme() ?? "light";
+  const v2 = useUiVersion() === "v2";
+  const scheme = v2 ? "dark" : scheme0;
   const textPrimary = scheme === "dark" ? "#fff" : "#111";
   const textSecondary = scheme === "dark" ? "#c9c9c9" : "#444";
   const border = scheme === "dark" ? "#2e2f33" : "#e5e9f0";

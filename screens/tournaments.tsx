@@ -89,22 +89,24 @@ function fromDateId(id) {
 /* ---------- Theme Tokens ---------- */
 function useModernTheme() {
   const scheme = useColorScheme() || "light";
-  const isDark = scheme === "dark";
-  const navTheme = useTheme();
+  const navTheme = useTheme() as any;
+  const v2 = navTheme?.version === "v2";
+  // V2 Modern luôn nền tối navy; nếu không, theo nav theme (dark/light).
+  const isDark = v2 || !!navTheme?.dark || scheme === "dark";
   const primaryColor = navTheme?.colors?.primary ?? "#3b82f6";
 
   return {
     isDark,
     colors: {
-      bg: isDark ? "#0f1115" : "#f8fafc",
-      card: isDark ? "#181a20" : "#ffffff",
-      text: isDark ? "#ffffff" : "#0f172a",
-      textSec: isDark ? "#848E9C" : "#64748b",
-      border: isDark ? "#262932" : "#e2e8f0",
+      bg: v2 ? "#040E20" : isDark ? "#0f1115" : "#f8fafc",
+      card: v2 ? "#0A1B34" : isDark ? "#181a20" : "#ffffff",
+      text: v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#0f172a",
+      textSec: v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#64748b",
+      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#262932" : "#e2e8f0",
       primary: primaryColor,
       success: "#10b981",
       warning: "#f97316",
-      inputBg: isDark ? "#20232b" : "#f1f5f9",
+      inputBg: v2 ? "rgba(255,255,255,0.06)" : isDark ? "#20232b" : "#f1f5f9",
     },
     cardShadow: {
       shadowColor: isDark ? "#000" : "#1e293b",

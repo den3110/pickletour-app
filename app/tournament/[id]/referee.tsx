@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 // app/(app)/tournament/[id]/referee.jsx
 import React, {
   useEffect,
@@ -53,19 +54,20 @@ import { buildRefereeMatchRoute } from "@/utils/refereeMatchRoute";
 /* ---------------- THEME ---------------- */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
-  const dark = scheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const dark = v2 || scheme === "dark";
   return useMemo(
     () => ({
       scheme,
       // base
-      bg: dark ? "#0b0d10" : "#f6f8fc",
-      cardBg: dark ? "#111214" : "#ffffff",
-      border: dark ? "#2a2f36" : "#e4e8ef",
-      text: dark ? "#e5e7eb" : "#111111",
-      subtext: dark ? "#cbd5e1" : "#444444",
-      muted: dark ? "#94a3b8" : "#9aa0a6",
-      icon: dark ? "#d1d5db" : "#334155",
-      tint: dark ? "#7cc0ff" : "#0a84ff",
+      bg: v2 ? "#040E20" : dark ? "#0b0d10" : "#f6f8fc",
+      cardBg: v2 ? "#0A1B34" : dark ? "#111214" : "#ffffff",
+      border: v2 ? "rgba(92,180,255,0.16)" : dark ? "#2a2f36" : "#e4e8ef",
+      text: v2 ? "#EAF3FF" : dark ? "#e5e7eb" : "#111111",
+      subtext: v2 ? "#C4D6EC" : dark ? "#cbd5e1" : "#444444",
+      muted: v2 ? "#8CA6C8" : dark ? "#94a3b8" : "#9aa0a6",
+      icon: v2 ? "#C4D6EC" : dark ? "#d1d5db" : "#334155",
+      tint: v2 ? "#12B6F3" : dark ? "#7cc0ff" : "#0a84ff",
 
       // pills / chips
       pillDefaultBg: dark ? "#1e293b" : "#eef2f7",

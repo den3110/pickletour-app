@@ -1,4 +1,5 @@
 // app/(auth)/reset-password-otp.jsx
+import { useUiVersion } from "@/hooks/uiVersion";
 import React, {
   useCallback,
   useEffect,
@@ -170,20 +171,21 @@ export default function ResetPasswordOtpScreen() {
   };
 
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || colorScheme === "dark";
   const themed = useMemo(
     () => ({
-      bg: isDark ? "#0b0b0c" : "#f5f7fb",
-      cardBg: isDark ? "#16181d" : "#ffffff",
-      text: isDark ? "#e6e6e9" : "#0f172a",
-      subtext: isDark ? "#a1a1aa" : "#475569",
-      border: isDark ? "#2a2d33" : "#e5e7eb",
-      primary: "#2563eb",
+      bg: v2 ? "#040E20" : isDark ? "#0b0b0c" : "#f5f7fb",
+      cardBg: v2 ? "#0A1B34" : isDark ? "#16181d" : "#ffffff",
+      text: v2 ? "#EAF3FF" : isDark ? "#e6e6e9" : "#0f172a",
+      subtext: v2 ? "#8CA6C8" : isDark ? "#a1a1aa" : "#475569",
+      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#2a2d33" : "#e5e7eb",
+      primary: v2 ? "#12B6F3" : "#2563eb",
       danger: "#dc2626",
-      primaryText: "#ffffff",
-      muted: isDark ? "#2b2f36" : "#f1f5f9",
+      primaryText: v2 ? "#04121f" : "#ffffff",
+      muted: v2 ? "#0E2244" : isDark ? "#2b2f36" : "#f1f5f9",
     }),
-    [isDark]
+    [isDark, v2]
   );
 
   // ⬇️ NEW: điều khiển OTP animation

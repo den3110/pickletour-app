@@ -1,4 +1,5 @@
 import { t } from "@/utils/i18n";
+import { useUiVersion } from "@/hooks/uiVersion";
 // app/screens/TournamentRegistrationScreen.tsx
 import {
   Stack,
@@ -82,16 +83,17 @@ const PLACE = "https://dummyimage.com/800x600/cccccc/ffffff&text=?";
 /* =============== THEME & UTILS =============== */
 function useThemeColors() {
   const scheme = useColorScheme() ?? "light";
+  const v2 = useUiVersion() === "v2";
   return useMemo(() => {
-    const isDark = scheme === "dark";
+    const isDark = v2 || scheme === "dark";
     return {
       scheme,
-      tint: isDark ? "#60a5fa" : "#2563eb",
-      pageBg: isDark ? "#0f1115" : "#F5F7FA",
-      cardBg: isDark ? "#181a20" : "#FFFFFF",
-      border: isDark ? "#262932" : "#E5E7EB",
-      textPrimary: isDark ? "#f8fafc" : "#0f172a",
-      textSecondary: isDark ? "#848E9C" : "#6B7280",
+      tint: v2 ? "#12B6F3" : isDark ? "#60a5fa" : "#2563eb",
+      pageBg: v2 ? "#040E20" : isDark ? "#0f1115" : "#F5F7FA",
+      cardBg: v2 ? "#0A1B34" : isDark ? "#181a20" : "#FFFFFF",
+      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#262932" : "#E5E7EB",
+      textPrimary: v2 ? "#EAF3FF" : isDark ? "#f8fafc" : "#0f172a",
+      textSecondary: v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#6B7280",
       chipBg: isDark ? "#20232b" : "#F3F4F6",
       inputBg: isDark ? "#20232b" : "#F3F4F6",
       ghostBg: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
@@ -119,7 +121,7 @@ function useThemeColors() {
         elevation: 3,
       },
     };
-  }, [scheme]);
+  }, [scheme, v2]);
 }
 
 const glassScheme = (C: ReturnType<typeof useThemeColors>) =>

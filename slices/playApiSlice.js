@@ -36,7 +36,7 @@ export const playApiSlice = apiSlice.injectEndpoints({
     deleteInvite: builder.mutation({
       query: (id) => ({ url: `/api/play/${id}`, method: "DELETE" }),
     }),
-    requestJoin: builder.mutation({
+    requestJoinPlay: builder.mutation({
       query: ({ id, note }) => ({ url: `/api/play/${id}/join`, method: "POST", body: { note } }),
     }),
     respondJoin: builder.mutation({
@@ -59,7 +59,7 @@ export const {
   useCreateInviteMutation,
   useUpdateInviteMutation,
   useDeleteInviteMutation,
-  useRequestJoinMutation,
+  useRequestJoinPlayMutation,
   useRespondJoinMutation,
   useLeaveInviteMutation,
 } = playApiSlice;
