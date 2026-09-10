@@ -10,7 +10,6 @@ import React,
   useState } from "react";
 import {
   Animated,
-  FlatList,
   Linking,
   Platform,
   Pressable,
@@ -20,12 +19,10 @@ import {
   Modal,
   SafeAreaView as RNSafeAreaView,
 } from "react-native";
-import { TextInput } from "@/components/ui/i18nTextInput";
 import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
@@ -33,6 +30,22 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import {
+  DateFilter,
+  TournamentActions,
+  TournamentCard as PremiumTournamentCard,
+  TournamentCover,
+  TournamentFilters,
+  TournamentHeader,
+  TournamentInfo,
+  TournamentList,
+  TournamentPage,
+  TournamentSearch,
+  TOURNAMENT_COLORS,
+  ZaloButton,
+  type TournamentAction,
+  type TournamentFilterKey,
+} from "@/components/tournaments/TournamentDesign";
 
 // Nhóm Zalo cộng đồng — fallback khi giải chưa đặt link Zalo riêng.
 const DEFAULT_ZALO_GROUP = "https://zalo.me/g/yarnhm129";
@@ -52,12 +65,6 @@ const TABS = [
   { key: "ongoing", label: "Đang diễn ra" },
   { key: "finished", label: "Đã kết thúc" },
 ];
-
-const STATUS_CONFIG = {
-  upcoming: { label: "Sắp diễn ra", color: "#0ea5e9" },
-  ongoing: { label: "Đang diễn ra", color: "#22c55e" },
-  finished: { label: "Đã kết thúc", color: "#64748b" },
-};
 
 function formatDate(d) {
   if (!d) return "--/--";
@@ -99,12 +106,12 @@ function useModernTheme() {
   return {
     isDark,
     colors: {
-      bg: v2 ? "#040E20" : isDark ? "#0f1115" : "#f8fafc",
-      card: v2 ? "#0A1B34" : isDark ? "#181a20" : "#ffffff",
-      text: v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#0f172a",
-      textSec: v2 ? "#8CA6C8" : isDark ? "#848E9C" : "#64748b",
-      border: v2 ? "rgba(92,180,255,0.16)" : isDark ? "#262932" : "#e2e8f0",
-      primary: primaryColor,
+      bg: v2 ? TOURNAMENT_COLORS.background : isDark ? "#0f1115" : "#f8fafc",
+      card: v2 ? TOURNAMENT_COLORS.surfaceStrong : isDark ? "#181a20" : "#ffffff",
+      text: v2 ? TOURNAMENT_COLORS.text : isDark ? "#ffffff" : "#0f172a",
+      textSec: v2 ? TOURNAMENT_COLORS.textMuted : isDark ? "#848E9C" : "#64748b",
+      border: v2 ? TOURNAMENT_COLORS.border : isDark ? "#262932" : "#e2e8f0",
+      primary: v2 ? TOURNAMENT_COLORS.primary : primaryColor,
       success: "#10b981",
       warning: "#f97316",
       inputBg: v2 ? "rgba(255,255,255,0.06)" : isDark ? "#20232b" : "#f1f5f9",
@@ -213,345 +220,6 @@ function SkeletonCard() {
   );
 }
 
-function MetaRow({ icon, text, theme }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      <Ionicons name={icon} size={15} color={theme.colors.textSec} />
-      <Text
-        style={{ fontSize: 13, color: theme.colors.textSec, fontWeight: "500" }}
-        numberOfLines={1}
-      >
-        {text}
-      </Text>
-    </View>
-  );
-}
-
-function TabPill({ label, active, onPress, theme }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-      ]}
-    >
-      <AppleLiquidGlassView
-        fallback="view"
-        glassColorScheme={theme.isDark ? "dark" : "light"}
-        glassEffectStyle={active ? "regular" : "clear"}
-        glassTintColor={
-          active
-            ? theme.isDark
-              ? "rgba(167, 139, 250, 0.32)"
-              : "rgba(255, 255, 255, 0.64)"
-            : theme.isDark
-            ? "rgba(15, 23, 42, 0.44)"
-            : "rgba(255, 255, 255, 0.38)"
-        }
-        isInteractive
-        style={[
-          styles.tabPill,
-          active
-            ? {
-                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                  ? theme.colors.primary + "20"
-                  : theme.colors.text,
-                borderColor: IOS_26_LIQUID_GLASS_ENABLED
-                  ? theme.colors.primary + "66"
-                  : theme.colors.text,
-              }
-            : {
-                backgroundColor: IOS_26_LIQUID_GLASS_ENABLED
-                  ? theme.colors.card + "99"
-                  : "transparent",
-                borderColor: theme.colors.border,
-              },
-          IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-        ]}
-      >
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color:
-            active && !IOS_26_LIQUID_GLASS_ENABLED
-              ? theme.colors.card
-              : active
-              ? theme.colors.primary
-              : theme.colors.textSec,
-        }}
-      >
-        {label}
-      </Text>
-      </AppleLiquidGlassView>
-    </Pressable>
-  );
-}
-
-const btnBaseStyle = {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  paddingVertical: 10,
-  paddingHorizontal: 16,
-  borderRadius: 30,
-  minHeight: 40,
-};
-
-/* ---------- Buttons ---------- */
-function PrimaryBtn({ onPress, children, theme, icon }) {
-  if (IOS_26_LIQUID_GLASS_ENABLED) {
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-        ]}
-      >
-        <AppleLiquidGlassView
-          fallback="view"
-          glassColorScheme={theme.isDark ? "dark" : "light"}
-          glassEffectStyle="regular"
-          glassTintColor={
-            theme.isDark ? "rgba(37, 99, 235, 0.24)" : "rgba(255, 255, 255, 0.5)"
-          }
-          isInteractive
-          style={[
-            btnBaseStyle,
-            styles.actionGlassBtn,
-            {
-              backgroundColor: theme.colors.primary + "20",
-              borderColor: theme.colors.primary + "66",
-            },
-          ]}
-        >
-          {icon && (
-            <Ionicons
-              name={icon}
-              size={16}
-              color={theme.colors.primary}
-              style={{ marginRight: 6 }}
-            />
-          )}
-          <Text style={[styles.btnTextWhite, { color: theme.colors.primary }]}>
-            {children}
-          </Text>
-        </AppleLiquidGlassView>
-      </Pressable>
-    );
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        btnBaseStyle,
-        { backgroundColor: theme.colors.primary, marginBottom: 10 },
-        theme.btnShadow,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-      ]}
-    >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color="#fff"
-          style={{ marginRight: 6 }}
-        />
-      )}
-      <Text style={styles.btnTextWhite}>{children}</Text>
-    </Pressable>
-  );
-}
-
-function WarningBtn({ onPress, children, theme, icon }) {
-  if (IOS_26_LIQUID_GLASS_ENABLED) {
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-        ]}
-      >
-        <AppleLiquidGlassView
-          fallback="view"
-          glassColorScheme={theme.isDark ? "dark" : "light"}
-          glassEffectStyle="regular"
-          glassTintColor={
-            theme.isDark ? "rgba(249, 115, 22, 0.24)" : "rgba(255, 255, 255, 0.5)"
-          }
-          isInteractive
-          style={[
-            btnBaseStyle,
-            styles.actionGlassBtn,
-            {
-              backgroundColor: theme.colors.warning + "20",
-              borderColor: theme.colors.warning + "66",
-            },
-          ]}
-        >
-          {icon && (
-            <Ionicons
-              name={icon}
-              size={16}
-              color={theme.colors.warning}
-              style={{ marginRight: 6 }}
-            />
-          )}
-          <Text style={[styles.btnTextWhite, { color: theme.colors.warning }]}>
-            {children}
-          </Text>
-        </AppleLiquidGlassView>
-      </Pressable>
-    );
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        btnBaseStyle,
-        { backgroundColor: theme.colors.warning, marginBottom: 10 },
-        theme.warningShadow,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-      ]}
-    >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color="#fff"
-          style={{ marginRight: 6 }}
-        />
-      )}
-      <Text style={styles.btnTextWhite}>{children}</Text>
-    </Pressable>
-  );
-}
-
-// Nút Zalo — cùng style pill/glass với các nút khác, chỉ đổi sang màu xanh Zalo.
-function ZaloBtn({ onPress, children, theme, icon }) {
-  const ZALO = "#0068FF";
-  if (IOS_26_LIQUID_GLASS_ENABLED) {
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-        ]}
-      >
-        <AppleLiquidGlassView
-          fallback="view"
-          glassColorScheme={theme.isDark ? "dark" : "light"}
-          glassEffectStyle="regular"
-          glassTintColor={
-            theme.isDark ? "rgba(0, 104, 255, 0.24)" : "rgba(255, 255, 255, 0.5)"
-          }
-          isInteractive
-          style={[
-            btnBaseStyle,
-            styles.actionGlassBtn,
-            { backgroundColor: ZALO + "20", borderColor: ZALO + "66" },
-          ]}
-        >
-          {icon && (
-            <Ionicons
-              name={icon}
-              size={16}
-              color={ZALO}
-              style={{ marginRight: 6 }}
-            />
-          )}
-          <Text style={[styles.btnTextWhite, { color: ZALO }]}>{children}</Text>
-        </AppleLiquidGlassView>
-      </Pressable>
-    );
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        btnBaseStyle,
-        { backgroundColor: ZALO, marginBottom: 10 },
-        theme.btnShadow,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-      ]}
-    >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color="#fff"
-          style={{ marginRight: 6 }}
-        />
-      )}
-      <Text style={styles.btnTextWhite}>{children}</Text>
-    </Pressable>
-  );
-}
-
-function OutlineBtn({ onPress, children, theme, icon }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        !IOS_26_LIQUID_GLASS_ENABLED && [
-          btnBaseStyle,
-          {
-            backgroundColor: "transparent",
-            borderWidth: 1.5,
-            borderColor: theme.colors.border,
-            paddingVertical: 8.5,
-            marginBottom: 10,
-          },
-        ],
-        pressed &&
-          (IOS_26_LIQUID_GLASS_ENABLED
-            ? { opacity: 0.88, transform: [{ scale: 0.98 }] }
-            : { backgroundColor: theme.colors.text + "08" }),
-      ]}
-    >
-      <AppleLiquidGlassView
-        fallback="view"
-        glassColorScheme={theme.isDark ? "dark" : "light"}
-        glassEffectStyle="clear"
-        glassTintColor={
-          theme.isDark ? "rgba(15, 23, 42, 0.42)" : "rgba(255, 255, 255, 0.42)"
-        }
-        isInteractive
-        style={
-          IOS_26_LIQUID_GLASS_ENABLED
-            ? [
-                btnBaseStyle,
-                {
-                  backgroundColor: theme.colors.card + "80",
-                  borderColor: theme.colors.border,
-                },
-                styles.actionGlassBtn,
-                styles.glassControl,
-              ]
-            : styles.transparentFill
-        }
-      >
-      {icon && (
-        <Ionicons
-          name={icon}
-          size={16}
-          color={theme.colors.text}
-          style={{ marginRight: 6 }}
-        />
-      )}
-      <Text
-        style={{ fontWeight: "700", color: theme.colors.text, fontSize: 13 }}
-      >
-        {children}
-      </Text>
-      </AppleLiquidGlassView>
-    </Pressable>
-  );
-}
-
 function TournamentListHeader({
   isBack,
   theme,
@@ -567,154 +235,27 @@ function TournamentListHeader({
   error,
 }) {
   return (
-    <View style={{ marginBottom: 10 }}>
-      <View style={styles.header}>
-        {isBack && (
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={10}
-            style={IOS_26_LIQUID_GLASS_ENABLED ? styles.backButtonGlassWrap : { marginRight: 10 }}
-          >
-            {IOS_26_LIQUID_GLASS_ENABLED ? (
-              <AppleLiquidGlassView
-                fallback="view"
-                glassColorScheme={theme.isDark ? "dark" : "light"}
-                glassEffectStyle="regular"
-                glassTintColor={
-                  theme.isDark
-                    ? "rgba(15, 23, 42, 0.48)"
-                    : "rgba(255, 255, 255, 0.52)"
-                }
-                isInteractive
-                style={styles.backButtonGlass}
-              >
-                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
-              </AppleLiquidGlassView>
-            ) : (
-              <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
-            )}
-          </Pressable>
-        )}
-
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Giải đấu
-        </Text>
-      </View>
-
-      <AppleLiquidGlassView
-        fallback="view"
-        glassColorScheme={theme.isDark ? "dark" : "light"}
-        glassEffectStyle="regular"
-        glassTintColor={
-          theme.isDark ? "rgba(15, 23, 42, 0.56)" : "rgba(255, 255, 255, 0.6)"
+    <View style={styles.listHeader}>
+      <TournamentHeader isBack={isBack} onBack={() => router.back()} />
+      <TournamentSearch
+        value={keyword}
+        onChangeText={setKeyword}
+        onClear={() => setKeyword("")}
+      />
+      <TournamentFilters
+        active={tab as TournamentFilterKey}
+        onChange={(nextTab) => setTab(nextTab)}
+      />
+      <DateFilter
+        active={hasDateFilter}
+        label={
+          hasDateFilter
+            ? `${formatDate(fromDate)} – ${formatDate(toDate)}`
+            : "Lọc theo ngày"
         }
-        isInteractive
-        style={[
-          styles.searchBox,
-          {
-            backgroundColor: theme.colors.card,
-            borderColor: theme.colors.border,
-          },
-          IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
-        ]}
-      >
-        <Ionicons name="search" size={20} color={theme.colors.textSec} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.colors.text }]}
-          placeholder="Tìm kiếm giải đấu..."
-          placeholderTextColor={theme.colors.textSec}
-          value={keyword}
-          onChangeText={setKeyword}
-          returnKeyType="search"
-        />
-        {keyword.length > 0 && (
-          <Pressable onPress={() => setKeyword("")}>
-            <Ionicons name="close-circle" size={18} color={theme.colors.textSec} />
-          </Pressable>
-        )}
-      </AppleLiquidGlassView>
-
-      <View style={styles.filtersRow}>
-        <View style={styles.tabsRow}>
-          {TABS.map((t) => (
-            <TabPill
-              key={t.key}
-              label={t.label}
-              active={tab === t.key}
-              onPress={() => setTab(t.key)}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        <Pressable
-          onPress={openDateModal}
-          style={({ pressed }) => [
-            pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-          ]}
-        >
-          <AppleLiquidGlassView
-            fallback="view"
-            glassColorScheme={theme.isDark ? "dark" : "light"}
-            glassEffectStyle={hasDateFilter ? "regular" : "clear"}
-            glassTintColor={
-              hasDateFilter
-                ? theme.isDark
-                  ? "rgba(14, 165, 233, 0.24)"
-                  : "rgba(255, 255, 255, 0.62)"
-                : theme.isDark
-                ? "rgba(15, 23, 42, 0.46)"
-                : "rgba(255, 255, 255, 0.44)"
-            }
-            isInteractive
-            style={[
-              styles.dateFilterPill,
-              {
-                backgroundColor: hasDateFilter
-                  ? theme.colors.primary + "12"
-                  : theme.colors.card,
-                borderColor: hasDateFilter ? theme.colors.primary : theme.colors.border,
-              },
-              IOS_26_LIQUID_GLASS_ENABLED && styles.glassPill,
-            ]}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={hasDateFilter ? theme.colors.primary : theme.colors.textSec}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.dateFilterLabel,
-                {
-                  color: hasDateFilter ? theme.colors.primary : theme.colors.textSec,
-                },
-              ]}
-            >
-              {hasDateFilter
-                ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
-                : "Lọc theo ngày"}
-            </Text>
-
-            {hasDateFilter && <View style={[styles.filterActiveDot, { backgroundColor: theme.colors.primary }]} />}
-
-            {hasDateFilter && (
-              <Pressable
-                hitSlop={8}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  clearDateFilter();
-                }}
-                style={{ marginLeft: 2 }}
-              >
-                <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
-              </Pressable>
-            )}
-          </AppleLiquidGlassView>
-        </Pressable>
-      </View>
+        onPress={openDateModal}
+        onClear={clearDateFilter}
+      />
 
       {!!error && (
         <AppleLiquidGlassView
@@ -880,8 +421,6 @@ export default function TournamentDashboardScreen({ isBack = false }) {
 
   // === RENDER ITEM ===
   const renderItem = ({ item: tt }) => {
-    const statusMeta = STATUS_CONFIG[tt.status] || STATUS_CONFIG.finished;
-
     const onPressSchedule = () => router.push(`/tournament/${tt._id}/schedule`);
     const onPressRegister = () => router.push(`/tournament/${tt._id}/register`);
     const onPressBracket = () =>
@@ -897,208 +436,72 @@ export default function TournamentDashboardScreen({ isBack = false }) {
     const showRegister =
       !isRefereeOfThis && (canManage(tt) || tt.status === "upcoming");
 
+    const actions: TournamentAction[] = [];
+    if (Number((tt as any)?.matchesTotal) > 0) {
+      actions.push({
+        key: "schedule",
+        label: "Lịch đấu",
+        icon: "calendar-outline",
+        onPress: onPressSchedule,
+      });
+    }
+    if (isRefereeOfThis) {
+      actions.push({
+        key: "referee",
+        label: "Chấm trận",
+        icon: "create-outline",
+        onPress: onPressReferee,
+        primary: true,
+        warning: true,
+      });
+    } else if (showRegister) {
+      actions.push({
+        key: "register",
+        label: "Đăng ký",
+        icon: "person-add-outline",
+        onPress: onPressRegister,
+        primary: true,
+      });
+    }
+    if (Number((tt as any)?.bracketsTotal) > 0) {
+      actions.push({
+        key: "bracket",
+        label: tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ",
+        icon: "git-network-outline",
+        onPress: onPressBracket,
+      });
+    }
+
     return (
-      <AppleLiquidGlassView
-        fallback="view"
-        glassColorScheme={theme.isDark ? "dark" : "light"}
-        glassEffectStyle="regular"
-        glassTintColor={
-          theme.isDark
-            ? "rgba(15, 23, 42, 0.58)"
-            : "rgba(255, 255, 255, 0.58)"
-        }
-        style={[
-          styles.cardContainer,
-          {
-            backgroundColor: theme.colors.card,
-            borderWidth: 1,
-            borderColor: theme.isDark ? "rgba(92,180,255,0.16)" : "#e2e8f0",
-          },
-          IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
-          theme.cardShadow,
-        ]}
-      >
-        {/* ==== Ảnh bìa + tiêu đề đè lên (thiết kế mới, cinematic) ==== */}
-        <Pressable onPress={() => onPressCard(tt)}>
-          <View style={styles.cardMediaWrap}>
-            <ExpoImage
-              source={{
-                uri:
-                  normalizeUrl(tt.image) ||
-                  "https://dummyimage.com/1200x675/cccccc/ffffff&text=No+Image",
-              }}
-              style={styles.cardImage}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-            {/* Lớp phủ gradient dưới để chữ nổi & fade vào thân thẻ */}
-            <LinearGradient
-              pointerEvents="none"
-              colors={["transparent", "rgba(2,8,20,0.35)", theme.colors.card]}
-              locations={[0, 0.55, 1]}
-              style={styles.cardMediaScrim}
-            />
-
-            {/* Badge trạng thái — chấm phát sáng */}
-            <View style={styles.statusBadgeOverlay}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: statusMeta.color, shadowColor: statusMeta.color },
-                ]}
-              />
-              <Text style={styles.statusTextOverlay}>{statusMeta.label}</Text>
-            </View>
-
-            {/* Format badge: MLP / TEAM — góc trên phải */}
-            {String((tt as any)?.tournamentMode || "").toLowerCase() === "mlp" && (
-              <View style={styles.formatBadgeMlp}>
-                <Text style={styles.formatBadgeText}>🏆 MLP</Text>
-              </View>
-            )}
-            {String((tt as any)?.tournamentMode || "").toLowerCase() === "team" && (
-              <View style={styles.formatBadgeTeam}>
-                <Text style={styles.formatBadgeText}>👥 TEAM</Text>
-              </View>
-            )}
-
-            {/* Tiêu đề đè lên phần dưới ảnh */}
-            <Text
-              style={[styles.cardTitleOnImage, { color: theme.colors.text }]}
-              numberOfLines={2}
-            >
-              {tt.name}
-            </Text>
-          </View>
-        </Pressable>
-
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 }}>
-          {/* ==== Meta 3 cột có vạch ngăn (theo mẫu) ==== */}
-          <View style={styles.metaGrid}>
-            <View style={styles.metaCol}>
-              <Ionicons name="calendar-clear-outline" size={17} color={theme.colors.primary} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Thời gian</Text>
-                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={2}>
-                  {`${formatDate(tt.startDate)} - ${formatDate(tt.endDate)}`}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.metaDividerV, { backgroundColor: theme.colors.border }]} />
-            <View style={styles.metaCol}>
-              <Ionicons name="location-outline" size={17} color={theme.colors.primary} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Địa điểm</Text>
-                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={2}>
-                  {tt.location || "Chưa cập nhật"}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.metaDividerV, { backgroundColor: theme.colors.border }]} />
-            <View style={styles.metaCol}>
-              <Ionicons name="people-outline" size={17} color={theme.colors.primary} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Đăng ký</Text>
-                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={1}>
-                  {`${tt.registered}/${tt.maxPairs}`}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* ==== Nút hành động (theo mẫu: có mũi tên, nút chính đặc) ==== */}
-          <View style={styles.tBtnRow}>
-            {Number((tt as any)?.matchesTotal) > 0 && (
-              <Pressable
-                onPress={onPressSchedule}
-                style={({ pressed }) => [
-                  styles.tBtn,
-                  styles.tBtnOutline,
-                  { borderColor: theme.colors.primary + "55" },
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
-                <Text style={[styles.tBtnText, { color: theme.colors.primary }]} numberOfLines={1}>
-                  Lịch đấu
-                </Text>
-              </Pressable>
-            )}
-
-            {isRefereeOfThis ? (
-              <Pressable
-                onPress={onPressReferee}
-                style={({ pressed }) => [
-                  styles.tBtn,
-                  styles.tBtnSolid,
-                  { backgroundColor: theme.colors.warning, shadowColor: theme.colors.warning },
-                  pressed && { opacity: 0.9 },
-                ]}
-              >
-                <Ionicons name="create-outline" size={16} color="#1a1200" />
-                <Text style={[styles.tBtnText, { color: "#1a1200" }]} numberOfLines={1}>Chấm trận</Text>
-              </Pressable>
-            ) : (
-              showRegister && (
-                <Pressable
-                  onPress={onPressRegister}
-                  style={({ pressed }) => [
-                    styles.tBtn,
-                    styles.tBtnSolid,
-                    { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
-                    pressed && { opacity: 0.9 },
-                  ]}
-                >
-                  <Ionicons name="person-add-outline" size={16} color="#04121f" />
-                  <Text style={[styles.tBtnText, { color: "#04121f" }]} numberOfLines={1}>Đăng ký</Text>
-              </Pressable>
-              )
-            )}
-
-            {Number((tt as any)?.bracketsTotal) > 0 && (
-              <Pressable
-                onPress={onPressBracket}
-                style={({ pressed }) => [
-                  styles.tBtn,
-                  styles.tBtnOutline,
-                  { borderColor: theme.colors.border },
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <Ionicons name="git-network-outline" size={16} color={theme.colors.text} />
-                <Text style={[styles.tBtnText, { color: theme.colors.text }]} numberOfLines={1}>
-                  {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
-                </Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Nhóm Zalo — nút phụ căn giữa */}
-          <Pressable
-            onPress={() =>
-              Linking.openURL((tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP)
-            }
-            style={({ pressed }) => [
-              styles.tBtn,
-              styles.tBtnZalo,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Ionicons name="chatbubbles" size={16} color="#0A84FF" />
-            <Text style={[styles.tBtnText, styles.tBtnZaloText]} numberOfLines={1}>Nhóm Zalo</Text>
-            <Ionicons name="chevron-forward" size={15} color="#0A84FF" style={{ opacity: 0.7 }} />
-          </Pressable>
-        </View>
-      </AppleLiquidGlassView>
+      <PremiumTournamentCard>
+        <TournamentCover
+          image={tt.image}
+          title={tt.name || "Giải đấu Pickletour"}
+          status={tt.status}
+          mode={(tt as any)?.tournamentMode}
+          onPress={() => onPressCard(tt)}
+        />
+        <TournamentInfo
+          date={`${formatDate(tt.startDate)}\n– ${formatDate(tt.endDate)}`}
+          location={tt.location || "Chưa cập nhật"}
+          registration={`${tt.registered}/${tt.maxPairs}`}
+        />
+        <TournamentActions actions={actions} />
+        <ZaloButton
+          onPress={() =>
+            Linking.openURL((tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP)
+          }
+        />
+      </PremiumTournamentCard>
     );
   };
 
   const screenContent = (
-    <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+    <TournamentPage>
       <View style={styles.container}>
         {/* ✅ FlatList bọc tất cả (kể cả Header) */}
         {isLoading || isFetching ? (
-          <FlatList
+          <TournamentList
             ListHeaderComponent={
               <TournamentListHeader
                 isBack={isBack}
@@ -1119,13 +522,13 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             keyExtractor={(_, i) => `sk-${i}`}
             renderItem={() => <SkeletonCard />}
             ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
-            contentContainerStyle={{ paddingBottom: 30 }}
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           />
         ) : (
-          <FlatList
+          <TournamentList
             ListHeaderComponent={
               <TournamentListHeader
                 isBack={isBack}
@@ -1145,7 +548,7 @@ export default function TournamentDashboardScreen({ isBack = false }) {
             data={filtered}
             keyExtractor={(item) => String(item._id)}
             renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={styles.listContent}
             ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
             refreshing={refreshing}
             onRefresh={onRefresh}
@@ -1358,12 +761,15 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         ImageComponent={ViewerImage}
         backgroundColor={isDark ? "#0b0b0c" : "#ffffff"}
       />
-    </View>
+    </TournamentPage>
   );
 
   if (IOS_26_LIQUID_GLASS_ENABLED) {
     return (
-      <EdgeSafeAreaView edges={["top"]} style={{ flex: 1 }}>
+      <EdgeSafeAreaView
+        edges={["top"]}
+        style={{ flex: 1, backgroundColor: TOURNAMENT_COLORS.background }}
+      >
         {screenContent}
       </EdgeSafeAreaView>
     );
@@ -1380,6 +786,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  listHeader: {
+    marginBottom: 2,
+  },
+  listContent: {
+    paddingBottom: 112,
   },
   cardContainer: {
     borderRadius: 20,

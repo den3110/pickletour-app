@@ -16,6 +16,8 @@ import { normalizeUrl } from "@/utils/normalizeUri";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { IOS_26_LIQUID_GLASS_ENABLED } from "@/utils/nativeTabs";
+import { useUiVersion } from "@/hooks/uiVersion";
+import { HOME_COLORS } from "@/components/home/HomeDesign";
 
 const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
   ? require("@/assets/lottie/bg-3d.json")
@@ -24,9 +26,10 @@ const BG_3D = SHOULD_RENDER_NATIVE_LOTTIE
 /* ---------- Leaderboard Card Component ---------- */
 function LeaderboardCard({ athlete, theme }) {
   const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const subtext = isDark ? "#b0b0b0" : "#666666";
+  const v2 = useUiVersion() === "v2";
+  const bg = v2 ? HOME_COLORS.surfaceStrong : theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
+  const text = v2 ? HOME_COLORS.text : theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const subtext = v2 ? HOME_COLORS.textMuted : isDark ? "#b0b0b0" : "#666666";
 
   const borderColors = {
     gold: ["#FFD700", "#FFA500", "#FFD700"],
@@ -46,7 +49,7 @@ function LeaderboardCard({ athlete, theme }) {
 
           return (
             <View key={idx} style={styles.achievementItem}>
-              <Text style={styles.achievementIcon}>{achievement.icon}</Text>
+              <Ionicons name="ribbon-outline" size={18} color={HOME_COLORS.primary} />
               <View style={styles.achievementInfo}>
                 {achievement.type === "wins" ? (
                   <>
@@ -105,12 +108,18 @@ function LeaderboardCard({ athlete, theme }) {
               <Text style={styles.rankText}>#{athlete.rank}</Text>
             </View>
 
-            <Image
-              source={{ uri: athlete.avatar }}
-              style={styles.avatarImage}
-              contentFit="cover"
-              transition={200}
-            />
+            {athlete.avatar ? (
+              <Image
+                source={{ uri: athlete.avatar }}
+                style={styles.avatarImage}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={[styles.avatarImage, styles.avatarFallback]}>
+                <Ionicons name="person" size={24} color={HOME_COLORS.textMuted} />
+              </View>
+            )}
 
             <View style={styles.nameContainer}>
               <Text
@@ -202,6 +211,7 @@ function LeaderboardCard({ athlete, theme }) {
 /* ---------- Leaderboard Section Component ---------- */
 export default function LeaderboardSection() {
   const theme = useTheme();
+  const v2 = useUiVersion() === "v2";
   const { data, isLoading, isError } = useGetFeaturedLeaderboardQuery({
     sinceDays: 90,
     limit: 5,
@@ -223,7 +233,7 @@ export default function LeaderboardSection() {
     <View style={styles.leaderboardSection}>
       {/* Background Animation */}
       <View style={styles.leaderboardBackground}>
-        {SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
+        {!v2 && SHOULD_RENDER_NATIVE_LOTTIE && BG_3D ? (
           <LottieView
             source={BG_3D}
             autoPlay
@@ -234,7 +244,14 @@ export default function LeaderboardSection() {
             pointerEvents="none"
           />
         ) : null}
-        <View style={styles.leaderboardOverlay} />
+        {v2 ? (
+          <LinearGradient
+            colors={["rgba(8,31,58,0.94)", "rgba(2,11,28,0.98)"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        ) : (
+          <View style={styles.leaderboardOverlay} />
+        )}
       </View>
 
       {/* Header */}
@@ -249,16 +266,20 @@ export default function LeaderboardSection() {
           >
             <LinearGradient
               pointerEvents="none"
-              colors={["rgba(255, 232, 96, 0.98)", "rgba(255, 166, 0, 0.92)"]}
+              colors={
+                v2
+                  ? ["rgba(16,57,91,0.98)", "rgba(7,29,55,0.98)"]
+                  : ["rgba(255, 232, 96, 0.98)", "rgba(255, 166, 0, 0.92)"]
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <Ionicons name="podium" size={28} color="#FFFFFF" />
+            <Ionicons name="podium" size={25} color={v2 ? HOME_COLORS.warning : "#FFFFFF"} />
             <Text style={styles.leaderboardHeaderText}>
               Bảng xếp hạng nổi bật
             </Text>
-            <Ionicons name="podium" size={28} color="#FFFFFF" />
+            <Ionicons name="podium" size={25} color={v2 ? HOME_COLORS.warning : "#FFFFFF"} />
           </AppleLiquidGlassView>
         ) : (
           <LinearGradient
@@ -330,7 +351,7 @@ export default function LeaderboardSection() {
                 name: u.name,
                 nickname: u.nickname,
                 avatar:
-                  normalizeUrl(u.avatar) || "https://i.pravatar.cc/150?img=12",
+                  normalizeUrl(u.avatar) || null,
                 score: u.score,
                 winRate: u.winRate,
                 finalWins: u.finalWins,
@@ -357,9 +378,13 @@ export default function LeaderboardSection() {
               isInteractive
               style={[styles.viewAllGradient, styles.viewAllGlass]}
             >
-              <LinearGradient
-                pointerEvents="none"
-                colors={["rgba(255, 225, 72, 0.98)", "rgba(255, 149, 0, 0.92)"]}
+            <LinearGradient
+              pointerEvents="none"
+                colors={
+                  v2
+                    ? [HOME_COLORS.primary, HOME_COLORS.secondary]
+                    : ["rgba(255, 225, 72, 0.98)", "rgba(255, 149, 0, 0.92)"]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={StyleSheet.absoluteFillObject}
@@ -476,6 +501,11 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: "#f0f0f0",
     marginRight: 12,
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(143,170,200,0.12)",
   },
   nameContainer: {
     flex: 1,

@@ -10,7 +10,7 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useUiVersion } from "@/hooks/uiVersion";
 import { buildLoginHref } from "@/services/authSession";
-import { FacebookTabBar } from "@/components/tabbar/FacebookTabBar";
+import { BottomNavigation } from "@/components/tabbar/FacebookTabBar";
 import { useNotifUnreadCountQuery } from "@/slices/notificationCenterApiSlice";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 
@@ -144,7 +144,7 @@ export default function TabLayout() {
 
   const v2 = useUiVersion() === "v2";
   const renderTabBar = React.useCallback(
-    (props: any) => <FacebookTabBar {...props} isDark={isDark} v2={v2} />,
+    (props: any) => <BottomNavigation {...props} isDark={isDark} v2={v2} />,
     [isDark, v2],
   );
 

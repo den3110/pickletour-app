@@ -19,7 +19,6 @@ import { Text } from "@/components/ui/i18nText";
 import { Stack, router, useRouter } from "expo-router";
 import { useIsFocused, useTheme } from "@react-navigation/native";
 import { useSelector } from "react-redux";
-import Hero from "@/components/Hero";
 import {
   AntDesign,
   FontAwesome,
@@ -36,10 +35,15 @@ import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import ImageViewing from "react-native-image-viewing";
-import { useRatingPrompt } from "@/hooks/useRatingPrompt";
 import LeaderboardSection from "@/components/home/LeaderboardSection";
 import EventLiveBanner from "@/components/home/EventLiveBanner";
 import CourtBookingBanner from "@/components/home/CourtBookingBanner";
+import {
+  HomePage,
+  HomeSectionHeader,
+  QuickActions,
+  HOME_COLORS,
+} from "@/components/home/HomeDesign";
 import { SHOULD_RENDER_NATIVE_LOTTIE } from "@/utils/runtimeSafety";
 import { useUiVersion, V2 } from "@/hooks/uiVersion";
 import PlayerNameText from "@/components/PlayerNameText";
@@ -465,8 +469,9 @@ function ProButton({ onPress, children, colors, style, icon }) {
 function AnimatedStatusChip() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isFocused = useIsFocused();
+  const v2 = useUiVersion() === "v2";
   useEffect(() => {
-    if (!isFocused) {
+    if (!isFocused || v2) {
       scaleAnim.stopAnimation();
       return undefined;
     }
@@ -486,7 +491,16 @@ function AnimatedStatusChip() {
     );
     loop.start();
     return () => loop.stop();
-  }, [isFocused, scaleAnim]);
+  }, [isFocused, scaleAnim, v2]);
+
+  if (v2) {
+    return (
+      <View style={[styles.statusBadgeOnImage, styles.v2TournamentStatus]}>
+        <View style={styles.v2TournamentStatusDot} />
+        <Text style={styles.statusBadgeText}>Sắp diễn ra</Text>
+      </View>
+    );
+  }
 
   return (
     <Animated.View
@@ -613,7 +627,7 @@ function AnimatedLogo() {
       Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 20, friction: 7, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim]);
 
   useEffect(() => {
     if (!v2 || !isFocused) {
@@ -631,14 +645,14 @@ function AnimatedLogo() {
   }, [v2, isFocused, floatAnim]);
 
   if (v2) {
-    const badgeW = Math.min(SCREEN_WIDTH - 170, 168);
+    const badgeW = Math.min(SCREEN_WIDTH - 190, 146);
     const badgeH = badgeW / BADGE_ASPECT;
     const floatY = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
     return (
       <Animated.View
         style={{
           alignItems: "center",
-          marginBottom: 10,
+          marginBottom: 8,
           opacity: fadeAnim,
           transform: [{ scale: scaleAnim }, { translateY: floatY }],
         }}
@@ -675,12 +689,11 @@ function AnimatedLogo() {
 function AthleteIsland() {
   const userInfo = useSelector((s) => s.auth?.userInfo);
   const router = useRouter();
-  const goProfile = React.useCallback(() => router.push("/profile/stack"), []);
+  const goProfile = React.useCallback(() => router.push("/profile/stack"), [router]);
 
   // 1. Lấy theme hiện tại
   const { dark } = useTheme();
   const v2 = useUiVersion() === "v2";
-  const insets = useSafeAreaInsets();
 
   // 2. Định nghĩa màu sắc dynamic
   const themeColors = useMemo(
@@ -1092,9 +1105,6 @@ function FeatureItem({ item, theme }) {
 /* ---------- Features Grid ---------- */
 function FeaturesGrid() {
   const theme = useTheme();
-  const isDark = !!theme?.dark;
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const sub = isDark ? "#94a3b8" : "#64748b";
 
   // Hàng cuối thiếu bao nhiêu ô để đủ 4 cột → chèn ô rỗng, giữ lưới thẳng hàng
   const NUM_COLUMNS = 4;
@@ -1103,28 +1113,11 @@ function FeaturesGrid() {
 
   return (
     <View style={styles.featuresContainer}>
-      <View style={styles.sectionHead}>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={styles.sectionAccent} />
-            <Text style={[styles.sectionTitle, { color: text }]}>
-              Tính năng PickleTour
-            </Text>
-          </View>
-          <Text style={[styles.sectionSub, { color: sub }]}>
-            Mọi thứ cho người chơi pickleball — trong một app
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.sectionCount,
-            { backgroundColor: isDark ? "rgba(34,193,214,0.16)" : "rgba(34,193,214,0.12)" },
-          ]}
-        >
-          <Ionicons name="grid-outline" size={12} color="#22c1d6" />
-          <Text style={styles.sectionCountText}>{FEATURES.length}</Text>
-        </View>
-      </View>
+      <HomeSectionHeader
+        title="Tính năng PickleTour"
+        subtitle="Mọi thứ cho người chơi pickleball — trong một app"
+        count={FEATURES.length}
+      />
       <View style={styles.featuresGrid}>
         {FEATURES.map((item) => (
           <FeatureItem key={item.id} item={item} theme={theme} />
@@ -1143,10 +1136,11 @@ const TournamentCard = React.memo(function TournamentCard({
   theme,
 }) {
   const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const subtext = isDark ? "#b0b0b0" : "#666666";
-  const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
+  const v2 = useUiVersion() === "v2";
+  const bg = v2 ? HOME_COLORS.surfaceStrong : theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
+  const text = v2 ? HOME_COLORS.text : theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const subtext = v2 ? HOME_COLORS.textMuted : isDark ? "#b0b0b0" : "#666666";
+  const border = v2 ? HOME_COLORS.border : theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
   const [imageVisible, setImageVisible] = useState(false);
   const imageUri =
     normalizeUrl(tournament.image) ||
@@ -1185,66 +1179,16 @@ const TournamentCard = React.memo(function TournamentCard({
           {/* Format badge: MLP / TEAM — góc trên trái */}
           {String((tournament as any)?.tournamentMode || "")
             .toLowerCase() === "mlp" && (
-            <View
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 999,
-                backgroundColor: "#f59e0b",
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.4)",
-                shadowColor: "#000",
-                shadowOpacity: 0.35,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 2 },
-                elevation: 4,
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontWeight: "900",
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                }}
-              >
-                🏆 MLP
-              </Text>
+            <View style={styles.homeTournamentModeBadge}>
+              <Ionicons name="trophy-outline" size={12} color="#FFE071" />
+              <Text style={styles.homeTournamentModeText}>MLP</Text>
             </View>
           )}
           {String((tournament as any)?.tournamentMode || "")
             .toLowerCase() === "team" && (
-            <View
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 999,
-                backgroundColor: "#6366f1",
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.4)",
-                shadowColor: "#000",
-                shadowOpacity: 0.35,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 2 },
-                elevation: 4,
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontWeight: "900",
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                }}
-              >
-                👥 TEAM
-              </Text>
+            <View style={styles.homeTournamentModeBadge}>
+              <Ionicons name="people-outline" size={12} color="#FFE071" />
+              <Text style={styles.homeTournamentModeText}>TEAM</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -1329,7 +1273,7 @@ function TournamentsSection() {
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const isDark = !!theme?.dark;
-  const bgColor = theme?.colors?.background ?? (isDark ? "#0b0f14" : "#f5f7fb");
+  const v2 = useUiVersion() === "v2";
 
   const { data: tournaments, isLoading } = useGetTournamentsQuery(
     { sportType: "2", groupId: "0" },
@@ -1376,53 +1320,12 @@ function TournamentsSection() {
 
   return (
     <View style={styles.tournamentsSection}>
-      {/* 🛑 GIỮ NGUYÊN HEADER CŨ THEO YÊU CẦU */}
-      <View style={styles.sectionHeaderWrapper}>
-        <LinearGradient
-          colors={["#FF6B6B", "#4ECDC4", "#45B7D1"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sectionHeader}
-        >
-          {IOS_26_LIQUID_GLASS_ENABLED ? (
-            <AppleLiquidGlassView
-              fallback="view"
-              glassEffectStyle="regular"
-              glassTintColor="rgba(255, 255, 255, 0.28)"
-              isInteractive
-              style={styles.sectionHeaderGlassFill}
-            >
-              <LinearGradient
-                colors={[
-                  "rgba(255,107,107,0.44)",
-                  "rgba(78,205,196,0.36)",
-                  "rgba(69,183,209,0.42)",
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                pointerEvents="none"
-                style={styles.sectionHeaderGlassShine}
-              />
-              <View style={styles.sectionHeaderContent}>
-                <Ionicons name="trophy" size={24} color="#FFFFFF" />
-                <Text style={styles.sectionHeaderText}>
-                  Đăng ký tham gia giải đấu
-                </Text>
-                <Ionicons name="trophy" size={24} color="#FFFFFF" />
-              </View>
-            </AppleLiquidGlassView>
-          ) : (
-            <View style={styles.sectionHeaderContent}>
-              <Ionicons name="trophy" size={24} color="#FFFFFF" />
-              <Text style={styles.sectionHeaderText}>
-                Đăng ký tham gia giải đấu
-              </Text>
-              <Ionicons name="trophy" size={24} color="#FFFFFF" />
-            </View>
-          )}
-        </LinearGradient>
-        <View style={[styles.triangleLeft, { borderLeftColor: bgColor }]} />
-        <View style={[styles.triangleRight, { borderRightColor: bgColor }]} />
+      <View style={styles.homeSectionHeaderPad}>
+        <HomeSectionHeader
+          title="Giải đấu sắp diễn ra"
+          subtitle="Sẵn sàng tranh tài cùng cộng đồng Pickletour"
+          icon="trophy-outline"
+        />
       </View>
 
       <View style={styles.navigationContainer}>
@@ -1529,11 +1432,20 @@ function TournamentsSection() {
           isInteractive
           style={[
             styles.viewAllButtonNew,
-            { backgroundColor: isDark ? "#1F2229" : "#FFF" },
+            {
+              backgroundColor: v2
+                ? HOME_COLORS.surface
+                : isDark
+                  ? "#1F2229"
+                  : "#FFF",
+            },
           ]}
         >
           <Text
-            style={[styles.viewAllTextNew, { color: isDark ? "#FFF" : "#333" }]}
+            style={[
+              styles.viewAllTextNew,
+              { color: v2 ? HOME_COLORS.textSoft : isDark ? "#FFF" : "#333" },
+            ]}
           >
             Xem tất cả giải đấu
           </Text>
@@ -1550,10 +1462,11 @@ function TournamentsSection() {
 const NewsCard = React.memo(function NewsCard({ news, theme }) {
   const [imageError, setImageError] = useState(false);
   const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const subtext = isDark ? "#b0b0b0" : "#666666";
-  const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
+  const v2 = useUiVersion() === "v2";
+  const bg = v2 ? HOME_COLORS.surfaceStrong : theme?.colors?.card ?? (isDark ? "#1a1d23" : "#ffffff");
+  const text = v2 ? HOME_COLORS.text : theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const subtext = v2 ? HOME_COLORS.textMuted : isDark ? "#b0b0b0" : "#666666";
+  const border = v2 ? HOME_COLORS.border : theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e0e0e0");
 
   return (
     <AppleLiquidGlassView
@@ -1607,7 +1520,7 @@ const NewsCard = React.memo(function NewsCard({ news, theme }) {
           style={styles.newsDetailLink}
         >
           <Text style={styles.newsDetailText}>Đọc tiếp</Text>
-          <Ionicons name="chevron-forward" size={16} color="#A29BFE" />
+          <Ionicons name="chevron-forward" size={16} color={HOME_COLORS.primary} />
         </TouchableOpacity>
       </View>
     </AppleLiquidGlassView>
@@ -1618,7 +1531,6 @@ const NewsCard = React.memo(function NewsCard({ news, theme }) {
 function NewsSection() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
   const { data: news, isLoading } = useGetNewsQuery(undefined, {
     refetchOnFocus: false,
   });
@@ -1644,11 +1556,12 @@ function NewsSection() {
   return (
     <View style={styles.newsSection}>
       <View style={styles.newsSectionHeaderRow}>
-        <View style={styles.newsHeaderContainer}>
-          <View style={styles.newsHeaderDecor} />
-          <Text style={[styles.newsHeaderTitle, { color: text }]}>
-            Tin tức nổi bật
-          </Text>
+        <View style={styles.newsHeaderFlex}>
+          <HomeSectionHeader
+            title="Tin tức nổi bật"
+            subtitle="Tin mới từ cộng đồng pickleball"
+            icon="newspaper-outline"
+          />
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -1664,7 +1577,7 @@ function NewsSection() {
             style={styles.seeMoreButtonNew}
           >
             <Text style={styles.seeMoreTextNew}>Xem thêm</Text>
-            <Ionicons name="chevron-forward" size={14} color="#6C5CE7" />
+            <Ionicons name="chevron-forward" size={14} color={HOME_COLORS.primary} />
           </AppleLiquidGlassView>
         </TouchableOpacity>
       </View>
@@ -1690,11 +1603,20 @@ function NewsSection() {
 function ContactCard() {
   const theme = useTheme();
   const isDark = !!theme?.dark;
-  const bg = theme?.colors?.card ?? (isDark ? "#14171c" : "#ffffff");
-  const border = theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e7eaf0");
-  const text = theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
-  const sub = isDark ? "#c9c9c9" : "#555555";
-  const tint = theme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
+  const v2 = useUiVersion() === "v2";
+  const bg = v2
+    ? HOME_COLORS.surfaceStrong
+    : theme?.colors?.card ?? (isDark ? "#14171c" : "#ffffff");
+  const border = v2
+    ? HOME_COLORS.border
+    : theme?.colors?.border ?? (isDark ? "#2a2e35" : "#e7eaf0");
+  const text = v2
+    ? HOME_COLORS.text
+    : theme?.colors?.text ?? (isDark ? "#ffffff" : "#111111");
+  const sub = v2 ? HOME_COLORS.textMuted : isDark ? "#c9c9c9" : "#555555";
+  const tint = v2
+    ? HOME_COLORS.primary
+    : theme?.colors?.primary ?? (isDark ? "#7cc0ff" : "#0a84ff");
 
   const { data, isLoading, isError } = useGetContactContentQuery();
   const info = useMemo(
@@ -1705,10 +1627,14 @@ function ContactCard() {
   return (
     <AppleLiquidGlassView
       fallback="view"
-      intensity={isDark ? 72 : 58}
+      intensity={v2 ? 48 : isDark ? 72 : 58}
       tint={isDark ? "dark" : "light"}
       glassTintColor={
-        isDark ? "rgba(20, 23, 28, 0.48)" : "rgba(255, 255, 255, 0.38)"
+        v2
+          ? "rgba(8,31,58,0.56)"
+          : isDark
+            ? "rgba(20, 23, 28, 0.48)"
+            : "rgba(255, 255, 255, 0.38)"
       }
       style={[styles.card, { backgroundColor: bg, borderColor: border }]}
     >
@@ -1893,11 +1819,9 @@ export default function HomeScreen() {
     );
     return () => listener.remove();
   }, []);
-  const userInfo = useSelector((s) => s.auth?.userInfo);
   const theme = useTheme();
   const isDark = !!theme?.dark;
   const v2 = useUiVersion() === "v2";
-  const bg = v2 ? V2.navyDeep : isDark ? "#0f1115" : "#F5F7FA";
   const heroTopBleed = Platform.OS === "ios" ? insets.top : 0;
 
   useEffect(() => {
@@ -1994,8 +1918,9 @@ export default function HomeScreen() {
           ),
         }}
       />
-      <View style={[styles.homeRoot, { backgroundColor: bg }]}>
-        <HomeLiquidGlassBackdrop isDark={isDark} active={isFocused} />
+      <HomePage>
+      <View style={[styles.homeRoot, { backgroundColor: "transparent" }]}>
+        {!v2 ? <HomeLiquidGlassBackdrop isDark={isDark} active={isFocused} /> : null}
         <ScrollView
           ref={scrollViewRef}
           style={styles.homeScroll}
@@ -2005,7 +1930,7 @@ export default function HomeScreen() {
           <View
             style={[
               styles.hero3dWrap,
-              { height: (v2 ? 300 : 240) + heroTopBleed },
+              { height: (v2 ? 252 : 240) + heroTopBleed },
               v2 && { justifyContent: "flex-start", paddingTop: heroTopBleed + 6 },
             ]}
           >
@@ -2026,7 +1951,7 @@ export default function HomeScreen() {
             <AthleteIsland />
           </View>
 
-          <View style={{ height: 16 }} />
+          {v2 ? <QuickActions /> : null}
           <EventLiveBanner />
           <CourtBookingBanner />
 
@@ -2048,6 +1973,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
       </View>
+      </HomePage>
     </>
   );
 }
@@ -2059,7 +1985,7 @@ const styles = StyleSheet.create({
   v2HeaderText: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#EAF3FF",
+    color: HOME_COLORS.textSoft,
     letterSpacing: 0.3,
     fontStyle: "italic",
   },
@@ -2067,10 +1993,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     alignSelf: "center",
     top: 36,
-    width: 330,
-    height: 190,
+    width: 300,
+    height: 164,
     borderRadius: 165,
-    backgroundColor: "rgba(18,182,243,0.28)",
+    backgroundColor: "rgba(18,182,243,0.14)",
   },
   v2SpeedLines: { position: "absolute", top: -60, bottom: -60, left: -80, right: -80 },
   v2SpeedLine: { position: "absolute", top: 0, bottom: 0, backgroundColor: "#5CD6FF" },
@@ -2080,35 +2006,35 @@ const styles = StyleSheet.create({
   v2IslandWrapper: {
     width: "100%",
     shadowColor: "#0A1B34",
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 6,
   },
   v2Island: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    gap: 14,
-    borderRadius: 22,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    gap: 12,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(92,180,255,0.4)",
     overflow: "hidden",
   },
   v2IslandSheen: { position: "absolute", left: 0, right: 0, top: 0, height: 44 },
   v2AvatarRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
   },
   v2AvatarInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#081428",
     alignItems: "center",
     justifyContent: "center",
@@ -2116,14 +2042,28 @@ const styles = StyleSheet.create({
   },
   v2NameContainer: { minWidth: 0, justifyContent: "center" },
   v2Name: { color: V2.ink, fontSize: 16.5, marginBottom: 1 },
-  featureV2: { alignItems: "center", paddingVertical: 4, paddingHorizontal: 2 },
+  featureV2: {
+    minHeight: 102,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: "rgba(90,180,230,0.23)",
+    backgroundColor: "rgba(7,27,52,0.78)",
+    shadowColor: "#020B1C",
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
   featureV2IconWrap: { position: "relative", marginBottom: 8 },
   featureV2Icon: {
-    width: 62,
-    height: 62,
+    width: 54,
+    height: 54,
     shadowColor: "#12B6F3",
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
   },
   newBadgeV2: { top: -6, right: -8 },
@@ -2231,10 +2171,10 @@ const styles = StyleSheet.create({
   hero3dWrap: {
     width: "100%",
     height: 240,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: 12,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2255,7 +2195,7 @@ const styles = StyleSheet.create({
   islandContainer: {
     alignItems: "center",
     width: "100%",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
 
   logoGradient: {
@@ -2377,7 +2317,7 @@ const styles = StyleSheet.create({
   rankText: { fontSize: 12, fontWeight: "700", color: "#FFFFFF" },
   loginButtonText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 
-  featuresContainer: { paddingHorizontal: 16 },
+  featuresContainer: { paddingHorizontal: 16, marginTop: 4 },
   sectionHead: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -2406,7 +2346,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  featureCol: { width: "23.2%", marginBottom: 10 },
+  featureCol: { width: "23.2%", marginBottom: 9 },
   featureTile: {
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
@@ -2476,8 +2416,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   featureTitle: {
-    fontSize: 11.5,
-    fontWeight: "700",
+    fontSize: 11.25,
+    fontWeight: "800",
     textAlign: "center",
     lineHeight: 14,
     height: 28,
@@ -2515,6 +2455,27 @@ const styles = StyleSheet.create({
   },
 
   tournamentsSection: { marginBottom: 8 },
+  homeSectionHeaderPad: { paddingHorizontal: 16 },
+  homeTournamentModeBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(40,30,4,0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255,208,72,0.64)",
+  },
+  homeTournamentModeText: {
+    color: "#FFE071",
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
   /* OLD HEADER STYLES */
   sectionHeaderWrapper: {
     flexDirection: "row",
@@ -2597,21 +2558,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    marginBottom: 12,
+    marginTop: -4,
+    marginBottom: 8,
   },
   navArrow: {
     borderRadius: 20,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.12,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
   navArrowGradient: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -2625,6 +2587,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
+    borderColor: "rgba(90,180,230,0.28)",
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 20,
@@ -2650,6 +2613,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+  },
+  v2TournamentStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    overflow: "visible",
+    backgroundColor: "rgba(2,11,28,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(34,216,121,0.38)",
+  },
+  v2TournamentStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: HOME_COLORS.success,
+    shadowColor: HOME_COLORS.success,
+    shadowOpacity: 0.72,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
   },
   statusBadgeGradient: {
     flexDirection: "row",
@@ -2756,19 +2741,20 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     gap: 12,
     borderWidth: 1,
-    borderColor: "rgba(128,128,128,0.1)",
+    borderColor: "rgba(8,189,245,0.32)",
+    backgroundColor: "rgba(7,27,52,0.86)",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  viewAllTextNew: { fontSize: 15, fontWeight: "700" },
+  viewAllTextNew: { fontSize: 14, fontWeight: "800", color: HOME_COLORS.textSoft },
   viewAllIconCircle: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#4ECDC4",
+    backgroundColor: HOME_COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2776,11 +2762,12 @@ const styles = StyleSheet.create({
   newsSection: { marginBottom: 8 },
   newsSectionHeaderRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     marginHorizontal: 16,
     marginBottom: 12,
   },
+  newsHeaderFlex: { flex: 1, minWidth: 0 },
   newsHeaderContainer: { flexDirection: "row", alignItems: "center", gap: 10 },
   newsHeaderDecor: {
     width: 5,
@@ -2792,20 +2779,20 @@ const styles = StyleSheet.create({
   seeMoreButtonNew: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(108, 92, 231, 0.08)",
+    backgroundColor: "rgba(8,189,245,0.09)",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
     gap: 4,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(162,155,254,0.24)",
-    shadowColor: "#6C5CE7",
+    borderColor: "rgba(8,189,245,0.26)",
+    shadowColor: HOME_COLORS.primary,
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  seeMoreTextNew: { fontSize: 12, fontWeight: "700", color: "#6C5CE7" },
+  seeMoreTextNew: { fontSize: 12, fontWeight: "700", color: HOME_COLORS.primary },
   newsList: { paddingHorizontal: 16, paddingVertical: 8 },
 
   /* 💎 PREMIUM NEWS CARD */
@@ -2814,6 +2801,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
+    borderColor: "rgba(90,180,230,0.25)",
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 15,
@@ -2833,7 +2821,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingVertical: 4,
   },
-  newsDetailText: { fontSize: 14, fontWeight: "700", color: "#A29BFE" },
+  newsDetailText: { fontSize: 14, fontWeight: "700", color: HOME_COLORS.primary },
 
   card: {
     borderWidth: 1,

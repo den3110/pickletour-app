@@ -5,7 +5,7 @@ import {
 import { Stack,
   router,
   useFocusEffect } from "expo-router";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useSocket } from "@/context/SocketContext";
 import * as ImagePicker from "expo-image-picker";
 import { CONDITION_MAP,
@@ -14,6 +14,7 @@ import { PLAY_STATUS,
   formatPlayTime,
   skillLabel } from "@/constants/play";
 import * as ImageManipulator from "expo-image-manipulator";
+import { LinearGradient } from "expo-linear-gradient";
 import { useVideoPlayer,
   VideoView } from "expo-video";
 import React, { useState,
@@ -40,7 +41,6 @@ import {
 import { TextInput } from "@/components/ui/i18nTextInput";
 import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
 
 import {
   useListFeedQuery,
@@ -69,6 +69,12 @@ import { AspectImage } from "@/components/feed/AspectImage";
 import { AuthorAvatar } from "@/components/social/AuthorAvatar";
 import PlayerNameText from "@/components/PlayerNameText";
 import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
+import {
+  FEED_COLORS,
+  FeedFilters,
+  FeedHeader,
+  FeedPage,
+} from "@/components/feed/FeedDesign";
 
 const REACTION_EMOJI: Record<string, string> = {
   like: "👍",
@@ -187,7 +193,6 @@ function ScoreBadges({
   double?: number | null;
   size?: "sm" | "md";
 }) {
-  const C = useThemeTokens();
   const s = Number(single || 0);
   const d = Number(double || 0);
   if (!s && !d) return null;
@@ -198,13 +203,13 @@ function ScoreBadges({
   return (
     <View style={scoreStyles.wrap}>
       {s > 0 && (
-        <View style={[sizeStyle, { backgroundColor: C.primarySoft }]}>
-          <Text style={[txtStyle, { color: C.dark ? "#93c5fd" : "#1D4ED8" }]}>Đơn {fmt(s)}</Text>
+        <View style={[sizeStyle, scoreStyles.singleBadge]}>
+          <Text style={[txtStyle, { color: "#A9DCFF" }]}>Đơn {fmt(s)}</Text>
         </View>
       )}
       {d > 0 && (
-        <View style={[sizeStyle, { backgroundColor: C.purpleSoft }]}>
-          <Text style={[txtStyle, { color: C.dark ? "#f9a8d4" : "#BE185D" }]}>Đôi {fmt(d)}</Text>
+        <View style={[sizeStyle, scoreStyles.doubleBadge]}>
+          <Text style={[txtStyle, { color: "#D8B4FE" }]}>Đôi {fmt(d)}</Text>
         </View>
       )}
     </View>
@@ -222,11 +227,21 @@ const scoreStyles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
+    borderWidth: 1,
   },
   badgeMd: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+    borderWidth: 1,
+  },
+  singleBadge: {
+    backgroundColor: "rgba(22,119,255,0.2)",
+    borderColor: "rgba(80,170,255,0.26)",
+  },
+  doubleBadge: {
+    backgroundColor: "rgba(139,61,219,0.24)",
+    borderColor: "rgba(185,112,255,0.25)",
   },
   textSm: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
   textMd: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
@@ -237,17 +252,19 @@ function GuestBanner() {
   return (
     <View
       style={{
-        backgroundColor: C.card,
-        borderRadius: 12,
+        backgroundColor: FEED_COLORS.surface,
+        borderRadius: 20,
         padding: 16,
         marginHorizontal: 12,
-        marginTop: 12,
+        marginBottom: 14,
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
+        borderWidth: 1,
+        borderColor: FEED_COLORS.border,
       }}
     >
-      <Ionicons name="log-in-outline" size={22} color="#0066FF" />
+      <Ionicons name="log-in-outline" size={24} color={FEED_COLORS.primary} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
           Đăng nhập để đăng bài, bình luận, thả cảm xúc
@@ -259,10 +276,10 @@ function GuestBanner() {
       <Pressable
         onPress={() => router.push("/login" as any)}
         style={{
-          backgroundColor: "#0066FF",
+          backgroundColor: FEED_COLORS.secondary,
           paddingHorizontal: 12,
           paddingVertical: 8,
-          borderRadius: 8,
+          borderRadius: 12,
         }}
       >
         <Text style={{ color: "#fff", fontWeight: "600", fontSize: 13 }}>
@@ -302,7 +319,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   const [mentionResults, setMentionResults] = useState<any[]>([]);
   // Track user đã chọn từ popup (id + display name) để gửi explicit mentions.
   const [selectedMentions, setSelectedMentions] = useState<
-    Array<{ _id: string; display: string }>
+    { _id: string; display: string }[]
   >([]);
   const mentionDebounceRef = useRef<any>(null);
   const [uploadMedia] = useUploadFeedMediaMutation();
@@ -470,7 +487,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   return (
     <View style={styles.composer}>
       <View style={styles.composerRow}>
-        <AuthorAvatar user={me} size={40} />
+        <AuthorAvatar user={me} size={46} />
         <TextInput
           style={styles.input}
           multiline
@@ -603,7 +620,10 @@ function Composer({ onPosted }: { onPosted: () => void }) {
               marginBottom: 8,
             }}
           >
-            <Text style={{ fontWeight: "800", color: C.text }}>📊 Bình chọn</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+              <Ionicons name="bar-chart-outline" size={18} color="#A855F7" />
+              <Text style={{ fontWeight: "800", color: C.text }}>Bình chọn</Text>
+            </View>
             <Pressable onPress={() => setPollDraft(null)} hitSlop={8}>
               <Ionicons name="close" size={18} color={C.sub} />
             </Pressable>
@@ -741,13 +761,20 @@ function Composer({ onPosted }: { onPosted: () => void }) {
               disabled={disabled}
               style={[styles.postBtn, disabled && { opacity: 0.5 }]}
             >
-              <Text style={styles.postBtnText}>
-                {isLoading
-                  ? "Đang đăng…"
-                  : isUploading
-                  ? `Đang tải (${uploadingCount})…`
-                  : "Đăng"}
-              </Text>
+              <LinearGradient
+                colors={[FEED_COLORS.primary, FEED_COLORS.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.postBtnGradient}
+              >
+                <Text style={styles.postBtnText}>
+                  {isLoading
+                    ? "Đang đăng…"
+                    : isUploading
+                    ? `Đang tải (${uploadingCount})…`
+                    : "Đăng"}
+                </Text>
+              </LinearGradient>
             </Pressable>
           );
         })()}
@@ -937,7 +964,7 @@ function InlineVideo({
       player={player}
       contentFit="contain"
       nativeControls
-      allowsFullscreen
+      fullscreenOptions={{ enable: true }}
       allowsPictureInPicture={false}
     />
   );
@@ -1119,7 +1146,7 @@ function SharedMatchCardRN({ sm }: { sm: any }) {
           backgroundColor: "#0066FF",
         }}
       >
-        <Text>🏓</Text>
+        <Ionicons name="podium-outline" size={17} color="#FFFFFF" />
         <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>
           {sm.tournamentName || "Kết quả trận đấu"}
           {sm.code ? ` · ${sm.code}` : ""}
@@ -1210,13 +1237,13 @@ function SharedListingCardRN({ sl }: { sl: any }) {
           />
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontSize: 30 }}>🛍️</Text>
+            <Ionicons name="bag-handle-outline" size={30} color={C.muted} />
           </View>
         )}
       </View>
       <View style={{ flex: 1, padding: 10, gap: 3 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text style={{ fontSize: 12 }}>🛍️</Text>
+          <Ionicons name="bag-handle-outline" size={14} color={FEED_COLORS.primary} />
           <Text style={{ color: "#0066FF", fontWeight: "700", fontSize: 12 }}>
             Sản phẩm trên Chợ
           </Text>
@@ -1267,7 +1294,7 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
       style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#16a34a" }}>
-        <Text>🏓</Text>
+        <Ionicons name="people-outline" size={17} color="#FFFFFF" />
         <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>Kèo giao lưu · Tìm bạn đánh</Text>
         <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
           <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{st.label}</Text>
@@ -1275,8 +1302,16 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
       </View>
       <View style={{ padding: 12 }}>
         <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{sp.title || sp.courtName || "Kèo pickleball"}</Text>
-        <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>🕒 {formatPlayTime(sp.playAt)}</Text>
-        <Text style={{ fontSize: 13, color: C.sub }}>📍 {[sp.courtName, sp.province].filter(Boolean).join(", ") || "—"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 5 }}>
+          <Ionicons name="time-outline" size={14} color={C.sub} />
+          <Text style={{ fontSize: 13, color: C.sub }}>{formatPlayTime(sp.playAt)}</Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 }}>
+          <Ionicons name="location-outline" size={14} color={C.sub} />
+          <Text style={{ fontSize: 13, color: C.sub, flex: 1 }} numberOfLines={1}>
+            {[sp.courtName, sp.province].filter(Boolean).join(", ") || "—"}
+          </Text>
+        </View>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
           <Text style={{ fontSize: 12.5, color: C.sub, flex: 1 }}>{skillLabel(sp.skillMin, sp.skillMax)} · thiếu {slotsLeft} người</Text>
           <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: sp.status === "open" ? "#16a34a" : C.border }}>
@@ -1288,9 +1323,27 @@ function SharedPlayCardRN({ sp }: { sp: any }) {
   );
 }
 
+function EventMeta({
+  icon,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 7, marginTop: 5 }}>
+      <Ionicons name={icon} size={16} color={FEED_COLORS.primary} />
+      <Text style={{ color: FEED_COLORS.textMuted, fontSize: 13, lineHeight: 18, flex: 1 }}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
 // Card sự kiện xé vé / social được chia sẻ (rủ mọi người tham gia)
 function SharedEventCardRN({ se }: { se: any }) {
   const C = useThemeTokens();
+  const styles = useMemo(() => mk_styles(C), [C]);
   const start = se.startAt ? new Date(se.startAt) : null;
   const when = start
     ? start.toLocaleString("vi-VN", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })
@@ -1303,25 +1356,60 @@ function SharedEventCardRN({ se }: { se: any }) {
   return (
     <Pressable
       onPress={() => se.eventId && router.push(`/events/${se.eventId}` as any)}
-      style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}
+      style={styles.eventCard}
     >
-      {!!se.coverImage && <Image source={{ uri: se.coverImage }} style={{ width: "100%", height: 140 }} resizeMode="cover" />}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#e11d48" }}>
-        <Text>🎟️</Text>
-        <Text style={{ color: "#fff", fontWeight: "800", flex: 1 }} numberOfLines={1}>Sự kiện xé vé · Đánh social</Text>
-        <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{ended ? "Đã diễn ra" : left > 0 ? `Còn ${left} suất` : "Hết suất"}</Text>
+      {!!se.coverImage && (
+        <Image
+          source={{ uri: se.coverImage }}
+          style={styles.eventImage}
+          resizeMode="cover"
+        />
+      )}
+      <LinearGradient
+        colors={["#F62962", "#D91D58"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.eventStatus}
+      >
+        <Ionicons name="ticket-outline" size={17} color="#FFFFFF" />
+        <Text style={styles.eventStatusText} numberOfLines={1}>
+          Sự kiện xé vé · Đánh social
+        </Text>
+        <View style={styles.eventSlots}>
+          <Ionicons name="people" size={14} color="#FFFFFF" />
+          <Text style={styles.eventSlotsText}>
+            {ended ? "Đã diễn ra" : left > 0 ? `Còn ${left} suất` : "Hết suất"}
+          </Text>
         </View>
-      </View>
-      <View style={{ padding: 12 }}>
-        <Text style={{ fontWeight: "800", fontSize: 15, color: C.text }}>{se.title || "Sự kiện"}</Text>
-        {!!when && <Text style={{ fontSize: 13, color: C.sub, marginTop: 4 }}>🕒 {when}</Text>}
-        <Text style={{ fontSize: 13, color: C.sub }} numberOfLines={1}>📍 {[se.venueName, se.address].filter(Boolean).join(" · ") || "—"}{se.courts ? ` · ${se.courts}` : ""}</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 8 }}>
-          <Text style={{ fontSize: 12.5, color: C.sub, flex: 1 }} numberOfLines={1}>{skill}{gender[se.genderPolicy] ? ` · ${gender[se.genderPolicy]}` : ""} · {se.registered || 0}/{se.capacity || 0} suất · {price}</Text>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: !ended && left > 0 ? "#e11d48" : C.border }}>
-            <Text style={{ color: !ended && left > 0 ? "#fff" : C.muted, fontWeight: "700", fontSize: 12.5 }}>{!ended && left > 0 ? "Tham gia" : "Xem"}</Text>
+      </LinearGradient>
+      <View style={styles.eventBody}>
+        <Text style={styles.eventTitle}>{se.title || "Sự kiện"}</Text>
+        {!!when && <EventMeta icon="calendar-outline">{when}</EventMeta>}
+        <EventMeta icon="location-outline">
+          {[se.venueName, se.address].filter(Boolean).join(" · ") || "—"}
+          {se.courts ? ` · ${se.courts}` : ""}
+        </EventMeta>
+        <View style={styles.eventFooter}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <EventMeta icon="reader-outline">
+              {skill}
+              {gender[se.genderPolicy] ? ` · ${gender[se.genderPolicy]}` : ""}
+              {` · ${se.registered || 0}/${se.capacity || 0} suất · ${price}`}
+            </EventMeta>
           </View>
+          <LinearGradient
+            colors={
+              !ended && left > 0
+                ? ["#FF315F", "#E91E63"]
+                : ["#33445B", "#25364D"]
+            }
+            style={styles.eventCta}
+          >
+            <Text style={styles.eventCtaText}>
+              {!ended && left > 0 ? "Tham gia" : "Xem"}
+            </Text>
+            <Ionicons name="chevron-forward" size={15} color="#FFFFFF" />
+          </LinearGradient>
         </View>
       </View>
     </Pressable>
@@ -1477,7 +1565,7 @@ function PostCard({ post, me }: { post: any; me: any }) {
           }
           hitSlop={6}
         >
-          <AuthorAvatar user={post.author} size={40} />
+          <AuthorAvatar user={post.author} size={46} />
         </Pressable>
         <Pressable
           onPress={() =>
@@ -1492,7 +1580,14 @@ function PostCard({ post, me }: { post: any; me: any }) {
               name={authorName(post.author)}
               style={styles.postAuthor}
             />
-            {post.isPinned && <Text style={styles.pinnedBadge}>  📌</Text>}
+            {post.isPinned && (
+              <Ionicons
+                name="pin"
+                size={14}
+                color={FEED_COLORS.warning}
+                style={styles.pinnedBadge}
+              />
+            )}
             <ScoreBadges
               single={post.author?.score?.single}
               double={post.author?.score?.double}
@@ -1589,10 +1684,19 @@ function PostCard({ post, me }: { post: any; me: any }) {
         />
       )}
       <View style={styles.statsRow}>
-        <Text style={styles.statText}>{post.reactionCount || 0} cảm xúc</Text>
-        <Text style={styles.statText}>{post.commentCount || 0} bình luận</Text>
+        <View style={styles.statItem}>
+          <Ionicons name="heart" size={16} color={FEED_COLORS.event} />
+          <Text style={styles.statText}>{post.reactionCount || 0} cảm xúc</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Ionicons name="chatbubble-outline" size={15} color={FEED_COLORS.textMuted} />
+          <Text style={styles.statText}>{post.commentCount || 0} bình luận</Text>
+        </View>
         {(post.shareCount || 0) > 0 && (
-          <Text style={styles.statText}>{post.shareCount} chia sẻ</Text>
+          <View style={styles.statItem}>
+            <Ionicons name="share-social-outline" size={15} color={FEED_COLORS.primary} />
+            <Text style={styles.statText}>{post.shareCount} chia sẻ</Text>
+          </View>
         )}
       </View>
       <View style={styles.actionRow}>
@@ -1601,10 +1705,16 @@ function PostCard({ post, me }: { post: any; me: any }) {
           onPress={() => doReact(post.myReaction || "like")}
           style={styles.actionBtn}
         >
-          <Text style={{ fontSize: 18 }}>
-            {post.myReaction ? REACTION_EMOJI[post.myReaction] : "👍"}
-          </Text>
-          <Text style={[styles.actionLabel, post.myReaction && { color: "#0066FF", fontWeight: "600" }]}>
+          {post.myReaction && post.myReaction !== "like" ? (
+            <Text style={{ fontSize: 18 }}>{REACTION_EMOJI[post.myReaction]}</Text>
+          ) : (
+            <Ionicons
+              name={post.myReaction === "like" ? "thumbs-up" : "thumbs-up-outline"}
+              size={19}
+              color={post.myReaction ? FEED_COLORS.warning : FEED_COLORS.textMuted}
+            />
+          )}
+          <Text style={[styles.actionLabel, post.myReaction && styles.actionLabelActive]}>
             {post.myReaction === "love" ? "Yêu" : "Thích"}
           </Text>
         </Pressable>
@@ -1623,12 +1733,12 @@ function PostCard({ post, me }: { post: any; me: any }) {
           <Ionicons
             name={saved ? "bookmark" : "bookmark-outline"}
             size={18}
-            color={saved ? "#0066FF" : "#64748B"}
+            color={saved ? FEED_COLORS.primary : FEED_COLORS.textMuted}
           />
           <Text
             style={[
               styles.actionLabel,
-              saved && { color: "#0066FF", fontWeight: "600" },
+              saved && styles.actionLabelActive,
             ]}
           >
             {saved ? "Đã lưu" : "Lưu"}
@@ -1839,95 +1949,80 @@ export default function FeedScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <Stack.Screen options={{ title: t("Bảng tin") }} />
-      <FlatList
-        data={items}
-        keyExtractor={(i: any) => i._id}
-        ListHeaderComponent={
-          <>
-            {me ? <Composer onPosted={handleRefresh} /> : <GuestBanner />}
-            {me ? (
-              <View style={styles.feedTabs}>
-                {(
-                  [
-                    { key: "all", label: "Tất cả" },
-                    { key: "following", label: "Đang theo dõi" },
-                  ] as const
-                ).map((t) => {
-                  const active = feedTab === t.key;
-                  return (
-                    <TouchableOpacity
-                      key={t.key}
-                      onPress={() => {
-                        if (feedTab === t.key) return;
-                        setCursor(null);
-                        setFeedTab(t.key);
-                      }}
-                      style={[
-                        styles.feedTabBtn,
-                        active && styles.feedTabBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.feedTabText,
-                          active && styles.feedTabTextActive,
-                        ]}
-                      >
-                        {t.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+    <FeedPage>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <Stack.Screen options={{ title: t("Bảng tin"), headerShown: false }} />
+        <FlatList
+          data={items}
+          keyExtractor={(i: any) => i._id}
+          ListHeaderComponent={
+            <>
+              <FeedHeader />
+              {me ? <Composer onPosted={handleRefresh} /> : <GuestBanner />}
+              {me ? (
+                <FeedFilters
+                  active={feedTab}
+                  onChange={(nextTab) => {
+                    if (feedTab === nextTab) return;
+                    setCursor(null);
+                    setFeedTab(nextTab);
+                  }}
+                />
+              ) : null}
+            </>
+          }
+          renderItem={renderItem}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching && !cursor}
+              onRefresh={handleRefresh}
+              tintColor={FEED_COLORS.primary}
+            />
+          }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            isFetching && cursor ? (
+              <View style={{ padding: 16 }}>
+                <ActivityIndicator color={FEED_COLORS.primary} />
               </View>
-            ) : null}
-          </>
-        }
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={isFetching && !cursor}
-            onRefresh={handleRefresh}
-            tintColor={C.sub}
-          />
-        }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          isFetching && cursor ? (
-            <View style={{ padding: 16 }}>
-              <ActivityIndicator color={C.primary} />
-            </View>
-          ) : !hasMore && items.length > 0 ? (
-            <Text
-              style={{
-                textAlign: "center",
-                color: C.muted,
-                padding: 16,
-                fontSize: 12,
-              }}
-            >
-              — Đã xem hết bài viết —
-            </Text>
-          ) : null
-        }
-        ListEmptyComponent={
-          !isFetching ? (
-            <Text style={styles.empty}>
-              {feedTab === "following"
-                ? "Chưa có bài viết từ giải bạn theo dõi. Hãy theo dõi giải để xem tin ở đây 🔔"
-                : "Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ 👋"}
-            </Text>
-          ) : (
-            <View style={{ padding: 24 }}>
-              <ActivityIndicator color={C.primary} />
-            </View>
-          )
-        }
-        contentContainerStyle={{ paddingBottom: 40 }}
-      />
-    </SafeAreaView>
+            ) : !hasMore && items.length > 0 ? (
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: FEED_COLORS.textMuted,
+                  padding: 16,
+                  fontSize: 12,
+                }}
+              >
+                — Đã xem hết bài viết —
+              </Text>
+            ) : null
+          }
+          ListEmptyComponent={
+            !isFetching ? (
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="newspaper-outline"
+                  size={30}
+                  color={FEED_COLORS.primary}
+                />
+                <Text style={styles.empty}>
+                  {feedTab === "following"
+                    ? "Chưa có bài viết từ giải bạn theo dõi. Hãy theo dõi giải để xem tin ở đây."
+                    : "Chưa có bài viết nào. Hãy là người đầu tiên chia sẻ."}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ padding: 24 }}>
+                <ActivityIndicator color={FEED_COLORS.primary} />
+              </View>
+            )
+          }
+          contentContainerStyle={styles.listContent}
+        />
+      </SafeAreaView>
+    </FeedPage>
   );
 }
 
@@ -2065,7 +2160,8 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   },
   pickerName: { fontSize: 14, fontWeight: "700", color: C.text },
   pickerMeta: { fontSize: 12, color: C.sub, marginTop: 2 },
-  container: { flex: 1, backgroundColor: C.bg },
+  container: { flex: 1, backgroundColor: "transparent" },
+  listContent: { paddingBottom: 116 },
   emptyLogin: {
     flex: 1,
     alignItems: "center",
@@ -2073,7 +2169,21 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     padding: 24,
   },
   emptyTitle: { fontSize: 16, marginBottom: 12, color: C.text2 },
-  empty: { padding: 24, textAlign: "center", color: C.sub },
+  emptyState: {
+    marginHorizontal: 12,
+    padding: 28,
+    alignItems: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: FEED_COLORS.border,
+    backgroundColor: FEED_COLORS.surface,
+  },
+  empty: {
+    paddingTop: 10,
+    textAlign: "center",
+    color: FEED_COLORS.textMuted,
+    lineHeight: 19,
+  },
   feedTabs: {
     flexDirection: "row",
     gap: 8,
@@ -2090,18 +2200,20 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   feedTabText: { fontSize: 13, fontWeight: "700", color: C.sub },
   feedTabTextActive: { color: "#0a0e1a" },
   composer: {
-    backgroundColor: C.card,
-    padding: 12,
+    backgroundColor: FEED_COLORS.surface,
+    padding: 13,
     marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 14,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(8,189,245,0.38)",
+    shadowColor: FEED_COLORS.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  composerRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  composerRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   avatarSm: {
     width: 40,
     height: 40,
@@ -2113,12 +2225,18 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   avatarLetter: { color: "#fff", fontWeight: "700", fontSize: 16 },
   input: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 66,
     maxHeight: 160,
-    fontSize: 15,
-    color: C.text,
-    padding: 0,
-    paddingTop: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    color: FEED_COLORS.textSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: FEED_COLORS.border,
+    backgroundColor: "rgba(3,18,37,0.62)",
+    textAlignVertical: "top",
   },
   mediaPreview: {
     width: 80,
@@ -2144,41 +2262,68 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   composerActions: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 11,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: FEED_COLORS.border,
+    gap: 2,
   },
-  iconBtn: { flexDirection: "row", alignItems: "center", gap: 6, padding: 6 },
-  iconBtnLabel: { color: "#0066FF", fontWeight: "600" },
+  iconBtn: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 2,
+  },
+  iconBtnLabel: {
+    color: FEED_COLORS.primary,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
   postBtn: {
-    backgroundColor: "#0066FF",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    width: 68,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginLeft: 3,
   },
-  postBtnText: { color: "#fff", fontWeight: "700" },
+  postBtnGradient: {
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  postBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   postCard: {
-    backgroundColor: C.card,
+    backgroundColor: FEED_COLORS.surface,
     marginHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 12,
+    marginBottom: 14,
+    borderRadius: 22,
     padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(8,189,245,0.28)",
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
-  postHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  postAuthor: { fontWeight: "700", color: C.text },
-  pinnedBadge: { color: "#F59E0B" },
-  postTime: { fontSize: 12, color: C.sub, marginTop: 2 },
+  postHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 2 },
+  postAuthor: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "800",
+    color: FEED_COLORS.text,
+  },
+  pinnedBadge: { marginLeft: 4 },
+  postTime: { fontSize: 12, color: FEED_COLORS.textMuted, marginTop: 3 },
   postContent: {
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 22,
-    color: C.text,
+    marginTop: 12,
+    fontSize: 16,
+    lineHeight: 23,
+    color: FEED_COLORS.textSoft,
   },
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   tagChip: {
@@ -2187,30 +2332,36 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 12,
   },
-  tagChipText: { color: "#0066FF", fontSize: 12, fontWeight: "600" },
+  tagChipText: { color: FEED_COLORS.primary, fontSize: 12, fontWeight: "700" },
   // mediaRow / mediaSlide / mediaImg: đã chuyển sang <PostMedia/> render động (center).
   statsRow: {
     flexDirection: "row",
-    gap: 16,
-    marginTop: 10,
-    paddingBottom: 8,
+    alignItems: "center",
+    gap: 14,
+    marginTop: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: FEED_COLORS.border,
   },
-  statText: { fontSize: 12, color: C.sub },
+  statItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  statText: { fontSize: 12, color: FEED_COLORS.textMuted },
   actionRow: {
     flexDirection: "row",
-    marginTop: 4,
-    justifyContent: "space-around",
+    marginTop: 3,
+    alignItems: "center",
   },
   actionBtn: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 2,
   },
-  actionLabel: { color: C.sub, fontSize: 14 },
+  actionLabel: { color: FEED_COLORS.textMuted, fontSize: 12.5, fontWeight: "600" },
+  actionLabelActive: { color: FEED_COLORS.primary, fontWeight: "800" },
   previewComments: {
     marginTop: 8,
     paddingTop: 8,
@@ -2225,10 +2376,12 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   },
   previewBubble: {
     flex: 1,
-    backgroundColor: C.field,
+    backgroundColor: "rgba(13,42,70,0.68)",
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(90,180,230,0.16)",
   },
   previewAuthor: { fontWeight: "700", color: C.text, fontSize: 12 },
   previewContent: { color: C.text, fontSize: 13, marginTop: 1 },
@@ -2237,7 +2390,7 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     position: "absolute",
     left: 12,
     bottom: 40,
-    backgroundColor: C.card,
+    backgroundColor: FEED_COLORS.surfaceStrong,
     borderRadius: 24,
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -2246,6 +2399,49 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: FEED_COLORS.border,
   },
   reactionPick: { paddingHorizontal: 6, paddingVertical: 4 },
+  eventCard: {
+    marginTop: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(8,189,245,0.34)",
+    overflow: "hidden",
+    backgroundColor: "rgba(4,22,43,0.94)",
+  },
+  eventImage: { width: "100%", aspectRatio: 16 / 8.6, backgroundColor: "#071A30" },
+  eventStatus: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  eventStatusText: { flex: 1, color: "#FFFFFF", fontSize: 12.5, fontWeight: "800" },
+  eventSlots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  eventSlotsText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  eventBody: { padding: 12 },
+  eventTitle: { color: FEED_COLORS.text, fontSize: 17, lineHeight: 22, fontWeight: "900" },
+  eventFooter: { flexDirection: "row", alignItems: "flex-end", gap: 9, marginTop: 3 },
+  eventCta: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    paddingHorizontal: 13,
+    borderRadius: 999,
+  },
+  eventCtaText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
 });

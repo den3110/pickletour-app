@@ -89,9 +89,9 @@ function TabItem({
   }));
 
   const accent = v2
-    ? "#12B6F3"
+    ? "#00BFFF"
     : TAB_ACCENTS[route.name] || "#1877F2";
-  const inactiveColor = v2 ? "#6E88AC" : isDark ? "#8E8E93" : "#8A8F98";
+  const inactiveColor = v2 ? "#7892B5" : isDark ? "#8E8E93" : "#8A8F98";
   const iconColor = isFocused ? accent : inactiveColor;
   const labelColor = isFocused ? accent : inactiveColor;
 
@@ -123,9 +123,12 @@ function TabItem({
             styles.pill,
             v2
               ? {
-                  backgroundColor: "rgba(18,182,243,0.2)",
+                  backgroundColor: "rgba(0,105,168,0.28)",
                   borderWidth: 1,
-                  borderColor: "rgba(92,214,255,0.45)",
+                  borderColor: "rgba(0,191,255,0.52)",
+                  shadowColor: "#00BFFF",
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
                 }
               : { backgroundColor: accent + (isDark ? "33" : "22") },
             pillAnimStyle,
@@ -171,7 +174,7 @@ function TabItem({
   );
 }
 
-export function FacebookTabBar({
+export function BottomNavigation({
   state,
   descriptors,
   navigation,
@@ -209,11 +212,16 @@ export function FacebookTabBar({
         style={[
           styles.wrapper,
           {
-            backgroundColor: v2 ? "#0A1B34" : isDark ? "#111214" : "#FFFFFF",
+            backgroundColor: v2
+              ? "rgba(7, 27, 52, 0.97)"
+              : isDark
+                ? "#111214"
+                : "#FFFFFF",
             paddingBottom: bottomPad,
+            minHeight: 80 + bottomPad,
             shadowOpacity: isDark || v2 ? 0.35 : 0.08,
           },
-          v2 && { borderTopWidth: 1, borderTopColor: "rgba(92,180,255,0.18)" },
+          v2 && styles.v2Wrapper,
         ]}
       >
         {visibleRoutes.map((route) => {
@@ -261,22 +269,34 @@ export function FacebookTabBar({
   );
 }
 
+// Giữ tên export cũ để không làm ảnh hưởng những nơi dùng component hiện tại.
+export const FacebookTabBar = BottomNavigation;
+
 const styles = StyleSheet.create({
   outer: {
     position: "relative",
+    backgroundColor: "#020B1C",
   },
   topAccent: {
-    height: 2,
+    height: 1,
     width: "100%",
   },
   wrapper: {
     flexDirection: "row",
-    paddingTop: 8,
+    paddingTop: 7,
     paddingHorizontal: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -3 },
     shadowRadius: 10,
     elevation: 8,
+  },
+  v2Wrapper: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,191,255,0.38)",
+    shadowColor: "#00BFFF",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
   },
   tab: {
     flex: 1,
@@ -287,23 +307,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   iconWrap: {
-    width: 48,
-    height: 32,
+    width: 52,
+    height: 34,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
   pill: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 16,
+    top: 1,
+    bottom: 1,
+    left: 1,
+    right: 1,
+    borderRadius: 17,
   },
   label: {
-    fontSize: 10,
-    marginTop: 4,
+    fontSize: 10.5,
+    marginTop: 3,
     textAlign: "center",
     width: "100%",
     letterSpacing: 0.2,

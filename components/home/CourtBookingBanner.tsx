@@ -13,29 +13,26 @@ const PERKS = [
 ];
 
 export default function CourtBookingBanner() {
-  // Vệt sáng chạy ngang (shine) + nhịp thở của tag MỚI
+  // Chuyển động vào cảnh một lần để giữ giao diện nhẹ và tập trung.
   const shine = useRef(new Animated.Value(-1)).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const shineLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shine, { toValue: 1.6, duration: 2600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.delay(1800),
-        Animated.timing(shine, { toValue: -1, duration: 0, useNativeDriver: true }),
-      ]),
-    );
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.08, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
-    shineLoop.start();
-    pulseLoop.start();
+    const shineIntro = Animated.timing(shine, {
+      toValue: 1.6,
+      duration: 2200,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    });
+    const badgeIntro = Animated.sequence([
+      Animated.timing(pulse, { toValue: 1.06, duration: 550, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 550, useNativeDriver: true }),
+    ]);
+    shineIntro.start();
+    badgeIntro.start();
     return () => {
-      shineLoop.stop();
-      pulseLoop.stop();
+      shineIntro.stop();
+      badgeIntro.stop();
     };
   }, [shine, pulse]);
 
@@ -44,7 +41,7 @@ export default function CourtBookingBanner() {
   return (
     <View style={styles.wrap}>
       <Pressable onPress={() => router.push("/courts")} style={({ pressed }) => [styles.press, pressed && { transform: [{ scale: 0.985 }] }]}>
-        <LinearGradient colors={["#06111f", "#0f3d4a", "#22c1d6"]} start={{ x: 0, y: 0 }} end={{ x: 1.1, y: 1 }} style={styles.card}>
+        <LinearGradient colors={["#06152B", "#0A354D", "#087C98"]} start={{ x: 0, y: 0 }} end={{ x: 1.1, y: 1 }} style={styles.card}>
           {/* Trang trí */}
           <View pointerEvents="none" style={styles.glowA} />
           <View pointerEvents="none" style={styles.glowB} />
@@ -107,8 +104,8 @@ const styles = StyleSheet.create({
   press: {
     borderRadius: 24,
     shadowColor: "#22c1d6",
-    shadowOpacity: 0.42,
-    shadowRadius: 18,
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
@@ -116,10 +113,10 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    borderColor: "rgba(8,189,245,0.42)",
     overflow: "hidden",
   },
-  glowA: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "rgba(34,193,214,0.28)", top: -120, right: -70 },
+  glowA: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "rgba(8,189,245,0.16)", top: -120, right: -70 },
   glowB: { position: "absolute", width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(245,179,1,0.14)", bottom: -90, left: -50 },
   shine: { position: "absolute", top: -40, bottom: -40, width: 90, backgroundColor: "rgba(255,255,255,0.10)" },
   courtLines: { position: "absolute", right: 14, top: 14, opacity: 0.35 },
@@ -131,13 +128,13 @@ const styles = StyleSheet.create({
   tagText: { color: "#06111f", fontWeight: "900", fontSize: 11, letterSpacing: 1 },
   badgeHot: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.28)", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
   badgeHotText: { color: "#fde68a", fontWeight: "700", fontSize: 11 },
-  title: { color: "#fff", fontWeight: "900", fontSize: 24, letterSpacing: -0.5, marginTop: 12 },
+  title: { color: "#fff", fontWeight: "900", fontSize: 22, letterSpacing: -0.45, marginTop: 12 },
   sub: { color: "rgba(255,255,255,0.82)", fontSize: 13, lineHeight: 19, marginTop: 6, paddingRight: 70 },
   perks: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
   perk: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
   perkText: { color: "#e0fbff", fontSize: 11.5, fontWeight: "600" },
   ctaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 16 },
-  cta: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 11, borderRadius: 14 },
+  cta: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#35D7F7", paddingHorizontal: 16, paddingVertical: 11, borderRadius: 14 },
   ctaText: { color: "#06111f", fontWeight: "900", fontSize: 14 },
   ghost: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },
   ghostText: { color: "#fff", fontWeight: "700", fontSize: 12.5 },
