@@ -1694,16 +1694,6 @@ export default function RankingListScreen({ isBack = false }) {
   };
   const [accumulatedList, setAccumulatedList] = useState([]);
   const [hasMore, setHasMore] = useState(true);
-  // Danh sách hiển thị sau khi lọc giới tính (client-side)
-  const displayList = useMemo(
-    () =>
-      genderFilter === "all"
-        ? accumulatedList
-        : accumulatedList.filter(
-            (it) => (it?.user?.gender || "") === genderFilter,
-          ),
-    [accumulatedList, genderFilter],
-  );
 
   // API
   const {
@@ -1718,6 +1708,7 @@ export default function RankingListScreen({ isBack = false }) {
     scoreType: rangeActive ? scoreType : undefined,
     minScore: rangeActive ? range[0] : undefined,
     maxScore: rangeActive ? range[1] : undefined,
+    gender: genderFilter !== "all" ? genderFilter : undefined,
   });
   const { data: podiumData, refetch: refetchPodiums } =
     useGetRankingsPodiums30dQuery();
@@ -2032,7 +2023,10 @@ export default function RankingListScreen({ isBack = false }) {
                       <TouchableOpacity
                         key={o.v}
                         activeOpacity={0.85}
-                        onPress={() => setGenderFilter(o.v as any)}
+                        onPress={() => {
+                          setGenderFilter(o.v as any);
+                          setPage(0);
+                        }}
                         style={[
                           styles.genderChip,
                           {
@@ -2115,7 +2109,7 @@ export default function RankingListScreen({ isBack = false }) {
             >
               <MemoizedListView
                 scrollRef={scrollViewRef}
-                data={displayList}
+                data={accumulatedList}
                 renderItem={renderItem}
                 header={HeaderComponent}
                 footer={
@@ -2183,7 +2177,7 @@ export default function RankingListScreen({ isBack = false }) {
                 ) : (
                   // ✅ LOAD NẶNG SAU 150ms
                   <MemoizedChartView
-                    data={displayList}
+                    data={accumulatedList}
                     theme={theme}
                     onUserPress={handleChartUserPress}
                     onLoadMore={handleLoadMore}
