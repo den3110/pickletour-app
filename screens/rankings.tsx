@@ -1263,9 +1263,36 @@ const FlameAvatarAnimated = memo(({ uri, medal, theme, onPress }) => {
 FlameAvatarAnimated.displayName = "FlameAvatarAnimated";
 
 /* ================= Ranking Card ================= */
+/* Ruy băng thứ hạng có vương miện (vàng/bạc/đồng/cyan) — theo mẫu */
+const RankRibbon = memo(({ rankNo, medal }: any) => {
+  const grad =
+    medal === "gold"
+      ? ["#FCE38A", "#F6B301", "#B67B02"]
+      : medal === "silver"
+      ? ["#EDEFF2", "#C3CAD3", "#8B93A0"]
+      : medal === "bronze"
+      ? ["#E7B48A", "#CD7F45", "#8A5424"]
+      : ["#5CD6FF", "#12B6F3", "#045DA0"];
+  return (
+    <View style={styles.ribbonWrap}>
+      <LinearGradient
+        colors={grad as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.ribbonBody}
+      >
+        <MaterialCommunityIcons name="crown" size={14} color="#fff" />
+        <Text style={styles.ribbonNum}>{rankNo}</Text>
+      </LinearGradient>
+      <View style={[styles.ribbonNotch, { borderTopColor: grad[2] }]} />
+    </View>
+  );
+});
+
 const RankingCard = memo(
   ({
     item,
+    rankNo,
     podium,
     scorePatch,
     cccdPatch,
@@ -1362,6 +1389,16 @@ const RankingCard = memo(
       } catch {}
     };
     const avatarSrc = u?.avatar || PLACE;
+    // Màu huy chương theo THỨ HẠNG bảng (top 3 = vàng/bạc/đồng), ưu tiên podium nếu có.
+    const displayMedal =
+      podium?.medal ||
+      (rankNo === 1
+        ? "gold"
+        : rankNo === 2
+        ? "silver"
+        : rankNo === 3
+        ? "bronze"
+        : null);
     const age = calcAge(u);
 
     const scoreColor = getScoreColor(r, theme);
@@ -1391,8 +1428,9 @@ const RankingCard = memo(
     }, [achievements, onOpenAchievements, u]);
 
     return (
-      <FlameCard medal={podium?.medal} theme={theme}>
+      <FlameCard medal={displayMedal} theme={theme}>
         <View style={styles.cardHeader}>
+          <RankRibbon rankNo={rankNo} medal={displayMedal} />
           <TouchableOpacity
             onPress={() => onOpenZoom(avatarSrc)}
             activeOpacity={0.8}
@@ -1400,15 +1438,15 @@ const RankingCard = memo(
             <View style={styles.avatarContainer}>
               <FlameAvatar
                 uri={avatarSrc}
-                medal={podium?.medal}
+                medal={displayMedal}
                 theme={theme}
                 onPress={() => onOpenZoom(avatarSrc)}
               />
-              {podium && (
+              {displayMedal && (
                 <View
                   style={[
                     styles.avatarBorder,
-                    { borderColor: COLORS[podium.medal] },
+                    { borderColor: COLORS[displayMedal] },
                   ]}
                 />
               )}
@@ -2068,9 +2106,10 @@ export default function RankingListScreen({ isBack = false }) {
   }, [podiumAnnouncementData]);
 
   const renderItem = useCallback(
-    ({ item }) => (
+    ({ item, index }) => (
       <RankingCard
         item={item}
+        rankNo={index + 1}
         podium={podiumByUser[item?.user?._id]}
         scorePatch={{}}
         cccdPatch={{}}
@@ -2179,9 +2218,22 @@ export default function RankingListScreen({ isBack = false }) {
                   )}
                 </Pressable>
               )}
-              <Text style={[styles.screenTitle, { color: theme.text }]}>
-                Bảng xếp hạng
-              </Text>
+              <View style={{ flexShrink: 1 }}>
+                <Text style={[styles.screenTitle, { color: theme.text }]}>
+                  Bảng xếp hạng
+                </Text>
+                <Text
+                  style={{
+                    color: theme.subText,
+                    fontSize: 12.5,
+                    marginTop: 2,
+                    fontWeight: "500",
+                  }}
+                  numberOfLines={2}
+                >
+                  Cập nhật thứ hạng vận động viên theo điểm thi đấu
+                </Text>
+              </View>
             </View>
 
             <View
@@ -2691,6 +2743,39 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   cardHeader: { flexDirection: "row", marginBottom: 16, alignItems: "flex-start" },
+  ribbonWrap: { alignItems: "center", marginRight: 12, marginTop: 2 },
+  ribbonBody: {
+    width: 42,
+    paddingTop: 7,
+    paddingBottom: 9,
+    borderTopLeftRadius: 11,
+    borderTopRightRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  ribbonNum: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+    lineHeight: 22,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  ribbonNotch: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 21,
+    borderRightWidth: 21,
+    borderTopWidth: 11,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
   gradeIconBtn: {
     width: 36,
     height: 36,

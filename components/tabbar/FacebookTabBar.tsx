@@ -121,7 +121,13 @@ function TabItem({
         <Animated.View
           style={[
             styles.pill,
-            { backgroundColor: accent + (isDark ? "33" : "22") },
+            v2
+              ? {
+                  backgroundColor: "rgba(18,182,243,0.2)",
+                  borderWidth: 1,
+                  borderColor: "rgba(92,214,255,0.45)",
+                }
+              : { backgroundColor: accent + (isDark ? "33" : "22") },
             pillAnimStyle,
           ]}
         />
