@@ -38,16 +38,36 @@ const PtInput = forwardRef<TextInput, PtInputProps>(function PtInput(props, ref)
     onChangeText?.(t);
   }, [controlled, onChangeText]);
 
-  const openKeypad = useCallback(() => {
+  // Sau khi bấm "Xong", Modal đóng → focus TỰ quay lại TextInput → onFocus lại mở
+  // keypad → keypad "không bao giờ tắt". Cờ này chặn lần mở-do-focus ngay sau khi Done.
+  const suppressFocusOpenRef = useRef(false);
+  const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // fromPress = true khi user CHẠM thật vào ô → luôn mở (bỏ qua suppress).
+  const openKeypad = useCallback((fromPress = false) => {
     if (editable === false) return;
+    if (suppressFocusOpenRef.current && !fromPress) return;
+    if (fromPress) suppressFocusOpenRef.current = false;
     setOpen(true);
   }, [editable]);
 
   const done = useCallback(() => {
+    suppressFocusOpenRef.current = true;
     setOpen(false);
     inputRef.current?.blur();
     onSubmitEditing?.({ nativeEvent: { text: current } } as any);
+    if (suppressTimerRef.current) clearTimeout(suppressTimerRef.current);
+    suppressTimerRef.current = setTimeout(() => {
+      suppressFocusOpenRef.current = false;
+    }, 500);
   }, [current, onSubmitEditing]);
+
+  React.useEffect(
+    () => () => {
+      if (suppressTimerRef.current) clearTimeout(suppressTimerRef.current);
+    },
+    [],
+  );
 
   if (!useKeypad) {
     return (
@@ -80,8 +100,8 @@ const PtInput = forwardRef<TextInput, PtInputProps>(function PtInput(props, ref)
         keyboardType={keyboardType}
         showSoftInputOnFocus={false}
         contextMenuHidden
-        onPressIn={(e) => { openKeypad(); (rest as any).onPressIn?.(e); }}
-        onFocus={(e) => { openKeypad(); onFocus?.(e); }}
+        onPressIn={(e) => { openKeypad(true); (rest as any).onPressIn?.(e); }}
+        onFocus={(e) => { openKeypad(false); onFocus?.(e); }}
         onBlur={onBlur}
         onChangeText={setText}
       />
