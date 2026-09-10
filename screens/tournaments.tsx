@@ -973,102 +973,121 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         </Pressable>
 
         <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 }}>
-          <View style={{ gap: 7, marginBottom: 16 }}>
-            <MetaRow
-              theme={theme}
-              icon="calendar-clear-outline"
-              text={`${formatDate(tt.startDate)} - ${formatDate(tt.endDate)}`}
-            />
-            <MetaRow
-              theme={theme}
-              icon="location-outline"
-              text={tt.location || "Địa điểm chưa cập nhật"}
-            />
-            <MetaRow
-              theme={theme}
-              icon="people-outline"
-              text={`Đã đăng ký: ${tt.registered}/${tt.maxPairs}`}
-            />
+          {/* ==== Meta 3 cột có vạch ngăn (theo mẫu) ==== */}
+          <View style={styles.metaGrid}>
+            <View style={styles.metaCol}>
+              <Ionicons name="calendar-clear-outline" size={17} color={theme.colors.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Thời gian</Text>
+                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={2}>
+                  {`${formatDate(tt.startDate)} - ${formatDate(tt.endDate)}`}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.metaDividerV, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.metaCol}>
+              <Ionicons name="location-outline" size={17} color={theme.colors.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Địa điểm</Text>
+                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={2}>
+                  {tt.location || "Chưa cập nhật"}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.metaDividerV, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.metaCol}>
+              <Ionicons name="people-outline" size={17} color={theme.colors.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.metaColLabel, { color: theme.colors.textSec }]}>Đăng ký</Text>
+                <Text style={[styles.metaColValue, { color: theme.colors.text }]} numberOfLines={1}>
+                  {`${tt.registered}/${tt.maxPairs}`}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {/* Divider */}
-          <View
-            style={{
-              height: 1,
-              backgroundColor: theme.colors.border,
-              marginBottom: 12,
-              opacity: 0.5,
-            }}
-          />
-
-          {/* Buttons */}
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 10,
-              marginTop: 4,
-              marginBottom: -10,
-            }}
-          >
-            {/* Lịch đấu — chỉ hiện khi giải đã có trận (lịch) */}
+          {/* ==== Nút hành động (theo mẫu: có mũi tên, nút chính đặc) ==== */}
+          <View style={styles.tBtnRow}>
             {Number((tt as any)?.matchesTotal) > 0 && (
-              <PrimaryBtn
-                theme={theme}
-                icon="calendar-outline"
+              <Pressable
                 onPress={onPressSchedule}
+                style={({ pressed }) => [
+                  styles.tBtn,
+                  styles.tBtnOutline,
+                  { borderColor: theme.colors.primary + "55" },
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                Lịch đấu
-              </PrimaryBtn>
+                <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+                <Text style={[styles.tBtnText, { color: theme.colors.primary }]} numberOfLines={1}>
+                  Lịch đấu
+                </Text>
+              </Pressable>
             )}
 
-            {/* Trọng tài của giải → nút Chấm trận (thay Đăng ký) */}
             {isRefereeOfThis ? (
-              <WarningBtn
-                theme={theme}
-                icon="create-outline"
+              <Pressable
                 onPress={onPressReferee}
+                style={({ pressed }) => [
+                  styles.tBtn,
+                  styles.tBtnSolid,
+                  { backgroundColor: theme.colors.warning, shadowColor: theme.colors.warning },
+                  pressed && { opacity: 0.9 },
+                ]}
               >
-                Chấm trận
-              </WarningBtn>
+                <Ionicons name="create-outline" size={16} color="#1a1200" />
+                <Text style={[styles.tBtnText, { color: "#1a1200" }]} numberOfLines={1}>Chấm trận</Text>
+              </Pressable>
             ) : (
               showRegister && (
-                <WarningBtn
-                  theme={theme}
-                  icon="person-add-outline"
+                <Pressable
                   onPress={onPressRegister}
+                  style={({ pressed }) => [
+                    styles.tBtn,
+                    styles.tBtnSolid,
+                    { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
+                    pressed && { opacity: 0.9 },
+                  ]}
                 >
-                  Đăng ký
-                </WarningBtn>
+                  <Ionicons name="person-add-outline" size={16} color="#04121f" />
+                  <Text style={[styles.tBtnText, { color: "#04121f" }]} numberOfLines={1}>Đăng ký</Text>
+              </Pressable>
               )
             )}
 
-            {/* Sơ đồ — chỉ hiện khi giải đã có sơ đồ (bracket) */}
             {Number((tt as any)?.bracketsTotal) > 0 && (
-              <OutlineBtn
-                theme={theme}
-                icon="git-network-outline"
+              <Pressable
                 onPress={onPressBracket}
+                style={({ pressed }) => [
+                  styles.tBtn,
+                  styles.tBtnOutline,
+                  { borderColor: theme.colors.border },
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
-              </OutlineBtn>
+                <Ionicons name="git-network-outline" size={16} color={theme.colors.text} />
+                <Text style={[styles.tBtnText, { color: theme.colors.text }]} numberOfLines={1}>
+                  {tt.status === "finished" ? "Xem sơ đồ" : "Sơ đồ"}
+                </Text>
+              </Pressable>
             )}
-
-            {/* Nhóm Zalo — cùng style pill với các nút khác, màu xanh */}
-            <ZaloBtn
-              theme={theme}
-              icon="chatbubbles"
-              onPress={() =>
-                Linking.openURL(
-                  (tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP
-                )
-              }
-            >
-              Zalo
-            </ZaloBtn>
           </View>
+
+          {/* Nhóm Zalo — nút phụ căn giữa */}
+          <Pressable
+            onPress={() =>
+              Linking.openURL((tt as any)?.zaloGroupUrl || DEFAULT_ZALO_GROUP)
+            }
+            style={({ pressed }) => [
+              styles.tBtn,
+              styles.tBtnZalo,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons name="chatbubbles" size={16} color="#0A84FF" />
+            <Text style={[styles.tBtnText, styles.tBtnZaloText]} numberOfLines={1}>Nhóm Zalo</Text>
+            <Ionicons name="chevron-forward" size={15} color="#0A84FF" style={{ opacity: 0.7 }} />
+          </Pressable>
         </View>
       </AppleLiquidGlassView>
     );
@@ -1470,6 +1489,61 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
+  /* ===== Meta 3 cột (theo mẫu) ===== */
+  metaGrid: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  metaCol: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 2,
+  },
+  metaColLabel: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    marginBottom: 2,
+    textTransform: "uppercase",
+  },
+  metaColValue: { fontSize: 12.5, fontWeight: "800", lineHeight: 16 },
+  metaDividerV: { width: 1, alignSelf: "stretch", marginVertical: 4, opacity: 0.6 },
+  /* ===== Nút hành động (theo mẫu) ===== */
+  tBtnRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  tBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    minHeight: 48,
+  },
+  tBtnOutline: { borderWidth: 1.5, backgroundColor: "transparent" },
+  tBtnSolid: {
+    shadowOpacity: 0.42,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  tBtnText: { textAlign: "center", fontSize: 12.5, fontWeight: "800" },
+  tBtnZalo: {
+    flex: 0,
+    alignSelf: "center",
+    minWidth: 190,
+    borderWidth: 1.5,
+    borderColor: "rgba(10,132,255,0.45)",
+    backgroundColor: "rgba(10,132,255,0.08)",
+    paddingHorizontal: 22,
+    marginTop: 2,
+  },
+  tBtnZaloText: { color: "#0A84FF" },
   statusBadgeOverlay: {
     position: "absolute",
     top: 12,

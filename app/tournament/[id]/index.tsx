@@ -798,7 +798,7 @@ export default function TournamentOverviewScreen() {
                 <View style={S.shortcutIcon}>
                   <MaterialIcons name="event-note" size={18} color="#fff" />
                 </View>
-                <Text style={S.shortcutText}>Lịch</Text>
+                <Text numberOfLines={2} style={S.shortcutText}>Lịch</Text>
               </Pressable>
 
               <Pressable
@@ -815,7 +815,7 @@ export default function TournamentOverviewScreen() {
                     color="#fff"
                   />
                 </View>
-                <Text style={S.shortcutText}>Sơ đồ</Text>
+                <Text numberOfLines={2} style={S.shortcutText}>Sơ đồ</Text>
               </Pressable>
 
               {(tournament as any)?.tournamentMode === "mlp" && (
@@ -838,7 +838,7 @@ export default function TournamentOverviewScreen() {
                       color="#fff"
                     />
                   </View>
-                  <Text style={S.shortcutText}>MLP</Text>
+                  <Text numberOfLines={2} style={S.shortcutText}>MLP</Text>
                 </Pressable>
               )}
 
@@ -853,7 +853,7 @@ export default function TournamentOverviewScreen() {
                 <View style={S.shortcutIcon}>
                   <Ionicons name="create-outline" size={18} color="#fff" />
                 </View>
-                <Text style={S.shortcutText}>Đăng ký</Text>
+                <Text numberOfLines={2} style={S.shortcutText}>Đăng ký</Text>
               </Pressable>
 
               <Pressable
@@ -872,7 +872,7 @@ export default function TournamentOverviewScreen() {
                 <View style={[S.shortcutIcon, { backgroundColor: "#0068FF" }]}>
                   <Ionicons name="chatbubbles" size={18} color="#fff" />
                 </View>
-                <Text style={S.shortcutText}>Nhóm Zalo</Text>
+                <Text numberOfLines={2} style={S.shortcutText}>Nhóm Zalo</Text>
               </Pressable>
 
               <Pressable
@@ -885,7 +885,7 @@ export default function TournamentOverviewScreen() {
                 <View style={[S.shortcutIcon, { backgroundColor: "#F59E0B" }]}>
                   <Ionicons name="star" size={18} color="#fff" />
                 </View>
-                <Text style={S.shortcutText}>
+                <Text numberOfLines={2} style={S.shortcutText}>
                   {reviewSummary?.summary?.count
                     ? `Đánh giá ${reviewSummary.summary.avg?.toFixed(1)}★`
                     : "Đánh giá"}
@@ -911,7 +911,7 @@ export default function TournamentOverviewScreen() {
                     color="#fff"
                   />
                 </View>
-                <Text style={S.shortcutText}>
+                <Text numberOfLines={2} style={S.shortcutText}>
                   {isFollowing ? "Đang theo dõi" : "Theo dõi"}
                 </Text>
               </Pressable>
@@ -1441,27 +1441,35 @@ const S = StyleSheet.create({
     opacity: 0.95,
   },
 
-  shortcutsWrap: { flexDirection: "row", gap: 10 },
+  shortcutsWrap: { flexDirection: "row", gap: 8, alignItems: "stretch" },
   shortcut: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(146,197,255,0.28)",
     borderRadius: 16,
     paddingVertical: 12,
+    paddingHorizontal: 4,
+    minHeight: 90,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
+    justifyContent: "flex-start",
+    gap: 8,
   },
   shortcutIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.18)",
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
-  shortcutText: { color: "#fff", fontWeight: "900", fontSize: 12 },
+  shortcutText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 11.5,
+    lineHeight: 15,
+    textAlign: "center",
+  },
 
   statCard: {
     borderWidth: 1,
