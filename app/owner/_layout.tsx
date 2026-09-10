@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { useTheme } from "@react-navigation/native";
+import AppBackButton from "@/components/ui/AppBackButton";
 import { pal } from "@/utils/courtFormat";
 
 export default function OwnerLayout() {
@@ -13,6 +14,9 @@ export default function OwnerLayout() {
         headerTitleStyle: { fontWeight: "800", fontSize: 17 },
         headerShadowVisible: false,
         headerBackTitle: "Quay lại",
+        headerLeft: ({ tintColor }) => (
+          <AppBackButton color={tintColor ?? C.text} />
+        ),
         contentStyle: { backgroundColor: C.bg },
       }}
     />

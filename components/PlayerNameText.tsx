@@ -16,6 +16,7 @@ import Svg, {
   LinearGradient,
   Stop,
 } from "react-native-svg";
+import { useSelector } from "react-redux";
 import { useGetNameStylesQuery } from "../slices/nameStyleApiSlice";
 import { resolveNameStyle, angleToSvgVector } from "../utils/nameStyle";
 import { getPlayerDisplayName } from "../utils/matchDisplay";
@@ -118,6 +119,7 @@ export default function PlayerNameText({
   const { data: map } = useGetNameStylesQuery(undefined, {
     refetchOnMountOrArgChange: false,
   });
+  const myId = useSelector((s: any) => s.auth?.userInfo?._id);
 
   const target = user || player || null;
 
@@ -134,8 +136,12 @@ export default function PlayerNameText({
 
   // 2) Hiệu ứng
   const ns = useMemo(
-    () => resolveNameStyle(map, target, { nickname: nickname || name }),
-    [map, target, nickname, name],
+    () =>
+      resolveNameStyle(map, target, {
+        nickname: nickname || name,
+        viewerId: myId,
+      }),
+    [map, target, nickname, name, myId],
   );
 
   if (!ns) {
