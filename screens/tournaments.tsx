@@ -25,6 +25,7 @@ import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
@@ -910,16 +911,16 @@ export default function TournamentDashboardScreen({ isBack = false }) {
           styles.cardContainer,
           {
             backgroundColor: theme.colors.card,
-            borderWidth: theme.isDark ? 0 : 0.5,
-            borderColor: theme.isDark ? "transparent" : "#e2e8f0",
+            borderWidth: 1,
+            borderColor: theme.isDark ? "rgba(92,180,255,0.16)" : "#e2e8f0",
           },
           IOS_26_LIQUID_GLASS_ENABLED && styles.glassCard,
           theme.cardShadow,
         ]}
       >
-        {/* Ảnh Bìa */}
-        <View>
-          <Pressable onPress={() => setPreview(tt.image)} activeOpacity={0.9}>
+        {/* ==== Ảnh bìa + tiêu đề đè lên (thiết kế mới, cinematic) ==== */}
+        <Pressable onPress={() => onPressCard(tt)}>
+          <View style={styles.cardMediaWrap}>
             <ExpoImage
               source={{
                 uri:
@@ -930,45 +931,49 @@ export default function TournamentDashboardScreen({ isBack = false }) {
               contentFit="cover"
               cachePolicy="memory-disk"
             />
-          </Pressable>
-
-          <AppleLiquidGlassView
-            fallback="view"
-            glassColorScheme={theme.isDark ? "dark" : "light"}
-            glassEffectStyle="regular"
-            glassTintColor="rgba(0, 0, 0, 0.36)"
-            style={styles.statusBadgeOverlay}
-          >
-            <View
-              style={[styles.statusDot, { backgroundColor: statusMeta.color }]}
+            {/* Lớp phủ gradient dưới để chữ nổi & fade vào thân thẻ */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={["transparent", "rgba(2,8,20,0.35)", theme.colors.card]}
+              locations={[0, 0.55, 1]}
+              style={styles.cardMediaScrim}
             />
-            <Text style={styles.statusTextOverlay}>{statusMeta.label}</Text>
-          </AppleLiquidGlassView>
 
-          {/* Format badge: MLP / TEAM — góc trên phải, khớp web */}
-          {String((tt as any)?.tournamentMode || "").toLowerCase() === "mlp" && (
-            <View style={styles.formatBadgeMlp}>
-              <Text style={styles.formatBadgeText}>🏆 MLP</Text>
+            {/* Badge trạng thái — chấm phát sáng */}
+            <View style={styles.statusBadgeOverlay}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: statusMeta.color, shadowColor: statusMeta.color },
+                ]}
+              />
+              <Text style={styles.statusTextOverlay}>{statusMeta.label}</Text>
             </View>
-          )}
-          {String((tt as any)?.tournamentMode || "").toLowerCase() === "team" && (
-            <View style={styles.formatBadgeTeam}>
-              <Text style={styles.formatBadgeText}>👥 TEAM</Text>
-            </View>
-          )}
-        </View>
 
-        <View style={{ padding: 14 }}>
-          <Pressable onPress={() => onPressCard(tt)}>
+            {/* Format badge: MLP / TEAM — góc trên phải */}
+            {String((tt as any)?.tournamentMode || "").toLowerCase() === "mlp" && (
+              <View style={styles.formatBadgeMlp}>
+                <Text style={styles.formatBadgeText}>🏆 MLP</Text>
+              </View>
+            )}
+            {String((tt as any)?.tournamentMode || "").toLowerCase() === "team" && (
+              <View style={styles.formatBadgeTeam}>
+                <Text style={styles.formatBadgeText}>👥 TEAM</Text>
+              </View>
+            )}
+
+            {/* Tiêu đề đè lên phần dưới ảnh */}
             <Text
-              style={[styles.cardTitle, { color: theme.colors.text }]}
+              style={[styles.cardTitleOnImage, { color: theme.colors.text }]}
               numberOfLines={2}
             >
               {tt.name}
             </Text>
-          </Pressable>
+          </View>
+        </Pressable>
 
-          <View style={{ gap: 6, marginTop: 8, marginBottom: 16 }}>
+        <View style={{ paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 }}>
+          <View style={{ gap: 7, marginBottom: 16 }}>
             <MetaRow
               theme={theme}
               icon="calendar-clear-outline"
@@ -1435,33 +1440,64 @@ const styles = StyleSheet.create({
   glassPill: {
     borderWidth: 1,
   },
+  cardMediaWrap: {
+    position: "relative",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: "hidden",
+  },
   cardImage: {
     width: "100%",
     aspectRatio: BANNER_RATIO,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  },
+  cardMediaScrim: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "72%",
+  },
+  cardTitleOnImage: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 11,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    lineHeight: 25,
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
   statusBadgeOverlay: {
     position: "absolute",
     top: 12,
     left: 12,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    borderRadius: 20,
-    paddingHorizontal: 10,
+    backgroundColor: "rgba(2,8,20,0.6)",
+    borderRadius: 999,
+    paddingHorizontal: 11,
     paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
   },
   statusTextOverlay: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   formatBadgeMlp: {
     position: "absolute",

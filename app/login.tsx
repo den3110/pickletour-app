@@ -68,6 +68,7 @@ const getLoginErrorMessage = (err) => {
 };
 
 const LOGO_SRC = require("@/assets/images/icon.png");
+const LOGO_V2_BADGE = require("@/assets/images/logo-v2-badge.png");
 const BG_LOTTIE = require("@/assets/lottie/animated-bg.json");
 
 const BOTTOM_ACTIONS_H = 132;
@@ -299,12 +300,21 @@ export default function LoginScreen() {
                   style={[
                     styles.logoWrap,
                     IOS_26_LIQUID_GLASS_ENABLED && styles.glassControl,
-                    { backgroundColor: logoBg, borderColor: border },
+                    v2
+                      ? {
+                          backgroundColor: "transparent",
+                          borderWidth: 0,
+                          width: 190,
+                          height: 160,
+                          borderRadius: 0,
+                          shadowOpacity: 0,
+                        }
+                      : { backgroundColor: logoBg, borderColor: border },
                   ]}
                 >
                   <Image
-                    source={LOGO_SRC}
-                    style={styles.logo}
+                    source={v2 ? LOGO_V2_BADGE : LOGO_SRC}
+                    style={v2 ? styles.logoV2 : styles.logo}
                     contentFit="contain"
                     transition={150}
                     cachePolicy="memory-disk"
@@ -524,6 +534,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logo: { width: 88, height: 88, borderRadius: 18 },
+  logoV2: { width: 168, height: 148 },
   title: {
     fontSize: 22,
     fontWeight: "700",
