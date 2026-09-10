@@ -1673,6 +1673,10 @@ export default function RankingListScreen({ isBack = false }) {
     SCORE_MIN,
     SCORE_MAX,
   ]);
+  // Lọc theo giới tính: all (Cả hai) | male (Nam) | female (Nữ)
+  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">(
+    "all",
+  );
   const rangeActive = range[0] > SCORE_MIN || range[1] < SCORE_MAX;
   const onScoreTypeChange = (v: "single" | "double" | "mix") => {
     setScoreType(v);
@@ -1690,6 +1694,16 @@ export default function RankingListScreen({ isBack = false }) {
   };
   const [accumulatedList, setAccumulatedList] = useState([]);
   const [hasMore, setHasMore] = useState(true);
+  // Danh sách hiển thị sau khi lọc giới tính (client-side)
+  const displayList = useMemo(
+    () =>
+      genderFilter === "all"
+        ? accumulatedList
+        : accumulatedList.filter(
+            (it) => (it?.user?.gender || "") === genderFilter,
+          ),
+    [accumulatedList, genderFilter],
+  );
 
   // API
   const {
@@ -1987,20 +2001,62 @@ export default function RankingListScreen({ isBack = false }) {
             }}
           />
           {filtersExpanded ? (
-            <ScoreRange values={liveRange} active={rangeActive} onClear={clearRange}>
-              <RangeSlider
-                min={SCORE_MIN}
-                max={SCORE_MAX}
-                step={0.1}
-                values={range}
-                onChange={setLiveRange}
-                onCommit={commitRange}
-                trackColor="rgba(120,180,230,0.28)"
-                activeColor={RANKING_COLORS.primary}
-                thumbColor="#F4FBFF"
-                thumbBorder={RANKING_COLORS.primary}
-              />
-            </ScoreRange>
+            <>
+              <ScoreRange values={liveRange} active={rangeActive} onClear={clearRange}>
+                <RangeSlider
+                  min={SCORE_MIN}
+                  max={SCORE_MAX}
+                  step={0.1}
+                  values={range}
+                  onChange={setLiveRange}
+                  onCommit={commitRange}
+                  trackColor="rgba(120,180,230,0.28)"
+                  activeColor={RANKING_COLORS.primary}
+                  thumbColor="#F4FBFF"
+                  thumbBorder={RANKING_COLORS.primary}
+                />
+              </ScoreRange>
+              {/* Lọc theo giới tính */}
+              <View style={styles.genderRow}>
+                <Text style={[styles.genderLabel, { color: theme.text }]}>
+                  Giới tính
+                </Text>
+                <View style={styles.genderChips}>
+                  {[
+                    { v: "all", l: "Cả hai" },
+                    { v: "male", l: "Nam" },
+                    { v: "female", l: "Nữ" },
+                  ].map((o) => {
+                    const active = genderFilter === (o.v as any);
+                    return (
+                      <TouchableOpacity
+                        key={o.v}
+                        activeOpacity={0.85}
+                        onPress={() => setGenderFilter(o.v as any)}
+                        style={[
+                          styles.genderChip,
+                          {
+                            borderColor: active ? theme.primary : theme.border,
+                            backgroundColor: active
+                              ? theme.primary
+                              : "transparent",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.genderChipText,
+                            { color: active ? "#04121f" : theme.subText },
+                          ]}
+                        >
+                          {o.l}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
           ) : null}
         </View>
       </TouchableWithoutFeedback>
@@ -2059,7 +2115,7 @@ export default function RankingListScreen({ isBack = false }) {
             >
               <MemoizedListView
                 scrollRef={scrollViewRef}
-                data={accumulatedList}
+                data={displayList}
                 renderItem={renderItem}
                 header={HeaderComponent}
                 footer={
@@ -2127,7 +2183,7 @@ export default function RankingListScreen({ isBack = false }) {
                 ) : (
                   // ✅ LOAD NẶNG SAU 150ms
                   <MemoizedChartView
-                    data={accumulatedList}
+                    data={displayList}
                     theme={theme}
                     onUserPress={handleChartUserPress}
                     onLoadMore={handleLoadMore}
@@ -2467,6 +2523,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   cardHeader: { flexDirection: "row", marginBottom: 16, alignItems: "flex-start" },
+  genderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    marginHorizontal: 16,
+    gap: 10,
+  },
+  genderLabel: { fontSize: 14, fontWeight: "700" },
+  genderChips: { flexDirection: "row", gap: 8, flex: 1 },
+  genderChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  genderChipText: { fontSize: 13, fontWeight: "700" },
   ribbonWrap: { alignItems: "center", marginRight: 12, marginTop: 2 },
   ribbonBody: {
     width: 42,
