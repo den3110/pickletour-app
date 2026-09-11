@@ -3,6 +3,7 @@ import {
   Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as Clipboard from "expo-clipboard";
 import { formatPrice } from "@/constants/market";
 import { formatPlayTime,
   skillLabel } from "@/constants/play";
@@ -1515,6 +1516,31 @@ export default function ChatWindow() {
               <Ionicons name="arrow-undo-outline" size={22} color={C.text} />
               <Text style={{ fontSize: 16, color: C.text }}>Trả lời</Text>
             </Pressable>
+            {!!actionMsg?.content && (
+              <Pressable
+                onPress={async () => {
+                  const t = String(actionMsg.content || "");
+                  setActionMsg(null);
+                  try {
+                    await Clipboard.setStringAsync(t);
+                    Alert.alert("Đã sao chép", "Đã sao chép tin nhắn.");
+                  } catch {
+                    Alert.alert("Lỗi", "Không sao chép được.");
+                  }
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingVertical: 14,
+                  borderTopWidth: 1,
+                  borderTopColor: C.border,
+                }}
+              >
+                <Ionicons name="copy-outline" size={22} color={C.text} />
+                <Text style={{ fontSize: 16, color: C.text }}>Sao chép</Text>
+              </Pressable>
+            )}
             {actionMsg && (
               <Pressable
                 onPress={() =>

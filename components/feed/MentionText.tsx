@@ -1,6 +1,38 @@
 import React from "react";
+import { Linking } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { router } from "expo-router";
+
+// Bắt http(s)://... hoặc www...., cắt dấu câu ở cuối.
+const URL_RE = /((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:!?)\]}'"])/gi;
+
+// Tách 1 đoạn text thành <Text> thường + <Text> link (tap mở URL).
+// Link kế thừa màu chữ + gạch chân → luôn đọc rõ trên mọi nền bong bóng.
+function renderTextWithLinks(text: string, keyPrefix: number) {
+  if (!text) return text;
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text))) {
+    const url = m[0];
+    const start = m.index;
+    if (start > last) nodes.push(text.slice(last, start));
+    const href = url.startsWith("http") ? url : `https://${url}`;
+    nodes.push(
+      <Text
+        key={`${keyPrefix}-u-${start}`}
+        style={{ textDecorationLine: "underline", fontWeight: "600" }}
+        onPress={() => Linking.openURL(href).catch(() => {})}
+      >
+        {url}
+      </Text>
+    );
+    last = start + url.length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
 
 /**
  * Render nội dung có @mention thành text màu xanh, tap để mở profile.
@@ -81,7 +113,7 @@ export function MentionText({
             {p.text}
           </Text>
         ) : (
-          <Text key={i}>{p.text}</Text>
+          <Text key={i}>{renderTextWithLinks(p.text, i)}</Text>
         )
       )}
     </Text>
