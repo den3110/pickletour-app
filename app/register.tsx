@@ -720,6 +720,7 @@ export default function RegisterScreen() {
               textPrimary={textPrimary}
               textSecondary={textSecondary}
               keyboardType="number-pad"
+              systemKeyboard
               maxLength={12}
               required={requireOptional}
               error={showErrors && !!validation.fields.cccd}

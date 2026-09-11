@@ -1043,6 +1043,7 @@ function EditUserForm({
               }))
             }
             keyboardType="number-pad"
+            systemKeyboard
           />
           <DOBPickerRN
             styles={styles}
@@ -1386,6 +1387,7 @@ function TextFieldRN({
   placeholder,
   secureTextEntry,
   keyboardType,
+  systemKeyboard,
   rightIcon,
   onRightIconPress,
   errorText = "",
@@ -1401,6 +1403,7 @@ function TextFieldRN({
           placeholderTextColor={styles.tokens.iconMuted}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
+          systemKeyboard={systemKeyboard}
           style={{
             flex: 1,
             paddingVertical: Platform.OS === "ios" ? 8 : 6,

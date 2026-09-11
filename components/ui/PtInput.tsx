@@ -21,8 +21,11 @@ export type PtInputProps = TextInputProps & {
 
 const PtInput = forwardRef<TextInput, PtInputProps>(function PtInput(props, ref) {
   const { keyboardType, keypadLabel, systemKeyboard, onFocus, onBlur, onChangeText, value, defaultValue, editable, placeholder, maxLength, onSubmitEditing, ...rest } = props;
-  const mode = keyboardType ? MODE_BY_KB[String(keyboardType)] : undefined;
-  const useKeypad = !!mode && !systemKeyboard;
+  const kbStr = keyboardType ? String(keyboardType) : "";
+  const mode = MODE_BY_KB[kbStr];
+  // SĐT (phone-pad) LUÔN dùng bàn phím hệ thống — số điện thoại cần nhập được số 0 ở đầu,
+  // keypad custom không cho. CCCD dùng systemKeyboard tại chỗ nhập.
+  const useKeypad = !!mode && !systemKeyboard && kbStr !== "phone-pad";
 
   const inputRef = useRef<TextInput>(null);
   useImperativeHandle(ref, () => inputRef.current as TextInput);

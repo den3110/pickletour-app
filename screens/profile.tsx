@@ -1412,9 +1412,11 @@ export default function ProfileScreen({ isBack = false }) {
                 <BentoCardWide
                   gradient={t.v2 ? ["#0A4C8A", "#12B6F3"] : ["#14b8a6", "#06b6d4"]}
                   icon="trending-up"
-                  value={`${fmtScore(user.ratingDouble)}/${fmtScore(
-                    user.ratingSingle,
-                  )}`}
+                  value={
+                    user.rated === false
+                      ? "Chưa chấm"
+                      : `${fmtScore(user.ratingDouble)}/${fmtScore(user.ratingSingle)}`
+                  }
                   label="Điểm đôi/điểm đơn"
                 />
                 <Card title="Thông tin" t={t}>
@@ -1589,6 +1591,7 @@ export default function ProfileScreen({ isBack = false }) {
                   error={showErr("cccd") ? errors.cccd : ""}
                   icon="credit-card"
                   keyboardType="number-pad"
+                  systemKeyboard
                   maxLength={12}
                   highlighted={HL.cccd}
                   t={t}
@@ -2817,6 +2820,7 @@ const FormField = ({
   error,
   icon,
   keyboardType,
+  systemKeyboard,
   secureTextEntry,
   placeholder,
   maxLength,
@@ -2865,6 +2869,7 @@ const FormField = ({
           placeholder={placeholder || label}
           placeholderTextColor={t.textMuted}
           keyboardType={keyboardType}
+          systemKeyboard={systemKeyboard}
           secureTextEntry={secureTextEntry}
           maxLength={maxLength}
           style={[styles.formTextInput, { color: t.text }]}
