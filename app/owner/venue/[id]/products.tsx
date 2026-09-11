@@ -10,7 +10,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import {
   useListProductsQuery, useCreateProductMutation, useUpdateProductMutation, useDeleteProductMutation,
-  useCreateSaleMutation, useListSalesQuery,
+  useCreateSaleMutation, useListSalesQuery, useUpdateSaleMutation, useDeleteSaleMutation,
 } from "@/slices/venueOwnerApiSlice";
 import { useGetVenueQuery } from "@/slices/venuesApiSlice";
 import { fmtVND, pal, toDateInput } from "@/utils/courtFormat";
@@ -28,9 +28,25 @@ export default function ProductsScreen() {
   const [updateProduct] = useUpdateProductMutation();
   const [deleteProduct] = useDeleteProductMutation();
   const [createSale, { isLoading: selling }] = useCreateSaleMutation();
+  const [updateSale] = useUpdateSaleMutation();
+  const [deleteSale] = useDeleteSaleMutation();
 
   const [editing, setEditing] = useState<any>(null);
+  const [editingSale, setEditingSale] = useState<any>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
+
+  const removeSale = (s: any) => {
+    Alert.alert("Xoá đơn?", `Đơn ${s.code || ""} · ${fmtVND(s.total)} sẽ bị xoá và hoàn tồn kho.`, [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Xoá", style: "destructive",
+        onPress: async () => {
+          try { await deleteSale({ venueId: id, saleId: s._id }).unwrap(); }
+          catch (e: any) { Alert.alert("Lỗi", e?.data?.message || "Không xoá được đơn"); }
+        },
+      },
+    ]);
+  };
 
   const list = (products || []).filter((p: any) => p.active);
   const cartItems = list.filter((p: any) => cart[p._id] > 0);
@@ -126,8 +142,10 @@ export default function ProductsScreen() {
                     {(s.items || []).reduce((a: number, b: any) => a + b.qty, 0)} món · {s.paymentMethod === "transfer" ? "CK" : "Tiền mặt"} · {new Date(s.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                 </View>
+                <TouchableOpacity onPress={() => setEditingSale(s)} style={[styles.miniBtn, { backgroundColor: C.field }]}><Ionicons name="create-outline" size={16} color={C.text} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => printReceipt(s)} style={[styles.miniBtn, { backgroundColor: C.accentSoft }]}><Ionicons name="print-outline" size={16} color={C.accent} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => sharePdf(saleReceiptHtml(venueInfo, s), `HoaDon-${s.code}`)} style={[styles.miniBtn, { backgroundColor: C.field }]}><Ionicons name="share-outline" size={16} color={C.sub} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => removeSale(s)} style={[styles.miniBtn, { backgroundColor: "rgba(239,68,68,0.12)" }]}><Ionicons name="trash-outline" size={16} color="#ef4444" /></TouchableOpacity>
               </View>
             ))}
           </View>
@@ -147,7 +165,100 @@ export default function ProductsScreen() {
       )}
 
       <ProductEditor C={C} venueId={id} editing={editing} onClose={() => setEditing(null)} create={createProduct} update={updateProduct} remove={deleteProduct} creating={creating} />
+      <SaleEditor C={C} venueId={id} sale={editingSale} onClose={() => setEditingSale(null)} update={updateSale} />
     </View>
+  );
+}
+
+// Sửa 1 đơn: chỉnh số lượng từng món (+/- / xoá món), đổi phương thức, ghi chú.
+function SaleEditor({ C, venueId, sale, onClose, update }: any) {
+  const [lines, setLines] = useState<any[]>([]);
+  const [method, setMethod] = useState<"cash" | "transfer">("cash");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (!sale) return;
+    setLines((sale.items || []).map((it: any) => ({
+      productId: String(it.product),
+      name: it.name,
+      price: Number(it.price) || 0,
+      qty: Number(it.qty) || 1,
+    })));
+    setMethod(sale.paymentMethod === "transfer" ? "transfer" : "cash");
+    setNote(sale.note || "");
+  }, [sale]);
+
+  const setQty = (pid: string, delta: number) =>
+    setLines((ls) =>
+      ls
+        .map((l) => (l.productId === pid ? { ...l, qty: l.qty + delta } : l))
+        .filter((l) => l.qty > 0),
+    );
+
+  const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
+
+  const onSave = async () => {
+    if (!lines.length) { Alert.alert("Đơn phải có ít nhất 1 món."); return; }
+    setSaving(true);
+    try {
+      await update({
+        venueId,
+        saleId: sale._id,
+        items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+        paymentMethod: method,
+        note,
+      }).unwrap();
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Không sửa được đơn");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={!!sale} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={[styles.modal, { backgroundColor: C.card, maxHeight: "88%" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Sửa đơn {sale?.code || ""}</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
+            {lines.map((l) => (
+              <View key={l.productId} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: C.text, fontWeight: "600" }} numberOfLines={1}>{l.name}</Text>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>{fmtVND(l.price)} · {fmtVND(l.price * l.qty)}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setQty(l.productId, -1)} style={[styles.qtyBtn, { borderColor: C.border }]}><Ionicons name="remove" size={16} color={C.text} /></TouchableOpacity>
+                <Text style={{ color: C.text, fontWeight: "800", minWidth: 22, textAlign: "center" }}>{l.qty}</Text>
+                <TouchableOpacity onPress={() => setQty(l.productId, 1)} style={[styles.qtyBtn, { borderColor: C.border }]}><Ionicons name="add" size={16} color={C.text} /></TouchableOpacity>
+              </View>
+            ))}
+            {!lines.length && <Text style={{ color: C.sub, paddingVertical: 12 }}>Đã xoá hết món — không thể lưu.</Text>}
+          </ScrollView>
+
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+            <TouchableOpacity onPress={() => setMethod("cash")} style={[styles.mBtn, { borderWidth: 1, borderColor: method === "cash" ? C.accent : C.border }]}>
+              <Text style={{ color: method === "cash" ? C.accent : C.sub, fontWeight: "700" }}>Tiền mặt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMethod("transfer")} style={[styles.mBtn, { borderWidth: 1, borderColor: method === "transfer" ? C.accent : C.border }]}>
+              <Text style={{ color: method === "transfer" ? C.accent : C.sub, fontWeight: "700" }}>Chuyển khoản</Text>
+            </TouchableOpacity>
+          </View>
+          <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, marginTop: 10 }]} value={note} onChangeText={setNote} placeholder="Ghi chú (tuỳ chọn)" placeholderTextColor={C.sub} />
+
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+            <Text style={{ color: C.text, fontWeight: "800" }}>Tổng: {fmtVND(total)}</Text>
+            <TouchableOpacity onPress={onSave} disabled={saving || !lines.length} style={[styles.mBtn, { flex: 0, paddingHorizontal: 28, backgroundColor: C.accent, opacity: saving || !lines.length ? 0.6 : 1 }]}>
+              <Text style={{ color: C.onAccent, fontWeight: "800" }}>{saving ? "Đang lưu…" : "Lưu"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 

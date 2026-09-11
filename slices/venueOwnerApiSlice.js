@@ -115,6 +115,14 @@ export const venueOwnerApiSlice = apiSlice.injectEndpoints({
       query: ({ venueId, ...body }) => ({ url: `/api/venues/${venueId}/sales`, method: "POST", body }),
       invalidatesTags: (r, e, a) => [{ type: "Venue", id: `SALES-${a.venueId}` }, { type: "Venue", id: `PROD-${a.venueId}` }],
     }),
+    updateSale: builder.mutation({
+      query: ({ venueId, saleId, ...body }) => ({ url: `/api/venues/${venueId}/sales/${saleId}`, method: "PATCH", body }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `SALES-${a.venueId}` }, { type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
+    deleteSale: builder.mutation({
+      query: ({ venueId, saleId }) => ({ url: `/api/venues/${venueId}/sales/${saleId}`, method: "DELETE" }),
+      invalidatesTags: (r, e, a) => [{ type: "Venue", id: `SALES-${a.venueId}` }, { type: "Venue", id: `PROD-${a.venueId}` }],
+    }),
     // Gói giờ / thẻ tháng (chủ sân)
     listPackagesOwner: builder.query({
       query: (venueId) => ({ url: `/api/venues/${venueId}/packages?all=1` }),
@@ -174,6 +182,8 @@ export const {
   useDeleteProductMutation,
   useListSalesQuery,
   useCreateSaleMutation,
+  useUpdateSaleMutation,
+  useDeleteSaleMutation,
   useListPackagesOwnerQuery,
   useCreatePackageMutation,
   useUpdatePackageMutation,
