@@ -3,12 +3,15 @@ import { fmtVND } from "@/utils/courtFormat";
 
 type Venue = { name?: string; address?: string; province?: string; phone?: string };
 type SaleItem = { name: string; price: number; qty: number; lineTotal: number };
+type ServiceItem = { name: string; amount: number; qty: number; lineTotal: number };
 type Sale = {
   code?: string;
   items?: SaleItem[];
+  serviceItems?: ServiceItem[];
   total?: number;
   paymentMethod?: string;
   customerName?: string;
+  customerPhone?: string;
   note?: string;
   createdAt?: string;
 };
@@ -50,6 +53,7 @@ const shell = (body: string) => `<!DOCTYPE html><html><head><meta charset="utf-8
 /** Hoá đơn 1 đơn bán hàng. */
 export function saleReceiptHtml(venue: Venue, sale: Sale): string {
   const items = sale.items || [];
+  const services = sale.serviceItems || [];
   const lines = items
     .map(
       (it) => `<tr>
@@ -59,16 +63,31 @@ export function saleReceiptHtml(venue: Venue, sale: Sale): string {
       </tr>`,
     )
     .join("");
+  const serviceLines = services
+    .map(
+      (s) => `<tr>
+        <td class="name">${esc(s.name)}<div class="sm muted">${fmtVND(s.amount)}${s.qty > 1 ? ` × ${s.qty}` : ""}</div></td>
+        <td class="qty">${s.qty}</td>
+        <td class="amt">${fmtVND(s.lineTotal)}</td>
+      </tr>`,
+    )
+    .join("");
+  const serviceBlock = services.length
+    ? `<div class="dash"></div><div class="sm muted" style="font-weight:700;margin-bottom:2px">Dịch vụ / Sân</div><table><tbody>${serviceLines}</tbody></table>`
+    : "";
+  const productBlock = items.length
+    ? `${services.length ? `<div class="sm muted" style="font-weight:700;margin:6px 0 2px">Sản phẩm</div>` : ""}<table><tbody>${lines}</tbody></table>`
+    : "";
   const body = `
     <h1>${esc(venue.name || "PickleTour")}</h1>
     ${venue.address ? `<div class="center sm muted">${esc([venue.address, venue.province].filter(Boolean).join(", "))}</div>` : ""}
     ${venue.phone ? `<div class="center sm muted">ĐT: ${esc(venue.phone)}</div>` : ""}
     <div class="dash"></div>
-    <div class="center md" style="font-weight:700">HOÁ ĐƠN BÁN HÀNG</div>
+    <div class="center md" style="font-weight:700">HOÁ ĐƠN THANH TOÁN</div>
     <div class="row sm muted" style="margin-top:4px"><span>Số: ${esc(sale.code || "")}</span><span>${dt(sale.createdAt)}</span></div>
-    ${sale.customerName ? `<div class="sm muted">Khách: ${esc(sale.customerName)}</div>` : ""}
+    ${sale.customerName ? `<div class="sm muted">Khách: ${esc(sale.customerName)}${sale.customerPhone ? ` · ${esc(sale.customerPhone)}` : ""}</div>` : ""}
     <div class="dash"></div>
-    <table><tbody>${lines}</tbody></table>
+    ${productBlock}${serviceBlock}
     <div class="dash"></div>
     <div class="row total"><span>TỔNG CỘNG</span><span>${fmtVND(sale.total || 0)}</span></div>
     <div class="row sm muted" style="margin-top:4px"><span>Thanh toán</span><span>${PAY_LABEL[sale.paymentMethod || "cash"] || "Tiền mặt"}</span></div>

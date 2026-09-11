@@ -34,6 +34,10 @@ export default function ProductsScreen() {
   const [editing, setEditing] = useState<any>(null);
   const [editingSale, setEditingSale] = useState<any>(null);
   const [cart, setCart] = useState<Record<string, number>>({});
+  // Dịch vụ / tiền sân (khách vãng lai) — gộp cùng bill bán hàng.
+  const [services, setServices] = useState<Array<{ id: string; name: string; amount: number; qty: number }>>([]);
+  const [customerName, setCustomerName] = useState("");
+  const [svcModal, setSvcModal] = useState(false);
 
   const removeSale = (s: any) => {
     Alert.alert("Xoá đơn?", `Đơn ${s.code || ""} · ${fmtVND(s.total)} sẽ bị xoá và hoàn tồn kho.`, [
@@ -50,7 +54,15 @@ export default function ProductsScreen() {
 
   const list = (products || []).filter((p: any) => p.active);
   const cartItems = list.filter((p: any) => cart[p._id] > 0);
-  const cartTotal = cartItems.reduce((s: number, p: any) => s + p.price * cart[p._id], 0);
+  const productTotal = cartItems.reduce((s: number, p: any) => s + p.price * cart[p._id], 0);
+  const serviceTotal = services.reduce((s, x) => s + x.amount * x.qty, 0);
+  const cartTotal = productTotal + serviceTotal;
+  const hasAnything = cartItems.length > 0 || services.length > 0;
+
+  const addService = (name: string, amount: number, qty: number) => {
+    setServices((s) => [...s, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, amount, qty }]);
+  };
+  const removeService = (sid: string) => setServices((s) => s.filter((x) => x.id !== sid));
 
   const add = (pid: string) => setCart((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
   const sub = (pid: string) => setCart((c) => { const n = (c[pid] || 0) - 1; const cc = { ...c }; if (n <= 0) delete cc[pid]; else cc[pid] = n; return cc; });
@@ -71,15 +83,23 @@ export default function ProductsScreen() {
 
   const checkout = async (method: "cash" | "transfer") => {
     try {
-      const sale: any = await createSale({ venueId: id, items: cartItems.map((p: any) => ({ productId: p._id, qty: cart[p._id] })), paymentMethod: method }).unwrap();
+      const sale: any = await createSale({
+        venueId: id,
+        items: cartItems.map((p: any) => ({ productId: p._id, qty: cart[p._id] })),
+        serviceItems: services.map((s) => ({ name: s.name, amount: s.amount, qty: s.qty })),
+        customerName: customerName.trim(),
+        paymentMethod: method,
+      }).unwrap();
       setCart({});
-      Alert.alert("Đã bán", `Thu ${fmtVND(sale?.total ?? cartTotal)} (${method === "cash" ? "tiền mặt" : "chuyển khoản"})`, [
+      setServices([]);
+      setCustomerName("");
+      Alert.alert("Đã thu tiền", `Thu ${fmtVND(sale?.total ?? cartTotal)} (${method === "cash" ? "tiền mặt" : "chuyển khoản"})`, [
         { text: "In hoá đơn", onPress: () => printReceipt(sale) },
         { text: "Lưu PDF", onPress: () => sharePdf(saleReceiptHtml(venueInfo, sale), `HoaDon-${sale?.code || ""}`) },
         { text: "Xong", style: "cancel" },
       ]);
     } catch (e: any) {
-      Alert.alert("Lỗi", e?.data?.message || "Bán hàng thất bại");
+      Alert.alert("Lỗi", e?.data?.message || "Thanh toán thất bại");
     }
   };
 
@@ -88,7 +108,7 @@ export default function ProductsScreen() {
       <Stack.Screen options={{ title: "Bán hàng & kho", headerRight: () => (
         <TouchableOpacity onPress={() => setEditing({ new: true })} hitSlop={8}><Ionicons name="add-circle" size={24} color={C.accent} /></TouchableOpacity>
       ) }} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: cartItems.length ? 130 : 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: hasAnything ? 210 : 40 }}>
         {sales ? (
           <View style={[styles.todayBar, { backgroundColor: C.card, borderColor: C.border }]}>
             <View style={{ flex: 1 }}>
@@ -100,6 +120,25 @@ export default function ProductsScreen() {
             </TouchableOpacity>
           </View>
         ) : null}
+
+        {/* Tính tiền khách vãng lai: thêm tiền sân / dịch vụ vào bill */}
+        <TouchableOpacity onPress={() => setSvcModal(true)} style={[styles.svcAddBtn, { borderColor: C.accent, backgroundColor: C.accentSoft }]}>
+          <Ionicons name="add-circle-outline" size={18} color={C.accent} />
+          <Text style={{ color: C.accent, fontWeight: "800" }}>Thêm tiền sân / dịch vụ (khách vãng lai)</Text>
+        </TouchableOpacity>
+        {services.length > 0 && (
+          <View style={{ marginBottom: 12, gap: 6 }}>
+            {services.map((s) => (
+              <View key={s.id} style={[styles.svcRow, { backgroundColor: C.card, borderColor: C.border }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: C.text, fontWeight: "700" }} numberOfLines={1}>{s.name}</Text>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>{fmtVND(s.amount)}{s.qty > 1 ? ` × ${s.qty}` : ""} = {fmtVND(s.amount * s.qty)}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeService(s.id)} style={[styles.miniBtn, { backgroundColor: "rgba(239,68,68,0.12)" }]}><Ionicons name="trash-outline" size={16} color="#ef4444" /></TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
         {isLoading ? <ActivityIndicator color={C.accent} /> : list.length === 0 ? (
           <Text style={{ color: C.sub, textAlign: "center", marginTop: 20 }}>Chưa có sản phẩm. Bấm + để thêm.</Text>
         ) : list.map((p: any) => {
@@ -137,9 +176,14 @@ export default function ProductsScreen() {
             {sales.items.map((s: any) => (
               <View key={s._id} style={[styles.saleRow, { backgroundColor: C.card, borderColor: C.border }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ color: C.text, fontWeight: "700" }} numberOfLines={1}>{s.code} · {fmtVND(s.total)}</Text>
+                  <Text style={{ color: C.text, fontWeight: "700" }} numberOfLines={1}>
+                    {s.code} · {fmtVND(s.total)}{s.customerName ? ` · ${s.customerName}` : ""}
+                  </Text>
                   <Text style={{ color: C.sub, fontSize: 12 }} numberOfLines={1}>
-                    {(s.items || []).reduce((a: number, b: any) => a + b.qty, 0)} món · {s.paymentMethod === "transfer" ? "CK" : "Tiền mặt"} · {new Date(s.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                    {[
+                      (s.items || []).length ? `${(s.items || []).reduce((a: number, b: any) => a + b.qty, 0)} món` : "",
+                      (s.serviceItems || []).length ? `${(s.serviceItems || []).length} dịch vụ` : "",
+                    ].filter(Boolean).join(" · ")} · {s.paymentMethod === "transfer" ? "CK" : "Tiền mặt"} · {new Date(s.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setEditingSale(s)} style={[styles.miniBtn, { backgroundColor: C.field }]}><Ionicons name="create-outline" size={16} color={C.text} /></TouchableOpacity>
@@ -152,20 +196,37 @@ export default function ProductsScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Giỏ bán */}
-      {cartItems.length > 0 && (
+      {/* Giỏ bán / tính tiền */}
+      {hasAnything && (
         <View style={[styles.cart, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>{cartItems.length} món · {fmtVND(cartTotal)}</Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity style={[styles.payBtn, { borderWidth: 1, borderColor: C.border }]} onPress={() => setCart({})}><Text style={{ color: C.sub, fontWeight: "700" }}>Xoá</Text></TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <Text style={{ color: C.text, fontWeight: "800" }} numberOfLines={1}>
+              {cartItems.length > 0 ? `${cartItems.length} món` : ""}
+              {cartItems.length > 0 && services.length > 0 ? " · " : ""}
+              {services.length > 0 ? `${services.length} dịch vụ` : ""}
+              {"  "}<Text style={{ color: C.success }}>{fmtVND(cartTotal)}</Text>
+            </Text>
+            <TouchableOpacity onPress={() => { setCart({}); setServices([]); setCustomerName(""); }}>
+              <Text style={{ color: C.sub, fontWeight: "700", fontSize: 12 }}>Xoá hết</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={[styles.custInput, { backgroundColor: C.field, color: C.text }]}
+            value={customerName}
+            onChangeText={setCustomerName}
+            placeholder="Tên khách vãng lai (tuỳ chọn)"
+            placeholderTextColor={C.sub}
+          />
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
             <TouchableOpacity style={[styles.payBtn, { backgroundColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("cash")}><Text style={{ color: C.onAccent, fontWeight: "800" }}>Thu tiền mặt</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.payBtn, { borderWidth: 1, borderColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("transfer")}><Text style={{ color: C.accent, fontWeight: "800" }}>CK</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.payBtn, { borderWidth: 1, borderColor: C.accent, opacity: selling ? 0.6 : 1 }]} disabled={selling} onPress={() => checkout("transfer")}><Text style={{ color: C.accent, fontWeight: "800" }}>Chuyển khoản</Text></TouchableOpacity>
           </View>
         </View>
       )}
 
       <ProductEditor C={C} venueId={id} editing={editing} onClose={() => setEditing(null)} create={createProduct} update={updateProduct} remove={deleteProduct} creating={creating} />
       <SaleEditor C={C} venueId={id} sale={editingSale} onClose={() => setEditingSale(null)} update={updateSale} />
+      <ServiceModal C={C} visible={svcModal} onClose={() => setSvcModal(false)} onAdd={addService} />
     </View>
   );
 }
@@ -173,6 +234,7 @@ export default function ProductsScreen() {
 // Sửa 1 đơn: chỉnh số lượng từng món (+/- / xoá món), đổi phương thức, ghi chú.
 function SaleEditor({ C, venueId, sale, onClose, update }: any) {
   const [lines, setLines] = useState<any[]>([]);
+  const [svcLines, setSvcLines] = useState<any[]>([]);
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -185,6 +247,12 @@ function SaleEditor({ C, venueId, sale, onClose, update }: any) {
       price: Number(it.price) || 0,
       qty: Number(it.qty) || 1,
     })));
+    setSvcLines((sale.serviceItems || []).map((s: any, i: number) => ({
+      key: `svc-${i}`,
+      name: s.name,
+      amount: Number(s.amount) || 0,
+      qty: Number(s.qty) || 1,
+    })));
     setMethod(sale.paymentMethod === "transfer" ? "transfer" : "cash");
     setNote(sale.note || "");
   }, [sale]);
@@ -195,17 +263,26 @@ function SaleEditor({ C, venueId, sale, onClose, update }: any) {
         .map((l) => (l.productId === pid ? { ...l, qty: l.qty + delta } : l))
         .filter((l) => l.qty > 0),
     );
+  const setSvcQty = (key: string, delta: number) =>
+    setSvcLines((ls) =>
+      ls.map((l) => (l.key === key ? { ...l, qty: l.qty + delta } : l)).filter((l) => l.qty > 0),
+    );
+  const removeSvc = (key: string) => setSvcLines((ls) => ls.filter((l) => l.key !== key));
 
-  const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
+  const total =
+    lines.reduce((s, l) => s + l.price * l.qty, 0) +
+    svcLines.reduce((s, l) => s + l.amount * l.qty, 0);
+  const canSave = lines.length > 0 || svcLines.length > 0;
 
   const onSave = async () => {
-    if (!lines.length) { Alert.alert("Đơn phải có ít nhất 1 món."); return; }
+    if (!canSave) { Alert.alert("Đơn phải có ít nhất 1 món hoặc dịch vụ."); return; }
     setSaving(true);
     try {
       await update({
         venueId,
         saleId: sale._id,
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+        serviceItems: svcLines.map((l) => ({ name: l.name, amount: l.amount, qty: l.qty })),
         paymentMethod: method,
         note,
       }).unwrap();
@@ -237,7 +314,19 @@ function SaleEditor({ C, venueId, sale, onClose, update }: any) {
                 <TouchableOpacity onPress={() => setQty(l.productId, 1)} style={[styles.qtyBtn, { borderColor: C.border }]}><Ionicons name="add" size={16} color={C.text} /></TouchableOpacity>
               </View>
             ))}
-            {!lines.length && <Text style={{ color: C.sub, paddingVertical: 12 }}>Đã xoá hết món — không thể lưu.</Text>}
+            {svcLines.map((l) => (
+              <View key={l.key} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: C.text, fontWeight: "600" }} numberOfLines={1}>{l.name} <Text style={{ color: C.accent, fontSize: 11 }}>· dịch vụ</Text></Text>
+                  <Text style={{ color: C.sub, fontSize: 12 }}>{fmtVND(l.amount)} · {fmtVND(l.amount * l.qty)}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setSvcQty(l.key, -1)} style={[styles.qtyBtn, { borderColor: C.border }]}><Ionicons name="remove" size={16} color={C.text} /></TouchableOpacity>
+                <Text style={{ color: C.text, fontWeight: "800", minWidth: 22, textAlign: "center" }}>{l.qty}</Text>
+                <TouchableOpacity onPress={() => setSvcQty(l.key, 1)} style={[styles.qtyBtn, { borderColor: C.border }]}><Ionicons name="add" size={16} color={C.text} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => removeSvc(l.key)} style={[styles.miniBtn, { backgroundColor: "rgba(239,68,68,0.12)" }]}><Ionicons name="trash-outline" size={15} color="#ef4444" /></TouchableOpacity>
+              </View>
+            ))}
+            {!canSave && <Text style={{ color: C.sub, paddingVertical: 12 }}>Đã xoá hết — không thể lưu.</Text>}
           </ScrollView>
 
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
@@ -252,7 +341,7 @@ function SaleEditor({ C, venueId, sale, onClose, update }: any) {
 
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
             <Text style={{ color: C.text, fontWeight: "800" }}>Tổng: {fmtVND(total)}</Text>
-            <TouchableOpacity onPress={onSave} disabled={saving || !lines.length} style={[styles.mBtn, { flex: 0, paddingHorizontal: 28, backgroundColor: C.accent, opacity: saving || !lines.length ? 0.6 : 1 }]}>
+            <TouchableOpacity onPress={onSave} disabled={saving || !canSave} style={[styles.mBtn, { flex: 0, paddingHorizontal: 28, backgroundColor: C.accent, opacity: saving || !canSave ? 0.6 : 1 }]}>
               <Text style={{ color: C.onAccent, fontWeight: "800" }}>{saving ? "Đang lưu…" : "Lưu"}</Text>
             </TouchableOpacity>
           </View>
@@ -318,8 +407,60 @@ function ProductEditor({ C, venueId, editing, onClose, create, update, remove, c
   );
 }
 
+// Modal thêm dòng dịch vụ / tiền sân cho hoá đơn khách vãng lai.
+function ServiceModal({ C, visible, onClose, onAdd }: any) {
+  const [name, setName] = useState("Tiền sân");
+  const [amount, setAmount] = useState("");
+  const [qty, setQty] = useState("1");
+
+  React.useEffect(() => {
+    if (visible) { setName("Tiền sân"); setAmount(""); setQty("1"); }
+  }, [visible]);
+
+  const PRESETS = ["Tiền sân", "Thuê vợt", "Thuê bóng", "Dịch vụ khác"];
+
+  const submit = () => {
+    const a = Math.max(0, Number(String(amount).replace(/[^\d]/g, "")) || 0);
+    const q = Math.max(1, Number(qty) || 1);
+    if (a <= 0) { Alert.alert("Nhập số tiền dịch vụ (> 0)."); return; }
+    onAdd(String(name || "Dịch vụ").trim(), a, q);
+    onClose();
+  };
+
+  return (
+    <Modal visible={!!visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.modalWrap} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={[styles.modal, { backgroundColor: C.card }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Thêm tiền sân / dịch vụ</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            {PRESETS.map((p) => (
+              <TouchableOpacity key={p} onPress={() => setName(p)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: name === p ? C.accent : C.border }}>
+                <Text style={{ color: name === p ? C.accent : C.sub, fontWeight: "700", fontSize: 12.5 }}>{p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput style={[styles.input, { backgroundColor: C.field, color: C.text }]} value={name} onChangeText={setName} placeholder="Tên dịch vụ" placeholderTextColor={C.sub} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 2 }]} value={amount} onChangeText={setAmount} placeholder="Số tiền (đ)" placeholderTextColor={C.sub} keyboardType="numeric" />
+            <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={qty} onChangeText={setQty} placeholder="SL/giờ" placeholderTextColor={C.sub} keyboardType="numeric" />
+          </View>
+          <TouchableOpacity onPress={submit} style={[styles.mBtn, { backgroundColor: C.accent, marginTop: 4 }]}>
+            <Text style={{ color: C.onAccent, fontWeight: "800" }}>Thêm vào bill</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   todayBar: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12, marginBottom: 12 },
+  svcAddBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 14, paddingVertical: 12, marginBottom: 12 },
+  svcRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 10 },
+  custInput: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14 },
   reportBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   saleRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, padding: 12, marginBottom: 8 },
   miniBtn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
