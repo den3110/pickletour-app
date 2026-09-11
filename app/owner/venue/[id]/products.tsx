@@ -447,8 +447,8 @@ function ServiceModal({ C, visible, onClose, onAdd }: any) {
             <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 2 }]} value={amount} onChangeText={setAmount} placeholder="Số tiền (đ)" placeholderTextColor={C.sub} keyboardType="numeric" />
             <PtInput style={[styles.input, { backgroundColor: C.field, color: C.text, flex: 1 }]} value={qty} onChangeText={setQty} placeholder="SL/giờ" placeholderTextColor={C.sub} keyboardType="numeric" />
           </View>
-          <TouchableOpacity onPress={submit} style={[styles.mBtn, { backgroundColor: C.accent, marginTop: 4 }]}>
-            <Text style={{ color: C.onAccent, fontWeight: "800" }}>Thêm vào bill</Text>
+          <TouchableOpacity onPress={submit} style={{ paddingVertical: 15, borderRadius: 14, alignItems: "center", backgroundColor: C.accent, marginTop: 6 }}>
+            <Text style={{ color: C.onAccent, fontWeight: "800", fontSize: 15 }}>Thêm vào bill</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
