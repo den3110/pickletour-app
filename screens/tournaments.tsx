@@ -484,7 +484,11 @@ export default function TournamentDashboardScreen({ isBack = false }) {
         <TournamentInfo
           date={`${formatDate(tt.startDate)}\n– ${formatDate(tt.endDate)}`}
           location={tt.location || "Chưa cập nhật"}
-          registration={`${tt.registered}/${tt.maxPairs}`}
+          registration={
+            Number(tt.maxPairs) > 0
+              ? `${tt.registered ?? 0}/${tt.maxPairs}`
+              : `${tt.registered ?? 0}`
+          }
         />
         <TournamentActions actions={actions} />
         <ZaloButton

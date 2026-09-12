@@ -1238,7 +1238,11 @@ const TournamentCard = React.memo(function TournamentCard({
                 }}
               />
               <Text style={[styles.registrationText, { color: subtext }]}>
-                {tournament.registered}/{tournament.maxPairs} vận động viên
+                {tournament.registered ?? 0}
+                {Number(tournament.maxPairs) > 0
+                  ? `/${tournament.maxPairs}`
+                  : ""}{" "}
+                {tournament.tournamentMode === "mlp" ? "đội" : "vận động viên"}
               </Text>
             </View>
           </View>
