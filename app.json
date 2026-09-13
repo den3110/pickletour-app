@@ -4,7 +4,7 @@
     "slug": "pickletour-app",
     "version": "1.1.15",
     "orientation": "default",
-    "icon": "./assets/images/icon-circle.png",
+    "icon": "./assets/images/icon-v3.png",
     "scheme": "pickletourapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -51,8 +51,8 @@
     "android": {
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon-circle.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon-v3.png",
+        "backgroundColor": "#0a1834"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
