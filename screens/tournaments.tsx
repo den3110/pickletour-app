@@ -480,6 +480,11 @@ export default function TournamentDashboardScreen({ isBack = false }) {
           status={tt.status}
           mode={(tt as any)?.tournamentMode}
           onPress={() => onPressCard(tt)}
+          onPressImage={() => {
+            const uri = normalizeUrl(tt.image);
+            if (uri) setPreview(uri);
+            else onPressCard(tt);
+          }}
         />
         <TournamentInfo
           date={`${formatDate(tt.startDate)}\n– ${formatDate(tt.endDate)}`}

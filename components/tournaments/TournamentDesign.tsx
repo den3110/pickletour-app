@@ -331,17 +331,22 @@ export const TournamentCover = memo(function TournamentCover({
   status,
   mode,
   onPress,
+  onPressImage,
 }: {
   image?: string | null;
   title: string;
   status?: string;
   mode?: string;
   onPress: () => void;
+  // Bấm vào ẢNH poster → mở fullscreen viewer (nếu có).
+  // Bấm vào TITLE hoặc vùng khác vẫn đi vào chi tiết qua onPress.
+  onPressImage?: () => void;
 }) {
   const normalizedMode = String(mode || "").toLowerCase();
+  const imagePress = onPressImage || onPress;
   return (
     <>
-      <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.coverPressed}>
+      <Pressable onPress={imagePress} style={({ pressed }) => pressed && styles.coverPressed}>
         <View style={styles.cover}>
           <ExpoImage
             source={{ uri: normalizeUrl(image) || "https://dummyimage.com/1200x675/081b33/8faac8&text=Pickletour" }}
