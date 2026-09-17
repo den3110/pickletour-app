@@ -125,24 +125,27 @@ export default function MlpDualDetailScreen() {
     return side === "A" ? isCaptainA : isCaptainB;
   };
 
+  // MLP DreamBreaker: rotate theo TỔNG điểm A+B — cả 2 đội cùng xoay.
   const currentPlayerAId = useMemo(() => {
     const db = d?.dreamBreaker;
     const lineup = Array.isArray(db?.lineupA) ? db.lineupA : [];
     if (!lineup.length) return null;
-    const idx =
-      Math.floor(Math.max(0, Number(db?.scoreA || 0)) / Math.max(1, dbRotate)) %
-      lineup.length;
+    const combined =
+      Math.max(0, Number(db?.scoreA || 0)) +
+      Math.max(0, Number(db?.scoreB || 0));
+    const idx = Math.floor(combined / Math.max(1, dbRotate)) % lineup.length;
     return lineup[idx];
-  }, [d?.dreamBreaker?.scoreA, d?.dreamBreaker?.lineupA, dbRotate]);
+  }, [d?.dreamBreaker?.scoreA, d?.dreamBreaker?.scoreB, d?.dreamBreaker?.lineupA, dbRotate]);
   const currentPlayerBId = useMemo(() => {
     const db = d?.dreamBreaker;
     const lineup = Array.isArray(db?.lineupB) ? db.lineupB : [];
     if (!lineup.length) return null;
-    const idx =
-      Math.floor(Math.max(0, Number(db?.scoreB || 0)) / Math.max(1, dbRotate)) %
-      lineup.length;
+    const combined =
+      Math.max(0, Number(db?.scoreA || 0)) +
+      Math.max(0, Number(db?.scoreB || 0));
+    const idx = Math.floor(combined / Math.max(1, dbRotate)) % lineup.length;
     return lineup[idx];
-  }, [d?.dreamBreaker?.scoreB, d?.dreamBreaker?.lineupB, dbRotate]);
+  }, [d?.dreamBreaker?.scoreA, d?.dreamBreaker?.scoreB, d?.dreamBreaker?.lineupB, dbRotate]);
 
   if (isLoading || !dual) {
     return (
@@ -271,14 +274,14 @@ export default function MlpDualDetailScreen() {
                 <CurrentPlayerCard
                   label={d.teamA?.name || "Team A"}
                   player={currentPlayerA}
-                  currentScore={d.dreamBreaker.scoreA}
+                  currentScore={(d.dreamBreaker.scoreA || 0) + (d.dreamBreaker.scoreB || 0)}
                   rotate={dbRotate}
                   lineupSize={d.dreamBreaker.lineupA?.length || 0}
                 />
                 <CurrentPlayerCard
                   label={d.teamB?.name || "Team B"}
                   player={currentPlayerB}
-                  currentScore={d.dreamBreaker.scoreB}
+                  currentScore={(d.dreamBreaker.scoreA || 0) + (d.dreamBreaker.scoreB || 0)}
                   rotate={dbRotate}
                   lineupSize={d.dreamBreaker.lineupB?.length || 0}
                 />
