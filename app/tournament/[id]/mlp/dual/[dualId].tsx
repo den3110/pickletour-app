@@ -35,8 +35,6 @@ import {
 } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
-import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 export default function MlpDualDetailScreen() {
   const C = useThemeTokens();
@@ -87,12 +85,15 @@ export default function MlpDualDetailScreen() {
   const dbRotate = Number(dbCfg.rotationEveryPoints) || 4;
 
   const [dbStartOpen, setDbStartOpen] = useState(false);
-  const [viewer, setViewer] = useState<{open: boolean; matchId: string | null}>({
-    open: false,
-    matchId: null,
-  });
   const openMatchViewer = (mid: string | null | undefined) => {
-    if (mid) setViewer({ open: true, matchId: String(mid) });
+    if (!mid) return;
+    // Điều hướng vào giao diện chấm điểm chuẩn (RefereeScorePanel).
+    // ResponsiveMatchViewer chỉ là modal view-only nên bị readonly khi
+    // user không nằm trong match.referees.
+    router.push({
+      pathname: "/match/[id]/referee",
+      params: { id: String(mid) },
+    });
   };
   const [lineupTarget, setLineupTarget] = useState<{
     sub: any;
@@ -181,7 +182,6 @@ export default function MlpDualDetailScreen() {
   };
 
   return (
-    <BottomSheetModalProvider>
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title: t("MLP · Chi tiết dual") }} />
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
@@ -406,13 +406,7 @@ export default function MlpDualDetailScreen() {
         }}
       />
     
-      <ResponsiveMatchViewer
-        open={viewer.open}
-        matchId={viewer.matchId}
-        onClose={() => setViewer({ open: false, matchId: null })}
-      />
     </SafeAreaView>
-    </BottomSheetModalProvider>
   );
 }
 
