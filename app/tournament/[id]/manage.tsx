@@ -1779,6 +1779,9 @@ export default function ManageScreen() {
     refetchOnReconnect: true,
   });
 
+  const isMlpTour =
+    String((tour as any)?.tournamentMode || "").toLowerCase() === "mlp";
+
   const {
     data: bracketsData = [],
     isLoading: brLoading,
@@ -3717,9 +3720,56 @@ ${html.replace(/<html>|<\/html>|<head>.*?<\/head>|<!doctype[^>]*>/gis, "")}
                   dark={dark}
                   tintColor={manageAccentTint(t.infoText, dark, 0.18)}
                 />
-                <Text style={{ color: t.infoText }}>
-                  Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
-                </Text>
+                {isMlpTour ? (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ color: t.infoText, fontWeight: "700" }}>
+                      Giải MLP không dùng "bracket" thường.
+                    </Text>
+                    <Text style={{ color: t.infoText, fontSize: 12 }}>
+                      Trận đấu MLP nằm trong các "dual match" theo vòng bảng /
+                      knockout. Bấm bên dưới để mở danh sách dual và chấm điểm.
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                      <Pressable
+                        onPress={() =>
+                          router.push(`/tournament/${tid}/mlp/duals` as any)
+                        }
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 10,
+                          backgroundColor: colors.primary,
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontWeight: "800" }}>
+                          Chấm trận MLP · Duals
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          router.push(
+                            `/tournament/${tid}/mlp/standings` as any,
+                          )
+                        }
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: colors.primary,
+                        }}
+                      >
+                        <Text style={{ color: colors.primary, fontWeight: "800" }}>
+                          Xem BXH MLP
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={{ color: t.infoText }}>
+                    Chưa có bracket thuộc loại {TYPE_LABEL(tab)}.
+                  </Text>
+                )}
               </View>
             }
             extraData={`${liveBump}|${selBump}|${courtFilter}|${showBye}`}
