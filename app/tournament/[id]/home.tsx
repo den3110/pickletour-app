@@ -32,6 +32,7 @@ import {
   useAdminGetBracketsQuery,
   useAdminListMatchesByTournamentQuery,
 } from "@/slices/tournamentsApiSlice";
+import { useListMlpDualsQuery } from "@/slices/mlpApiSlice";
 import {
   getPairDisplayName,
   getPlayerDisplayName,
@@ -153,6 +154,12 @@ export default function OverviewScreen() {
     isLoading: brLoading,
     error: brErr,
   } = useAdminGetBracketsQuery(id);
+
+  const isMlpTour = String((t as any)?.tournamentMode || "").toLowerCase() === "mlp";
+  const { data: mlpDualsResp } = useListMlpDualsQuery(
+    { tourId: id },
+    { skip: !isMlpTour || !id },
+  );
   const {
     data: matchPage,
     isLoading: mLoading,
@@ -225,6 +232,49 @@ export default function OverviewScreen() {
 
   // 4) Bracket progress
   const bracketProgress = useMemo(() => {
+    // MLP: dựng progress theo pool + knockout (dùng mlpDualMatches)
+    if (isMlpTour) {
+      const items = Array.isArray((mlpDualsResp as any)?.items)
+        ? (mlpDualsResp as any).items
+        : [];
+      const byKey: Record<string, any> = {};
+      let koTotal = 0;
+      let koFinished = 0;
+      for (const d of items) {
+        if (d?.phase === "group" && d?.poolKey) {
+          const k = "pool-" + String(d.poolKey);
+          if (!byKey[k]) {
+            byKey[k] = {
+              _id: k,
+              name: "Bảng " + String(d.poolKey),
+              type: "round_robin",
+              stage: 0,
+              total: 0,
+              finished: 0,
+            };
+          }
+          byKey[k].total += 1;
+          if (d?.status === "finished") byKey[k].finished += 1;
+        } else if (d?.phase === "knockout") {
+          koTotal += 1;
+          if (d?.status === "finished") koFinished += 1;
+        }
+      }
+      const out = Object.values(byKey).sort((a: any, b: any) =>
+        String(a.name).localeCompare(String(b.name)),
+      );
+      if (koTotal > 0) {
+        out.push({
+          _id: "ko",
+          name: "Vòng knockout",
+          type: "knockout",
+          stage: 1,
+          total: koTotal,
+          finished: koFinished,
+        });
+      }
+      return out;
+    }
     const byId = new Map();
     (brackets || []).forEach((b) =>
       byId.set(String(b._id), {
@@ -248,7 +298,7 @@ export default function OverviewScreen() {
         return (a.stage ?? 0) - (b.stage ?? 0);
       return (TYPE_LABEL(a.type) || "").localeCompare(TYPE_LABEL(b.type) || "");
     });
-  }, [brackets, allMatches]);
+  }, [isMlpTour, mlpDualsResp, brackets, allMatches]);
 
   // 5) Upcoming / Recent
   const now = Date.now();
@@ -802,7 +852,10 @@ export default function OverviewScreen() {
               Tiến độ các bracket
             </Text>
             <Spacer />
-            <Chip outlined label={`${brackets.length} bracket`} />
+            <Chip
+              outlined
+              label={`${isMlpTour ? bracketProgress.length : (brackets?.length || 0)} bracket`}
+            />
           </HStack>
           {bracketProgress.length === 0 ? (
             <View

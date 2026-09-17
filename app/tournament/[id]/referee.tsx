@@ -738,21 +738,34 @@ export default function RefereeCenterScreen() {
     { tourId: id },
     { skip: !isMlpTour || !id, refetchOnFocus: true },
   );
+  // Admin/manager của giải sẽ được thấy TẤT CẢ MLP duals đang DreamBreaker/tie_break
+  // (không chỉ những dual mình là trọng tài) — để chấm/hỗ trợ khi cần.
+  const isAdminOfTour = useMemo(() => {
+    if (!me) return false;
+    if (me?.role === "admin" || me?.isAdmin || me?.isSuperUser) return true;
+    if (!tour) return false;
+    const myId = String(me?._id || "");
+    if (String(tour.createdBy?._id ?? tour.createdBy) === myId) return true;
+    const mgrs = Array.isArray(tour.managers) ? tour.managers : [];
+    return mgrs.some(
+      (m: any) => String(m?.user?._id ?? m?.user ?? m) === myId,
+    );
+  }, [me, tour]);
+
   const mlpDbDuals = useMemo(() => {
     if (!isMlpTour) return [];
     const items = Array.isArray(mlpDualsResp?.items) ? mlpDualsResp.items : [];
     const myId = String(me?._id || "");
     return items.filter((dl: any) => {
-      // Chỉ hiện dual đang tie_break (chờ DreamBreaker start) hoặc đã
-      // trigger DreamBreaker chưa xong.
       const inDb =
         dl?.status === "tie_break" ||
         (dl?.dreamBreaker?.triggered && !dl?.dreamBreaker?.winner);
       if (!inDb) return false;
+      // Admin/manager → thấy tất cả
+      if (isAdminOfTour) return true;
       // Trọng tài của dual → có quyền chấm.
       const dualRefs = Array.isArray(dl?.referees) ? dl.referees : [];
       if (dualRefs.some((r: any) => String(r?._id ?? r) === myId)) return true;
-      // Trọng tài của bất kỳ sub-match nào.
       const subs = Array.isArray(dl?.subMatches) ? dl.subMatches : [];
       if (
         subs.some((s: any) => {
@@ -761,13 +774,11 @@ export default function RefereeCenterScreen() {
         })
       )
         return true;
-      // Fallback "trọng tài theo sân": nếu station.defaultReferees có mình.
       const stationRefs = Array.isArray(dl?.courtStation?.defaultReferees)
         ? dl.courtStation.defaultReferees
         : [];
       if (stationRefs.some((r: any) => String(r?._id ?? r) === myId))
         return true;
-      // Sub-station.defaultReferees
       return subs.some((s: any) => {
         const sSt = Array.isArray(s?.courtStation?.defaultReferees)
           ? s.courtStation.defaultReferees
@@ -775,7 +786,7 @@ export default function RefereeCenterScreen() {
         return sSt.some((r: any) => String(r?._id ?? r) === myId);
       });
     });
-  }, [mlpDualsResp?.items, isMlpTour, me?._id]);
+  }, [mlpDualsResp?.items, isMlpTour, me?._id, isAdminOfTour]);
 
   const [tab, setTab] = useState(TAB_ALL);
   const [q, setQ] = useState("");

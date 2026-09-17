@@ -40,6 +40,7 @@ import {
   useListTournamentBracketsQuery,
   useGetRegistrationsQuery,
 } from "@/slices/tournamentsApiSlice";
+import { useListMlpDualsQuery } from "@/slices/mlpApiSlice";
 import {
   useListMySubscriptionsQuery,
   useSubscribeTopicMutation,
@@ -451,6 +452,13 @@ export default function TournamentOverviewScreen() {
     refetchOnReconnect: false,
   });
 
+  const isMlpTour =
+    String((tournament as any)?.tournamentMode || "").toLowerCase() === "mlp";
+  const { data: mlpDualsResp } = useListMlpDualsQuery(
+    { tourId: id },
+    { skip: !isMlpTour || !id },
+  );
+
   const {
     data: regs = [],
     error: rError,
@@ -526,7 +534,7 @@ export default function TournamentOverviewScreen() {
       courtsLive,
       regTotal,
       paidCount,
-      bracketCount: Array.isArray(brackets) ? brackets.length : 0,
+      bracketCount: bracketsCount,
       donePct,
     };
   }, [allSorted, regs, brackets]);
@@ -540,14 +548,41 @@ export default function TournamentOverviewScreen() {
     [allSorted]
   );
 
+  // MLP không dùng collection `brackets` — dựng "virtual brackets" từ pools + knockout
+  const mlpBrackets = useMemo(() => {
+    if (!isMlpTour) return [];
+    const items = Array.isArray((mlpDualsResp as any)?.items)
+      ? (mlpDualsResp as any).items
+      : [];
+    const pools = new Set<string>();
+    let hasKo = false;
+    for (const d of items) {
+      if (d?.phase === "group" && d?.poolKey) pools.add(String(d.poolKey));
+      if (d?.phase === "knockout") hasKo = true;
+    }
+    const out = Array.from(pools)
+      .sort()
+      .map((k, i) => ({ id: `pool-${k}`, name: `Bảng ${k}`, order: i }));
+    if (hasKo) out.push({ id: "ko", name: "Vòng knockout", order: 100 });
+    return out;
+  }, [isMlpTour, mlpDualsResp]);
+
   const bracketQuick = useMemo(() => {
+    if (isMlpTour) return mlpBrackets.slice(0, 8);
     const list = Array.isArray(brackets) ? brackets : [];
     return list.slice(0, 8).map((b) => ({
       id: String(b?._id || ""),
       name: b?.name || "Bracket",
       order: b?.order ?? 9999,
     }));
-  }, [brackets]);
+  }, [isMlpTour, mlpBrackets, brackets]);
+
+  // Tổng số bracket (dùng cho badge "N bracket")
+  const bracketsCount = isMlpTour
+    ? mlpBrackets.length
+    : Array.isArray(brackets)
+      ? brackets.length
+      : 0;
 
   const errorMsg =
     (tError && (tError.data?.message || tError.error)) ||
@@ -1236,8 +1271,7 @@ export default function TournamentOverviewScreen() {
                           </Text>
                         </View>
                       ))}
-                      {Array.isArray(brackets) &&
-                      brackets.length > bracketQuick.length ? (
+                      {bracketsCount > bracketQuick.length ? (
                         <Text style={{ color: T.sub, marginTop: 6 }}>
                           +{brackets.length - bracketQuick.length} bracket nữa…
                         </Text>
