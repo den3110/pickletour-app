@@ -35,6 +35,8 @@ import {
 } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
+import ResponsiveMatchViewer from "@/components/match/ResponsiveMatchViewer";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 export default function MlpDualDetailScreen() {
   const C = useThemeTokens();
@@ -85,6 +87,13 @@ export default function MlpDualDetailScreen() {
   const dbRotate = Number(dbCfg.rotationEveryPoints) || 4;
 
   const [dbStartOpen, setDbStartOpen] = useState(false);
+  const [viewer, setViewer] = useState<{open: boolean; matchId: string | null}>({
+    open: false,
+    matchId: null,
+  });
+  const openMatchViewer = (mid: string | null | undefined) => {
+    if (mid) setViewer({ open: true, matchId: String(mid) });
+  };
   const [lineupTarget, setLineupTarget] = useState<{
     sub: any;
     side: "A" | "B";
@@ -172,6 +181,7 @@ export default function MlpDualDetailScreen() {
   };
 
   return (
+    <BottomSheetModalProvider>
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title: t("MLP · Chi tiết dual") }} />
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
@@ -224,6 +234,7 @@ export default function MlpDualDetailScreen() {
             teamA={d.teamA}
             teamB={d.teamB}
             onOpenLineup={(side) => setLineupTarget({ sub, side })}
+            onOpenRefereeUI={(mid) => openMatchViewer(mid)}
             onSync={async (scoreA, scoreB, status) => {
               try {
                 await syncSub({
@@ -394,7 +405,14 @@ export default function MlpDualDetailScreen() {
           }
         }}
       />
+    
+      <ResponsiveMatchViewer
+        open={viewer.open}
+        matchId={viewer.matchId}
+        onClose={() => setViewer({ open: false, matchId: null })}
+      />
     </SafeAreaView>
+    </BottomSheetModalProvider>
   );
 }
 
@@ -887,6 +905,7 @@ function SubMatchCard({
   onOpenLineup,
   teamA,
   teamB,
+  onOpenRefereeUI,
 }: {
   sub: any;
   slot: any;
@@ -897,6 +916,7 @@ function SubMatchCard({
   teamA: any;
   teamB: any;
   onOpenLineup: (side: "A" | "B") => void;
+  onOpenRefereeUI?: (matchId: string | null) => void;
 }) {
   const C = useThemeTokens();
   const styles = useMemo(() => mk_styles(C), [C]);
@@ -929,6 +949,16 @@ function SubMatchCard({
             {slot.label} · {slot.matchType} · {slot.genderRule}
           </Text>
         )}
+        {canManage && sub?.match && onOpenRefereeUI ? (
+          <Pressable
+            onPress={() => onOpenRefereeUI(String(sub.match))}
+            style={styles.subRefereeBtn}
+            hitSlop={8}
+          >
+            <Ionicons name="game-controller" size={12} color="#fff" />
+            <Text style={styles.subRefereeBtnText}>Chấm trọng tài</Text>
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.subPlayers}>
         <View style={{ flex: 1 }}>
@@ -1120,6 +1150,16 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     borderColor: C.border,
   },
   subHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  subRefereeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#0066FF",
+  },
+  subRefereeBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   subKey: {
     fontSize: 14,
     fontWeight: "800",
