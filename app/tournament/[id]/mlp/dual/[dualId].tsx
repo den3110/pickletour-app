@@ -949,17 +949,19 @@ function SubMatchCard({
             {slot.label} · {slot.matchType} · {slot.genderRule}
           </Text>
         )}
-        {canManage && sub?.match && onOpenRefereeUI ? (
-          <Pressable
-            onPress={() => onOpenRefereeUI(String(sub.match))}
-            style={styles.subRefereeBtn}
-            hitSlop={8}
-          >
-            <Ionicons name="game-controller" size={12} color="#fff" />
-            <Text style={styles.subRefereeBtnText}>Chấm trọng tài</Text>
-          </Pressable>
-        ) : null}
       </View>
+      {canManage && sub?.match && onOpenRefereeUI ? (
+        <Pressable
+          onPress={() => onOpenRefereeUI(String(sub.match))}
+          style={styles.subRefereeBtnBig}
+        >
+          <Ionicons name="game-controller" size={16} color="#fff" />
+          <Text style={styles.subRefereeBtnBigText}>
+            Mở giao diện trọng tài (chấm điểm chi tiết)
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#fff" />
+        </Pressable>
+      ) : null}
       <View style={styles.subPlayers}>
         <View style={{ flex: 1 }}>
           <Text style={styles.subTeamName} numberOfLines={1}>
@@ -1160,6 +1162,18 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
     backgroundColor: "#0066FF",
   },
   subRefereeBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  subRefereeBtnBig: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#0066FF",
+    marginBottom: 8,
+  },
+  subRefereeBtnBigText: { color: "#fff", fontSize: 13, fontWeight: "800", flex: 1, textAlign: "center" },
   subKey: {
     fontSize: 14,
     fontWeight: "800",
