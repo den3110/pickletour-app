@@ -91,6 +91,8 @@ export default function MlpTeamsScreen() {
   const cfg: any = (tour as any)?.mlpConfig || {};
   const minRoster = Number(cfg.minRosterSize) || 4;
   const maxRoster = Number(cfg.maxRosterSize) || 8;
+  const minMale = Math.max(0, Number(cfg.minMalePlayers) || 0);
+  const minFemale = Math.max(0, Number(cfg.minFemalePlayers) || 0);
   const maxTeamScore =
     Number(cfg.maxTeamScore) > 0 ? Number(cfg.maxTeamScore) : null;
 
@@ -364,6 +366,8 @@ export default function MlpTeamsScreen() {
         minRoster={minRoster}
         maxRoster={maxRoster}
         maxTeamScore={maxTeamScore}
+        minMale={minMale}
+        minFemale={minFemale}
         onSaved={() => {
           setCreateOpen(false);
           refetch();
@@ -400,6 +404,8 @@ function TeamFormModal({
   minRoster,
   maxRoster,
   maxTeamScore,
+  minMale = 0,
+  minFemale = 0,
   onSaved,
   canEdit = true,
 }: {
@@ -410,6 +416,8 @@ function TeamFormModal({
   minRoster: number;
   maxRoster: number;
   maxTeamScore: number | null;
+  minMale?: number;
+  minFemale?: number;
   onSaved: () => void;
   canEdit?: boolean;
 }) {
@@ -495,11 +503,29 @@ function TeamFormModal({
   const overCap =
     maxTeamScore != null && totalDouble > maxTeamScore;
 
+  const genderCounts = useMemo(() => {
+    let male = 0;
+    let female = 0;
+    for (const p of players) {
+      const g = String((p as any)?.gender || "").toLowerCase();
+      if (g === "male" || g === "m" || g === "nam") male += 1;
+      else if (g === "female" || g === "f" || g === "nu" || g === "nữ") female += 1;
+    }
+    return { male, female };
+  }, [players]);
+  const genderShort = {
+    male: Math.max(0, minMale - genderCounts.male),
+    female: Math.max(0, minFemale - genderCounts.female),
+  };
+  const genderOk =
+    genderCounts.male >= minMale && genderCounts.female >= minFemale;
+
   const canSubmit =
     !!name.trim() &&
     players.length >= minRoster &&
     players.length <= maxRoster &&
-    !overCap;
+    !overCap &&
+    genderOk;
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -509,6 +535,15 @@ function TeamFormModal({
           "Chưa đủ",
           `Roster cần ít nhất ${minRoster} VĐV`,
         );
+      if (!genderOk) {
+        const parts: string[] = [];
+        if (genderShort.male > 0) parts.push(`${genderShort.male} nam`);
+        if (genderShort.female > 0) parts.push(`${genderShort.female} nữ`);
+        return Alert.alert(
+          "Thiếu giới tính",
+          `Cần thêm ${parts.join(", ")} (Nam ${genderCounts.male}/${minMale} · Nữ ${genderCounts.female}/${minFemale}).`,
+        );
+      }
       if (overCap)
         return Alert.alert(
           "Vượt giới hạn",
