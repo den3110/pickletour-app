@@ -35,6 +35,7 @@ import {
 } from "@/slices/mlpApiSlice";
 import { useSocket } from "@/context/SocketContext";
 import { useThemeTokens, type ThemeTokens } from "@/hooks/useThemeTokens";
+import { buildRefereeMatchRoute } from "@/utils/refereeMatchRoute";
 
 export default function MlpDualDetailScreen() {
   const C = useThemeTokens();
@@ -85,7 +86,50 @@ export default function MlpDualDetailScreen() {
   const dbRotate = Number(dbCfg.rotationEveryPoints) || 4;
 
   const [dbStartOpen, setDbStartOpen] = useState(false);
-
+  const openMatchViewer = (sub: any) => {
+    const mid = sub?.match ? String(sub.match) : null;
+    if (!mid) return;
+    // Build match-like snapshot từ sub-match + dual + tournament để
+    // buildRefereeMatchRoute có đủ pairA/pairB/tournament — RefereeScorePanel
+    // không crash khi Match doc chưa được populate participants/tournament.
+    const teamA = d?.teamA || {};
+    const teamB = d?.teamB || {};
+    const labelPlayers = (arr: any[]) =>
+      (Array.isArray(arr) ? arr : [])
+        .map((p) => p?.nickname || p?.name || "VĐV")
+        .join(" / ");
+    const slotObj = (cfg.slots || []).find((sl: any) => sl.key === sub.slotKey);
+    const snap = {
+      _id: mid,
+      id: mid,
+      matchId: mid,
+      status: sub?.result?.status || "scheduled",
+      tournament: {
+        _id: String(tour?._id || d?.tournament || ""),
+        eventType: slotObj?.matchType || "double",
+        nameDisplayMode: (tour as any)?.nameDisplayMode || "nickname",
+      },
+      pairA: {
+        _id: "mlp-sideA",
+        teamName: teamA?.name || "Team A",
+        name: teamA?.name || "Team A",
+        displayName: `${teamA?.name || "Team A"} · ${labelPlayers(sub.playersA)}`,
+        player1: sub?.playersA?.[0] || null,
+        player2: sub?.playersA?.[1] || null,
+        players: sub?.playersA || [],
+      },
+      pairB: {
+        _id: "mlp-sideB",
+        teamName: teamB?.name || "Team B",
+        name: teamB?.name || "Team B",
+        displayName: `${teamB?.name || "Team B"} · ${labelPlayers(sub.playersB)}`,
+        player1: sub?.playersB?.[0] || null,
+        player2: sub?.playersB?.[1] || null,
+        players: sub?.playersB || [],
+      },
+    };
+    router.push(buildRefereeMatchRoute(snap));
+  };
   const [lineupTarget, setLineupTarget] = useState<{
     sub: any;
     side: "A" | "B";
@@ -225,6 +269,7 @@ export default function MlpDualDetailScreen() {
             teamA={d.teamA}
             teamB={d.teamB}
             onOpenLineup={(side) => setLineupTarget({ sub, side })}
+            onOpenRefereeUI={() => openMatchViewer(sub)}
             onSync={async (scoreA, scoreB, status) => {
               try {
                 await syncSub({
@@ -889,6 +934,7 @@ function SubMatchCard({
   onOpenLineup,
   teamA,
   teamB,
+  onOpenRefereeUI,
 }: {
   sub: any;
   slot: any;
@@ -899,6 +945,7 @@ function SubMatchCard({
   teamA: any;
   teamB: any;
   onOpenLineup: (side: "A" | "B") => void;
+  onOpenRefereeUI?: () => void;
 }) {
   const C = useThemeTokens();
   const styles = useMemo(() => mk_styles(C), [C]);
@@ -932,13 +979,18 @@ function SubMatchCard({
           </Text>
         )}
       </View>
-      {/*
-        Nút "Mở giao diện trọng tài" tạm gỡ do RefereeScorePanel bị crash
-        khi khởi tạo từ dữ liệu MLP sub-match (thiếu populate tournament +
-        participants). Sẽ được bật lại khi backend ensureMlpSubMatchDoc
-        cung cấp đầy đủ snapshot cho RefereeScorePanel.
-        Trong lúc chờ, admin/manager dùng form nhập điểm + status ngay bên dưới.
-      */}
+      {canManage && sub?.match && onOpenRefereeUI ? (
+        <Pressable
+          onPress={() => onOpenRefereeUI && onOpenRefereeUI()}
+          style={styles.subRefereeBtnBig}
+        >
+          <Ionicons name="game-controller" size={16} color="#fff" />
+          <Text style={styles.subRefereeBtnBigText}>
+            Mở giao diện trọng tài (chấm điểm chi tiết)
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#fff" />
+        </Pressable>
+      ) : null}
       <View style={styles.subPlayers}>
         <View style={{ flex: 1 }}>
           <Text style={styles.subTeamName} numberOfLines={1}>
