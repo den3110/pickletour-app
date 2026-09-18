@@ -163,6 +163,27 @@ export const mlpApiSlice = apiSlice.injectEndpoints({
       ],
     }),
 
+    patchMlpTeamPool: builder.mutation({
+      query: ({ tourId, teamId, ...body }: any) => ({
+        url: `/api/mlp/tournaments/${tourId}/teams/${teamId}/pool`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (r, e, { tourId }) => [
+        { type: "MlpTeam" as any, id: tourId },
+        { type: "MlpDual" as any, id: tourId },
+        { type: "MlpPools" as any, id: tourId },
+      ],
+    }),
+    generateMlpDuals: builder.mutation({
+      query: (tid: string) => ({
+        url: `/api/mlp/tournaments/${tid}/duals/generate`,
+        method: "POST",
+      }),
+      invalidatesTags: (r, e, tid) => [
+        { type: "MlpDual" as any, id: tid },
+      ],
+    }),
     /* ── Group stage pools (readonly cho mobile) ── */
     listMlpPools: builder.query({
       query: (tid: string) => ({
@@ -189,4 +210,6 @@ export const {
   useUndoMlpDbPointMutation,
   useCheckInMlpDualMutation,
   useListMlpPoolsQuery,
+  usePatchMlpTeamPoolMutation,
+  useGenerateMlpDualsMutation,
 } = mlpApiSlice;

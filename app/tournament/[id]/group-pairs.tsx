@@ -15,9 +15,15 @@ import { useTheme } from "@react-navigation/native";
 import {
   useAdminGetBracketsQuery,
   useGetRegistrationsQuery,
+  useGetTournamentQuery,
   useAddPairToGroupMutation,
   useMovePairBetweenGroupsMutation,
 } from "@/slices/tournamentsApiSlice";
+import {
+  useListMlpTeamsQuery,
+  usePatchMlpTeamPoolMutation,
+  useGenerateMlpDualsMutation,
+} from "@/slices/mlpApiSlice";
 
 const nameOf = (p: any) =>
   (p?.nickName && String(p.nickName).trim()) ||
@@ -36,8 +42,11 @@ export default function GroupPairsMobile() {
   const theme: any = useTheme();
   const C = theme.colors;
 
+  const { data: tournament } = useGetTournamentQuery(id, { skip: !id });
+  const isMlpTour =
+    String((tournament as any)?.tournamentMode || "").toLowerCase() === "mlp";
   const { data: brackets = [], refetch } = useAdminGetBracketsQuery(id, {
-    skip: !id,
+    skip: !id || isMlpTour,
   });
   const { data: regs = [] } = useGetRegistrationsQuery(id, { skip: !id });
   const [addPair, { isLoading: adding }] = useAddPairToGroupMutation();
@@ -112,9 +121,11 @@ export default function GroupPairsMobile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.background }}>
-      <Stack.Screen options={{ title: t("Thêm / Chuyển cặp") }} />
+      <Stack.Screen options={{ title: t(isMlpTour ? "Thêm / Chuyển đội" : "Thêm / Chuyển cặp") }} />
       <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }}>
-        {groupBrackets.length === 0 ? (
+        {isMlpTour ? (
+          <MlpTeamPoolsSection tourId={id} C={C} />
+        ) : groupBrackets.length === 0 ? (
           <Text style={{ color: C.text, padding: 20, textAlign: "center" }}>
             Giải này không có vòng bảng.
           </Text>
@@ -338,5 +349,254 @@ function PickerModal({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+
+/* ================== MLP Teams Pool Section ================== */
+function MlpTeamPoolsSection({ tourId, C }: { tourId: string; C: any }) {
+  const { data: teamsResp, refetch } = useListMlpTeamsQuery(
+    { tourId, status: "approved" },
+    { skip: !tourId },
+  );
+  const teams: any[] = Array.isArray((teamsResp as any)?.items)
+    ? (teamsResp as any).items
+    : [];
+  const [patchPool, { isLoading: patching }] = usePatchMlpTeamPoolMutation();
+  const [genDuals, { isLoading: genning }] = useGenerateMlpDualsMutation();
+
+  const poolMap = React.useMemo(() => {
+    const m: Record<string, any[]> = {};
+    for (const t of teams) {
+      const k = t.poolKey || "__none__";
+      (m[k] = m[k] || []).push(t);
+    }
+    return m;
+  }, [teams]);
+  const poolKeys = Object.keys(poolMap)
+    .filter((k) => k !== "__none__")
+    .sort();
+  const unassigned = poolMap["__none__"] || [];
+
+  const [target, setTarget] = useState<{ teamId: string; fromKey: string | null } | null>(null);
+  const [genDirty, setGenDirty] = useState(false);
+
+  const doMove = async (teamId: string, poolKey: string | null) => {
+    try {
+      await patchPool({ tourId, teamId, poolKey }).unwrap();
+      setTarget(null);
+      setGenDirty(true);
+      refetch();
+      Alert.alert("Đã chuyển", poolKey ? `Đội đã vào Bảng ${poolKey}.` : "Đội đã rời bảng.");
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Chuyển bảng thất bại.");
+    }
+  };
+  const doGen = async () => {
+    try {
+      await genDuals(tourId).unwrap();
+      setGenDirty(false);
+      Alert.alert("OK", "Đã sinh lại lịch dual matches.");
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Sinh lại dual thất bại.");
+    }
+  };
+
+  const nextPoolKey =
+    poolKeys.length === 0
+      ? "A"
+      : String.fromCharCode(65 + poolKeys.length);
+  const allChoices: string[] = poolKeys.includes(nextPoolKey)
+    ? poolKeys
+    : [...poolKeys, nextPoolKey];
+
+  return (
+    <View style={{ gap: 12 }}>
+      {genDirty ? (
+        <Pressable
+          onPress={doGen}
+          disabled={genning}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            backgroundColor: "#F59E0B",
+            alignItems: "center",
+          }}
+        >
+          {genning ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={{ color: "#fff", fontWeight: "800" }}>
+              Sinh lại lịch dual matches (áp dụng thay đổi)
+            </Text>
+          )}
+        </Pressable>
+      ) : null}
+
+      {poolKeys.map((k) => {
+        const list = poolMap[k] || [];
+        return (
+          <View
+            key={k}
+            style={{
+              backgroundColor: C.card,
+              borderRadius: 12,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: C.border,
+            }}
+          >
+            <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>
+              Bảng {k} ({list.length})
+            </Text>
+            {list.map((tm: any) => (
+              <View
+                key={tm._id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: C.border,
+                }}
+              >
+                <Text style={{ flex: 1, color: C.text }} numberOfLines={1}>
+                  {tm.name}
+                </Text>
+                <Pressable
+                  onPress={() => setTarget({ teamId: tm._id, fromKey: k })}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    backgroundColor: "#0066FF",
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
+                    Chuyển
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+
+      {/* Unassigned teams */}
+      <View
+        style={{
+          backgroundColor: C.card,
+          borderRadius: 12,
+          padding: 12,
+          borderWidth: 1,
+          borderColor: C.border,
+        }}
+      >
+        <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>
+          Chưa gán bảng ({unassigned.length})
+        </Text>
+        {unassigned.length === 0 ? (
+          <Text style={{ color: C.text, opacity: 0.6 }}>
+            Tất cả đội đã có bảng.
+          </Text>
+        ) : (
+          unassigned.map((tm: any) => (
+            <View
+              key={tm._id}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: C.border,
+              }}
+            >
+              <Text style={{ flex: 1, color: C.text }} numberOfLines={1}>
+                {tm.name}
+              </Text>
+              <Pressable
+                onPress={() => setTarget({ teamId: tm._id, fromKey: null })}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  backgroundColor: "#10B981",
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
+                  Thêm vào bảng
+                </Text>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Modal chọn bảng đích */}
+      <Modal
+        visible={!!target}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTarget(null)}
+      >
+        <Pressable
+          onPress={() => setTarget(null)}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 24 }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{ backgroundColor: C.card, borderRadius: 12, padding: 16, gap: 8 }}
+          >
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 15, marginBottom: 4 }}>
+              Chọn bảng đích
+            </Text>
+            {allChoices.map((k) => (
+              <Pressable
+                key={k}
+                onPress={() => target && doMove(target.teamId, k)}
+                disabled={patching || target?.fromKey === k}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: target?.fromKey === k ? C.border : "#0066FF",
+                  alignItems: "center",
+                  opacity: target?.fromKey === k ? 0.5 : 1,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800" }}>
+                  {k === nextPoolKey && !poolKeys.includes(k)
+                    ? `Tạo Bảng ${k} mới`
+                    : `Bảng ${k}`}
+                  {target?.fromKey === k ? " (hiện tại)" : ""}
+                </Text>
+              </Pressable>
+            ))}
+            {target?.fromKey ? (
+              <Pressable
+                onPress={() => target && doMove(target.teamId, null)}
+                disabled={patching}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: "#EF4444",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#EF4444", fontWeight: "800" }}>
+                  Rời bảng (Chưa gán)
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => setTarget(null)}
+              style={{ padding: 10, alignItems: "center" }}
+            >
+              <Text style={{ color: C.text }}>Đóng</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
