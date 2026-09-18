@@ -3,6 +3,7 @@ import { t } from "@/utils/i18n";
 import {
   Ionicons } from "@expo/vector-icons";
 import { Stack,
+  router,
   useLocalSearchParams } from "expo-router";
 import React,
   { useEffect,
