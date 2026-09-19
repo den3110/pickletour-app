@@ -51,6 +51,8 @@ export default function ImouPlaybackViewScreen() {
   const [progress, setProgress] = useState(0);
   const [seekDrag, setSeekDrag] = useState<number | null>(null);
   const [barWidth, setBarWidth] = useState(0);
+  /** true khi VideoView onReady fire — tránh hiện khung decode dở (grey/noisy) trước IDR. */
+  const [firstFrame, setFirstFrame] = useState(false);
   const sessionRef = useRef<string | null>(null);
 
   const beginDate = useMemo(() => parseImouTime(String(begin) || ""), [begin]);
@@ -61,7 +63,7 @@ export default function ImouPlaybackViewScreen() {
     if (!ImouNative || !deviceId || !begin || !end) return;
     let cancelled = false;
     (async () => {
-      setStatus("starting"); setErrorMsg(null); setProgress(0);
+      setStatus("starting"); setErrorMsg(null); setProgress(0); setFirstFrame(false);
       try {
         const sess: any = await ImouNative.startPlayback(deviceId, begin, end, { withAudio: !muted });
         if (cancelled) { try { await ImouNative.stopSession(sess.sessionId); } catch {} return; }
@@ -102,9 +104,8 @@ export default function ImouPlaybackViewScreen() {
       if (status === "playing") { await ImouNative.setPaused(sessionId, true); setStatus("paused"); }
       else if (status === "paused") { await ImouNative.setPaused(sessionId, false); setStatus("playing"); }
       else if (status === "ended") {
-        // restart from begin
         try { await ImouNative.stopSession(sessionId); } catch {}
-        setProgress(0); setStatus("starting");
+        setProgress(0); setStatus("starting"); setFirstFrame(false);
         const sess: any = await ImouNative.startPlayback(deviceId, begin, end, { withAudio: !muted });
         sessionRef.current = sess.sessionId; setSessionId(sess.sessionId); setStatus("playing");
       }
@@ -122,7 +123,7 @@ export default function ImouPlaybackViewScreen() {
     const target = new Date(beginDate.getTime() + sec * 1000);
     try {
       if (sessionRef.current) { try { await ImouNative.stopSession(sessionRef.current); } catch {} sessionRef.current = null; }
-      setStatus("starting"); setProgress(sec);
+      setStatus("starting"); setProgress(sec); setFirstFrame(false);
       const sess: any = await ImouNative.startPlayback(deviceId, fmtImouLocalTime(target), end, { withAudio: !muted });
       sessionRef.current = sess.sessionId; setSessionId(sess.sessionId); setStatus("playing");
     } catch (e: any) { Alert.alert("Lỗi", e?.message || "Seek thất bại"); }
@@ -174,12 +175,16 @@ export default function ImouPlaybackViewScreen() {
 
       <TouchableOpacity activeOpacity={1} onPress={() => setShowControls((v) => !v)} style={styles.videoWrap}>
         {sessionId ? (
-          <VideoView sessionId={sessionId} resizeMode="contain" style={StyleSheet.absoluteFillObject}
+          <VideoView
+            sessionId={sessionId}
+            resizeMode="contain"
+            style={[StyleSheet.absoluteFillObject, !firstFrame && { opacity: 0 }]}
+            onReady={() => setFirstFrame(true)}
             onError={(e: any) => { setStatus("error"); setErrorMsg(e?.message || "Player lỗi"); }}
           />
         ) : null}
 
-        {(status === "starting" || status === "idle") && (
+        {(status === "starting" || status === "idle" || !firstFrame) && status !== "error" && status !== "ended" && (
           <View style={styles.overlayCenter}>
             <ActivityIndicator color="#fff" size="large" />
             <Text style={styles.overlayText}>Đang tải playback…</Text>

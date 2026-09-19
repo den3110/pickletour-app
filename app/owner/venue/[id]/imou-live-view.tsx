@@ -47,6 +47,8 @@ export default function ImouLiveViewScreen() {
   const [retryCount, setRetryCount] = useState(0);
   const retryTimerRef = useRef<any>(null);
   const MAX_RETRIES = 5;
+  /** VideoView onReady fire khi có I-frame decode xong — ẩn video khi chưa ready để tránh khung xám/nhiễu. */
+  const [firstFrame, setFirstFrame] = useState(false);
 
   useEffect(() => {
     if (!ImouNative || !activeDeviceId) return;
@@ -56,7 +58,7 @@ export default function ImouLiveViewScreen() {
         try { await ImouNative.stopSession(sessionRef.current); } catch {}
         sessionRef.current = null;
       }
-      setStatus("starting"); setErrorMsg(null);
+      setStatus("starting"); setErrorMsg(null); setFirstFrame(false);
       try {
         const sess: any = await ImouNative.startLive(activeDeviceId, { quality, withAudio: !muted });
         if (cancelled) { try { await ImouNative.stopSession(sess.sessionId); } catch {} return; }
@@ -167,7 +169,9 @@ export default function ImouLiveViewScreen() {
 
       <TouchableOpacity activeOpacity={1} onPress={() => setShowControls((v) => !v)} style={styles.videoWrap}>
         {sessionId ? (
-          <VideoView sessionId={sessionId} resizeMode="contain" style={StyleSheet.absoluteFillObject}
+          <VideoView sessionId={sessionId} resizeMode="contain"
+            style={[StyleSheet.absoluteFillObject, !firstFrame && { opacity: 0 }]}
+            onReady={() => setFirstFrame(true)}
             onError={(e: any) => {
               const msg = String(e?.code || "") + " " + String(e?.message || "");
               if (/closed|reconnect|network|disconnect|timeout|io\(/i.test(msg)) {
@@ -191,7 +195,7 @@ export default function ImouLiveViewScreen() {
           />
         ) : null}
 
-        {(status === "starting" || status === "idle") && (
+        {(status === "starting" || status === "idle" || !firstFrame) && status !== "error" && (
           <View style={styles.overlayCenter}>
             <ActivityIndicator color="#fff" size="large" />
             <Text style={styles.overlayText}>Đang mở stream…</Text>
