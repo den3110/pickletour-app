@@ -185,7 +185,7 @@ export default function ImouPlaybackViewScreen() {
           <VideoView
             sessionId={sessionId}
             resizeMode="contain"
-            style={[StyleSheet.absoluteFillObject, !firstFrame && { opacity: 0 }]}
+            style={StyleSheet.absoluteFillObject}
             onReady={() => setFirstFrame(true)}
             onError={(e: any) => { setStatus("error"); setErrorMsg(e?.message || "Player lỗi"); }}
           />
@@ -274,7 +274,7 @@ export default function ImouPlaybackViewScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
   videoWrap: { flex: 1, backgroundColor: "#000", position: "relative" },
-  overlayCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.4)" },
+  overlayCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#000" },
   overlayText: { color: "#fff", fontSize: 13 },
   topBar: { position: "absolute", top: 0, left: 0, right: 0 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(0,0,0,0.35)" },

@@ -179,7 +179,7 @@ export default function ImouLiveViewScreen() {
       <TouchableOpacity activeOpacity={1} onPress={() => setShowControls((v) => !v)} style={styles.videoWrap}>
         {sessionId ? (
           <VideoView sessionId={sessionId} resizeMode="contain"
-            style={[StyleSheet.absoluteFillObject, !firstFrame && { opacity: 0 }]}
+            style={StyleSheet.absoluteFillObject}
             onReady={() => setFirstFrame(true)}
             onError={(e: any) => {
               const msg = String(e?.code || "") + " " + String(e?.message || "");
@@ -354,7 +354,7 @@ function DpadBtn({ icon, onPress }: any) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
   videoWrap: { flex: 1, backgroundColor: "#000", position: "relative" },
-  overlayCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.4)" },
+  overlayCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#000" },
   overlayText: { color: "#fff", fontSize: 13 },
   retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, marginTop: 8 },
   topBar: { position: "absolute", top: 0, left: 0, right: 0 },
