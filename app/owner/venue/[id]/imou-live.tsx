@@ -74,7 +74,7 @@ export default function ImouLiveScreen() {
     if (!ImouNative) return;
     router.push({
       pathname: "/owner/venue/[id]/imou-live-view" as any,
-      params: { id, deviceId: cam.deviceId, courtId: cam.courtId },
+      params: { id, deviceId: cam.deviceId, courtId: cam.courtId, snap: snaps[cam.deviceId] || "" },
     });
   };
 

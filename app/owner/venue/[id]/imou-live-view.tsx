@@ -1,7 +1,7 @@
 // Owner: xem live 1 cam Imou (full-screen) — PTZ, zoom, snapshot, ghi hình, đổi cam.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Alert,
+  View, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Alert, Image,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,9 +20,10 @@ function loadImouNative(): { native: any | null; VideoView: any | null } {
 }
 
 interface PtzCap { move: "eight" | "four" | "twoLR" | "none"; zoom: boolean }
+const MAX_RETRIES = 5;
 
 export default function ImouLiveViewScreen() {
-  const { id, deviceId: initialDevice } = useLocalSearchParams<{ id: string; deviceId: string }>();
+  const { id, deviceId: initialDevice, snap } = useLocalSearchParams<{ id: string; deviceId: string; snap?: string }>();
   const theme = useTheme();
   const C = useMemo(() => pal(!!theme.dark), [theme.dark]);
   const { native: ImouNative, VideoView } = useMemo(loadImouNative, []);
@@ -32,6 +33,8 @@ export default function ImouLiveViewScreen() {
 
   const [activeDeviceId, setActiveDeviceId] = useState<string>(String(initialDevice || ""));
   const activeCam = cams.find((c) => c.deviceId === activeDeviceId);
+  // Poster = snapshot từ màn grid; chỉ đúng cho cam mở đầu.
+  const poster = activeDeviceId === String(initialDevice || "") && snap ? String(snap) : null;
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "starting" | "live" | "error">("idle");
@@ -44,10 +47,12 @@ export default function ImouLiveViewScreen() {
   const [zoomPct, setZoomPct] = useState<number | null>(null);
   const sessionRef = useRef<string | null>(null);
   const [restartKey, setRestartKey] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
   const retryTimerRef = useRef<any>(null);
-  const MAX_RETRIES = 5;
-  /** VideoView onReady fire khi có I-frame decode xong — ẩn video khi chưa ready để tránh khung xám/nhiễu. */
+  const [retryingIn, setRetryingIn] = useState<number | null>(null);
+  const [nativeReconnecting, setNativeReconnecting] = useState<number | null>(null);
+  // onReady của VideoView fire khi bind session (không phải frame đầu) — dùng
+  // làm mốc bỏ overlay, kèm fallback vì native có thể miss.
   const [firstFrame, setFirstFrame] = useState(false);
 
   useEffect(() => {
@@ -57,6 +62,7 @@ export default function ImouLiveViewScreen() {
       if (sessionRef.current) {
         try { await ImouNative.stopSession(sessionRef.current); } catch {}
         sessionRef.current = null;
+        setSessionId(null);
       }
       setStatus("starting"); setErrorMsg(null); setFirstFrame(false);
       try {
@@ -75,6 +81,49 @@ export default function ImouLiveViewScreen() {
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     };
   }, [activeDeviceId, quality, restartKey]);
+
+  useEffect(() => {
+    if (!sessionId || firstFrame) return;
+    const t = setTimeout(() => setFirstFrame(true), 2500);
+    return () => clearTimeout(t);
+  }, [sessionId, firstFrame]);
+
+  // Prop onError của VideoView là prop chết → nghe lỗi ở cấp module.
+  useEffect(() => {
+    if (!ImouNative) return;
+    const sub = ImouNative.onError?.((e: any) => {
+      const sid = e?.sessionId;
+      if (sid && sessionRef.current && sid !== sessionRef.current) return;
+      const code = String(e?.code || "");
+      const msg = String(e?.message || "");
+      if (code === "reconnecting") {
+        const m = msg.match(/attempt=(\d+)/);
+        setNativeReconnecting(m ? +m[1] : 1);
+        return;
+      }
+      if (/closed|network|disconnect|timeout|io\(|producer_failed/i.test(code + " " + msg)) {
+        if (retryTimerRef.current) return;
+        const n = retryCountRef.current;
+        if (n >= MAX_RETRIES) {
+          setStatus("error"); setErrorMsg(`Kết nối lỗi sau ${MAX_RETRIES} lần thử. Kiểm tra mạng.`);
+          return;
+        }
+        retryCountRef.current = n + 1;
+        setNativeReconnecting(null);
+        setRetryingIn(n + 1);
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          setRetryingIn(null);
+          setRestartKey((k) => k + 1);
+        }, 1000 * Math.pow(2, n));
+      } else {
+        setStatus("error"); setErrorMsg(msg || code || "Player lỗi");
+      }
+    });
+    return () => { sub?.remove?.(); };
+  }, [ImouNative]);
+
+  useEffect(() => { if (firstFrame) { retryCountRef.current = 0; setNativeReconnecting(null); } }, [firstFrame]);
 
   useEffect(() => {
     if (!ImouNative || !activeDeviceId) return;
@@ -101,14 +150,16 @@ export default function ImouLiveViewScreen() {
     return () => clearTimeout(t);
   }, [showControls]);
 
-  // Fallback: nếu native onReady không fire trong 2s sau khi có sessionId
-  // (native module race Player.get() miss) thì tự bung firstFrame để user
-  // vẫn thấy được video (dù có thể lóe 1 khung nhiễu — vẫn hơn treo mãi).
-  useEffect(() => {
-    if (!sessionId || firstFrame) return;
-    const t = setTimeout(() => setFirstFrame(true), 2000);
-    return () => clearTimeout(t);
-  }, [sessionId, firstFrame]);
+  const manualRetry = () => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    retryCountRef.current = 0; setRetryingIn(null); setNativeReconnecting(null);
+    setRestartKey((k) => k + 1);
+  };
+  const switchCam = (dev: string) => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    retryCountRef.current = 0; setRetryingIn(null); setNativeReconnecting(null);
+    setActiveDeviceId(dev);
+  };
 
   const doMute = async (next: boolean) => {
     setMuted(next);
@@ -158,6 +209,7 @@ export default function ImouLiveViewScreen() {
   if (!ImouNative || !VideoView) {
     return (
       <SafeAreaView style={[styles.errRoot, { backgroundColor: C.bg }]}>
+        <Stack.Screen options={{ headerShown: false }} />
         <StatusBar barStyle="light-content" />
         <Ionicons name="alert-circle" size={48} color={C.warning} />
         <Text style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Module camera chưa build</Text>
@@ -171,57 +223,50 @@ export default function ImouLiveViewScreen() {
     );
   }
 
+  const loadingOverlay = status === "starting" || status === "idle" || (status === "live" && !firstFrame);
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" />
 
       <TouchableOpacity activeOpacity={1} onPress={() => setShowControls((v) => !v)} style={styles.videoWrap}>
+        {/* key={sessionId}: view + layer mới mỗi session, không dính frame cũ. */}
         {sessionId ? (
-          <VideoView sessionId={sessionId} resizeMode="contain"
-            style={StyleSheet.absoluteFillObject}
-            onReady={() => setFirstFrame(true)}
-            onError={(e: any) => {
-              const msg = String(e?.code || "") + " " + String(e?.message || "");
-              if (/closed|reconnect|network|disconnect|timeout|io\(/i.test(msg)) {
-                if (retryTimerRef.current) return;
-                setRetryCount((n) => {
-                  if (n >= MAX_RETRIES) {
-                    setStatus("error"); setErrorMsg(`Kết nối lỗi sau ${MAX_RETRIES} lần thử.`);
-                    return n;
-                  }
-                  const delay = 1000 * Math.pow(2, n);
-                  retryTimerRef.current = setTimeout(() => {
-                    retryTimerRef.current = null;
-                    setStatus("starting"); setRestartKey((k) => k + 1);
-                  }, delay);
-                  return n + 1;
-                });
-              } else {
-                setStatus("error"); setErrorMsg(e?.message || "Player lỗi");
-              }
-            }}
-          />
+          <VideoView key={sessionId} sessionId={sessionId} resizeMode="contain"
+            style={StyleSheet.absoluteFillObject} onReady={() => setFirstFrame(true)} />
         ) : null}
 
-        {(status === "starting" || status === "idle" || !firstFrame) && status !== "error" && (
+        {loadingOverlay && !retryingIn && (
           <View style={styles.overlayCenter}>
+            {poster ? <Image source={{ uri: poster }} style={styles.poster} resizeMode="contain" blurRadius={2} /> : null}
             <ActivityIndicator color="#fff" size="large" />
             <Text style={styles.overlayText}>Đang mở stream…</Text>
+          </View>
+        )}
+        {retryingIn != null && (
+          <View style={styles.overlayCenter}>
+            <ActivityIndicator color="#fff" size="large" />
+            <Text style={styles.overlayText}>Đang kết nối lại ({retryingIn}/{MAX_RETRIES})…</Text>
+          </View>
+        )}
+        {nativeReconnecting != null && retryingIn == null && status === "live" && (
+          <View style={styles.reconBadge} pointerEvents="none">
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.reconBadgeText}>Đang nối lại ({nativeReconnecting}/3)…</Text>
           </View>
         )}
         {status === "error" && (
           <View style={styles.overlayCenter}>
             <Ionicons name="warning" size={40} color={C.warning} />
             <Text style={styles.overlayText}>{errorMsg}</Text>
-            <TouchableOpacity onPress={() => { setRetryCount(0); setRestartKey((k) => k + 1); }} style={[styles.retryBtn, { backgroundColor: C.accent }]}>
+            <TouchableOpacity onPress={manualRetry} style={[styles.retryBtn, { backgroundColor: C.accent }]}>
               <Text style={{ color: C.onAccent, fontWeight: "800" }}>Thử lại</Text>
             </TouchableOpacity>
           </View>
         )}
       </TouchableOpacity>
 
-      {/* Top bar */}
       {showControls && (
         <SafeAreaView edges={["top"]} style={styles.topBar} pointerEvents="box-none">
           <View style={styles.topRow}>
@@ -252,7 +297,6 @@ export default function ImouLiveViewScreen() {
         </SafeAreaView>
       )}
 
-      {/* Bottom controls */}
       {showControls && (
         <SafeAreaView edges={["bottom"]} style={styles.bottomBar} pointerEvents="box-none">
           <View style={styles.rowInline}>
@@ -316,7 +360,7 @@ export default function ImouLiveViewScreen() {
                 return (
                   <TouchableOpacity
                     key={c.key}
-                    onPress={() => { setRetryCount(0); setActiveDeviceId(c.deviceId); }}
+                    onPress={() => switchCam(c.deviceId)}
                     style={[styles.switcherChip, on && styles.switcherChipActive]}
                   >
                     <Ionicons name="videocam" size={12} color={on ? "#0F172A" : "#fff"} />
@@ -355,7 +399,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
   videoWrap: { flex: 1, backgroundColor: "#000", position: "relative" },
   overlayCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#000" },
+  poster: { ...StyleSheet.absoluteFillObject, opacity: 0.45 },
   overlayText: { color: "#fff", fontSize: 13 },
+  reconBadge: {
+    position: "absolute", top: 90, alignSelf: "center", flexDirection: "row", gap: 6, alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+  },
+  reconBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, marginTop: 8 },
   topBar: { position: "absolute", top: 0, left: 0, right: 0 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(0,0,0,0.35)" },

@@ -95,11 +95,28 @@ export default function ImouPlaybackListScreen() {
 
   const normalizeEnd = (b: string, e: string): string => (!e || e <= b) ? shiftYmdt(b, 30) : e;
 
-  const openPlayback = (begin: string, end: string, title: string | undefined) => {
+  // Queue = các đoạn SAU đoạn đang mở, sort ASC (Imou trả DESC) → viewer tự
+  // preload + chuyển tiếp liền mạch tới cuối ngày.
+  const openPlayback = (begin: string, end: string, title: string | undefined, source: "rec" | "event") => {
     if (!activeDeviceId) return;
+    let queue: Array<{ begin: string; end: string; title?: string }> = [];
+    if (source === "rec" && recordings) {
+      const asc = [...recordings].sort((a, b) => a.begin.localeCompare(b.begin));
+      const idx = asc.findIndex((r) => r.begin === begin);
+      if (idx >= 0) queue = asc.slice(idx + 1).map((r) => ({
+        begin: r.begin, end: normalizeEnd(r.begin, r.end), title: `${fmtTime(r.begin)} · ${fmtDuration(r.durationS)}`,
+      }));
+    } else if (source === "event" && events) {
+      const asc = [...events].sort((a, b) => a.begin.localeCompare(b.begin));
+      const idx = asc.findIndex((r) => r.begin === begin);
+      if (idx >= 0) queue = asc.slice(idx + 1).map((r) => ({ begin: r.begin, end: normalizeEnd(r.begin, r.end), title: r.title }));
+    }
     router.push({
       pathname: "/owner/venue/[id]/imou-playback-view" as any,
-      params: { id, deviceId: activeDeviceId, begin, end: normalizeEnd(begin, end), title: title || "" },
+      params: {
+        id, deviceId: activeDeviceId, begin, end: normalizeEnd(begin, end), title: title || "",
+        queue: JSON.stringify(queue),
+      },
     });
   };
 
@@ -197,7 +214,7 @@ export default function ImouPlaybackListScreen() {
                   <TouchableOpacity
                     key={`${r.begin}-${i}`}
                     activeOpacity={0.7}
-                    onPress={() => openPlayback(r.begin, r.end, `${fmtTime(r.begin)} · ${fmtDuration(r.durationS)}`)}
+                    onPress={() => openPlayback(r.begin, r.end, `${fmtTime(r.begin)} · ${fmtDuration(r.durationS)}`, "rec")}
                     style={[styles.recRow, { backgroundColor: C.card, borderColor: C.border }]}
                   >
                     <View style={{ alignItems: "center", minWidth: 60 }}>
@@ -225,7 +242,7 @@ export default function ImouPlaybackListScreen() {
                 <TouchableOpacity
                   key={ev.recordId}
                   activeOpacity={0.85}
-                  onPress={() => openPlayback(ev.begin, ev.end, ev.title)}
+                  onPress={() => openPlayback(ev.begin, ev.end, ev.title, "event")}
                   style={[styles.eventCard, { backgroundColor: C.card, borderColor: C.border }]}
                 >
                   <View style={styles.eventThumbWrap}>
