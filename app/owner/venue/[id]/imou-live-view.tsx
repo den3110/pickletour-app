@@ -101,6 +101,15 @@ export default function ImouLiveViewScreen() {
     return () => clearTimeout(t);
   }, [showControls]);
 
+  // Fallback: nếu native onReady không fire trong 2s sau khi có sessionId
+  // (native module race Player.get() miss) thì tự bung firstFrame để user
+  // vẫn thấy được video (dù có thể lóe 1 khung nhiễu — vẫn hơn treo mãi).
+  useEffect(() => {
+    if (!sessionId || firstFrame) return;
+    const t = setTimeout(() => setFirstFrame(true), 2000);
+    return () => clearTimeout(t);
+  }, [sessionId, firstFrame]);
+
   const doMute = async (next: boolean) => {
     setMuted(next);
     if (!sessionId || !ImouNative) return;

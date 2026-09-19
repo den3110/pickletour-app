@@ -98,6 +98,13 @@ export default function ImouPlaybackViewScreen() {
     return () => clearTimeout(t);
   }, [showControls]);
 
+  // Fallback: onReady có thể không fire (native race Player.get miss) → bung sau 2s.
+  useEffect(() => {
+    if (!sessionId || firstFrame) return;
+    const t = setTimeout(() => setFirstFrame(true), 2000);
+    return () => clearTimeout(t);
+  }, [sessionId, firstFrame]);
+
   const togglePlayPause = async () => {
     if (!sessionId || !ImouNative) return;
     try {
