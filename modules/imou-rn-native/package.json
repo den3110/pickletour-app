@@ -1,0 +1,44 @@
+{
+  "name": "imou-rn-native",
+  "version": "0.1.0",
+  "description": "Native RN module for Imou Life cameras — login, devices, live view, SD playback. Pure Swift/Kotlin implementation of the private cloud protocol (no Dahua SDK redistribution).",
+  "main": "src/index.ts",
+  "react-native": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "ios",
+    "native/include",
+    "native/src",
+    "imou-rn-native.podspec",
+    "README.md",
+    "RFC.md"
+  ],
+  "keywords": [
+    "react-native",
+    "imou",
+    "lechange",
+    "dahua",
+    "camera",
+    "hevc",
+    "playback",
+    "live"
+  ],
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-webview": ">=11.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-native": "^0.72.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "..."
+  },
+  "license": "MIT"
+}

@@ -61,3 +61,8 @@ abcdk-
 # Upload keystore — NEVER commit
 android/app/pickletour-upload.jks
 *.jks
+
+
+# Allow local RN modules (imou-rn-native + native sources)
+!modules/
+!modules/**

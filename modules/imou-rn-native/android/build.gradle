@@ -1,0 +1,57 @@
+// imou-rn-native — Android module
+//
+// Build tested với:
+//   - Gradle 8.0+
+//   - AGP 8.0+
+//   - Kotlin 1.9+
+//   - minSdk 23 (Android 6.0 — TLS 1.2 mặc định + ARMv7/v8 cleanly)
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.imou.rn.nativemod'
+    compileSdk 34
+    ndkVersion '27.1.12297006'
+
+    defaultConfig {
+        minSdk 23
+        targetSdk 34
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // No FFmpegKit conflicts — Android SDK only.
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.facebook.react:react-native:+'
+
+    // Kotlin coroutines for async session pipeline
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // OkHttp cho SaaS API + DH-HTTP transport
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // Secure storage (session token)
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // No FFmpegKit needed: pipeline uses MediaCodec(HEVC) + Surface +
+    // AudioTrack directly. All Android system APIs — no extra link.
+}
