@@ -10,6 +10,7 @@ import { Stack, useLocalSearchParams, router } from "expo-router";
 import { useTheme } from "@react-navigation/native";
 import { pal } from "@/utils/courtFormat";
 import { useGetVenueQuery } from "@/slices/venuesApiSlice";
+import { syncImouSessionToBackend } from "@/hooks/useImouSessionSync";
 import {
   useLinkImouAccountMutation,
   useUnlinkImouAccountMutation,
@@ -43,8 +44,12 @@ export default function ImouLoginScreen() {
   useEffect(() => {
     (async () => {
       if (!ImouNative) { setIsLogged(false); return; }
-      try { setIsLogged(!!(await ImouNative.isLoggedIn())); }
-      catch { setIsLogged(false); }
+      try {
+        const logged = !!(await ImouNative.isLoggedIn());
+        setIsLogged(logged);
+        // Đồng bộ session hiện tại lên backend để server auto-live dùng chung.
+        if (logged && id) syncImouSessionToBackend(id);
+      } catch { setIsLogged(false); }
     })();
   }, []);
 

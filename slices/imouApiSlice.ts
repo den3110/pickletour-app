@@ -32,6 +32,9 @@ export const imouApiSlice = apiSlice.injectEndpoints({
         body: { phone, password, areaCode: areaCode || "84" },
       }),
     }),
+    getImouSession: builder.query({
+      query: (venueId: string) => ({ url: `/api/imou/venues/${venueId}/session` }),
+    }),
     getImouCreds: builder.query({
       query: (venueId: string) => ({ url: `/api/imou/venues/${venueId}/creds` }),
     }),
@@ -67,6 +70,7 @@ export const {
   useUploadImouSessionMutation,
   useUploadImouCredsMutation,
   useLazyGetImouCredsQuery,
+  useLazyGetImouSessionQuery,
   useAddImouCamMutation,
   useRenameImouCamMutation,
   useRemoveImouCamMutation,

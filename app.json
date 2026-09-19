@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pickletour",
     "slug": "pickletour-app",
-    "version": "1.1.17",
+    "version": "1.1.18",
     "orientation": "default",
     "icon": "./assets/images/icon-v3.png",
     "scheme": "pickletourapp",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pkt.pickletour",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "associatedDomains": [
         "applinks:pickletour.vn",
         "applinks:www.pickletour.vn"
@@ -57,7 +57,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.pkt.pickletour",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 47,
+      "versionCode": 48,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",

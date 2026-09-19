@@ -69,6 +69,13 @@ export interface Session {
   sessionId: string;
 }
 
+export interface ImouSessionInfo {
+  uuidUser: string;
+  uuidKey: string;
+  sessionId: string;
+  regionalHost: string;
+}
+
 export type CaptchaSolver =
   | { mode: 'webview' } // sẽ trigger event 'captchaRequired' để JS render Geetest modal
   | { mode: '2captcha'; apiKey: string };
@@ -174,6 +181,15 @@ export const ImouNative = {
   login(opts: LoginOpts): Promise<void> { return Native.login(opts); },
   logout(): Promise<void> { return Native.logout(); },
   isLoggedIn(): Promise<boolean> { return Native.isLoggedIn(); },
+  /** Session hiện tại {uuidUser,uuidKey,sessionId,regionalHost} — upload backend
+   *  để server auto-live dùng chung (Imou chỉ cho 1 phiên/tài khoản). */
+  getSessionInfo(): Promise<ImouSessionInfo> { return Native.getSessionInfo(); },
+  /** Nạp session lấy từ backend thay vì login lại (tránh đá phiên server). */
+  importSession(s: ImouSessionInfo): Promise<void> { return Native.importSession(s); },
+  /** Native tự relogin sau 12002 → JS nên upload session mới lên backend. */
+  onSessionRenewed(cb: (s: ImouSessionInfo) => void) {
+    return Events.addListener('sessionRenewed', cb);
+  },
 
   /** Khi captchaSolver='webview', native sẽ emit 'captchaRequired' event.
    *  JS render Geetest modal → gọi submitCaptcha() để complete login. */

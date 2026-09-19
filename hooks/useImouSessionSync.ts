@@ -1,5 +1,11 @@
-// useImouSessionSync — subscribe native event `sessionExpired` (12002) →
-// auto relogin bằng creds cached trong native Keychain, hoặc fetch từ backend.
+// useImouSessionSync — giữ session Imou dùng CHUNG giữa app chủ sân và server
+// auto-live (Imou chỉ cho 1 phiên/tài khoản, login mới là phiên cũ bị đá).
+//
+// - sessionRenewed (native vừa tự relogin sau 12002) → upload session mới
+//   lên backend để server dùng theo.
+// - sessionExpired (12002) → thử lấy session mới nhất từ backend (server có
+//   thể vừa relogin) và importSession thay vì login lại; nếu backend không có
+//   gì mới hơn thì native tự relogin (sẽ bắn sessionRenewed → upload).
 import { useEffect } from "react";
 import { NativeEventEmitter, NativeModules } from "react-native";
 import { store } from "../store.js";
@@ -10,57 +16,59 @@ function loadImouNative(): any | null {
   catch { return null; }
 }
 
+async function uploadSession(venueId: string, sess: any) {
+  if (!sess?.uuidUser || !sess?.sessionId) return;
+  await store
+    .dispatch(imouApiSlice.endpoints.uploadImouSession.initiate({ venueId, session: sess }))
+    .unwrap()
+    .catch((e: any) => console.warn("[Imou] uploadSession fail:", e?.message));
+}
+
+/** Đồng bộ session hiện tại của native lên backend (gọi sau login / mở app). */
+export async function syncImouSessionToBackend(venueId: string) {
+  const ImouNative = loadImouNative();
+  if (!ImouNative?.getSessionInfo) return;
+  try {
+    const sess = await ImouNative.getSessionInfo();
+    await uploadSession(venueId, sess);
+  } catch (e: any) {
+    console.warn("[Imou] getSessionInfo skip:", e?.message);
+  }
+}
+
 export function useImouSessionSync(venueId?: string | null) {
   useEffect(() => {
     if (!venueId) return;
     const ImouNative = loadImouNative();
     if (!ImouNative || !NativeModules.ImouNative) return;
-    let sub: any;
+    const subs: any[] = [];
     try {
       const emitter = new NativeEventEmitter(NativeModules.ImouNative);
-      sub = emitter.addListener("sessionExpired", async () => {
-        console.log("[Imou] sessionExpired — attempt auto relogin");
+      subs.push(emitter.addListener("sessionRenewed", (sess: any) => {
+        console.log("[Imou] sessionRenewed → upload backend");
+        uploadSession(venueId, sess);
+      }));
+      subs.push(emitter.addListener("sessionExpired", async () => {
+        console.log("[Imou] sessionExpired — thử lấy session từ backend");
         try {
-          // Step 1: native tự relogin từ Keychain
-          const stillLogged = await ImouNative.isLoggedIn();
-          if (stillLogged) {
-            const sess = await ImouNative.getSessionInfo();
-            await store
-              .dispatch(
-                imouApiSlice.endpoints.uploadImouSession.initiate({ venueId, session: sess }),
-              )
-              .unwrap()
-              .catch(() => {});
-            console.log("[Imou] auto-relogin OK");
-            return;
-          }
-          // Step 2: fallback fetch creds encrypted từ backend + login lại
-          const credsRes: any = await store
-            .dispatch(imouApiSlice.endpoints.getImouCreds.initiate(venueId, { forceRefetch: true }))
-            .unwrap();
-          const creds = credsRes?.creds;
-          if (!creds?.phone || !creds?.password) throw new Error("No backend creds");
-          await ImouNative.login({
-            phone: creds.phone,
-            password: creds.password,
-            areaCode: creds.areaCode || "84",
-            captchaSolver: { mode: "webview" },
-          });
-          const sess = await ImouNative.getSessionInfo();
-          await store
-            .dispatch(
-              imouApiSlice.endpoints.uploadImouSession.initiate({ venueId, session: sess }),
-            )
+          const res: any = await store
+            .dispatch(imouApiSlice.endpoints.getImouSession.initiate(venueId, { forceRefetch: true }))
             .unwrap()
-            .catch(() => {});
-          console.log("[Imou] relogin from backend creds OK");
-        } catch (e) {
-          console.warn("[Imou] auto-relogin FAIL:", (e as any)?.message);
+            .catch(() => null);
+          const remote = res?.session;
+          if (!remote?.sessionId || !ImouNative.importSession) return;
+          let local: any = null;
+          try { local = await ImouNative.getSessionInfo(); } catch {}
+          if (local?.sessionId === remote.sessionId) return; // backend cũng cũ → native tự relogin
+          await ImouNative.importSession(remote);
+          console.log("[Imou] importSession từ backend OK");
+        } catch (e: any) {
+          console.warn("[Imou] importSession fail:", e?.message);
         }
-      });
-    } catch (e) {
-      console.warn("[Imou] listener setup fail:", (e as any)?.message);
+      }));
+    } catch (e: any) {
+      console.warn("[Imou] listener setup fail:", e?.message);
     }
-    return () => { try { sub?.remove?.(); } catch {} };
+    return () => { for (const s of subs) { try { s?.remove?.(); } catch {} } };
   }, [venueId]);
 }

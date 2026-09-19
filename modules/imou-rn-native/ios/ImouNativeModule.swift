@@ -35,7 +35,7 @@ public final class ImouNativeModule: RCTEventEmitter {
   override public static func requiresMainQueueSetup() -> Bool { false }
   override public func supportedEvents() -> [String]! {
     return ["captchaRequired", "sessionReady", "error", "sessionExpired",
-            "playbackProgress"]
+            "sessionRenewed", "playbackProgress"]
   }
 
   // ─── Auth ─────────────────────────────────────────────────────────────
@@ -95,6 +95,9 @@ public final class ImouNativeModule: RCTEventEmitter {
                                          password: c.password)
       try? SessionStore.save(s)
       NSLog("[imou-rn-native] 12002 auto-relogin OK")
+      // JS upload session mới lên backend để server auto-live dùng chung
+      // (Imou chỉ cho 1 phiên/tài khoản — không upload là server bị đá).
+      self.sendEvent(withName: "sessionRenewed", body: Self.sessionDict(s))
       return s
     } catch {
       NSLog("[imou-rn-native] 12002 relogin failed: \(error)")
@@ -142,6 +145,53 @@ public final class ImouNativeModule: RCTEventEmitter {
     SessionStore.clear()
     api = nil
     resolve(nil)
+  }
+
+  static func sessionDict(_ s: ImouSession) -> [String: Any] {
+    return ["uuidUser": s.uuidUser, "uuidKey": s.uuidKey,
+            "sessionId": s.sessionId, "regionalHost": s.regionalHost]
+  }
+
+  /// Xuất session hiện tại (không kèm loginResponse) để JS upload lên backend.
+  @objc(getSessionInfo:rejecter:)
+  public func getSessionInfo(resolver resolve: @escaping RCTPromiseResolveBlock,
+                             rejecter reject: @escaping RCTPromiseRejectBlock) {
+    do {
+      guard let s = try SessionStore.load() else {
+        reject("not_logged_in", "no session", nil); return
+      }
+      resolve(Self.sessionDict(s))
+    } catch {
+      reject("session_load_failed", "\(error)", error)
+    }
+  }
+
+  /// Nạp session từ nơi khác (backend đã lưu / server vừa relogin) thay vì
+  /// login lại — tránh đá phiên của server auto-live.
+  @objc(importSession:resolver:rejecter:)
+  public func importSession(_ dict: [String: Any],
+                            resolver resolve: @escaping RCTPromiseResolveBlock,
+                            rejecter reject: @escaping RCTPromiseRejectBlock) {
+    guard let uuidUser = dict["uuidUser"] as? String, !uuidUser.isEmpty,
+          let uuidKey = dict["uuidKey"] as? String, !uuidKey.isEmpty,
+          let sessionId = dict["sessionId"] as? String, !sessionId.isEmpty,
+          var host = dict["regionalHost"] as? String, !host.isEmpty else {
+      reject("bad_args", "uuidUser/uuidKey/sessionId/regionalHost required", nil); return
+    }
+    host = host.replacingOccurrences(of: "https://", with: "")
+               .replacingOccurrences(of: ":443", with: "")
+    while host.hasSuffix("/") { host.removeLast() }
+    let s = ImouSession(uuidUser: uuidUser, uuidKey: uuidKey,
+                        sessionId: sessionId, regionalHost: host)
+    do {
+      try SessionStore.save(s)
+      api = ApiClient(s, onSessionExpired: { [weak self] in
+        await self?.reloginFromCachedCreds()
+      })
+      resolve(nil)
+    } catch {
+      reject("session_save_failed", "\(error)", error)
+    }
   }
 
   @objc(isLoggedIn:rejecter:)
