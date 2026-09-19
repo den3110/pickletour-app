@@ -32,7 +32,9 @@ const MGMT = [
   { key: "revenue", label: "Doanh thu", icon: "bar-chart-outline", route: "revenue", tint: "#22c55e", perm: "revenue.view" },
   { key: "staff", label: "Nhân viên", icon: "people-outline", route: "staff", tint: "#6366f1", perm: "staff.manage" },
   { key: "edit", label: "Cài đặt sân", icon: "settings-outline", route: "edit", tint: "#94a3b8", perm: "venue.edit" },
-  { key: "imou", label: "Camera Imou", icon: "videocam-outline", route: "imou-login", tint: "#0EA5E9", perm: "venue.edit" },
+  { key: "imou", label: "Cài đặt cam Imou", icon: "settings-outline", route: "imou-login", tint: "#0EA5E9", perm: "venue.edit" },
+  { key: "imou-live", label: "Xem live cam", icon: "videocam-outline", route: "imou-live", tint: "#DC2626", perm: null as any },
+  { key: "imou-playback", label: "Xem lại cam", icon: "film-outline", route: "imou-playback-list", tint: "#7C3AED", perm: null as any },
 ];
 // "Đặt hộ" tái dùng màn đặt công khai (owner → tự confirmed)
 const openTile = (m: any, id: string) =>
