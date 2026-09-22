@@ -29,6 +29,17 @@ export function normalizeNotifUrl(url?: string): string | null {
   // Gói của khách
   if (path === "/my-packages" || path === "/courts/my-packages") return "/courts/my-packages";
 
+  // Clip camera của khách: /clips?booking=ID (hoặc /clips/ID cũ) → màn cắt clip theo booking.
+  if (path === "/clips" || /^\/clips\/[^/]+$/.test(path)) {
+    const bid = qGet(query, "booking");
+    return bid ? `/courts/clips/${bid}` : "/courts/my-bookings";
+  }
+  // Chủ sân duyệt clip: /owner/clip-approvals?venueId=ID → /owner/venue/ID/clip-approvals
+  if (path === "/owner/clip-approvals") {
+    const vid = qGet(query, "venueId");
+    return vid ? `/owner/venue/${vid}/clip-approvals` : "/owner";
+  }
+
   // Quản lý cụm sân (web: /owner/venues/:id[/bookings|/revenue...]) → hub mobile /owner/venue/:id
   let m = path.match(/^\/owner\/venues\/([^/]+)(?:\/[a-z-]+)?$/i);
   if (m) return `/owner/venue/${m[1]}`;
