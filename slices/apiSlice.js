@@ -346,6 +346,7 @@ export const apiSlice = createApi({
   tagTypes: [
     "Reviews",
     "Subscriptions",
+    "Clip",
     "Venue",
     "VenueStaff",
     "VenueAccess",

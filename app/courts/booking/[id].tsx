@@ -314,6 +314,14 @@ export default function BookingDetailScreen() {
               <Ionicons name="people" size={18} color="#fff" />
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Mở kèo tìm người chơi</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.btn, { backgroundColor: "#0ea5e9", alignSelf: "stretch", marginTop: 10 }, shadow(C.dark, 2)]}
+              onPress={() => router.push({ pathname: "/courts/clips/[bookingId]", params: { bookingId: String(b._id) } })}
+            >
+              <Ionicons name="cut" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Cắt clip camera</Text>
+            </TouchableOpacity>
           </View>
         )}
 
