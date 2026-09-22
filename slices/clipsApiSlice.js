@@ -31,6 +31,20 @@ export const clipsApiSlice = apiSlice.injectEndpoints({
         { type: "Clip", id: `BOOKING-${arg.bookingId}` },
       ],
     }),
+
+    // ── Chủ sân duyệt clip ngoài giờ ──────────────────────────────────
+    listPendingClips: builder.query({
+      query: (venueId) => ({ url: `/api/clips/pending?venueId=${venueId}` }),
+      providesTags: (r, e, venueId) => [{ type: "Clip", id: `PENDING-${venueId}` }],
+    }),
+    approveClip: builder.mutation({
+      query: ({ id }) => ({ url: `/api/clips/${id}/approve`, method: "POST" }),
+      invalidatesTags: (r, e, arg) => [{ type: "Clip", id: `PENDING-${arg.venueId}` }],
+    }),
+    rejectClip: builder.mutation({
+      query: ({ id, reason }) => ({ url: `/api/clips/${id}/reject`, method: "POST", body: { reason } }),
+      invalidatesTags: (r, e, arg) => [{ type: "Clip", id: `PENDING-${arg.venueId}` }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -41,4 +55,7 @@ export const {
   useGetClipQuery,
   useCreateClipMutation,
   useDeleteClipMutation,
+  useListPendingClipsQuery,
+  useApproveClipMutation,
+  useRejectClipMutation,
 } = clipsApiSlice;

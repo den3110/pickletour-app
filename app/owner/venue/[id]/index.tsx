@@ -35,6 +35,7 @@ const MGMT = [
   { key: "imou", label: "Cài đặt cam Imou", icon: "settings-outline", route: "imou-login", tint: "#0EA5E9", perm: "venue.edit" },
   { key: "imou-live", label: "Xem live cam", icon: "videocam-outline", route: "imou-live", tint: "#DC2626", perm: null as any },
   { key: "imou-playback", label: "Xem lại cam", icon: "film-outline", route: "imou-playback-list", tint: "#7C3AED", perm: null as any },
+  { key: "clip-approvals", label: "Duyệt cắt clip", icon: "cut-outline", route: "clip-approvals", tint: "#a855f7", perm: "bookings.manage" },
 ];
 // "Đặt hộ" tái dùng màn đặt công khai (owner → tự confirmed)
 const openTile = (m: any, id: string) =>

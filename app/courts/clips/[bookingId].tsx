@@ -17,6 +17,7 @@ import { useTheme } from "@react-navigation/native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { useThemeTokens } from "@/hooks/useThemeTokens";
 import { Chip, shadow, R, SP } from "@/components/courts/ui";
 import { tLabel } from "@/utils/courtFormat";
@@ -31,11 +32,13 @@ const STEP_MIN = 5;
 const DURATIONS = [5, 10, 15, 20, 25, 30];
 
 const STATUS_META: Record<string, { label: string; color: string; icon: any }> = {
+  pending_approval: { label: "Chờ chủ sân duyệt", color: "#a855f7", icon: "hourglass-outline" },
   queued: { label: "Đang chờ", color: "#f59e0b", icon: "time-outline" },
   processing: { label: "Đang cắt", color: "#3b82f6", icon: "sync-outline" },
   done: { label: "Xong", color: "#22c55e", icon: "checkmark-circle" },
   failed: { label: "Thất bại", color: "#ef4444", icon: "alert-circle" },
   cancelled: { label: "Đã huỷ", color: "#94a3b8", icon: "close-circle" },
+  rejected: { label: "Bị từ chối", color: "#ef4444", icon: "close-circle" },
 };
 
 function fmtSize(bytes?: number) {
@@ -85,9 +88,13 @@ export default function ClipCutScreen() {
   const [startMs, setStartMs] = useState<number | null>(null);
   const [durationMin, setDurationMin] = useState<number>(10);
   const [openClipId, setOpenClipId] = useState<string | null>(null);
+  // Cắt NGOÀI giờ đã đặt → cần chủ sân duyệt; chọn giờ tự do (quá khứ).
+  const [outside, setOutside] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [outsideStart, setOutsideStart] = useState<number | null>(null);
 
   const effDevice = deviceId || cams[0]?.deviceId || null;
-  const effStart = startMs ?? windowStart;
+  const effStart = outside ? outsideStart ?? 0 : startMs ?? windowStart;
 
   // Các mốc "bắt đầu" mỗi 5 phút trong khung giờ đã đặt.
   const startOptions = useMemo(() => {
@@ -100,11 +107,17 @@ export default function ClipCutScreen() {
     return out;
   }, [windowStart, windowEnd]);
 
-  // Độ dài hợp lệ: ≤ maxMinutes và không vượt quá giờ đặt.
+  // Độ dài hợp lệ: ≤ maxMinutes. Trong giờ đặt: ≤ thời gian còn lại của giờ đặt.
+  // Ngoài giờ đặt: kết thúc không vượt quá hiện tại (thẻ SD chỉ có cảnh quá khứ).
   const durationOptions = useMemo(() => {
+    if (outside) {
+      if (!effStart) return DURATIONS.filter((m) => m <= maxMinutes);
+      const remainMin = Math.floor((Date.now() - effStart) / 60000);
+      return DURATIONS.filter((m) => m <= maxMinutes && m <= remainMin);
+    }
     const remainMin = Math.floor((windowEnd - effStart) / 60000);
     return DURATIONS.filter((m) => m <= maxMinutes && m <= remainMin);
-  }, [windowEnd, effStart, maxMinutes]);
+  }, [outside, windowEnd, effStart, maxMinutes]);
 
   const effDuration = durationOptions.includes(durationMin)
     ? durationMin
@@ -119,7 +132,11 @@ export default function ClipCutScreen() {
   });
   const jobs = listData?.jobs || [];
   useEffect(() => {
-    setPoll(jobs.some((j: any) => j.status === "queued" || j.status === "processing"));
+    setPoll(
+      jobs.some((j: any) =>
+        ["pending_approval", "queued", "processing"].includes(j.status)
+      )
+    );
   }, [listData]);
 
   const [createClip, { isLoading: creating }] = useCreateClipMutation();
@@ -132,8 +149,12 @@ export default function ClipCutScreen() {
       Alert.alert("Thiếu camera", "Sân này chưa gắn camera để cắt clip.");
       return;
     }
+    if (outside && !outsideStart) {
+      Alert.alert("Chọn thời điểm", "Hãy chọn giờ bắt đầu muốn cắt.");
+      return;
+    }
     if (!effDuration) {
-      Alert.alert("Khoảng không hợp lệ", "Không đủ thời gian trong giờ đặt để cắt.");
+      Alert.alert("Khoảng không hợp lệ", "Không đủ thời gian để cắt (chỉ cắt được cảnh đã qua).");
       return;
     }
     try {
@@ -143,13 +164,20 @@ export default function ClipCutScreen() {
         startAt: new Date(effStart).toISOString(),
         endAt: new Date(endMs).toISOString(),
       }).unwrap();
-      const ahead = res?.queueAhead || 0;
-      Alert.alert(
-        "Đã gửi yêu cầu cắt clip",
-        ahead > 0
-          ? `Đang chờ ${ahead} clip xử lý trước. Bạn sẽ nhận thông báo khi xong.`
-          : "Đang xử lý. Bạn sẽ nhận thông báo khi clip sẵn sàng."
-      );
+      if (res?.requiresApproval) {
+        Alert.alert(
+          "Đã gửi yêu cầu duyệt",
+          "Đây là clip NGOÀI giờ bạn đặt nên cần chủ sân duyệt. Bạn sẽ nhận thông báo khi được duyệt/từ chối."
+        );
+      } else {
+        const ahead = res?.queueAhead || 0;
+        Alert.alert(
+          "Đã gửi yêu cầu cắt clip",
+          ahead > 0
+            ? `Đang chờ ${ahead} clip xử lý trước. Bạn sẽ nhận thông báo khi xong.`
+            : "Đang xử lý. Bạn sẽ nhận thông báo khi clip sẵn sàng."
+        );
+      }
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || "Không tạo được yêu cầu cắt clip.");
     }
@@ -177,7 +205,7 @@ export default function ClipCutScreen() {
   }
 
   function onDelete(job: any) {
-    const isCancel = job.status === "queued";
+    const isCancel = job.status === "queued" || job.status === "pending_approval";
     Alert.alert(
       isCancel ? "Huỷ yêu cầu?" : "Xoá clip?",
       isCancel ? "Yêu cầu đang chờ sẽ bị huỷ." : "Clip sẽ bị xoá khỏi máy chủ.",
@@ -251,30 +279,80 @@ export default function ClipCutScreen() {
                 </>
               )}
 
+              {/* Toggle: cắt ngoài giờ đã đặt (cần chủ sân duyệt) */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setOutside((v) => !v)}
+                style={[styles2.toggleRow, { borderColor: C.border, backgroundColor: C.field }]}
+              >
+                <Ionicons
+                  name={outside ? "checkbox" : "square-outline"}
+                  size={20}
+                  color={outside ? C.primary : C.sub}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: "700", fontSize: 13.5 }}>
+                    Cắt ngoài khung giờ tôi đặt
+                  </Text>
+                  <Text style={{ color: C.sub, fontSize: 11.5, marginTop: 1 }}>
+                    Yêu cầu sẽ cần chủ sân duyệt trước khi cắt.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
               {/* Chọn thời điểm bắt đầu */}
               <Text style={styles2.label}>Bắt đầu lúc</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm }}>
-                {startOptions.map((t) => {
-                  const on = effStart === t;
-                  return (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => setStartMs(t)}
-                      style={[styles2.pick, { borderColor: on ? C.primary : C.border, backgroundColor: on ? C.primarySoft || "rgba(59,130,246,0.14)" : C.field }]}
-                    >
-                      <Text style={{ color: on ? C.primary : C.text, fontWeight: "700", fontSize: 13 }}>
-                        {tLabel(new Date(t).toISOString())}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              {outside ? (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setPickerOpen(true)}
+                  style={[styles2.pick, { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, borderColor: C.primary, backgroundColor: C.primarySoft || "rgba(59,130,246,0.14)" }]}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={C.primary} />
+                  <Text style={{ color: C.primary, fontWeight: "700", fontSize: 13 }}>
+                    {outsideStart
+                      ? `${tLabel(new Date(outsideStart).toISOString())} · ${new Date(outsideStart).toLocaleDateString("vi-VN")}`
+                      : "Chọn ngày & giờ"}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm }}>
+                  {startOptions.map((t) => {
+                    const on = effStart === t;
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => setStartMs(t)}
+                        style={[styles2.pick, { borderColor: on ? C.primary : C.border, backgroundColor: on ? C.primarySoft || "rgba(59,130,246,0.14)" : C.field }]}
+                      >
+                        <Text style={{ color: on ? C.primary : C.text, fontWeight: "700", fontSize: 13 }}>
+                          {tLabel(new Date(t).toISOString())}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              <DateTimePickerModal
+                isVisible={pickerOpen}
+                mode="datetime"
+                maximumDate={new Date()}
+                date={outsideStart ? new Date(outsideStart) : new Date(windowStart || Date.now())}
+                onConfirm={(d: Date) => {
+                  setPickerOpen(false);
+                  setOutsideStart(d.getTime());
+                }}
+                onCancel={() => setPickerOpen(false)}
+              />
 
               {/* Chọn độ dài */}
               <Text style={styles2.label}>Độ dài</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: SP.sm }}>
                 {durationOptions.length === 0 ? (
-                  <Text style={{ color: C.sub }}>Không đủ thời gian còn lại trong giờ đặt.</Text>
+                  <Text style={{ color: C.sub }}>
+                    {outside ? "Hãy chọn giờ bắt đầu (đã qua) ở trên." : "Không đủ thời gian còn lại trong giờ đặt."}
+                  </Text>
                 ) : (
                   durationOptions.map((m) => {
                     const on = effDuration === m;
@@ -309,15 +387,17 @@ export default function ClipCutScreen() {
                   <ActivityIndicator color={C.onPrimary || "#fff"} />
                 ) : (
                   <>
-                    <Ionicons name="cut" size={18} color={C.onPrimary || "#fff"} />
+                    <Ionicons name={outside ? "paper-plane" : "cut"} size={18} color={C.onPrimary || "#fff"} />
                     <Text style={{ color: C.onPrimary || "#fff", fontWeight: "800", fontSize: 15 }}>
-                      Cắt clip
+                      {outside ? "Gửi yêu cầu duyệt" : "Cắt clip"}
                     </Text>
                   </>
                 )}
               </TouchableOpacity>
               <Text style={{ color: C.sub, fontSize: 11.5, textAlign: "center" }}>
-                Máy chủ xử lý lần lượt từng clip — có thể mất vài phút.
+                {outside
+                  ? "Clip ngoài giờ đặt cần chủ sân duyệt trước khi cắt."
+                  : "Máy chủ xử lý lần lượt từng clip — có thể mất vài phút."}
               </Text>
             </View>
 
@@ -348,6 +428,16 @@ export default function ClipCutScreen() {
                       {j.status === "failed" && !!j.error && (
                         <Text style={{ color: C.danger || "#ef4444", fontSize: 12.5 }}>{j.error}</Text>
                       )}
+                      {j.status === "rejected" && (
+                        <Text style={{ color: C.danger || "#ef4444", fontSize: 12.5 }}>
+                          Chủ sân từ chối{j.rejectReason ? `: ${j.rejectReason}` : "."}
+                        </Text>
+                      )}
+                      {j.status === "pending_approval" && (
+                        <Text style={{ color: C.sub, fontSize: 12.5 }}>
+                          Đang chờ chủ sân duyệt (clip ngoài giờ đặt).
+                        </Text>
+                      )}
                       {j.fileUrl && j.status === "done" && (
                         <Text style={{ color: C.sub, fontSize: 12 }}>{fmtSize(j.fileSize)}</Text>
                       )}
@@ -369,9 +459,9 @@ export default function ClipCutScreen() {
                         )}
                         {j.status !== "processing" && (
                           <TouchableOpacity onPress={() => onDelete(j)} style={[styles2.smallBtn, { backgroundColor: C.field, borderWidth: 1, borderColor: C.border }]}>
-                            <Ionicons name={j.status === "queued" ? "close" : "trash"} size={15} color={C.danger || "#ef4444"} />
+                            <Ionicons name={j.status === "queued" || j.status === "pending_approval" ? "close" : "trash"} size={15} color={C.danger || "#ef4444"} />
                             <Text style={[styles2.smallBtnTxt, { color: C.danger || "#ef4444" }]}>
-                              {j.status === "queued" ? "Huỷ" : "Xoá"}
+                              {j.status === "queued" || j.status === "pending_approval" ? "Huỷ" : "Xoá"}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -406,6 +496,16 @@ const mk = (C: any) =>
       paddingVertical: 9,
       borderRadius: 999,
       borderWidth: 1,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginTop: 2,
     },
     btn: {
       flexDirection: "row",
