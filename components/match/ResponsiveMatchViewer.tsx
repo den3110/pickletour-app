@@ -31,6 +31,7 @@ import {
   useListTournamentBracketsQuery,
 } from "@/slices/tournamentsApiSlice";
 import MatchContent from "./MatchContent";
+import { useUiVersion } from "@/hooks/uiVersion";
 
 /* =========================
  * Helpers: V/T (+B cho vòng bảng)
@@ -357,57 +358,58 @@ function useLockedDialogMatch({
 /* =============== THEME =============== */
 function useThemeTokens() {
   const scheme = useColorScheme() ?? "light";
+  // V2 modern (navy) ưu tiên như MatchContent — nếu không, sheet trắng chỏi với
+  // các card navy bên trong khi máy đang light mode nhưng app bật V2.
+  const v2 = useUiVersion() === "v2";
+  const isDark = v2 || scheme === "dark";
 
   // màu chính + văn bản
-  const tint = scheme === "dark" ? "#7cc0ff" : "#0a84ff";
-  const textPrimary = scheme === "dark" ? "#ffffff" : "#0f172a";
-  const textSecondary = scheme === "dark" ? "#d1d1d1" : "#334155";
+  const tint = v2 ? "#12B6F3" : isDark ? "#7cc0ff" : "#0a84ff";
+  const textPrimary = v2 ? "#EAF3FF" : isDark ? "#ffffff" : "#0f172a";
+  const textSecondary = v2 ? "#8CA6C8" : isDark ? "#d1d1d1" : "#334155";
 
-  // nền sheet + viền mềm + handle
-  const sheetBg = scheme === "dark" ? "#111214" : "#ffffff";
-  const softBg = scheme === "dark" ? "#1e1f23" : "#eef1f6";
-  const softBorder = scheme === "dark" ? "#3a3b40" : "#cbd5e1";
-  const handle = scheme === "dark" ? "#475569" : "#94a3b8";
-  const backdrop = scheme === "dark" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.45)";
+  // nền sheet + viền mềm + handle (V2 dùng cùng nền trang navy của MatchContent)
+  const sheetBg = v2 ? "#040E20" : isDark ? "#111214" : "#ffffff";
+  const softBg = v2 ? "#0E2244" : isDark ? "#1e1f23" : "#eef1f6";
+  const softBorder = v2 ? "rgba(92,180,255,0.16)" : isDark ? "#3a3b40" : "#cbd5e1";
+  const handle = v2 ? "#3A5A82" : isDark ? "#475569" : "#94a3b8";
+  const backdrop = isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.45)";
 
   // Pills (status)
   const pill = {
-    live:
-      scheme === "dark"
-        ? {
-            bg: "rgba(251,146,60,0.18)",
-            bd: "#fb923c",
-            color: "#fed7aa",
-          }
-        : {
-            bg: "#fff7ed",
-            bd: "#fdba74",
-            color: "#9a3412",
-          },
-    finished:
-      scheme === "dark"
-        ? {
-            bg: "rgba(16,185,129,0.18)",
-            bd: "#34d399",
-            color: "#a7f3d0",
-          }
-        : {
-            bg: "#ecfdf5",
-            bd: "#86efac",
-            color: "#065f46",
-          },
-    scheduled:
-      scheme === "dark"
-        ? {
-            bg: "rgba(148,163,184,0.18)",
-            bd: "#64748b",
-            color: "#cbd5e1",
-          }
-        : {
-            bg: "#f1f5f9",
-            bd: "#cbd5e1",
-            color: "#334155",
-          },
+    live: isDark
+      ? {
+          bg: "rgba(251,146,60,0.18)",
+          bd: "#fb923c",
+          color: "#fed7aa",
+        }
+      : {
+          bg: "#fff7ed",
+          bd: "#fdba74",
+          color: "#9a3412",
+        },
+    finished: isDark
+      ? {
+          bg: "rgba(16,185,129,0.18)",
+          bd: "#34d399",
+          color: "#a7f3d0",
+        }
+      : {
+          bg: "#ecfdf5",
+          bd: "#86efac",
+          color: "#065f46",
+        },
+    scheduled: isDark
+      ? {
+          bg: "rgba(148,163,184,0.18)",
+          bd: "#64748b",
+          color: "#cbd5e1",
+        }
+      : {
+          bg: "#f1f5f9",
+          bd: "#cbd5e1",
+          color: "#334155",
+        },
   };
 
   return {
