@@ -45,6 +45,20 @@ export const clipsApiSlice = apiSlice.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/api/clips/${id}/reject`, method: "POST", body: { reason } }),
       invalidatesTags: (r, e, arg) => [{ type: "Clip", id: `PENDING-${arg.venueId}` }],
     }),
+
+    // Cấu hình sân: tự duyệt clip ngoài giờ.
+    getClipSettings: builder.query({
+      query: (venueId) => ({ url: `/api/clips/settings?venueId=${venueId}` }),
+      providesTags: (r, e, venueId) => [{ type: "Clip", id: `SETTINGS-${venueId}` }],
+    }),
+    setClipSettings: builder.mutation({
+      query: ({ venueId, autoApprove }) => ({
+        url: `/api/clips/settings`,
+        method: "PATCH",
+        body: { venueId, autoApprove },
+      }),
+      invalidatesTags: (r, e, arg) => [{ type: "Clip", id: `SETTINGS-${arg.venueId}` }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -58,4 +72,6 @@ export const {
   useListPendingClipsQuery,
   useApproveClipMutation,
   useRejectClipMutation,
+  useGetClipSettingsQuery,
+  useSetClipSettingsMutation,
 } = clipsApiSlice;

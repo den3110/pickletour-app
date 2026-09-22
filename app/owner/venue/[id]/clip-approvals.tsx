@@ -19,6 +19,8 @@ import {
   useListPendingClipsQuery,
   useApproveClipMutation,
   useRejectClipMutation,
+  useGetClipSettingsQuery,
+  useSetClipSettingsMutation,
 } from "@/slices/clipsApiSlice";
 
 /** "2026_09_22_19_00_00" → "19:00 22/09". */
@@ -42,8 +44,20 @@ export default function ClipApprovalsScreen() {
   });
   const jobs = data?.jobs || [];
 
+  const { data: settings } = useGetClipSettingsQuery(id, { skip: !id });
+  const [setClipSettings, { isLoading: savingSetting }] = useSetClipSettingsMutation();
+  const autoApprove = !!settings?.autoApprove;
+
   const [approveClip] = useApproveClipMutation();
   const [rejectClip] = useRejectClipMutation();
+
+  async function onToggleAuto() {
+    try {
+      await setClipSettings({ venueId: id, autoApprove: !autoApprove }).unwrap();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || "Không lưu được cấu hình.");
+    }
+  }
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -80,6 +94,37 @@ export default function ClipApprovalsScreen() {
         keyboardShouldPersistTaps="handled"
         refreshControl={undefined}
       >
+        {/* Tự duyệt clip ngoài giờ */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          disabled={savingSetting}
+          onPress={onToggleAuto}
+          style={[styles.card, shadow(dark, 1), { flexDirection: "row", alignItems: "center", gap: 12, opacity: savingSetting ? 0.6 : 1 }]}
+        >
+          <View style={[styles.icon, { backgroundColor: autoApprove ? "rgba(34,197,94,0.16)" : C.field }]}>
+            <Ionicons name={autoApprove ? "flash" : "flash-off"} size={16} color={autoApprove ? "#22c55e" : C.sub} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: C.text, fontWeight: "800", fontSize: 14 }}>
+              Tự duyệt clip ngoài giờ
+            </Text>
+            <Text style={{ color: C.sub, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+              {autoApprove
+                ? "Đang BẬT — yêu cầu ngoài giờ tự cắt, không cần duyệt tay."
+                : "Đang TẮT — yêu cầu ngoài giờ phải chờ bạn duyệt."}
+            </Text>
+          </View>
+          {savingSetting ? (
+            <ActivityIndicator color={C.primary} />
+          ) : (
+            <Ionicons
+              name={autoApprove ? "toggle" : "toggle-outline"}
+              size={34}
+              color={autoApprove ? "#22c55e" : C.muted}
+            />
+          )}
+        </TouchableOpacity>
+
         <Text style={{ color: C.sub, fontSize: 12.5, lineHeight: 18 }}>
           Đây là các yêu cầu cắt clip NGOÀI khung giờ khách đã đặt — cần bạn duyệt trước khi
           hệ thống cắt. Yêu cầu trong giờ đặt sẽ tự động xử lý, không hiện ở đây.
