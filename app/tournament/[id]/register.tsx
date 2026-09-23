@@ -45,6 +45,8 @@ import {
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
   useJoinAsPartnerMutation,
+  useApprovePartnerMutation,
+  useRejectPartnerMutation,
   useGetRegistrationsQuery,
   useManagerSetRegStatusMutation,
   useGetTournamentQuery,
@@ -952,6 +954,9 @@ const RegItem = memo(function RegItem({
   myUserId,
   onJoinPartner,
   joinBusy,
+  onApprovePartner,
+  onRejectPartner,
+  partnerActBusy,
 }: any) {
   const C = useThemeColors();
   const total = totalScoreOf(r, isSingles);
@@ -1165,12 +1170,15 @@ const RegItem = memo(function RegItem({
           </TouchableOpacity>
         )}
 
-        {/* VĐV bấm Tham gia để ghép cặp vào đăng ký đơn (giải đôi) */}
+        {/* Người khác: gửi yêu cầu "Xin ghép cặp" (chờ VĐV 1 duyệt) */}
         {!isSingles &&
           !r.player2 &&
           r.lookingForPartner &&
           isLoggedIn &&
-          String(r.player1?.user || "") !== String(myUserId || "") && (
+          String(r.player1?.user || "") !== String(myUserId || "") &&
+          !(r.joinRequests || []).some(
+            (jr: any) => String(jr.user) === String(myUserId || ""),
+          ) && (
             <TouchableOpacity
               style={[styles.addPlayerBtn, { borderColor: "#16a34a", backgroundColor: "#16a34a" }]}
               disabled={joinBusy}
@@ -1178,9 +1186,61 @@ const RegItem = memo(function RegItem({
             >
               <Ionicons name="person-add" size={16} color="#fff" />
               <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>
-                {joinBusy ? t("Đang ghép...") : t("Tham gia (ghép cặp)")}
+                {joinBusy ? t("Đang gửi...") : t("Xin ghép cặp")}
               </Text>
             </TouchableOpacity>
+          )}
+
+        {/* Người đã gửi yêu cầu → trạng thái chờ */}
+        {!isSingles &&
+          !r.player2 &&
+          r.lookingForPartner &&
+          (r.joinRequests || []).some(
+            (jr: any) => String(jr.user) === String(myUserId || ""),
+          ) && (
+            <Text style={{ fontSize: 12, color: "#d97706", fontWeight: "700", marginTop: 6 }}>
+              {t("Đã gửi yêu cầu — chờ duyệt")}
+            </Text>
+          )}
+
+        {/* VĐV 1 (chủ đăng ký đơn): duyệt/chọn 1 người trong danh sách xin ghép */}
+        {!isSingles &&
+          !r.player2 &&
+          r.lookingForPartner &&
+          String(r.player1?.user || "") === String(myUserId || "") &&
+          (r.joinRequests || []).length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: C.textSecondary, marginBottom: 4 }}>
+                {t("VĐV xin ghép")} ({(r.joinRequests || []).length})
+              </Text>
+              {(r.joinRequests || []).map((jr: any) => {
+                const busy = partnerActBusy === String(r._id) + ":" + String(jr.user);
+                return (
+                  <View
+                    key={String(jr.user)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}
+                  >
+                    <Text style={{ flex: 1, color: C.textPrimary, fontSize: 13 }} numberOfLines={1}>
+                      {jr.nickName || jr.fullName} · {Number(jr.score || 0).toFixed(3)}
+                    </Text>
+                    <TouchableOpacity
+                      disabled={busy}
+                      onPress={() => onApprovePartner?.(r, jr)}
+                      style={{ backgroundColor: "#16a34a", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>{t("Duyệt")}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={busy}
+                      onPress={() => onRejectPartner?.(r, jr)}
+                      style={{ borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                    >
+                      <Text style={{ color: C.textSecondary, fontSize: 12, fontWeight: "700" }}>{t("Từ chối")}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
           )}
       </View>
 
@@ -1553,27 +1613,30 @@ export default function TournamentRegistrationScreen() {
   // Mutations
   const [createInvite, { isLoading: saving }] = useCreateRegInviteMutation();
   const [joinAsPartner] = useJoinAsPartnerMutation();
+  const [approvePartner] = useApprovePartnerMutation();
+  const [rejectPartner] = useRejectPartnerMutation();
 
+  // Người khác: gửi YÊU CẦU ghép cặp (chờ VĐV 1 duyệt)
   const handleJoinPartner = useCallback(
     (reg: any) => {
       if (!isLoggedIn)
         return Alert.alert("Thông báo", t("Vui lòng đăng nhập."));
       Alert.alert(
-        t("Ghép cặp"),
-        t("Ghép cặp cùng đội với VĐV này?"),
+        t("Xin ghép cặp"),
+        t("Gửi yêu cầu ghép cặp với VĐV này?"),
         [
           { text: t("Huỷ"), style: "cancel" },
           {
-            text: t("Tham gia"),
+            text: t("Gửi yêu cầu"),
             onPress: async () => {
               try {
                 setJoinBusyId(String(reg._id));
                 await joinAsPartner({ regId: reg._id }).unwrap();
-                Alert.alert(t("Thành công"), t("Đã ghép cặp thành công!"));
+                Alert.alert(t("Thành công"), t("Đã gửi yêu cầu, chờ VĐV 1 duyệt."));
               } catch (e: any) {
                 Alert.alert(
                   t("Lỗi"),
-                  e?.data?.message || t("Không ghép cặp được. Vui lòng thử lại."),
+                  e?.data?.message || t("Không thực hiện được. Vui lòng thử lại."),
                 );
               } finally {
                 setJoinBusyId("");
@@ -1585,6 +1648,49 @@ export default function TournamentRegistrationScreen() {
       );
     },
     [isLoggedIn, joinAsPartner],
+  );
+
+  // VĐV 1: duyệt 1 người trong danh sách xin ghép
+  const handleApprovePartner = useCallback(
+    (reg: any, applicant: any) => {
+      Alert.alert(
+        t("Duyệt partner"),
+        `${t("Chọn")} ${applicant.nickName || applicant.fullName || ""} ${t("làm partner của bạn?")}`,
+        [
+          { text: t("Huỷ"), style: "cancel" },
+          {
+            text: t("Duyệt"),
+            onPress: async () => {
+              try {
+                setJoinBusyId(String(reg._id) + ":" + String(applicant.user));
+                await approvePartner({ regId: reg._id, userId: applicant.user }).unwrap();
+                Alert.alert(t("Thành công"), t("Đã ghép cặp thành công!"));
+              } catch (e: any) {
+                Alert.alert(t("Lỗi"), e?.data?.message || t("Không thực hiện được. Vui lòng thử lại."));
+              } finally {
+                setJoinBusyId("");
+              }
+            },
+          },
+        ],
+        { cancelable: true },
+      );
+    },
+    [approvePartner],
+  );
+
+  const handleRejectPartner = useCallback(
+    async (reg: any, applicant: any) => {
+      try {
+        setJoinBusyId(String(reg._id) + ":" + String(applicant.user));
+        await rejectPartner({ regId: reg._id, userId: applicant.user }).unwrap();
+      } catch (e: any) {
+        Alert.alert(t("Lỗi"), e?.data?.message || t("Không thực hiện được. Vui lòng thử lại."));
+      } finally {
+        setJoinBusyId("");
+      }
+    },
+    [rejectPartner],
   );
   const [respondInvite] = useRespondRegInviteMutation();
   const [cancelReg] = useCancelRegistrationMutation();
@@ -3150,6 +3256,9 @@ export default function TournamentRegistrationScreen() {
               myUserId={me?._id}
               onJoinPartner={handleJoinPartner}
               joinBusy={joinBusyId === String(item._id)}
+              onApprovePartner={handleApprovePartner}
+              onRejectPartner={handleRejectPartner}
+              partnerActBusy={joinBusyId}
               onPreview={openPreview}
               onOpenProfile={openProfileByPlayer}
               onOpenReplace={openReplace}
@@ -3241,6 +3350,9 @@ export default function TournamentRegistrationScreen() {
               myUserId={me?._id}
               onJoinPartner={handleJoinPartner}
               joinBusy={joinBusyId === String(item._id)}
+              onApprovePartner={handleApprovePartner}
+              onRejectPartner={handleRejectPartner}
+              partnerActBusy={joinBusyId}
               onPreview={openPreview}
               onOpenProfile={openProfileByPlayer}
               onOpenReplace={openReplace}
