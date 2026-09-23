@@ -2803,18 +2803,21 @@ export default function TournamentRegistrationScreen() {
                 )}
                 {isDoubles && (
                   <TouchableOpacity
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     onPress={() => setLookingForPartner((v) => !v)}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 8,
                       marginTop: 12,
+                      paddingVertical: 6,
                     }}
                   >
                     <Ionicons
                       name={lookingForPartner ? "checkbox" : "square-outline"}
-                      size={20}
+                      size={22}
                       color={lookingForPartner ? "#16a34a" : C.textSecondary}
+                      style={{ marginRight: 8 }}
                     />
                     <Text style={{ fontSize: 13, color: C.textPrimary, flex: 1 }}>
                       {t("Đăng ký đơn — tìm partner (ghép sau)")}
