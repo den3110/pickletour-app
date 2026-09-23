@@ -72,7 +72,7 @@ function useDebouncedValue(value: string, delay = 320) {
 
 export default function LiveMatchesScreen({ isBack = false }: { isBack?: boolean }) {
   const T = useThemeTokens();
-  const [segment, setSegment] = useState("clusters");
+  const [segment, setSegment] = useState("live");
   const [selectedClusterId, setSelectedClusterId] = useState("");
   const [selectedStation, setSelectedStation] = useState<any>(null);
 

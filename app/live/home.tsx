@@ -1,6 +1,6 @@
-import MobileLiveFeedScreen from "@/components/live_list/MobileLiveFeedScreen";
+import LiveMatchesScreen from "@/components/live_list/LiveMatchesScreen";
 import React from "react";
 
 export default function LiveRoute() {
-  return <MobileLiveFeedScreen isBack />;
+  return <LiveMatchesScreen isBack />;
 }

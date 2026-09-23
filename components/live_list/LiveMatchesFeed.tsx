@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -110,6 +111,7 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
   const lastFetchRef = useRef(Date.now());
 
   const [keyword, setKeyword] = useState("");
+  const [tournamentId, setTournamentId] = useState(""); // "" = tất cả giải
   const [statuses, setStatuses] = useState([...DEFAULT_STATUSES]);
   const [excludeFinished, setExcludeFinished] = useState(DEFAULT_FILTERS.excludeFinished);
   const [windowHours, setWindowHours] = useState(DEFAULT_FILTERS.windowHours);
@@ -131,8 +133,9 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
       statuses: filteredStatuses.join(","),
       windowMs: windowHours * 3600 * 1000,
       excludeFinished,
+      ...(tournamentId ? { tournamentId } : {}),
     };
-  }, [debouncedKeyword, excludeFinished, statuses, windowHours]);
+  }, [debouncedKeyword, excludeFinished, statuses, windowHours, tournamentId]);
 
   const { data, isLoading, isFetching, refetch } = useGetLiveMatchesQuery(queryArgs, {
     refetchOnFocus: true,
@@ -143,6 +146,15 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
     const raw = Array.isArray(data?.items) ? data.items : [];
     return raw.map((match) => ({ ...match, matchId: match?.matchId || match?._id }));
   }, [data?.items]);
+
+  // Danh sách giải cho bộ lọc — backend trả FULL list (tính trước khi lọc theo giải);
+  // giữ lần có dữ liệu gần nhất để không mất option khi đang lọc/refetch.
+  const [tournamentOptions, setTournamentOptions] = useState<any[]>([]);
+  useEffect(() => {
+    if (Array.isArray(data?.tournaments) && data.tournaments.length) {
+      setTournamentOptions(data.tournaments);
+    }
+  }, [data?.tournaments]);
 
   const tournamentRoomIds = useMemo(() => {
     const ids = new Set<string>();
@@ -329,6 +341,48 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
           ) : null}
         </View>
 
+        {tournamentOptions.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+            style={{ marginTop: 8 }}
+          >
+            {[{ _id: "", name: "Tất cả giải", liveCount: 0, count: 0 }, ...tournamentOptions].map(
+              (tt: any) => {
+                const active = String(tournamentId) === String(tt._id);
+                return (
+                  <TouchableOpacity
+                    key={String(tt._id) || "all"}
+                    onPress={() => setTournamentId(String(tt._id))}
+                    style={[
+                      styles.tournamentChip,
+                      {
+                        backgroundColor: active ? T.tint : T.cardBg,
+                        borderColor: active ? T.tint : T.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: active ? "#fff" : T.textPrimary,
+                        fontWeight: "700",
+                        fontSize: 13,
+                        maxWidth: 180,
+                      }}
+                    >
+                      {tt.name}
+                      {tt._id && tt.liveCount ? ` · ${tt.liveCount} live` : ""}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </ScrollView>
+        ) : null}
+
         <View style={styles.actionsRow}>
           <TouchableOpacity
             onPress={() => {
@@ -379,6 +433,8 @@ const LiveMatchesFeed = memo(function LiveMatchesFeed() {
       windowHours,
       excludeFinished,
       autoRefresh,
+      tournamentId,
+      tournamentOptions,
     ]
   );
 
@@ -506,6 +562,13 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     minHeight: 52,
+  },
+  tournamentChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    justifyContent: "center",
   },
   searchInput: {
     flex: 1,
