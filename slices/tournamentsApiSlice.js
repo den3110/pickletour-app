@@ -278,15 +278,24 @@ export const tournamentsApiSlice = apiSlice.injectEndpoints({
 
     // NEW: tạo lời mời đăng ký
     createRegInvite: builder.mutation({
-      query: ({ tourId, message, player1Id, player2Id, status }) => ({
+      query: ({ tourId, message, player1Id, player2Id, status, lookingForPartner }) => ({
         url: `/api/tournaments/${tourId}/registration-invites`,
         method: "POST",
-        body: { message, player1Id, player2Id, status },
+        body: { message, player1Id, player2Id, status, lookingForPartner },
       }),
       invalidatesTags: (res) =>
         res?.invite?.status === "finalized" || res?.status
           ? ["Registrations"]
           : [],
+    }),
+
+    // NEW: VĐV bấm "Tham gia" ghép cặp vào đăng ký đơn (giải đôi)
+    joinAsPartner: builder.mutation({
+      query: ({ regId }) => ({
+        url: `/api/registrations/${regId}/join-as-partner`,
+        method: "PATCH",
+      }),
+      invalidatesTags: ["Registrations"],
     }),
 
     // NEW: list lời mời mình còn pending (theo từng giải)
@@ -931,6 +940,7 @@ export const {
   useGetMatchPublicQuery,
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
+  useJoinAsPartnerMutation,
   useListMyRegInvitesQuery,
   useRespondRegInviteMutation,
   useManagerSetRegPaymentStatusMutation,

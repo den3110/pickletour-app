@@ -44,6 +44,7 @@ import { FlashList } from "@shopify/flash-list";
 import {
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
+  useJoinAsPartnerMutation,
   useGetRegistrationsQuery,
   useManagerSetRegStatusMutation,
   useGetTournamentQuery,
@@ -947,6 +948,10 @@ const RegItem = memo(function RegItem({
   onDemoteToWaitlist,
   busy,
   posterBusyId,
+  isLoggedIn,
+  myUserId,
+  onJoinPartner,
+  joinBusy,
 }: any) {
   const C = useThemeColors();
   const total = totalScoreOf(r, isSingles);
@@ -1159,6 +1164,24 @@ const RegItem = memo(function RegItem({
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* VĐV bấm Tham gia để ghép cặp vào đăng ký đơn (giải đôi) */}
+        {!isSingles &&
+          !r.player2 &&
+          r.lookingForPartner &&
+          isLoggedIn &&
+          String(r.player1?.user || "") !== String(myUserId || "") && (
+            <TouchableOpacity
+              style={[styles.addPlayerBtn, { borderColor: "#16a34a", backgroundColor: "#16a34a" }]}
+              disabled={joinBusy}
+              onPress={() => onJoinPartner?.(r)}
+            >
+              <Ionicons name="person-add" size={16} color="#fff" />
+              <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>
+                {joinBusy ? t("Đang ghép...") : t("Tham gia (ghép cặp)")}
+              </Text>
+            </TouchableOpacity>
+          )}
       </View>
 
       {/* Footer Info & Actions (Tách 2 dòng) */}
@@ -1529,6 +1552,40 @@ export default function TournamentRegistrationScreen() {
 
   // Mutations
   const [createInvite, { isLoading: saving }] = useCreateRegInviteMutation();
+  const [joinAsPartner] = useJoinAsPartnerMutation();
+
+  const handleJoinPartner = useCallback(
+    (reg: any) => {
+      if (!isLoggedIn)
+        return Alert.alert("Thông báo", t("Vui lòng đăng nhập."));
+      Alert.alert(
+        t("Ghép cặp"),
+        t("Ghép cặp cùng đội với VĐV này?"),
+        [
+          { text: t("Huỷ"), style: "cancel" },
+          {
+            text: t("Tham gia"),
+            onPress: async () => {
+              try {
+                setJoinBusyId(String(reg._id));
+                await joinAsPartner({ regId: reg._id }).unwrap();
+                Alert.alert(t("Thành công"), t("Đã ghép cặp thành công!"));
+              } catch (e: any) {
+                Alert.alert(
+                  t("Lỗi"),
+                  e?.data?.message || t("Không ghép cặp được. Vui lòng thử lại."),
+                );
+              } finally {
+                setJoinBusyId("");
+              }
+            },
+          },
+        ],
+        { cancelable: true },
+      );
+    },
+    [isLoggedIn, joinAsPartner],
+  );
   const [respondInvite] = useRespondRegInviteMutation();
   const [cancelReg] = useCancelRegistrationMutation();
   const [setPaymentStatus, { isLoading: settingPayment }] =
@@ -1543,6 +1600,9 @@ export default function TournamentRegistrationScreen() {
   const [p1Admin, setP1Admin] = useState<any>(null);
   const [p2, setP2] = useState<any>(null);
   const [msg, setMsg] = useState("");
+  // Đăng ký ĐƠN cho giải ĐÔI (tìm partner, ghép sau)
+  const [lookingForPartner, setLookingForPartner] = useState(false);
+  const [joinBusyId, setJoinBusyId] = useState<string>("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [cancelingId, setCancelingId] = useState<string | null>(null);
@@ -1811,13 +1871,17 @@ export default function TournamentRegistrationScreen() {
     if (!isLoggedIn) return Alert.alert("Thông báo", "Vui lòng đăng nhập.");
     const p1Id = isAdmin ? p1Admin?._id : me?._id;
     if (!p1Id) return Alert.alert("Lỗi", "Thiếu thông tin VĐV 1");
-    if (isDoubles && !p2?._id) return Alert.alert("Lỗi", "Thiếu VĐV 2");
+    // Đăng ký đơn (tìm partner): chỉ áp cho giải đôi + user thường + đã bật.
+    const soloFindPartner = isDoubles && !isAdmin && lookingForPartner;
+    if (isDoubles && !p2?._id && !soloFindPartner)
+      return Alert.alert("Lỗi", "Thiếu VĐV 2");
 
     const basePayload = {
       tourId: id,
       message: msg,
       player1Id: String(p1Id),
-      player2Id: p2?._id,
+      player2Id: soloFindPartner ? undefined : p2?._id,
+      lookingForPartner: soloFindPartner,
     };
 
     // Admin + cap đầy → hỏi Chờ hay Duyệt luôn
@@ -1857,6 +1921,7 @@ export default function TournamentRegistrationScreen() {
     id,
     msg,
     tour,
+    lookingForPartner,
     performCreateInvite,
   ]);
 
@@ -2630,7 +2695,40 @@ export default function TournamentRegistrationScreen() {
                     </Text>
                   </RegisterGlassSurface>
                 )}
-                {isDoubles && (
+                {isDoubles && !isAdmin && (
+                  <TouchableOpacity
+                    onPress={() => setLookingForPartner((v) => !v)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    <Ionicons
+                      name={lookingForPartner ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={lookingForPartner ? "#16a34a" : C.textSecondary}
+                    />
+                    <Text style={{ fontSize: 13, color: C.textPrimary, flex: 1 }}>
+                      {t("Đăng ký đơn — tìm partner (ghép sau)")}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {isDoubles && lookingForPartner && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: C.textSecondary,
+                      marginTop: 6,
+                    }}
+                  >
+                    {t(
+                      'Bạn sẽ xuất hiện trong danh sách với slot VĐV 2 còn trống. Người khác bấm "Tham gia" để ghép cặp cùng bạn.',
+                    )}
+                  </Text>
+                )}
+                {isDoubles && !lookingForPartner && (
                   <View style={{ marginTop: 12 }}>
                     <RegisterGlassSurface
                       C={C}
@@ -3048,6 +3146,10 @@ export default function TournamentRegistrationScreen() {
               cap={cap}
               delta={delta}
               isOwner={item.createdBy === me?._id}
+              isLoggedIn={isLoggedIn}
+              myUserId={me?._id}
+              onJoinPartner={handleJoinPartner}
+              joinBusy={joinBusyId === String(item._id)}
               onPreview={openPreview}
               onOpenProfile={openProfileByPlayer}
               onOpenReplace={openReplace}
@@ -3135,6 +3237,10 @@ export default function TournamentRegistrationScreen() {
               cap={cap}
               delta={delta}
               isOwner={item.createdBy === me?._id}
+              isLoggedIn={isLoggedIn}
+              myUserId={me?._id}
+              onJoinPartner={handleJoinPartner}
+              joinBusy={joinBusyId === String(item._id)}
               onPreview={openPreview}
               onOpenProfile={openProfileByPlayer}
               onOpenReplace={openReplace}
