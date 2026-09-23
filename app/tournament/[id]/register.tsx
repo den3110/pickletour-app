@@ -1871,8 +1871,8 @@ export default function TournamentRegistrationScreen() {
     if (!isLoggedIn) return Alert.alert("Thông báo", "Vui lòng đăng nhập.");
     const p1Id = isAdmin ? p1Admin?._id : me?._id;
     if (!p1Id) return Alert.alert("Lỗi", "Thiếu thông tin VĐV 1");
-    // Đăng ký đơn (tìm partner): chỉ áp cho giải đôi + user thường + đã bật.
-    const soloFindPartner = isDoubles && !isAdmin && lookingForPartner;
+    // Đăng ký đơn (tìm partner): áp cho giải đôi khi đã bật (cả admin lẫn user).
+    const soloFindPartner = isDoubles && lookingForPartner;
     if (isDoubles && !p2?._id && !soloFindPartner)
       return Alert.alert("Lỗi", "Thiếu VĐV 2");
 
@@ -2695,7 +2695,7 @@ export default function TournamentRegistrationScreen() {
                     </Text>
                   </RegisterGlassSurface>
                 )}
-                {isDoubles && !isAdmin && (
+                {isDoubles && (
                   <TouchableOpacity
                     onPress={() => setLookingForPartner((v) => !v)}
                     style={{
