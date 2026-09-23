@@ -3170,6 +3170,7 @@ export default function TournamentRegistrationScreen() {
       p1Admin,
       p2,
       msg,
+      lookingForPartner,
       saving,
       canManage,
       id,
