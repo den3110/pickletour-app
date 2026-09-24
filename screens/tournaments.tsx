@@ -24,6 +24,7 @@ import { SafeAreaView as EdgeSafeAreaView } from "react-native-safe-area-context
 import { useSelector } from "react-redux";
 import { Image as ExpoImage } from "expo-image";
 import { normalizeUrl } from "@/utils/normalizeUri";
+import { groupTournaments, subLabelOf, groupStatus } from "@/utils/groupTournaments";
 import { useTheme } from "@react-navigation/native";
 import ImageView from "react-native-image-viewing";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -279,6 +280,116 @@ function TournamentListHeader({
   );
 }
 
+/* ---------- Card GOM NHÓM: nhiều nội dung cùng 1 sự kiện ---------- */
+function GroupCard({ group, canManage, formatDate }: any) {
+  const [open, setOpen] = React.useState(false);
+  const items: any[] = group?.items || [];
+  const cover = items.find((x) => normalizeUrl(x?.image)) || items[0];
+  const gstatus = groupStatus(items);
+  const totalReg = items.reduce((s, x) => s + (Number(x?.registered) || 0), 0);
+  const zalo = items.find((x) => x?.zaloGroupUrl)?.zaloGroupUrl || DEFAULT_ZALO_GROUP;
+  const visible = open ? items : items.slice(0, 3);
+
+  return (
+    <PremiumTournamentCard>
+      <TournamentCover
+        image={cover?.image}
+        title={group?.title || "Giải đấu Pickletour"}
+        status={gstatus}
+        onPress={() => setOpen((v) => !v)}
+        onPressImage={() => setOpen((v) => !v)}
+      />
+      <View style={{ paddingHorizontal: 14, paddingTop: 6 }}>
+        <Text style={{ fontSize: 12.5, color: "#8A94A6", fontWeight: "600" }}>
+          {items[0]?.location || "Chưa cập nhật"} · {items.length} nội dung
+          {totalReg > 0 ? ` · ${totalReg} đội` : ""}
+        </Text>
+      </View>
+
+      <View style={{ paddingHorizontal: 12, paddingTop: 8, gap: 8 }}>
+        {visible.map((it) => {
+          const sub =
+            subLabelOf(it?.name, group?.title) ||
+            (String(it?.eventType || "").toLowerCase() === "single" ? "Đấu đơn" : "Đấu đôi");
+          const cap = Number(it?.maxPairs) || 0;
+          const reg = Number(it?.registered) || 0;
+          const manage = canManage?.(it);
+          const canReg = manage || it?.status === "upcoming";
+          return (
+            <View
+              key={String(it?._id)}
+              style={{
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.08)",
+                backgroundColor: "rgba(255,255,255,0.03)",
+                padding: 10,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => router.push(`/tournament/${it?._id}`)}
+                activeOpacity={0.7}
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+              >
+                <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "700", color: "#E7ECF3" }} numberOfLines={1}>
+                  {sub}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#8A94A6", fontWeight: "600" }}>
+                  {cap > 0 ? `${reg}/${cap}` : `${reg}`}
+                </Text>
+              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                {canReg && (
+                  <TouchableOpacity
+                    onPress={() => router.push(`/tournament/${it?._id}/register`)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#2E7DF6", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                  >
+                    <Ionicons name="person-add-outline" size={13} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Đăng ký</Text>
+                  </TouchableOpacity>
+                )}
+                {Number((it as any)?.matchesTotal) > 0 && (
+                  <TouchableOpacity
+                    onPress={() => router.push(`/tournament/${it?._id}/schedule`)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                  >
+                    <Ionicons name="calendar-outline" size={13} color="#B9C2D0" />
+                    <Text style={{ color: "#B9C2D0", fontSize: 12, fontWeight: "700" }}>Lịch đấu</Text>
+                  </TouchableOpacity>
+                )}
+                {Number((it as any)?.bracketsTotal) > 0 && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: "/tournament/[id]/bracket", params: { id: it?._id } })}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                  >
+                    <Ionicons name="git-network-outline" size={13} color="#B9C2D0" />
+                    <Text style={{ color: "#B9C2D0", fontSize: 12, fontWeight: "700" }}>Sơ đồ</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingTop: 10 }}>
+        {items.length > 3 && (
+          <TouchableOpacity
+            onPress={() => setOpen((v) => !v)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 4 }}
+          >
+            <Text style={{ color: "#2E7DF6", fontSize: 12.5, fontWeight: "700" }}>
+              {open ? "Thu gọn" : `Xem tất cả ${items.length} nội dung`}
+            </Text>
+            <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color="#2E7DF6" />
+          </TouchableOpacity>
+        )}
+      </View>
+      <ZaloButton onPress={() => Linking.openURL(zalo)} />
+    </PremiumTournamentCard>
+  );
+}
+
 /* ---------- Main Screen ---------- */
 export default function TournamentDashboardScreen({ isBack = false }) {
   const theme = useModernTheme();
@@ -419,8 +530,19 @@ export default function TournamentDashboardScreen({ isBack = false }) {
 
   const onPressCard = (tt) => router.push(`/tournament/${tt._id}`);
 
+  // Gom nhóm giải cùng sự kiện (cùng tên gốc / cùng cụm sân ≤2 ngày)
+  const groups = useMemo(() => groupTournaments(filtered), [filtered]);
+
   // === RENDER ITEM ===
-  const renderItem = ({ item: tt }) => {
+  const renderItem = ({ item }) => {
+    if (item?.isGroup) {
+      return <GroupCard group={item} canManage={canManage} formatDate={formatDate} />;
+    }
+    const tt = item?.items ? item.items[0] : item;
+    return renderSingle(tt);
+  };
+
+  const renderSingle = (tt) => {
     const onPressSchedule = () => router.push(`/tournament/${tt._id}/schedule`);
     const onPressRegister = () => router.push(`/tournament/${tt._id}/register`);
     const onPressBracket = () =>
@@ -554,8 +676,8 @@ export default function TournamentDashboardScreen({ isBack = false }) {
                 error={error}
               />
             }
-            data={filtered}
-            keyExtractor={(item) => String(item._id)}
+            data={groups}
+            keyExtractor={(item) => String(item.key || item._id)}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
