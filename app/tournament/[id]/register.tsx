@@ -1218,11 +1218,34 @@ const RegItem = memo(function RegItem({
                 return (
                   <View
                     key={String(jr.user)}
-                    style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}
                   >
-                    <Text style={{ flex: 1, color: C.textPrimary, fontSize: 13 }} numberOfLines={1}>
-                      {jr.nickName || jr.fullName} · {Number(jr.score || 0).toFixed(3)}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => onOpenProfile?.({ user: jr.user })}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}
+                      activeOpacity={0.7}
+                    >
+                      <ExpoImage
+                        source={{ uri: normalizeUrl(jr.avatar) || PLACE }}
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 17,
+                          backgroundColor: C.pageBg,
+                          borderWidth: 1,
+                          borderColor: C.border,
+                        }}
+                        contentFit="cover"
+                      />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ color: C.textPrimary, fontSize: 13, fontWeight: "600" }} numberOfLines={1}>
+                          {jr.nickName || jr.fullName}
+                        </Text>
+                        <Text style={{ color: C.textSecondary, fontSize: 11 }} numberOfLines={1}>
+                          {t("Điểm")}: {Number(jr.score || 0).toFixed(3)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       disabled={busy}
                       onPress={() => onApprovePartner?.(r, jr)}
