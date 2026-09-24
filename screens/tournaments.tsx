@@ -283,7 +283,7 @@ function TournamentListHeader({
 
 /* ---------- Card GOM NHÓM: nhiều nội dung cùng 1 sự kiện ---------- */
 function GroupCard({ group, canManage, formatDate }: any) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(true); // mặc định hiện đủ nội dung
   const items: any[] = group?.items || [];
   const cover = items.find((x) => normalizeUrl(x?.image)) || items[0];
   const gstatus = groupStatus(items);
@@ -316,59 +316,91 @@ function GroupCard({ group, canManage, formatDate }: any) {
           const reg = Number(it?.registered) || 0;
           const manage = canManage?.(it);
           const canReg = manage || it?.status === "upcoming";
+          const isDouble = String(it?.eventType || "").toLowerCase() !== "single";
+          const full = cap > 0 && reg >= cap;
+          const pct = cap > 0 ? Math.min(100, Math.round((reg / cap) * 100)) : 0;
+          const accent = full ? "#F2555A" : "#2E7DF6";
           return (
-            <View
+            <TouchableOpacity
               key={String(it?._id)}
+              activeOpacity={0.85}
+              onPress={() => router.push(`/tournament/${it?._id}`)}
               style={{
-                borderRadius: 12,
+                flexDirection: "row",
+                borderRadius: 14,
                 borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.08)",
-                backgroundColor: "rgba(255,255,255,0.03)",
-                padding: 10,
+                borderColor: "rgba(255,255,255,0.09)",
+                backgroundColor: "rgba(255,255,255,0.04)",
+                overflow: "hidden",
               }}
             >
-              <TouchableOpacity
-                onPress={() => router.push(`/tournament/${it?._id}`)}
-                activeOpacity={0.7}
-                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}
-              >
-                <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "700", color: "#E7ECF3" }} numberOfLines={1}>
-                  {sub}
-                </Text>
-                <Text style={{ fontSize: 12, color: "#8A94A6", fontWeight: "600" }}>
-                  {cap > 0 ? `${reg}/${cap}` : `${reg}`}
-                </Text>
-              </TouchableOpacity>
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                {canReg && (
-                  <TouchableOpacity
-                    onPress={() => router.push(`/tournament/${it?._id}/register`)}
-                    style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#2E7DF6", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
-                  >
-                    <Ionicons name="person-add-outline" size={13} color="#fff" />
-                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Đăng ký</Text>
-                  </TouchableOpacity>
+              <View style={{ width: 4, backgroundColor: accent }} />
+              <View style={{ flex: 1, padding: 12, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#EEF2F8" }} numberOfLines={1}>
+                      {sub}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                      <View style={{ backgroundColor: "rgba(46,125,246,0.16)", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#7FB0FF" }}>
+                          {isDouble ? "Đấu đôi" : "Đấu đơn"}
+                        </Text>
+                      </View>
+                      {full && (
+                        <View style={{ backgroundColor: "rgba(242,85,90,0.16)", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#FF8A8E" }}>Đã đầy</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: full ? "#FF8A8E" : "#DCE3EC" }}>
+                    {cap > 0 ? `${reg}/${cap}` : `${reg}`}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#5B6472" />
+                </View>
+
+                {cap > 0 && (
+                  <View style={{ height: 5, borderRadius: 99, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                    <View style={{ width: `${pct}%`, height: "100%", borderRadius: 99, backgroundColor: accent }} />
+                  </View>
                 )}
-                {Number((it as any)?.matchesTotal) > 0 && (
-                  <TouchableOpacity
-                    onPress={() => router.push(`/tournament/${it?._id}/schedule`)}
-                    style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
-                  >
-                    <Ionicons name="calendar-outline" size={13} color="#B9C2D0" />
-                    <Text style={{ color: "#B9C2D0", fontSize: 12, fontWeight: "700" }}>Lịch đấu</Text>
-                  </TouchableOpacity>
-                )}
-                {Number((it as any)?.bracketsTotal) > 0 && (
-                  <TouchableOpacity
-                    onPress={() => router.push({ pathname: "/tournament/[id]/bracket", params: { id: it?._id } })}
-                    style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
-                  >
-                    <Ionicons name="git-network-outline" size={13} color="#B9C2D0" />
-                    <Text style={{ color: "#B9C2D0", fontSize: 12, fontWeight: "700" }}>Sơ đồ</Text>
-                  </TouchableOpacity>
-                )}
+
+                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {canReg && (
+                    <TouchableOpacity
+                      onPress={() => router.push(`/tournament/${it?._id}/register`)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#2E7DF6", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9 }}
+                    >
+                      <Ionicons name="person-add-outline" size={13} color="#fff" />
+                      <Text style={{ color: "#fff", fontSize: 12.5, fontWeight: "800" }}>Đăng ký</Text>
+                    </TouchableOpacity>
+                  )}
+                  {Number((it as any)?.matchesTotal) > 0 && (
+                    <TouchableOpacity
+                      onPress={() => router.push(`/tournament/${it?._id}/schedule`)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 }}
+                    >
+                      <Ionicons name="calendar-outline" size={13} color="#B9C2D0" />
+                      <Text style={{ color: "#B9C2D0", fontSize: 12.5, fontWeight: "700" }}>Lịch đấu</Text>
+                    </TouchableOpacity>
+                  )}
+                  {Number((it as any)?.bracketsTotal) > 0 && (
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: "/tournament/[id]/bracket", params: { id: it?._id } })}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 }}
+                    >
+                      <Ionicons name="git-network-outline" size={13} color="#B9C2D0" />
+                      <Text style={{ color: "#B9C2D0", fontSize: 12.5, fontWeight: "700" }}>Sơ đồ</Text>
+                    </TouchableOpacity>
+                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginLeft: "auto" }}>
+                    <Text style={{ color: "#7FB0FF", fontSize: 12.5, fontWeight: "700" }}>Chi tiết</Text>
+                    <Ionicons name="arrow-forward" size={13} color="#7FB0FF" />
+                  </View>
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </View>
