@@ -14,6 +14,7 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  TouchableOpacity,
   useColorScheme,
   View,
   Modal,
