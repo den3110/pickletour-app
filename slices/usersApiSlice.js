@@ -63,8 +63,13 @@ export const userApiSlice = apiSlice.injectEndpoints({
           if (payload?.ratingDouble !== undefined) {
             next.ratingDouble = payload.ratingDouble;
           }
+          if (payload?.rated !== undefined) {
+            next.rated = payload.rated;
+          }
           if (ratingScore !== null) {
             next.ratingScore = ratingScore;
+          } else {
+            delete next.ratingScore;
           }
 
           dispatch(setCredentials(next));

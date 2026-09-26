@@ -718,7 +718,10 @@ function AthleteIsland() {
   const rawRankNo = hasStoredRankNo ? storedRawRankNo : fetchedRawRankNo;
   const rankNoNumber = Number(rawRankNo);
   const hasRankNo = isValidRankNo(rawRankNo);
-  const ratingScore = getBestRatingScore(myRankData, userInfo);
+  // Chỉ hiện điểm trình khi user đã được chấm (có Ranking doc). userInfo lưu sẵn
+  // có thể còn điểm khởi tạo mặc định (2.5) nên KHÔNG dùng làm nguồn điểm ở đây.
+  const isRated = hasRankNo || Boolean(myRankData?.rated);
+  const ratingScore = isRated ? getBestRatingScore(myRankData) : null;
   const shouldHideRankBadge =
     !!userInfo && !hasRankNo && ratingScore === null && isFetchingMyRank;
 
