@@ -2408,7 +2408,7 @@ function RootLayout() {
 // HotUpdater chỉ được wrap khi bật EXPO_PUBLIC_ENABLE_HOT_UPDATER=1.
 const ExportedLayout = HotUpdater
   ? HotUpdater.wrap({
-      baseURL: "https://hot-updater.datistpham.workers.dev/api/check-update",
+      baseURL: "https://pickletour.vn/api/hot-updater/check-update",
       updateMode: "manual",
       requestTimeout: 8000,
       onNotifyAppReady: (result: {
