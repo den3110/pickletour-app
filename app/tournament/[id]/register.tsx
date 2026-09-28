@@ -405,9 +405,10 @@ const decideTotalState = (total: number, cap: number, delta?: number) => {
   const c = Number(cap);
   if (!Number.isFinite(t) || !(Number.isFinite(c) && c > 0))
     return { state: "default", note: "" };
-  const d = Number.isFinite(delta) && Number(delta) > 0 ? Number(delta) : 0;
-  if (t > c + d + 1e-6) return { state: "error", note: "" };
-  if (Math.abs(t - (c + d)) <= 1e-6) return { state: "warning", note: "" };
+  // Vượt TRẦN điểm (nominal cap) => đỏ, giống bản V1 (delta chỉ là dung sai chặn
+  // đăng ký ở backend, không dùng để "xanh hoá" cặp đã quá trần).
+  if (t > c + 1e-6) return { state: "error", note: "" };
+  if (Math.abs(t - c) <= 1e-6) return { state: "warning", note: "" };
   return { state: "success", note: "" };
 };
 
@@ -1875,14 +1876,12 @@ export default function TournamentRegistrationScreen() {
       const EPS = 0.001;
       const players = [r?.player1, r?.player2].filter(Boolean);
       if (key === "over") {
-        // Chỉ tính "vượt điểm trình" khi ĐỎ = vượt QUÁ mức tối đa cho phép
-        // (cap + delta). Bằng cap+delta là "maxed" (cam), KHÔNG tính là vượt.
+        // "Vượt điểm trình" = vượt TRẦN (nominal cap), khớp chip tổng màu đỏ.
         const total = totalScoreOf(r, isSingles);
-        const overTotal =
-          cap > 0 && total != null && total > cap + delta + EPS;
+        const overTotal = cap > 0 && total != null && total > cap + EPS;
         const overSingle =
           eachCap > 0 &&
-          players.some((p: any) => Number(p.score) > eachCap + delta + EPS);
+          players.some((p: any) => Number(p.score) > eachCap + EPS);
         return overTotal || overSingle;
       }
       if (key === "unpaid")
