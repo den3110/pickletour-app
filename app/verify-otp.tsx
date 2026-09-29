@@ -283,6 +283,7 @@ export default function VerifyOtpScreen() {
                   setOtp(v.replace(/[^\d]/g, "").slice(0, OTP_LENGTH))
                 }
                 keyboardType="number-pad"
+                systemKeyboard
                 textContentType="oneTimeCode" // iOS Auto-fill OTP
                 maxLength={OTP_LENGTH}
                 style={styles.hiddenInput}

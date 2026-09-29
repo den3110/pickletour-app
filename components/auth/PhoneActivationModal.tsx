@@ -139,6 +139,7 @@ export default function PhoneActivationModal({
                 placeholder="••••••"
                 placeholderTextColor={C.muted}
                 keyboardType="number-pad"
+                systemKeyboard
                 maxLength={6}
                 autoFocus
               />

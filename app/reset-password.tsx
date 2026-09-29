@@ -95,6 +95,7 @@ function OtpCells({ value, setValue, themed, editable = true }) {
           onChangeText={(t) => handleChange(t, i)}
           onKeyPress={(e) => handleKeyPress(e, i)}
           keyboardType="number-pad"
+          systemKeyboard
           returnKeyType={i === OTP_LEN - 1 ? "done" : "next"}
           maxLength={1}
           editable={editable}

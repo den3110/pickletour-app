@@ -626,6 +626,7 @@ export default function CheckpointRealtimeGate() {
         placeholder="Mã xác minh"
         placeholderTextColor={isDark ? "#667085" : "#94a3b8"}
         keyboardType="number-pad"
+        systemKeyboard
         textContentType="oneTimeCode"
         autoComplete="sms-otp"
         maxLength={6}
