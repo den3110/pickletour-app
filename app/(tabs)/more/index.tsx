@@ -19,8 +19,20 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 // Marker bản OTA — dòng này đổi khi hot-update đã về máy.
 // Giá trị "baseline" nằm trong BẢN NATIVE (build/archive). Bản OTA trên server
-// mang giá trị khác ("OTA 2026-10-01") → sau khi OTA áp dụng, dòng này sẽ ĐỔI.
+// mang giá trị khác → sau khi OTA áp dụng, dòng này sẽ ĐỔI.
 const OTA_TAG = "base 1.1.20 · chưa OTA";
+
+// Chẩn đoán OTA: đọc globalThis.__PT_OTA__ do app/_layout.tsx ghi (flag đã nhúng
+// lúc build, module load được không, kết quả check gần nhất). Tự làm mới định kỳ.
+const readOtaDiag = () => {
+  try {
+    const d = (globalThis as any).__PT_OTA__;
+    if (!d) return "diag: n/a";
+    return `flag=${d.flag} · mod=${d.module} · own=${d.ownership} · ${d.last}`;
+  } catch {
+    return "diag: err";
+  }
+};
 
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
@@ -192,6 +204,12 @@ export default function MoreIndexScreen() {
   const isDark = theme.dark;
   const lang = useLang();
   const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
+  // Dòng chẩn đoán OTA ở footer — làm mới mỗi 2s để thấy kết quả check gần nhất.
+  const [otaDiagLine, setOtaDiagLine] = React.useState(readOtaDiag);
+  React.useEffect(() => {
+    const t = setInterval(() => setOtaDiagLine(readOtaDiag()), 2000);
+    return () => clearInterval(t);
+  }, []);
   const pageBg = isDark ? theme.colors.background : "#F8FAFC";
   const cardBg = isDark ? theme.colors.card : "rgba(255,255,255,0.9)";
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0";
@@ -507,6 +525,17 @@ export default function MoreIndexScreen() {
           }}
         >
           {`PickleTour v${Application.nativeApplicationVersion ?? "?"} · ${OTA_TAG}`}
+        </Text>
+        <Text
+          selectable
+          style={{
+            marginTop: 4,
+            textAlign: "center",
+            fontSize: 10,
+            color: isDark ? "#52525B" : "#CBD5E1",
+          }}
+        >
+          {otaDiagLine}
         </Text>
       </ScrollView>
     </SafeAreaView>

@@ -82,13 +82,27 @@ const CLARITY_RN_ENABLED =
 
 // HotUpdater: import động và chỉ bật khi cấu hình rõ ràng để tránh crash native lúc mở app.
 let HotUpdater: any = null;
+let hotUpdaterLoadError = "";
 if (HOT_UPDATER_ENABLED) {
   try {
     HotUpdater = require("@hot-updater/react-native").HotUpdater;
   } catch (e) {
+    hotUpdaterLoadError = String((e as any)?.message || e);
     if (__DEV__) console.warn("HotUpdater not available (Expo Go?):", e);
   }
 }
+// Chẩn đoán OTA (đọc ở footer tab More): giá trị flag ĐÃ NHÚNG lúc build, module
+// có load được không, và kết quả lần check gần nhất. Giúp biết chính xác OTA hỏng
+// ở khâu nào (flag chưa vào build / check không chạy / lỗi mạng / tải‑áp).
+(globalThis as any).__PT_OTA__ = {
+  flag: String(process.env.EXPO_PUBLIC_ENABLE_HOT_UPDATER ?? "undef"),
+  ownership: String(Constants.appOwnership ?? "null"),
+  module: HotUpdater ? "on" : hotUpdaterLoadError ? `loadErr:${hotUpdaterLoadError}` : "off",
+  last: "idle",
+};
+const otaDiag = (s: string) => {
+  try { (globalThis as any).__PT_OTA__.last = s; } catch {}
+};
 
 // app/_layout.tsx
 if (__DEV__) {
@@ -994,6 +1008,7 @@ function RootLayout() {
     if (now - otaLastCheckAtRef.current < 15000) return;
     otaLastCheckAtRef.current = now;
     otaCheckInFlightRef.current = true;
+    otaDiag("checking…");
 
     try {
       let remoteForceUpdate = false;
@@ -1011,6 +1026,7 @@ function RootLayout() {
           if (killSwitchData && killSwitchData.allowed === false) {
             if (__DEV__)
               console.log("[HotUpdater] OTA updates disabled remotely.");
+            otaDiag("killswitch: tắt từ xa");
             otaCheckInFlightRef.current = false;
             return;
           }
@@ -1026,9 +1042,13 @@ function RootLayout() {
       });
 
       if (!updateInfo) {
+        otaDiag("không có bản mới (server trả null)");
         otaCheckInFlightRef.current = false;
         return;
       }
+      otaDiag(
+        `có bản: ${String(updateInfo?.id || "").slice(0, 8)} ${String(updateInfo?.status || "")}`,
+      );
       const updateId = String(updateInfo?.id || "").trim();
       const updateStatus = String(updateInfo?.status || "UPDATE").toUpperCase();
       const isRollbackUpdate = updateStatus === "ROLLBACK";
@@ -1159,6 +1179,7 @@ function RootLayout() {
       Alert.alert(title, message, buttons, { cancelable: false });
     } catch (error) {
       console.error("[HotUpdater] Check error:", error);
+      otaDiag(`lỗi: ${String((error as any)?.message || error).slice(0, 80)}`);
       otaCheckInFlightRef.current = false;
     }
   }, [startHotUpdate]);
