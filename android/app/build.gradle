@@ -77,7 +77,11 @@ def releaseStoreFile = findProperty('PICKLETOUR_UPLOAD_STORE_FILE')
 def releaseStorePassword = findProperty('PICKLETOUR_UPLOAD_STORE_PASSWORD')
 def releaseKeyAlias = findProperty('PICKLETOUR_UPLOAD_KEY_ALIAS')
 def releaseKeyPassword = findProperty('PICKLETOUR_UPLOAD_KEY_PASSWORD')
-def pickletourHotUpdaterEnabled = (findProperty('pickletour.hotUpdaterEnabled') ?: 'false').toBoolean()
+// Mặc định BẬT native HotUpdater để build release nạp bundle OTA đã tải.
+// (Trước đây mặc định 'false' → release không truyền -P sẽ tắt OTA, Android luôn
+//  nạp bundle nhúng → mất OTA. Debug dùng metro nên không ảnh hưởng dev.)
+// Muốn tắt: -Ppickletour.hotUpdaterEnabled=false
+def pickletourHotUpdaterEnabled = (findProperty('pickletour.hotUpdaterEnabled') ?: 'true').toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
