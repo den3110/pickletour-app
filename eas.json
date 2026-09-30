@@ -14,11 +14,17 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_HOT_UPDATER": "1"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_HOT_UPDATER": "1"
+      }
     }
   },
   "submit": {
