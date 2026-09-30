@@ -14,7 +14,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import * as Application from "expo-application";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Marker bản OTA — dòng này đổi khi hot-update đã về máy.
+// Giá trị "baseline" nằm trong BẢN NATIVE (build/archive). Bản OTA trên server
+// mang giá trị khác ("OTA 2026-10-01") → sau khi OTA áp dụng, dòng này sẽ ĐỔI.
+const OTA_TAG = "base 1.1.20 · chưa OTA";
 
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
 import { buildLoginHref } from "@/services/authSession";
@@ -491,6 +497,17 @@ export default function MoreIndexScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Text
+          style={{
+            marginTop: 18,
+            textAlign: "center",
+            fontSize: 12,
+            color: isDark ? "#71717A" : "#A1A1AA",
+          }}
+        >
+          {`PickleTour v${Application.nativeApplicationVersion ?? "?"} · ${OTA_TAG}`}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
