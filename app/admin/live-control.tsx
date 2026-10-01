@@ -39,6 +39,10 @@ export default function LiveControlScreen() {
   const isDark = theme.dark;
   const userInfo = useSelector((s: any) => s.auth?.userInfo);
   const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin" || userInfo?.isSuperAdmin);
+  const isCommentator = !!userInfo?.isCommentator;
+  const canAccess = isAdmin || isCommentator;
+  // Bình luận viên (không phải admin): chỉ xem + bình luận, ẩn mọi điều khiển.
+  const commentaryOnly = !isAdmin;
 
   const C = {
     bg: isDark ? theme.colors.background : "#F8FAFC",
@@ -53,7 +57,7 @@ export default function LiveControlScreen() {
   };
 
   const { data: machinesData, isLoading: loadingMachines, refetch: refetchMachines } =
-    useGetLiveMachinesQuery(undefined, { pollingInterval: 20000, skip: !isAdmin });
+    useGetLiveMachinesQuery(undefined, { pollingInterval: 20000, skip: !canAccess });
   const machines: any[] = machinesData?.machines || [];
   const [machineId, setMachineId] = useState<string>("");
   const [callMut] = useLiveControlCallMutation();
@@ -165,7 +169,7 @@ export default function LiveControlScreen() {
     }
   };
 
-  if (!isAdmin) return <Redirect href="/(tabs)/more" />;
+  if (!canAccess) return <Redirect href="/(tabs)/more" />;
 
   const sessions: any[] = snap.sessions || [];
   const perf = snap.perf || {};
@@ -174,7 +178,7 @@ export default function LiveControlScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { borderColor: C.border }]}>
-        <Text style={[styles.h1, { color: C.text }]}>🎬 Điều khiển Live</Text>
+        <Text style={[styles.h1, { color: C.text }]}>{commentaryOnly ? "🎙️ Bình luận Live" : "🎬 Điều khiển Live"}</Text>
       </View>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
@@ -212,13 +216,15 @@ export default function LiveControlScreen() {
 
         {!!machineId && (
           <>
-            {/* Thêm sân live / hẹn giờ */}
-            <Pressable
-              onPress={() => router.push(`/admin/live-add?machineId=${encodeURIComponent(machineId)}` as any)}
-              style={[styles.addBtn, { backgroundColor: C.primary }]}
-            >
-              <Text style={{ color: "#fff", fontWeight: "800" }}>＋ Thêm sân live / Hẹn giờ</Text>
-            </Pressable>
+            {/* Thêm sân live / hẹn giờ (chỉ admin) */}
+            {!commentaryOnly && (
+              <Pressable
+                onPress={() => router.push(`/admin/live-add?machineId=${encodeURIComponent(machineId)}` as any)}
+                style={[styles.addBtn, { backgroundColor: C.primary }]}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800" }}>＋ Thêm sân live / Hẹn giờ</Text>
+              </Pressable>
+            )}
 
             {/* Perf + lỗi */}
             <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -229,24 +235,26 @@ export default function LiveControlScreen() {
               {!!err && <Text style={{ color: C.danger, marginTop: 6, fontSize: 13 }}>{err}</Text>}
             </View>
 
-            {/* Độ hiển thị overlay (chung) */}
-            <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-              <Text style={{ color: C.text, fontWeight: "700" }}>🎚️ Độ hiển thị overlay (chung mọi sân)</Text>
-              <View style={styles.presetRow}>
-                {OPACITY_PRESETS.map((p) => (
-                  <Pressable
-                    key={p}
-                    onPress={() => applyOpacity(p)}
-                    style={[styles.preset, { backgroundColor: opacity === p ? C.primary : C.chipOff, borderColor: C.border }]}
-                  >
-                    <Text style={{ color: opacity === p ? "#fff" : C.text, fontWeight: "700", fontSize: 13 }}>{p}%</Text>
-                  </Pressable>
-                ))}
+            {/* Độ hiển thị overlay (chung) — chỉ admin */}
+            {!commentaryOnly && (
+              <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+                <Text style={{ color: C.text, fontWeight: "700" }}>🎚️ Độ hiển thị overlay (chung mọi sân)</Text>
+                <View style={styles.presetRow}>
+                  {OPACITY_PRESETS.map((p) => (
+                    <Pressable
+                      key={p}
+                      onPress={() => applyOpacity(p)}
+                      style={[styles.preset, { backgroundColor: opacity === p ? C.primary : C.chipOff, borderColor: C.border }]}
+                    >
+                      <Text style={{ color: opacity === p ? "#fff" : C.text, fontWeight: "700", fontSize: 13 }}>{p}%</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
-            {/* Nút dừng tất cả */}
-            {sessions.length > 0 && (
+            {/* Nút dừng tất cả — chỉ admin */}
+            {!commentaryOnly && sessions.length > 0 && (
               <Pressable onPress={stopAll} style={[styles.stopAll, { borderColor: C.danger }]}>
                 <Text style={{ color: C.danger, fontWeight: "800" }}>■ Dừng tất cả</Text>
               </Pressable>
@@ -280,14 +288,16 @@ export default function LiveControlScreen() {
                         <MaterialIcons name="mic" size={15} color={C.primary} />
                         <Text style={{ color: C.primary, fontWeight: "700", fontSize: 12 }}>Bình luận</Text>
                       </Pressable>
-                      <Pressable onPress={() => stopCourt(s)} style={[styles.stopBtn, { backgroundColor: C.danger }]}>
-                        <Text style={{ color: "#fff", fontWeight: "700" }}>■ Dừng</Text>
-                      </Pressable>
+                      {!commentaryOnly && (
+                        <Pressable onPress={() => stopCourt(s)} style={[styles.stopBtn, { backgroundColor: C.danger }]}>
+                          <Text style={{ color: "#fff", fontWeight: "700" }}>■ Dừng</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
 
-                  {/* Link xem */}
-                  {(s.watchUrls || []).map((u: string) => (
+                  {/* Link xem + điều khiển (chỉ admin) */}
+                  {!commentaryOnly && (s.watchUrls || []).map((u: string) => (
                     <View key={u} style={[styles.linkRow, { borderColor: C.border }]}>
                       <Pressable style={{ flex: 1 }} onPress={() => Linking.openURL(u)}>
                         <Text numberOfLines={1} style={{ color: C.primary, fontSize: 12 }}>↗ {u}</Text>
@@ -298,27 +308,29 @@ export default function LiveControlScreen() {
                     </View>
                   ))}
 
-                  {/* Vị trí overlay (bấm để đổi góc) */}
-                  <Text style={{ color: C.sub, fontSize: 12, marginTop: 10 }}>Vị trí overlay (chạm để đổi)</Text>
-                  <View style={styles.layRow}>
-                    {[["scoreboard", "Bảng điểm"], ["brand", "Logo"], ["sponsor", "Tài trợ"]].map(([k, label]) => (
-                      <Pressable key={k} onPress={() => cycleLayout(s, k)} style={[styles.layBtn, { borderColor: C.border, backgroundColor: C.chipOff }]}>
-                        <Text style={{ color: C.sub, fontSize: 10 }}>{label}</Text>
-                        <Text style={{ color: C.text, fontSize: 12, fontWeight: "700" }}>
-                          {CORNER_LABEL[s.layout?.[k] || "top-left"]}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-
-                  {/* Ẩn ngày giờ */}
-                  <View style={[styles.rowBetween, { marginTop: 10 }]}>
-                    <Text style={{ color: C.text, fontSize: 14 }}>Ẩn ngày giờ camera (làm mờ)</Text>
-                    <Switch value={!!s.hideTimestamp} onValueChange={(v) => toggleTs(s, v)} />
-                  </View>
-                  {s.hideTimestamp ? (
-                    <Text style={{ color: C.sub, fontSize: 11 }}>Bật/tắt sẽ khởi động lại luồng ~vài giây.</Text>
-                  ) : null}
+                  {/* Vị trí overlay + ẩn ngày giờ (chỉ admin) */}
+                  {!commentaryOnly && (
+                    <>
+                      <Text style={{ color: C.sub, fontSize: 12, marginTop: 10 }}>Vị trí overlay (chạm để đổi)</Text>
+                      <View style={styles.layRow}>
+                        {[["scoreboard", "Bảng điểm"], ["brand", "Logo"], ["sponsor", "Tài trợ"]].map(([k, label]) => (
+                          <Pressable key={k} onPress={() => cycleLayout(s, k)} style={[styles.layBtn, { borderColor: C.border, backgroundColor: C.chipOff }]}>
+                            <Text style={{ color: C.sub, fontSize: 10 }}>{label}</Text>
+                            <Text style={{ color: C.text, fontSize: 12, fontWeight: "700" }}>
+                              {CORNER_LABEL[s.layout?.[k] || "top-left"]}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <View style={[styles.rowBetween, { marginTop: 10 }]}>
+                        <Text style={{ color: C.text, fontSize: 14 }}>Ẩn ngày giờ camera (làm mờ)</Text>
+                        <Switch value={!!s.hideTimestamp} onValueChange={(v) => toggleTs(s, v)} />
+                      </View>
+                      {s.hideTimestamp ? (
+                        <Text style={{ color: C.sub, fontSize: 11 }}>Bật/tắt sẽ khởi động lại luồng ~vài giây.</Text>
+                      ) : null}
+                    </>
+                  )}
                 </View>
               ))
             )}

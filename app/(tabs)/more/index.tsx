@@ -202,7 +202,8 @@ export default function MoreIndexScreen() {
   const insets = useSafeAreaInsets();
   const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
   const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin" || userInfo?.isSuperAdmin);
-  // Admin: thêm mục Điều khiển Live (máy PC live qua Tailscale/backend proxy).
+  const isCommentator = !!userInfo?.isCommentator;
+  // Admin: mục Điều khiển Live (đầy đủ). Bình luận viên: chỉ vào bình luận.
   const moreItems = isAdmin
     ? [
         ...MORE_ITEMS,
@@ -215,7 +216,19 @@ export default function MoreIndexScreen() {
           accent: "#0EA5E9",
         },
       ]
-    : MORE_ITEMS;
+    : isCommentator
+      ? [
+          ...MORE_ITEMS,
+          {
+            key: "live-control",
+            title: "Bình luận Live",
+            description: "Vào luồng live đang chạy để bình luận bằng mic.",
+            icon: "mic-outline" as const,
+            route: "/admin/live-control",
+            accent: "#0EA5E9",
+          },
+        ]
+      : MORE_ITEMS;
   const isDark = theme.dark;
   const lang = useLang();
   const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
