@@ -27,15 +27,18 @@ export default function LiveAddScreen() {
   const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin" || userInfo?.isSuperAdmin);
   const { machineId } = useLocalSearchParams<{ machineId: string }>();
 
-  const C = {
-    bg: isDark ? theme.colors.background : "#F8FAFC",
-    card: isDark ? "#111827" : "#FFFFFF",
-    border: isDark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
-    text: theme.colors.text,
-    sub: isDark ? "#94A3B8" : "#64748B",
-    primary: "#0EA5E9",
-    field: isDark ? "#0b1220" : "#F1F5F9",
-  };
+  const C = useMemo(
+    () => ({
+      bg: isDark ? theme.colors.background : "#F8FAFC",
+      card: isDark ? "#111827" : "#FFFFFF",
+      border: isDark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
+      text: theme.colors.text,
+      sub: isDark ? "#94A3B8" : "#64748B",
+      primary: "#0EA5E9",
+      field: isDark ? "#0b1220" : "#F1F5F9",
+    }),
+    [isDark, theme],
+  );
 
   const [callMut] = useLiveControlCallMutation();
   const call = useCallback(
@@ -170,34 +173,47 @@ export default function LiveAddScreen() {
   };
   const [iosPicker, setIosPicker] = useState<Date | null>(null);
 
-  if (!isAdmin) return <Redirect href="/(tabs)/more" />;
+  // Giữ identity ổn định (useCallback) để gõ TextInput không bị remount → mất focus/đóng bàn phím.
+  const Row = useCallback(
+    ({ label, children }: any) => (
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ color: C.sub, fontSize: 13, marginBottom: 5 }}>{label}</Text>
+        {children}
+      </View>
+    ),
+    [C],
+  );
+  const SelectBtn = useCallback(
+    ({ text, onPress }: any) => (
+      <Pressable onPress={onPress} style={[styles.select, { backgroundColor: C.field, borderColor: C.border }]}>
+        <Text style={{ color: text ? C.text : C.sub }}>{text || "— Chọn —"}</Text>
+      </Pressable>
+    ),
+    [C],
+  );
+  const Seg = useCallback(
+    ({ options, value, onChange }: any) => (
+      <View style={styles.seg}>
+        {options.map((o: any) => (
+          <Pressable key={o.v} onPress={() => onChange(o.v)} style={[styles.segItem, { backgroundColor: value === o.v ? C.primary : C.field, borderColor: C.border }]}>
+            <Text style={{ color: value === o.v ? "#fff" : C.text, fontWeight: "600", fontSize: 13 }}>{o.l}</Text>
+          </Pressable>
+        ))}
+      </View>
+    ),
+    [C],
+  );
+  const Toggle = useCallback(
+    ({ label, value, onValueChange }: any) => (
+      <View style={[styles.toggleRow]}>
+        <Text style={{ color: C.text, flex: 1 }}>{label}</Text>
+        <Switch value={value} onValueChange={onValueChange} />
+      </View>
+    ),
+    [C],
+  );
 
-  const Row = ({ label, children }: any) => (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={{ color: C.sub, fontSize: 13, marginBottom: 5 }}>{label}</Text>
-      {children}
-    </View>
-  );
-  const SelectBtn = ({ text, onPress }: any) => (
-    <Pressable onPress={onPress} style={[styles.select, { backgroundColor: C.field, borderColor: C.border }]}>
-      <Text style={{ color: text ? C.text : C.sub }}>{text || "— Chọn —"}</Text>
-    </Pressable>
-  );
-  const Seg = ({ options, value, onChange }: any) => (
-    <View style={styles.seg}>
-      {options.map((o: any) => (
-        <Pressable key={o.v} onPress={() => onChange(o.v)} style={[styles.segItem, { backgroundColor: value === o.v ? C.primary : C.field, borderColor: C.border }]}>
-          <Text style={{ color: value === o.v ? "#fff" : C.text, fontWeight: "600", fontSize: 13 }}>{o.l}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-  const Toggle = ({ label, value, onValueChange }: any) => (
-    <View style={[styles.toggleRow]}>
-      <Text style={{ color: C.text, flex: 1 }}>{label}</Text>
-      <Switch value={value} onValueChange={onValueChange} />
-    </View>
-  );
+  if (!isAdmin) return <Redirect href="/(tabs)/more" />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "left", "right"]}>
