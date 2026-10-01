@@ -32,6 +32,13 @@ export const liveControlApiSlice = apiSlice.injectEndpoints({
         body: { token, sdp, type },
       }),
     }),
+    // RTSP nguồn (admin) để xem trực tiếp mượt khi cùng Tailscale. direct=false nếu
+    // nguồn local (Dahua P2P)/Imou/không RTSP → dùng WebRTC.
+    getSessionRtsp: builder.query({
+      query: ({ machineId, sid }) =>
+        `/api/live-control/${encodeURIComponent(machineId)}/session-rtsp?sid=${encodeURIComponent(sid)}`,
+      keepUnusedDataFor: 30,
+    }),
   }),
 });
 
@@ -40,4 +47,5 @@ export const {
   useLiveControlCallMutation,
   useCreateCommentaryTokenMutation,
   useCommentaryOfferMutation,
+  useGetSessionRtspQuery,
 } = liveControlApiSlice;

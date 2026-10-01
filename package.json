@@ -103,6 +103,7 @@
     "react-native-toast-message": "^2.3.3",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.18.0",
+    "react-native-vlc-media-player": "^1.0.98",
     "react-native-web": "^0.21.0",
     "react-native-webrtc": "^124.0.8",
     "react-native-webview": "13.16.0",
