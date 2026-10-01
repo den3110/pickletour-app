@@ -20,7 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 // Marker bản OTA — dòng này đổi khi hot-update đã về máy.
 // Giá trị "baseline" nằm trong BẢN NATIVE (build/archive). Bản OTA trên server
 // mang giá trị khác → sau khi OTA áp dụng, dòng này sẽ ĐỔI.
-const OTA_TAG = "base 1.1.20 · chưa OTA";
+const OTA_TAG = "";
 
 // Chẩn đoán OTA: đọc globalThis.__PT_OTA__ do app/_layout.tsx ghi (flag đã nhúng
 // lúc build, module load được không, kết quả check gần nhất). Tự làm mới định kỳ.
@@ -201,6 +201,21 @@ export default function MoreIndexScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const userInfo = useSelector((state: any) => state.auth?.userInfo || null);
+  const isAdmin = !!(userInfo?.isAdmin || userInfo?.role === "admin" || userInfo?.isSuperAdmin);
+  // Admin: thêm mục Điều khiển Live (máy PC live qua Tailscale/backend proxy).
+  const moreItems = isAdmin
+    ? [
+        ...MORE_ITEMS,
+        {
+          key: "live-control",
+          title: "Điều khiển Live",
+          description: "Điều khiển các luồng live (PC live) từ xa.",
+          icon: "videocam-outline" as const,
+          route: "/admin/live-control",
+          accent: "#0EA5E9",
+        },
+      ]
+    : MORE_ITEMS;
   const isDark = theme.dark;
   const lang = useLang();
   const isAuthed = Boolean(userInfo?.token || userInfo?._id || userInfo?.email);
@@ -393,7 +408,7 @@ export default function MoreIndexScreen() {
             </View>
           </Pressable>
 
-          {MORE_ITEMS.map((item) => (
+          {moreItems.map((item) => (
             <Pressable
               key={item.key}
               accessibilityRole="button"
