@@ -1,7 +1,8 @@
 // Bình luận trực tiếp NGAY TRONG app (native):
-//  - Mic → luồng live luôn qua WebRTC (aiortc, token-gated) như bản web.
-//  - Video xem: nếu admin + nguồn là RTSP tới được qua Tailscale → phát RTSP trực
-//    tiếp (VLC) cho mượt/nét; nếu không → video 360p qua WebRTC. Có nút chuyển.
+//  - Mic → luồng live LUÔN qua WebRTC (aiortc, token-gated) — KHÔNG cần Tailscale.
+//  - Video xem: nếu admin + nguồn RTSP + điện thoại tới được (Tailscale) → phát RTSP
+//    THẲNG bằng VLC (mượt, KHÔNG tốn tài nguyên VPS). Nếu không tới được → tự
+//    fallback video qua WebRTC (VPS kéo RTSP full-res/360p) — chỉ tốn VPS khi cần.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/ui/i18nText";
@@ -60,7 +61,7 @@ export default function NativeCommentaryScreen() {
     [isDark, theme],
   );
 
-  // RTSP trực tiếp chỉ dành cho admin (URL chứa creds cam).
+  // RTSP trực tiếp chỉ cho admin (URL chứa creds cam).
   const { data: rtspInfo, isFetching: rtspFetching } = useGetSessionRtspQuery(
     { machineId: String(machineId), sid: String(sid) },
     { skip: !isAdmin || !machineId || !sid },
@@ -82,8 +83,10 @@ export default function NativeCommentaryScreen() {
   const trackRef = useRef<any>(null);
   const remoteRef = useRef<any>(null);
   const startedRef = useRef(false);
+  const connectTimerRef = useRef<any>(null);
 
   const cleanup = useCallback(() => {
+    try { clearTimeout(connectTimerRef.current); } catch {}
     try { trackRef.current && (trackRef.current.enabled = false); } catch {}
     try { streamRef.current?.getTracks?.().forEach((t: any) => t.stop()); } catch {}
     try { pcRef.current?.close?.(); } catch {}
@@ -95,7 +98,8 @@ export default function NativeCommentaryScreen() {
     setTalking(false);
   }, []);
 
-  // videoViaRtsp = true → KHÔNG nhận video qua WebRTC (video xem bằng VLC/RTSP).
+  // videoViaRtsp = true → KHÔNG xin video qua WebRTC (video xem bằng VLC/RTSP),
+  // VPS chỉ lo mic (tiết kiệm tài nguyên).
   const doConnect = useCallback(
     async (videoViaRtsp: boolean) => {
       setErr("");
@@ -118,7 +122,7 @@ export default function NativeCommentaryScreen() {
 
         const pc: any = new RTCPeerConnection({ iceServers: ICE });
         pcRef.current = pc;
-        pc.addTrack(track, stream);
+        pc.addTrack(track, stream); // mic (sendonly)
         if (!videoViaRtsp) {
           pc.addTransceiver("video", { direction: "recvonly" });
           pc.addEventListener("track", (e: any) => {
@@ -130,10 +134,16 @@ export default function NativeCommentaryScreen() {
         }
         pc.addEventListener("connectionstatechange", () => {
           const st = pc.connectionState;
-          if (st === "connected") setStatus("connected");
-          else if (st === "failed" || st === "disconnected" || st === "closed") {
+          if (st === "connected") {
+            clearTimeout(connectTimerRef.current);
+            setErr("");
+            setStatus("connected");
+          } else if (st === "failed") {
+            // Chỉ "failed" (terminal) mới là lỗi. "disconnected"/"connecting" là
+            // tạm thời khi ICE đang thử → KHÔNG báo lỗi vội.
+            clearTimeout(connectTimerRef.current);
             setStatus("error");
-            setErr("Mất kết nối. Hãy thử kết nối lại.");
+            setErr("Không kết nối được. Hãy thử lại.");
           }
         });
 
@@ -144,6 +154,14 @@ export default function NativeCommentaryScreen() {
           token, sdp: pc.localDescription.sdp, type: pc.localDescription.type,
         }).unwrap();
         await pc.setRemoteDescription(new RTCSessionDescription(ans));
+        // Lưới an toàn: 20s chưa "connected" mới coi là lỗi.
+        clearTimeout(connectTimerRef.current);
+        connectTimerRef.current = setTimeout(() => {
+          if (pcRef.current && pcRef.current.connectionState !== "connected") {
+            setStatus("error");
+            setErr("Không kết nối được. Hãy thử lại.");
+          }
+        }, 20000);
       } catch (e: any) {
         setStatus("error");
         setErr(e?.data?.message || e?.message || "Lỗi kết nối");
@@ -170,7 +188,7 @@ export default function NativeCommentaryScreen() {
     setTalking(on);
   };
   const reconnect = () => { cleanup(); startedRef.current = true; doConnect(videoMode === "rtsp"); };
-  // Nếu RTSP lỗi → chuyển sang WebRTC 360p.
+  // RTSP (VLC) không xem được (vd không bật Tailscale) → chuyển video sang WebRTC.
   const fallbackToWebrtc = () => { cleanup(); startedRef.current = true; doConnect(false); };
   const disconnect = () => { cleanup(); router.back(); };
 
@@ -198,13 +216,13 @@ export default function NativeCommentaryScreen() {
             style={{ flex: 1 }}
             source={{ uri: rtspUrl, initOptions: ["--network-caching=300", "--rtsp-tcp"] }}
             autoplay
-            onError={() => { setErr("Không xem được RTSP — chuyển sang WebRTC."); fallbackToWebrtc(); }}
+            onError={() => fallbackToWebrtc()}
           />
         ) : remoteUrl ? (
           <RTCView streamURL={remoteUrl} style={{ flex: 1 }} objectFit="contain" />
         ) : (
           <View style={styles.videoPlaceholder}>
-            {status === "connecting" ? (
+            {status === "connecting" || status === "idle" ? (
               <>
                 <ActivityIndicator color={C.primary} />
                 <Text style={{ color: C.sub, marginTop: 8 }}>Đang kết nối…</Text>
@@ -225,7 +243,7 @@ export default function NativeCommentaryScreen() {
           </View>
         )}
 
-        {(connected || status === "connecting") && (
+        {(connected || status === "connecting" || status === "idle") && (
           <Pressable
             onPress={toggleTalk}
             disabled={!connected}
