@@ -22,6 +22,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import {
   useGetLiveMachinesQuery,
   useLiveControlCallMutation,
+  useCreateCommentaryTokenMutation,
 } from "@/slices/liveControlApiSlice";
 
 const CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
@@ -56,6 +57,7 @@ export default function LiveControlScreen() {
   const machines: any[] = machinesData?.machines || [];
   const [machineId, setMachineId] = useState<string>("");
   const [callMut] = useLiveControlCallMutation();
+  const [createCommentaryToken] = useCreateCommentaryTokenMutation();
 
   const [snap, setSnap] = useState<any>({ perf: {}, sessions: [] });
   const [opacity, setOpacity] = useState<number>(100);
@@ -153,6 +155,15 @@ export default function LiveControlScreen() {
   const copy = async (url: string) => {
     try { await Clipboard.setStringAsync(url); Alert.alert("Đã copy", url); } catch {}
   };
+  // Mở trang bình luận viên (mic → luồng live) cho 1 sân.
+  const openCommentary = async (s: any) => {
+    try {
+      const d: any = await createCommentaryToken({ machineId, sid: s.sid, courtName: s.court || "" }).unwrap();
+      await Linking.openURL(d.url);
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.data?.message || e?.message || "Không tạo được liên kết bình luận");
+    }
+  };
 
   if (!isAdmin) return <Redirect href="/(tabs)/more" />;
 
@@ -176,7 +187,7 @@ export default function LiveControlScreen() {
           <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
             <Text style={{ color: C.text, fontWeight: "700" }}>Chưa có máy PC live nào online</Text>
             <Text style={{ color: C.sub, marginTop: 6, fontSize: 13 }}>
-              Trên app desktop: đăng nhập admin + bật "Điều khiển từ xa" (control server) + máy phải trong Tailscale cùng máy chủ.
+              Trên app desktop: đăng nhập admin + bật “Điều khiển từ xa” (control server) + máy phải trong Tailscale cùng máy chủ.
             </Text>
           </View>
         ) : (
@@ -264,9 +275,15 @@ export default function LiveControlScreen() {
                         {s.speed ? ` · ${Number(s.speed).toFixed(2)}×` : ""}
                       </Text>
                     </View>
-                    <Pressable onPress={() => stopCourt(s)} style={[styles.stopBtn, { backgroundColor: C.danger }]}>
-                      <Text style={{ color: "#fff", fontWeight: "700" }}>■ Dừng</Text>
-                    </Pressable>
+                    <View style={{ gap: 6 }}>
+                      <Pressable onPress={() => openCommentary(s)} style={[styles.micBtn, { borderColor: C.primary }]}>
+                        <MaterialIcons name="mic" size={15} color={C.primary} />
+                        <Text style={{ color: C.primary, fontWeight: "700", fontSize: 12 }}>Bình luận</Text>
+                      </Pressable>
+                      <Pressable onPress={() => stopCourt(s)} style={[styles.stopBtn, { backgroundColor: C.danger }]}>
+                        <Text style={{ color: "#fff", fontWeight: "700" }}>■ Dừng</Text>
+                      </Pressable>
+                    </View>
                   </View>
 
                   {/* Link xem */}
@@ -328,7 +345,8 @@ const styles = StyleSheet.create({
   preset: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   stopAll: { borderWidth: 1.5, borderRadius: 12, paddingVertical: 12, alignItems: "center", marginBottom: 12 },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  stopBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  stopBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, alignItems: "center" },
+  micBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8 },
   copyBtn: { padding: 4 },
   layRow: { flexDirection: "row", gap: 8, marginTop: 6 },
