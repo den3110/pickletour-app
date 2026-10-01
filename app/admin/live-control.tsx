@@ -8,6 +8,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   View,
@@ -159,11 +160,17 @@ export default function LiveControlScreen() {
   const copy = async (url: string) => {
     try { await Clipboard.setStringAsync(url); Alert.alert("Đã copy", url); } catch {}
   };
-  // Mở trang bình luận viên (mic → luồng live) cho 1 sân.
-  const openCommentary = async (s: any) => {
+  // Bình luận NGAY trong app (native WebRTC).
+  const openNativeCommentary = (s: any) => {
+    router.push(
+      `/admin/commentary?machineId=${encodeURIComponent(machineId)}&sid=${encodeURIComponent(s.sid)}&court=${encodeURIComponent(s.court || "")}` as any
+    );
+  };
+  // Tạo link web gọn gửi cho người bất kỳ (admin).
+  const shareWebLink = async (s: any) => {
     try {
       const d: any = await createCommentaryToken({ machineId, sid: s.sid, courtName: s.court || "" }).unwrap();
-      await Linking.openURL(d.url);
+      await Share.share({ message: `Link bình luận sân ${s.court || ""}: ${d.url}`, url: d.url });
     } catch (e: any) {
       Alert.alert("Lỗi", e?.data?.message || e?.message || "Không tạo được liên kết bình luận");
     }
@@ -284,10 +291,18 @@ export default function LiveControlScreen() {
                       </Text>
                     </View>
                     <View style={{ gap: 6 }}>
-                      <Pressable onPress={() => openCommentary(s)} style={[styles.micBtn, { borderColor: C.primary }]}>
+                      <Pressable onPress={() => openNativeCommentary(s)} style={[styles.micBtn, { borderColor: C.primary }]}>
                         <MaterialIcons name="mic" size={15} color={C.primary} />
-                        <Text style={{ color: C.primary, fontWeight: "700", fontSize: 12 }}>Bình luận</Text>
+                        <Text style={{ color: C.primary, fontWeight: "700", fontSize: 12 }}>
+                          {commentaryOnly ? "Bình luận" : "BL trong app"}
+                        </Text>
                       </Pressable>
+                      {!commentaryOnly && (
+                        <Pressable onPress={() => shareWebLink(s)} style={[styles.micBtn, { borderColor: C.sub }]}>
+                          <MaterialIcons name="link" size={15} color={C.sub} />
+                          <Text style={{ color: C.sub, fontWeight: "700", fontSize: 12 }}>Link web</Text>
+                        </Pressable>
+                      )}
                       {!commentaryOnly && (
                         <Pressable onPress={() => stopCourt(s)} style={[styles.stopBtn, { backgroundColor: C.danger }]}>
                           <Text style={{ color: "#fff", fontWeight: "700" }}>■ Dừng</Text>

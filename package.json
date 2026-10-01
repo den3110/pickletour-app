@@ -13,6 +13,7 @@
     "postinstall": "node ./scripts/patch-ios-deps.js"
   },
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^15.0.2",
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.4",
     "@hot-updater/react-native": "^0.25.4",
@@ -78,6 +79,7 @@
     "expo-system-ui": "~55.0.11",
     "expo-video": "~55.0.11",
     "expo-web-browser": "~55.0.10",
+    "imou-rn-native": "file:./modules/imou-rn-native",
     "lodash": "^4.17.21",
     "lottie-react-native": "^7.3.4",
     "luxon": "^3.7.2",
@@ -102,6 +104,7 @@
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.18.0",
     "react-native-web": "^0.21.0",
+    "react-native-webrtc": "^124.0.8",
     "react-native-webview": "13.16.0",
     "react-native-worklets": "0.7.2",
     "react-native-youtube-iframe": "^2.4.1",
@@ -109,8 +112,7 @@
     "react-redux": "^9.2.0",
     "redux-persist": "^6.0.0",
     "socket.io-client": "^4.8.1",
-    "yarn": "^1.22.22",
-    "imou-rn-native": "file:./modules/imou-rn-native"
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -24,6 +24,14 @@ export const liveControlApiSlice = apiSlice.injectEndpoints({
         body: { sid, courtName: courtName || "" },
       }),
     }),
+    // Gửi WebRTC offer (bình luận native trong app) → nhận answer. Token-gated.
+    commentaryOffer: builder.mutation({
+      query: ({ token, sdp, type }) => ({
+        url: `/api/commentary/offer`,
+        method: "POST",
+        body: { token, sdp, type },
+      }),
+    }),
   }),
 });
 
@@ -31,4 +39,5 @@ export const {
   useGetLiveMachinesQuery,
   useLiveControlCallMutation,
   useCreateCommentaryTokenMutation,
+  useCommentaryOfferMutation,
 } = liveControlApiSlice;
