@@ -84,9 +84,12 @@ export default function NativeCommentaryScreen() {
   const remoteRef = useRef<any>(null);
   const startedRef = useRef(false);
   const connectTimerRef = useRef<any>(null);
+  const rtspTimerRef = useRef<any>(null);
+  const rtspPlayingRef = useRef(false);
 
   const cleanup = useCallback(() => {
     try { clearTimeout(connectTimerRef.current); } catch {}
+    try { clearTimeout(rtspTimerRef.current); } catch {}
     try { trackRef.current && (trackRef.current.enabled = false); } catch {}
     try { streamRef.current?.getTracks?.().forEach((t: any) => t.stop()); } catch {}
     try { pcRef.current?.close?.(); } catch {}
@@ -187,9 +190,24 @@ export default function NativeCommentaryScreen() {
     t.enabled = on;
     setTalking(on);
   };
+  // RTSP (VLC) không xem được (vd không bật Tailscale / không tới được cam) → chuyển
+  // video sang WebRTC (VPS kéo). Giữ nguyên mic, chỉ đổi nguồn video.
+  const fallbackToWebrtc = useCallback(() => {
+    cleanup();
+    startedRef.current = true;
+    doConnect(false);
+  }, [cleanup, doConnect]);
+  // Nếu đang chế độ RTSP mà sau 7s VLC vẫn chưa phát được hình → tự chuyển WebRTC.
+  useEffect(() => {
+    if (videoMode !== "rtsp") return undefined;
+    rtspPlayingRef.current = false;
+    clearTimeout(rtspTimerRef.current);
+    rtspTimerRef.current = setTimeout(() => {
+      if (!rtspPlayingRef.current) fallbackToWebrtc();
+    }, 7000);
+    return () => clearTimeout(rtspTimerRef.current);
+  }, [videoMode, fallbackToWebrtc]);
   const reconnect = () => { cleanup(); startedRef.current = true; doConnect(videoMode === "rtsp"); };
-  // RTSP (VLC) không xem được (vd không bật Tailscale) → chuyển video sang WebRTC.
-  const fallbackToWebrtc = () => { cleanup(); startedRef.current = true; doConnect(false); };
   const disconnect = () => { cleanup(); router.back(); };
 
   if (!canAccess) return <Redirect href="/(tabs)/more" />;
@@ -212,12 +230,21 @@ export default function NativeCommentaryScreen() {
 
       <View style={styles.videoBox}>
         {videoMode === "rtsp" && rtspUrl ? (
-          <VLCPlayer
-            style={{ flex: 1 }}
-            source={{ uri: rtspUrl, initOptions: ["--network-caching=300", "--rtsp-tcp"] }}
-            autoplay
-            onError={() => fallbackToWebrtc()}
-          />
+          <>
+            <VLCPlayer
+              style={{ flex: 1 }}
+              source={{ uri: rtspUrl, initOptions: ["--network-caching=300", "--rtsp-tcp"] }}
+              autoplay
+              onProgress={() => { rtspPlayingRef.current = true; }}
+              onPlaying={() => { rtspPlayingRef.current = true; }}
+              onError={() => fallbackToWebrtc()}
+            />
+            {/* Nút chuyển tay sang WebRTC (nếu RTSP không tới được qua Tailscale). */}
+            <Pressable onPress={fallbackToWebrtc} style={styles.switchBtn}>
+              <MaterialIcons name="wifi" size={14} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>Xem qua WebRTC</Text>
+            </Pressable>
+          </>
         ) : remoteUrl ? (
           <RTCView streamURL={remoteUrl} style={{ flex: 1 }} objectFit="contain" />
         ) : (
@@ -277,5 +304,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12 },
   videoBox: { flex: 1, margin: 16, borderRadius: 16, overflow: "hidden", backgroundColor: "#000" },
   videoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+  switchBtn: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   talkBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 2, borderRadius: 14, paddingVertical: 16, marginTop: 8 },
 });
