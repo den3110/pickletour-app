@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, Redirect } from "expo-router";
+import { Stack, Redirect, router } from "expo-router";
 import { useSelector } from "react-redux";
 import { useTheme } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
@@ -201,6 +201,14 @@ export default function LiveControlScreen() {
 
         {!!machineId && (
           <>
+            {/* Thêm sân live / hẹn giờ */}
+            <Pressable
+              onPress={() => router.push(`/admin/live-add?machineId=${encodeURIComponent(machineId)}` as any)}
+              style={[styles.addBtn, { backgroundColor: C.primary }]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800" }}>＋ Thêm sân live / Hẹn giờ</Text>
+            </Pressable>
+
             {/* Perf + lỗi */}
             <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
               <Text style={{ color: C.sub, fontSize: 13 }}>
@@ -313,6 +321,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   h1: { fontSize: 20, fontWeight: "800" },
   card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12 },
+  addBtn: { borderRadius: 12, paddingVertical: 13, alignItems: "center", marginBottom: 12 },
   machineChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, marginRight: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
