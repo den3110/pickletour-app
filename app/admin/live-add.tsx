@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   Switch,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { Text } from "@/components/ui/i18nText";
 import { TextInput } from "@/components/ui/i18nTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +21,8 @@ import { useSelector } from "react-redux";
 import { useTheme } from "@react-navigation/native";
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { useLiveControlCallMutation } from "@/slices/liveControlApiSlice";
+import { useUploadImageToFolderMutation } from "@/slices/uploadApiSlice";
+import { prepareSupportImageForUpload } from "@/utils/supportImageUpload";
 
 export default function LiveAddScreen() {
   const theme = useTheme();
@@ -41,6 +45,8 @@ export default function LiveAddScreen() {
   );
 
   const [callMut] = useLiveControlCallMutation();
+  const [uploadImg] = useUploadImageToFolderMutation();
+  const [logoUploading, setLogoUploading] = useState(false);
   const call = useCallback(
     (path: string, method = "GET", body?: any) =>
       callMut({ machineId: String(machineId), path, method, body }).unwrap(),
@@ -69,6 +75,8 @@ export default function LiveAddScreen() {
   const [title, setTitle] = useState("");
   const [encoder, setEncoder] = useState("auto");
   const [overlayStyle, setOverlayStyle] = useState("classic");
+  const [browserOverlayUrl, setBrowserOverlayUrl] = useState("");
+  const [showTicker, setShowTicker] = useState(true);
   const [schedAt, setSchedAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -107,6 +115,23 @@ export default function LiveAddScreen() {
     } catch {}
   };
 
+  const pickLogo = async () => {
+    try {
+      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.95 });
+      if (r.canceled || !r.assets?.[0]) return;
+      setLogoUploading(true);
+      const file = await prepareSupportImageForUpload({ uri: r.assets[0].uri }, "logo");
+      const res: any = await uploadImg({ folder: "overlay-logos", file, options: { format: "png", quality: 92 } }).unwrap();
+      const url = res?.url || res?.data?.url;
+      if (url) setBrandLogoUrl(url);
+      else throw new Error("Không nhận được URL");
+    } catch (e: any) {
+      Alert.alert("Lỗi", "Tải logo thất bại: " + (e?.message || e));
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const buildPayload = () => {
     if (!tour) throw new Error("Chọn giải đấu");
     if (!court) throw new Error("Chọn sân");
@@ -127,10 +152,15 @@ export default function LiveAddScreen() {
       courtStationId: court._id, courtName: court.name,
       source, destinations,
       perMatchLive: perMatch, recordClips, splitPerTournament: split,
-      title: title.trim(), encoder, overlayStyle,
+      title: title.trim(), encoder, overlayStyle, noTicker: !showTicker,
       advanced: { resolutionH: 1080, fps: 0, videoBitrateKbps: 4500 },
     };
     if (hideTs) payload.hideTimestamp = true;
+    if (overlayStyle === "url") {
+      if (!browserOverlayUrl.trim()) throw new Error("Nhập URL scoreboard");
+      payload.browserOverlayUrl = browserOverlayUrl.trim();
+    }
+    if (brandLogoUrl.trim()) payload.brandLogoUrl = brandLogoUrl.trim();
     return payload;
   };
 
@@ -289,18 +319,50 @@ export default function LiveAddScreen() {
 
           <Row label="Kiểu overlay bảng điểm">
             <SelectBtn
-              text={{ classic: "Classic (mặc định)", A: "A · Broadcast Pro", B: "B · Aurora Glass", C: "C · Minimal Clean", D: "D · Neon Volt" }[overlayStyle] || "Classic (mặc định)"}
+              text={{ classic: "Classic (mặc định)", A: "A · Broadcast Pro", B: "B · Aurora Glass", C: "C · Minimal Clean", D: "D · Neon Volt", url: "Scoreboard từ URL" }[overlayStyle] || "Classic (mặc định)"}
               onPress={() => setPicker({ title: "Kiểu overlay", items: [
                 { label: "Classic (mặc định)", value: "classic" },
                 { label: "A · Broadcast Pro", value: "A" },
                 { label: "B · Aurora Glass", value: "B" },
                 { label: "C · Minimal Clean", value: "C" },
                 { label: "D · Neon Volt", value: "D" },
+                { label: "Scoreboard từ URL (tuỳ chỉnh)", value: "url" },
               ], onPick: setOverlayStyle })}
             />
+            {overlayStyle === "url" && (
+              <TextInput
+                value={browserOverlayUrl}
+                onChangeText={setBrowserOverlayUrl}
+                placeholder="https://… (trang overlay HTML của bạn)"
+                placeholderTextColor={C.sub}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.input, { backgroundColor: C.field, borderColor: C.border, color: C.text, marginTop: 8 }]}
+              />
+            )}
+          </Row>
+
+          <Row label="Logo overlay (trống = logo PickleTour)">
+            <TextInput
+              value={brandLogoUrl}
+              onChangeText={setBrandLogoUrl}
+              placeholder="https://… hoặc bấm Tải ảnh lên"
+              placeholderTextColor={C.sub}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.input, { backgroundColor: C.field, borderColor: C.border, color: C.text }]}
+            />
+            <Pressable onPress={pickLogo} disabled={logoUploading} style={[styles.select, { backgroundColor: C.field, borderColor: C.border, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 8 }]}>
+              {logoUploading ? <ActivityIndicator size="small" color={C.primary} /> : null}
+              <Text style={{ color: C.text }}>{logoUploading ? "Đang tải…" : "📷 Tải ảnh lên"}</Text>
+            </Pressable>
+            {!!brandLogoUrl && (
+              <Image source={{ uri: brandLogoUrl }} resizeMode="contain" style={{ height: 48, width: 120, marginTop: 8, alignSelf: "flex-start" }} />
+            )}
           </Row>
 
           <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Toggle label="Chữ chạy cuối màn hình (ticker)" value={showTicker} onValueChange={setShowTicker} />
             <Toggle label="Live riêng từng trận" value={perMatch} onValueChange={setPerMatch} />
             <Toggle label="Tách live theo giải (đổi giải → live mới)" value={split} onValueChange={setSplit} />
             <Toggle label="Ghi + cắt clip lên Drive" value={recordClips} onValueChange={setRecordClips} />
