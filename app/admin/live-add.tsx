@@ -77,6 +77,7 @@ export default function LiveAddScreen() {
   const [overlayStyle, setOverlayStyle] = useState("classic");
   const [browserOverlayUrl, setBrowserOverlayUrl] = useState("");
   const [showTicker, setShowTicker] = useState(true);
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [schedAt, setSchedAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState(false);
 
