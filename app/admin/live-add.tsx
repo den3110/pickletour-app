@@ -68,6 +68,7 @@ export default function LiveAddScreen() {
   const [hideTs, setHideTs] = useState(false);
   const [title, setTitle] = useState("");
   const [encoder, setEncoder] = useState("auto");
+  const [overlayStyle, setOverlayStyle] = useState("classic");
   const [schedAt, setSchedAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -126,7 +127,7 @@ export default function LiveAddScreen() {
       courtStationId: court._id, courtName: court.name,
       source, destinations,
       perMatchLive: perMatch, recordClips, splitPerTournament: split,
-      title: title.trim(), encoder,
+      title: title.trim(), encoder, overlayStyle,
       advanced: { resolutionH: 1080, fps: 0, videoBitrateKbps: 4500 },
     };
     if (hideTs) payload.hideTimestamp = true;
@@ -285,6 +286,19 @@ export default function LiveAddScreen() {
               <SelectBtn text={encoder === "auto" ? "Tự động (GPU)" : (opt.encoders.find((e: any) => e.value === encoder)?.label || encoder)} onPress={() => setPicker({ title: "Encoder", items: [{ label: "Tự động (GPU)", value: "auto" }, ...opt.encoders.map((e: any) => ({ label: e.label, value: e.value }))], onPick: setEncoder })} />
             </Row>
           ) : null}
+
+          <Row label="Kiểu overlay bảng điểm">
+            <SelectBtn
+              text={{ classic: "Classic (mặc định)", A: "A · Broadcast Pro", B: "B · Aurora Glass", C: "C · Minimal Clean", D: "D · Neon Volt" }[overlayStyle] || "Classic (mặc định)"}
+              onPress={() => setPicker({ title: "Kiểu overlay", items: [
+                { label: "Classic (mặc định)", value: "classic" },
+                { label: "A · Broadcast Pro", value: "A" },
+                { label: "B · Aurora Glass", value: "B" },
+                { label: "C · Minimal Clean", value: "C" },
+                { label: "D · Neon Volt", value: "D" },
+              ], onPick: setOverlayStyle })}
+            />
+          </Row>
 
           <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
             <Toggle label="Live riêng từng trận" value={perMatch} onValueChange={setPerMatch} />
