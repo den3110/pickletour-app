@@ -171,7 +171,7 @@ export default function LiveAddScreen() {
       await call("/api/start", "POST", buildPayload());
       Alert.alert("OK", "Đã bắt đầu live.");
       router.back();
-    } catch (e: any) { Alert.alert("Lỗi", e?.data?.message || e?.message || "Thử lại"); }
+    } catch (e: any) { Alert.alert("Lỗi", e?.data?.error || e?.data?.detail || e?.data?.message || e?.message || "Thử lại"); }
     finally { setBusy(false); }
   };
   const doSchedule = async () => {
@@ -182,7 +182,7 @@ export default function LiveAddScreen() {
       await call("/api/schedule", "POST", { ...buildPayload(), startAt: schedAt.getTime() });
       Alert.alert("OK", "Đã hẹn giờ live lúc " + schedAt.toLocaleString("vi-VN"));
       router.back();
-    } catch (e: any) { Alert.alert("Lỗi", e?.data?.message || e?.message || "Thử lại"); }
+    } catch (e: any) { Alert.alert("Lỗi", e?.data?.error || e?.data?.detail || e?.data?.message || e?.message || "Thử lại"); }
     finally { setBusy(false); }
   };
 
