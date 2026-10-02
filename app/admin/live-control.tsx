@@ -64,7 +64,7 @@ export default function LiveControlScreen() {
   const [callMut] = useLiveControlCallMutation();
   const [createCommentaryToken] = useCreateCommentaryTokenMutation();
 
-  const [snap, setSnap] = useState<any>({ perf: {}, sessions: [] });
+  const [snap, setSnap] = useState<any>({ perf: {}, sessions: [], schedules: [] });
   const [opacity, setOpacity] = useState<number>(100);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -91,7 +91,7 @@ export default function LiveControlScreen() {
     if (!machineId) return;
     try {
       const d = await call("/api/state");
-      setSnap({ perf: d?.perf || {}, sessions: d?.sessions || [] });
+      setSnap({ perf: d?.perf || {}, sessions: d?.sessions || [], schedules: d?.schedules || [] });
       setErr("");
     } catch (e: any) {
       setErr(e?.data?.message || e?.message || "Không kết nối được máy live");
@@ -155,6 +155,12 @@ export default function LiveControlScreen() {
     withBusy(() => call("/api/set-ts-cover", "POST", { sid: s.sid, hideTimestamp: on }));
   const setNameMode = (s: any, mode: "nick" | "full") =>
     withBusy(() => call("/api/set-layout", "POST", { sid: s.sid, nameMode: mode }));
+  const cancelSchedule = (sc: any) =>
+    Alert.alert("Xoá lịch hẹn", sc?.label || "Xoá lịch này?", [
+      { text: "Huỷ", style: "cancel" },
+      { text: "Xoá", style: "destructive", onPress: () => withBusy(() => call("/api/schedule-cancel", "POST", { id: sc.id })) },
+    ]);
+  const fmtSched = (ms: any) => { try { return new Date(Number(ms)).toLocaleString("vi-VN"); } catch { return String(ms); } };
   const applyOpacity = (pct: number) => {
     setOpacity(pct);
     withBusy(() => call("/api/set-opacity", "POST", { opacity: pct / 100 }));
@@ -181,6 +187,7 @@ export default function LiveControlScreen() {
   if (!canAccess) return <Redirect href="/(tabs)/more" />;
 
   const sessions: any[] = snap.sessions || [];
+  const schedules: any[] = snap.schedules || [];
   const perf = snap.perf || {};
 
   return (
@@ -267,6 +274,28 @@ export default function LiveControlScreen() {
               <Pressable onPress={stopAll} style={[styles.stopAll, { borderColor: C.danger }]}>
                 <Text style={{ color: C.danger, fontWeight: "800" }}>■ Dừng tất cả</Text>
               </Pressable>
+            )}
+
+            {/* Lịch đã hẹn giờ */}
+            {!commentaryOnly && schedules.length > 0 && (
+              <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border, marginBottom: 12 }]}>
+                <Text style={{ color: C.text, fontWeight: "800", marginBottom: 8 }}>⏰ Lịch đã hẹn ({schedules.length})</Text>
+                {schedules.map((sc) => (
+                  <View key={sc.id} style={[styles.rowBetween, { borderColor: C.border, borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 8 }]}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text numberOfLines={1} style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>
+                        {sc.label || sc.title || [sc.meta?.tournamentName, sc.meta?.courtName].filter(Boolean).join(" - ") || "(live)"}
+                      </Text>
+                      <Text style={{ color: C.sub, fontSize: 12 }}>
+                        {fmtSched(sc.startAt)}{sc.meta?.perMatch ? " · live từng trận" : ""}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => cancelSchedule(sc)} style={[styles.micBtn, { borderColor: C.danger }]}>
+                      <Text style={{ color: C.danger, fontWeight: "700", fontSize: 12 }}>Xoá</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
             )}
 
             {/* Danh sách sân */}
