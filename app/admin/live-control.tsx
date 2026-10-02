@@ -153,6 +153,8 @@ export default function LiveControlScreen() {
   };
   const toggleTs = (s: any, on: boolean) =>
     withBusy(() => call("/api/set-ts-cover", "POST", { sid: s.sid, hideTimestamp: on }));
+  const setNameMode = (s: any, mode: "nick" | "full") =>
+    withBusy(() => call("/api/set-layout", "POST", { sid: s.sid, nameMode: mode }));
   const applyOpacity = (pct: number) => {
     setOpacity(pct);
     withBusy(() => call("/api/set-opacity", "POST", { opacity: pct / 100 }));
@@ -336,6 +338,21 @@ export default function LiveControlScreen() {
                             </Text>
                           </Pressable>
                         ))}
+                      </View>
+                      <Text style={{ color: C.sub, fontSize: 12, marginTop: 10 }}>Tên hiển thị trên bảng điểm</Text>
+                      <View style={styles.layRow}>
+                        {[["nick", "Biệt danh"], ["full", "Họ tên đầy đủ"]].map(([mode, label]) => {
+                          const active = (s.nameMode || "nick") === mode;
+                          return (
+                            <Pressable
+                              key={mode}
+                              onPress={() => setNameMode(s, mode as "nick" | "full")}
+                              style={[styles.layBtn, { borderColor: C.border, backgroundColor: active ? C.primary : C.chipOff }]}
+                            >
+                              <Text style={{ color: active ? "#fff" : C.text, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+                            </Pressable>
+                          );
+                        })}
                       </View>
                       <View style={[styles.rowBetween, { marginTop: 10 }]}>
                         <Text style={{ color: C.text, fontSize: 14 }}>Ẩn ngày giờ camera (làm mờ)</Text>
