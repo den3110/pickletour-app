@@ -129,6 +129,33 @@ type Feed = {
   embeddable?: boolean;
   sourceType?: "youtube" | "hls" | "url";
   hlsUrl?: string;
+  publishedAt?: string | null;
+  durationSec?: number;
+};
+
+/** Giây -> "h:mm:ss" / "m:ss". Rỗng nếu không có. */
+const fmtDuration = (sec?: number) => {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  if (!s) return "";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(ss)}` : `${m}:${p(ss)}`;
+};
+/** Ngày up clip: "20/10 14:30" (năm nay) hoặc "20/10/2025". Rỗng nếu không có. */
+const fmtClipDate = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  if (d.getFullYear() === new Date().getFullYear()) {
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm} ${hh}:${mi}`;
+  }
+  return `${dd}/${mm}/${d.getFullYear()}`;
 };
 
 const ytWatchUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
@@ -534,6 +561,11 @@ function ReplayGroup({
             <View style={styles.playOverlay}>
               <Ionicons name="play-circle" size={30} color="rgba(255,255,255,0.92)" />
             </View>
+            {!!fmtDuration(f.durationSec) && (
+              <View style={styles.durBadge}>
+                <Text style={styles.durBadgeText}>{fmtDuration(f.durationSec)}</Text>
+              </View>
+            )}
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.replayTitle} numberOfLines={2}>
@@ -547,6 +579,16 @@ function ReplayGroup({
                 {f.angleLabelDisplay || f.angleLabel || "Toàn cảnh"}
               </Text>
             </View>
+            {!!(fmtClipDate(f.publishedAt) || fmtDuration(f.durationSec)) && (
+              <Text style={styles.replayWhen} numberOfLines={1}>
+                {[
+                  fmtClipDate(f.publishedAt),
+                  fmtDuration(f.durationSec) ? `⏱ ${fmtDuration(f.durationSec)}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            )}
           </View>
         </Pressable>
       ))}
@@ -716,6 +758,17 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   replayMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   dotSm: { width: 7, height: 7, borderRadius: 4 },
   replaySub: { color: C.sub, fontSize: 12, flex: 1 },
+  replayWhen: { color: C.sub, fontSize: 11, marginTop: 2, opacity: 0.8 },
+  durBadge: {
+    position: "absolute",
+    bottom: 3,
+    right: 3,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  durBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
   empty: { alignItems: "center", justifyContent: "center", paddingVertical: 64, gap: 12 },
   emptyText: { color: C.sub, fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
 });
