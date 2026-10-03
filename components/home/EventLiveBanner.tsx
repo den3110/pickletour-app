@@ -13,10 +13,54 @@ import { Animated,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
 
-import { useGetEventLiveConfigQuery } from "@/slices/eventLiveApiSlice";
+import { useGetEventLiveHomeQuery } from "@/slices/eventLiveApiSlice";
+
+type HomeEvent = {
+  slug?: string;
+  eventName?: string;
+  bannerImageUrl?: string;
+  configured?: boolean;
+};
+
+function EventLiveCard({ ev, pulse }: { ev: HomeEvent; pulse: Animated.Value }) {
+  const name = ev.eventName || "Giải đấu đang diễn ra";
+  const href = ev.slug ? `/live/event/${ev.slug}` : "/live/event";
+  return (
+    <Pressable
+      onPress={() => router.push(href as any)}
+      style={({ pressed }) => [styles.press, pressed && { opacity: 0.92 }]}
+    >
+      <LinearGradient
+        colors={["#0b1220", "#7f1d1d", "#dc2626"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.liveTag}>
+          <Animated.View style={[styles.dot, { opacity: pulse }]} />
+          <Text style={styles.liveTagText}>LIVE</Text>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.title} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.sub} numberOfLines={1}>
+            Xem trực tiếp · nhiều sân · nhiều góc camera
+          </Text>
+        </View>
+
+        <View style={styles.cta}>
+          <Ionicons name="play" size={16} color="#dc2626" />
+          <Text style={styles.ctaText}>Xem</Text>
+        </View>
+      </LinearGradient>
+    </Pressable>
+  );
+}
 
 export default function EventLiveBanner() {
-  const { data } = useGetEventLiveConfigQuery(undefined, {
+  const { data } = useGetEventLiveHomeQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
   const pulse = useRef(new Animated.Value(1)).current;
@@ -32,41 +76,18 @@ export default function EventLiveBanner() {
     return () => loop.stop();
   }, [pulse]);
 
-  if (!data?.enabled || !data?.configured) return null;
-  const name = data.eventName || "Giải đấu đang diễn ra";
+  const events: HomeEvent[] = (data?.events || []).filter(
+    (e: HomeEvent) => e && e.configured,
+  );
+  if (!events.length) return null;
 
   return (
     <View style={styles.wrap}>
-      <Pressable
-        onPress={() => router.push("/live/event")}
-        style={({ pressed }) => [styles.press, pressed && { opacity: 0.92 }]}
-      >
-        <LinearGradient
-          colors={["#0b1220", "#7f1d1d", "#dc2626"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-        >
-          <View style={styles.liveTag}>
-            <Animated.View style={[styles.dot, { opacity: pulse }]} />
-            <Text style={styles.liveTagText}>LIVE</Text>
-          </View>
-
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.title} numberOfLines={1}>
-              {name}
-            </Text>
-            <Text style={styles.sub} numberOfLines={1}>
-              Xem trực tiếp · nhiều sân · nhiều góc camera
-            </Text>
-          </View>
-
-          <View style={styles.cta}>
-            <Ionicons name="play" size={16} color="#dc2626" />
-            <Text style={styles.ctaText}>Xem</Text>
-          </View>
-        </LinearGradient>
-      </Pressable>
+      {events.map((ev, i) => (
+        <View key={ev.slug || `elv-${i}`} style={i > 0 ? { marginTop: 10 } : undefined}>
+          <EventLiveCard ev={ev} pulse={pulse} />
+        </View>
+      ))}
     </View>
   );
 }

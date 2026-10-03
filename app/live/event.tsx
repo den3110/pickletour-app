@@ -3,7 +3,8 @@
 import {
   Ionicons } from "@expo/vector-icons";
 import { router,
-  Stack } from "expo-router";
+  Stack,
+  useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React,
   { useEffect,
@@ -147,8 +148,11 @@ export default function EventLiveScreen() {
   const playerW = width;
   const playerH = Math.round((playerW * 9) / 16);
 
+  const params = useLocalSearchParams<{ slug?: string }>();
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug || "";
+
   const { data, isLoading, isFetching, refetch, isError } =
-    useGetEventLiveQuery(undefined, {
+    useGetEventLiveQuery(slug || undefined, {
       pollingInterval: 60000,
       refetchOnMountOrArgChange: true,
     });
