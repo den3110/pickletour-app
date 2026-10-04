@@ -19,6 +19,7 @@ import {
   Platform,
   Alert,
   useColorScheme,
+  Image,
 } from "react-native";
 import { TextInput } from "@/components/ui/i18nTextInput";
 import { Text } from "@/components/ui/i18nText";
@@ -26,7 +27,8 @@ import Constants from "expo-constants";
 import { useSelector } from "react-redux";
 import { WebView } from "react-native-webview";
 import { CompatVideo as Video } from "@/lib/expoMediaCompat";
-import { fixFacebookOpenUrl } from "@/components/live_list/liveUtils";
+import { fixFacebookOpenUrl, sid } from "@/components/live_list/liveUtils";
+import { setLiveWatchPayload } from "@/components/live_list/liveWatchHandoff";
 import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -1360,7 +1362,7 @@ const buildFramedHtml = (embedUrl, allow) => {
       .replace(/"/g, "&quot;");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:#000;overflow:hidden}.wrap{position:absolute;inset:0}iframe{width:100%;height:100%;border:0;display:block}</style></head><body><div class="wrap"><iframe src="${safeUrl}" allow="${safeAllow}" allowfullscreen frameborder="0"></iframe></div></body></html>`;
 };
-const StreamPlayer = memo(({ stream }) => {
+const StreamPlayer = memo(({ stream, match }) => {
   const [ratio, setRatio] = useState(
     stream?.aspect === "9:16" ? 9 / 16 : 16 / 9,
   );
@@ -1372,7 +1374,66 @@ const StreamPlayer = memo(({ stream }) => {
   if (!stream || !stream.canEmbed) return null;
 
   switch (stream.kind) {
-    case "yt":
+    case "yt": {
+      // YouTube: KHÔNG nhúng WebView nhỏ (WKWebView không nạp lại URL có start= về trễ).
+      // Dùng đúng cơ chế tab Live: mở trang /live/watch full màn với item = trận
+      // (getMatchPublic đã kèm streams có embedUrl ?start=N) → tua thẳng tới trận.
+      const idm = String(stream.embedUrl || stream.url || "").match(
+        /(?:embed\/|[?&]v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/,
+      );
+      const ytId = idm ? idm[1] : "";
+      const thumb = ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "";
+      const openFullscreen = () => {
+        const id = sid(match?._id || match?.id);
+        if (!match || !id) {
+          Linking.openURL(stream.url || stream.embedUrl).catch(() => {});
+          return;
+        }
+        setLiveWatchPayload({
+          item: match,
+          sessionKey: String(stream.key || ""),
+          startPosition: 0,
+          shouldPlay: true,
+          muted: false,
+        });
+        router.push(`/live/watch?id=${encodeURIComponent(id)}`);
+      };
+      return (
+        <AspectBox ratio={ratio}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={openFullscreen}
+            style={{ flex: 1, backgroundColor: "#000" }}
+          >
+            {thumb ? (
+              <Image
+                source={{ uri: thumb }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="cover"
+              />
+            ) : null}
+            <View
+              style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0, bottom: 0,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <View
+                style={{
+                  width: 68, height: 68, borderRadius: 34,
+                  backgroundColor: "rgba(255,0,0,0.92)",
+                  alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <MaterialIcons name="play-arrow" size={44} color="#fff" />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </AspectBox>
+      );
+    }
     case "vimeo":
     case "twitch":
     case "facebook":
@@ -3953,7 +4014,7 @@ function MatchContent({ m, isLoading, liveLoading, onSaved }) {
           >
             {activeStream.canEmbed ? (
               <>
-                <StreamPlayer stream={activeStream} />
+                <StreamPlayer stream={activeStream} match={merged} />
                 {showPlayer && (
                   <TouchableOpacity
                     style={styles.streamLinkBtn}

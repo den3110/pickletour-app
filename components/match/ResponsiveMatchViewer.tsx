@@ -551,6 +551,11 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
       video: mm.video || b.video,
       videoStartSeconds:
         Number(b.videoStartSeconds) || Number(mm.videoStartSeconds) || 0,
+      // streams từ getMatchPublic đã kèm embedUrl ?start=N → trang /live/watch dùng
+      // trực tiếp (cơ chế tab Live). Giữ lại nếu snapshot live không có.
+      streams:
+        Array.isArray(mm.streams) && mm.streams.length ? mm.streams : b.streams,
+      defaultStreamKey: mm.defaultStreamKey || b.defaultStreamKey,
     };
   }, [mm, base]);
 
