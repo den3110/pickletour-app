@@ -57,6 +57,7 @@ import {
   useGetRankingsPodiumAnnouncementsQuery,
   useGetRankingsPodiums30dQuery,
 } from "@/slices/rankingsApiSlice";
+import { useGetPlayerPositionsQuery } from "@/slices/headtoheadApiSlice";
 import { useGetMeQuery } from "@/slices/usersApiSlice";
 import { setKeyword } from "@/slices/rankingUiSlice";
 import { normalizeUrl } from "@/utils/normalizeUri";
@@ -1271,6 +1272,7 @@ const RankingCard = memo(
     item,
     rankNo,
     podium,
+    position,
     scorePatch,
     cccdPatch,
     me,
@@ -1522,6 +1524,9 @@ const RankingCard = memo(
           </View>
           {age ? <InfoTag icon="calendar-outline" text={`${age} tuổi`} theme={theme} /> : null}
           <InfoTag icon={u?.gender === "female" ? "female" : "male"} text={genderLabel(u?.gender)} theme={theme} />
+          {position?.label ? (
+            <InfoTag icon="grid-outline" text={`Sở trường ${position.label}`} theme={theme} />
+          ) : null}
         </PlayerBadges>
 
         <AchievementSummary achievements={achievements} theme={theme} onOpen={openAchievements} />
@@ -1712,6 +1717,14 @@ export default function RankingListScreen({ isBack = false }) {
   });
   const { data: podiumData, refetch: refetchPodiums } =
     useGetRankingsPodiums30dQuery();
+  // Vị trí sở trường ô 1/ô 2 cho các VĐV đang hiển thị
+  const posUserIds = useMemo(
+    () => accumulatedList.map((r) => r?.user?._id).filter(Boolean),
+    [accumulatedList],
+  );
+  const { data: posByUser = {} } = useGetPlayerPositionsQuery(posUserIds, {
+    skip: !posUserIds.length,
+  });
   const {
     data: podiumAnnouncementData,
     refetch: refetchPodiumAnnouncements,
@@ -1919,6 +1932,7 @@ export default function RankingListScreen({ isBack = false }) {
         item={item}
         rankNo={index + 1}
         podium={podiumByUser[item?.user?._id]}
+        position={posByUser[item?.user?._id]}
         scorePatch={{}}
         cccdPatch={{}}
         me={me}
@@ -1931,6 +1945,7 @@ export default function RankingListScreen({ isBack = false }) {
     ),
     [
       podiumByUser,
+      posByUser,
       me,
       openZoom,
       openGrade,

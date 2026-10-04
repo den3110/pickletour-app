@@ -46,6 +46,7 @@ import {
   useDeleteRatingHistoryMutation,
   useGetUserAchievementsQuery,
 } from "@/slices/usersApiSlice";
+import { useGetPlayerPositionQuery } from "@/slices/headtoheadApiSlice";
 import { useLocalSearchParams, router } from "expo-router";
 import { normalizeUrl } from "@/utils/normalizeUri";
 import AppleLiquidGlassView from "@/components/ui/AppleLiquidGlassView";
@@ -1369,6 +1370,11 @@ export default function PublicProfileScreen() {
 
   const { userInfo } = useSelector((state) => state.auth || {});
   const baseId = base?._id || "";
+  // Vị trí sở trường ô 1 / ô 2 (đánh đôi)
+  const { data: positionStat } = useGetPlayerPositionQuery(
+    { playerId: baseId },
+    { skip: !baseId },
+  );
   const viewerId = userInfo?._id || userInfo?.id;
   const isSelf = viewerId && baseId && String(viewerId) === String(baseId);
   const isAdminViewer =
@@ -2372,6 +2378,15 @@ export default function PublicProfileScreen() {
               colors={colors}
               onPress={() => handleOpenStatsSheet("rating")}
             />
+            {positionStat?.label ? (
+              <StatCard
+                icon={<Ionicons name="grid" size={30} color="#FFF" />}
+                value={positionStat.label}
+                label="Sở trường"
+                gradient={["#7C3AED", "#A855F7"]}
+                colors={colors}
+              />
+            ) : null}
           </View>
 
           {/* Coach achievements — hiển thị nếu là HLV hoặc chính chủ (để có

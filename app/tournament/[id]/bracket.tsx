@@ -3657,8 +3657,9 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const [selectedGroupKeys, setSelectedGroupKeys] = useState(new Set());
   const [onlyMyGroups, setOnlyMyGroups] = useState(false);
 
-  // 🆕 v4 modern bracket UI gate — persist qua AsyncStorage
-  const [bracketUiVersion, setBracketUiVersion] = useState<"v1" | "v4">("v1");
+  // 🆕 v4 modern bracket UI gate — persist qua AsyncStorage.
+  // Mặc định v4 (giao diện BẢNG) cho vòng bảng; vẫn tôn trọng lựa chọn đã lưu.
+  const [bracketUiVersion, setBracketUiVersion] = useState<"v1" | "v4">("v4");
   useEffect(() => {
     let mounted = true;
     (async () => {

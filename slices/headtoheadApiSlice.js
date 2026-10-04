@@ -52,6 +52,25 @@ export const head2headApiSlice = apiSlice.injectEndpoints({
         { type: "PlayerStats", id: playerId },
       ],
     }),
+
+    // Vị trí sở trường ô 1 / ô 2 của 1 VĐV
+    getPlayerPosition: builder.query({
+      query: ({ playerId }) => ({
+        url: `/api/head2head/${playerId}/position`,
+        method: "GET",
+      }),
+      transformResponse: (response) => response?.data || response,
+    }),
+
+    // Vị trí sở trường của NHIỀU VĐV (bảng xếp hạng) → map { userId: {...} }
+    getPlayerPositions: builder.query({
+      query: (userIds) => ({
+        url: `/api/head2head/positions`,
+        method: "POST",
+        body: { userIds: Array.isArray(userIds) ? userIds : [] },
+      }),
+      transformResponse: (response) => response?.data || {},
+    }),
   }),
 });
 
@@ -60,4 +79,6 @@ export const {
   useGetHead2HeadMatchesQuery,
   useGetFrequentOpponentsQuery,
   useGetPlayerStatsQuery,
+  useGetPlayerPositionQuery,
+  useGetPlayerPositionsQuery,
 } = head2headApiSlice;
