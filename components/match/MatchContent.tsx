@@ -1165,12 +1165,12 @@ function normalizeStreams(m) {
   pushList(m?.sources?.items);
 
   // Live "xuyên suốt": 1 clip dài gán cho nhiều trận → tua thẳng tới trận trong clip
-  // bằng tham số start (giây) của YouTube. Chỉ áp cho clip chung (= m.video).
+  // bằng tham số start (giây) của YouTube. Áp cho MỌI stream YouTube (dù dựng từ
+  // m.video hay từ m.streams), và chỉ thêm nếu embedUrl CHƯA có start (tránh nhân đôi).
   const vss = Math.max(0, Math.floor(Number(m?.videoStartSeconds) || 0));
   if (vss > 0) {
-    const clipUrl = isNonEmptyString(m?.video) ? m.video.trim() : "";
     for (const s of out) {
-      if (s?.kind === "yt" && s?.embedUrl && (!clipUrl || s.url === clipUrl)) {
+      if (s?.kind === "yt" && s?.embedUrl && !/[?&]start=/.test(s.embedUrl)) {
         s.embedUrl += (s.embedUrl.includes("?") ? "&" : "?") + "start=" + vss;
       }
     }
