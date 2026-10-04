@@ -1664,7 +1664,7 @@ export default function RankingListScreen({ isBack = false }) {
 
   // UI State
   const [viewMode, setViewMode] = useState("list");
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // ✅ STATE MỚI: Kiểm soát Lazy Loading Chart
   const [hasRenderedChart, setHasRenderedChart] = useState(false);
@@ -1703,6 +1703,21 @@ export default function RankingListScreen({ isBack = false }) {
   const clearRange = () => {
     setRange([SCORE_MIN, SCORE_MAX]);
     setLiveRange([SCORE_MIN, SCORE_MAX]);
+    setPage(0);
+  };
+  // Có bất kỳ bộ lọc nào đang bật (để tô sáng nút "Bộ lọc" kể cả khi popup đóng).
+  const anyFilterActive =
+    rangeActive ||
+    genderFilter !== "all" ||
+    preferredFilter !== "" ||
+    provinceFilter !== "";
+  // Xoá toàn bộ bộ lọc trong popup.
+  const resetAllFilters = () => {
+    setRange([SCORE_MIN, SCORE_MAX]);
+    setLiveRange([SCORE_MIN, SCORE_MAX]);
+    setGenderFilter("all");
+    setPreferredFilter("");
+    setProvinceFilter("");
     setPage(0);
   };
   const [accumulatedList, setAccumulatedList] = useState([]);
@@ -2009,15 +2024,31 @@ export default function RankingListScreen({ isBack = false }) {
           <RankingFilters
             value={scoreType}
             options={SCORE_TYPES}
-            expanded={filtersExpanded}
+            expanded={filtersExpanded || anyFilterActive}
             onChange={onScoreTypeChange}
             onToggleFilters={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setFiltersExpanded((value) => !value);
+              setFiltersExpanded(true);
             }}
           />
-          {filtersExpanded ? (
-            <>
+          <Modal
+            visible={filtersExpanded}
+            animationType="slide"
+            transparent
+            onRequestClose={() => setFiltersExpanded(false)}
+          >
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+              <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: "85%", paddingTop: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 }}>
+                  <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: "800" }}>Bộ lọc</Text>
+                  <TouchableOpacity onPress={() => setFiltersExpanded(false)} hitSlop={10}>
+                    <Ionicons name="close" size={24} color={theme.subText} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+                >
               <ScoreRange values={liveRange} active={rangeActive} onClear={clearRange}>
                 <RangeSlider
                   min={SCORE_MIN}
@@ -2033,7 +2064,7 @@ export default function RankingListScreen({ isBack = false }) {
                 />
               </ScoreRange>
               {/* Lọc theo giới tính */}
-              <View style={styles.genderRow}>
+              <View style={[styles.genderRow, { marginHorizontal: 0 }]}>
                 <Text style={[styles.genderLabel, { color: theme.text }]}>
                   Giới tính
                 </Text>
@@ -2077,7 +2108,7 @@ export default function RankingListScreen({ isBack = false }) {
               </View>
 
               {/* Lọc theo vị trí sở trường (ô 1 / ô 2) */}
-              <View style={styles.genderRow}>
+              <View style={[styles.genderRow, { marginHorizontal: 0 }]}>
                 <Text style={[styles.genderLabel, { color: theme.text }]}>
                   Sở trường
                 </Text>
@@ -2119,7 +2150,7 @@ export default function RankingListScreen({ isBack = false }) {
               </View>
 
               {/* Lọc theo tỉnh/thành */}
-              <View style={styles.genderRow}>
+              <View style={[styles.genderRow, { marginHorizontal: 0 }]}>
                 <Text style={[styles.genderLabel, { color: theme.text }]}>
                   Tỉnh/thành
                 </Text>
@@ -2164,8 +2195,49 @@ export default function RankingListScreen({ isBack = false }) {
                   </TouchableOpacity>
                 ) : null}
               </View>
-            </>
-          ) : null}
+                </ScrollView>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    paddingHorizontal: 16,
+                    paddingTop: 10,
+                    paddingBottom: 20,
+                    borderTopWidth: 1,
+                    borderTopColor: theme.border,
+                  }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={resetAllFilters}
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                    }}
+                  >
+                    <Text style={{ color: theme.text, fontWeight: "700" }}>Xoá lọc</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setFiltersExpanded(false)}
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: theme.primary,
+                    }}
+                  >
+                    <Text style={{ color: "#04121f", fontWeight: "800" }}>Xong</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </TouchableWithoutFeedback>
 
