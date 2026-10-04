@@ -13,6 +13,8 @@ export const rankingsApiSlice = apiSlice.injectEndpoints({
         minScore,
         maxScore,
         gender,
+        province,
+        preferred,
       } = {}) => {
         const params = new URLSearchParams();
 
@@ -29,6 +31,9 @@ export const rankingsApiSlice = apiSlice.injectEndpoints({
           params.set("maxScore", String(maxScore));
         if (gender === "male" || gender === "female")
           params.set("gender", gender);
+        if (province) params.set("province", String(province).trim());
+        if (preferred === 1 || preferred === 2 || preferred === "1" || preferred === "2")
+          params.set("preferred", String(preferred));
 
         const qs = params.toString();
 

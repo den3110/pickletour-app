@@ -25,9 +25,12 @@ import {
   Easing,
   FlatList,
   Keyboard,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
   Platform,
@@ -38,6 +41,7 @@ import {
   SafeAreaView as RNSafeAreaView,
 } from "react-native";
 import { Text } from "@/components/ui/i18nText";
+import { VN_PROVINCES } from "@/constants/provinces";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -1682,6 +1686,10 @@ export default function RankingListScreen({ isBack = false }) {
   const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">(
     "all",
   );
+  const [preferredFilter, setPreferredFilter] = useState<"" | "1" | "2">("");
+  const [provinceFilter, setProvinceFilter] = useState<string>("");
+  const [provincePickerOpen, setProvincePickerOpen] = useState(false);
+  const [provinceSearch, setProvinceSearch] = useState("");
   const rangeActive = range[0] > SCORE_MIN || range[1] < SCORE_MAX;
   const onScoreTypeChange = (v: "single" | "double" | "mix") => {
     setScoreType(v);
@@ -1714,6 +1722,8 @@ export default function RankingListScreen({ isBack = false }) {
     minScore: rangeActive ? range[0] : undefined,
     maxScore: rangeActive ? range[1] : undefined,
     gender: genderFilter !== "all" ? genderFilter : undefined,
+    province: provinceFilter || undefined,
+    preferred: preferredFilter || undefined,
   });
   const { data: podiumData, refetch: refetchPodiums } =
     useGetRankingsPodiums30dQuery();
@@ -2065,10 +2075,164 @@ export default function RankingListScreen({ isBack = false }) {
                   })}
                 </View>
               </View>
+
+              {/* Lọc theo vị trí sở trường (ô 1 / ô 2) */}
+              <View style={styles.genderRow}>
+                <Text style={[styles.genderLabel, { color: theme.text }]}>
+                  Sở trường
+                </Text>
+                <View style={styles.genderChips}>
+                  {[
+                    { v: "", l: "Tất cả" },
+                    { v: "1", l: "Ô 1" },
+                    { v: "2", l: "Ô 2" },
+                  ].map((o) => {
+                    const active = preferredFilter === (o.v as any);
+                    return (
+                      <TouchableOpacity
+                        key={o.v || "all"}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setPreferredFilter(o.v as any);
+                          setPage(0);
+                        }}
+                        style={[
+                          styles.genderChip,
+                          {
+                            borderColor: active ? theme.primary : theme.border,
+                            backgroundColor: active ? theme.primary : "transparent",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.genderChipText,
+                            { color: active ? "#04121f" : theme.subText },
+                          ]}
+                        >
+                          {o.l}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Lọc theo tỉnh/thành */}
+              <View style={styles.genderRow}>
+                <Text style={[styles.genderLabel, { color: theme.text }]}>
+                  Tỉnh/thành
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setProvincePickerOpen(true)}
+                  style={[
+                    styles.genderChip,
+                    {
+                      borderColor: provinceFilter ? theme.primary : theme.border,
+                      backgroundColor: provinceFilter ? theme.primary : "transparent",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="location-outline"
+                    size={14}
+                    color={provinceFilter ? "#04121f" : theme.subText}
+                  />
+                  <Text
+                    style={[
+                      styles.genderChipText,
+                      { color: provinceFilter ? "#04121f" : theme.subText },
+                    ]}
+                  >
+                    {provinceFilter || "Tất cả"}
+                  </Text>
+                </TouchableOpacity>
+                {provinceFilter ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setProvinceFilter("");
+                      setPage(0);
+                    }}
+                    hitSlop={10}
+                    style={{ marginLeft: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={20} color={theme.subText} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </>
           ) : null}
         </View>
       </TouchableWithoutFeedback>
+
+      {/* Modal chọn tỉnh/thành */}
+      <Modal
+        visible={provincePickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setProvincePickerOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: "80%", paddingTop: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 }}>
+              <Text style={{ flex: 1, color: theme.text, fontSize: 16, fontWeight: "800" }}>Chọn tỉnh/thành</Text>
+              <TouchableOpacity onPress={() => setProvincePickerOpen(false)} hitSlop={10}>
+                <Ionicons name="close" size={24} color={theme.subText} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.border }}>
+              <Ionicons name="search" size={16} color={theme.subText} />
+              <TextInput
+                value={provinceSearch}
+                onChangeText={setProvinceSearch}
+                placeholder="Tìm tỉnh/thành…"
+                placeholderTextColor={theme.subText}
+                style={{ flex: 1, color: theme.text, paddingVertical: 8 }}
+              />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ paddingHorizontal: 8 }}>
+              {["", ...VN_PROVINCES]
+                .filter((p) =>
+                  !provinceSearch
+                    ? true
+                    : p === ""
+                      ? false
+                      : p
+                          .toLowerCase()
+                          .normalize("NFD")
+                          .replace(/[̀-ͯ]/g, "")
+                          .includes(
+                            provinceSearch
+                              .toLowerCase()
+                              .normalize("NFD")
+                              .replace(/[̀-ͯ]/g, ""),
+                          ),
+                )
+                .map((p) => (
+                  <TouchableOpacity
+                    key={p || "all"}
+                    onPress={() => {
+                      setProvinceFilter(p);
+                      setPage(0);
+                      setProvincePickerOpen(false);
+                      setProvinceSearch("");
+                    }}
+                    style={{ paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}
+                  >
+                    <Text style={{ color: provinceFilter === p ? theme.primary : theme.text, fontWeight: provinceFilter === p ? "800" : "500" }}>
+                      {p || "Tất cả tỉnh/thành"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <View style={{ flex: 1, paddingHorizontal: 16 }}>
         {error ? (
