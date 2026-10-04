@@ -18,6 +18,7 @@ import {
   Pressable,
   Linking,
   RefreshControl,
+  TextInput,
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
@@ -49,6 +50,8 @@ import {
   getMatchPayloadId,
   getPairDisplayName,
   getPlayerDisplayName,
+  getPlayerNickname,
+  getPlayerFullName,
   isNewerOrEqualMatchPayload,
   isLightweightMatchPayload,
   mergeMatchPayload,
@@ -3761,6 +3764,53 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
   const loading = l1 || l2 || l3;
   const error = e1 || e2 || e3;
 
+  // ===== Tìm trận theo tên / biệt danh VĐV (toàn giải, mọi bảng/nhánh) =====
+  const [playerSearch, setPlayerSearch] = useState("");
+  const playerSearchMatches = useMemo(() => {
+    const norm = (s) =>
+      String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    const q = norm(playerSearch);
+    if (q.length < 2) return null;
+    const list = Array.isArray(allMatchesFetched) ? allMatchesFetched : [];
+    const playersOf = (pair) => {
+      if (!pair) return [];
+      if (Array.isArray(pair.players) && pair.players.length) return pair.players;
+      return [pair.player1, pair.player2].filter(Boolean);
+    };
+    const pairHay = (pair) => {
+      const parts = [];
+      for (const p of playersOf(pair)) {
+        parts.push(getPlayerNickname(p), getPlayerFullName(p));
+      }
+      parts.push(pair?.teamName, pair?.name, pair?.label);
+      return parts.filter(Boolean).join(" ");
+    };
+    const bName = (b) => {
+      const id = String(b?._id || b || "");
+      return (brackets || []).find((x) => String(x._id) === id)?.name || "";
+    };
+    const out = [];
+    for (const m of list) {
+      if (!m?.pairA && !m?.pairB) continue;
+      const hay = norm(`${pairHay(m.pairA)} ${pairHay(m.pairB)}`);
+      if (hay && hay.includes(q)) {
+        out.push({
+          _id: String(m._id),
+          m,
+          code: m.code || m.displayCode || "",
+          bracketName: bName(m.bracket),
+        });
+        if (out.length >= 50) break;
+      }
+    }
+    return out;
+  }, [playerSearch, allMatchesFetched, brackets]);
+
   /* ===== live layer ===== */
   const liveMapRef = useRef(new Map());
   const [liveBump, setLiveBump] = useState(0);
@@ -5513,6 +5563,88 @@ export default function TournamentBracketRN({ tourId: tourIdProp }) {
           </Card>
 
           <TabsBar items={tabLabels} value={tab} onChange={setTab} t={t} />
+
+          {/* Tìm trận theo tên / biệt danh VĐV (toàn giải) */}
+          <View style={{ marginBottom: 10, zIndex: 20 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                borderWidth: 1,
+                borderColor: t.colors.border,
+                backgroundColor: t.colors.card,
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+              }}
+            >
+              <Text style={{ fontSize: 15, opacity: 0.6 }}>🔍</Text>
+              <TextInput
+                value={playerSearch}
+                onChangeText={setPlayerSearch}
+                placeholder="Tìm trận theo tên hoặc biệt danh VĐV…"
+                placeholderTextColor={t.colors.text + "77"}
+                style={{ flex: 1, color: t.colors.text, fontSize: 14, paddingVertical: 2 }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {playerSearch ? (
+                <TouchableOpacity onPress={() => setPlayerSearch("")} hitSlop={10}>
+                  <Text style={{ fontSize: 16, opacity: 0.6, color: t.colors.text }}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {playerSearchMatches && (
+              <View
+                style={{
+                  marginTop: 6,
+                  borderWidth: 1,
+                  borderColor: t.colors.border,
+                  backgroundColor: t.colors.card,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {playerSearchMatches.length === 0 ? (
+                  <Text style={{ padding: 12, color: t.colors.text, opacity: 0.6, fontSize: 13 }}>
+                    Không tìm thấy trận nào khớp “{playerSearch.trim()}”.
+                  </Text>
+                ) : (
+                  <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+                    <Text style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2, color: t.colors.text, opacity: 0.55, fontSize: 12 }}>
+                      {playerSearchMatches.length} trận khớp
+                    </Text>
+                    {playerSearchMatches.map((r) => (
+                      <TouchableOpacity
+                        key={r._id}
+                        onPress={() => {
+                          setPlayerSearch("");
+                          openMatch(r.m);
+                        }}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          borderTopWidth: 1,
+                          borderTopColor: t.colors.border,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: t.colors.text, opacity: 0.55 }} numberOfLines={1}>
+                          {[r.bracketName, r.code].filter(Boolean).join(" · ")}
+                        </Text>
+                        <Text style={{ fontSize: 13.5, fontWeight: "600", color: t.colors.text }} numberOfLines={1}>
+                          {resolveSideLabel(r.m, "A")}
+                          <Text style={{ opacity: 0.5 }}>  vs  </Text>
+                          {resolveSideLabel(r.m, "B")}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
+          </View>
 
           <CourtStatusBar
             tournamentId={tourId}
