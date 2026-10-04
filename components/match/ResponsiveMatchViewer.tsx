@@ -335,17 +335,18 @@ function useLockedDialogMatch({
     const baseM = pick(base);
     const chosen = liveM || baseM;
     if (!chosen) return;
-    // Snapshot socket (live) KHÔNG có các field tĩnh của bản ghi (video replay + mốc
-    // tua videoStartSeconds) → giữ lại từ base để YouTube tua thẳng tới trận (như web).
+    // Snapshot socket (live) THƯỜNG có videoStartSeconds=0 (mặc định) → KHÔNG được ghi đè
+    // mốc tua thật từ base. Ưu tiên giá trị >0 của base (bản ghi đầy đủ) cho mốc tua +
+    // link replay để YouTube tua thẳng tới trận (như web).
     const next =
       liveM && baseM
         ? {
             ...liveM,
-            video: liveM.video || baseM.video,
+            video: baseM.video || liveM.video,
             videoStartSeconds:
-              liveM.videoStartSeconds != null
-                ? liveM.videoStartSeconds
-                : baseM.videoStartSeconds,
+              Number(baseM.videoStartSeconds) ||
+              Number(liveM.videoStartSeconds) ||
+              0,
             streams: liveM.streams || baseM.streams,
           }
         : chosen;
@@ -539,6 +540,20 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
     isLoadingLive,
   });
 
+  // Bảo đảm MatchContent luôn nhận mốc tua + link replay từ base (bản ghi đầy đủ), kể cả
+  // khi dedup theo chữ ký của lock bỏ qua cập nhật. base là nguồn sự thật cho field tĩnh.
+  const mmFinal = useMemo(() => {
+    if (!mm) return mm;
+    const b = base && String(base._id || "") === String(mm._id || "") ? base : null;
+    if (!b) return mm;
+    return {
+      ...mm,
+      video: mm.video || b.video,
+      videoStartSeconds:
+        Number(b.videoStartSeconds) || Number(mm.videoStartSeconds) || 0,
+    };
+  }, [mm, base]);
+
   // THEME
   const T = useThemeTokens();
 
@@ -672,7 +687,7 @@ function ResponsiveMatchViewerBody({ open, matchId, onClose }) {
         >
           <MatchContent
             key={String(matchId || "")}
-            m={mm}
+            m={mmFinal}
             isLoading={loading}
             liveLoading={false}
             onSaved={handleSaved}
