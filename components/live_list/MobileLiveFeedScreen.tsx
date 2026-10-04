@@ -392,7 +392,11 @@ function FeedVideoSurface({
   if (session?.embedHtml) {
     return (
       <WebView
-        source={{ html: buildPlayerHtml(session.embedHtml) }}
+        source={{
+          html: buildPlayerHtml(session.embedHtml),
+          baseUrl: "https://www.pickletour.vn",
+        }}
+        originWhitelist={["*"]}
         style={StyleSheet.absoluteFill}
         javaScriptEnabled
         domStorageEnabled

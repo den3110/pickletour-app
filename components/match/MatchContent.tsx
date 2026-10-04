@@ -905,7 +905,9 @@ function detectEmbed(url) {
     return {
       kind: "yt",
       canEmbed: true,
-      embedUrl: `https://www.youtube.com/embed/${ytId}`,
+      // Nhúng qua iframe (xem StreamPlayer): thêm playsinline/rel + origin khớp baseUrl
+      // để YouTube nhận đây là nhúng hợp lệ (tránh "Lỗi 153" khi WebView mở thẳng URL).
+      embedUrl: `https://www.youtube.com/embed/${ytId}?playsinline=1&rel=0&modestbranding=1&origin=https://www.pickletour.vn`,
       allow:
         "autoplay; encrypted-media; picture-in-picture; web-share; fullscreen",
       aspect,
@@ -1330,6 +1332,18 @@ const DelayedManifestPlayer = memo(function DelayedManifestPlayer({ stream }) {
 });
 
 /* ---------- StreamPlayer (RN) ---------- */
+// Nhúng video qua <iframe> trong 1 trang HTML có baseUrl là domain https hợp lệ.
+// Lý do: nếu WebView mở THẲNG URL nhúng (source={{uri}}) thì YouTube coi đó là trang
+// cấp cao (không có khung nhúng cha) và báo "Lỗi cấu hình trình phát video / Lỗi 153".
+// Bọc trong iframe + baseUrl pickletour.vn → YouTube thấy nhúng hợp lệ và phát bình thường.
+const EMBED_BASE_URL = "https://www.pickletour.vn";
+const buildFramedHtml = (embedUrl, allow) => {
+  const safeUrl = String(embedUrl || "").replace(/"/g, "&quot;");
+  const safeAllow =
+    String(allow || "autoplay; encrypted-media; picture-in-picture; fullscreen")
+      .replace(/"/g, "&quot;");
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%;background:#000;overflow:hidden}.wrap{position:absolute;inset:0}iframe{width:100%;height:100%;border:0;display:block}</style></head><body><div class="wrap"><iframe src="${safeUrl}" allow="${safeAllow}" allowfullscreen frameborder="0"></iframe></div></body></html>`;
+};
 const StreamPlayer = memo(({ stream }) => {
   const [ratio, setRatio] = useState(
     stream?.aspect === "9:16" ? 9 / 16 : 16 / 9,
@@ -1350,10 +1364,17 @@ const StreamPlayer = memo(({ stream }) => {
       return (
         <AspectBox ratio={ratio}>
           <WebView
-            source={{ uri: stream.embedUrl }}
-            style={{ flex: 1 }}
+            source={{
+              html: buildFramedHtml(stream.embedUrl, stream.allow),
+              baseUrl: EMBED_BASE_URL,
+            }}
+            originWhitelist={["*"]}
+            style={{ flex: 1, backgroundColor: "#000" }}
             allowsFullscreenVideo
+            allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled
+            domStorageEnabled
           />
         </AspectBox>
       );

@@ -220,7 +220,11 @@ export default function LiveWatchScreen() {
     playerNode = (
       <WebView
         key={`html-${activeKey}`}
-        source={{ html: buildEmbedHtml(session.embedHtml) }}
+        source={{
+          html: buildEmbedHtml(session.embedHtml),
+          baseUrl: "https://www.pickletour.vn",
+        }}
+        originWhitelist={["*"]}
         style={styles.webview}
         javaScriptEnabled
         domStorageEnabled

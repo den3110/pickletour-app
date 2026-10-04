@@ -241,6 +241,34 @@ export function buildCanonicalSessions(match: any = {}) {
         };
       }
 
+      // YouTube / Vimeo / Twitch / iframe có embedUrl → bọc thành iframe_html để các màn
+      // phát (live/watch, feed) render qua WebView. embedHtml + baseUrl https giúp YouTube
+      // coi là nhúng hợp lệ (tránh "Lỗi 153" khi mở thẳng URL nhúng).
+      if (
+        (kind === "yt" ||
+          kind === "youtube" ||
+          kind === "iframe" ||
+          kind === "vimeo" ||
+          kind === "twitch") &&
+        explicitEmbedUrl
+      ) {
+        const safeEmbed = explicitEmbedUrl.replace(/"/g, "&quot;");
+        return {
+          key: stream?.key || "stream",
+          provider: kind === "yt" ? "youtube" : kind,
+          kind: "iframe_html",
+          label: stream?.displayLabel || "Video",
+          providerLabel: stream?.providerLabel || "Video",
+          watchUrl: openUrl || url,
+          openUrl: openUrl || url,
+          embedHtml: `<iframe src="${safeEmbed}" allow="autoplay; encrypted-media; picture-in-picture; web-share; fullscreen" allowfullscreen frameborder="0" style="width:100%;height:100%;border:0"></iframe>`,
+          canInlineEmbed: true,
+          primary,
+          ready: stream?.ready !== false,
+          delaySeconds: Number(stream?.delaySeconds || 0),
+        };
+      }
+
       return {
         key: stream?.key || "stream",
         provider: kind || "stream",
