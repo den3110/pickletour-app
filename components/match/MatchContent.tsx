@@ -798,6 +798,10 @@ function isMatchEqual(a, b) {
   if (!a || !b) return false;
   if (a._id !== b._id) return false;
   if (a.status !== b.status) return false;
+  // Link replay + mốc tua (clip xuyên suốt) đổi → coi là KHÁC để view cập nhật, nếu không
+  // giá trị videoStartSeconds (về trễ từ base) bị bỏ qua → YouTube không tua tới trận.
+  if ((a.video || "") !== (b.video || "")) return false;
+  if ((Number(a.videoStartSeconds) || 0) !== (Number(b.videoStartSeconds) || 0)) return false;
 
   const ra = a.rules || {};
   const rb = b.rules || {};
