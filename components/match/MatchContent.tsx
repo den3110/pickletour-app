@@ -1380,6 +1380,9 @@ const StreamPlayer = memo(({ stream }) => {
       return (
         <AspectBox ratio={ratio}>
           <WebView
+            // key theo embedUrl: khi mốc tua (start=) được chèn SAU khi base về, iOS WKWebView
+            // không tự reload source.html → phải remount để nạp URL mới (tua đúng trận).
+            key={stream.embedUrl}
             source={{
               html: buildFramedHtml(stream.embedUrl, stream.allow),
               baseUrl: EMBED_BASE_URL,
