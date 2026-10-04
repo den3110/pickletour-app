@@ -160,11 +160,22 @@ const fmtClipDate = (iso?: string | null) => {
 
 const ytWatchUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
 const openYouTube = (id: string) => Linking.openURL(ytWatchUrl(id)).catch(() => {});
+type CourtMatch = {
+  teamA?: string;
+  teamB?: string;
+  scoreA?: number;
+  scoreB?: number;
+  gamesA?: number;
+  gamesB?: number;
+  bestOf?: number;
+  stageName?: string;
+};
 type Court = {
   courtKey: string | null;
   courtLabel: string;
   angles?: Feed[];
   videos?: Feed[];
+  match?: CourtMatch;
 };
 
 export default function EventLiveScreen() {
@@ -492,6 +503,33 @@ function CourtCard({
           <Text style={styles.miniLiveText}>LIVE</Text>
         </View>
       </View>
+      {court.match ? (
+        <View style={styles.matchBox}>
+          {!!court.match.stageName && (
+            <Text style={styles.matchStage} numberOfLines={1}>
+              {court.match.stageName}
+            </Text>
+          )}
+          <View style={styles.matchScoreRow}>
+            <Text style={[styles.matchTeam, { textAlign: "right" }]} numberOfLines={1}>
+              {court.match.teamA || "Đội A"}
+            </Text>
+            <View style={styles.matchScoreBox}>
+              <Text style={styles.matchScore}>{court.match.scoreA ?? 0}</Text>
+              <Text style={styles.matchColon}>:</Text>
+              <Text style={styles.matchScore}>{court.match.scoreB ?? 0}</Text>
+            </View>
+            <Text style={styles.matchTeam} numberOfLines={1}>
+              {court.match.teamB || "Đội B"}
+            </Text>
+          </View>
+          {Number(court.match.bestOf) > 1 && (
+            <Text style={styles.matchGames}>
+              Ván thắng {court.match.gamesA ?? 0}–{court.match.gamesB ?? 0}
+            </Text>
+          )}
+        </View>
+      ) : null}
       <View style={styles.angleWrap}>
         {feeds.map((f) => {
           const on = f.videoId === currentId;
@@ -728,6 +766,32 @@ const mk_styles = (C: ThemeTokens) => StyleSheet.create({
   cardTitle: { color: C.text, fontSize: 15, fontWeight: "800", flex: 1 },
   miniLive: { flexDirection: "row", alignItems: "center", gap: 5 },
   miniLiveText: { color: "#ff6b6b", fontSize: 11, fontWeight: "800" },
+  matchBox: {
+    marginBottom: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  matchStage: { color: "#fbbf24", fontSize: 11, fontWeight: "700", textAlign: "center", marginBottom: 3 },
+  matchScoreRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  matchTeam: { flex: 1, color: C.text, fontSize: 12.5, fontWeight: "600" },
+  matchScoreBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: "#0b1220",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  matchScore: { color: "#fff", fontSize: 15, fontWeight: "900", minWidth: 14, textAlign: "center" },
+  matchColon: { color: "#64748b", fontSize: 13, fontWeight: "700" },
+  matchGames: { color: C.sub, fontSize: 10.5, textAlign: "center", marginTop: 3 },
   angleWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   angleBtn: {
     flexDirection: "row",
