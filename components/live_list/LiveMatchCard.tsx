@@ -108,11 +108,16 @@ function renderPlayer(activeSession: any) {
   if (activeSession?.embedHtml) {
     return (
       <WebView
-        source={{ html: buildPlayerHtml(activeSession.embedHtml) }}
+        source={{
+          html: buildPlayerHtml(activeSession.embedHtml),
+          baseUrl: "https://www.pickletour.vn",
+        }}
+        originWhitelist={["*"]}
         style={styles.player}
         javaScriptEnabled
         domStorageEnabled
         allowsFullscreenVideo
+        allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
       />
     );

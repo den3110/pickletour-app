@@ -331,8 +331,24 @@ function useLockedDialogMatch({
       return id && id === lockedId ? cand : null;
     };
 
-    const next = pick(live) || pick(base);
-    if (!next) return;
+    const liveM = pick(live);
+    const baseM = pick(base);
+    const chosen = liveM || baseM;
+    if (!chosen) return;
+    // Snapshot socket (live) KHÔNG có các field tĩnh của bản ghi (video replay + mốc
+    // tua videoStartSeconds) → giữ lại từ base để YouTube tua thẳng tới trận (như web).
+    const next =
+      liveM && baseM
+        ? {
+            ...liveM,
+            video: liveM.video || baseM.video,
+            videoStartSeconds:
+              liveM.videoStartSeconds != null
+                ? liveM.videoStartSeconds
+                : baseM.videoStartSeconds,
+            streams: liveM.streams || baseM.streams,
+          }
+        : chosen;
 
     const isMatchChanged = previousLockedIdRef.current !== lockedId;
     if (isMatchChanged) {
