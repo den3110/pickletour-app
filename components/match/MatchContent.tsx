@@ -27,7 +27,7 @@ import Constants from "expo-constants";
 import { useSelector } from "react-redux";
 import { WebView } from "react-native-webview";
 import { CompatVideo as Video } from "@/lib/expoMediaCompat";
-import { fixFacebookOpenUrl, sid } from "@/components/live_list/liveUtils";
+import { fixFacebookOpenUrl } from "@/components/live_list/liveUtils";
 import { setLiveWatchPayload } from "@/components/live_list/liveWatchHandoff";
 import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
