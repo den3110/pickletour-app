@@ -956,6 +956,7 @@ export const {
   useAddTournamentManagerMutation,
   useRemoveTournamentManagerMutation,
   useGetMatchPublicQuery,
+  useLazyGetMatchPublicQuery,
   useCancelRegistrationMutation,
   useCreateRegInviteMutation,
   useJoinAsPartnerMutation,

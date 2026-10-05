@@ -33,6 +33,7 @@ import * as Clipboard from "expo-clipboard";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAdminPatchMatchMutation } from "@/slices/matchesApiSlice";
+import { useLazyGetMatchPublicQuery } from "@/slices/tournamentsApiSlice";
 import { useShareToFeed } from "@/components/feed/ShareToFeedModal";
 import AdminMatchTools from "@/components/match/AdminMatchTools";
 import PublicProfileDialog from "../PublicProfileDialog";
@@ -1366,6 +1367,9 @@ const StreamPlayer = memo(({ stream, match }) => {
   const [ratio, setRatio] = useState(
     stream?.aspect === "9:16" ? 9 / 16 : 16 / 9,
   );
+  // Fetch tươi getMatchPublic ngay lúc bấm Play → item chắc chắn có streams kèm ?start=N
+  // (không phụ thuộc trạng thái gộp dữ liệu live/base phía client).
+  const [fetchMatchPublic] = useLazyGetMatchPublicQuery();
 
   useEffect(() => {
     setRatio(stream?.aspect === "9:16" ? 9 / 16 : 16 / 9);
@@ -1383,14 +1387,23 @@ const StreamPlayer = memo(({ stream, match }) => {
       );
       const ytId = idm ? idm[1] : "";
       const thumb = ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "";
-      const openFullscreen = () => {
+      const openFullscreen = async () => {
         const id = sid(match?._id || match?.id);
         if (!match || !id) {
           Linking.openURL(stream.url || stream.embedUrl).catch(() => {});
           return;
         }
+        // Lấy bản ghi tươi từ API (đã kèm streams có embedUrl ?start=N). Nếu lỗi mạng
+        // thì dùng tạm dữ liệu đang có.
+        let item = match;
+        try {
+          const fresh = await fetchMatchPublic(id, true).unwrap();
+          if (fresh && Array.isArray(fresh.streams) && fresh.streams.length) {
+            item = fresh;
+          }
+        } catch {}
         setLiveWatchPayload({
-          item: match,
+          item,
           sessionKey: String(stream.key || ""),
           startPosition: 0,
           shouldPlay: true,
