@@ -1370,6 +1370,26 @@ const StreamPlayer = memo(({ stream, match }) => {
   // Fetch tươi getMatchPublic ngay lúc bấm Play → item chắc chắn có streams kèm ?start=N
   // (không phụ thuộc trạng thái gộp dữ liệu live/base phía client).
   const [fetchMatchPublic] = useLazyGetMatchPublicQuery();
+  // Xem INLINE (màn nhỏ, không xoay ngang): lấy URL nhúng YouTube ĐÃ kèm ?start=N từ
+  // backend TRƯỚC khi mount WebView, để lần nạp đầu đã đúng mốc (WKWebView không nạp lại
+  // khi URL đổi sau). Chưa có URL → hiện thumbnail.
+  const ytMatchId = sid(match?._id || match?.id);
+  const [freshEmbedUrl, setFreshEmbedUrl] = useState("");
+  useEffect(() => {
+    let alive = true;
+    setFreshEmbedUrl("");
+    if (!ytMatchId || stream?.kind !== "yt") return () => { alive = false; };
+    (async () => {
+      try {
+        const fresh = await fetchMatchPublic(ytMatchId, true).unwrap();
+        const yt = (Array.isArray(fresh?.streams) ? fresh.streams : []).find(
+          (s) => String(s?.kind || "").toLowerCase() === "yt" && s?.embedUrl,
+        );
+        if (alive && yt?.embedUrl) setFreshEmbedUrl(String(yt.embedUrl));
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [ytMatchId, stream?.kind, fetchMatchPublic]);
 
   useEffect(() => {
     setRatio(stream?.aspect === "9:16" ? 9 / 16 : 16 / 9);
@@ -1379,9 +1399,15 @@ const StreamPlayer = memo(({ stream, match }) => {
 
   switch (stream.kind) {
     case "yt": {
-      // YouTube: KHÔNG nhúng WebView nhỏ (WKWebView không nạp lại URL có start= về trễ).
-      // Dùng đúng cơ chế tab Live: mở trang /live/watch full màn với item = trận
-      // (getMatchPublic đã kèm streams có embedUrl ?start=N) → tua thẳng tới trận.
+      // YouTube: xem INLINE màn nhỏ bằng URL nhúng ĐÃ kèm ?start=N lấy từ backend
+      // (freshEmbedUrl, fetch ở trên). Mount WebView CHỈ KHI đã có URL → lần nạp đầu đúng
+      // mốc, không cần xoay ngang. Có nút nhỏ mở full màn (/live/watch) nếu muốn.
+      const inlineUrl = freshEmbedUrl
+        ? freshEmbedUrl +
+          (/[?&]playsinline=/.test(freshEmbedUrl)
+            ? ""
+            : (freshEmbedUrl.includes("?") ? "&" : "?") + "playsinline=1")
+        : "";
       const idm = String(stream.embedUrl || stream.url || "").match(
         /(?:embed\/|[?&]v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/,
       );
@@ -1411,6 +1437,42 @@ const StreamPlayer = memo(({ stream, match }) => {
         });
         router.push(`/live/watch?id=${encodeURIComponent(id)}`);
       };
+      if (inlineUrl) {
+        return (
+          <AspectBox ratio={ratio}>
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+              <WebView
+                key={inlineUrl}
+                source={{
+                  html: buildFramedHtml(inlineUrl, stream.allow),
+                  baseUrl: EMBED_BASE_URL,
+                }}
+                originWhitelist={["*"]}
+                style={{ flex: 1, backgroundColor: "#000" }}
+                allowsFullscreenVideo
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled
+                domStorageEnabled
+              />
+              {/* Nút nhỏ mở full màn (tuỳ chọn), không bắt buộc xoay ngang */}
+              <TouchableOpacity
+                onPress={openFullscreen}
+                hitSlop={8}
+                style={{
+                  position: "absolute", top: 6, right: 6,
+                  width: 32, height: 32, borderRadius: 16,
+                  backgroundColor: "rgba(0,0,0,0.45)",
+                  alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <MaterialIcons name="fullscreen" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </AspectBox>
+        );
+      }
+      // Đang lấy URL kèm start= → thumbnail + loading; bấm vẫn mở được full màn.
       return (
         <AspectBox ratio={ratio}>
           <TouchableOpacity
@@ -1433,15 +1495,7 @@ const StreamPlayer = memo(({ stream, match }) => {
                 justifyContent: "center",
               }}
             >
-              <View
-                style={{
-                  width: 68, height: 68, borderRadius: 34,
-                  backgroundColor: "rgba(255,0,0,0.92)",
-                  alignItems: "center", justifyContent: "center",
-                }}
-              >
-                <MaterialIcons name="play-arrow" size={44} color="#fff" />
-              </View>
+              <ActivityIndicator size="large" color="#fff" />
             </View>
           </TouchableOpacity>
         </AspectBox>
